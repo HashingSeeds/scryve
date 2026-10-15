@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
-import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
+import { AccessibilityInfo, Platform, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, {
   cancelAnimation,
   Easing,
@@ -42,11 +42,14 @@ import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
+  cornerOffset,
+  getDeltaFontSizeThatFits,
   getLifeLineHeight,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
+  type LifeCardScreenEdges,
 } from "../playerCardTypes"
 import {
   SeatIdentity,
@@ -66,6 +69,7 @@ export interface PokemonSeatCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   disabled?: boolean
@@ -83,6 +87,9 @@ const KNOCKOUT_TOAST_MS = 6_000
 const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
 const BENCH_HEIGHT = 56
+const CUTOUT_ENDS_ABOVE_INSET = 11
+const NAME_LINE_HEIGHT = 26
+const NAME_MAX_FONT_SCALE = 1.3
 const COMPACT_BENCH_HEIGHT = 44
 const PRIZE_PIP_ASPECT = 4 / 5
 const HERO_CAPTION_HEIGHT = 44
@@ -110,6 +117,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   dice,
   contentRotation = 0,
   contentInsets,
+  screenEdges,
   menuCorner,
   menuEdgeCenter,
   disabled,
@@ -125,6 +133,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     themed,
     theme: { spacing },
   } = useAppTheme()
+  const { fontScale } = useWindowDimensions()
   const ink = accessibleForeground(color)
   const board = pokemonBoardOf(table.table, playerId)
   const rules = table.tableRules.pokemon ?? { benchSize: 5, damageStep: 10 }
@@ -150,12 +159,24 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     Math.max(identityMetrics.edge, menu - inset) - padding
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
-  const bottomRowLift =
-    seatIdentityBottomGap(
-      identityMetrics.edge,
-      insets.bottom,
-      CONTENT_EDGES[contentRotation].bottom,
-    ) - padding
+  const edges = CONTENT_EDGES[contentRotation]
+  // why: boards hide the status bar, and a camera cutout ends at least 11pt above its inset, so a full-width seat's row rises until its name line meets that line: the mark and prizes sit in the corners beside the cutout. Dice chips and the stale line are taller than the name, so the row stays put while they show.
+  const besideCutout =
+    edges.bottom !== "bottom" &&
+    insets.bottom > 0 &&
+    !!screenEdges?.[edges.left] &&
+    !!screenEdges[edges.right] &&
+    !diceChips?.length &&
+    staleSince === undefined
+  const nameLine = NAME_LINE_HEIGHT * Math.min(fontScale, NAME_MAX_FONT_SCALE)
+  const bottomRowLift = besideCutout
+    ? Math.max(
+        cornerOffset(identityMetrics.edge, edges.bottom, edges.left, contentInsets, screenEdges),
+        insets.bottom - CUTOUT_ENDS_ABOVE_INSET + nameLine / 2 - prizeRowHeight / 2,
+      ) -
+      insets.bottom -
+      padding
+    : seatIdentityBottomGap(identityMetrics.edge, insets.bottom, edges.bottom) - padding
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -590,23 +611,30 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             onLongPress={putPrizeBack}
             style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
           >
+            {/* why: a two-wide flexWrap grid can wrap after every pip when Yoga's float sums overshoot its width, standing the cards in one line. */}
             <View
-              style={[$prizeGrid, { width: pip.width * 2 + pip.gap, gap: pip.gap }]}
+              style={{ gap: pip.gap }}
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
-              {Array.from({ length: prizePips }, (_, index) => (
-                <View
-                  key={index}
-                  testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
-                  style={[
-                    $prizePip,
-                    { width: pip.width, height: pip.height },
-                    index < prizes
-                      ? { backgroundColor: ink }
-                      : [$prizePipGone, { borderColor: tint(0.45) }],
-                  ]}
-                />
+              {Array.from({ length: Math.ceil(prizePips / 2) }, (_, row) => (
+                <View key={row} style={[$prizeRow, { gap: pip.gap }]}>
+                  {[row * 2, row * 2 + 1]
+                    .filter((index) => index < prizePips)
+                    .map((index) => (
+                      <View
+                        key={index}
+                        testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
+                        style={[
+                          $prizePip,
+                          { width: pip.width, height: pip.height },
+                          index < prizes
+                            ? { backgroundColor: ink }
+                            : [$prizePipGone, { borderColor: tint(0.45) }],
+                        ]}
+                      />
+                    ))}
+                </View>
               ))}
             </View>
           </BoardPressable>
@@ -778,7 +806,12 @@ function PokemonHero({
   onEdit: () => void
   onHoldChange: (held: boolean) => void
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
+  const { fontScale } = useWindowDimensions()
+  const [heroWidth, setHeroWidth] = useState(0)
   const remaining = remainingHp(pokemon)
   const name = pokemonName(pokemon)
   const slotLabel = bench ? `Bench, ${name}` : name
@@ -796,16 +829,21 @@ function PokemonHero({
     { direction: -1, glyph: "−", align: "flex-start" as const },
     { direction: 1, glyph: "+", align: "flex-end" as const },
   ]
+  const recentHp = -recentDelta
   return (
-    <View testID={`pokemon-hero-seat-${seatNumber}`} style={themed($hero)}>
+    <View
+      testID={`pokemon-hero-seat-${seatNumber}`}
+      onLayout={(event) => setHeroWidth(event.nativeEvent.layout.width)}
+      style={themed($hero)}
+    >
       {interactive ? (
         <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, themed($zones)]}>
           {zones.map(({ direction, glyph, align }) => {
-            const delta = direction * step
-            const feedback =
-              direction * recentDelta > 0
-                ? `${recentDelta > 0 ? "+" : "-"}${Math.abs(recentDelta)}`
-                : glyph
+            const delta = -direction * step
+            const showingDelta = direction * recentHp > 0
+            const feedback = showingDelta
+              ? `${recentHp > 0 ? "+" : "-"}${Math.abs(recentHp)}`
+              : glyph
             return (
               <BoardPressable
                 key={delta}
@@ -844,7 +882,21 @@ function PokemonHero({
                   text={feedback}
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
-                  style={[themed(compact ? $compactGlyph : $glyph), { color: ink }]}
+                  style={[
+                    themed(compact ? $compactGlyph : $glyph),
+                    showingDelta && {
+                      fontSize: getDeltaFontSizeThatFits({
+                        text: feedback,
+                        baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
+                        run: heroWidth,
+                        inset: spacing.xs,
+                        lifeFontSize: fontSize,
+                        lifeDigits: String(remaining).length,
+                        fontScale,
+                      }),
+                    },
+                    { color: ink },
+                  ]}
                 />
               </BoardPressable>
             )
@@ -1088,7 +1140,7 @@ const $chipPip: ViewStyle = { width: 5, height: 7, borderRadius: 1, opacity: 0.8
 const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 3, opacity: 0.85 }
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
-const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
+const $prizeRow: ViewStyle = { flexDirection: "row" }
 const $identity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
@@ -1190,8 +1242,18 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
   borderRadius: 12,
 })
-const $glyph: ThemedStyle<TextStyle> = () => ({ fontSize: 44, lineHeight: 50, opacity: 0.6 })
-const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 30, lineHeight: 34, opacity: 0.6 })
+const GLYPH_SIZE = 44
+const COMPACT_GLYPH_SIZE = 30
+const $glyph: ThemedStyle<TextStyle> = () => ({
+  fontSize: GLYPH_SIZE,
+  lineHeight: 50,
+  opacity: 0.6,
+})
+const $compactGlyph: ThemedStyle<TextStyle> = () => ({
+  fontSize: COMPACT_GLYPH_SIZE,
+  lineHeight: 34,
+  opacity: 0.6,
+})
 const $bottomRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

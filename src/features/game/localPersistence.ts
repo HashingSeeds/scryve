@@ -28,6 +28,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "./playSystems"
+import { isRoundClockSetup, type RoundClock } from "./roundClock"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -356,6 +357,31 @@ function parseMatch(value: unknown, seatCount: number): LocalGameMatch | undefin
   }
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value)
+}
+
+const ROUND_CLOCK_NUMBERS = [
+  "pausedAt",
+  "adjustMs",
+  "calledAtMs",
+  "turn",
+  "bonusTurns",
+] as const satisfies readonly (keyof RoundClock)[]
+
+function parseRoundClock(value: unknown): RoundClock | undefined {
+  if (!isRecord(value) || !isFiniteNumber(value.startedAt)) return undefined
+  if (!isRoundClockSetup(value.setup)) return undefined
+  const clock: RoundClock = { setup: value.setup, startedAt: value.startedAt }
+  for (const key of ROUND_CLOCK_NUMBERS) {
+    const field = value[key]
+    if (field === undefined) continue
+    if (!isFiniteNumber(field)) return undefined
+    clock[key] = field
+  }
+  return clock
+}
+
 function parseSkippedBy(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
   const ids = value.filter((id): id is string => typeof id === "string" && id.length > 0)
@@ -397,6 +423,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const table = parseTableState(value.table)
   const account = parseAccount(value.account)
   const match = parseMatch(value.match, players.length)
+  const clock = parseRoundClock(value.clock)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -419,6 +446,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(result ? { result } : {}),
     ...(account ? { account } : {}),
     ...(match ? { match } : {}),
+    ...(clock ? { clock } : {}),
     ...(Number.isInteger(value.firstChooserSeat) &&
     typeof value.firstChooserSeat === "number" &&
     value.firstChooserSeat >= 0 &&

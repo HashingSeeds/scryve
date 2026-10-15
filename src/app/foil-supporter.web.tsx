@@ -37,7 +37,7 @@ export default function FoilSupporterRoute() {
           title: "Foil Supporter",
           collapseTitle: false,
           leftTx: "common:back",
-          onLeftPress: () => router.replace("/"),
+          onLeftPress: () => router.dismissTo("/"),
         }}
       >
         <View style={$content}>

@@ -37,7 +37,7 @@ export default function DevSeedRoute() {
         heading="Seed failed"
         content={error}
         button="Open Play"
-        buttonOnPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+        buttonOnPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
       />
     </Screen>
   )

@@ -44,16 +44,34 @@ const PENTAGON_FACE = { top: "#46434E", bottom: "#26242C" } as const
 const PENTAGON_GLYPH = "#FFFFFF"
 const PENTAGON_GLYPH_PX_PER_UNIT = 0.8
 
-function regularPolygonPoints(radius: number): string {
+// The app's softened corners (buildSoftCorners): each corner is a quadratic curve that starts and
+// ends `cornerRadius` along its two sides, so the pentagon is rounded, not pointy.
+const PENTAGON_CORNER_RADIUS = 9
+const FACE_CORNER_RADIUS = PENTAGON_CORNER_RADIUS * 0.9
+
+function softPentagonPath(radius: number, cornerRadius: number): string {
   const center = PENTAGON_VIEWBOX / 2
-  return Array.from({ length: 5 }, (_, corner) => {
+  const tips = Array.from({ length: 5 }, (_, corner) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * corner) / 5
-    return `${(center + radius * Math.cos(angle)).toFixed(2)},${(center + radius * Math.sin(angle)).toFixed(2)}`
-  }).join(" ")
+    return { x: center + radius * Math.cos(angle), y: center + radius * Math.sin(angle) }
+  })
+  const share = Math.min(cornerRadius / (2 * radius * Math.sin(Math.PI / 5)), 0.45)
+  type Point = (typeof tips)[number]
+  const towards = (from: Point, to: Point) => ({
+    x: from.x + (to.x - from.x) * share,
+    y: from.y + (to.y - from.y) * share,
+  })
+  const point = ({ x, y }: Point) => `${x.toFixed(2)},${y.toFixed(2)}`
+  const corners = tips.map((tip, corner) => {
+    const enter = towards(tip, tips[(corner + 4) % 5] ?? tip)
+    const exit = towards(tip, tips[(corner + 1) % 5] ?? tip)
+    return `${corner === 0 ? "M" : "L"}${point(enter)} Q${point(tip)} ${point(exit)}`
+  })
+  return `${corners.join(" ")} Z`
 }
 
-const PENTAGON_POINTS = regularPolygonPoints(PENTAGON_RADIUS)
-const PENTAGON_FACE_POINTS = regularPolygonPoints(PENTAGON_RADIUS - PENTAGON_STROKE_WIDTH / 2)
+const PENTAGON_PATH = softPentagonPath(PENTAGON_RADIUS, PENTAGON_CORNER_RADIUS)
+const FACE_PATH = softPentagonPath(PENTAGON_RADIUS - PENTAGON_STROKE_WIDTH / 2, FACE_CORNER_RADIUS)
 
 // The app's glyph is 16x2px bars spaced 5px apart; convert to viewBox units.
 const GLYPH_BARS = [-5, 0, 5]
@@ -69,11 +87,33 @@ let pentagonCount = 0
 
 function pentagonSvg(): string {
   const gradient = `pentagon-fill-${pentagonCount++}`
-  return `<svg viewBox="0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}" aria-hidden="true"><defs><linearGradient id="${gradient}" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="${PENTAGON_FACE.top}"/><stop offset="1" stop-color="${PENTAGON_FACE.bottom}"/></linearGradient></defs><polygon points="${PENTAGON_POINTS}" fill="url(#${gradient})" stroke="${PENTAGON_BORDER}" stroke-width="${PENTAGON_STROKE_WIDTH}" stroke-linejoin="round"/><polygon points="${PENTAGON_FACE_POINTS}" fill="none" stroke="${PENTAGON_BORDER}" stroke-opacity="0.22" stroke-width="1.4" stroke-linejoin="round"/>${GLYPH_BARS}</svg>`
+  return `<svg viewBox="0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}" aria-hidden="true"><defs><linearGradient id="${gradient}" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="${PENTAGON_FACE.top}"/><stop offset="1" stop-color="${PENTAGON_FACE.bottom}"/></linearGradient></defs><path d="${PENTAGON_PATH}" fill="url(#${gradient})" stroke="${PENTAGON_BORDER}" stroke-width="${PENTAGON_STROKE_WIDTH}" stroke-linejoin="round"/><path d="${FACE_PATH}" fill="none" stroke="${PENTAGON_BORDER}" stroke-opacity="0.22" stroke-width="1.4" stroke-linejoin="round"/>${GLYPH_BARS}</svg>`
 }
 
 // Matches the app (LifeCard DELTA_VISIBLE_MS): how long the running change shows in a glyph.
 const DELTA_VISIBLE_MS = 1800
+// The smallest a running change shrinks, and the gap it keeps from the total. The demo's seats run
+// smaller than the app's, so its floor sits below the app's 12.
+const DELTA_FONT_MIN_PX = 9
+const DELTA_LIFE_GAP_PX = 4
+
+// A running change keeps its glyph's spot, shrinking to the room between the total and the edge.
+// Offsets ignore the seat's rotation, so this measures along the seat's own reading direction.
+function fitDeltas(root: Element) {
+  for (const glyph of root.querySelectorAll<HTMLElement>(".glyph")) {
+    glyph.style.fontSize = ""
+    const parent = glyph.parentElement
+    const total = parent?.querySelector<HTMLElement>(".life, .pk-hp")
+    if (!glyph.classList.contains("delta") || !parent || !total) continue
+    const inset = glyph.classList.contains("plus")
+      ? parent.clientWidth - glyph.offsetLeft - glyph.offsetWidth
+      : glyph.offsetLeft
+    const room = (parent.clientWidth - total.offsetWidth) / 2 - inset - DELTA_LIFE_GAP_PX
+    if (glyph.offsetWidth <= room) continue
+    const size = parseFloat(getComputedStyle(glyph).fontSize)
+    glyph.style.fontSize = `${Math.max(DELTA_FONT_MIN_PX, (size * room) / glyph.offsetWidth)}px`
+  }
+}
 
 export function seatColor(seat: number): string {
   return PLAYER_COLOR_CHOICES[seat % PLAYER_COLOR_CHOICES.length] ?? PLAYER_COLOR_CHOICES[0]
@@ -192,6 +232,15 @@ export function createDemoGame(initial: DemoGameSetup) {
       history.length = 0
       emit({ type: "reset" })
     },
+    // The whole game as it stands, for `restore` to put back after a demo borrows the board.
+    snapshot() {
+      return { setup, life, table }
+    },
+    restore(saved: { setup: typeof setup; life: typeof life; table: typeof table }) {
+      ;({ setup, life, table } = saved)
+      history.length = 0
+      emit({ type: "reset" })
+    },
   }
 }
 
@@ -253,6 +302,31 @@ const APP_MARK_SHAPES: Record<PlayerMarkShape, string> = {
     '<path d="M21.04 8.4a2.5 2.5 0 0 1 1.92 0l9.5 3.96A2.5 2.5 0 0 1 34 14.67V23c0 6-5 10-12 14-7-4-12-8-12-14v-8.33a2.5 2.5 0 0 1 1.54-2.31Z"/>',
   heart:
     '<path d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"/>',
+}
+
+// Each shape's drawn edges on its 44 unit box (PlayerMark's MARK_ART_BOUNDS).
+const MARK_ART_BOUNDS: Record<
+  PlayerMarkShape,
+  { top: number; bottom: number; left: number; right: number }
+> = {
+  circle: { top: 10, bottom: 34, left: 10, right: 34 },
+  triangle: { top: 8.56, bottom: 34.5, left: 7.59, right: 36.41 },
+  square: { top: 11, bottom: 33, left: 11, right: 33 },
+  diamond: { top: 9.04, bottom: 34.96, left: 9.04, right: 34.96 },
+  star: { top: 8.43, bottom: 35.06, left: 8.08, right: 35.92 },
+  hexagon: { top: 8.39, bottom: 35.61, left: 9.88, right: 34.12 },
+  plus: { top: 8, bottom: 36, left: 8, right: 36 },
+  shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
+  heart: { top: 9.15, bottom: 34.84, left: 8, right: 36 },
+}
+
+// A mark cropped to its drawn edges, so the shape itself, not its box, lines up with what sits
+// beside it (SeatIdentity's seatMarkArt). Its width follows the shape.
+export function croppedMarkSvg(shape: PlayerMarkShape, fill: string): string {
+  const { top, bottom, left, right } = MARK_ART_BOUNDS[shape]
+  const width = (right - left).toFixed(2)
+  const height = (bottom - top).toFixed(2)
+  return `<svg viewBox="${left} ${top} ${width} ${height}" width="${width}" height="${height}" fill="${fill}" aria-hidden="true">${APP_MARK_SHAPES[shape]}</svg>`
 }
 
 // Where the sword sits inside each shape (PlayerMark's SWORD_INSET_THAT_FITS_SHAPE).
@@ -394,7 +468,7 @@ export function createCommanderDemo(
     later(COMMANDER_DEMO_FADE_MS, () => el.remove())
   }
 
-  // Hands the demo's damage back, one point at a time so the life counts up.
+  // Hands one point of the demo's damage back, so a replay starts from the same board.
   function giveBack(): boolean {
     for (const [seat, count] of owed) {
       game.change(seat, 1)
@@ -404,10 +478,6 @@ export function createCommanderDemo(
     }
     return owed.size > 0
   }
-  function drain() {
-    if (giveBack()) later(45, drain)
-  }
-
   function play() {
     clearTimers()
     layers().forEach((el) => el.remove())
@@ -519,7 +589,6 @@ export function createCommanderDemo(
       clearTimers()
       dropHints()
       layers().forEach(fadeOut)
-      drain()
     },
   }
 }
@@ -535,7 +604,7 @@ function seatInnerHtml(game: DemoGame, seat: number, interactive: boolean) {
     ? `<button class="hit minus" data-seat="${seat}" data-dir="-1" aria-label="${name}, minus"></button><button class="hit plus" data-seat="${seat}" data-dir="1" aria-label="${name}, plus"></button>`
     : ""
   return `<span class="glyph minus" data-glyph="${seat}:-1">−</span>
-      <span class="center"><span class="life" data-life="${seat}" data-digits="${String(value).length}">${value}</span><span class="delta-above" data-above="${seat}"></span></span>
+      <span class="center"><span class="life" data-life="${seat}" data-digits="${String(value).length}">${value}</span></span>
       <span class="glyph plus" data-glyph="${seat}:1">+</span>
       <span class="who">${markSvg(seatShape(seat), "#fff")}<span>${name}</span></span>
       ${controls}`
@@ -551,7 +620,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     return pokemon.html({
       ...placement,
       name: seatName(game, placement.seat),
-      mark: markSvg(seatShape(placement.seat), "#fff"),
+      mark: croppedMarkSvg(seatShape(placement.seat), "#fff"),
     })
   }
 
@@ -593,6 +662,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       ? (document.activeElement as HTMLElement).dataset
       : undefined
     inner.innerHTML = pokemonHtml(placement)
+    fitDeltas(inner)
     if (!focused?.pk) return
     const id = focused.id ? `[data-id="${focused.id}"]` : ""
     const dir = focused.dir ? `[data-dir="${focused.dir}"]` : ""
@@ -601,14 +671,8 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       ?.focus({ preventScroll: true })
   }
 
-  // Like the app's LifeControls: the running change replaces the glyph on its side, or sits
-  // above the total for a calculator counter (RecentDeltaLabel), whose amounts run long.
+  // Like the app's LifeControls: the running change replaces the glyph on its side.
   function showGlyphs(seat: number, total: number) {
-    if (playSystemRules(game.setup.system).counter.calculator) {
-      const above = el.querySelector<HTMLElement>(`[data-above="${seat}"]`)
-      if (above) above.textContent = total ? `${total > 0 ? "+" : "−"}${Math.abs(total)}` : ""
-      return
-    }
     for (const direction of [-1, 1] as const) {
       const glyph = el.querySelector<HTMLElement>(`[data-glyph="${seat}:${direction}"]`)
       if (!glyph) continue
@@ -620,6 +684,8 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
           : "−"
       glyph.classList.toggle("delta", showing)
     }
+    const inner = el.querySelector(`.seat[data-player="${seat}"] .seat-in`)
+    if (inner) fitDeltas(inner)
   }
 
   function showChange(seat: number, delta: number) {

@@ -74,6 +74,35 @@ export function getLifeFontSizeThatFits(input: {
   return Math.max(LIFE_FONT_MIN, Math.min(LIFE_FONT_MAX, Math.floor(Math.min(byWidth, byHeight))))
 }
 
+const DELTA_FONT_MIN = 12
+const DELTA_LIFE_GAP = 4
+
+function lifeTextScale(fontScale: number) {
+  return Math.min(Math.max(fontScale, 0.1), LIFE_MAX_FONT_SCALE)
+}
+
+export function getDeltaTextWidth(text: string, fontSize: number, fontScale: number) {
+  return text.length * LIFE_DIGIT_ASPECT * fontSize * lifeTextScale(fontScale)
+}
+
+// why: the running change keeps its +/− slot beside the total, so it shrinks to the room left between the total and the slot's edge.
+export function getDeltaFontSizeThatFits(input: {
+  text: string
+  baseSize: number
+  run: number
+  inset: number
+  lifeFontSize: number
+  lifeDigits: number
+  fontScale: number
+}): number {
+  if (!(input.run > 0)) return input.baseSize
+  const lifeWidth =
+    input.lifeDigits * LIFE_DIGIT_ASPECT * input.lifeFontSize * lifeTextScale(input.fontScale)
+  const room = input.run / 2 - lifeWidth / 2 - input.inset - DELTA_LIFE_GAP
+  const fits = room / getDeltaTextWidth(input.text, 1, input.fontScale)
+  return Math.max(DELTA_FONT_MIN, Math.min(input.baseSize, Math.floor(fits)))
+}
+
 export function getLifeTargetTextSpace(targetSize: number) {
   return Math.max(targetSize - LIFE_TARGET_TEXT_INSET * 2, 1)
 }

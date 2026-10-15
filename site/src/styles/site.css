@@ -243,21 +243,6 @@ figure {
   font-size: calc(min(100cqw, 100cqh) * 0.34);
 }
 
-/* A calculator counter's running change, just above its total (the app's RecentDeltaLabel). */
-.delta-above {
-  position: absolute;
-  bottom: calc(50% + min(100cqw, 100cqh) * 0.12);
-  left: 0;
-  right: 0;
-  color: #fff;
-  font-size: calc(min(100cqw, 100cqh) * 0.075);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  line-height: 1;
-  pointer-events: none;
-  text-align: center;
-}
-
 .glyph {
   position: absolute;
   top: 50%;
@@ -314,6 +299,11 @@ figure {
   --u: min(var(--w), var(--h));
   --pad: calc(var(--u) * 0.045);
   --small: clamp(6px, calc(var(--u) * 0.042), 13px);
+  /* The prize grid: three rows of whole-pixel cards, so every row draws the same height. Small
+     seats keep 3px cards, so a phone-width board still draws cards rather than dots. */
+  --pip-gap: max(1px, round(down, var(--u) * 0.008, 1px));
+  --pip: max(3px, round((var(--u) * 0.12 - var(--pip-gap) * 2) / 3, 1px));
+  --prizes: calc(var(--pip) * 3 + var(--pip-gap) * 2);
   position: absolute;
   display: flex;
   inset: 0;
@@ -337,8 +327,9 @@ figure {
 }
 
 .pk-bench {
+  --bench: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
   display: flex;
-  height: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
+  height: var(--bench);
   flex: none;
   gap: calc(var(--u) * 0.018);
 }
@@ -378,11 +369,12 @@ figure {
 }
 
 .pk .pk-chip {
+  --bar: max(1px, calc(var(--bench) * 0.055));
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: calc(var(--u) * 0.014) calc(var(--u) * 0.024);
+  padding: calc(var(--bench) * 0.05) calc(var(--u) * 0.024) calc(var(--bar) * 3);
   border: 1px solid rgb(255 255 255 / 30%);
   text-align: left;
 }
@@ -396,14 +388,14 @@ figure {
   width: 100%;
   flex: none;
   line-height: 1.2;
-  font-size: clamp(5px, calc(var(--u) * 0.032), 11px);
+  font-size: clamp(5px, calc(var(--bench) * 0.19), 11px);
   opacity: 0.85;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .pk-chip b {
-  font-size: calc(var(--u) * 0.07);
+  font-size: calc(var(--bench) * 0.38);
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
 }
@@ -428,7 +420,7 @@ figure {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 3px;
+  height: var(--bar);
   background: #fff;
   opacity: 0.85;
 }
@@ -544,9 +536,11 @@ figure {
   opacity: 0.7;
 }
 
+/* The mark and the prize grid are the same height and share their outer edge, as in the app's
+   bottom row. */
 .pk-foot {
   display: flex;
-  height: calc(var(--u) * 0.12);
+  height: max(calc(var(--u) * 0.12), var(--prizes));
   flex: none;
   align-items: center;
   justify-content: space-between;
@@ -558,29 +552,35 @@ figure {
   min-width: 0;
 }
 
+/* The mark is cropped to its drawn edges (croppedMarkSvg), so the shape is the grid's height.
+   The name keeps its size and centers against it. */
+.pk .who svg {
+  width: auto;
+  height: var(--prizes);
+  flex: none;
+}
+
 .pk .pk-prizes {
-  height: 100%;
+  height: var(--prizes);
   padding: 0 2px;
   border-radius: 6px;
 }
 
+/* Two by three like the app's prize grid, as tall as the mark beside it. */
 .pk-pips {
   display: grid;
-  height: 100%;
-  gap: 2px;
-  grid-auto-rows: 1fr;
-  grid-template-columns: repeat(2, auto);
+  gap: var(--pip-gap);
+  grid-auto-rows: var(--pip);
+  grid-template-columns: repeat(2, max(2px, round(var(--pip) * 0.8, 1px)));
 }
 
 .pk-pips i {
-  height: 100%;
-  aspect-ratio: 4 / 5;
-  border-radius: 2px;
+  border-radius: max(0.5px, calc(var(--pip) * 0.16));
   background: #fff;
 }
 
 .pk-pips i.gone {
-  border: 1.5px solid rgb(255 255 255 / 45%);
+  border: max(0.5px, calc(var(--pip) * 0.12)) solid rgb(255 255 255 / 45%);
   background: none;
 }
 
@@ -1075,6 +1075,22 @@ figure {
   background: transparent;
   color: var(--tint);
   cursor: pointer;
+}
+
+/* The details step swaps its heading and copy with the demo it shows. */
+.demo-copy:not([hidden]) {
+  display: contents;
+}
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.demo-controls .demo-replay {
+  align-self: auto;
 }
 
 .step-copy {

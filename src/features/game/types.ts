@@ -1,5 +1,6 @@
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { PlaySystemId } from "./playSystems"
+import type { RoundClock } from "./roundClock"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
@@ -107,6 +108,8 @@ export interface LocalGame {
   result?: LocalGameResult
   account?: LocalGameAccount
   match?: LocalGameMatch
+  /** why: a match's games share one round clock, so the next game carries it over unchanged. */
+  clock?: RoundClock
   firstChooserSeat?: number
   firstPlayerOffered?: true
 }

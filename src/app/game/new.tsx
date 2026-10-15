@@ -153,7 +153,8 @@ export default function NewLocalGameRoute() {
           }
           if (current) localGameRepository.clearActiveGame()
           if (setup.account) localGameRepository.saveMeSeat(setup.account.meSeat)
-          router.replace({
+          // why: setup sits above the board it came from, so replacing it would stack a second board that never unmounts.
+          router.dismissTo({
             pathname: "/",
             params: {
               destination: "play",

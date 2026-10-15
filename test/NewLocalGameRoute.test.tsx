@@ -39,7 +39,7 @@ jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
   },
 }))
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
+  router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (effect: () => void) => {
     jest.requireActual<typeof import("react")>("react").useEffect(effect, [effect])
@@ -118,7 +118,7 @@ describe("new local game route", () => {
     )
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(localGameRepository.loadActiveGame()).toBeNull()
-    expect(router.replace).toHaveBeenCalledWith(
+    expect(router.dismissTo).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: "/",
         params: expect.objectContaining({ destination: "play" }),
@@ -256,7 +256,7 @@ describe("new local game route", () => {
     expect(view.getByTestId("start-game-button")).toBeEnabled()
     expect(router.replace).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("start-game-button"))
-    expect(router.replace).toHaveBeenCalledWith(
+    expect(router.dismissTo).toHaveBeenCalledWith(
       expect.objectContaining({
         params: expect.objectContaining({ prepared: expect.stringContaining('"startingLife":21') }),
       }),
@@ -439,7 +439,7 @@ describe("new local game route while signed in", () => {
     fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
     fireEvent.press(view.getByTestId("start-game-button"))
 
-    const call = (router.replace as jest.Mock).mock.calls.at(-1)?.[0] as {
+    const call = (router.dismissTo as jest.Mock).mock.calls.at(-1)?.[0] as {
       params: { prepared: string }
     }
     const prepared = JSON.parse(call.params.prepared) as Parameters<typeof createLocalGame>[0]

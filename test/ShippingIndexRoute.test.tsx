@@ -181,6 +181,34 @@ describe("shipping index route", () => {
     expect(view.getAllByText("8000")).toHaveLength(2)
   })
 
+  it("shows the newly prepared game when setup returns to the mounted board", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+    expect(view.getByLabelText("2 player life grid")).toBeTruthy()
+
+    mockSearchParams = {
+      destination: "play",
+      prepared: JSON.stringify({
+        players: PLAYER_COLORS.slice(0, 3).map((color, index) => ({
+          name: `Player ${index + 1}`,
+          color,
+        })),
+        startingLife: 30,
+      }),
+    }
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByLabelText("3 player life grid")).toBeTruthy()
+    expect(view.getAllByText("30")).toHaveLength(3)
+  })
+
   it("picks up a launch destination saved while it stayed mounted", () => {
     const view = render(
       <ThemeProvider initialContext="light">

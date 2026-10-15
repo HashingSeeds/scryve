@@ -19,6 +19,7 @@ import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import {
   canContinueMatch,
   drawsLabel,
@@ -35,6 +36,7 @@ import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { supportsCommanderDamage } from "@/features/game/playSystems"
+import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import type {
   GamePlayer,
   LocalGame,
@@ -100,8 +102,13 @@ export function CurrentGameScreen({
   )
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
+  const [clockOpen, setClockOpen] = useState(false)
+  const openClock = useCallback(() => setClockOpen(true), [])
+  const closeClock = useCallback(() => setClockOpen(false), [])
+  const clock = runtime.game.clock
   const isFresh = runtime.game.id !== resumedGameId && !hasLocalGameStarted(runtime.game)
   const match = runtime.game.match
+  const matchLine = matchContextLabel(runtime.game)
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
@@ -451,17 +458,29 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {match && !menuOpen ? (
-        <View pointerEvents="none" style={[themed($matchLayer), { top: insets.top + 4 }]}>
-          <Text
-            testID="match-context"
-            accessibilityLabel={`${matchContextLabel(runtime.game)}, best of ${match.bestOf}`}
-            size="xxs"
-            weight="medium"
-            text={matchContextLabel(runtime.game)}
-            style={themed($matchContextText)}
-          />
-        </View>
+      {(match || clock) && !menuOpen ? (
+        <BoardContextLabels
+          match={
+            match && matchLine
+              ? { line: matchLine, accessibilityLabel: `${matchLine}, best of ${match.bestOf}` }
+              : undefined
+          }
+          clock={clock}
+          system={system}
+          top={insets.top}
+          bottom={insets.bottom}
+          onClockPress={clock && runtime.game.status === "active" ? openClock : undefined}
+        />
+      ) : null}
+
+      {clockOpen && clock ? (
+        <RoundClockDialog
+          clock={clock}
+          system={system}
+          players={runtime.game.players}
+          onChange={runtime.changeClock}
+          onClose={closeClock}
+        />
       ) : null}
 
       {endSource ? (
@@ -584,18 +603,6 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
-const $matchLayer: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  left: 0,
-  right: 0,
-  zIndex: 60,
-  elevation: 60,
-  alignItems: "center",
-})
-const $matchContextText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.neutral100,
-  opacity: 0.8,
-})
 const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

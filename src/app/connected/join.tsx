@@ -6,7 +6,7 @@ import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 export default function JoinRoute() {
   const { code } = useLocalSearchParams<{ code?: string }>()
   return (
-    <CloudScreen multiplayer onBack={() => router.replace("/")}>
+    <CloudScreen multiplayer onBack={() => router.dismissTo("/")}>
       {(access) => (
         <JoinConnectedScreen
           access={access}

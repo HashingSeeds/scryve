@@ -1,7 +1,7 @@
 # goldie.config.ts
 
-One file holds everything app-specific. It exports a configuration object. When Goldie is installed locally,
-its package exports the optional `GoldieConfig` type. Every relative path in it resolves against the config
+One file holds everything app-specific. It exports a `GoldieConfig` (type from
+`$GOLDIE/src/config.ts`). Every relative path in it resolves against the config
 file itself, and `out/` is created next to it. Scene flows are the exception:
 they are argent flow names resolved against `flowsDir`, which defaults to
 `.argent/flows` inside `appRoot`.
@@ -9,28 +9,43 @@ they are argent flow names resolved against `flowsDir`, which defaults to
 ## Annotated example
 
 ```ts
+import type { GoldieConfig } from "/Users/<you>/Dev/goldie/src/config.ts";
+
 const APP_ROOT = "/absolute/path/to/the/app/repo";
 
-const config = {
+const config: GoldieConfig = {
   appRoot: APP_ROOT,
   // The Release simulator build found in Step 1. Absolute path.
   appPath: `${process.env.HOME}/Library/Developer/Xcode/DerivedData/<App>-<hash>/Build/Products/Release-iphonesimulator/<App>.app`,
   bundleId: "com.example.app",
 
-  devices: ["iphone-6.9"],       // keys from $GOLDIE/src/specs.ts
-  locales: ["en-US"],
-  appearance: "dark",           // simulator appearance for every capture
+  // Google Play too: add "pixel-10-pro" and the android block below. Scenes
+  // and flows are shared across devices; argent flows replay on Android when
+  // their selectors match. The emulator must already be running.
+  // android: { appPath: "/path/to/app-release.apk", applicationId: "com.example.app" },
 
-  // Bundled bezels: "17-pro-silver" | "17-pro-blue" | "17-pro-orange".
-  // Pick the finish that contrasts with the background.
-  frame: { variant: "17-pro-blue" },
+  // "iphone-6.9" (iPhone 17 Pro Max), "ipad-13" (iPad Pro 13-inch), "pixel-10-pro" (Google Play); keys from $GOLDIE/src/specs.ts.
+  // Every device replays the same flows and gets its own raw captures, output folder and studio view.
+  devices: ["iphone-6.9", "ipad-13"],
+  locales: ["en-US"],
+  // Capture each locale in its own language (iOS): the flows replay once per locale with the
+  // simulator pinned to it, into out/raw/<device>/<locale>/. Off: one capture, in the first locale.
+  // localizedCaptures: true,
+  appearance: "light",           // simulator appearance for every capture
+
+  // Bundled bezels: "17-pro-silver" | "17-pro-blue" | "17-pro-orange" for the iPhone,
+  // "ipad-pro-13-silver" | "ipad-pro-13-space-gray" for the iPad. Pick the finish
+  // that contrasts with the background. One variant applies to its own device and
+  // the others keep their first variant; or give one per device key. The android
+  // device is framed with the bundled Pixel 10 Pro bezel instead.
+  frame: { variant: { "iphone-6.9": "17-pro-blue", "ipad-13": "ipad-pro-13-space-gray" } },
 
   theme: {
     // Any CSS background. Soft brand-tinted gradients read best at store size.
     // "transparent" exports PNGs with alpha (for compositing; not uploadable as-is).
-    background: "#000",
-    headlineColor: "#FFFFFF",    // must contrast with the background;
-    subheadColor: "#FFFFFF",     // light text on a dark background and vice versa
+    background: "linear-gradient(160deg, #E8F1FF 0%, #F7FAFF 55%, #FFFFFF 100%)",
+    headlineColor: "#0E1B2A",    // must contrast with the background;
+    subheadColor: "#5A6A7D",     // light text on a dark background and vice versa
     // The system stack, or a bundled typeface named first: "Merriweather",
     // "DM Mono", "Lato", "DM Sans", "Montserrat" (files in $GOLDIE/assets/fonts).
     fontFamily: '-apple-system, "SF Pro Display", system-ui, sans-serif',
@@ -55,8 +70,8 @@ const config = {
     description: { "en-US": "Two or three short paragraphs, store voice." },
   },
 
-  // flowsDir defaults to <appRoot>/.argent/flows. An explicit relative path
-  // resolves from this config file; "../.argent/flows" works when it is in goldie/.
+  // flowsDir: "../.argent/flows" by default, resolved from appRoot. Every
+  // scene names a flow there, the way `argent flow run <name>` does.
 
   scenes: [
     // One entry per screenshot, in store-page order. The first two tiles are
@@ -91,10 +106,8 @@ const config = {
 export default config;
 ```
 
-For a local installation, use `import type { GoldieConfig } from "goldie"`
-and annotate the configuration. For an `npx` invocation, the unannotated
-object above avoids requiring a source checkout. Run `goldie doctor` against
-the selected package version to check the configuration.
+Import the type with an absolute path to the goldie checkout, since the config
+lives in the app repo.
 
 ## Templates and layouts
 
@@ -164,8 +177,11 @@ applies to every tile, `scenes[].decorations` to one; both stack.
 
 | Asset | Spec | Location |
 |---|---|---|
-| 6.9" screenshots | 1320x2868 PNG, no alpha | `out/screenshots/6.9/<locale>/` |
-| 6.9" preview | 886x1920 H.264 30fps AAC, 15 to 30 s | `out/previews/6.9/<locale>/` |
+| 6.9" screenshots | 1320x2868 PNG, no alpha | `out/screenshots/iphone-6.9/<locale>/` |
+| 6.9" preview | 886x1920 H.264 30fps AAC, 15 to 30 s | `out/previews/iphone-6.9/<locale>/` |
+| 13" screenshots | 2064x2752 PNG, no alpha | `out/screenshots/ipad-13/<locale>/` |
+| 13" preview | 1200x1600 H.264 30fps AAC, 15 to 30 s | `out/previews/ipad-13/<locale>/` |
+| Play phone screenshots | 1080x1920 PNG, no alpha | `out/screenshots/pixel-10-pro/<locale>/` |
 
 `goldie verify` checks the finished files against these with `sips` and
 `ffprobe` and fails on any mismatch.

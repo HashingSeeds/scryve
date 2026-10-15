@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react"
-import { AccessibilityInfo, StyleSheet } from "react-native"
-import { act, fireEvent, render, screen } from "@testing-library/react-native"
+import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
 import { applyLocalTableAction, createLocalGame, localTableRules } from "@/features/game/domain"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
@@ -190,6 +190,42 @@ describe("PokemonSeatCard", () => {
 
     fireEvent.press(screen.getByTestId("pokemon-damage-seat-1--10"))
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("320")
+  })
+
+  it("lowers HP from the − side and raises it from the + side", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    const active = table.actions.placePokemon(me, "active", {
+      name: "Charizard ex",
+      hp: 330,
+      prizes: 2,
+    })!
+    table.actions.adjustPokemonDamage(me, active, 50)
+    render(<Seat harness={table} seat={0} />)
+
+    const hero = within(screen.getByTestId("pokemon-hero-seat-1"))
+    fireEvent.press(hero.getByText("−"))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("270")
+    expect(hero.getByText("-10")).toBeTruthy()
+
+    fireEvent.press(hero.getByText("+"))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("280")
+  })
+
+  it("shrinks the running change in its glyph to fit beside the HP", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Blastoise ex", hp: 330, prizes: 2 })
+    render(<Seat harness={table} seat={0} />)
+    fireEvent(screen.getByTestId("pokemon-hero-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 300, height: 200 } },
+    })
+
+    const hero = within(screen.getByTestId("pokemon-hero-seat-1"))
+    for (let tap = 0; tap < 3; tap++)
+      fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    const fontSize = (text: string) => StyleSheet.flatten(hero.getByText(text).props.style).fontSize
+    expect(fontSize("-30")).toBeLessThan(fontSize("+"))
   })
 
   it("knocks out on lethal damage, scores the opponent's prizes, and Undo puts it all back", () => {
@@ -423,6 +459,75 @@ describe("PokemonSeatCard", () => {
     fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "longPress")
     expect(onChangePrizes).toHaveBeenLastCalledWith(1)
     expect(screen.queryByText("+1")).toBeNull()
+  })
+
+  it("stands the prize cards in rows of two", () => {
+    render(<Seat harness={pokemonTable(["Ada", "Grace"])} seat={0} prizes={6} />)
+    const pips = screen.getAllByTestId(/^pokemon-prize-pip-\d-seat-1$/, {
+      includeHiddenElements: true,
+    })
+    const rowOf = (pip: (typeof pips)[number]) => {
+      let node = pip.parent
+      while (node && typeof node.type !== "string") node = node.parent
+      return node
+    }
+    const rows = [...new Set(pips.map(rowOf))]
+
+    expect(rows.map((row) => pips.filter((pip) => rowOf(pip) === row).length)).toEqual([2, 2, 2])
+  })
+
+  it("raises a full-width top seat's bottom row until its name meets the cutout", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const row = () => {
+      const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
+      const style = StyleSheet.flatten(screen.getByTestId("pokemon-bottom-row-seat-1").props.style)
+      const fromEdge = Number(layer.paddingBottom) + Number(style.marginBottom)
+      return { fromEdge, middle: fromEdge + Number(style.height) / 2 }
+    }
+    const top = {
+      contentRotation: 180,
+      contentInsets: { top: 47, right: 0, bottom: 0, left: 0 },
+    } as const
+    const view = render(<Seat harness={table} seat={0} {...top} />)
+    expect(row().fromEdge).toBe(47)
+
+    view.rerender(
+      <Seat
+        harness={table}
+        seat={0}
+        {...top}
+        screenEdges={{ top: true, right: true, bottom: false, left: true }}
+      />,
+    )
+    const nameLine = 26 * Math.min(Dimensions.get("window").fontScale, 1.3)
+    expect(row().middle).toBe(47 - 11 + nameLine / 2)
+
+    view.rerender(
+      <Seat
+        harness={table}
+        seat={0}
+        {...top}
+        staleSince={0}
+        screenEdges={{ top: true, right: true, bottom: false, left: true }}
+      />,
+    )
+    expect(row().fromEdge).toBe(47)
+
+    const dice = {
+      chips: [{ kind: "roll", roll: { tool: "coin", value: "Heads" } }] as const,
+      onPress: jest.fn(),
+      onClearChip: jest.fn(),
+    }
+    view.rerender(
+      <Seat
+        harness={table}
+        seat={0}
+        {...top}
+        dice={dice}
+        screenEdges={{ top: true, right: true, bottom: false, left: true }}
+      />,
+    )
+    expect(row().fromEdge).toBe(47)
   })
 
   it("stops taking prizes at 0 and putting them back at 6", () => {

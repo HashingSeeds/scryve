@@ -12,7 +12,7 @@ jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
   LocalDeckChoicesSource: () => null,
 }))
 jest.mock("expo-router", () => ({
-  router: { replace: jest.fn(), back: jest.fn() },
+  router: { replace: jest.fn(), dismissTo: jest.fn(), back: jest.fn() },
   useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({}),
 }))

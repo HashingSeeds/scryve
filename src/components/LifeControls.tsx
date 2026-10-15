@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { StyleSheet, useWindowDimensions, View } from "react-native"
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
@@ -10,7 +10,10 @@ import type { ThemedStyle } from "@/theme/types"
 import { BoardPressable } from "./BoardPressable"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
+  getDeltaFontSizeThatFits,
+  getDeltaTextWidth,
   LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_MAX_FONT_SCALE,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
 import { Text } from "./Text"
@@ -26,6 +29,8 @@ export interface LifeControlsProps {
   lifeStep?: number
   recentDelta?: RecentDelta
   pendingDelta?: number
+  lifeFontSize?: number
+  lifeDigits?: number
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   onPreview?: (pendingDelta: number) => void
@@ -89,57 +94,6 @@ function deltaText(delta: number) {
   return delta > 0 ? `+${delta}` : `-${Math.abs(delta)}`
 }
 
-export function RecentDeltaLabel({
-  seatNumber,
-  recentDelta: recentDeltaStore,
-  pendingDelta = 0,
-  lifeFontSize,
-  compact,
-  contentRotation = 0,
-  foreground,
-}: {
-  seatNumber: number
-  recentDelta: RecentDelta
-  pendingDelta?: number
-  lifeFontSize: number
-  compact?: boolean
-  contentRotation?: LifeCardContentRotation
-  foreground: string
-}) {
-  const recentDelta =
-    useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
-  if (!recentDelta) return null
-  const fontSize = compact ? 16 : 24
-  // why: the label clears the digits' cap height, which is about 0.75 of the font size.
-  const lift = lifeFontSize * 0.375 + fontSize * 0.5 + (compact ? 6 : 12)
-  const [dx, dy] = { 0: [0, -lift], 180: [0, lift], 90: [lift, 0], [-90]: [-lift, 0] }[
-    contentRotation
-  ]
-  return (
-    <View
-      testID={`life-recent-delta-seat-${seatNumber}`}
-      pointerEvents="none"
-      importantForAccessibility="no-hide-descendants"
-      accessibilityElementsHidden
-      style={[$recentDelta, { transform: [{ translateX: dx }, { translateY: dy }] }]}
-    >
-      <Text
-        text={deltaText(recentDelta)}
-        weight="semiBold"
-        maxFontSizeMultiplier={1.3}
-        numberOfLines={1}
-        style={{
-          color: foreground,
-          fontSize,
-          lineHeight: Math.round(fontSize * 1.25),
-          fontVariant: ["tabular-nums"],
-          transform: [{ rotate: `${contentRotation}deg` }],
-        }}
-      />
-    </View>
-  )
-}
-
 export function lifeControlTestId(seatNumber: number, delta: LifeDelta) {
   return `life-seat-${seatNumber}-${delta}`
 }
@@ -159,12 +113,19 @@ export function LifeControls({
   lifeStep,
   recentDelta: recentDeltaStore = NO_RECENT_DELTA,
   pendingDelta = 0,
+  lifeFontSize = 0,
+  lifeDigits = 0,
   onChange,
   onLongChange,
   onPreview,
   style,
 }: LifeControlsProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
+  const { fontScale } = useWindowDimensions()
+  const [zonesSize, setZonesSize] = useState({ width: 0, height: 0 })
   const recentDelta =
     useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
   const longPressHandled = useRef<LifeDelta | null>(null)
@@ -181,8 +142,6 @@ export function LifeControls({
   const sideways = Math.abs(contentRotation) === 90
   const counter = playSystemRules(system).counter
   const tapStep = lifeStep ?? counter.tapStep
-  // why: a calculator counter shows its running change above the total, so the glyphs stay put.
-  const glyphFeedback = !counter.calculator
 
   function labelFor(delta: LifeDelta) {
     return `${identity}, ${delta > 0 ? "add" : "subtract"} ${counterValueLabel(system, Math.abs(delta))}`
@@ -193,6 +152,9 @@ export function LifeControls({
       <View
         testID="life-control-zones"
         pointerEvents="box-none"
+        onLayout={({ nativeEvent: { layout } }) =>
+          setZonesSize({ width: layout.width, height: layout.height })
+        }
         style={themed(
           contentRotation === 90
             ? $zonesFacingLeft
@@ -204,8 +166,27 @@ export function LifeControls({
         {HALF_CARD_ZONES.map(({ direction, glyph, edge }) => {
           const delta = direction * tapStep
           const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
-          const feedback =
-            glyphFeedback && direction * recentDelta > 0 ? deltaText(recentDelta) : glyph
+          const showingDelta = direction * recentDelta > 0
+          const feedback = showingDelta ? deltaText(recentDelta) : glyph
+          const deltaSize = showingDelta
+            ? getDeltaFontSizeThatFits({
+                text: feedback,
+                baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
+                run: sideways ? zonesSize.height : zonesSize.width,
+                inset: spacing.xs,
+                lifeFontSize,
+                lifeDigits,
+                fontScale,
+              })
+            : undefined
+          // why: a sideways glyph turns inside its unturned box, so a delta wider than the line height would reach past the card edge; move it inward by that overhang.
+          const lineHeight =
+            (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) *
+            Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+          const overhang =
+            sideways && deltaSize
+              ? Math.max((getDeltaTextWidth(feedback, deltaSize, fontScale) - lineHeight) / 2, 0)
+              : 0
           return (
             <BoardPressable
               key={delta}
@@ -260,7 +241,15 @@ export function LifeControls({
                 numberOfLines={1}
                 style={[
                   themed(compact ? $compactGlyph : $glyph),
-                  contentRotationStyle,
+                  deltaSize !== undefined && { fontSize: deltaSize },
+                  overhang
+                    ? {
+                        transform: [
+                          { translateY: pinsToTopEdge ? overhang : -overhang },
+                          { rotate: `${contentRotation}deg` },
+                        ],
+                      }
+                    : contentRotationStyle,
                   { color: foreground },
                 ]}
               />
@@ -270,12 +259,6 @@ export function LifeControls({
       </View>
     </View>
   )
-}
-
-const $recentDelta: ViewStyle = {
-  ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
 }
 
 const $zones: ThemedStyle<ViewStyle> = () => ({
@@ -312,14 +295,17 @@ const $zoneSidewaysBottom: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xs,
 })
 
+const GLYPH_SIZE = 44
+const COMPACT_GLYPH_SIZE = 30
+
 const $glyph: ThemedStyle<TextStyle> = () => ({
-  fontSize: 44,
+  fontSize: GLYPH_SIZE,
   lineHeight: LIFE_GLYPH_LINE_HEIGHT,
   opacity: 0.6,
 })
 
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({
-  fontSize: 30,
+  fontSize: COMPACT_GLYPH_SIZE,
   lineHeight: COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   opacity: 0.6,
 })
