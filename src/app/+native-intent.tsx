@@ -17,7 +17,8 @@ const DEV_SEED_LINK =
 const PR_PREVIEW_LINK =
   /^(?:(?:scryve|count)-preview:\/\/(?:\/?preview\/|expo-development-client\/\?url=https:\/\/u\.expo\.dev\/[0-9a-f-]+\?channel-name=)|\/preview\/)(pr-[0-9]+)$/
 
-const DEV_LAN_LINK = /^(?:(?:scryve|count)-dev:\/\/\/?|\/)lan(\?[A-Za-z0-9=&]+)?$/
+const DEV_LAN_LINK =
+  /^(?:(?:scryve|count)-dev:\/\/\/?|\/)lan(\?(?:[A-Za-z0-9=&]|%[0-9A-Fa-f]{2})+)?$/
 
 function devSeedPath(path: string): string | null {
   const match = DEV_SEED_LINK.exec(path)
