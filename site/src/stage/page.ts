@@ -140,8 +140,9 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   const step = query<HTMLElement>(".steps [data-step='details']")
   const demoPicker = query<HTMLElement>("[data-pick='demo']", step)
   let showing: Demo | undefined
-  // A demo picked before the step comes on screen plays when it does.
-  let requested: Demo | undefined
+  // The demo the step shows next. Picking a game anywhere on the page sets it, so the step's copy
+  // already matches by the time it scrolls into view and never changes in front of the visitor.
+  let chosen: Demo = game.setup.system === "pokemon" ? "pokemon" : "commander"
   let borrowed: ReturnType<DemoGame["snapshot"]> | undefined
   // The table after each change the demo makes, for the rewind.
   let trail: ReturnType<DemoGame["snapshot"]>[] = []
@@ -208,15 +209,19 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     rewinding = window.setTimeout(next, every)
   }
 
+  function choose(demo: Demo) {
+    chosen = demo
+    press(demoPicker, demo)
+    step.querySelectorAll<HTMLElement>("[data-demo-copy]").forEach((copy) => {
+      copy.hidden = copy.dataset.demoCopy !== demo
+    })
+  }
   function show(demo: Demo) {
     if (showing) demos[showing].stop()
     if (showing && borrowed) game.restore(borrowed)
     trail = []
     showing = demo
-    press(demoPicker, demo)
-    step.querySelectorAll<HTMLElement>("[data-demo-copy]").forEach((copy) => {
-      copy.hidden = copy.dataset.demoCopy !== demo
-    })
+    choose(demo)
     demos[demo].start()
     if (demo === "commander" && game.setup.system !== "mtg")
       game.reset({
@@ -231,9 +236,16 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     const demo = DEMOS.find((value) => value === picked(event))
     if (!demo) return
     if (borrowed) return show(demo)
-    requested = demo
+    choose(demo)
     scrollToStep()
   })
+  systemPickers.forEach((picker) =>
+    picker.addEventListener("click", (event) => {
+      const value = picked(event)
+      if (!borrowed && PLAY_SYSTEM_IDS.some((system) => system === value))
+        choose(value === "pokemon" ? "pokemon" : "commander")
+    }),
+  )
   query<HTMLElement>("[data-replay]", step).addEventListener("click", () => {
     if (borrowed && showing) show(showing)
     else scrollToStep()
@@ -248,9 +260,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
         game.restore(leaving ?? game.snapshot())
       }
       borrowed = game.snapshot()
-      const demo = requested ?? (game.setup.system === "pokemon" ? "pokemon" : "commander")
-      requested = undefined
-      return show(demo)
+      return show(chosen)
     }
     if (showing) demos[showing].stop()
     showing = undefined
