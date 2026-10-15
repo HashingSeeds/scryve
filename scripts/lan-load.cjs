@@ -16,14 +16,14 @@ let rejected = 0
 let closedEarly = 0
 
 function guest(index) {
-  const playerId = `load-${index}`
+  let seatKey
   const sent = new Map()
   let own = { life: 0, version: 0, round: 0 }
   let active = false
   let buffer = ""
   let tapper
   const socket = net.connect(Number(port), host, () =>
-    socket.write(`${JSON.stringify({ type: "join", playerId, name: `Load ${index}` })}\n`),
+    socket.write(`${JSON.stringify({ type: "join", name: `Load ${index}` })}\n`),
   )
   socket.setEncoding("utf8")
   socket.on("data", (chunk) => {
@@ -37,8 +37,9 @@ function guest(index) {
       messagesIn += 1
       const message = JSON.parse(line)
       if (message.type === "rejected") rejected += 1
+      if (message.type === "welcome") seatKey = message.pass.key
       if (message.type !== "game") continue
-      const seat = message.game.seats.find((candidate) => candidate.playerId === playerId)
+      const seat = message.game.seats.find((candidate) => candidate.key === seatKey)
       if (!seat) continue
       if (message.game.round !== own.round)
         own = { life: seat.life, version: seat.version, round: message.game.round }

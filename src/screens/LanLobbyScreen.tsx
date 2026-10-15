@@ -59,7 +59,7 @@ export function LanLobbyScreen({
   )
   const [startingLife, setStartingLife] = useState<number>(automation.start ?? 20)
   const [name, setName] = useState(loadLanName)
-  const projection = game ? lanProjection(game, lanSession.playerId) : undefined
+  const projection = game && session.seatKey ? lanProjection(game, session.seatKey) : undefined
   const players = projection?.players ?? []
   const readyPlayers = game ? connectedSeatCount(game) : 0
 
@@ -150,7 +150,7 @@ export function LanLobbyScreen({
           <>
             <View style={themed($section)}>
               {players.map((player) => {
-                const seat = game?.seats.find((candidate) => candidate.playerId === player.playerId)
+                const seat = game?.seats.find((candidate) => candidate.key === player.playerId)
                 return (
                   <View key={player.playerId} style={themed($seatRow)}>
                     <View style={[themed($swatch), { backgroundColor: player.color }]} />

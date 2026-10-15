@@ -10,14 +10,14 @@ if (!host || !port) {
   process.exit(1)
 }
 
-const playerId = `mac-${name}`
+let seatKey
 const log = (line) => console.log(`${new Date().toISOString().slice(11, 23)} ${line}`)
 let own = { life: 0, version: 0, round: 0 }
 let active = false
 
 const socket = net.connect(Number(port), host, () => {
   log(`connected to ${host}:${port}`)
-  send({ type: "join", playerId, name })
+  send({ type: "join", name })
 })
 const send = (message) => socket.write(`${JSON.stringify(message)}\n`)
 
@@ -32,10 +32,11 @@ socket.on("data", (chunk) => {
     if (!line) continue
     const message = JSON.parse(line)
     if (message.type === "rejected") log(`rejected: ${message.reason}`)
+    if (message.type === "welcome") seatKey = message.pass.key
     if (message.type !== "game") continue
     const { game } = message
     active = game.status === "active"
-    const seat = game.seats.find((candidate) => candidate.playerId === playerId)
+    const seat = game.seats.find((candidate) => candidate.key === seatKey)
     if (seat && (game.round !== own.round || seat.version >= own.version))
       own = { life: seat.life, version: seat.version, round: game.round }
     log(`${game.status}: ${game.seats.map((s) => `${s.name}=${s.life}`).join(" ")}`)

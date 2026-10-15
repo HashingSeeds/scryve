@@ -14,7 +14,7 @@ export default function LanGameRoute() {
   return (
     <ConnectedBoardWithRuntime
       publicId={runtime.projection.publicId}
-      ownerId={lanSession.playerId}
+      ownerId={lanSession.getState().seatKey ?? "nearby"}
       runtime={runtime}
       moderation={false}
       onGameEnded={backToLobby}

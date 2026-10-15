@@ -16,8 +16,11 @@ const NO_TABLE_ACTIONS = createTableActions(
 )
 
 export function useLanGame(): ConnectedGameRuntime {
-  const { game, status } = useLanSession()
-  const projection = useMemo(() => (game ? lanProjection(game, lanSession.playerId) : null), [game])
+  const { game, status, seatKey } = useLanSession()
+  const projection = useMemo(
+    () => (game && seatKey ? lanProjection(game, seatKey) : null),
+    [game, seatKey],
+  )
   return useMemo((): ConnectedGameRuntime => {
     const base = {
       ...NO_TABLE_ACTIONS,
@@ -26,7 +29,7 @@ export function useLanGame(): ConnectedGameRuntime {
       pending: [],
       failed: [],
       connectionStatus: status === "connected" ? ("connected" as const) : ("offline" as const),
-      changeLife: (playerId: string, delta: number) => lanSession.changeLife(playerId, delta),
+      changeLife: (seatKey: string, delta: number) => lanSession.changeLife(seatKey, delta),
       submitCommanderDamage: noop,
       resolveCommanderDamageClaim: noop,
       finish: async () => {

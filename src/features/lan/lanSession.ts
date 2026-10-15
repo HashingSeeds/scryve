@@ -3,14 +3,14 @@ import { AppState, Platform } from "react-native"
 import type { Service } from "react-native-zeroconf"
 
 import { createClientId } from "@/features/game/domain"
-import { LocalGameRepository } from "@/features/game/localPersistence"
+import { load, remove, save } from "@/utils/storage"
 
 import { loadLanName } from "./lanAvailability"
 import {
+  admitLanGuest,
   connectedSeatCount,
   createLanGame,
   LAN_MIN_PLAYERS,
-  joinLanGame,
   mergeHostGame,
   parseGuestMessage,
   parseHostMessage,
@@ -21,6 +21,7 @@ import {
   type LanGuestMessage,
   type LanHostMessage,
   type LanLife,
+  type LanSeatPass,
 } from "./lanGame"
 import {
   connectLan,
@@ -31,15 +32,19 @@ import {
 } from "./lanTransport"
 
 const RECONNECT_DELAY_MS = 1_500
+// why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
+const RECONNECT_GIVE_UP_MS = 2 * 60_000
 // why: a full table tapping fast would otherwise re-render the host and broadcast on every change, starving its JS thread.
 const FLUSH_INTERVAL_MS = 33
 // why: a host that was killed never withdraws its Bonjour advert, which can outlive it by over an hour.
 const UNREACHABLE_HIDE_MS = 2 * 60_000
+const PASS_KEY = "lan.seatPass"
 
 export interface LanSessionState {
   role?: "host" | "guest"
   status: "idle" | "connecting" | "connected" | "reconnecting"
   game?: LanGame
+  seatKey?: string
   serviceName?: string
   error?: string
 }
@@ -57,18 +62,30 @@ const deviceName = () =>
 
 const playerName = () => loadLanName().trim() || deviceName()
 
-class LanSession {
-  readonly playerId = new LocalGameRepository().getDeviceId()
+// why: a guest whose app restarts mid-game reclaims its seat with this; only the latest game's pass is worth keeping.
+function savedPass(serviceName: string): LanSeatPass | undefined {
+  const saved = load(PASS_KEY)
+  if (typeof saved !== "object" || saved === null) return undefined
+  const { service, key, token } = saved as Record<string, unknown>
+  return service === serviceName && typeof key === "string" && typeof token === "string"
+    ? { key, token }
+    : undefined
+}
+
+export class LanSession {
   private state: LanSessionState = IDLE
   private listeners = new Set<() => void>()
   private server?: LanHost
   private serverClosed = false
+  private tokens = new Map<string, string>()
   private peers = new Map<string, LanConnection<LanHostMessage>>()
   // why: a socket that hasn't sent its join yet isn't in peers, but still has to close when the host leaves.
   private accepted = new Set<LanConnection<LanHostMessage>>()
   private connection?: LanConnection<LanGuestMessage>
+  private pass?: LanSeatPass
   private ownLife?: LanLife
   private reconnectTimer?: ReturnType<typeof setTimeout>
+  private reconnectingSince?: number
   private unreachableAt = new Map<string, number>()
   private flushTimer?: ReturnType<typeof setTimeout>
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
@@ -107,14 +124,16 @@ class LanSession {
 
   async host() {
     this.session += 1
+    this.tokens.clear()
     const name = playerName()
-    const game = createLanGame(createClientId("lan"), { playerId: this.playerId, name })
-    this.set({
+    const seatKey = createClientId("seat")
+    const game = createLanGame(createClientId("lan"), seatKey, name)
+    this.replace({
       role: "host",
       status: "connecting",
       game,
+      seatKey,
       serviceName: `${name} ${game.id.slice(-4)}`,
-      error: undefined,
     })
     await this.listen()
   }
@@ -154,7 +173,7 @@ class LanSession {
   }
 
   private acceptPeer(peer: LanConnection<LanHostMessage>) {
-    let peerId: string | undefined
+    let seatKey: string | undefined
     const session = this.session
     this.accepted.add(peer)
     return {
@@ -162,23 +181,28 @@ class LanSession {
         const game = this.state.game
         if (!game || session !== this.session) return
         if (message.type === "join") {
-          const joined = joinLanGame(game, message)
-          if ("rejected" in joined) {
-            return peer.sendAndClose({ type: "rejected", reason: joined.rejected })
-          }
-          peerId = message.playerId
-          const previous = this.peers.get(peerId)
-          this.peers.set(peerId, peer)
+          if (seatKey) return
+          const fresh = { key: createClientId("seat"), token: createClientId("token") }
+          const admitted = admitLanGuest(game, this.tokens, message, fresh)
+          if ("rejected" in admitted)
+            return peer.sendAndClose({ type: "rejected", reason: admitted.rejected })
+          seatKey = admitted.pass.key
+          this.tokens.set(admitted.pass.key, admitted.pass.token)
+          const previous = this.peers.get(seatKey)
+          this.peers.set(seatKey, peer)
           previous?.close()
-          return this.publish(joined)
+          peer.send({ type: "welcome", pass: admitted.pass })
+          return this.publish(admitted.game)
         }
-        if (peerId && game.status === "active") this.publish(setLanLife(game, peerId, message))
+        if (seatKey && game.status === "active") this.publish(setLanLife(game, seatKey, message))
       },
       onClose: () => {
         this.accepted.delete(peer)
-        if (!peerId || this.peers.get(peerId) !== peer) return
-        this.peers.delete(peerId)
-        if (this.state.game) this.publish(releaseLanSeat(this.state.game, peerId))
+        const game = this.state.game
+        if (!seatKey || this.peers.get(seatKey) !== peer || !game) return
+        this.peers.delete(seatKey)
+        if (game.status === "lobby") this.tokens.delete(seatKey)
+        this.publish(releaseLanSeat(game, seatKey))
       },
     }
   }
@@ -199,8 +223,14 @@ class LanSession {
 
   async join(service: Service) {
     this.ownLife = undefined
-    this.replace({ role: "guest", status: "connecting", serviceName: service.name })
+    this.pass = savedPass(service.name)
     const session = ++this.session
+    this.replace({
+      role: "guest",
+      status: "connecting",
+      serviceName: service.name,
+      ...(this.pass ? { seatKey: this.pass.key } : {}),
+    })
     try {
       await this.connect(service, session)
     } catch {
@@ -219,6 +249,7 @@ class LanSession {
         onClose: () => {
           if (session !== this.session) return
           this.connection = undefined
+          this.reconnectingSince ??= Date.now()
           this.set({ status: "reconnecting" })
           this.scheduleReconnect(session)
         },
@@ -228,28 +259,40 @@ class LanSession {
     this.connection = connection
     connection.send({
       type: "join",
-      playerId: this.playerId,
       name: playerName(),
+      ...(this.pass ? { pass: this.pass } : {}),
       ...(this.ownLife ? { life: this.ownLife } : {}),
     })
   }
 
   private receive(message: LanHostMessage) {
     if (message.type === "rejected") {
+      remove(PASS_KEY)
       this.leave()
       return this.set({ error: message.reason })
     }
+    if (message.type === "welcome") {
+      this.pass = message.pass
+      save(PASS_KEY, { service: this.state.serviceName, ...message.pass })
+      return this.set({ seatKey: message.pass.key })
+    }
+    this.reconnectingSince = undefined
+    const { seatKey } = this.state
     if (this.ownLife?.round !== message.game.round) this.ownLife = undefined
-    const game = mergeHostGame(message.game, this.playerId, this.ownLife)
+    const game = seatKey ? mergeHostGame(message.game, seatKey, this.ownLife) : message.game
     this.set({ game, status: "connected" })
     if (game.status === "abandoned") return this.leave({ keepGame: true })
-    const hostSeat = message.game.seats.find((seat) => seat.playerId === this.playerId)
+    const hostSeat = message.game.seats.find((seat) => seat.key === seatKey)
     if (this.ownLife && hostSeat && this.ownLife.version > hostSeat.version)
       this.connection?.send({ type: "life", ...this.ownLife })
   }
 
   private scheduleReconnect(session: number) {
     clearTimeout(this.reconnectTimer)
+    if (Date.now() - (this.reconnectingSince ?? Date.now()) > RECONNECT_GIVE_UP_MS) {
+      this.leave({ keepGame: true })
+      return this.set({ error: "Lost the host. The game may have ended." })
+    }
     this.reconnectTimer = setTimeout(async () => {
       const { serviceName } = this.state
       if (session !== this.session || !serviceName) return
@@ -262,14 +305,14 @@ class LanSession {
     }, RECONNECT_DELAY_MS)
   }
 
-  changeLife(playerId: string, delta: number) {
+  changeLife(seatKey: string, delta: number) {
     const { game, role } = this.state
-    const seat = game?.seats.find((candidate) => candidate.playerId === playerId)
-    if (!game || !seat || playerId !== this.playerId || game.status !== "active") return
+    const seat = game?.seats.find((candidate) => candidate.key === seatKey)
+    if (!game || !seat || seatKey !== this.state.seatKey || game.status !== "active") return
     const life = { life: seat.life + delta, version: seat.version + 1, round: game.round }
-    if (role === "host") return this.publish(setLanLife(game, playerId, life))
+    if (role === "host") return this.publish(setLanLife(game, seatKey, life))
     this.ownLife = life
-    this.set({ game: setLanLife(game, playerId, life) })
+    this.set({ game: setLanLife(game, seatKey, life) })
     this.connection?.send({ type: "life", ...life })
   }
 
@@ -288,23 +331,23 @@ class LanSession {
     const { game, role } = this.state
     this.session += 1
     clearTimeout(this.reconnectTimer)
-    if (role === "host" && game && game.status !== "abandoned")
-      this.publish({ ...game, status: "abandoned" })
     clearTimeout(this.flushTimer)
-    this.flush()
-    const server = this.server
-    const peers = [...this.accepted]
+    this.flushTimer = undefined
+    this.reconnectingSince = undefined
+    if (role === "host" && game) {
+      const ended: LanGame = game.status === "abandoned" ? game : { ...game, status: "abandoned" }
+      // why: sendAndClose waits for the flush, so every guest learns the game ended instead of reconnecting to nothing.
+      for (const peer of this.peers.values()) peer.sendAndClose({ type: "game", game: ended })
+      for (const peer of this.accepted) if (![...this.peers.values()].includes(peer)) peer.close()
+    }
+    void this.server?.stop()
     this.server = undefined
     this.peers.clear()
     this.accepted.clear()
+    this.tokens.clear()
     this.connection?.close()
     this.connection = undefined
     this.ownLife = undefined
-    // why: give the abandoned state a moment to flush before the sockets close.
-    setTimeout(() => {
-      for (const peer of peers) peer.close()
-      void server?.stop()
-    }, 300)
     this.replace(keepGame && game ? { ...IDLE, game } : IDLE)
   }
 }

@@ -1,62 +1,73 @@
 import {
+  admitLanGuest,
   createLanGame,
-  joinLanGame,
+  LAN_MAX_SEATS,
   lanProjection,
+  MAX_LAN_VERSION_STEP,
   mergeHostGame,
+  parseGuestMessage,
   releaseLanSeat,
   setLanLife,
   startLanGame,
   type LanGame,
+  type LanSeatPass,
 } from "./lanGame"
 
-const lobby = () => createLanGame("game", { playerId: "host", name: "Host" })
+const lobby = () => createLanGame("game", "host", "Host")
+const tokens = new Map<string, string>()
+const late = { type: "join", name: "late" } as const
+const unused = { key: "unused", token: "unused" }
 
-function joined(game: LanGame, playerId: string) {
-  const next = joinLanGame(game, { type: "join", playerId, name: playerId })
-  if ("rejected" in next) throw new Error(next.rejected)
-  return next
+function seatGuest(game: LanGame, key: string) {
+  const pass = { key, token: `token-${key}` }
+  const admitted = admitLanGuest(game, tokens, { type: "join", name: key }, pass)
+  if ("rejected" in admitted) throw new Error(admitted.rejected)
+  tokens.set(key, pass.token)
+  return admitted.game
 }
 
-const lifeOf = (game: LanGame, playerId: string) =>
-  game.seats.find((seat) => seat.playerId === playerId)?.life
+const rejoin = (game: LanGame, pass: LanSeatPass) =>
+  admitLanGuest(game, tokens, { type: "join", name: "x", pass }, unused)
+
+const lifeOf = (game: LanGame, key: string) => game.seats.find((seat) => seat.key === key)?.life
 
 describe("LAN game", () => {
-  it("seats new devices only while in the lobby", () => {
-    const game = startLanGame(joined(lobby(), "guest"), 40)
+  it("seats new guests only in the lobby and only up to the board's player limit", () => {
+    let full = lobby()
+    for (let index = 1; index < LAN_MAX_SEATS; index += 1) full = seatGuest(full, `guest-${index}`)
+    const started = startLanGame(seatGuest(lobby(), "guest"), 20)
 
-    expect(joinLanGame(game, { type: "join", playerId: "late", name: "Late" })).toEqual({
+    expect(admitLanGuest(full, tokens, late, unused)).toEqual({ rejected: "This game is full." })
+    expect(admitLanGuest(started, tokens, late, unused)).toEqual({
       rejected: "This game has already started.",
     })
-    expect(game.seats.map((seat) => [seat.playerId, seat.life])).toEqual([
-      ["host", 40],
-      ["guest", 40],
-    ])
   })
 
-  it("lets a returning device keep its seat and restore a newer life total", () => {
-    const game = startLanGame(joined(lobby(), "guest"), 20)
-    const rejoined = joinLanGame(game, {
-      type: "join",
-      playerId: "guest",
-      name: "guest",
-      life: { life: 13, version: 5, round: 1 },
+  it("returns a seat only to the pass it was issued with, and never hands out the host's", () => {
+    const game = startLanGame(seatGuest(lobby(), "guest"), 20)
+
+    expect(rejoin(game, { key: "guest", token: "token-guest" })).not.toHaveProperty("rejected")
+    expect(rejoin(game, { key: "guest", token: "guessed" })).toEqual({
+      rejected: "That seat belongs to another device.",
     })
-
-    expect("rejected" in rejoined ? null : lifeOf(rejoined, "guest")).toBe(13)
+    expect(rejoin(game, { key: "host", token: "anything" })).toHaveProperty("rejected")
   })
 
-  it("ignores a replayed older life total", () => {
-    const game = setLanLife(startLanGame(joined(lobby(), "guest"), 20), "guest", {
+  it("ignores a replayed older life total and a version jump that would lock the seat", () => {
+    const game = setLanLife(startLanGame(seatGuest(lobby(), "guest"), 20), "guest", {
       life: 12,
       version: 4,
       round: 1,
     })
+    const jump = { life: 1, version: 4 + MAX_LAN_VERSION_STEP + 1, round: 1 }
 
     expect(lifeOf(setLanLife(game, "guest", { life: 18, version: 3, round: 1 }), "guest")).toBe(12)
+    expect(lifeOf(setLanLife(game, "guest", jump), "guest")).toBe(12)
+    expect(parseGuestMessage('{"type":"life","life":1,"version":1e308,"round":1}')).toBeNull()
   })
 
   it("keeps a guest's own newer life when the host has not caught up", () => {
-    const host = startLanGame(joined(lobby(), "guest"), 20)
+    const host = startLanGame(seatGuest(lobby(), "guest"), 20)
     const merged = mergeHostGame(host, "guest", { life: 9, version: 7, round: 1 })
 
     expect(lifeOf(merged, "guest")).toBe(9)
@@ -67,7 +78,7 @@ describe("LAN game", () => {
   })
 
   it("keeps a restart's starting life over a total from the previous game", () => {
-    const first = startLanGame(joined(lobby(), "guest"), 20)
+    const first = startLanGame(seatGuest(lobby(), "guest"), 20)
     const restarted = startLanGame(first, 40)
     const stale = { life: 3, version: 9, round: first.round }
 
@@ -75,20 +86,14 @@ describe("LAN game", () => {
     expect(lifeOf(mergeHostGame(restarted, "guest", stale), "guest")).toBe(40)
   })
 
-  it("frees a lobby seat, holds one mid-game, and drops it if still away at the next start", () => {
-    const lobbyGame = joined(joined(lobby(), "left"), "stays")
+  it("frees a lobby seat but holds a started game's seat for its owner to rejoin", () => {
+    const lobbyGame = seatGuest(seatGuest(lobby(), "left"), "stays")
+    const away = releaseLanSeat(startLanGame(lobbyGame, 20), "left")
 
-    expect(
-      releaseLanSeat(lobbyGame, "left").seats.map(({ playerId, seat }) => [playerId, seat]),
-    ).toEqual([
+    expect(releaseLanSeat(lobbyGame, "left").seats.map(({ key, seat }) => [key, seat])).toEqual([
       ["host", 1],
       ["stays", 2],
     ])
-    const finished = {
-      ...releaseLanSeat(startLanGame(lobbyGame, 20), "left"),
-      status: "finished" as const,
-    }
-    expect(finished.seats).toHaveLength(3)
-    expect(startLanGame(finished, 20).seats.map((seat) => seat.playerId)).toEqual(["host", "stays"])
+    expect(startLanGame(away, 20).seats.map((seat) => seat.key)).toEqual(["host", "left", "stays"])
   })
 })
