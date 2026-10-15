@@ -169,12 +169,12 @@ export function PokemonKeypad({
 }
 
 const SHIFT_PATHS = ["M12 3.5 L20.5 12 H15.5 V19.5 H8.5 V12 H3.5 Z"]
-const DELETE_PATHS = [
+export const DELETE_PATHS = [
   "M9 5 H19.5 Q21.5 5 21.5 7 V17 Q21.5 19 19.5 19 H9 L2.5 12 Z",
   "M11.5 9 L17 15 M17 9 L11.5 15",
 ]
 
-function KeyIcon({
+export function KeyIcon({
   paths,
   color,
   size,

@@ -243,6 +243,21 @@ figure {
   font-size: calc(min(100cqw, 100cqh) * 0.34);
 }
 
+/* A calculator counter's running change, just above its total (the app's RecentDeltaLabel). */
+.delta-above {
+  position: absolute;
+  bottom: calc(50% + min(100cqw, 100cqh) * 0.12);
+  left: 0;
+  right: 0;
+  color: #fff;
+  font-size: calc(min(100cqw, 100cqh) * 0.075);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+  text-align: center;
+}
+
 .glyph {
   position: absolute;
   top: 50%;

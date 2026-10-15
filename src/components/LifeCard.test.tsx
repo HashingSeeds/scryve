@@ -1135,55 +1135,50 @@ describe("LifeCard", () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it("uses Yu-Gi-Oh! quick amounts and 100 point scrub steps", () => {
-    const onChange = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="light">
+  function yugiohCard(life: number, onChange = jest.fn()) {
+    return (
+      <ThemeProvider initialContext="dark">
         <LifeCard
           playerName="Ada"
           seatNumber={1}
-          life={8000}
+          life={life}
           color="#41476E"
           system="ygo"
           onChange={onChange}
         />
-      </ThemeProvider>,
+      </ThemeProvider>
     )
-    fireEvent(view.getByTestId("life-seat-1-100"), "longPress")
-    fireEvent.press(view.getByTestId("life-editor-step-1--50"))
-    expect(onChange).toHaveBeenCalledWith(-50)
-    const slider = view.getByTestId("life-editor-slider-seat-1")
-    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
-    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
-    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 101, pageY: 100 } })
-    fireEvent(slider, "responderRelease")
-    expect(onChange).toHaveBeenLastCalledWith(100)
+  }
+
+  it("deals a typed Yu-Gi-Oh! amount from the calculator a long-press opens", () => {
+    const onChange = jest.fn()
+    const view = render(yugiohCard(8000, onChange))
+    fireEvent(view.getByTestId("life-seat-1--1000"), "longPress")
+    expect(view.queryByTestId("life-editor-slider-seat-1")).toBeNull()
+    for (const key of ["2", "5", "00"]) {
+      fireEvent.press(view.getByTestId(`life-calculator-key-${key}-seat-1`))
+    }
+    expect(view.getByTestId("life-calculator-value-seat-1")).toHaveTextContent("2500")
+    fireEvent.press(view.getByTestId("life-calculator-damage-seat-1"))
+    expect(onChange).toHaveBeenCalledWith(-2500)
+    expect(view.queryByTestId("life-calculator-seat-1")).toBeNull()
   })
 
-  it.each([-1, 1])("scrubs Yu-Gi-Oh! by %i × 8,000 at the slider end", (direction) => {
+  it("halves Yu-Gi-Oh! Life Points from the corner button, rounding up", () => {
     const onChange = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={8000}
-          color="#41476E"
-          system="ygo"
-          onChange={onChange}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent(view.getByTestId("life-seat-1-100"), "longPress")
-    expect(view.getByTestId("life-editor-title-seat-1").props.children).toBe("Ada")
-    const slider = view.getByTestId("life-editor-slider-seat-1")
-    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
-    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
-    fireEvent(slider, "responderMove", {
-      nativeEvent: { pageX: 100 + direction * 100, pageY: 100 },
-    })
-    fireEvent(slider, "responderRelease")
-    expect(onChange).toHaveBeenCalledWith(direction * 8000)
+    const view = render(yugiohCard(4050, onChange))
+    fireEvent.press(view.getByTestId("life-calculator-open-seat-1"))
+    fireEvent.press(view.getByTestId("life-calculator-half-seat-1"))
+    expect(onChange).toHaveBeenCalledWith(-2025)
+  })
+
+  it("keeps the Yu-Gi-Oh! glyphs and shows the running change above the total", () => {
+    const view = render(yugiohCard(8000))
+    view.rerender(yugiohCard(7000))
+    expect(
+      view.getByTestId("life-recent-delta-seat-1", { includeHiddenElements: true }),
+    ).toHaveTextContent("-1000")
+    expect(view.getByTestId("life-seat-1--1000")).toHaveTextContent("−")
   })
 
   it("removes steppers from a view-only card instead of dimming them", () => {

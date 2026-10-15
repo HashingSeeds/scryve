@@ -389,13 +389,13 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("play-system-ygo"))
     expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
     fireEvent.press(view.getByTestId("setup-options"))
-    expect(view.getByLabelText("Change by, 100")).toBeTruthy()
+    expect(view.getByLabelText("Change by, 1000")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
 
     expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
       format: "advanced",
       layout: "auto",
-      lifeStep: 100,
+      lifeStep: 1000,
       system: "ygo",
     })
   })
@@ -419,7 +419,7 @@ describe("NewGameScreen", () => {
     expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
       format: "advanced",
       layout: "auto",
-      lifeStep: 100,
+      lifeStep: 1000,
       system: "ygo",
     })
   })

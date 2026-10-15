@@ -38,26 +38,28 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
   pokemon: playRulesFor("pokemon"),
 }
 
+const GENERIC_COUNTER: CounterRules = {
+  label: "life",
+  heading: "Life",
+  singular: "life",
+  plural: "life",
+  defaultValue: 20,
+  presets: [],
+  tapStep: 1,
+  quickAdjustments: [10, 5],
+  scrubStep: 1,
+  scrubSteps: 20,
+  longPressStep: undefined,
+  direction: "open",
+  maxStartingValue: 999,
+}
+
 const GENERIC_PLAY_RULES = {
   id: NO_PLAY_SYSTEM,
   label: "No system",
   shortLabel: "No system",
   defaultFormat: "",
-  counter: {
-    label: "life",
-    heading: "Life",
-    singular: "life",
-    plural: "life",
-    defaultValue: 20,
-    presets: [],
-    tapStep: 1,
-    quickAdjustments: [10, 5],
-    scrubStep: 1,
-    scrubSteps: 20,
-    longPressStep: undefined,
-    direction: "open",
-    maxStartingValue: 999,
-  },
+  counter: GENERIC_COUNTER,
 } as const
 
 export const PLAY_SYSTEM_LIST = PLAY_SYSTEM_IDS.map((id) => PLAY_SYSTEMS[id])
