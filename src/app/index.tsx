@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { View, type ViewStyle } from "react-native"
+import { Linking, Platform, View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
@@ -115,16 +115,20 @@ export default function Index() {
         contentContainerStyle={themed($oldGame)}
       >
         <View style={themed($oldGameCopy)}>
-          <Text
-            text="Update Scryve to continue this game"
-            preset="heading"
-            accessibilityRole="header"
-          />
-          <Text text="It was saved by a newer version of Scryve. Starting a new game replaces it." />
+          <Text text="Update Scryve" preset="heading" accessibilityRole="header" />
+          <Text text="Your current game was saved by a newer version. Update to keep playing it." />
         </View>
         <View style={themed($oldGameActions)}>
+          {STORE_PAGE ? (
+            <Button
+              text={STORE_PAGE.label}
+              preset="primary"
+              style={themed($primaryAction)}
+              onPress={() => void Linking.openURL(STORE_PAGE.url).catch(() => undefined)}
+            />
+          ) : null}
           <Button
-            text="Start a new game"
+            text="Replace with a new game"
             style={themed($secondaryAction)}
             onPress={() => {
               localGameRepository.clearActiveGame()
@@ -191,6 +195,14 @@ export default function Index() {
     />
   )
 }
+
+const STORE_PAGE = Platform.select({
+  ios: { label: "Open App Store", url: "https://apps.apple.com/app/id6798955244" },
+  android: {
+    label: "Open Google Play",
+    url: "https://play.google.com/store/apps/details?id=com.sowinghope.count",
+  },
+})
 
 const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,

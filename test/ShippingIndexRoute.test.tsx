@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from "react-native"
+import { Linking, Pressable, StyleSheet } from "react-native"
 import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
@@ -140,11 +140,12 @@ describe("shipping index route", () => {
     },
   )
 
-  it("keeps a game saved by a newer version until the player starts a new one", () => {
+  it("keeps a game saved by a newer version until the player replaces it", () => {
     storage.set(
       LOCAL_KEYS.active,
       JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
     )
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
 
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -152,9 +153,13 @@ describe("shipping index route", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getByText("Update Scryve to continue this game")).toBeTruthy()
+    expect(view.getByText("Update Scryve")).toBeTruthy()
     expect(view.queryByTestId("game-board")).toBeNull()
-    fireEvent.press(view.getByRole("button", { name: "Start a new game" }))
+    fireEvent.press(view.getByRole("button", { name: "Open App Store" }))
+    expect(openURL).toHaveBeenCalledWith("https://apps.apple.com/app/id6798955244")
+    expect(localGameRepository.hasNewerActiveGame()).toBe(true)
+
+    fireEvent.press(view.getByRole("button", { name: "Replace with a new game" }))
     expect(view.getByTestId("game-board")).toBeTruthy()
     expect(localGameRepository.hasNewerActiveGame()).toBe(false)
   })
