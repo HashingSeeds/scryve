@@ -158,7 +158,8 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     delete stage.dataset.rewinding
   }
   // A keyboard activation has no point, so it goes to the redrawn control with the same data
-  // attributes (seat, direction, action, Pokémon). A control the landed game lacks gets nothing.
+  // attributes (seat, direction, action, picker value), anywhere on the page. A control the landed
+  // game lacks gets nothing.
   const sameControl = (old: Element) => {
     const control = old.closest<HTMLElement>("button")
     if (!control) return null
@@ -168,7 +169,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
           `[data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${value}"]`,
       )
       .join("")
-    return match ? board.querySelector(`button${match}`) : null
+    return match ? document.querySelector<HTMLElement>(`button${match}`) : null
   }
   // A tap anywhere lands the rewind first, so the tap changes the visitor's table and no later
   // frame overwrites it. Capture runs before the boards' and pickers' own handlers.
@@ -186,7 +187,9 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
         event.detail === 0
           ? sameControl(event.target)
           : document.elementFromPoint(event.clientX, event.clientY)
-      if (now instanceof HTMLElement) now.click()
+      if (!(now instanceof HTMLElement)) return
+      if (event.detail === 0) now.focus({ preventScroll: true })
+      now.click()
     },
     true,
   )
