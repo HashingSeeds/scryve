@@ -213,7 +213,11 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     const next = () => {
       const frame = frames.shift()
       if (!frame) return stopRewind()
+      // A frame redraws the boards, so keyboard focus moves to the same control in the redraw.
+      const focused = document.activeElement
       game.restore(frame)
+      if (focused instanceof Element && !focused.isConnected)
+        sameControl(focused)?.focus({ preventScroll: true })
       if (frames.length) rewinding = window.setTimeout(next, every)
       else stopRewind()
     }
