@@ -7,7 +7,7 @@ import { loadString, saveString } from "@/utils/storage"
 const NAME_KEY = "lan.playerName"
 export const LAN_NAME_MAX_LENGTH = 24
 
-const isPreviewBuild = () => Constants.expoConfig?.extra?.appVariant === "preview"
+export const isPreviewBuild = () => Constants.expoConfig?.extra?.appVariant === "preview"
 
 // why: nearby play ships to beta testers first through the Beta updates switch they already have; internal preview builds get it too so release mode can be tested.
 export const lanPlayAvailable = () =>
