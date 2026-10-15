@@ -57,6 +57,7 @@ import {
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
+import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
@@ -524,6 +525,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
   const game = view.game
+  const { startingLife } = game
+  const lifeLog = useMemo(
+    (): LifeLogSource => ({ kind: "connected", publicId, startingLife }),
+    [publicId, startingLife],
+  )
   const { syncSignal, offlineSince, finishBlocker } = view
   const terminalStatus = game.status
   const rematchPublicId = game.rematchPublicId
@@ -813,96 +819,100 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <GameBoardStage
-        testID="connected-game-board"
-        playerCount={players.length}
-        layoutVariant={layoutVariant}
-        renderGrid={(boardOrientation) => (
-          <ConnectedLifeGrid
-            boardOrientation={boardOrientation}
-            seats={players}
-            system={system}
-            lifeStep={game.lifeStep}
-            layoutVariant={layoutVariant}
-            disabled={!active || overlayOpen}
-            isPlayerDisabled={(player) => !controlled.has(player.id)}
-            isPlayerOwned={(player) => controlled.has(player.id)}
-            isPlayerEliminated={(player) =>
-              commanderDamageEnabled &&
-              Boolean(
-                game.players.find((candidate) => candidate.playerId === player.id)
-                  ?.eliminatedByCommanderDamage,
-              )
-            }
-            getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
-            getSeatDeck={(player) => {
-              const versionId = controlled.has(player.id)
-                ? game.players.find((candidate) => candidate.playerId === player.id)?.deckVersionId
-                : undefined
-              return versionId ? { ownerId, versionId } : undefined
-            }}
-            commanderDamage={
-              commanderDamageEnabled
-                ? {
-                    incomingFor: incomingCommanderDamage,
-                    armedPlayerId: armedCommander?.playerId ?? null,
-                    inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
-                    staging: {
-                      stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
-                      stagedTargets: armedCommander
-                        ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
-                        : 0,
-                      onSend: sendCommanderDamage,
-                      onCancel: () => setArmedCommander(null),
-                    },
-                    pendingFor: (player) =>
-                      controlled.has(player.id)
-                        ? (game.commanderDamage?.pendingClaims ?? [])
-                            .filter((claim) => claim.toPlayerId === player.id)
-                            .map((claim) => ({
-                              claimId: claim.claimId,
-                              attackerName: displayNameOf(claim.fromPlayerId),
-                              delta: claim.delta,
-                              onConfirm: () => controls.resolveCommanderDamageClaim(claim, true),
-                              onDecline: () => controls.resolveCommanderDamageClaim(claim, false),
-                            }))
-                        : [],
-                    onPressSword: toggleCommanderSword,
-                    onStage: stageCommanderDamage,
-                  }
-                : undefined
-            }
-            dice={dice.grid}
-            onChange={controls.changeLife}
-          />
-        )}
-        menu={{
-          open: menuOpen,
-          actions: radialActions,
-          variant: menuButtonStyle,
-          seatColors,
-          exitAction,
-          signal: boardSyncMenuSignal(syncSignal),
-          statusLine:
-            syncStatusText && syncSignal.kind !== "live"
-              ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
-              : undefined,
-          heldAction: diceOpen ? "dice" : undefined,
-          onToggle: toggleMenu,
-          onClose: closeMenu,
-        }}
-        windowOverlay={
-          menuOpen && onDecks && onSettings && onAccount ? (
-            <FloatingAppNavigation
-              destinationLabel="Decks"
-              accountLabel={accountLabel}
-              onDestination={onDecks}
-              onSettings={onSettings}
-              onAccount={onAccount}
+      <LifeLogContext.Provider value={lifeLog}>
+        <GameBoardStage
+          testID="connected-game-board"
+          playerCount={players.length}
+          layoutVariant={layoutVariant}
+          renderGrid={(boardOrientation) => (
+            <ConnectedLifeGrid
+              boardOrientation={boardOrientation}
+              seats={players}
+              system={system}
+              lifeStep={game.lifeStep}
+              layoutVariant={layoutVariant}
+              disabled={!active || overlayOpen}
+              isPlayerDisabled={(player) => !controlled.has(player.id)}
+              isPlayerOwned={(player) => controlled.has(player.id)}
+              isPlayerEliminated={(player) =>
+                commanderDamageEnabled &&
+                Boolean(
+                  game.players.find((candidate) => candidate.playerId === player.id)
+                    ?.eliminatedByCommanderDamage,
+                )
+              }
+              getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
+              getSeatDeck={(player) => {
+                const versionId = controlled.has(player.id)
+                  ? game.players.find((candidate) => candidate.playerId === player.id)
+                      ?.deckVersionId
+                  : undefined
+                return versionId ? { ownerId, versionId } : undefined
+              }}
+              commanderDamage={
+                commanderDamageEnabled
+                  ? {
+                      incomingFor: incomingCommanderDamage,
+                      armedPlayerId: armedCommander?.playerId ?? null,
+                      inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
+                      staging: {
+                        stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
+                        stagedTargets: armedCommander
+                          ? Object.values(armedCommander.staged).filter((delta) => delta !== 0)
+                              .length
+                          : 0,
+                        onSend: sendCommanderDamage,
+                        onCancel: () => setArmedCommander(null),
+                      },
+                      pendingFor: (player) =>
+                        controlled.has(player.id)
+                          ? (game.commanderDamage?.pendingClaims ?? [])
+                              .filter((claim) => claim.toPlayerId === player.id)
+                              .map((claim) => ({
+                                claimId: claim.claimId,
+                                attackerName: displayNameOf(claim.fromPlayerId),
+                                delta: claim.delta,
+                                onConfirm: () => controls.resolveCommanderDamageClaim(claim, true),
+                                onDecline: () => controls.resolveCommanderDamageClaim(claim, false),
+                              }))
+                          : [],
+                      onPressSword: toggleCommanderSword,
+                      onStage: stageCommanderDamage,
+                    }
+                  : undefined
+              }
+              dice={dice.grid}
+              onChange={controls.changeLife}
             />
-          ) : null
-        }
-      />
+          )}
+          menu={{
+            open: menuOpen,
+            actions: radialActions,
+            variant: menuButtonStyle,
+            seatColors,
+            exitAction,
+            signal: boardSyncMenuSignal(syncSignal),
+            statusLine:
+              syncStatusText && syncSignal.kind !== "live"
+                ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
+                : undefined,
+            heldAction: diceOpen ? "dice" : undefined,
+            onToggle: toggleMenu,
+            onClose: closeMenu,
+          }}
+          windowOverlay={
+            menuOpen && onDecks && onSettings && onAccount ? (
+              <FloatingAppNavigation
+                destinationLabel="Decks"
+                accountLabel={accountLabel}
+                onDestination={onDecks}
+                onSettings={onSettings}
+                onAccount={onAccount}
+              />
+            ) : null
+          }
+        />
+      </LifeLogContext.Provider>
       <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
 
       {inviteDialogOpen && invitation ? (

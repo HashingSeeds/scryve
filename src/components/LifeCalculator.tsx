@@ -1,10 +1,11 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { LayoutChangeEvent, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Rect } from "react-native-svg"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
+import { LifeLog, type LifeLogStep } from "@/features/game/LifeLog"
 import type { PlaySystemId } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -35,9 +36,13 @@ const BESIDE_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "‚å
 const MAX_DIGITS = String(MAX_LIFE_DELTA).length
 // why: below this height a column squeezes the keys too small to hit, so the keypad moves beside the number.
 const COLUMN_MIN_HEIGHT = 300
+// why: wide enough for a six-digit change at the log's text size, so the log shows as many recent steps as fit.
+const LOG_STEP_WIDTH = 52
+const LOG_GAP = 6
 const FADE_MS = 160
 
 type Props = {
+  playerId?: string
   seatNumber: number
   playerName: string
   life: number
@@ -68,6 +73,7 @@ export function CalculatorGlyph({ color, size }: { color: string; size: number }
 }
 
 export function LifeCalculator({
+  playerId,
   seatNumber,
   playerName,
   life,
@@ -264,6 +270,20 @@ export function LifeCalculator({
           </BoardPressable>
         </View>
       </View>
+      {playerId ? (
+        <LifeLog playerId={playerId}>
+          {(steps) => (
+            <LifeLogRow
+              steps={steps}
+              seatNumber={seatNumber}
+              playerName={playerName}
+              ink={ink}
+              damage={theme.colors.error}
+              gain={theme.colors.success}
+            />
+          )}
+        </LifeLog>
+      ) : null}
       {beside ? (
         <View style={$besideBody}>
           <View style={$besideReadout}>
@@ -280,6 +300,66 @@ export function LifeCalculator({
         </>
       )}
     </Animated.View>
+  )
+}
+
+function signed(delta: number) {
+  return `${delta < 0 ? "‚àí" : "+"}${Math.abs(delta)}`
+}
+
+function LifeLogRow({
+  steps,
+  seatNumber,
+  playerName,
+  ink,
+  damage,
+  gain,
+}: {
+  steps: readonly LifeLogStep[]
+  seatNumber: number
+  playerName: string
+  ink: string
+  damage: string
+  gain: string
+}) {
+  const [width, setWidth] = useState(0)
+  if (steps.length < 2) return null
+  const fits = Math.max(1, Math.floor((width + LOG_GAP) / (LOG_STEP_WIDTH + LOG_GAP)))
+  const shown = steps.slice(-fits)
+  const label = steps
+    .map(({ delta, life }) => (delta === undefined ? `${life}` : `${signed(delta)} to ${life}`))
+    .join(", ")
+
+  return (
+    <View
+      testID={`life-calculator-log-seat-${seatNumber}`}
+      accessible
+      accessibilityLabel={`${playerName}'s life log: ${label}`}
+      onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
+      style={$log}
+    >
+      {width > 0
+        ? shown.map(({ id, delta, life }) => (
+            <View key={id} style={$logStep}>
+              {delta === undefined ? null : (
+                <Text
+                  text={signed(delta)}
+                  size="xxs"
+                  weight="bold"
+                  numberOfLines={1}
+                  style={[$logText, { color: delta < 0 ? damage : gain }]}
+                />
+              )}
+              <Text
+                text={String(life)}
+                size="xxs"
+                numberOfLines={1}
+                style={[$logText, { color: ink }]}
+              />
+            </View>
+          ))
+        : null}
+    </View>
   )
 }
 
@@ -320,5 +400,12 @@ const $action: ViewStyle = {
   paddingHorizontal: 4,
 }
 const $hint: TextStyle = { opacity: 0.72 }
+const $log: ViewStyle = { flexDirection: "row", justifyContent: "flex-end", gap: LOG_GAP }
+const $logStep: ViewStyle = {
+  width: LOG_STEP_WIDTH,
+  alignItems: "flex-end",
+  justifyContent: "flex-end",
+}
+const $logText: TextStyle = { fontVariant: ["tabular-nums"], lineHeight: 15 }
 const $pressed: ViewStyle = { opacity: 0.75 }
 const $disabled: ViewStyle = { opacity: 0.35 }

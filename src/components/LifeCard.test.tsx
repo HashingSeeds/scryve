@@ -2,8 +2,17 @@ import { StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 import * as Reanimated from "react-native-reanimated"
 
-import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
+import {
+  asActorId,
+  asDeviceId,
+  asGameId,
+  asOperationId,
+  asPlayerId,
+  PLAYER_COLORS,
+} from "@/features/game/domain"
+import { LifeLogContext } from "@/features/game/LifeLog"
 import { playTableRules } from "@/features/game/playSystems"
+import type { LifeChangedEvent } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
@@ -1179,6 +1188,51 @@ describe("LifeCard", () => {
     fireEvent.press(view.getByTestId("life-calculator-key-00-seat-1"))
     fireEvent.press(view.getByTestId("life-calculator-key-0-seat-1"))
     expect(view.getByText("− → 0 · + → 1500")).toBeTruthy()
+  })
+
+  it("lists the seat's Life Points so far in the calculator, newest on the right", () => {
+    const ada = asPlayerId("ada")
+    const change = (id: string, delta: number): LifeChangedEvent => ({
+      type: "life.changed",
+      operationId: asOperationId(id),
+      gameId: asGameId("game"),
+      actorId: asActorId("local"),
+      deviceId: asDeviceId("device"),
+      clientCreatedAt: 1,
+      playerId: ada,
+      delta,
+    })
+    const view = render(
+      <LifeLogContext.Provider
+        value={{
+          kind: "local",
+          startingLife: 8000,
+          events: [change("op-1", -2000), change("op-2", 800)],
+        }}
+      >
+        <ThemeProvider initialContext="dark">
+          <LifeCard
+            playerId={ada}
+            playerName="Ada"
+            seatNumber={1}
+            life={6800}
+            color="#41476E"
+            system="ygo"
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>
+      </LifeLogContext.Provider>,
+    )
+    fireEvent.press(view.getByTestId("life-calculator-open-seat-1"))
+    const log = view.getByTestId("life-calculator-log-seat-1")
+    expect(log).toHaveProp(
+      "accessibilityLabel",
+      "Ada's life log: 8000, −2000 to 6000, +800 to 6800",
+    )
+    fireEvent(log, "layout", { nativeEvent: { layout: { width: 120 } } })
+    expect(within(log).queryByText("8000")).toBeNull()
+    expect(within(log).getByText("−2000")).toBeTruthy()
+    expect(within(log).getByText("6800")).toBeTruthy()
   })
 
   it("shrinks the Yu-Gi-Oh! running change in its glyph to fit beside the total", () => {
