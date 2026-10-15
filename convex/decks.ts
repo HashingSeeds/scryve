@@ -30,7 +30,12 @@ import {
 } from "./lib/entitlements"
 import { limitGameRate } from "./lib/gameRateLimits"
 import { ygoImageUrl } from "./lib/games/yugioh"
-import { capabilityReleased, requireReleasedCapability } from "./lib/integrations"
+import {
+  capabilityReleased,
+  integration,
+  integrationFor,
+  requireReleasedCapability,
+} from "./lib/integrations"
 import {
   assertDeckFormat,
   assertDeckName,
@@ -168,12 +173,11 @@ function fingerprint(cards: DeckCardInput[]) {
 }
 
 function cardFields(game: string, card: DeckCardInput) {
-  const isMagic = game === DEFAULT_DECK_GAME
   return {
     game,
     identityNamespace:
       card.identityNamespace ??
-      (isMagic ? "scryfall-oracle" : game === "ygo" ? "ygoprodeck-card" : "tcgdex-card"),
+      (integration(game) ?? integrationFor(DEFAULT_DECK_GAME)).identityNamespace,
     ...((card.cardId ?? card.oracleId) ? { cardId: card.cardId ?? card.oracleId } : {}),
     ...((card.providerCardId ?? card.scryfallId)
       ? { providerCardId: card.providerCardId ?? card.scryfallId }
