@@ -212,6 +212,22 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("280")
   })
 
+  it("shrinks the running change in its glyph to fit beside the HP", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Blastoise ex", hp: 330, prizes: 2 })
+    render(<Seat harness={table} seat={0} />)
+    fireEvent(screen.getByTestId("pokemon-hero-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 300, height: 200 } },
+    })
+
+    const hero = within(screen.getByTestId("pokemon-hero-seat-1"))
+    for (let tap = 0; tap < 3; tap++)
+      fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    const fontSize = (text: string) => StyleSheet.flatten(hero.getByText(text).props.style).fontSize
+    expect(fontSize("-30")).toBeLessThan(fontSize("+"))
+  })
+
   it("knocks out on lethal damage, scores the opponent's prizes, and Undo puts it all back", () => {
     jest.useFakeTimers()
     const table = pokemonTable(["Ada", "Grace"])
