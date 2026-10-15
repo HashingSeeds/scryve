@@ -14,6 +14,7 @@ import Animated, {
 import {
   DIE_SIDES,
   toolLabel,
+  type ChoiceReason,
   type DiceSeatChip,
   type DiceSeatView,
   type DiceTool,
@@ -237,7 +238,7 @@ function Result({
   if (view.kind === "choice")
     return (
       <>
-        {label(view.reason === "flip" ? "Won the flip" : "Lost the last game")}
+        {label(CHOICE_LABEL[view.reason])}
         {headline("Goes first?")}
         <View style={themed($options)}>
           {(["first", "second"] as const).map((order) => (
@@ -286,11 +287,13 @@ function Result({
           ? null
           : view.status === "won"
             ? label("Goes first")
-            : view.status === "tied"
-              ? label("Tie. Tap to roll again")
-              : view.status === "out"
-                ? label("Out")
-                : null}
+            : view.status === "chooses"
+              ? label("Won the roll")
+              : view.status === "tied"
+                ? label("Tie. Tap to roll again")
+                : view.status === "out"
+                  ? label("Out")
+                  : null}
       </>
     )
   if (view.kind === "waiting") return null
@@ -343,19 +346,27 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
     const status =
       view.status === "won"
         ? ", goes first"
-        : view.status === "tied"
-          ? ", tied, tap to roll again"
-          : view.status === "out"
-            ? ", out"
-            : ""
+        : view.status === "chooses"
+          ? ", won the roll"
+          : view.status === "tied"
+            ? ", tied, tap to roll again"
+            : view.status === "out"
+              ? ", out"
+              : ""
     return `${playerName} rolled ${view.value}${status}`
   }
   if (view?.kind === "choice")
-    return `${playerName} ${view.reason === "flip" ? "won the flip" : "lost the last game"} and chooses who goes first`
+    return `${playerName} ${CHOICE_LABEL[view.reason].toLowerCase()} and chooses who goes first`
   if (view?.kind === "waiting") return "Waiting for the choice"
   if (view?.kind === "first")
     return view.status === "won" ? `${playerName} goes first` : `${playerName} does not go first`
   return armed === "coin" ? `Flip a coin for ${playerName}` : `Roll a ${armed} for ${playerName}`
+}
+
+const CHOICE_LABEL: Record<ChoiceReason, string> = {
+  flip: "Won the flip",
+  roll: "Won the roll",
+  loss: "Lost the last game",
 }
 
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.
