@@ -35,6 +35,10 @@ function sampleValues(system: PlaySystemId, count: number): readonly number[] {
 }
 
 const DEMOS = ["commander", "pokemon"] as const
+// Leaving the demo step plays its changes back in reverse over about this long.
+const REWIND_MS = 1500
+const REWIND_MIN_STEP_MS = 30
+const REWIND_MAX_STEP_MS = 220
 type Demo = (typeof DEMOS)[number]
 
 function commanderSetup(count: number): DemoGameSetup {
@@ -124,8 +128,8 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   // The details step plays one demo at a time on the visitor's own table: Commander damage, or a
   // Pokémon turn. Seats and layout stay theirs; only the game changes when the demo needs it. It
   // opens on the visitor's game when that game has a demo, and the step's picker switches between
-  // them. Each switch or replay starts again from the visitor's table, and the step gives that
-  // table back when it leaves the screen.
+  // them. Each switch or replay starts again from the visitor's table. When the step leaves the
+  // screen, the demo's changes play back in reverse until the visitor's table is back.
   const demos: Record<Demo, { start: () => void; stop: () => void }> = {
     commander: createCommanderDemo(board, game, {
       damage: SAMPLE_COMMANDER_DAMAGE,
@@ -139,10 +143,75 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   // A demo picked before the step comes on screen plays when it does.
   let requested: Demo | undefined
   let borrowed: ReturnType<DemoGame["snapshot"]> | undefined
+  // The table after each change the demo makes, for the rewind.
+  let trail: ReturnType<DemoGame["snapshot"]>[] = []
+  let rewinding: number | undefined
+  let leaving: ReturnType<DemoGame["snapshot"]> | undefined
+  game.subscribe(() => {
+    if (showing && rewinding === undefined) trail.push(game.snapshot())
+  })
+
+  function stopRewind() {
+    window.clearTimeout(rewinding)
+    rewinding = undefined
+    delete stage.dataset.rewinding
+  }
+  // A keyboard activation has no point, so it goes to the redrawn control with the same data
+  // attributes (seat, direction, action, Pokémon). A control the landed game lacks gets nothing.
+  const sameControl = (old: Element) => {
+    const control = old.closest<HTMLElement>("button")
+    if (!control) return null
+    const match = Object.entries(control.dataset)
+      .map(
+        ([key, value]) =>
+          `[data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${value}"]`,
+      )
+      .join("")
+    return match ? board.querySelector(`button${match}`) : null
+  }
+  // A tap anywhere lands the rewind first, so the tap changes the visitor's table and no later
+  // frame overwrites it. Capture runs before the boards' and pickers' own handlers.
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!event.isTrusted || rewinding === undefined) return
+      stopRewind()
+      if (leaving) game.restore(leaving)
+      // Landing redraws the board, so a tap on it goes to whatever control is there now.
+      if (!(event.target instanceof Element) || event.target.isConnected) return
+      event.stopPropagation()
+      event.preventDefault()
+      const now =
+        event.detail === 0
+          ? sameControl(event.target)
+          : document.elementFromPoint(event.clientX, event.clientY)
+      if (now instanceof HTMLElement) now.click()
+    },
+    true,
+  )
+  // Steps back through the trail, about REWIND_MS in all, and lands on the visitor's table.
+  function rewind(to: ReturnType<DemoGame["snapshot"]>) {
+    const frames = [...trail.slice(0, -1).reverse(), to]
+    trail = []
+    const every = Math.min(
+      REWIND_MAX_STEP_MS,
+      Math.max(REWIND_MIN_STEP_MS, REWIND_MS / frames.length),
+    )
+    const next = () => {
+      const frame = frames.shift()
+      if (!frame) return stopRewind()
+      game.restore(frame)
+      if (frames.length) rewinding = window.setTimeout(next, every)
+      else stopRewind()
+    }
+    stage.dataset.rewinding = ""
+    rewinding = window.setTimeout(next, every)
+  }
 
   function show(demo: Demo) {
     if (showing) demos[showing].stop()
     if (showing && borrowed) game.restore(borrowed)
+    trail = []
     showing = demo
     press(demoPicker, demo)
     step.querySelectorAll<HTMLElement>("[data-demo-copy]").forEach((copy) => {
@@ -173,6 +242,11 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   return (next: string) => {
     if ((next === "details") === Boolean(borrowed)) return
     if (next === "details") {
+      // Coming back mid-rewind starts from the visitor's table, not a half-rewound one.
+      if (rewinding !== undefined) {
+        stopRewind()
+        game.restore(leaving ?? game.snapshot())
+      }
       borrowed = game.snapshot()
       const demo = requested ?? (game.setup.system === "pokemon" ? "pokemon" : "commander")
       requested = undefined
@@ -180,7 +254,9 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     }
     if (showing) demos[showing].stop()
     showing = undefined
-    if (borrowed) game.restore(borrowed)
+    leaving = borrowed
+    if (borrowed && prefersReducedMotion.matches) game.restore(borrowed)
+    else if (borrowed) rewind(borrowed)
     borrowed = undefined
   }
 }
@@ -377,6 +453,7 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   const showing = () =>
     (stage.dataset.scene === "intro" || stage.dataset.scene === "features") &&
     stage.dataset.step !== "details" &&
+    stage.dataset.rewinding === undefined &&
     !stage.classList.contains("full")
   const tap = () => {
     if (!showing()) return
