@@ -210,6 +210,15 @@ export function createDemoGame(initial: DemoGameSetup) {
       history.length = 0
       emit({ type: "reset" })
     },
+    // The whole game as it stands, for `restore` to put back after a demo borrows the board.
+    snapshot() {
+      return { setup, life, table }
+    },
+    restore(saved: { setup: typeof setup; life: typeof life; table: typeof table }) {
+      ;({ setup, life, table } = saved)
+      history.length = 0
+      emit({ type: "reset" })
+    },
   }
 }
 
@@ -437,7 +446,7 @@ export function createCommanderDemo(
     later(COMMANDER_DEMO_FADE_MS, () => el.remove())
   }
 
-  // Hands the demo's damage back, one point at a time so the life counts up.
+  // Hands one point of the demo's damage back, so a replay starts from the same board.
   function giveBack(): boolean {
     for (const [seat, count] of owed) {
       game.change(seat, 1)
@@ -447,10 +456,6 @@ export function createCommanderDemo(
     }
     return owed.size > 0
   }
-  function drain() {
-    if (giveBack()) later(45, drain)
-  }
-
   function play() {
     clearTimers()
     layers().forEach((el) => el.remove())
@@ -562,7 +567,6 @@ export function createCommanderDemo(
       clearTimers()
       dropHints()
       layers().forEach(fadeOut)
-      drain()
     },
   }
 }

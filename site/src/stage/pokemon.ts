@@ -8,7 +8,7 @@ import {
   getFourCardMenuJunction,
   type getPlayerGridLayout,
 } from "@/components/playerGridGeometry"
-import { playTableRules } from "@/features/game/playSystems"
+import { defaultStartingLife, playTableRules } from "@/features/game/playSystems"
 
 import {
   findPokemon,
@@ -21,7 +21,7 @@ import {
   type PokemonSlot,
   type TableState,
 } from "../../../convex/lib/table"
-import type { DemoGame, DemoGameSetup } from "./board"
+import type { DemoGame } from "./board"
 import { HINT_PRESS_MS, showTapHint } from "./hint"
 
 const RULES = playTableRules("pokemon").pokemon ?? { benchSize: 5, damageStep: 10 }
@@ -446,27 +446,30 @@ const inSeat = (seat: number, selector: string) => `.seat[data-player="${seat}"]
 const damageIn = (seat: number) => inSeat(seat, '[data-pk="damage"][data-dir="-1"]')
 const firstBench = (seat: number) => inSeat(seat, '[data-pk="bench"]')
 
-// The tour's Pokémon turn on a two-player table. Devon, facing the viewer, damages his Active
-// and then a bench Pokémon with one tap on its chip. Maya's Active takes the knockout, Devon's
-// prizes drop, and Maya taps her bench to send in a new Active. Each tap clicks the real control.
+// The tour's Pokémon turn, on whatever seats the visitor's table has. Devon damages his Active
+// and then a bench Pokémon with one tap on its chip. Maya's Active takes the knockout; with more
+// than one opponent she picks Devon to take the prizes. Devon's prizes drop, and Maya taps her
+// bench to send in a new Active. Each tap clicks the real control, and a tap whose control isn't
+// there (the visitor's own board may differ) does nothing.
 const POKEMON_DEMO_SCRIPT = [
   { tap: damageIn(1), hint: inSeat(1, '[data-glyph="1:-1"]'), presses: 3 },
   { tap: firstBench(1), presses: 1 },
   { tap: damageIn(1), hint: inSeat(1, '[data-glyph="1:-1"]'), presses: 2 },
   { tap: damageIn(0), hint: inSeat(0, '[data-glyph="0:-1"]'), presses: 2 },
+  { tap: inSeat(0, '[data-pk="taker"][data-value="1"]'), presses: 1 },
   { tap: firstBench(0), presses: 1 },
 ] as const
 
 export interface PokemonDemoOptions {
-  setup: DemoGameSetup
   reducedMotion: MediaQueryList
 }
 
-// Plays the tour's Pokémon turn on `board` from a fresh table each time it starts.
+// Plays the tour's Pokémon turn on `board`. A Pokémon table plays as it is; any other game turns
+// into Pokémon on the same seats and layout first.
 export function createPokemonDemo(
   board: HTMLElement,
   game: DemoGame,
-  { setup, reducedMotion }: PokemonDemoOptions,
+  { reducedMotion }: PokemonDemoOptions,
 ) {
   let active = false
   const timers = new Set<number>()
@@ -524,7 +527,13 @@ export function createPokemonDemo(
   return {
     start() {
       active = true
-      game.reset(setup)
+      if (game.setup.system === "pokemon") return later(0, play)
+      const count = game.setup.names.length
+      game.reset({
+        system: "pokemon",
+        startingLife: defaultStartingLife("pokemon", undefined, count),
+        values: SAMPLE_PRIZES.slice(0, count),
+      })
     },
     stop() {
       active = false

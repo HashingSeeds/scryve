@@ -34,14 +34,14 @@ function sampleValues(system: PlaySystemId, count: number): readonly number[] {
   return []
 }
 
-// The Pokémon step's two-player table.
-const POKEMON_TOUR_SETUP: DemoGameSetup = {
-  system: "pokemon",
-  startingLife: startingLife("pokemon"),
-  names: NAMES.slice(0, 2),
-  values: SAMPLE_PRIZES.slice(0, 2),
-  layout: "auto",
-}
+const DEMOS = ["commander", "pokemon"] as const
+// Leaving the demo step plays its changes back in reverse over about this long.
+const REWIND_MS = 1500
+const REWIND_MIN_STEP_MS = 30
+const REWIND_MAX_STEP_MS = 220
+const VISITOR_TAP = "scryve:visitor-tap"
+const REWIND_MAX_FRAMES = Math.floor(REWIND_MS / REWIND_MIN_STEP_MS)
+type Demo = (typeof DEMOS)[number]
 
 function commanderSetup(count: number): DemoGameSetup {
   return {
@@ -127,42 +127,170 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   game.subscribe((event) => event.type === "reset" && syncPickers())
   syncPickers()
 
-  // The commander damage demo plays while that step is on screen. Commander damage is a
-  // Magic format, so the step moves another system to Magic; the demo then plays on reset.
-  const commander = createCommanderDemo(board, game, {
-    damage: SAMPLE_COMMANDER_DAMAGE,
-    reducedMotion: prefersReducedMotion,
+  // The details step plays one demo at a time on the visitor's own table: Commander damage, or a
+  // Pokémon turn. Seats and layout stay theirs; only the game changes when the demo needs it. It
+  // opens on the visitor's game when that game has a demo, and the step's picker switches between
+  // them. Each switch or replay starts again from the visitor's table. When the step leaves the
+  // screen, the demo's changes play back in reverse until the visitor's table is back.
+  const demos: Record<Demo, { start: () => void; stop: () => void }> = {
+    commander: createCommanderDemo(board, game, {
+      damage: SAMPLE_COMMANDER_DAMAGE,
+      reducedMotion: prefersReducedMotion,
+    }),
+    pokemon: createPokemonDemo(board, game, { reducedMotion: prefersReducedMotion }),
+  }
+  const step = query<HTMLElement>(".steps [data-step='details']")
+  const demoPicker = query<HTMLElement>("[data-pick='demo']", step)
+  let showing: Demo | undefined
+  // The demo the step shows next. Picking a game anywhere on the page sets it, so the step's copy
+  // already matches by the time it scrolls into view and never changes in front of the visitor.
+  let chosen: Demo = game.setup.system === "pokemon" ? "pokemon" : "commander"
+  let borrowed: ReturnType<DemoGame["snapshot"]> | undefined
+  // The table after each change the demo makes, for the rewind.
+  let trail: ReturnType<DemoGame["snapshot"]>[] = []
+  let rewinding: number | undefined
+  let leaving: ReturnType<DemoGame["snapshot"]> | undefined
+  game.subscribe(() => {
+    if (showing && rewinding === undefined) trail.push(game.snapshot())
   })
-  // The Pokémon step plays a turn on a fresh two-player table each time it comes on screen.
-  const pokemon = createPokemonDemo(board, game, {
-    setup: POKEMON_TOUR_SETUP,
-    reducedMotion: prefersReducedMotion,
-  })
-  let showing = ""
-  const replay = (step: string, demo: { start: () => void }) => {
-    const copy = query<HTMLElement>(`.steps [data-step='${step}']`)
-    query<HTMLElement>("[data-replay]", copy).addEventListener("click", () => {
-      if (showing === step) demo.start()
-      else copy.scrollIntoView({ block: "start", behavior: "instant" })
+
+  function stopRewind() {
+    window.clearTimeout(rewinding)
+    rewinding = undefined
+    delete stage.dataset.rewinding
+  }
+  // A keyboard activation has no point, so it goes to the redrawn control with the same data
+  // attributes (seat, direction, action, picker value) in the same board or picker, which outlive
+  // the redraw. A control the landed game lacks gets nothing.
+  const ownerOf = (el: Element): ParentNode =>
+    el.closest<HTMLElement>("[data-board], [data-pick]") ?? document
+  const sameControl = (old: Element, owner: ParentNode) => {
+    const control = old.closest<HTMLElement>("button")
+    if (!control) return null
+    const match = Object.entries(control.dataset)
+      .map(
+        ([key, value]) =>
+          `[data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${value}"]`,
+      )
+      .join("")
+    return match ? owner.querySelector<HTMLElement>(`button${match}`) : null
+  }
+  // A tap anywhere lands the rewind first, so the tap changes the visitor's table and no later
+  // frame overwrites it. Capture runs before the boards' and pickers' own handlers.
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!event.isTrusted || rewinding === undefined) return
+      const owner = event.target instanceof Element ? ownerOf(event.target) : document
+      stopRewind()
+      if (leaving) game.restore(leaving)
+      // Landing redraws the board, so a tap on it goes to whatever control is there now.
+      if (!(event.target instanceof Element) || event.target.isConnected) return
+      event.stopPropagation()
+      event.preventDefault()
+      if (owner instanceof Element && owner.matches("[data-board]"))
+        stage.dispatchEvent(new Event(VISITOR_TAP))
+      const now =
+        event.detail === 0
+          ? sameControl(event.target, owner)
+          : document.elementFromPoint(event.clientX, event.clientY)
+      if (!(now instanceof HTMLElement)) return
+      if (event.detail === 0) now.focus({ preventScroll: true })
+      now.click()
+    },
+    true,
+  )
+  // Steps back through the trail, about REWIND_MS in all, and lands on the visitor's table.
+  function rewind(to: ReturnType<DemoGame["snapshot"]>) {
+    const steps = trail.slice(0, -1).reverse()
+    // A long trail is thinned to evenly spaced frames, so the rewind keeps to REWIND_MS.
+    const keep = Math.min(steps.length, REWIND_MAX_FRAMES)
+    const frames = [
+      ...Array.from({ length: keep }).flatMap(
+        (_, i) => steps[Math.floor((i * steps.length) / keep)] ?? [],
+      ),
+      to,
+    ]
+    trail = []
+    const every = Math.min(
+      REWIND_MAX_STEP_MS,
+      Math.max(REWIND_MIN_STEP_MS, REWIND_MS / frames.length),
+    )
+    const next = () => {
+      const frame = frames.shift()
+      if (!frame) return stopRewind()
+      // A frame redraws the boards, so keyboard focus moves to the same control in the redraw.
+      const focused = document.activeElement
+      const owner = focused ? ownerOf(focused) : document
+      game.restore(frame)
+      if (focused instanceof Element && !focused.isConnected)
+        sameControl(focused, owner)?.focus({ preventScroll: true })
+      if (frames.length) rewinding = window.setTimeout(next, every)
+      else stopRewind()
+    }
+    stage.dataset.rewinding = ""
+    rewinding = window.setTimeout(next, every)
+  }
+
+  function choose(demo: Demo) {
+    chosen = demo
+    press(demoPicker, demo)
+    step.querySelectorAll<HTMLElement>("[data-demo-copy]").forEach((copy) => {
+      copy.hidden = copy.dataset.demoCopy !== demo
     })
   }
-  replay("commander", commander)
-  replay("pokemon", pokemon)
-  return (step: string) => {
-    const next = step === "commander" || step === "pokemon" ? step : ""
-    if (next === showing) return
-    if (showing === "commander") commander.stop()
-    if (showing === "pokemon") pokemon.stop()
-    showing = next
-    if (next === "pokemon") return pokemon.start()
-    if (next !== "commander") return
-    commander.start()
-    if (game.setup.system === "mtg") return
-    game.reset({
-      system: "mtg",
-      startingLife: startingLife("mtg"),
-      values: SAMPLE_LIFE.slice(0, game.setup.names.length),
-    })
+  function show(demo: Demo) {
+    if (showing) demos[showing].stop()
+    if (showing && borrowed) game.restore(borrowed)
+    trail = []
+    showing = demo
+    choose(demo)
+    demos[demo].start()
+    if (demo === "commander" && game.setup.system !== "mtg")
+      game.reset({
+        system: "mtg",
+        startingLife: startingLife("mtg"),
+        values: SAMPLE_LIFE.slice(0, game.setup.names.length),
+      })
+  }
+  const scrollToStep = () => step.scrollIntoView({ block: "start", behavior: "instant" })
+
+  demoPicker.addEventListener("click", (event) => {
+    const demo = DEMOS.find((value) => value === picked(event))
+    if (!demo) return
+    if (borrowed) return show(demo)
+    choose(demo)
+    scrollToStep()
+  })
+  systemPickers.forEach((picker) =>
+    picker.addEventListener("click", (event) => {
+      const value = picked(event)
+      if (!borrowed && PLAY_SYSTEM_IDS.some((system) => system === value))
+        choose(value === "pokemon" ? "pokemon" : "commander")
+    }),
+  )
+  query<HTMLElement>("[data-replay]", step).addEventListener("click", () => {
+    if (borrowed && showing) show(showing)
+    else scrollToStep()
+  })
+
+  return (next: string) => {
+    if ((next === "details") === Boolean(borrowed)) return
+    if (next === "details") {
+      // Coming back mid-rewind starts from the visitor's table, not a half-rewound one.
+      if (rewinding !== undefined) {
+        stopRewind()
+        game.restore(leaving ?? game.snapshot())
+      }
+      borrowed = game.snapshot()
+      return show(chosen)
+    }
+    if (showing) demos[showing].stop()
+    showing = undefined
+    leaving = borrowed
+    if (borrowed && prefersReducedMotion.matches) game.restore(borrowed)
+    else if (borrowed) rewind(borrowed)
+    borrowed = undefined
   }
 }
 
@@ -357,8 +485,8 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   // Full screen is for the visitor's own taps.
   const showing = () =>
     (stage.dataset.scene === "intro" || stage.dataset.scene === "features") &&
-    stage.dataset.step !== "commander" &&
-    stage.dataset.step !== "pokemon" &&
+    stage.dataset.step !== "details" &&
+    stage.dataset.rewinding === undefined &&
     !stage.classList.contains("full")
   const tap = () => {
     if (!showing()) return
@@ -386,11 +514,15 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
     pending = window.setTimeout(press, HINT_PRESS_MS)
   }
   const timer = window.setInterval(tap, DEMO_TAP_MS)
-  stage.addEventListener("click", (event) => {
-    if (!event.isTrusted || !(event.target as Element).closest(".hit, [data-pk]")) return
+  const stopTaps = () => {
     window.clearInterval(timer)
     window.clearTimeout(pending)
+  }
+  stage.addEventListener("click", (event) => {
+    if (event.isTrusted && (event.target as Element).closest(".hit, [data-pk]")) stopTaps()
   })
+  // The demo step's rewind replays a visitor's tap as a script click, so it says so itself.
+  stage.addEventListener(VISITOR_TAP, stopTaps)
 }
 
 // On wide screens the stage's phone starts out filling the hero, on its side, and shrinks

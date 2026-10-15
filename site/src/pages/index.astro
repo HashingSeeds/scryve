@@ -119,18 +119,23 @@ const plans = [
               <div class="picker" data-pick="layout" role="group" aria-label="Layout"></div>
             </div>
           </div>
-          <div class="step" data-step="commander">
+          <div class="step" data-step="details">
             <div class="step-copy">
-              <h2>Commander damage, per opponent.</h2>
-              <p>Every seat tracks damage from each commander at the table. At 21 from one commander, that player is out.</p>
-              <button class="demo-replay" type="button" data-replay>Replay demo</button>
-            </div>
-          </div>
-          <div class="step" data-step="pokemon">
-            <div class="step-copy">
-              <h2>Pokémon, down to the bench.</h2>
-              <p>The big number is your Active's HP. Tap a bench Pokémon to damage it. A knockout sends the prizes across the table. Pick your deck and its Pokémon place in one tap.</p>
-              <button class="demo-replay" type="button" data-replay>Replay demo</button>
+              <div class="demo-copy" data-demo-copy="commander">
+                <h2>Commander damage, per opponent.</h2>
+                <p>Every seat tracks damage from each commander at the table. At 21 from one commander, that player is out.</p>
+              </div>
+              <div class="demo-copy" data-demo-copy="pokemon" hidden>
+                <h2>Pokémon, down to the bench.</h2>
+                <p>The big number is your Active's HP. Tap a bench Pokémon to damage it. A knockout sends the prizes across the table. Pick your deck and its Pokémon place in one tap.</p>
+              </div>
+              <div class="demo-controls">
+                <div class="picker" data-pick="demo" role="group" aria-label="Demo">
+                  <button type="button" data-value="commander" aria-pressed="true">Commander</button>
+                  <button type="button" data-value="pokemon" aria-pressed="false">Pokémon</button>
+                </div>
+                <button class="demo-replay" type="button" data-replay>Replay demo</button>
+              </div>
             </div>
           </div>
           <div class="step" id="next" data-step="next">
