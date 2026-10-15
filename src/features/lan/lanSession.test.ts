@@ -1,6 +1,6 @@
 import type { LanGuestMessage, LanHostMessage } from "./lanGame"
 import { LanSession } from "./lanSession"
-import { hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
+import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
 
 jest.mock("./lanTransport", () => ({
   hostLan: jest.fn(),
@@ -103,5 +103,29 @@ describe("LAN session seats", () => {
     jest.advanceTimersByTime(50)
 
     expect(lifeOf(session, bob.pass().key)).toBe(15)
+  })
+})
+
+describe("LAN session guest", () => {
+  it("keeps its seat on the board after the host ends the game", async () => {
+    let host: LanPeerHandlers<LanHostMessage> | undefined
+    jest.mocked(connectLan).mockImplementation(async (_service, _parse, handlers) => {
+      host = handlers as LanPeerHandlers<LanHostMessage>
+      return { send: jest.fn(), sendAndClose: jest.fn(), close: jest.fn() }
+    })
+    const { session: hostSession } = await startedGame()
+    const guest = new LanSession()
+    await guest.join({ name: "Host game" } as Parameters<LanSession["join"]>[0])
+    const pass = { key: "seat-guest", token: "token" }
+    host?.onMessage({ type: "welcome", pass })
+    const game = hostSession.getState().game!
+
+    host?.onMessage({ type: "game", game: { ...game, status: "abandoned" } })
+
+    expect(guest.getState()).toMatchObject({
+      status: "idle",
+      seatKey: pass.key,
+      game: { status: "abandoned" },
+    })
   })
 })

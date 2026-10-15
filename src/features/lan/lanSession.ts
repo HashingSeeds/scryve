@@ -281,7 +281,11 @@ export class LanSession {
     if (this.ownLife?.round !== message.game.round) this.ownLife = undefined
     const game = seatKey ? mergeHostGame(message.game, seatKey, this.ownLife) : message.game
     this.set({ game, status: "connected" })
-    if (game.status === "abandoned") return this.leave({ keepGame: true })
+    if (game.status === "abandoned") {
+      this.leave({ keepGame: true })
+      // why: the board needs the seat to stay open and tell this guest the host ended the game.
+      return this.set({ seatKey })
+    }
     const hostSeat = message.game.seats.find((seat) => seat.key === seatKey)
     if (this.ownLife && hostSeat && this.ownLife.version > hostSeat.version)
       this.connection?.send({ type: "life", ...this.ownLife })
