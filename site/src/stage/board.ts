@@ -255,6 +255,31 @@ const APP_MARK_SHAPES: Record<PlayerMarkShape, string> = {
     '<path d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"/>',
 }
 
+// Each shape's drawn edges on its 44 unit box (PlayerMark's MARK_ART_BOUNDS).
+const MARK_ART_BOUNDS: Record<
+  PlayerMarkShape,
+  { top: number; bottom: number; left: number; right: number }
+> = {
+  circle: { top: 10, bottom: 34, left: 10, right: 34 },
+  triangle: { top: 8.56, bottom: 34.5, left: 7.59, right: 36.41 },
+  square: { top: 11, bottom: 33, left: 11, right: 33 },
+  diamond: { top: 9.04, bottom: 34.96, left: 9.04, right: 34.96 },
+  star: { top: 8.43, bottom: 35.06, left: 8.08, right: 35.92 },
+  hexagon: { top: 8.39, bottom: 35.61, left: 9.88, right: 34.12 },
+  plus: { top: 8, bottom: 36, left: 8, right: 36 },
+  shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
+  heart: { top: 9.15, bottom: 34.84, left: 8, right: 36 },
+}
+
+// A mark cropped to its drawn edges, so the shape itself, not its box, lines up with what sits
+// beside it (SeatIdentity's seatMarkArt). Its width follows the shape.
+export function croppedMarkSvg(shape: PlayerMarkShape, fill: string): string {
+  const { top, bottom, left, right } = MARK_ART_BOUNDS[shape]
+  const width = (right - left).toFixed(2)
+  const height = (bottom - top).toFixed(2)
+  return `<svg viewBox="${left} ${top} ${width} ${height}" width="${width}" height="${height}" fill="${fill}" aria-hidden="true">${APP_MARK_SHAPES[shape]}</svg>`
+}
+
 // Where the sword sits inside each shape (PlayerMark's SWORD_INSET_THAT_FITS_SHAPE).
 const SWORD_INSETS: Record<PlayerMarkShape, { centerY: number; size: number }> = {
   circle: { centerY: 22, size: 14 },
@@ -551,7 +576,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     return pokemon.html({
       ...placement,
       name: seatName(game, placement.seat),
-      mark: markSvg(seatShape(placement.seat), "#fff"),
+      mark: croppedMarkSvg(seatShape(placement.seat), "#fff"),
     })
   }
 
