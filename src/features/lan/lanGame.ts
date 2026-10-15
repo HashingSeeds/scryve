@@ -1,4 +1,11 @@
 import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
+import {
+  commanderClaimOutcome,
+  confirmCommanderClaim,
+  isCommanderDamageDelta,
+  isCommanderLethal,
+  MAX_LIFE_DELTA,
+} from "../../../convex/lib/gameRules"
 import { EMPTY_TABLE } from "../../../convex/lib/table"
 import type { ConnectedDisplayProjection } from "../connected/model"
 import { MAX_PLAYER_NAME_LENGTH, MAX_PLAYERS } from "../game/domain"
@@ -6,7 +13,7 @@ import { MAX_PLAYER_NAME_LENGTH, MAX_PLAYERS } from "../game/domain"
 export const LAN_MAX_SEATS = MAX_PLAYERS
 export const LAN_MIN_PLAYERS = 2
 // why: the same bound Convex puts on a life delta; a total outside it can only come from a broken or hostile peer.
-export const MAX_LAN_LIFE = 999_999
+export const MAX_LAN_LIFE = MAX_LIFE_DELTA
 // why: a guest offline for a long game still catches up, but one message can't jump a version so far the seat locks.
 export const MAX_LAN_VERSION_STEP = 10_000
 
@@ -23,6 +30,20 @@ export interface LanSeat {
   connected: boolean
 }
 
+export type LanFormat = "standard" | "commander"
+
+export interface LanCommanderClaim {
+  id: string
+  from: string
+  to: string
+  delta: number
+}
+
+export interface LanCommanderDamage {
+  totals: { from: string; to: string; total: number }[]
+  claims: LanCommanderClaim[]
+}
+
 export interface LanGame {
   id: string
   hostKey: string
@@ -30,6 +51,8 @@ export interface LanGame {
   // why: each start resets every life, so a total from an earlier round must never win against it.
   round: number
   startingLife: number
+  format?: LanFormat
+  commander?: LanCommanderDamage
   seats: LanSeat[]
 }
 
@@ -46,7 +69,10 @@ export interface LanSeatPass {
 }
 
 export type LanGuestMessage =
-  { type: "join"; name: string; pass?: LanSeatPass; life?: LanLife } | ({ type: "life" } & LanLife)
+  | { type: "join"; name: string; pass?: LanSeatPass; life?: LanLife }
+  | ({ type: "life" } & LanLife)
+  | { type: "commander.claim"; id: string; to: string; delta: number }
+  | { type: "commander.resolve"; id: string; accepted: boolean }
 
 export type LanHostMessage =
   | { type: "game"; game: LanGame }
@@ -126,19 +152,127 @@ export function releaseLanSeat(game: LanGame, key: string): LanGame {
   }
 }
 
-export function startLanGame(game: LanGame, startingLife: number): LanGame {
+export function startLanGame(
+  game: LanGame,
+  startingLife: number,
+  format: LanFormat = "standard",
+): LanGame {
+  const { commander: _previous, ...rest } = game
   return {
-    ...game,
+    ...rest,
     status: "active",
     round: game.round + 1,
     startingLife,
+    format,
+    ...(format === "commander" ? { commander: { totals: [], claims: [] } } : {}),
     seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: 0 })),
+  }
+}
+
+const commanderTotal = (commander: LanCommanderDamage, from: string, to: string) =>
+  commander.totals.find((total) => total.from === from && total.to === to)?.total ?? 0
+
+// why: the same decision Convex makes, so a claim that could never land is dropped on arrival instead of waiting on the defender.
+export function claimLanCommanderDamage(
+  game: LanGame,
+  from: string,
+  claim: { id: string; to: string; delta: number },
+): LanGame {
+  const { commander } = game
+  const seated = (key: string) => game.seats.some((seat) => seat.key === key)
+  if (
+    !commander ||
+    game.status !== "active" ||
+    from === claim.to ||
+    !seated(from) ||
+    !seated(claim.to) ||
+    !isCommanderDamageDelta(claim.delta) ||
+    commander.claims.some((existing) => existing.id === claim.id)
+  )
+    return game
+  const outcome = commanderClaimOutcome({
+    total: commanderTotal(commander, from, claim.to),
+    delta: claim.delta,
+    pendingClaims: commander.claims.length,
+    pairHasPendingClaim: commander.claims.some(
+      (existing) => existing.from === from && existing.to === claim.to,
+    ),
+  })
+  if (outcome === "declined") return game
+  return {
+    ...game,
+    commander: { ...commander, claims: [...commander.claims, { ...claim, from }] },
+  }
+}
+
+// why: confirming writes the defender's life, and only the defender may resolve, so its seat still has a single writer.
+export function resolveLanCommanderClaim(
+  game: LanGame,
+  defender: string,
+  resolution: { id: string; accepted: boolean },
+): LanGame {
+  const { commander } = game
+  const claim = commander?.claims.find(
+    (candidate) => candidate.id === resolution.id && candidate.to === defender,
+  )
+  const seat = game.seats.find((candidate) => candidate.key === defender)
+  if (!commander || !claim || !seat || game.status !== "active") return game
+  const claims = commander.claims.filter((candidate) => candidate !== claim)
+  const confirmed = resolution.accepted
+    ? confirmCommanderClaim({
+        total: commanderTotal(commander, claim.from, claim.to),
+        life: seat.life,
+        delta: claim.delta,
+      })
+    : null
+  if (!confirmed) return { ...game, commander: { ...commander, claims } }
+  const totals = [
+    ...commander.totals.filter((total) => !(total.from === claim.from && total.to === claim.to)),
+    { from: claim.from, to: claim.to, total: confirmed.total },
+  ]
+  return {
+    ...withSeat(game, defender, (owned) => ({
+      ...owned,
+      life: confirmed.currentLife,
+      version: owned.version + 1,
+    })),
+    commander: { totals, claims },
   }
 }
 
 // why: a host snapshot sent before the guest's latest change arrived would otherwise roll its life back.
 export function mergeHostGame(hostGame: LanGame, key: string, own: LanLife | undefined) {
   return own ? setLanLife(hostGame, key, own) : hostGame
+}
+
+const commanderEliminated = (commander: LanCommanderDamage, key: string) =>
+  commander.totals.some((total) => total.to === key && isCommanderLethal(total.total))
+
+// why: like Convex, only the defender sees a claim waiting on it.
+function commanderProjection(commander: LanCommanderDamage, seatKey: string) {
+  return {
+    totals: commander.totals.map(({ from, to, total }) => ({
+      fromPlayerId: from,
+      toPlayerId: to,
+      total,
+    })),
+    pendingClaims: commander.claims
+      .filter((claim) => claim.to === seatKey)
+      .map((claim) => ({
+        claimId: claim.id,
+        operationId: claim.id,
+        fromPlayerId: claim.from,
+        toPlayerId: claim.to,
+        delta: claim.delta,
+        clientCreatedAt: 0,
+        createdAt: 0,
+      })),
+    eliminatedPlayerIds: [
+      ...new Set(
+        commander.totals.filter((total) => isCommanderLethal(total.total)).map((total) => total.to),
+      ),
+    ],
+  }
 }
 
 export function lanProjection(game: LanGame, seatKey: string): ConnectedDisplayProjection {
@@ -148,8 +282,10 @@ export function lanProjection(game: LanGame, seatKey: string): ConnectedDisplayP
     status: game.status,
     playerCount: game.seats.length,
     system: "mtg",
+    ...(game.format === "commander" ? { format: "commander" } : {}),
     startingLife: game.startingLife,
-    ruleset: "lan",
+    ruleset: game.format === "commander" ? "commander" : "lan",
+    ...(game.commander ? { commanderDamage: commanderProjection(game.commander, seatKey) } : {}),
     isHost: game.hostKey === seatKey,
     eventSequence: 0,
     serverUpdatedAt: 0,
@@ -162,6 +298,9 @@ export function lanProjection(game: LanGame, seatKey: string): ConnectedDisplayP
       color: PLAYER_COLOR_CHOICES[(seat.seat - 1) % PLAYER_COLOR_CHOICES.length],
       shape: shapeForSeat(seat.seat),
       currentLife: seat.life,
+      ...(game.commander
+        ? { eliminatedByCommanderDamage: commanderEliminated(game.commander, seat.key) }
+        : {}),
       controlledByMe: seat.key === seatKey,
       pendingDelta: 0,
     })),
@@ -180,6 +319,26 @@ const isCount = (value: unknown): value is number =>
 
 const isLife = (value: unknown): value is LanLife =>
   isRecord(value) && isLifeTotal(value.life) && isCount(value.version) && isCount(value.round)
+
+const isId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 64
+
+const isCommander = (value: unknown): value is LanCommanderDamage =>
+  isRecord(value) &&
+  Array.isArray(value.totals) &&
+  value.totals.every(
+    (total) =>
+      isRecord(total) && isId(total.from) && isId(total.to) && Number.isInteger(total.total),
+  ) &&
+  Array.isArray(value.claims) &&
+  value.claims.every(
+    (claim) =>
+      isRecord(claim) &&
+      isId(claim.id) &&
+      isId(claim.from) &&
+      isId(claim.to) &&
+      isCommanderDamageDelta(claim.delta),
+  )
 
 const isPass = (value: unknown): value is LanSeatPass =>
   isRecord(value) &&
@@ -207,6 +366,15 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
     }
   if (value.type === "life" && isLife(value))
     return { type: "life", life: value.life, version: value.version, round: value.round }
+  if (
+    value.type === "commander.claim" &&
+    isId(value.id) &&
+    isId(value.to) &&
+    isCommanderDamageDelta(value.delta)
+  )
+    return { type: "commander.claim", id: value.id, to: value.to, delta: value.delta }
+  if (value.type === "commander.resolve" && isId(value.id) && typeof value.accepted === "boolean")
+    return { type: "commander.resolve", id: value.id, accepted: value.accepted }
   return null
 }
 
@@ -228,6 +396,8 @@ const isGame = (value: unknown): value is LanGame =>
   LAN_STATUSES.some((status) => status === value.status) &&
   isCount(value.round) &&
   Number.isInteger(value.startingLife) &&
+  (value.format === undefined || value.format === "standard" || value.format === "commander") &&
+  (value.commander === undefined || isCommander(value.commander)) &&
   Array.isArray(value.seats) &&
   value.seats.length <= LAN_MAX_SEATS &&
   value.seats.every(isSeat)

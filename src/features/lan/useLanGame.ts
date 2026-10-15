@@ -1,5 +1,9 @@
 import { useMemo } from "react"
 
+import type {
+  ConnectedCommanderDamageChange,
+  ConnectedCommanderDamageClaim,
+} from "@/features/connected/model"
 import type { ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { NO_PLAY_SYSTEM, playTableRules } from "@/features/game/playSystems"
 import { createTableActions } from "@/features/game/tableRuntime"
@@ -30,8 +34,12 @@ export function useLanGame(): ConnectedGameRuntime {
       failed: [],
       connectionStatus: status === "connected" ? ("connected" as const) : ("offline" as const),
       changeLife: (seatKey: string, delta: number) => lanSession.changeLife(seatKey, delta),
-      submitCommanderDamage: noop,
-      resolveCommanderDamageClaim: noop,
+      submitCommanderDamage: (
+        fromPlayerId: string,
+        changes: readonly ConnectedCommanderDamageChange[],
+      ) => lanSession.claimCommanderDamage(fromPlayerId, changes),
+      resolveCommanderDamageClaim: (claim: ConnectedCommanderDamageClaim, accepted: boolean) =>
+        lanSession.resolveCommanderDamage(claim.claimId, accepted),
       finish: async () => {
         lanSession.finish()
         return true

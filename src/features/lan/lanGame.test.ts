@@ -1,5 +1,6 @@
 import {
   admitLanGuest,
+  claimLanCommanderDamage,
   createLanGame,
   LAN_MAX_SEATS,
   lanProjection,
@@ -7,6 +8,7 @@ import {
   mergeHostGame,
   parseGuestMessage,
   releaseLanSeat,
+  resolveLanCommanderClaim,
   setLanLife,
   startLanGame,
   type LanGame,
@@ -117,5 +119,50 @@ describe("LAN game", () => {
       ["stays", 2],
     ])
     expect(startLanGame(away, 20).seats.map((seat) => seat.key)).toEqual(["host", "left", "stays"])
+  })
+})
+
+describe("LAN commander damage", () => {
+  const commanderGame = () => startLanGame(seatGuest(lobby(), "guest"), 40, "commander")
+  const claim = (game: LanGame, delta: number, id = "claim") =>
+    claimLanCommanderDamage(game, "host", { id, to: "guest", delta })
+
+  it("changes the defender's life only when the defender confirms", () => {
+    const claimed = claim(commanderGame(), 7)
+    const declined = resolveLanCommanderClaim(claimed, "guest", { id: "claim", accepted: false })
+    const confirmed = resolveLanCommanderClaim(claimed, "guest", { id: "claim", accepted: true })
+
+    expect(lanProjection(claimed, "guest").commanderDamage?.pendingClaims).toHaveLength(1)
+    expect(lanProjection(claimed, "host").commanderDamage?.pendingClaims).toEqual([])
+    expect(resolveLanCommanderClaim(claimed, "host", { id: "claim", accepted: true })).toBe(claimed)
+    expect(lifeOf(declined, "guest")).toBe(40)
+    expect(lifeOf(confirmed, "guest")).toBe(33)
+    expect(confirmed.commander).toEqual({
+      totals: [{ from: "host", to: "guest", total: 7 }],
+      claims: [],
+    })
+  })
+
+  it("marks a player out at 21 and drops claims Convex would decline", () => {
+    let game = commanderGame()
+    for (const id of ["a", "b", "c"])
+      game = resolveLanCommanderClaim(claim(game, 7, id), "guest", { id, accepted: true })
+
+    expect(lanProjection(game, "host").commanderDamage?.eliminatedPlayerIds).toEqual(["guest"])
+    expect(claim(game, -22)).toBe(game)
+    expect(claim(claim(game, 1, "x"), 1, "y").commander?.claims).toHaveLength(1)
+    expect(claim(startLanGame(seatGuest(lobby(), "guest"), 20), 5)).toEqual(
+      startLanGame(seatGuest(lobby(), "guest"), 20),
+    )
+  })
+
+  it("clears commander damage when the host starts again", () => {
+    const hit = resolveLanCommanderClaim(claim(commanderGame(), 5), "guest", {
+      id: "claim",
+      accepted: true,
+    })
+
+    expect(startLanGame(hit, 40, "commander").commander).toEqual({ totals: [], claims: [] })
+    expect(startLanGame(hit, 20)).not.toHaveProperty("commander")
   })
 })

@@ -10,7 +10,12 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { LAN_NAME_MAX_LENGTH, loadLanName, saveLanName } from "@/features/lan/lanAvailability"
-import { connectedSeatCount, LAN_MIN_PLAYERS, lanProjection } from "@/features/lan/lanGame"
+import {
+  connectedSeatCount,
+  LAN_MIN_PLAYERS,
+  lanProjection,
+  type LanFormat,
+} from "@/features/lan/lanGame"
 import { lanSession, useLanSession } from "@/features/lan/lanSession"
 import {
   checkLocalNetworkAccess,
@@ -22,11 +27,16 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
 const STARTING_LIVES = [20, 30, 40] as const
+const FORMATS = [
+  { format: "standard", label: "Standard", life: 20 },
+  { format: "commander", label: "Commander", life: 40 },
+] as const satisfies readonly { format: LanFormat; label: string; life: number }[]
 
 export interface LanLobbyAutomation {
   host?: boolean
   join?: string
   start?: number
+  format?: LanFormat
   players?: number
 }
 
@@ -57,7 +67,10 @@ export function LanLobbyScreen({
   const nearby = services.filter(
     (service) => isLanGameService(service) && lanSession.isReachable(service.name),
   )
-  const [startingLife, setStartingLife] = useState<number>(automation.start ?? 20)
+  const [format, setFormat] = useState<LanFormat>(automation.format ?? "standard")
+  const [startingLife, setStartingLife] = useState<number>(
+    automation.start ?? (format === "commander" ? 40 : 20),
+  )
   const [name, setName] = useState(loadLanName)
   const projection = game && session.seatKey ? lanProjection(game, session.seatKey) : undefined
   const players = projection?.players ?? []
@@ -91,8 +104,8 @@ export function LanLobbyScreen({
       game?.status === "lobby" &&
       readyPlayers >= (automation.players ?? LAN_MIN_PLAYERS)
     )
-      lanSession.start(automation.start)
-  }, [automation.start, automation.players, role, game?.status, readyPlayers])
+      lanSession.start(automation.start, automation.format)
+  }, [automation.start, automation.format, automation.players, role, game?.status, readyPlayers])
 
   const heading = !inGame
     ? "Nearby games"
@@ -172,6 +185,20 @@ export function LanLobbyScreen({
             {role === "host" && game?.status !== "active" ? (
               <View style={themed($section)}>
                 <View style={themed($row)}>
+                  {FORMATS.map((choice) => (
+                    <Button
+                      key={choice.format}
+                      style={$styles.flex1}
+                      preset={format === choice.format ? "primary" : "default"}
+                      text={choice.label}
+                      onPress={() => {
+                        setFormat(choice.format)
+                        setStartingLife(choice.life)
+                      }}
+                    />
+                  ))}
+                </View>
+                <View style={themed($row)}>
                   {STARTING_LIVES.map((life) => (
                     <Button
                       key={life}
@@ -186,7 +213,7 @@ export function LanLobbyScreen({
                   preset="primary"
                   disabled={readyPlayers < LAN_MIN_PLAYERS}
                   text={game?.status === "lobby" ? "Start game" : "Start again"}
-                  onPress={() => lanSession.start(startingLife)}
+                  onPress={() => lanSession.start(startingLife, format)}
                 />
               </View>
             ) : null}

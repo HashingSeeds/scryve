@@ -1,4 +1,11 @@
-import type { LanGuestMessage, LanHostMessage } from "./lanGame"
+import {
+  admitLanGuest,
+  claimLanCommanderDamage,
+  createLanGame,
+  startLanGame,
+  type LanGuestMessage,
+  type LanHostMessage,
+} from "./lanGame"
 import { LanSession } from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
 
@@ -43,14 +50,14 @@ function socket() {
   }
 }
 
-async function startedGame() {
+async function startedGame(format?: "commander") {
   const session = new LanSession()
   await session.host()
   const alice = socket()
   alice.send({ type: "join", name: "Alice" })
   const bob = socket()
   bob.send({ type: "join", name: "Bob" })
-  session.start(20)
+  session.start(format ? 40 : 20, format)
   jest.advanceTimersByTime(50)
   return { session, alice, bob }
 }
@@ -106,6 +113,26 @@ describe("LAN session seats", () => {
   })
 })
 
+describe("LAN session commander damage", () => {
+  it("lets a guest claim only from its own seat and only the defender confirm", async () => {
+    const { session, alice, bob } = await startedGame("commander")
+    const hostKey = session.getState().seatKey!
+
+    alice.send({ type: "commander.claim", id: "c1", to: bob.pass().key, delta: 6 })
+    alice.send({ type: "commander.resolve", id: "c1", accepted: true })
+    session.resolveCommanderDamage("c1", true)
+    bob.send({ type: "commander.resolve", id: "c1", accepted: true })
+    jest.advanceTimersByTime(50)
+
+    expect(lifeOf(session, bob.pass().key)).toBe(34)
+    expect(lifeOf(session, alice.pass().key)).toBe(40)
+    expect(lifeOf(session, hostKey)).toBe(40)
+    expect(session.getState().game?.commander?.totals).toEqual([
+      { from: alice.pass().key, to: bob.pass().key, total: 6 },
+    ])
+  })
+})
+
 describe("LAN session guest", () => {
   it("keeps its seat on the board after the host ends the game", async () => {
     let host: LanPeerHandlers<LanHostMessage> | undefined
@@ -127,5 +154,42 @@ describe("LAN session guest", () => {
       seatKey: pass.key,
       game: { status: "abandoned" },
     })
+  })
+
+  it("builds a tap right after confirming on the confirmed life, as the host will", async () => {
+    const sent: unknown[] = []
+    let host: LanPeerHandlers<LanHostMessage> | undefined
+    jest.mocked(connectLan).mockImplementation(async (_service, _parse, handlers) => {
+      host = handlers as LanPeerHandlers<LanHostMessage>
+      return {
+        send: (message: unknown) => sent.push(message),
+        sendAndClose: jest.fn(),
+        close: jest.fn(),
+      }
+    })
+    const guest = new LanSession()
+    await guest.join({ name: "Host game" } as Parameters<LanSession["join"]>[0])
+    host?.onMessage({ type: "welcome", pass: { key: "guest", token: "token" } })
+    const seated = admitLanGuest(
+      createLanGame("game", "host", "Host"),
+      new Map(),
+      { type: "join", name: "Guest" },
+      { key: "guest", token: "token" },
+    )
+    if ("rejected" in seated) throw new Error(seated.rejected)
+    const game = claimLanCommanderDamage(startLanGame(seated.game, 40, "commander"), "host", {
+      id: "c1",
+      to: "guest",
+      delta: 5,
+    })
+    host?.onMessage({ type: "game", game })
+
+    guest.resolveCommanderDamage("c1", true)
+    guest.changeLife("guest", -1)
+
+    expect(sent.slice(-2)).toEqual([
+      { type: "commander.resolve", id: "c1", accepted: true },
+      { type: "life", life: 34, version: 2, round: 1 },
+    ])
   })
 })

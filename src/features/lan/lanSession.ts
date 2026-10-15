@@ -8,6 +8,7 @@ import { load, remove, save } from "@/utils/storage"
 import { loadLanName } from "./lanAvailability"
 import {
   admitLanGuest,
+  claimLanCommanderDamage,
   connectedSeatCount,
   createLanGame,
   LAN_MIN_PLAYERS,
@@ -15,8 +16,10 @@ import {
   parseGuestMessage,
   parseHostMessage,
   releaseLanSeat,
+  resolveLanCommanderClaim,
   setLanLife,
   startLanGame,
+  type LanFormat,
   type LanGame,
   type LanGuestMessage,
   type LanHostMessage,
@@ -194,7 +197,11 @@ export class LanSession {
           peer.send({ type: "welcome", pass: admitted.pass })
           return this.publish(admitted.game)
         }
-        if (seatKey && game.status === "active") this.publish(setLanLife(game, seatKey, message))
+        if (!seatKey || game.status !== "active") return
+        if (message.type === "life") return this.publish(setLanLife(game, seatKey, message))
+        if (message.type === "commander.claim")
+          return this.publish(claimLanCommanderDamage(game, seatKey, message))
+        this.publish(resolveLanCommanderClaim(game, seatKey, message))
       },
       onClose: () => {
         this.accepted.delete(peer)
@@ -320,10 +327,38 @@ export class LanSession {
     this.connection?.send({ type: "life", ...life })
   }
 
-  start(startingLife: number) {
+  claimCommanderDamage(from: string, changes: readonly { toPlayerId: string; delta: number }[]) {
+    const { game, role, seatKey } = this.state
+    if (!game || from !== seatKey || game.status !== "active") return
+    const claims = changes.map(({ toPlayerId, delta }) => ({
+      id: createClientId("claim"),
+      to: toPlayerId,
+      delta,
+    }))
+    if (role === "host")
+      return this.publish(
+        claims.reduce((next, claim) => claimLanCommanderDamage(next, from, claim), game),
+      )
+    for (const claim of claims) this.connection?.send({ type: "commander.claim", ...claim })
+  }
+
+  resolveCommanderDamage(id: string, accepted: boolean) {
+    const { game, role, seatKey } = this.state
+    if (!game || !seatKey || game.status !== "active") return
+    const resolved = resolveLanCommanderClaim(game, seatKey, { id, accepted })
+    if (role === "host") return this.publish(resolved)
+    // why: the host computes this same life from the same ordered messages, so a tap right after confirming builds on it instead of racing it.
+    const seat = resolved.seats.find((candidate) => candidate.key === seatKey)
+    if (seat && resolved !== game)
+      this.ownLife = { life: seat.life, version: seat.version, round: game.round }
+    this.set({ game: resolved })
+    this.connection?.send({ type: "commander.resolve", id, accepted })
+  }
+
+  start(startingLife: number, format: LanFormat = "standard") {
     const { game, role } = this.state
     if (role === "host" && game && connectedSeatCount(game) >= LAN_MIN_PLAYERS)
-      this.publish(startLanGame(game, startingLife))
+      this.publish(startLanGame(game, startingLife, format))
   }
 
   finish() {
