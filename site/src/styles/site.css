@@ -337,8 +337,9 @@ figure {
 }
 
 .pk-bench {
+  --bench: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
   display: flex;
-  height: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
+  height: var(--bench);
   flex: none;
   gap: calc(var(--u) * 0.018);
 }
@@ -378,11 +379,12 @@ figure {
 }
 
 .pk .pk-chip {
+  --bar: max(1px, calc(var(--bench) * 0.055));
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: calc(var(--u) * 0.014) calc(var(--u) * 0.024);
+  padding: calc(var(--bench) * 0.05) calc(var(--u) * 0.024) calc(var(--bar) * 3);
   border: 1px solid rgb(255 255 255 / 30%);
   text-align: left;
 }
@@ -396,14 +398,14 @@ figure {
   width: 100%;
   flex: none;
   line-height: 1.2;
-  font-size: clamp(5px, calc(var(--u) * 0.032), 11px);
+  font-size: clamp(5px, calc(var(--bench) * 0.19), 11px);
   opacity: 0.85;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .pk-chip b {
-  font-size: calc(var(--u) * 0.07);
+  font-size: calc(var(--bench) * 0.38);
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
 }
@@ -428,7 +430,7 @@ figure {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 3px;
+  height: var(--bar);
   background: #fff;
   opacity: 0.85;
 }
