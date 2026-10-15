@@ -34,6 +34,13 @@ import {
   PLAYER_MARK_SHAPES,
   shapeForSeat,
 } from "../../../convex/lib/appearance"
+import {
+  COMMANDER_LETHAL_DAMAGE,
+  isCommanderDamageDelta,
+  isLifeDelta,
+  MAX_COMMANDER_DAMAGE,
+  MAX_LIFE_DELTA,
+} from "../../../convex/lib/gameRules"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 import { flooredLifeDelta, isCounterOut } from "../../../convex/lib/systems"
 import {
@@ -44,13 +51,18 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 
+export {
+  COMMANDER_LETHAL_DAMAGE,
+  isCommanderDamageDelta,
+  isLifeDelta,
+  MAX_COMMANDER_DAMAGE,
+  MAX_LIFE_DELTA,
+}
+
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
-export const MAX_LIFE_DELTA = 999_999
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 export const MAX_PLAYER_NAME_LENGTH = 24
-export const COMMANDER_LETHAL_DAMAGE = 21
-export const MAX_COMMANDER_DAMAGE = 99
 
 export function validatePlayerNames(values: readonly string[]): {
   valid: boolean
@@ -97,24 +109,6 @@ export function validatePlayerCount(count: number): boolean {
 export function validateStartingLife(life: number, system?: PlaySystemId): boolean {
   return (
     Number.isInteger(life) && life > 0 && life <= playSystemRules(system).counter.maxStartingValue
-  )
-}
-
-export function isLifeDelta(value: unknown): value is LifeDelta {
-  return (
-    typeof value === "number" &&
-    Number.isInteger(value) &&
-    value !== 0 &&
-    Math.abs(value) <= MAX_LIFE_DELTA
-  )
-}
-
-export function isCommanderDamageDelta(value: unknown): value is number {
-  return (
-    typeof value === "number" &&
-    Number.isInteger(value) &&
-    value !== 0 &&
-    Math.abs(value) <= MAX_COMMANDER_DAMAGE
   )
 }
 

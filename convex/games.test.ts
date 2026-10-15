@@ -1453,6 +1453,26 @@ function commanderArgs(
 }
 
 describe("connected commander damage claims", () => {
+  it("refuses to treat a commander claim as a replayed life change", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const operationId = "commander-or-life-0001"
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, 7),
+    )
+    await t.run((ctx) =>
+      ctx.db.patch(game.joinerPlayerId, { userId: undefined, deviceId: undefined }),
+    )
+
+    await expect(
+      game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.joinerPlayerId, operationId, 7),
+      ),
+    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+  })
+
   it("projects defender-only pending claims and confirms them atomically", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

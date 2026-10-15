@@ -19,6 +19,21 @@ import { requireHost, requireMembership, requireSeatOwner, requireUser } from ".
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { limitGameRate } from "./lib/gameRateLimits"
+import {
+  applyLifeChange,
+  commanderClaimOutcome,
+  confirmCommanderClaim,
+  controlsSeat,
+  isCommanderDamageDelta,
+  isCommanderFormat,
+  isCommanderLethal,
+  isLifeDelta,
+  isSameCommanderClaim,
+  isSameCommanderResolution,
+  isSameLifeChange,
+  MAX_COMMANDER_DAMAGE,
+  MAX_PENDING_COMMANDER_CLAIMS,
+} from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
@@ -47,7 +62,7 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
-import { flooredLifeDelta, tableRules } from "./lib/systems"
+import { tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
@@ -68,8 +83,6 @@ import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
-const MAX_COMMANDER_DAMAGE = 99
-const MAX_PENDING_COMMANDER_CLAIMS = 100
 const NO_GAME_SYSTEM = "none"
 
 async function findGameByPublicId(ctx: QueryCtx, publicId: string) {
@@ -104,17 +117,13 @@ function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boole
     })
 }
 
-function isValidLifeDelta(delta: number) {
-  return Number.isInteger(delta) && delta !== 0 && Math.abs(delta) <= 999_999
-}
-
 function assertLifeDelta(delta: number) {
-  if (!isValidLifeDelta(delta))
+  if (!isLifeDelta(delta))
     throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
 }
 
 function assertGameWriteLifeDelta(delta: number) {
-  if (!isValidLifeDelta(delta))
+  if (!isLifeDelta(delta))
     throw gameWriteError(
       "invalid_life_delta",
       "Life delta must be a non-zero whole number from -999999 to 999999",
@@ -122,14 +131,14 @@ function assertGameWriteLifeDelta(delta: number) {
 }
 
 function assertCommanderDelta(delta: number) {
-  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > MAX_COMMANDER_DAMAGE)
+  if (!isCommanderDamageDelta(delta))
     throw new Error("Commander damage delta must be a non-zero whole number from -99 to 99")
 }
 
 function isCommanderGame(game: Doc<"games">) {
-  return (
-    (game.system ?? game.game ?? DEFAULT_DECK_GAME) === "mtg" &&
-    (game.format ?? game.ruleset) === "commander"
+  return isCommanderFormat(
+    game.system ?? game.game ?? DEFAULT_DECK_GAME,
+    game.format ?? game.ruleset,
   )
 }
 
@@ -395,7 +404,7 @@ async function commanderDamageProjection(
   )
   const eliminatedPlayerIds = new Set<Id<"gamePlayers">>()
   for (const total of totals) {
-    if (total.total >= 21) eliminatedPlayerIds.add(total.toPlayerId)
+    if (isCommanderLethal(total.total)) eliminatedPlayerIds.add(total.toPlayerId)
   }
   return {
     totals: totals.map((total) => ({
@@ -1866,8 +1875,11 @@ export const changeLife = mutation({
     if (
       !target ||
       target.gameId !== game._id ||
-      (target.userId === undefined ? game.hostUserId !== user._id : target.userId !== user._id) ||
-      (target.deviceId !== undefined && target.deviceId !== args.deviceId)
+      !controlsSeat(target, {
+        userId: user._id,
+        deviceId: args.deviceId,
+        isHost: game.hostUserId === user._id,
+      })
     )
       throw gameWriteError("seat_owner_required", "Seat-owner permission required")
 
@@ -1878,13 +1890,15 @@ export const changeLife = mutation({
       )
       .unique()
     if (duplicate) {
-      if (
-        duplicate.playerId !== target._id ||
-        duplicate.actorUserId !== user._id ||
-        requestedLifeDelta(duplicate) !== args.delta ||
-        duplicate.deviceId !== args.deviceId ||
-        duplicate.clientCreatedAt !== args.clientCreatedAt
-      )
+      const request = {
+        playerId: target._id,
+        actorUserId: user._id,
+        delta: args.delta,
+        deviceId: args.deviceId,
+        clientCreatedAt: args.clientCreatedAt,
+      }
+      const recorded = { ...duplicate, delta: requestedLifeDelta(duplicate) }
+      if (duplicate.kind !== "life.changed" || !isSameLifeChange(recorded, request))
         throw syncOperationMismatch()
       return {
         operationId: duplicate.operationId,
@@ -1898,12 +1912,11 @@ export const changeLife = mutation({
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
-    const delta = flooredLifeDelta(
+    const { delta, currentLife } = applyLifeChange(
       game.system ?? game.game ?? DEFAULT_DECK_GAME,
       target.currentLife,
       args.delta,
     )
-    const currentLife = target.currentLife + delta
     const eventId = await ctx.db.insert("gameEvents", {
       gameId: game._id,
       playerId: target._id,
@@ -2019,8 +2032,11 @@ export const tableAction = mutation({
     if (
       !actor ||
       actor.gameId !== game._id ||
-      (actor.userId === undefined ? game.hostUserId !== user._id : actor.userId !== user._id) ||
-      (actor.deviceId !== undefined && actor.deviceId !== args.deviceId)
+      !controlsSeat(actor, {
+        userId: user._id,
+        deviceId: args.deviceId,
+        isHost: game.hostUserId === user._id,
+      })
     )
       throw gameWriteError("seat_owner_required", "Seat-owner permission required")
 
@@ -2123,37 +2139,13 @@ async function commanderPlayerForWrite(
   if (
     !player ||
     player.gameId !== game._id ||
-    (player.userId === undefined ? game.hostUserId !== user._id : player.userId !== user._id) ||
-    (player.deviceId !== undefined && player.deviceId !== deviceId)
+    !controlsSeat(player, { userId: user._id, deviceId, isHost: game.hostUserId === user._id })
   )
     throw gameWriteError(
       "seat_owner_required",
       `Seat-owner permission required for the ${label === "source" ? "attacking" : "defending"} seat`,
     )
   return player
-}
-
-function commanderClaimMatches(
-  claim: Doc<"gameCommanderClaims">,
-  args: {
-    operationId: string
-    fromPlayerId: Id<"gamePlayers">
-    toPlayerId: Id<"gamePlayers">
-    delta: number
-    deviceId: string
-    clientCreatedAt: number
-  },
-  userId: Id<"users">,
-) {
-  return (
-    claim.operationId === args.operationId &&
-    claim.fromPlayerId === args.fromPlayerId &&
-    claim.toPlayerId === args.toPlayerId &&
-    claim.delta === args.delta &&
-    claim.actorUserId === userId &&
-    claim.deviceId === args.deviceId &&
-    claim.clientCreatedAt === args.clientCreatedAt
-  )
 }
 
 export const submitCommanderDamage = mutation({
@@ -2197,7 +2189,8 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     if (existing) {
-      if (!commanderClaimMatches(existing, args, user._id)) throw syncOperationMismatch()
+      if (!isSameCommanderClaim(existing, { ...args, actorUserId: user._id }))
+        throw syncOperationMismatch()
       return {
         operationId: existing.operationId,
         claimId: existing._id,
@@ -2220,17 +2213,19 @@ export const submitCommanderDamage = mutation({
         q.eq("gameId", game._id).eq("fromPlayerId", source._id).eq("toPlayerId", target._id),
       )
       .unique()
-    const nextTotal = (pair?.total ?? 0) + args.delta
     const pending = await ctx.db
       .query("gameCommanderClaims")
       .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
       .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
-    // why: a claim that can never land is stored as declined instead of thrown, so every installed outbox sees a success and stops retrying it.
     const declined =
-      nextTotal < 0 ||
-      nextTotal > MAX_COMMANDER_DAMAGE ||
-      pending.length >= MAX_PENDING_COMMANDER_CLAIMS ||
-      pending.some((claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id)
+      commanderClaimOutcome({
+        total: pair?.total ?? 0,
+        delta: args.delta,
+        pendingClaims: pending.length,
+        pairHasPendingClaim: pending.some(
+          (claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id,
+        ),
+      }) === "declined"
     const declineOperationId = `${args.operationId}_declined`
     if (
       declined &&
@@ -2374,13 +2369,14 @@ async function resolveCommanderClaim(
       const event = await commanderResolutionEvent(ctx, claim)
       if (
         !event ||
-        event.kind !== `commanderDamage.${claim.status}` ||
-        event.claimOperationId !== claim.operationId ||
-        event.playerId !== claim.toPlayerId ||
-        event.toPlayerId !== claim.toPlayerId ||
-        event.actorUserId !== user._id ||
-        event.deviceId !== args.deviceId ||
-        event.clientCreatedAt !== args.clientCreatedAt
+        !isSameCommanderResolution(event, {
+          kind: `commanderDamage.${claim.status}`,
+          claimOperationId: claim.operationId,
+          defenderPlayerId: claim.toPlayerId,
+          actorUserId: user._id,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        })
       )
         throw syncOperationMismatch()
       if (!claim.resolutionOperationId)
@@ -2427,9 +2423,13 @@ async function resolveCommanderClaim(
           .eq("toPlayerId", claim.toPlayerId),
       )
       .unique()
-    const total = (pair?.total ?? 0) + claim.delta
-    if (total < 0 || total > MAX_COMMANDER_DAMAGE)
-      throw new Error("Commander damage total must remain between 0 and 99")
+    const confirmed = confirmCommanderClaim({
+      total: pair?.total ?? 0,
+      life: target.currentLife,
+      delta: claim.delta,
+    })
+    if (!confirmed) throw new Error("Commander damage total must remain between 0 and 99")
+    const { total, currentLife } = confirmed
     await ctx.db.insert("gameEvents", {
       gameId: game._id,
       playerId: target._id,
@@ -2454,7 +2454,7 @@ async function resolveCommanderClaim(
         updatedAt: now,
       })
     await ctx.db.patch(target._id, {
-      currentLife: target.currentLife - claim.delta,
+      currentLife,
       eventCount: (target.eventCount ?? 0) + 1,
       lastEventAt: now,
     })
@@ -2469,7 +2469,7 @@ async function resolveCommanderClaim(
       claimId: claim._id,
       status: "confirmed" as const,
       total,
-      currentLife: target.currentLife - claim.delta,
+      currentLife,
       deduplicated: false,
     }
   }
