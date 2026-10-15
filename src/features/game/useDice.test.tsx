@@ -235,6 +235,27 @@ describe("useDice", () => {
     expect(announce).toHaveBeenLastCalledWith("Katherine goes first")
   })
 
+  it("shows the Yu-Gi-Oh! roll, then asks its winner to go first or second", () => {
+    jest.useFakeTimers()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
+    const rolls = [0.1, 0.9, 0.2]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const view = renderTable("ygo")
+
+    fireEvent.press(view.getByTestId("dice-rolloff"))
+    expect(announce).toHaveBeenLastCalledWith("Grace rolled 6. Go first or second")
+    act(() => jest.advanceTimersByTime(700))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/d66Won the roll$/)
+
+    act(() => jest.advanceTimersByTime(1800))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the rollGoes first\?/)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
+
+    fireEvent.press(view.getByTestId("dice-go-first"))
+    expect(announce).toHaveBeenLastCalledWith("Grace goes first")
+  })
+
   it("drops a pending settle when the game changes, so the next game's dice stay untouched", () => {
     jest.useFakeTimers()
     jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)

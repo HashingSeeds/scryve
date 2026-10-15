@@ -22,7 +22,7 @@ import {
   settleFirst,
   settleResult,
   startRollOff,
-  systemDie,
+  systemDice,
   toolLabel,
   type ChoiceReason,
   type DiceSeatChip,
@@ -47,7 +47,8 @@ export function useDice(
   gameId: string,
   system: unknown,
 ) {
-  const die = systemDie(system)
+  const rules = systemDice(system)
+  const { die } = rules
   const [stored, setStored] = useState<State>()
   const state = stored?.gameId === gameId ? stored : { gameId, ...CLOSED }
   const { dice } = state
@@ -111,7 +112,7 @@ export function useDice(
   const arm = stable("arm", (tool: DiceTool) => set(armTool(dice, tool), { mode: true }))
 
   function holdFirst(next: DiceState) {
-    return firstPlayerSeat(next) ? hold(FIRST_HOLD, BLOOM_MS.first, settleFirst)(next) : next
+    return settleFirst(next) === next ? next : hold(FIRST_HOLD, BLOOM_MS.first, settleFirst)(next)
   }
   function crown(next: DiceState) {
     const winner = firstPlayerSeat(next)
@@ -120,7 +121,7 @@ export function useDice(
   }
 
   const rollOff = stable("rollOff", () => {
-    const next = startRollOff(dice, seatIds(), die)
+    const next = startRollOff(dice, seatIds(), rules)
     const message = rollOffAnnouncement(next.first, players)
     if (message) announce(message)
     set(holdFirst(next))
