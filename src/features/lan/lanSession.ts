@@ -136,8 +136,7 @@ class LanSession {
         if (message.type === "join") {
           const joined = joinLanGame(game, message)
           if ("rejected" in joined) {
-            peer.send({ type: "rejected", reason: joined.rejected })
-            return peer.close()
+            return peer.sendAndClose({ type: "rejected", reason: joined.rejected })
           }
           peerId = message.playerId
           const previous = this.peers.get(peerId)

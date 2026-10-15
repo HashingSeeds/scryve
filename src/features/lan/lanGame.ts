@@ -98,9 +98,9 @@ export const setLanLife = (game: LanGame, playerId: string, life: LanLife) =>
 export const setLanConnected = (game: LanGame, playerId: string, connected: boolean) =>
   withSeat(game, playerId, (seat) => ({ ...seat, connected }))
 
-// why: an active game holds a departed seat for its reconnect; before that, a held seat would start as nobody's player.
+// why: only the lobby frees a seat; between games a departed guest may still reconnect before the next start.
 export function releaseLanSeat(game: LanGame, playerId: string): LanGame {
-  if (game.status === "active") return setLanConnected(game, playerId, false)
+  if (game.status !== "lobby") return setLanConnected(game, playerId, false)
   return {
     ...game,
     seats: game.seats
@@ -115,7 +115,9 @@ export function startLanGame(game: LanGame, startingLife: number): LanGame {
     status: "active",
     round: game.round + 1,
     startingLife,
-    seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: 0 })),
+    seats: game.seats
+      .filter((seat) => seat.connected)
+      .map((seat, index) => ({ ...seat, seat: index + 1, life: startingLife, version: 0 })),
   }
 }
 

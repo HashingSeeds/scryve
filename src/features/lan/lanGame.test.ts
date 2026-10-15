@@ -75,7 +75,7 @@ describe("LAN game", () => {
     expect(lifeOf(mergeHostGame(restarted, "guest", stale), "guest")).toBe(40)
   })
 
-  it("frees a lobby seat when its guest leaves but holds an active one for reconnect", () => {
+  it("frees a lobby seat, holds one mid-game, and drops it if still away at the next start", () => {
     const lobbyGame = joined(joined(lobby(), "left"), "stays")
 
     expect(
@@ -84,6 +84,11 @@ describe("LAN game", () => {
       ["host", 1],
       ["stays", 2],
     ])
-    expect(releaseLanSeat(startLanGame(lobbyGame, 20), "left").seats).toHaveLength(3)
+    const finished = {
+      ...releaseLanSeat(startLanGame(lobbyGame, 20), "left"),
+      status: "finished" as const,
+    }
+    expect(finished.seats).toHaveLength(3)
+    expect(startLanGame(finished, 20).seats.map((seat) => seat.playerId)).toEqual(["host", "stays"])
   })
 })

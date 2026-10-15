@@ -13,6 +13,7 @@ type Socket = ReturnType<typeof TcpSocket.createConnection>
 
 export interface LanConnection<Out> {
   send: (message: Out) => void
+  sendAndClose: (message: Out) => void
   close: () => void
 }
 
@@ -104,9 +105,16 @@ function wrapSocket<In, Out>(
   })
   socket.on("error", shutdown)
   socket.on("close", shutdown)
+  let ending = false
   return {
     send: (message) => {
-      if (!closed) socket.write(`${JSON.stringify(message)}\n`)
+      if (!closed && !ending) socket.write(`${JSON.stringify(message)}\n`)
+    },
+    sendAndClose: (message) => {
+      if (closed || ending) return
+      ending = true
+      socket.end(`${JSON.stringify(message)}\n`)
+      setTimeout(shutdown, SILENCE_LIMIT_MS)
     },
     close: shutdown,
   }
