@@ -30,18 +30,18 @@ function mountTimedGame() {
     system: "mtg",
     clock: { mode: "countdown", minutes: 50 },
   })
-  repository.saveActiveGame(game)
   const view = render(
     <ThemeProvider initialContext="light">
       <CurrentGameScreen initialGame={game} repository={repository} onViewSummary={jest.fn()} />
     </ThemeProvider>,
   )
-  return { view, repository }
+  return { view, repository, game }
 }
 
 describe("CurrentGameScreen round clock", () => {
   it("shows the clock to both ends of the table and walks the end-of-round turns", () => {
-    const { view, repository } = mountTimedGame()
+    const { view, repository, game } = mountTimedGame()
+    expect(repository.loadActiveGame()?.clock).toEqual(game.clock)
     expect(view.getByTestId("match-context")).toHaveTextContent(/^\d+:\d{2}$/)
     expect(
       view.getByTestId("match-context-top", { includeHiddenElements: true }),

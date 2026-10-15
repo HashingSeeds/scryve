@@ -44,6 +44,12 @@ describe("round clock", () => {
     expect(roundClockText(roundClockView(clock, "mtg", 22 * MINUTE))).toBe("Turns done")
   })
 
+  it("resumes a paused clock when time is called", () => {
+    const called = callRoundTime(pauseRoundClock(fifty, 10 * MINUTE), 20 * MINUTE)
+    expect(called.pausedAt).toBeUndefined()
+    expect(called.calledAtMs).toBe(10 * MINUTE)
+  })
+
   it("caps Pokémon's three turns with 15 minutes of overtime", () => {
     const clock = stepRoundTurn(
       startRoundClock({ mode: "countdown", minutes: 30 }, 0),

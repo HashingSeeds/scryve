@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as Haptics from "expo-haptics"
 
 import { captureGame, type GameEndSource } from "@/utils/analytics"
@@ -98,6 +98,12 @@ export function useLocalGame(
     },
     [repository],
   )
+
+  // why: a round clock runs before the first tap, so an unsaved timed board would restart its clock when the route rebuilds it.
+  const timedBoardId = game.clock && game.status === "active" ? game.id : undefined
+  useEffect(() => {
+    if (timedBoardId) repository.saveActiveGame(gameRef.current)
+  }, [repository, timedBoardId])
 
   // why: clock changes are rare taps (pause, adjust, next turn), so saving each one stays off the per-tick path.
   const changeClock = useCallback(

@@ -126,8 +126,11 @@ export function adjustRoundClock(clock: RoundClock, deltaMs: number): RoundClock
   return { ...clock, adjustMs: (clock.adjustMs ?? 0) + deltaMs }
 }
 
+/** why: the end-of-round procedure has no pause control, so calling time on a paused clock resumes it or Pokémon overtime would stay frozen. */
 export function callRoundTime(clock: RoundClock, now = Date.now()): RoundClock {
-  return clock.calledAtMs === undefined ? { ...clock, calledAtMs: elapsedMs(clock, now) } : clock
+  if (clock.calledAtMs !== undefined) return clock
+  const running = resumeRoundClock(clock, now)
+  return { ...running, calledAtMs: elapsedMs(running, now) }
 }
 
 export function stepRoundTurn(
