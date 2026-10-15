@@ -337,14 +337,17 @@ describe("an older build opening the new layout", () => {
     return board
   }
 
-  it.each([1, 150, 500, 501, 1234])(
-    "drops a %i-event game rather than misreading its chunks",
-    (taps) => {
-      const storage = new MemoryStorage()
-      playedGame(storage, taps)
-      expect(olderBuild.loadEvents(storage)).toBeNull()
-    },
-  )
+  it.each([1, 150, 500])("keeps a %i-event game whose chunks still start at 0", (taps) => {
+    const storage = new MemoryStorage()
+    const board = playedGame(storage, taps)
+    expect(olderBuild.loadEvents(storage)).toEqual(JSON.parse(JSON.stringify(board.game.events)))
+  })
+
+  it.each([501, 1234])("drops a %i-event game rather than misreading its chunks", (taps) => {
+    const storage = new MemoryStorage()
+    playedGame(storage, taps)
+    expect(olderBuild.loadEvents(storage)).toBeNull()
+  })
 
   it("leaves at most one game's chunks behind when it starts a new game over a long one", () => {
     const storage = new MemoryStorage()

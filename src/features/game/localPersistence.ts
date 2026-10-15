@@ -99,11 +99,14 @@ export interface StringStorage {
 
 /**
  * why: event N of the game lives in chunk floor(N / EVENT_CHUNK_SIZE), so a life tap rewrites only
- * the chunk its event lands in. Schema 1 numbered the kept chunks from 0 and had no append
- * bookkeeping; it still loads, and its next save rewrites every chunk in this layout.
+ * the chunk its event lands in. Schema 1 builds read chunks from 0 and ignore the extra fields, so
+ * a game whose kept chunks still start at 0 stays schema 1 and survives a fall back to older JS.
+ * Once the oldest chunk is dropped it becomes schema 2, which older builds skip instead of misreading.
+ * A schema 1 game written by an older build has no append bookkeeping, so its next save rewrites
+ * every chunk.
  */
 interface ActiveMetadata {
-  schemaVersion: 2
+  schemaVersion: 1 | 2
   game: Omit<LocalGame, "events">
   eventChunkCount: number
   eventChunkStart: number
@@ -631,7 +634,7 @@ export class LocalGameRepository {
       )
     }
     const metadata: ActiveMetadata = {
-      schemaVersion: 2,
+      schemaVersion: chunkStart === 0 ? 1 : 2,
       game: gameWithoutEvents,
       eventChunkCount: chunkEnd - chunkStart,
       eventChunkStart: chunkStart,
