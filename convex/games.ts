@@ -260,7 +260,7 @@ async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualC
   return game
 }
 
-/** why: clients from before the `systems` argument show any newer system as Magic, so they may join only the systems they shipped with. */
+/** why: clients from before the `systems` argument show any system they don't know as Magic. None of them knows a system beyond these three, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those, as they did before this check. */
 const SYSTEMS_BEFORE_CLIENT_LIST: readonly string[] = ["mtg", "ygo", "pokemon"]
 
 function assertClientPlaysSystem(
