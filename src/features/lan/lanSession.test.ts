@@ -7,7 +7,13 @@ import {
   type LanHostMessage,
 } from "./lanGame"
 import { LanSession } from "./lanSession"
-import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
+import {
+  connectLan,
+  hostLan,
+  resolveLanService,
+  type LanConnection,
+  type LanPeerHandlers,
+} from "./lanTransport"
 
 jest.mock("./lanTransport", () => ({
   hostLan: jest.fn(),
@@ -156,7 +162,7 @@ describe("LAN session guest", () => {
     })
   })
 
-  it("builds a tap right after confirming on the confirmed life, as the host will", async () => {
+  async function guestFacingClaim() {
     const sent: unknown[] = []
     let host: LanPeerHandlers<LanHostMessage> | undefined
     jest.mocked(connectLan).mockImplementation(async (_service, _parse, handlers) => {
@@ -183,13 +189,46 @@ describe("LAN session guest", () => {
       delta: 5,
     })
     host?.onMessage({ type: "game", game })
+    return { guest, game, sent, host: () => host }
+  }
+
+  const confirmed = {
+    type: "commander.resolve",
+    id: "c1",
+    accepted: true,
+    life: { life: 35, version: 1, round: 1 },
+  }
+
+  it("builds a tap right after confirming on the confirmed life", async () => {
+    const { guest, sent } = await guestFacingClaim()
 
     guest.resolveCommanderDamage("c1", true)
     guest.changeLife("guest", -1)
 
+    expect(sent.slice(-2)).toEqual([confirmed, { type: "life", life: 34, version: 2, round: 1 }])
+  })
+
+  it("never offers a claim again once confirmed, even from a stale snapshot", async () => {
+    const { guest, game, host } = await guestFacingClaim()
+
+    guest.resolveCommanderDamage("c1", true)
+    host()?.onMessage({ type: "game", game })
+
+    expect(guest.getState().game?.commander?.claims).toEqual([])
+    expect(lifeOf(guest, "guest")).toBe(35)
+  })
+
+  it("replays a confirm the host never received after reconnecting", async () => {
+    const { guest, host, sent } = await guestFacingClaim()
+    jest.mocked(resolveLanService).mockResolvedValue({ name: "Host game" } as never)
+
+    host()?.onClose()
+    guest.resolveCommanderDamage("c1", true)
+    await jest.advanceTimersByTimeAsync(2_000)
+
     expect(sent.slice(-2)).toEqual([
-      { type: "commander.resolve", id: "c1", accepted: true },
-      { type: "life", life: 34, version: 2, round: 1 },
+      expect.objectContaining({ type: "join", life: confirmed.life }),
+      confirmed,
     ])
   })
 })

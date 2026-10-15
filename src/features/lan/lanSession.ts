@@ -17,6 +17,7 @@ import {
   parseHostMessage,
   releaseLanSeat,
   resolveLanCommanderClaim,
+  resolveLanGuestCommanderClaim,
   setLanLife,
   startLanGame,
   type LanFormat,
@@ -87,6 +88,8 @@ export class LanSession {
   private connection?: LanConnection<LanGuestMessage>
   private pass?: LanSeatPass
   private ownLife?: LanLife
+  // why: kept until a host snapshot drops the claim, so a resolve lost to a dropped connection is replayed and never offered twice.
+  private resolutions = new Map<string, boolean>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private reconnectingSince?: number
   private unreachableAt = new Map<string, number>()
@@ -201,7 +204,7 @@ export class LanSession {
         if (message.type === "life") return this.publish(setLanLife(game, seatKey, message))
         if (message.type === "commander.claim")
           return this.publish(claimLanCommanderDamage(game, seatKey, message))
-        this.publish(resolveLanCommanderClaim(game, seatKey, message))
+        this.publish(resolveLanGuestCommanderClaim(game, seatKey, message))
       },
       onClose: () => {
         this.accepted.delete(peer)
@@ -230,6 +233,7 @@ export class LanSession {
 
   async join(service: Service) {
     this.ownLife = undefined
+    this.resolutions.clear()
     this.pass = savedPass(service.name)
     const session = ++this.session
     this.replace({
@@ -270,6 +274,16 @@ export class LanSession {
       ...(this.pass ? { pass: this.pass } : {}),
       ...(this.ownLife ? { life: this.ownLife } : {}),
     })
+    for (const [id, accepted] of this.resolutions) this.sendResolution(id, accepted)
+  }
+
+  private sendResolution(id: string, accepted: boolean) {
+    this.connection?.send({
+      type: "commander.resolve",
+      id,
+      accepted,
+      ...(this.ownLife ? { life: this.ownLife } : {}),
+    })
   }
 
   private receive(message: LanHostMessage) {
@@ -286,7 +300,12 @@ export class LanSession {
     this.reconnectingSince = undefined
     const { seatKey } = this.state
     if (this.ownLife?.round !== message.game.round) this.ownLife = undefined
-    const game = seatKey ? mergeHostGame(message.game, seatKey, this.ownLife) : message.game
+    const hostClaims = new Set(message.game.commander?.claims.map((claim) => claim.id))
+    for (const id of this.resolutions.keys()) if (!hostClaims.has(id)) this.resolutions.delete(id)
+    const resolved = new Set(this.resolutions.keys())
+    const game = seatKey
+      ? mergeHostGame(message.game, seatKey, this.ownLife, resolved)
+      : message.game
     this.set({ game, status: "connected" })
     if (game.status === "abandoned") {
       this.leave({ keepGame: true })
@@ -347,12 +366,15 @@ export class LanSession {
     if (!game || !seatKey || game.status !== "active") return
     const resolved = resolveLanCommanderClaim(game, seatKey, { id, accepted })
     if (role === "host") return this.publish(resolved)
-    // why: the host computes this same life from the same ordered messages, so a tap right after confirming builds on it instead of racing it.
+    if (resolved === game) return
+    // why: the confirmed life is this seat's own write, so a tap right after confirming builds on it and the host takes it like any other.
     const seat = resolved.seats.find((candidate) => candidate.key === seatKey)
-    if (seat && resolved !== game)
+    const before = game.seats.find((candidate) => candidate.key === seatKey)
+    if (seat && seat.version !== before?.version)
       this.ownLife = { life: seat.life, version: seat.version, round: game.round }
+    this.resolutions.set(id, accepted)
     this.set({ game: resolved })
-    this.connection?.send({ type: "commander.resolve", id, accepted })
+    this.sendResolution(id, accepted)
   }
 
   start(startingLife: number, format: LanFormat = "standard") {
@@ -387,6 +409,7 @@ export class LanSession {
     this.connection?.close()
     this.connection = undefined
     this.ownLife = undefined
+    this.resolutions.clear()
     this.replace(keepGame && game ? { ...IDLE, game } : IDLE)
   }
 }

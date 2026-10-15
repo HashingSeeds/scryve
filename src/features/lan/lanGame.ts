@@ -72,7 +72,7 @@ export type LanGuestMessage =
   | { type: "join"; name: string; pass?: LanSeatPass; life?: LanLife }
   | ({ type: "life" } & LanLife)
   | { type: "commander.claim"; id: string; to: string; delta: number }
-  | { type: "commander.resolve"; id: string; accepted: boolean }
+  | { type: "commander.resolve"; id: string; accepted: boolean; life?: LanLife }
 
 export type LanHostMessage =
   | { type: "game"; game: LanGame }
@@ -240,9 +240,35 @@ export function resolveLanCommanderClaim(
   }
 }
 
-// why: a host snapshot sent before the guest's latest change arrived would otherwise roll its life back.
-export function mergeHostGame(hostGame: LanGame, key: string, own: LanLife | undefined) {
-  return own ? setLanLife(hostGame, key, own) : hostGame
+// why: a guest's resolve carries the life it already applied, so a resolve replayed after a reconnect updates the totals without taking the damage twice.
+export function resolveLanGuestCommanderClaim(
+  game: LanGame,
+  defender: string,
+  resolution: Extract<LanGuestMessage, { type: "commander.resolve" }>,
+): LanGame {
+  const resolved = resolveLanCommanderClaim(game, defender, resolution)
+  if (!resolution.life || resolved === game) return resolved
+  return setLanLife({ ...resolved, seats: game.seats }, defender, resolution.life)
+}
+
+// why: a host snapshot sent before the guest's latest changes arrived would otherwise roll its life back and offer a claim it already resolved.
+export function mergeHostGame(
+  hostGame: LanGame,
+  key: string,
+  own: LanLife | undefined,
+  resolvedClaims: ReadonlySet<string> = new Set(),
+) {
+  const { commander } = hostGame
+  const game = commander?.claims.some((claim) => resolvedClaims.has(claim.id))
+    ? {
+        ...hostGame,
+        commander: {
+          ...commander,
+          claims: commander.claims.filter((claim) => !resolvedClaims.has(claim.id)),
+        },
+      }
+    : hostGame
+  return own ? setLanLife(game, key, own) : game
 }
 
 const commanderEliminated = (commander: LanCommanderDamage, key: string) =>
@@ -373,8 +399,20 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
     isCommanderDamageDelta(value.delta)
   )
     return { type: "commander.claim", id: value.id, to: value.to, delta: value.delta }
-  if (value.type === "commander.resolve" && isId(value.id) && typeof value.accepted === "boolean")
-    return { type: "commander.resolve", id: value.id, accepted: value.accepted }
+  if (
+    value.type === "commander.resolve" &&
+    isId(value.id) &&
+    typeof value.accepted === "boolean" &&
+    (value.life === undefined || isLife(value.life))
+  )
+    return {
+      type: "commander.resolve",
+      id: value.id,
+      accepted: value.accepted,
+      ...(value.life
+        ? { life: { life: value.life.life, version: value.life.version, round: value.life.round } }
+        : {}),
+    }
   return null
 }
 

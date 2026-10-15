@@ -9,6 +9,7 @@ import {
   parseGuestMessage,
   releaseLanSeat,
   resolveLanCommanderClaim,
+  resolveLanGuestCommanderClaim,
   setLanLife,
   startLanGame,
   type LanGame,
@@ -154,6 +155,23 @@ describe("LAN commander damage", () => {
     expect(claim(startLanGame(seatGuest(lobby(), "guest"), 20), 5)).toEqual(
       startLanGame(seatGuest(lobby(), "guest"), 20),
     )
+  })
+
+  it("takes the damage once when a reconnecting guest's life arrives before its replayed confirm", () => {
+    const life = { life: 33, version: 1, round: 1 }
+    const rejoined = setLanLife(claim(commanderGame(), 7), "guest", life)
+    const replayed = resolveLanGuestCommanderClaim(rejoined, "guest", {
+      type: "commander.resolve",
+      id: "claim",
+      accepted: true,
+      life,
+    })
+
+    expect(lifeOf(replayed, "guest")).toBe(33)
+    expect(replayed.commander).toEqual({
+      totals: [{ from: "host", to: "guest", total: 7 }],
+      claims: [],
+    })
   })
 
   it("clears commander damage when the host starts again", () => {
