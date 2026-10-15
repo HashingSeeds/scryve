@@ -75,12 +75,14 @@ export default function Index() {
   const [dismissedGameId, setDismissedGameId] = useState<string>()
   const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
   const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
+  const [newerGame, setNewerGame] = useState(() => localGameRepository.hasNewerActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
   useFocusEffect(
     useCallback(() => {
       const nextSettings = localGameRepository.loadSettings()
       setSettings(nextSettings)
       setLoadedGame(localGameRepository.loadActiveGame())
+      setNewerGame(localGameRepository.hasNewerActiveGame())
       setFreshGame(createFreshGame(prepared, nextSettings))
     }, [prepared]),
   )
@@ -102,6 +104,36 @@ export default function Index() {
 
   if (destination !== "play" && (!activeGame || stale) && settings.launchDestination === "decks") {
     return <Redirect href="/connected/decks" />
+  }
+
+  if (newerGame) {
+    return (
+      <Screen
+        preset="auto"
+        safeAreaEdges={["top", "bottom"]}
+        backgroundColor={theme.colors.surface}
+        contentContainerStyle={themed($oldGame)}
+      >
+        <View style={themed($oldGameCopy)}>
+          <Text
+            text="Update Scryve to continue this game"
+            preset="heading"
+            accessibilityRole="header"
+          />
+          <Text text="It was saved by a newer version of Scryve. Starting a new game replaces it." />
+        </View>
+        <View style={themed($oldGameActions)}>
+          <Button
+            text="Start a new game"
+            style={themed($secondaryAction)}
+            onPress={() => {
+              localGameRepository.clearActiveGame()
+              setNewerGame(false)
+            }}
+          />
+        </View>
+      </Screen>
+    )
   }
 
   if (activeGame && stale && !oldGameChoice) {

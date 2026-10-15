@@ -190,7 +190,7 @@ describe("LocalGameRepository", () => {
     expect(repository.loadActiveGame()).toEqual(game)
   })
 
-  it("writes only the newest chunk per tap and drops the oldest chunk past the cap", () => {
+  it("writes only the newest chunk per tap and drops the oldest 100 events at once past the cap", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
     let game = makeGame()
@@ -198,22 +198,41 @@ describe("LocalGameRepository", () => {
       game = tap(game)
       repository.saveActiveGame(game)
     }
-    expect(repository.loadActiveGame()?.events).toEqual(game.events)
-
     const set = jest.spyOn(storage, "set")
-    game = tap(game)
-    repository.saveActiveGame(game)
-    expect(set.mock.calls.map(([key]) => key)).toEqual([
-      LOCAL_KEYS.activeEvents(5),
-      LOCAL_KEYS.active,
-    ])
-    expect(storage.getString(LOCAL_KEYS.activeEvents(0))).toBeUndefined()
+    const savedKeys = (next: LocalGame) => {
+      set.mockClear()
+      repository.saveActiveGame(next)
+      return set.mock.calls.map(([key]) => key)
+    }
 
+    game = tap(game)
+    expect(savedKeys(game)).toEqual(
+      [0, 1, 2, 3, 4].map(LOCAL_KEYS.activeEvents).concat(LOCAL_KEYS.active),
+    )
     const reopened = repository.loadActiveGame()
     expect(reopened?.events).toEqual(game.events.slice(100))
+
     const tappedAfterReopen = tap(reopened ?? makeGame())
-    repository.saveActiveGame(tappedAfterReopen)
+    expect(savedKeys(tappedAfterReopen)).toEqual([LOCAL_KEYS.activeEvents(4), LOCAL_KEYS.active])
     expect(repository.loadActiveGame()?.events).toEqual(tappedAfterReopen.events)
+  })
+
+  it("keeps a game saved by a newer version until the player replaces it", () => {
+    const storage = new MemoryStorage()
+    const newer = JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 })
+    storage.set(LOCAL_KEYS.active, newer)
+    const repository = new LocalGameRepository(storage)
+
+    expect(repository.loadActiveGame()).toBeNull()
+    expect(repository.hasNewerActiveGame()).toBe(true)
+    repository.saveActiveGame(tap(makeGame()))
+    expect(storage.getString(LOCAL_KEYS.active)).toBe(newer)
+
+    repository.clearActiveGame()
+    expect(repository.hasNewerActiveGame()).toBe(false)
+    const game = tap(makeGame())
+    repository.saveActiveGame(game)
+    expect(repository.loadActiveGame()).toEqual(game)
   })
 
   it("falls back safely when active/settings schemas are corrupt", () => {

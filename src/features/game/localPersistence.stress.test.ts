@@ -86,12 +86,11 @@ function seededRandom(seed: number) {
   }
 }
 
-function storedChunkRange(storage: MemoryStorage) {
+function storedChunkCount(storage: MemoryStorage) {
   const raw: unknown = JSON.parse(storage.getString(LOCAL_KEYS.active) ?? "null")
-  if (typeof raw !== "object" || raw === null) return null
-  const start = "eventChunkStart" in raw ? Number(raw.eventChunkStart) : 0
-  const count = "eventChunkCount" in raw ? Number(raw.eventChunkCount) : 0
-  return { start, end: start + count }
+  return typeof raw === "object" && raw !== null && "eventChunkCount" in raw
+    ? Number(raw.eventChunkCount)
+    : 0
 }
 
 function chunkKeyIndexes(storage: MemoryStorage) {
@@ -112,10 +111,8 @@ function expectStored(storage: MemoryStorage, saved: Board) {
   )
   expect(events.length).toBeLessThanOrEqual(MAX_ACTIVE_EVENTS)
   expect(events.length).toBeGreaterThanOrEqual(Math.min(saved.game.events.length, MIN_KEPT_EVENTS))
-  const range = storedChunkRange(storage)
-  for (const index of chunkKeyIndexes(storage)) {
-    expect(range && index >= range.start && index < range.end).toBe(true)
-  }
+  const chunkCount = storedChunkCount(storage)
+  expect(chunkKeyIndexes(storage).sort((a, b) => a - b)).toEqual([...Array(chunkCount).keys()])
 }
 
 type Step = "tap" | "burst" | "touch" | "reload" | "stale" | "newGame" | "clear"
@@ -148,7 +145,7 @@ describe("active game persistence under random play", () => {
       const repository = new LocalGameRepository(storage)
       let board = newBoard(seed)
       let snapshots: Board[] = []
-      const reached = { pastCap: 0, rollover: 0, reopenedAppend: 0, staleRewrite: 0 }
+      const reached = { pastCap: 0, capRewrite: 0, reopenedAppend: 0, staleRewrite: 0 }
       const save = (next: Board) => {
         storage.mutations = []
         repository.saveActiveGame(next.game)
@@ -162,12 +159,16 @@ describe("active game persistence under random play", () => {
           if (kind === "tap") {
             if (board.game.events.length < board.history.length) reached.reopenedAppend += 1
             save(tap(board, step % 2))
-            // why: a tap from the board that wrote last must stay one chunk, the whole point of the layout.
+            // why: a tap from the board that wrote last rewrites one chunk, except the one tap in 100 past the cap that drops the oldest chunk.
             const sets = storage.mutations.filter(({ op }) => op === "set").length
-            const deletes = storage.mutations.filter(({ op }) => op === "delete").length
-            expect(sets).toBeLessThanOrEqual(2)
-            expect(deletes).toBeLessThanOrEqual(1)
-            if (deletes > 0) reached.rollover += 1
+            expect(storage.mutations.some(({ op }) => op === "delete")).toBe(false)
+            if (sets > 2) {
+              expect(board.game.events.length).toBeGreaterThan(MAX_ACTIVE_EVENTS)
+              expect(new LocalGameRepository(storage).loadActiveGame()?.events.length).toBe(
+                MIN_KEPT_EVENTS,
+              )
+              reached.capRewrite += 1
+            }
           } else if (kind === "burst") {
             save(tapTimes(board, 2 + Math.floor(random() * 40)))
           } else if (kind === "touch") {
@@ -264,7 +265,6 @@ describe("active game persistence when the app is killed mid-save", () => {
     ["the first tap past the cap", savedGame(500)],
     ["a tap long past the cap", savedGame(1234)],
     ["a tap on a game reopened past the cap", reopenedGame(777)],
-    ["the first tap on a schema 1 game at the cap", schemaOneGame(500)],
   ])("loads the game from before or after %s, wherever the kill lands", (_name, setup) => {
     const { storage, board } = storedAfter(setup)
     const before = new LocalGameRepository(storage).loadActiveGame()
@@ -280,10 +280,53 @@ describe("active game persistence when the app is killed mid-save", () => {
       killed.killAfter = kill
       expect(() => new LocalGameRepository(killed).saveActiveGame(next.game)).toThrow(ProcessKilled)
       const reopened = new LocalGameRepository(killed).loadActiveGame()
-      expect({ kill, reopened }).toEqual({ kill, reopened: kill > commit ? after : before })
+      if (kill > commit) expect({ kill, reopened }).toEqual({ kill, reopened: after })
+      else
+        expect({ kill, reopened: withoutOldestChunk(reopened, before) }).toEqual({
+          kill,
+          reopened: before,
+        })
+    }
+  })
+
+  it("keeps an older build's game at the cap consistent apart from history, wherever the kill lands", () => {
+    const { storage, board } = storedAfter(schemaOneGame(500))
+    const before = new LocalGameRepository(storage).loadActiveGame()
+    const next = tap(board)
+    const tapped = next.game.events.at(-1)
+
+    const completed = storage.clone()
+    new LocalGameRepository(completed).saveActiveGame(next.game)
+    for (let kill = 0; kill < completed.mutations.length; kill += 1) {
+      const killed = storage.clone()
+      killed.killAfter = kill
+      expect(() => new LocalGameRepository(killed).saveActiveGame(next.game)).toThrow(ProcessKilled)
+      const reopened = new LocalGameRepository(killed).loadActiveGame()
+      // why: an older build's save marks no committed event, so the first rewrite after the update can keep the new tap's event without its life change.
+      const history = reopened?.events.filter(
+        (event) => event !== tapped && event.operationId !== tapped?.operationId,
+      )
+      expect({ kill, reopened: reopened && { ...reopened, events: history } }).toEqual({
+        kill,
+        reopened: before && {
+          ...before,
+          events: before.events.slice(before.events.length - (history?.length ?? 0)),
+        },
+      })
+      expect(history?.length).toBeGreaterThanOrEqual(MAX_ACTIVE_EVENTS - CHUNK_SIZE)
     }
   })
 })
+
+/** why: a save killed partway through dropping the oldest chunk may reload without that chunk's history; the life totals and every newer event must still match. */
+function withoutOldestChunk(reopened: LocalGame | null, before: LocalGame | null) {
+  if (!reopened || !before || reopened.events.length >= before.events.length) return reopened
+  expect(reopened.events.length).toBeGreaterThanOrEqual(before.events.length - CHUNK_SIZE)
+  expect(reopened.events).toEqual(
+    before.events.slice(before.events.length - reopened.events.length),
+  )
+  return { ...reopened, events: before.events }
+}
 
 /** why: crash recovery can fall back to JS built into the binary, which only knows schema 1. This is that build's load and save. */
 const olderBuild = {
@@ -326,7 +369,7 @@ const olderBuild = {
   },
 }
 
-describe("an older build opening the new layout", () => {
+describe("an older build opening this layout", () => {
   function playedGame(storage: StringStorage, taps: number) {
     const repository = new LocalGameRepository(storage)
     let board = newBoard(1)
@@ -337,19 +380,14 @@ describe("an older build opening the new layout", () => {
     return board
   }
 
-  it.each([1, 150, 500])("keeps a %i-event game whose chunks still start at 0", (taps) => {
-    const storage = new MemoryStorage()
-    const board = playedGame(storage, taps)
-    expect(olderBuild.loadEvents(storage)).toEqual(JSON.parse(JSON.stringify(board.game.events)))
-  })
-
-  it.each([501, 1234])("drops a %i-event game rather than misreading its chunks", (taps) => {
+  it.each([1, 150, 500, 501, 1234])("reads a %i-event game the way this build does", (taps) => {
     const storage = new MemoryStorage()
     playedGame(storage, taps)
-    expect(olderBuild.loadEvents(storage)).toBeNull()
+    const loaded = new LocalGameRepository(storage).loadActiveGame()
+    expect(olderBuild.loadEvents(storage)).toEqual(JSON.parse(JSON.stringify(loaded?.events)))
   })
 
-  it("leaves at most one game's chunks behind when it starts a new game over a long one", () => {
+  it("leaves no chunks behind when it starts a new game over a long one", () => {
     const storage = new MemoryStorage()
     playedGame(storage, 1234)
     const replacement = tap(newBoard(2))
@@ -357,7 +395,6 @@ describe("an older build opening the new layout", () => {
 
     expect(olderBuild.loadEvents(storage)).toEqual(replacement.game.events)
     expect(new LocalGameRepository(storage).loadActiveGame()).toEqual(replacement.game)
-    const leftover = chunkKeyIndexes(storage).filter((index) => index !== 0)
-    expect(leftover.length).toBeLessThanOrEqual(MAX_ACTIVE_EVENTS / CHUNK_SIZE)
+    expect(chunkKeyIndexes(storage)).toEqual([0])
   })
 })
