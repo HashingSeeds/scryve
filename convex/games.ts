@@ -260,6 +260,18 @@ async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualC
   return game
 }
 
+/** why: clients from before the `systems` argument show any newer system as Magic, so they may join only the systems they shipped with. */
+const SYSTEMS_BEFORE_CLIENT_LIST: readonly string[] = ["mtg", "ygo", "pokemon"]
+
+function assertClientPlaysSystem(
+  game: Doc<"games">,
+  systems: readonly string[] = SYSTEMS_BEFORE_CLIENT_LIST,
+) {
+  const system = game.system ?? game.game
+  if (system === undefined || system === NO_GAME_SYSTEM || systems.includes(system)) return
+  throw new ConvexError({ code: "update_required", message: "Update Scryve to join this game" })
+}
+
 function seatLabelFor(player: { seat: number }) {
   return `Player ${player.seat}`
 }
@@ -839,6 +851,7 @@ export const claimSeat = mutation({
     deviceId: v.optional(v.string()),
     /** Imported games only: which existing seat to take. Lowest unclaimed when omitted. */
     seat: v.optional(v.number()),
+    systems: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -864,6 +877,7 @@ export const claimSeat = mutation({
         throw new Error(INVALID_INVITE_MESSAGE)
       return null
     }
+    assertClientPlaysSystem(game, args.systems)
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -1363,6 +1377,7 @@ export const claimableSeats = mutation({
   args: {
     token: v.optional(v.string()),
     manualCode: v.optional(v.string()),
+    systems: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1383,6 +1398,7 @@ export const claimableSeats = mutation({
       // why: clients that predate `invalid` see no seats and fall through to claimSeat, which throws.
       return { invalid: true as const, seats: [] }
     }
+    assertClientPlaysSystem(game, args.systems)
     const players = await playersForGame(ctx, game._id)
     for (const seated of players) {
       if (!seated.userId || seated.userId === user._id) continue
