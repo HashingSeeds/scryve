@@ -31,6 +31,8 @@ import {
 } from "./lanTransport"
 
 const RECONNECT_DELAY_MS = 1_500
+// why: a full table tapping fast would otherwise re-render the host and broadcast on every change, starving its JS thread.
+const FLUSH_INTERVAL_MS = 33
 // why: a host that was killed never withdraws its Bonjour advert, which can outlive it by over an hour.
 const UNREACHABLE_HIDE_MS = 2 * 60_000
 
@@ -68,6 +70,7 @@ class LanSession {
   private ownLife?: LanLife
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private unreachableAt = new Map<string, number>()
+  private flushTimer?: ReturnType<typeof setTimeout>
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
   private session = 0
 
@@ -95,6 +98,10 @@ class LanSession {
 
   private replace(next: LanSessionState) {
     this.state = next
+    this.notify()
+  }
+
+  private notify() {
     for (const listener of this.listeners) listener()
   }
 
@@ -176,8 +183,17 @@ class LanSession {
     }
   }
 
+  // why: guests only ever need the latest snapshot, so one flush covers every change since the last.
   private publish(game: LanGame) {
-    this.set({ game })
+    this.state = { ...this.state, game }
+    this.flushTimer ??= setTimeout(() => this.flush(), FLUSH_INTERVAL_MS)
+  }
+
+  private flush() {
+    this.flushTimer = undefined
+    this.notify()
+    const { game } = this.state
+    if (!game) return
     for (const peer of this.peers.values()) peer.send({ type: "game", game })
   }
 
@@ -274,6 +290,8 @@ class LanSession {
     clearTimeout(this.reconnectTimer)
     if (role === "host" && game && game.status !== "abandoned")
       this.publish({ ...game, status: "abandoned" })
+    clearTimeout(this.flushTimer)
+    this.flush()
     const server = this.server
     const peers = [...this.accepted]
     this.server = undefined
