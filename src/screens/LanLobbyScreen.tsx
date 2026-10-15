@@ -8,6 +8,8 @@ import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
+import { LAN_NAME_MAX_LENGTH, loadLanName, saveLanName } from "@/features/lan/lanAvailability"
 import { connectedSeatCount, LAN_MIN_PLAYERS, lanProjection } from "@/features/lan/lanGame"
 import { lanSession, useLanSession } from "@/features/lan/lanSession"
 import {
@@ -54,6 +56,7 @@ export function LanLobbyScreen({
   })
   const nearby = services.filter(isLanGameService)
   const [startingLife, setStartingLife] = useState<number>(automation.start ?? 20)
+  const [name, setName] = useState(loadLanName)
   const projection = game ? lanProjection(game, lanSession.playerId) : undefined
   const players = projection?.players ?? []
   const readyPlayers = game ? connectedSeatCount(game) : 0
@@ -113,6 +116,17 @@ export function LanLobbyScreen({
 
         {!inGame ? (
           <View style={themed($section)}>
+            <TextField
+              label="Your name"
+              placeholder="Shown to the table"
+              value={name}
+              maxLength={LAN_NAME_MAX_LENGTH}
+              autoCorrect={false}
+              onChangeText={(next) => {
+                setName(next)
+                saveLanName(next)
+              }}
+            />
             {nearby.length === 0 ? (
               <Text style={themed($dimmed)} text="No games on this network yet." />
             ) : null}

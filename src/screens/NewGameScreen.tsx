@@ -144,6 +144,7 @@ export interface NewGameScreenProps {
   onSavePlayers?: (players: NewPlayerInput[], account?: LocalGameAccountInput) => void
   joinContent?: ReactNode
   onResumeConnected?: (game: ResumableGame) => void
+  onNearby?: () => void
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
   localConnect?: LocalConnectFeed
   localMatchEnd?: { game: LocalGame; onEnd: (outcomes: MatchSeatOutcome[]) => void }
@@ -184,6 +185,7 @@ export function NewGameScreen({
   onSavePlayers,
   joinContent,
   onResumeConnected,
+  onNearby,
   localConnect,
   localMatchEnd,
 }: NewGameScreenProps) {
@@ -334,8 +336,10 @@ export function NewGameScreen({
     connectedMode || !onResumeConnected ? undefined : connectedGames.find((game) => game.isHost)
   /** Only a running local game can be handed to the server; a connected one is already there. */
   const canConnectLocal = Boolean(localConnect) && !connectedMode && localGameBlocksStart
+  const showNearby = connectedMode && Boolean(onNearby)
   const footerRow =
-    (canConnectLocal || Boolean(localMatchEnd)) && fontScale <= FOOTER_ROW_MAX_FONT_SCALE
+    (canConnectLocal || Boolean(localMatchEnd) || showNearby) &&
+    fontScale <= FOOTER_ROW_MAX_FONT_SCALE
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
@@ -860,6 +864,16 @@ export function NewGameScreen({
                             : submit
                   }
                 />
+                {showNearby ? (
+                  <Button
+                    testID="nearby-game-button"
+                    text="Nearby"
+                    TextProps={$footerButtonText}
+                    style={footerRow ? themed($footerAction) : undefined}
+                    accessibilityHint="Plays with phones on this Wi-Fi, without accounts or the cloud"
+                    onPress={onNearby}
+                  />
+                ) : null}
                 {localMatchEnd ? (
                   <Button
                     testID="end-match-setup-button"

@@ -5,6 +5,7 @@ import type { Service } from "react-native-zeroconf"
 import { createClientId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 
+import { loadLanName } from "./lanAvailability"
 import {
   connectedSeatCount,
   createLanGame,
@@ -41,7 +42,7 @@ export interface LanSessionState {
 
 const IDLE: LanSessionState = { status: "idle" }
 
-const defaultName = () =>
+const deviceName = () =>
   Platform.OS === "ios"
     ? Platform.isPad
       ? "iPad"
@@ -49,6 +50,8 @@ const defaultName = () =>
     : Platform.OS === "android"
       ? "Android"
       : "Player"
+
+const playerName = () => loadLanName().trim() || deviceName()
 
 class LanSession {
   readonly playerId = new LocalGameRepository().getDeviceId()
@@ -91,7 +94,7 @@ class LanSession {
 
   async host() {
     this.session += 1
-    const name = defaultName()
+    const name = playerName()
     const game = createLanGame(createClientId("lan"), { playerId: this.playerId, name })
     this.set({
       role: "host",
@@ -203,7 +206,7 @@ class LanSession {
     connection.send({
       type: "join",
       playerId: this.playerId,
-      name: defaultName(),
+      name: playerName(),
       ...(this.ownLife ? { life: this.ownLife } : {}),
     })
   }

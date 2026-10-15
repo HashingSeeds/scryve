@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
 
+import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { LanLobbyScreen } from "@/screens/LanLobbyScreen"
 
 export default function LanLobbyRoute() {
@@ -11,7 +12,7 @@ export default function LanLobbyRoute() {
     players?: string
   }>()
   const onPlay = useCallback(() => router.push("/lan/game"), [])
-  if (!__DEV__) return <Redirect href="/" />
+  if (!lanPlayAvailable()) return <Redirect href="/" />
   return (
     <LanLobbyScreen
       onBack={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
