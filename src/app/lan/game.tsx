@@ -1,4 +1,3 @@
-import { Platform } from "react-native"
 import { Redirect, router } from "expo-router"
 
 import { lanSession } from "@/features/lan/lanSession"
@@ -9,7 +8,7 @@ const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("
 
 export default function LanGameRoute() {
   const runtime = useLanGame()
-  if (!__DEV__ || Platform.OS === "web") return <Redirect href="/" />
+  if (!__DEV__) return <Redirect href="/" />
   if (runtime.status !== "ready") return <Redirect href="/lan" />
   return (
     <ConnectedBoardWithRuntime
