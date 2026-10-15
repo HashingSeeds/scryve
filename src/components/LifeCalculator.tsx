@@ -348,15 +348,16 @@ function LifeTrail({
   }))
   const fits = (count: number) =>
     changes
-      .slice(-count)
+      .slice(changes.length - count)
       .reduce(
         (sum, { delta, from }) =>
           sum + (`${from}`.length + signed(delta).length) * TRAIL_CHAR_WIDTH + TRAIL_GAP * 2,
         count < changes.length ? TRAIL_CHAR_WIDTH + TRAIL_GAP : 0,
       ) <= width
   let count = Math.min(cap, changes.length)
-  while (count > 1 && !fits(count)) count--
-  const shown = changes.slice(-count)
+  // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
+  while (count > 0 && !fits(count)) count--
+  const shown = changes.slice(changes.length - count)
 
   return (
     <View
@@ -366,7 +367,7 @@ function LifeTrail({
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
       style={[$trail, !beside && $trailCentered]}
     >
-      {width > 0 ? (
+      {count > 0 ? (
         <>
           {count < changes.length ? (
             <Text text="…" size="xxs" style={[$trailTotal, { color: ink }]} />
