@@ -1,5 +1,6 @@
 import type { ResumableGame } from "./connectedCopy"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
+import { toConnectedProjection } from "./model"
 import {
   CONNECTED_KEYS,
   ConnectedGameRepository,
@@ -11,6 +12,7 @@ import {
 } from "./persistence"
 import { sendQueuedAction } from "./useConnectedGame"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
+import { storedPlaySystem } from "../game/playSystems"
 import { setOutboxWriter } from "../sync/durableOutbox"
 
 class MemoryStorage {
@@ -638,6 +640,31 @@ function resumeEntry(publicId: string, updatedAt: number, isHost = true): Resuma
 }
 
 describe("connected resume index", () => {
+  it("keeps a game in a system this app doesn't know off Magic after a restart", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const projection = toConnectedProjection({
+      schemaVersion: 1,
+      publicId: "game-public",
+      status: "active",
+      playerCount: 2,
+      system: "a-later-system",
+      startingLife: 20,
+      ruleset: "standard",
+      isHost: true,
+      eventSequence: 0,
+      serverUpdatedAt: 10,
+      recentOperationIds: [],
+      players: [],
+    })!
+    repository.saveProjection(projection)
+    repository.createResumeObserver()(projection)
+
+    const reloaded = restarted(repository, storage)
+    expect(reloaded.loadProjection("game-public")?.system).toBeUndefined()
+    expect(storedPlaySystem(reloaded.loadResumeIndex()[0].system)).toBeUndefined()
+  })
+
   it("stores sanitized rows even when the server page carries extra fields", () => {
     const storage = new MemoryStorage()
     const deployment = "small-ibis-123.convex.cloud"
