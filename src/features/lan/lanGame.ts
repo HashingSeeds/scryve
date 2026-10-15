@@ -4,6 +4,7 @@ import {
   confirmCommanderClaim,
   isCommanderDamageDelta,
   isCommanderLethal,
+  MAX_COMMANDER_DAMAGE,
   MAX_LIFE_DELTA,
   MAX_PENDING_COMMANDER_CLAIMS,
 } from "../../../convex/lib/gameRules"
@@ -43,11 +44,11 @@ export interface LanCommanderClaim {
 export interface LanCommanderDamage {
   totals: { from: string; to: string; total: number }[]
   claims: LanCommanderClaim[]
-  // why: a guest replays a claim until it sees it here or in claims, so a settled claim can't come back as new.
-  settled: string[]
+  // why: each attacker numbers its claims, so a claim replayed after a reconnect is recognized however long ago it settled.
+  sequences: { key: string; seq: number }[]
 }
 
-export type LanClaimRequest = { id: string; to: string; delta: number; round: number }
+export type LanClaimRequest = { id: string; to: string; delta: number; round: number; seq: number }
 
 export interface LanGame {
   id: string
@@ -169,7 +170,7 @@ export function startLanGame(
     round: game.round + 1,
     startingLife,
     format,
-    ...(format === "commander" ? { commander: { totals: [], claims: [], settled: [] } } : {}),
+    ...(format === "commander" ? { commander: { totals: [], claims: [], sequences: [] } } : {}),
     seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: 0 })),
   }
 }
@@ -177,8 +178,8 @@ export function startLanGame(
 const commanderTotal = (commander: LanCommanderDamage, from: string, to: string) =>
   commander.totals.find((total) => total.from === from && total.to === to)?.total ?? 0
 
-const settle = (commander: LanCommanderDamage, id: string) =>
-  [...commander.settled, id].slice(-MAX_PENDING_COMMANDER_CLAIMS)
+export const lastClaimSeq = (game: LanGame, key: string) =>
+  game.commander?.sequences.find((entry) => entry.key === key)?.seq ?? 0
 
 // why: the same decision Convex makes, so a claim that could never land is dropped on arrival instead of waiting on the defender.
 export function claimLanCommanderDamage(
@@ -196,10 +197,14 @@ export function claimLanCommanderDamage(
     !seated(from) ||
     !seated(claim.to) ||
     !isCommanderDamageDelta(claim.delta) ||
-    commander.claims.some((existing) => existing.id === claim.id) ||
-    commander.settled.includes(claim.id)
+    claim.seq <= lastClaimSeq(game, from) ||
+    commander.claims.some((existing) => existing.id === claim.id)
   )
     return game
+  const sequences = [
+    ...commander.sequences.filter((entry) => entry.key !== from),
+    { key: from, seq: claim.seq },
+  ]
   const outcome = commanderClaimOutcome({
     total: commanderTotal(commander, from, claim.to),
     delta: claim.delta,
@@ -208,12 +213,11 @@ export function claimLanCommanderDamage(
       (existing) => existing.from === from && existing.to === claim.to,
     ),
   })
-  if (outcome === "declined")
-    return { ...game, commander: { ...commander, settled: settle(commander, claim.id) } }
+  if (outcome === "declined") return { ...game, commander: { ...commander, sequences } }
   const { id, to, delta } = claim
   return {
     ...game,
-    commander: { ...commander, claims: [...commander.claims, { id, from, to, delta }] },
+    commander: { ...commander, sequences, claims: [...commander.claims, { id, from, to, delta }] },
   }
 }
 
@@ -230,7 +234,6 @@ export function resolveLanCommanderClaim(
   const seat = game.seats.find((candidate) => candidate.key === defender)
   if (!commander || !claim || !seat || game.status !== "active") return game
   const claims = commander.claims.filter((candidate) => candidate !== claim)
-  const settled = settle(commander, claim.id)
   const confirmed = resolution.accepted
     ? confirmCommanderClaim({
         total: commanderTotal(commander, claim.from, claim.to),
@@ -238,7 +241,7 @@ export function resolveLanCommanderClaim(
         delta: claim.delta,
       })
     : null
-  if (!confirmed) return { ...game, commander: { ...commander, claims, settled } }
+  if (!confirmed) return { ...game, commander: { ...commander, claims } }
   const totals = [
     ...commander.totals.filter((total) => !(total.from === claim.from && total.to === claim.to)),
     { from: claim.from, to: claim.to, total: confirmed.total },
@@ -249,7 +252,7 @@ export function resolveLanCommanderClaim(
       life: confirmed.currentLife,
       version: owned.version + 1,
     })),
-    commander: { totals, claims, settled },
+    commander: { ...commander, totals, claims },
   }
 }
 
@@ -365,11 +368,17 @@ const isId = (value: unknown): value is string =>
 const isCommander = (value: unknown): value is LanCommanderDamage =>
   isRecord(value) &&
   Array.isArray(value.totals) &&
+  value.totals.length <= LAN_MAX_SEATS * LAN_MAX_SEATS &&
   value.totals.every(
     (total) =>
-      isRecord(total) && isId(total.from) && isId(total.to) && Number.isInteger(total.total),
+      isRecord(total) &&
+      isId(total.from) &&
+      isId(total.to) &&
+      isCount(total.total) &&
+      total.total <= MAX_COMMANDER_DAMAGE,
   ) &&
   Array.isArray(value.claims) &&
+  value.claims.length <= MAX_PENDING_COMMANDER_CLAIMS &&
   value.claims.every(
     (claim) =>
       isRecord(claim) &&
@@ -378,9 +387,9 @@ const isCommander = (value: unknown): value is LanCommanderDamage =>
       isId(claim.to) &&
       isCommanderDamageDelta(claim.delta),
   ) &&
-  Array.isArray(value.settled) &&
-  value.settled.length <= MAX_PENDING_COMMANDER_CLAIMS &&
-  value.settled.every(isId)
+  Array.isArray(value.sequences) &&
+  value.sequences.length <= LAN_MAX_SEATS &&
+  value.sequences.every((entry) => isRecord(entry) && isId(entry.key) && isCount(entry.seq))
 
 const isPass = (value: unknown): value is LanSeatPass =>
   isRecord(value) &&
@@ -413,7 +422,8 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
     isId(value.id) &&
     isId(value.to) &&
     isCommanderDamageDelta(value.delta) &&
-    isCount(value.round)
+    isCount(value.round) &&
+    isCount(value.seq)
   )
     return {
       type: "commander.claim",
@@ -421,6 +431,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       to: value.to,
       delta: value.delta,
       round: value.round,
+      seq: value.seq,
     }
   if (
     value.type === "commander.resolve" &&

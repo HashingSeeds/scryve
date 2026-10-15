@@ -9,6 +9,7 @@ import { loadLanName } from "./lanAvailability"
 import {
   admitLanGuest,
   claimLanCommanderDamage,
+  lastClaimSeq,
   connectedSeatCount,
   createLanGame,
   LAN_MIN_PLAYERS,
@@ -91,7 +92,7 @@ export class LanSession {
   private ownLife?: LanLife
   // why: kept until a host snapshot drops the claim, so a resolve lost to a dropped connection is replayed and never offered twice.
   private resolutions = new Map<string, boolean>()
-  // why: kept until the host shows the claim pending or settled, so a claim lost to a dropped connection is replayed.
+  // why: kept until the host's sequence for this seat passes it, so a claim lost to a dropped connection is replayed.
   private claims = new Map<string, LanClaimRequest>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private reconnectingSince?: number
@@ -309,9 +310,9 @@ export class LanSession {
     const { commander, round } = message.game
     const hostClaims = new Set(commander?.claims.map((claim) => claim.id))
     for (const id of this.resolutions.keys()) if (!hostClaims.has(id)) this.resolutions.delete(id)
+    const acknowledged = seatKey ? lastClaimSeq(message.game, seatKey) : 0
     for (const [id, claim] of this.claims)
-      if (claim.round !== round || hostClaims.has(id) || commander?.settled.includes(id))
-        this.claims.delete(id)
+      if (claim.round !== round || claim.seq <= acknowledged) this.claims.delete(id)
     const resolved = new Set(this.resolutions.keys())
     const game = seatKey
       ? mergeHostGame(message.game, seatKey, this.ownLife, resolved)
@@ -359,11 +360,14 @@ export class LanSession {
   claimCommanderDamage(from: string, changes: readonly { toPlayerId: string; delta: number }[]) {
     const { game, role, seatKey } = this.state
     if (!game || from !== seatKey || game.status !== "active") return
-    const claims = changes.map(({ toPlayerId, delta }) => ({
+    const unsent = [...this.claims.values()].filter((claim) => claim.round === game.round)
+    const last = Math.max(lastClaimSeq(game, from), ...unsent.map((claim) => claim.seq))
+    const claims = changes.map(({ toPlayerId, delta }, index) => ({
       id: createClientId("claim"),
       to: toPlayerId,
       delta,
       round: game.round,
+      seq: last + index + 1,
     }))
     if (role === "host")
       return this.publish(

@@ -124,7 +124,14 @@ describe("LAN session commander damage", () => {
     const { session, alice, bob } = await startedGame("commander")
     const hostKey = session.getState().seatKey!
 
-    alice.send({ type: "commander.claim", id: "c1", to: bob.pass().key, delta: 6, round: 1 })
+    alice.send({
+      type: "commander.claim",
+      id: "c1",
+      to: bob.pass().key,
+      delta: 6,
+      round: 1,
+      seq: 1,
+    })
     alice.send({ type: "commander.resolve", id: "c1", accepted: true })
     session.resolveCommanderDamage("c1", true)
     bob.send({ type: "commander.resolve", id: "c1", accepted: true })
@@ -188,6 +195,7 @@ describe("LAN session guest", () => {
       to: "guest",
       delta: 5,
       round: 1,
+      seq: 1,
     })
     host?.onMessage({ type: "game", game })
     return { guest, game, sent, host: () => host }
@@ -236,7 +244,7 @@ describe("LAN session guest", () => {
     host()?.onClose()
     await jest.advanceTimersByTimeAsync(2_000)
 
-    expect(replays()).toEqual([expect.objectContaining({ to: "host", delta: 3, round: 1 })])
+    expect(replays()).toEqual([expect.objectContaining({ to: "host", delta: 3, round: 1, seq: 1 })])
   })
 
   it("replays a confirm the host never received after reconnecting", async () => {
