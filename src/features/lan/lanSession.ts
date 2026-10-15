@@ -31,6 +31,8 @@ import {
 } from "./lanTransport"
 
 const RECONNECT_DELAY_MS = 1_500
+// why: a host that was killed never withdraws its Bonjour advert, which can outlive it by over an hour.
+const UNREACHABLE_HIDE_MS = 2 * 60_000
 
 export interface LanSessionState {
   role?: "host" | "guest"
@@ -65,6 +67,7 @@ class LanSession {
   private connection?: LanConnection<LanGuestMessage>
   private ownLife?: LanLife
   private reconnectTimer?: ReturnType<typeof setTimeout>
+  private unreachableAt = new Map<string, number>()
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
   private session = 0
 
@@ -75,6 +78,9 @@ class LanSession {
         void this.listen({ recovering: true })
     })
   }
+
+  isReachable = (serviceName: string) =>
+    Date.now() - (this.unreachableAt.get(serviceName) ?? 0) > UNREACHABLE_HIDE_MS
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener)
@@ -181,9 +187,10 @@ class LanSession {
     const session = ++this.session
     try {
       await this.connect(service, session)
-    } catch (error) {
-      if (session === this.session)
-        this.replace({ ...IDLE, error: `Could not join: ${String(error)}` })
+    } catch {
+      if (session !== this.session) return
+      this.unreachableAt.set(service.name, Date.now())
+      this.replace({ ...IDLE, error: `${service.name} isn't reachable. The game may have ended.` })
     }
   }
 

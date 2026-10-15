@@ -54,7 +54,9 @@ export function LanLobbyScreen({
     protocol: "tcp",
     enabled: ready && !inGame,
   })
-  const nearby = services.filter(isLanGameService)
+  const nearby = services.filter(
+    (service) => isLanGameService(service) && lanSession.isReachable(service.name),
+  )
   const [startingLife, setStartingLife] = useState<number>(automation.start ?? 20)
   const [name, setName] = useState(loadLanName)
   const projection = game ? lanProjection(game, lanSession.playerId) : undefined
