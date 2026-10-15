@@ -85,6 +85,61 @@ function createRecentDeltaStore() {
   }
 }
 
+function deltaText(delta: number) {
+  return delta > 0 ? `+${delta}` : `-${Math.abs(delta)}`
+}
+
+export function RecentDeltaLabel({
+  seatNumber,
+  recentDelta: recentDeltaStore,
+  pendingDelta = 0,
+  lifeFontSize,
+  compact,
+  contentRotation = 0,
+  foreground,
+}: {
+  seatNumber: number
+  recentDelta: RecentDelta
+  pendingDelta?: number
+  lifeFontSize: number
+  compact?: boolean
+  contentRotation?: LifeCardContentRotation
+  foreground: string
+}) {
+  const recentDelta =
+    useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
+  if (!recentDelta) return null
+  const fontSize = compact ? 16 : 24
+  // why: the label clears the digits' cap height, which is about 0.75 of the font size.
+  const lift = lifeFontSize * 0.375 + fontSize * 0.5 + (compact ? 6 : 12)
+  const [dx, dy] = { 0: [0, -lift], 180: [0, lift], 90: [lift, 0], [-90]: [-lift, 0] }[
+    contentRotation
+  ]
+  return (
+    <View
+      testID={`life-recent-delta-seat-${seatNumber}`}
+      pointerEvents="none"
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+      style={[$recentDelta, { transform: [{ translateX: dx }, { translateY: dy }] }]}
+    >
+      <Text
+        text={deltaText(recentDelta)}
+        weight="semiBold"
+        maxFontSizeMultiplier={1.3}
+        numberOfLines={1}
+        style={{
+          color: foreground,
+          fontSize,
+          lineHeight: Math.round(fontSize * 1.25),
+          fontVariant: ["tabular-nums"],
+          transform: [{ rotate: `${contentRotation}deg` }],
+        }}
+      />
+    </View>
+  )
+}
+
 export function lifeControlTestId(seatNumber: number, delta: LifeDelta) {
   return `life-seat-${seatNumber}-${delta}`
 }
@@ -126,6 +181,8 @@ export function LifeControls({
   const sideways = Math.abs(contentRotation) === 90
   const counter = playSystemRules(system).counter
   const tapStep = lifeStep ?? counter.tapStep
+  // why: a calculator counter shows its running change above the total, so the glyphs stay put.
+  const glyphFeedback = !counter.calculator
 
   function labelFor(delta: LifeDelta) {
     return `${identity}, ${delta > 0 ? "add" : "subtract"} ${counterValueLabel(system, Math.abs(delta))}`
@@ -148,11 +205,7 @@ export function LifeControls({
           const delta = direction * tapStep
           const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
           const feedback =
-            direction * recentDelta > 0
-              ? recentDelta > 0
-                ? `+${recentDelta}`
-                : `-${Math.abs(recentDelta)}`
-              : glyph
+            glyphFeedback && direction * recentDelta > 0 ? deltaText(recentDelta) : glyph
           return (
             <BoardPressable
               key={delta}
@@ -217,6 +270,12 @@ export function LifeControls({
       </View>
     </View>
   )
+}
+
+const $recentDelta: ViewStyle = {
+  ...StyleSheet.absoluteFill,
+  alignItems: "center",
+  justifyContent: "center",
 }
 
 const $zones: ThemedStyle<ViewStyle> = () => ({

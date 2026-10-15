@@ -72,13 +72,13 @@ describe("LifeControls", () => {
       </ThemeProvider>,
     )
 
-    const subtract = view.getByTestId("life-seat-1--100")
+    const subtract = view.getByTestId("life-seat-1--1000")
     fireEvent.press(subtract)
     fireEvent(subtract, "pressIn")
     fireEvent(subtract, "longPress")
 
-    expect(subtract.props.accessibilityLabel).toContain("subtract 100 Life Points")
-    expect(onChange).toHaveBeenCalledWith(-100)
+    expect(subtract.props.accessibilityLabel).toContain("subtract 1000 Life Points")
+    expect(onChange).toHaveBeenCalledWith(-1000)
     expect(onLongChange).toHaveBeenCalledWith(-1)
   })
 

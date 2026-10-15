@@ -469,7 +469,7 @@ describe("SettingsScreen", () => {
 
     fireEvent.press(view.getByTestId("default-starting-life-increment"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ defaultStartingLife: 8100 }),
+      expect.objectContaining({ defaultStartingLife: 9000 }),
     )
   })
 

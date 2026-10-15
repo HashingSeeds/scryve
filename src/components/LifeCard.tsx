@@ -16,7 +16,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
-import { counterValueLabel, type PlaySystemId } from "@/features/game/playSystems"
+import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -36,7 +36,8 @@ import { CommanderStrip } from "./CommanderStrip"
 import { CounterChips, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
-import { LifeControls, useRecentDelta } from "./LifeControls"
+import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
+import { LifeControls, RecentDeltaLabel, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
@@ -282,6 +283,7 @@ export const LifeCard = memo(function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
+  const calculator = !!playSystemRules(system).counter.calculator
   // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
   const [tableSheetOpen, setTableSheetOpen] = useState(false)
   const recentDelta = useRecentDelta(life)
@@ -335,6 +337,8 @@ export const LifeCard = memo(function LifeCard({
     !diceCovers &&
     ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
+  const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
+  const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
   const identityMetrics = seatIdentityMetrics(compact)
   const identityCorner = seatIdentityPlacement({
@@ -449,6 +453,17 @@ export const LifeCard = memo(function LifeCard({
               { color: foreground },
             ]}
           />
+          {calculator ? (
+            <RecentDeltaLabel
+              seatNumber={seatNumber}
+              recentDelta={recentDelta}
+              pendingDelta={preview}
+              lifeFontSize={resolvedLifeFontSize}
+              compact={compact}
+              contentRotation={contentRotation}
+              foreground={foreground}
+            />
+          ) : null}
         </Animated.View>
       </View>
       {eliminated ? (
@@ -626,7 +641,13 @@ export const LifeCard = memo(function LifeCard({
                 gap: identityMetrics.gap,
                 left: identityCorner.position.left,
                 bottom: identityCorner.position.bottom,
-                maxWidth: identityCorner.rowMaxWidth,
+                maxWidth:
+                  calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
+                    ? Math.max(
+                        identityCorner.rowMaxWidth - calculatorButtonSize - identityMetrics.gap,
+                        0,
+                      )
+                    : identityCorner.rowMaxWidth,
               },
             ]}
           >
@@ -680,6 +701,27 @@ export const LifeCard = memo(function LifeCard({
               />
             ) : null}
           </View>
+          {calculatorButtonShown ? (
+            <BoardPressable
+              testID={`life-calculator-open-seat-${seatNumber}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Open calculator for ${identity}`}
+              hitSlop={12}
+              onPress={() => setEditorOpen(true)}
+              style={({ pressed }) => [
+                $cornerButton,
+                {
+                  right: identityCorner.trailing.right,
+                  bottom: identityCorner.trailing.bottom,
+                  width: calculatorButtonSize,
+                  height: calculatorButtonSize,
+                },
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <CalculatorGlyph color={foreground} size={calculatorButtonSize} />
+            </BoardPressable>
+          ) : null}
         </View>
       ) : null}
       {claims?.length ? (
@@ -715,7 +757,23 @@ export const LifeCard = memo(function LifeCard({
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}
-      {editorOpen ? (
+      {editorOpen && calculator ? (
+        <LifeCalculator
+          seatNumber={seatNumber}
+          playerName={displayName}
+          life={life}
+          system={system}
+          color={color}
+          rotation={contentRotation}
+          cardWidth={cardSize.width}
+          cardHeight={cardSize.height}
+          contentInsets={contentInsets}
+          menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
+          onChange={onChange}
+          onClose={() => setEditorOpen(false)}
+        />
+      ) : editorOpen ? (
         <LifeEditor
           seatNumber={seatNumber}
           playerName={displayName}
@@ -776,6 +834,12 @@ const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
 
 const $cornerRow: ViewStyle = { position: "absolute", flexDirection: "row", alignItems: "center" }
 const $cornerIdentity: ViewStyle = { flexShrink: 1, minWidth: 0 }
+const $cornerButton: ViewStyle = {
+  position: "absolute",
+  alignItems: "center",
+  justifyContent: "center",
+  opacity: 0.6,
+}
 
 const CONTENT_LEFT_EDGE = {
   0: "left",
@@ -829,7 +893,13 @@ export function seatIdentityPlacement({
   const roomAboveCutout = raised + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0
   const cutoutAtMiddle = underCutout && roomAboveCutout
+  const rightEdge = CONTENT_RIGHT_EDGE[rotation]
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
+  // why: the outside corner opposite the name holds the seat's calculator button.
+  const trailing = {
+    right: cornerOffset(gap, rightEdge, bottomEdge, insets, screenEdges),
+    bottom: cornerOffset(gap, bottomEdge, rightEdge, insets, screenEdges),
+  }
   const bottom = cutoutAtMiddle
     ? raised
     : cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
@@ -854,7 +924,7 @@ export function seatIdentityPlacement({
   }
   // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
   const rowMaxWidth = run && !tucked ? Math.max(run - left * 2, 0) : position.maxWidth
-  return { layer, position, rowMaxWidth }
+  return { layer, position, rowMaxWidth, trailing }
 }
 
 const $commanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({

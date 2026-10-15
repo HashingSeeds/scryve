@@ -14,6 +14,8 @@ export type CounterDefinition = {
   readonly scrubSteps: number
   readonly direction: "open" | "down"
   readonly maxStartingValue: number
+  /** why: some games move the counter by typed amounts in the thousands; their seats open a calculator instead of the slider editor, and the running change sits above the total, where a five-digit label fits. */
+  readonly calculator?: true
 }
 
 export type FormatDefinition = {
@@ -243,13 +245,14 @@ export const SYSTEMS = {
       plural: "Life Points",
       defaultValue: 8000,
       presets: [8000],
-      tapStep: 100,
+      tapStep: 1000,
       quickAdjustments: [1000, 50],
       scrubStep: 100,
       scrubSteps: 80,
       longPressStep: 1000,
       direction: "open",
       maxStartingValue: 999_999,
+      calculator: true,
     },
     formats: [
       { id: "advanced", label: "Advanced", sections: YUGIOH_SECTIONS },

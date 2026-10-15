@@ -1,0 +1,324 @@
+import { useState } from "react"
+import type { TextStyle, ViewStyle } from "react-native"
+import { StyleSheet, View } from "react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import Svg, { Circle, Rect } from "react-native-svg"
+
+import { MAX_LIFE_DELTA } from "@/features/game/domain"
+import type { PlaySystemId } from "@/features/game/playSystems"
+import { useAppTheme } from "@/theme/context"
+import { accessibleForeground } from "@/utils/colorContrast"
+import { useCloseOnBack } from "@/utils/useCloseOnBack"
+import { useReducedMotion } from "@/utils/useReducedMotion"
+
+import { BoardPressable } from "./BoardPressable"
+import { mixColorsInLinearLight } from "./GameMenuButtonShape"
+import { overlayTint } from "./LifeControls"
+import type {
+  LifeCardContentInsets,
+  LifeCardContentRotation,
+  LifeCardMenuCorner,
+  LifeCardMenuEdge,
+} from "./playerCardTypes"
+import {
+  benchMenuClearance,
+  contentInsetsFor,
+  MENU_CLEARANCE,
+  rotatedLayerStyle,
+} from "./pokemon/pokemonCardLayout"
+import { DELETE_PATHS, KeyIcon } from "./pokemon/PokemonKeypad"
+import { Text } from "./Text"
+import { flooredLifeDelta } from "../../convex/lib/systems"
+
+const COLUMN_KEYS = ["1", "2", "3", "00", "4", "5", "6", "0", "7", "8", "9", "⌫"] as const
+const BESIDE_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "⌫"] as const
+const MAX_DIGITS = String(MAX_LIFE_DELTA).length
+// why: below this height a column squeezes the keys too small to hit, so the keypad moves beside the number.
+const COLUMN_MIN_HEIGHT = 300
+const FADE_MS = 160
+
+type Props = {
+  seatNumber: number
+  playerName: string
+  life: number
+  system?: PlaySystemId
+  color: string
+  rotation: LifeCardContentRotation
+  cardWidth: number
+  cardHeight: number
+  contentInsets?: LifeCardContentInsets
+  menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
+  onChange: (delta: number) => void
+  onClose: () => void
+}
+
+const GLYPH_KEYS = [8.6, 12, 15.4].flatMap((cx) => [13, 17].map((cy) => ({ cx, cy })))
+
+export function CalculatorGlyph({ color, size }: { color: string; size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={4.5} y={2.5} width={15} height={19} rx={3} stroke={color} strokeWidth={1.9} />
+      <Rect x={7.5} y={5.5} width={9} height={4} rx={1} stroke={color} strokeWidth={1.6} />
+      {GLYPH_KEYS.map(({ cx, cy }) => (
+        <Circle key={`${cx}:${cy}`} cx={cx} cy={cy} r={1.15} fill={color} />
+      ))}
+    </Svg>
+  )
+}
+
+export function LifeCalculator({
+  seatNumber,
+  playerName,
+  life,
+  system,
+  color,
+  rotation,
+  cardWidth,
+  cardHeight,
+  contentInsets,
+  menuCorner,
+  menuEdgeCenter,
+  onChange,
+  onClose,
+}: Props) {
+  const { theme } = useAppTheme()
+  const reducedMotion = useReducedMotion()
+  const [entry, setEntry] = useState("")
+  const amount = Number(entry)
+  // why: halving rounds the total up, as Yu-Gi-Oh! rounds halved Life Points; past the largest accepted change, ½ stays off rather than closing with nothing applied.
+  const halved = Math.ceil(life / 2) - life
+  const halving = Math.abs(halved) <= MAX_LIFE_DELTA ? halved : 0
+  const damaged = life + flooredLifeDelta(system, life, -amount)
+  const background = mixColorsInLinearLight(color, "#000000", 0.82)
+  const ink = accessibleForeground(background)
+  const damage = mixColorsInLinearLight(theme.colors.error, background, 0.55)
+  const gain = mixColorsInLinearLight(theme.colors.success, background, 0.55)
+  const sideways = Math.abs(rotation) === 90
+  const height = sideways ? cardWidth : cardHeight
+  const insets = contentInsetsFor(rotation, contentInsets)
+  const clearance = benchMenuClearance(rotation, menuCorner, menuEdgeCenter)
+  const beside = height > 0 && height - insets.top - insets.bottom < COLUMN_MIN_HEIGHT
+  const fade = reducedMotion === false
+  const inkText = { color: ink }
+
+  useCloseOnBack(true, onClose)
+
+  function press(key: (typeof COLUMN_KEYS)[number]) {
+    setEntry((current) => {
+      if (key === "⌫") return current.slice(0, -1)
+      if (!current && key.startsWith("0")) return current
+      const next = current + key
+      return next.length <= MAX_DIGITS ? next : current
+    })
+  }
+
+  function apply(delta: number) {
+    if (delta) onChange(delta)
+    onClose()
+  }
+
+  const key = (label: (typeof COLUMN_KEYS)[number]) => (
+    <BoardPressable
+      key={label}
+      testID={`life-calculator-key-${label === "⌫" ? "delete" : label}-seat-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={label === "⌫" ? "Delete" : label}
+      onPress={() => press(label)}
+      style={({ pressed }) => [$key, { backgroundColor: overlayTint(ink, pressed ? 0.36 : 0.18) }]}
+    >
+      {label === "⌫" ? (
+        <KeyIcon paths={DELETE_PATHS} color={ink} size={beside ? 18 : 22} />
+      ) : (
+        <Text text={label} weight="medium" size={beside ? "xs" : "sm"} style={inkText} />
+      )}
+    </BoardPressable>
+  )
+  const keys = beside ? BESIDE_KEYS : COLUMN_KEYS
+  const columns = beside ? 3 : 4
+  const keypad = (
+    <View
+      testID={`life-calculator-keypad-seat-${seatNumber}`}
+      style={[$keypad, beside && $keypadBeside]}
+    >
+      {Array.from({ length: keys.length / columns }, (_, row) => (
+        <View key={row} style={[$keyRow, beside ? $keyRowBeside : $keyRowColumn]}>
+          {keys.slice(row * columns, row * columns + columns).map(key)}
+        </View>
+      ))}
+    </View>
+  )
+
+  const action = (
+    id: "damage" | "half" | "gain",
+    label: string,
+    accessibilityLabel: string,
+    delta: number,
+    fill?: string,
+  ) => (
+    <BoardPressable
+      testID={`life-calculator-${id}-seat-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: !delta }}
+      disabled={!delta}
+      onPress={() => apply(delta)}
+      style={({ pressed }) => [
+        $action,
+        fill
+          ? { backgroundColor: fill }
+          : { borderColor: theme.colors.tint, borderWidth: 1.5, backgroundColor: background },
+        pressed && $pressed,
+        !delta && $disabled,
+      ]}
+    >
+      <Text
+        text={label}
+        weight="bold"
+        size={beside ? "xs" : "sm"}
+        numberOfLines={1}
+        style={{ color: fill ? accessibleForeground(fill) : theme.colors.tint }}
+      />
+    </BoardPressable>
+  )
+  const actions = (
+    <View style={$actions}>
+      {action(
+        "damage",
+        beside ? "−" : "− Damage",
+        `Subtract ${amount} from ${playerName}`,
+        -amount,
+        damage,
+      )}
+      {action("half", "½", `Halve ${playerName}'s total`, halving)}
+      {action("gain", beside ? "+" : "+ Gain", `Add ${amount} to ${playerName}`, amount, gain)}
+    </View>
+  )
+  const readout = (
+    <View style={beside ? undefined : $centered}>
+      <Text
+        testID={`life-calculator-value-seat-${seatNumber}`}
+        text={entry || String(life)}
+        accessibilityLiveRegion="polite"
+        numberOfLines={1}
+        style={[
+          beside ? $besideValue : $value,
+          { color: entry ? theme.colors.tint : ink },
+          !beside && $centeredText,
+        ]}
+      />
+      <Text
+        text={entry ? `− → ${damaged} · + → ${life + amount}` : "Type an amount"}
+        size="xxs"
+        numberOfLines={beside ? 2 : 1}
+        style={[inkText, $hint, !beside && $centeredText]}
+      />
+    </View>
+  )
+
+  return (
+    <Animated.View
+      testID={`life-calculator-seat-${seatNumber}`}
+      accessibilityViewIsModal
+      aria-modal
+      entering={fade ? FadeIn.duration(FADE_MS) : undefined}
+      exiting={fade ? FadeOut.duration(FADE_MS) : undefined}
+      style={[
+        StyleSheet.absoluteFill,
+        rotatedLayerStyle(rotation, cardWidth, cardHeight),
+        beside ? $besideSheet : $sheet,
+        {
+          backgroundColor: background,
+          paddingTop: (beside ? 6 : 12) + insets.top,
+          paddingBottom: (beside ? 6 : 12) + insets.bottom,
+          paddingLeft: (beside ? 8 : 12) + insets.left,
+          paddingRight: (beside ? 8 : 12) + insets.right,
+        },
+      ]}
+    >
+      <View style={[$header, { marginLeft: clearance.left, marginRight: clearance.right }]}>
+        <Text
+          text={playerName}
+          weight="bold"
+          size={beside ? "xs" : "sm"}
+          numberOfLines={1}
+          style={[inkText, $title]}
+        />
+        {/* why: a menu at the middle of this edge sits between the name and the close button. */}
+        {clearance.top ? <View style={{ width: MENU_CLEARANCE * 2 }} /> : null}
+        <View style={$closeSlot}>
+          <BoardPressable
+            testID={`life-calculator-close-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Close ${playerName}'s calculator`}
+            hitSlop={12}
+            onPress={onClose}
+            style={$close}
+          >
+            <View
+              style={[$closeStroke, { backgroundColor: ink, transform: [{ rotate: "45deg" }] }]}
+            />
+            <View
+              style={[$closeStroke, { backgroundColor: ink, transform: [{ rotate: "-45deg" }] }]}
+            />
+          </BoardPressable>
+        </View>
+      </View>
+      {beside ? (
+        <View style={$besideBody}>
+          <View style={$besideReadout}>
+            {readout}
+            {actions}
+          </View>
+          {keypad}
+        </View>
+      ) : (
+        <>
+          <View style={$columnReadout}>{readout}</View>
+          {keypad}
+          {actions}
+        </>
+      )}
+    </Animated.View>
+  )
+}
+
+const $sheet: ViewStyle = { zIndex: 20, gap: 8 }
+const $besideSheet: ViewStyle = { zIndex: 20, gap: 4 }
+const $header: ViewStyle = { flexDirection: "row", alignItems: "center", minHeight: 28 }
+const $title: TextStyle = { flex: 1 }
+const $closeSlot: ViewStyle = { flex: 1, alignItems: "flex-end" }
+const $close: ViewStyle = { alignItems: "center", height: 28, justifyContent: "center", width: 28 }
+const $closeStroke: ViewStyle = { borderRadius: 1, height: 2, position: "absolute", width: 18 }
+const $columnReadout: ViewStyle = { flex: 1, justifyContent: "center", minHeight: 64 }
+const $centered: ViewStyle = { alignItems: "center" }
+const $centeredText: TextStyle = { textAlign: "center" }
+const $value: TextStyle = { fontSize: 48, lineHeight: 56, fontVariant: ["tabular-nums"] }
+const $besideValue: TextStyle = { fontSize: 30, lineHeight: 36, fontVariant: ["tabular-nums"] }
+const $besideBody: ViewStyle = { flex: 1, flexDirection: "row", gap: 8, minHeight: 0 }
+const $besideReadout: ViewStyle = { flex: 1, justifyContent: "space-between", minWidth: 0 }
+const $keypad: ViewStyle = { gap: 5, flexShrink: 1, minHeight: 0 }
+const $keypadBeside: ViewStyle = { flex: 1.15, gap: 4 }
+const $keyRow: ViewStyle = { flexDirection: "row", gap: 5 }
+// why: a column row keeps a full key height and gives way only when the seat runs short.
+const $keyRowColumn: ViewStyle = { height: 44, flexShrink: 1, minHeight: 28 }
+const $keyRowBeside: ViewStyle = { flex: 1, gap: 4 }
+const $key: ViewStyle = {
+  flex: 1,
+  minWidth: 0,
+  borderRadius: 8,
+  alignItems: "center",
+  justifyContent: "center",
+}
+const $actions: ViewStyle = { flexDirection: "row", gap: 5 }
+const $action: ViewStyle = {
+  flex: 1,
+  minHeight: 38,
+  borderRadius: 8,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 4,
+}
+const $hint: TextStyle = { opacity: 0.72 }
+const $pressed: ViewStyle = { opacity: 0.75 }
+const $disabled: ViewStyle = { opacity: 0.35 }
