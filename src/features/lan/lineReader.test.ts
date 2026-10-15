@@ -15,9 +15,12 @@ describe("createLineReader", () => {
     expect(lines).toEqual(['{"name":"José"}', '{"name":"Zoë"}'])
   })
 
-  it("refuses a line that never ends", () => {
+  it("refuses an oversized line whether or not it has ended", () => {
     const read = createLineReader(() => {})
 
-    expect(() => read(new Uint8Array(MAX_LINE_BYTES + 1).fill(0x61))).toThrow("too long")
+    const oversized = new Uint8Array(MAX_LINE_BYTES + 1).fill(0x61)
+
+    expect(() => createLineReader(() => {})(oversized)).toThrow("too long")
+    expect(() => read(Buffer.concat([oversized, Buffer.from("\n")]))).toThrow("too long")
   })
 })

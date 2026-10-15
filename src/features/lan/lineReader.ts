@@ -8,14 +8,14 @@ export function createLineReader(onLine: (line: string) => void) {
   let pending = Buffer.alloc(0)
   return (chunk: Uint8Array) => {
     pending = Buffer.concat([pending, chunk])
-    if (pending.indexOf(0x0a) === -1 && pending.length > MAX_LINE_BYTES)
-      throw new Error("LAN message too long")
     let newline = pending.indexOf(0x0a)
     while (newline !== -1) {
+      if (newline > MAX_LINE_BYTES) throw new Error("LAN message too long")
       const line = pending.slice(0, newline).toString("utf8")
       pending = pending.slice(newline + 1)
       if (line) onLine(line)
       newline = pending.indexOf(0x0a)
     }
+    if (pending.length > MAX_LINE_BYTES) throw new Error("LAN message too long")
   }
 }

@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 
 import type { ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
-import { playTableRules } from "@/features/game/playSystems"
+import { NO_PLAY_SYSTEM, playTableRules } from "@/features/game/playSystems"
 import { createTableActions } from "@/features/game/tableRuntime"
 
 import { lanProjection } from "./lanGame"
@@ -22,7 +22,7 @@ export function useLanGame(): ConnectedGameRuntime {
     const base = {
       ...NO_TABLE_ACTIONS,
       table: EMPTY_TABLE,
-      tableRules: playTableRules("mtg"),
+      tableRules: playTableRules(NO_PLAY_SYSTEM),
       pending: [],
       failed: [],
       connectionStatus: status === "connected" ? ("connected" as const) : ("offline" as const),
