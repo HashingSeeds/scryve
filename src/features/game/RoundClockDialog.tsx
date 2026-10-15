@@ -71,13 +71,6 @@ export function RoundClockDialog({
           style={themed($dialogText)}
         />
       ) : null}
-      {view.kind === "time" && view.turns === 0 ? (
-        <Text
-          size="xs"
-          text="An unfinished match is a loss for both players."
-          style={themed($dialogText)}
-        />
-      ) : null}
       {leader ? <Text size="xs" text={leader} style={themed($dialogText)} /> : null}
 
       {view.kind === "time" ? (

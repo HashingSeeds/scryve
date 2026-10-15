@@ -27,7 +27,7 @@ export const ROUND_CLOCK_MINUTES = { min: 1, max: 180, step: 5 } as const
 
 const MINUTE_MS = 60_000
 
-/** why: MTR 2.5 and the Play! Pokémon handbook add turns after time; Yu-Gi-Oh! ends the match at once. */
+/** why: MTR 2.5 and the Play! Pokémon handbook add turns after time; Yu-Gi-Oh! and unknown systems show only that time is up. */
 const END_OF_ROUND_TURNS: Record<PlaySystemId, number> = { mtg: 5, pokemon: 3, ygo: 0 }
 
 /** why: Play! Pokémon caps the end-of-round turns at 15 minutes for every table. */
