@@ -28,7 +28,7 @@ export default function AccountRoute() {
         ) : null}
         <Button
           text="Open Play"
-          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+          onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
     )
@@ -45,7 +45,7 @@ export default function AccountRoute() {
         onOpenTerms={() => router.push("/terms")}
         onOpenPrivacy={() => router.push("/privacy")}
         onOpenGameContentNotices={() => router.push("/game-content-notices")}
-        onSignedOut={() => router.replace("/")}
+        onSignedOut={() => router.dismissTo("/")}
       />
     </Screen>
   )

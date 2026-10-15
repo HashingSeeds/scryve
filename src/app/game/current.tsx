@@ -19,7 +19,7 @@ export default function CurrentLocalGameRoute() {
           heading="No active local game"
           content="Your next game is ready on Play."
           button="Open Play"
-          buttonOnPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+          buttonOnPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
     )
@@ -35,7 +35,7 @@ export default function CurrentLocalGameRoute() {
       onSettings={() => router.push("/settings")}
       onAccount={() => router.push("/account")}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}
-      onGameAbandoned={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      onGameAbandoned={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
       ownerId={auth.isSignedIn ? auth.userId : undefined}
     />
   )
