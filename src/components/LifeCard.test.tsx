@@ -1239,6 +1239,7 @@ describe("LifeCard", () => {
     expect(within(log).getByText("6800")).toBeTruthy()
     fireEvent(log, "layout", { nativeEvent: { layout: { width: 60 } } })
     expect(within(log).queryByText("+800")).toBeNull()
+    expect(within(log).getByText("6800")).toBeTruthy()
   })
 
   it("shrinks the Yu-Gi-Oh! running change in its glyph to fit beside the total", () => {

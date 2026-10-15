@@ -41,7 +41,7 @@ const TRAIL_STEPS = { beside: 2, column: 3, wide: 5 }
 const TRAIL_WIDE = 520
 const TRAIL_GAP = 7
 // why: a generous per-character width at the trail's text size, so six-digit totals drop older steps instead of overflowing.
-const TRAIL_CHAR_WIDTH = 7.5
+const TRAIL_CHAR_WIDTH = 8
 // why: large system text still grows the trail, but only so far, so the fit estimate holds and the keypad keeps its room.
 const TRAIL_MAX_FONT_SCALE = 1.3
 const FADE_MS = 160
@@ -367,6 +367,16 @@ function LifeTrail({
   // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
   while (count > 0 && !fits(count)) count--
   const shown = changes.slice(changes.length - count)
+  const item = (text: string, style: TextStyle, weight?: "bold") => (
+    <Text
+      text={text}
+      size="xxs"
+      weight={weight}
+      numberOfLines={1}
+      maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
+      style={[{ color: ink }, style]}
+    />
+  )
 
   return (
     <View
@@ -376,43 +386,14 @@ function LifeTrail({
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
       style={[$trail, !beside && $trailCentered]}
     >
-      {count > 0 ? (
-        <>
-          {count < changes.length ? (
-            <Text
-              text="…"
-              size="xxs"
-              maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
-              style={[$trailTotal, { color: ink }]}
-            />
-          ) : null}
-          {shown.map(({ id, delta, from }) => (
-            <Fragment key={id}>
-              <Text
-                text={String(from)}
-                size="xxs"
-                maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
-                style={[$trailTotal, { color: ink }]}
-              />
-              <Text
-                text={signed(delta)}
-                size="xxs"
-                maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
-                weight="bold"
-                style={[$trailText, { color: delta < 0 ? damage : gain }]}
-              />
-            </Fragment>
-          ))}
-          {showTotal ? (
-            <Text
-              text={total}
-              size="xxs"
-              maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
-              style={[$trailText, { color: ink }]}
-            />
-          ) : null}
-        </>
-      ) : null}
+      {count > 0 && count < changes.length ? item("…", $trailTotal) : null}
+      {shown.map(({ id, delta, from }) => (
+        <Fragment key={id}>
+          {item(String(from), $trailTotal)}
+          {item(signed(delta), { ...$trailText, color: delta < 0 ? damage : gain }, "bold")}
+        </Fragment>
+      ))}
+      {showTotal && width > 0 ? item(total, $trailText) : null}
     </View>
   )
 }
@@ -454,14 +435,16 @@ const $action: ViewStyle = {
   paddingHorizontal: 4,
 }
 const $hint: TextStyle = { opacity: 0.72 }
+// why: if a glyph runs wider than the fit estimate, the trail clips at the seat edge instead of wrapping into the keypad.
 const $trail: ViewStyle = {
   alignSelf: "stretch",
   flexDirection: "row",
   gap: TRAIL_GAP,
   marginTop: 2,
+  overflow: "hidden",
 }
 const $trailCentered: ViewStyle = { justifyContent: "center" }
-const $trailText: TextStyle = { fontVariant: ["tabular-nums"] }
+const $trailText: TextStyle = { flexShrink: 0, fontVariant: ["tabular-nums"] }
 const $trailTotal: TextStyle = { ...$trailText, opacity: 0.6 }
 const $pressed: ViewStyle = { opacity: 0.75 }
 const $disabled: ViewStyle = { opacity: 0.35 }
