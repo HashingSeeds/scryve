@@ -1190,7 +1190,7 @@ describe("LifeCard", () => {
     expect(view.getByText("− → 0 · + → 1500")).toBeTruthy()
   })
 
-  it("lists the seat's Life Points so far in the calculator, newest on the right", () => {
+  it("trails the seat's recent Life Point changes under the calculator total, dropping the oldest to fit", () => {
     const ada = asPlayerId("ada")
     const change = (id: string, delta: number): LifeChangedEvent => ({
       type: "life.changed",
@@ -1226,9 +1226,14 @@ describe("LifeCard", () => {
       "Ada's life log: 8000, −2000 to 6000, +800 to 6800",
     )
     fireEvent(log, "layout", { nativeEvent: { layout: { width: 120 } } })
-    expect(within(log).queryByText("8000")).toBeNull()
+    expect(within(log).getByText("…")).toBeTruthy()
+    expect(within(log).queryByText("−2000")).toBeNull()
+    expect(within(log).getByText("6000")).toBeTruthy()
+    expect(within(log).getByText("+800")).toBeTruthy()
+    fireEvent(log, "layout", { nativeEvent: { layout: { width: 360 } } })
+    expect(within(log).queryByText("…")).toBeNull()
+    expect(within(log).getByText("8000")).toBeTruthy()
     expect(within(log).getByText("−2000")).toBeTruthy()
-    expect(within(log).getByText("6800")).toBeTruthy()
   })
 
   it("shrinks the Yu-Gi-Oh! running change in its glyph to fit beside the total", () => {
