@@ -38,7 +38,7 @@ describe("LAN game", () => {
       type: "join",
       playerId: "guest",
       name: "guest",
-      life: { life: 13, version: 5 },
+      life: { life: 13, version: 5, round: 1 },
     })
 
     expect("rejected" in rejoined ? null : lifeOf(rejoined, "guest")).toBe(13)
@@ -48,19 +48,29 @@ describe("LAN game", () => {
     const game = setLanLife(startLanGame(joined(lobby(), "guest"), 20), "guest", {
       life: 12,
       version: 4,
+      round: 1,
     })
 
-    expect(lifeOf(setLanLife(game, "guest", { life: 18, version: 3 }), "guest")).toBe(12)
+    expect(lifeOf(setLanLife(game, "guest", { life: 18, version: 3, round: 1 }), "guest")).toBe(12)
   })
 
   it("keeps a guest's own newer life when the host has not caught up", () => {
     const host = startLanGame(joined(lobby(), "guest"), 20)
-    const merged = mergeHostGame(host, "guest", { life: 9, version: 7 })
+    const merged = mergeHostGame(host, "guest", { life: 9, version: 7, round: 1 })
 
     expect(lifeOf(merged, "guest")).toBe(9)
     expect(lanProjection(merged, "guest").players.map((player) => player.controlledByMe)).toEqual([
       false,
       true,
     ])
+  })
+
+  it("keeps a restart's starting life over a total from the previous game", () => {
+    const first = startLanGame(joined(lobby(), "guest"), 20)
+    const restarted = startLanGame(first, 40)
+    const stale = { life: 3, version: 9, round: first.round }
+
+    expect(lifeOf(setLanLife(restarted, "guest", stale), "guest")).toBe(40)
+    expect(lifeOf(mergeHostGame(restarted, "guest", stale), "guest")).toBe(40)
   })
 })

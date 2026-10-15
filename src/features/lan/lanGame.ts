@@ -18,6 +18,8 @@ export interface LanGame {
   id: string
   hostId: string
   status: "lobby" | "active" | "finished" | "abandoned"
+  // why: each start resets every life, so a total from an earlier round must never win against it.
+  round: number
   startingLife: number
   seats: LanSeat[]
 }
@@ -25,11 +27,11 @@ export interface LanGame {
 export interface LanLife {
   life: number
   version: number
+  round: number
 }
 
 export type LanGuestMessage =
-  | { type: "join"; playerId: string; name: string; life?: LanLife }
-  | { type: "life"; life: number; version: number }
+  { type: "join"; playerId: string; name: string; life?: LanLife } | ({ type: "life" } & LanLife)
 
 export type LanHostMessage = { type: "game"; game: LanGame } | { type: "rejected"; reason: string }
 
@@ -39,6 +41,7 @@ export function createLanGame(id: string, host: { playerId: string; name: string
     id,
     hostId: host.playerId,
     status: "lobby",
+    round: 0,
     startingLife,
     seats: [
       {
@@ -58,8 +61,10 @@ const withSeat = (game: LanGame, playerId: string, update: (seat: LanSeat) => La
   seats: game.seats.map((seat) => (seat.playerId === playerId ? update(seat) : seat)),
 })
 
-const applyLife = (seat: LanSeat, life: LanLife | undefined): LanSeat =>
-  life && life.version > seat.version ? { ...seat, ...life } : seat
+const applyLife = (game: LanGame, seat: LanSeat, life: LanLife | undefined): LanSeat =>
+  life && life.round === game.round && life.version > seat.version
+    ? { ...seat, life: life.life, version: life.version }
+    : seat
 
 export function joinLanGame(
   game: LanGame,
@@ -67,7 +72,7 @@ export function joinLanGame(
 ): LanGame | { rejected: string } {
   if (game.seats.some((seat) => seat.playerId === join.playerId))
     return withSeat(game, join.playerId, (seat) =>
-      applyLife({ ...seat, name: join.name, connected: true }, join.life),
+      applyLife(game, { ...seat, name: join.name, connected: true }, join.life),
     )
   if (game.status !== "lobby") return { rejected: "This game has already started." }
   if (game.seats.length >= LAN_MAX_SEATS) return { rejected: "This game is full." }
@@ -88,7 +93,7 @@ export function joinLanGame(
 }
 
 export const setLanLife = (game: LanGame, playerId: string, life: LanLife) =>
-  withSeat(game, playerId, (seat) => applyLife(seat, life))
+  withSeat(game, playerId, (seat) => applyLife(game, seat, life))
 
 export const setLanConnected = (game: LanGame, playerId: string, connected: boolean) =>
   withSeat(game, playerId, (seat) => ({ ...seat, connected }))
@@ -97,8 +102,9 @@ export function startLanGame(game: LanGame, startingLife: number): LanGame {
   return {
     ...game,
     status: "active",
+    round: game.round + 1,
     startingLife,
-    seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: seat.version + 1 })),
+    seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: 0 })),
   }
 }
 
@@ -139,7 +145,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const isLife = (value: unknown): value is LanLife =>
-  isRecord(value) && Number.isInteger(value.life) && Number.isInteger(value.version)
+  isRecord(value) &&
+  Number.isInteger(value.life) &&
+  Number.isInteger(value.version) &&
+  Number.isInteger(value.round)
 
 export function parseGuestMessage(line: string): LanGuestMessage | null {
   const value: unknown = JSON.parse(line)
@@ -154,18 +163,21 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       type: "join",
       playerId: value.playerId,
       name: value.name.slice(0, 40),
-      ...(value.life ? { life: value.life } : {}),
+      ...(value.life
+        ? { life: { life: value.life.life, version: value.life.version, round: value.life.round } }
+        : {}),
     }
   if (value.type === "life" && isLife(value))
-    return { type: "life", life: value.life, version: value.version }
+    return { type: "life", life: value.life, version: value.version, round: value.round }
   return null
 }
 
 const LAN_STATUSES: readonly LanGame["status"][] = ["lobby", "active", "finished", "abandoned"]
 
 const isSeat = (value: unknown): value is LanSeat =>
-  isLife(value) &&
   isRecord(value) &&
+  Number.isInteger(value.life) &&
+  Number.isInteger(value.version) &&
   typeof value.playerId === "string" &&
   Number.isInteger(value.seat) &&
   typeof value.name === "string" &&
@@ -176,6 +188,7 @@ const isGame = (value: unknown): value is LanGame =>
   typeof value.id === "string" &&
   typeof value.hostId === "string" &&
   LAN_STATUSES.some((status) => status === value.status) &&
+  Number.isInteger(value.round) &&
   Number.isInteger(value.startingLife) &&
   Array.isArray(value.seats) &&
   value.seats.every(isSeat)

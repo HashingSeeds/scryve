@@ -12,7 +12,7 @@ if (!host || !port) {
 
 const playerId = `mac-${name}`
 const log = (line) => console.log(`${new Date().toISOString().slice(11, 23)} ${line}`)
-let own = { life: 0, version: 0 }
+let own = { life: 0, version: 0, round: 0 }
 let active = false
 
 const socket = net.connect(Number(port), host, () => {
@@ -36,7 +36,8 @@ socket.on("data", (chunk) => {
     const { game } = message
     active = game.status === "active"
     const seat = game.seats.find((candidate) => candidate.playerId === playerId)
-    if (seat && seat.version >= own.version) own = { life: seat.life, version: seat.version }
+    if (seat && (game.round !== own.round || seat.version >= own.version))
+      own = { life: seat.life, version: seat.version, round: game.round }
     log(`${game.status}: ${game.seats.map((s) => `${s.name}=${s.life}`).join(" ")}`)
   }
 })
@@ -46,7 +47,7 @@ socket.on("close", () => process.exit(0))
 const heartbeat = setInterval(() => socket.write("\n"), 1000)
 const lose = setInterval(() => {
   if (!active) return
-  own = { life: own.life - 1, version: own.version + 1 }
+  own = { ...own, life: own.life - 1, version: own.version + 1 }
   send({ type: "life", ...own })
 }, 3000)
 process.on("exit", () => [heartbeat, lose].forEach((timer) => timer.unref()))

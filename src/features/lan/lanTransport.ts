@@ -26,10 +26,12 @@ export interface LanHost {
   stop: () => Promise<void>
 }
 
-const zeroconf = new Zeroconf()
+// why: the constructor throws without the native module, so creating it on import crashes web.
+let zeroconfInstance: Zeroconf | undefined
+const zeroconf = () => (zeroconfInstance ??= new Zeroconf())
 
 export const checkLocalNetworkAccess = () =>
-  zeroconf.checkLocalNetworkAccess({ type: LAN_SERVICE_TYPE, protocol: LAN_PROTOCOL })
+  zeroconf().checkLocalNetworkAccess({ type: LAN_SERVICE_TYPE, protocol: LAN_PROTOCOL })
 
 // why: react-native-zeroconf advertises a throwaway service of our type while it checks permission.
 export const isLanGameService = (service: Service) => !service.name.startsWith("rnzeroconf-")
@@ -45,7 +47,12 @@ export function lanAddresses(service: Service) {
 }
 
 export const resolveLanService = (name: string) =>
-  zeroconf.resolveService({ name, type: LAN_SERVICE_TYPE, protocol: LAN_PROTOCOL, timeout: 3_000 })
+  zeroconf().resolveService({
+    name,
+    type: LAN_SERVICE_TYPE,
+    protocol: LAN_PROTOCOL,
+    timeout: 3_000,
+  })
 
 // why: TCP has no message boundaries; one chunk can hold half a message or several.
 export function createLineReader(onLine: (line: string) => void) {
@@ -120,7 +127,7 @@ export function hostLan<In, Out>(
     server.listen({ port: 0, host: "0.0.0.0" }, () => {
       const address = server.address()
       if (!address) return reject(new Error("Server has no address"))
-      zeroconf
+      zeroconf()
         .publishService({
           type: LAN_SERVICE_TYPE,
           protocol: LAN_PROTOCOL,
@@ -134,7 +141,9 @@ export function hostLan<In, Out>(
             stop: async () => {
               listening = false
               server.close()
-              await zeroconf.unpublishService(published.name).catch(() => null)
+              await zeroconf()
+                .unpublishService(published.name)
+                .catch(() => null)
             },
           })
         })
