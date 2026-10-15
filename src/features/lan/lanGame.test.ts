@@ -53,6 +53,28 @@ describe("LAN game", () => {
     expect(rejoin(game, { key: "host", token: "anything" })).toHaveProperty("rejected")
   })
 
+  it("gives a guest whose lobby seat was freed a new seat instead of turning it away", () => {
+    const freed = releaseLanSeat(seatGuest(lobby(), "left"), "left")
+    const back = admitLanGuest(
+      freed,
+      tokens,
+      { type: "join", name: "back", pass: { key: "left", token: "token-left" } },
+      { key: "fresh", token: "fresh-token" },
+    )
+
+    expect(back).toMatchObject({ pass: { key: "fresh" } })
+    expect(
+      admitLanGuest(
+        startLanGame(freed, 20),
+        tokens,
+        { type: "join", name: "x", pass: { key: "left", token: "token-left" } },
+        unused,
+      ),
+    ).toEqual({
+      rejected: "This game has already started.",
+    })
+  })
+
   it("ignores a replayed older life total and a version jump that would lock the seat", () => {
     const game = setLanLife(startLanGame(seatGuest(lobby(), "guest"), 20), "guest", {
       life: 12,

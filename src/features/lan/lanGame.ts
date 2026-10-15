@@ -78,7 +78,7 @@ const applyLife = (game: LanGame, seat: LanSeat, life: LanLife | undefined): Lan
     ? { ...seat, life: life.life, version: life.version }
     : seat
 
-// why: the host's seat has no token anywhere, so no pass can ever claim it; new seats only exist while in the lobby.
+// why: the host's seat has no token anywhere, so no pass can ever claim it; a pass for a seat the lobby already freed just gets a new one.
 export function admitLanGuest(
   game: LanGame,
   tokens: ReadonlyMap<string, string>,
@@ -86,17 +86,16 @@ export function admitLanGuest(
   fresh: LanSeatPass,
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
   const { pass } = join
-  if (pass) {
-    const owned = game.seats.some((seat) => seat.key === pass.key)
-    if (!owned || pass.key === game.hostKey || tokens.get(pass.key) !== pass.token)
-      return { rejected: "That seat belongs to another device." }
+  const owned = pass && game.seats.some((seat) => seat.key === pass.key)
+  if (pass && (pass.key === game.hostKey || (owned && tokens.get(pass.key) !== pass.token)))
+    return { rejected: "That seat belongs to another device." }
+  if (pass && owned)
     return {
       game: withSeat(game, pass.key, (seat) =>
         applyLife(game, { ...seat, name: join.name, connected: true }, join.life),
       ),
       pass,
     }
-  }
   if (game.status !== "lobby") return { rejected: "This game has already started." }
   if (game.seats.length >= LAN_MAX_SEATS) return { rejected: "This game is full." }
   const seat: LanSeat = {
