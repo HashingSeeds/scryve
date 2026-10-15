@@ -5,6 +5,7 @@ import Zeroconf, { type Service } from "react-native-zeroconf"
 export const LAN_SERVICE_TYPE = "scryve"
 const LAN_PROTOCOL = "tcp"
 const CONNECT_TIMEOUT_MS = 2_500
+const RESOLVE_TIMEOUT_SECONDS = 3
 const HEARTBEAT_MS = 1_000
 // why: a peer that loses Wi-Fi never sends a close, so silence is the only sign the socket is dead.
 const SILENCE_LIMIT_MS = 4_000
@@ -52,7 +53,7 @@ export const resolveLanService = (name: string) =>
     name,
     type: LAN_SERVICE_TYPE,
     protocol: LAN_PROTOCOL,
-    timeout: 3_000,
+    timeout: RESOLVE_TIMEOUT_SECONDS,
   })
 
 // why: TCP has no message boundaries; one chunk can hold half a message or several.
