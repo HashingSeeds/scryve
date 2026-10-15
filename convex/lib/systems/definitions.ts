@@ -1,5 +1,9 @@
 export type DeckSection = { readonly id: string; readonly label: string }
 
+/** why: survive games knock a seat out at 0 or below; race games end when any seat reaches `to`, counting toward it from the default value. */
+export type CounterGoal =
+  { readonly kind: "survive" } | { readonly kind: "race"; readonly to: number }
+
 export type CounterDefinition = {
   readonly label: string
   readonly heading: string
@@ -12,7 +16,7 @@ export type CounterDefinition = {
   readonly quickAdjustments: readonly [number, number]
   readonly scrubStep: number
   readonly scrubSteps: number
-  readonly direction: "open" | "down"
+  readonly goal: CounterGoal
   readonly maxStartingValue: number
   /** why: some games move the counter by typed amounts in the thousands; their seats open a calculator instead of the slider editor, and the running change sits above the total, where a five-digit label fits. */
   readonly calculator?: true
@@ -137,7 +141,7 @@ export const SYSTEMS = {
       quickAdjustments: [10, 5],
       scrubStep: 1,
       scrubSteps: 20,
-      direction: "open",
+      goal: { kind: "survive" },
       maxStartingValue: 999,
     },
     formats: [
@@ -250,7 +254,7 @@ export const SYSTEMS = {
       scrubStep: 100,
       scrubSteps: 80,
       longPressStep: 1000,
-      direction: "open",
+      goal: { kind: "survive" },
       maxStartingValue: 999_999,
       calculator: true,
     },
@@ -297,7 +301,7 @@ export const SYSTEMS = {
       quickAdjustments: [2, 1],
       scrubStep: 1,
       scrubSteps: 20,
-      direction: "down",
+      goal: { kind: "race", to: 0 },
       maxStartingValue: 99,
     },
     formats: [

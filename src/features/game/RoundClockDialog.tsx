@@ -23,6 +23,7 @@ import {
 } from "./roundClock"
 import type { GamePlayer } from "./types"
 import { useRoundClockView } from "./useRoundClockView"
+import { counterStanding } from "../../../convex/lib/systems"
 
 const MINUTE_MS = 60_000
 /** why: a Magic Slow Play warning adds two turns to the end-of-round procedure (IPG 3.3). */
@@ -161,9 +162,8 @@ export function RoundClockDialog({
 /** why: single elimination breaks an unfinished game on the counter, highest life or fewest Prize cards, so players want to see who leads. */
 function leaderLine(players: readonly GamePlayer[], system: PlaySystemId | undefined) {
   const counter = playSystemRules(system).counter
-  const sign = counter.direction === "down" ? -1 : 1
-  const best = Math.max(...players.map(({ life }) => life * sign))
-  const leaders = players.filter(({ life }) => life * sign === best)
+  const best = Math.max(...players.map(({ life }) => counterStanding(counter, life)))
+  const leaders = players.filter(({ life }) => counterStanding(counter, life) === best)
   if (leaders.length !== 1) return `Tied on ${counter.label.toLowerCase()}`
   return `${leaders[0].name} leads on ${counter.label.toLowerCase()}`
 }

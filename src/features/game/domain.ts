@@ -35,7 +35,7 @@ import {
   shapeForSeat,
 } from "../../../convex/lib/appearance"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
-import { flooredLifeDelta } from "../../../convex/lib/systems"
+import { flooredLifeDelta, isCounterOut } from "../../../convex/lib/systems"
 import {
   applyTableAction,
   EMPTY_TABLE,
@@ -350,11 +350,10 @@ export function isEliminatedByCommanderDamage(game: LocalGame, playerId: PlayerI
 }
 
 export function isPlayerOut(game: LocalGame, playerId: PlayerId): boolean {
-  if (playSystemRules(game.system).counter.direction === "down")
-    return game.players.some((player) => player.id !== playerId && player.life <= 0)
   const player = game.players.find(({ id }) => id === playerId)
+  const others = game.players.filter(({ id }) => id !== playerId).map(({ life }) => life)
   return (
-    (player?.life ?? 0) <= 0 ||
+    isCounterOut(playSystemRules(game.system).counter, player?.life ?? 0, others) ||
     isEliminatedByCommanderDamage(game, playerId) ||
     isOutByTableCounters(game.table ?? EMPTY_TABLE, playerId, localTableRules(game))
   )
