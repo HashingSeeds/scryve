@@ -39,6 +39,7 @@ const DEMOS = ["commander", "pokemon"] as const
 const REWIND_MS = 1500
 const REWIND_MIN_STEP_MS = 30
 const REWIND_MAX_STEP_MS = 220
+const REWIND_MAX_FRAMES = Math.floor(REWIND_MS / REWIND_MIN_STEP_MS)
 type Demo = (typeof DEMOS)[number]
 
 function commanderSetup(count: number): DemoGameSetup {
@@ -195,7 +196,15 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   )
   // Steps back through the trail, about REWIND_MS in all, and lands on the visitor's table.
   function rewind(to: ReturnType<DemoGame["snapshot"]>) {
-    const frames = [...trail.slice(0, -1).reverse(), to]
+    const steps = trail.slice(0, -1).reverse()
+    // A long trail is thinned to evenly spaced frames, so the rewind keeps to REWIND_MS.
+    const keep = Math.min(steps.length, REWIND_MAX_FRAMES)
+    const frames = [
+      ...Array.from({ length: keep }).flatMap(
+        (_, i) => steps[Math.floor((i * steps.length) / keep)] ?? [],
+      ),
+      to,
+    ]
     trail = []
     const every = Math.min(
       REWIND_MAX_STEP_MS,
