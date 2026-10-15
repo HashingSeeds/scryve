@@ -1898,7 +1898,8 @@ export const changeLife = mutation({
         clientCreatedAt: args.clientCreatedAt,
       }
       const recorded = { ...duplicate, delta: requestedLifeDelta(duplicate) }
-      if (!isSameLifeChange(recorded, request)) throw syncOperationMismatch()
+      if (duplicate.kind !== "life.changed" || !isSameLifeChange(recorded, request))
+        throw syncOperationMismatch()
       return {
         operationId: duplicate.operationId,
         eventId: duplicate._id,
