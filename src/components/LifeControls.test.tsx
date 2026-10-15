@@ -75,7 +75,9 @@ describe("LifeControls", () => {
       nativeEvent: { layout: { width: 193, height: 388 } },
     })
     const { transform } = StyleSheet.flatten(view.getByText("+1000").props.style)
-    expect(transform).toEqual([{ translateY: expect.any(Number) }, { rotate: "90deg" }])
+    // why: at 90° the + half sits at the bottom edge, so inward is up.
+    expect(transform[0].translateY).toBeLessThan(0)
+    expect(transform[1]).toEqual({ rotate: "90deg" })
   })
 
   it("uses Yu-Gi-Oh! Life Point increments", () => {

@@ -81,7 +81,6 @@ function lifeTextScale(fontScale: number) {
   return Math.min(Math.max(fontScale, 0.1), LIFE_MAX_FONT_SCALE)
 }
 
-// Estimates how wide a running change draws, by the same digit measure the fit uses.
 export function getDeltaTextWidth(text: string, fontSize: number, fontScale: number) {
   return text.length * LIFE_DIGIT_ASPECT * fontSize * lifeTextScale(fontScale)
 }
