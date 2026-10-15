@@ -36,7 +36,7 @@ let mockDeletion:
   | undefined
 
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), replace: jest.fn() },
+  router: { back: jest.fn(), dismissTo: jest.fn(), replace: jest.fn() },
 }))
 jest.mock("@clerk/expo", () => ({
   useUser: () => ({ isLoaded: true, user: { primaryEmailAddress: { emailAddress: "a@b.co" } } }),
@@ -94,7 +94,10 @@ describe("delete account route", () => {
     fireEvent.press(view.getByText("Try again"))
     expect(retry).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByText("Open Play"))
-    expect(router.replace).toHaveBeenCalledWith({ pathname: "/", params: { destination: "play" } })
+    expect(router.dismissTo).toHaveBeenCalledWith({
+      pathname: "/",
+      params: { destination: "play" },
+    })
   })
 
   it("restores a completed receipt after the identity is gone and the app restarts", () => {

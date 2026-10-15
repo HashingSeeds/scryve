@@ -7,7 +7,7 @@ export default function LobbyRoute() {
   const params = useLocalSearchParams<{ gameId: string }>()
   return (
     <ConnectedGate
-      onBack={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      onBack={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
     >
       <ConnectedLobbyScreen
         publicId={params.gameId}

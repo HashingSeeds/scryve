@@ -73,7 +73,11 @@ export default function Index() {
   const { themed, theme } = useAppTheme()
   const [settings, setSettings] = useState(() => localGameRepository.loadSettings())
   const [dismissedGameId, setDismissedGameId] = useState<string>()
-  const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
+  // why: the board stays mounted across games, so a choice about one stale game must not answer for the next.
+  const [oldGameChoice, setOldGameChoice] = useState<{
+    gameId: string
+    choice: "continue" | "end"
+  }>()
   const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
   useFocusEffect(
@@ -96,6 +100,7 @@ export default function Index() {
 
   const started = activeGame !== null && hasLocalGameStarted(activeGame)
   const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
+  const staleChoice = oldGameChoice?.gameId === activeGame?.id ? oldGameChoice?.choice : undefined
 
   if (resumeRedirect) return <Redirect href={resumeRedirect} />
   if (restoringAccount) return null
@@ -104,7 +109,7 @@ export default function Index() {
     return <Redirect href="/connected/decks" />
   }
 
-  if (activeGame && stale && !oldGameChoice) {
+  if (activeGame && stale && !staleChoice) {
     return (
       <Screen
         preset="auto"
@@ -121,12 +126,12 @@ export default function Index() {
             text="Continue"
             preset="primary"
             style={themed($primaryAction)}
-            onPress={() => setOldGameChoice("continue")}
+            onPress={() => setOldGameChoice({ gameId: activeGame.id, choice: "continue" })}
           />
           <Button
             text="End game"
             style={themed($secondaryAction)}
-            onPress={() => setOldGameChoice("end")}
+            onPress={() => setOldGameChoice({ gameId: activeGame.id, choice: "end" })}
           />
           <Button
             text="Abandon"
@@ -145,7 +150,7 @@ export default function Index() {
     <CurrentGameScreen
       initialGame={activeGame ?? freshGame}
       fresh={!started}
-      initialEndOpen={oldGameChoice === "end"}
+      initialEndOpen={staleChoice === "end"}
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
       onSetup={() => router.push(activeGame ? "/game/new?setup=1" : "/game/new")}

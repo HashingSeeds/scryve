@@ -25,7 +25,8 @@ export default function DecksRoute() {
       initialSystem={system}
       onBack={returnToLobby}
       onPlay={
-        returnToLobby ?? (() => router.replace({ pathname: "/", params: { destination: "play" } }))
+        returnToLobby ??
+        (() => router.dismissTo({ pathname: "/", params: { destination: "play" } }))
       }
       hasCurrentGame={hasCurrentGame}
       onSettings={() => router.push("/settings")}

@@ -13,7 +13,13 @@ const mockToken = "bad"
 let mockIsSignedIn = false
 
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn(), push: jest.fn() },
+  router: {
+    back: jest.fn(),
+    canGoBack: jest.fn(() => true),
+    dismissTo: jest.fn(),
+    replace: jest.fn(),
+    push: jest.fn(),
+  },
   useLocalSearchParams: () => ({ token: mockToken }),
   useFocusEffect: jest.fn(),
 }))
@@ -90,7 +96,7 @@ describe("Router recovery fallbacks", () => {
     fireEvent.press(view.getByText("Re-authenticate"))
     fireEvent.press(view.getByText("Open Play"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
-    expect(jest.requireMock("expo-router").router.replace).toHaveBeenCalledWith({
+    expect(jest.requireMock("expo-router").router.dismissTo).toHaveBeenCalledWith({
       pathname: "/",
       params: { destination: "play" },
     })
@@ -100,9 +106,9 @@ describe("Router recovery fallbacks", () => {
     const view = render(themed(<InviteRoute />))
     fireEvent.press(view.getByText("Enter a manual code"))
     fireEvent.press(view.getByText("Open Play"))
-    const replace = jest.requireMock("expo-router").router.replace
-    expect(replace).toHaveBeenNthCalledWith(1, "/connected/join")
-    expect(replace).toHaveBeenNthCalledWith(2, {
+    const { router } = jest.requireMock("expo-router")
+    expect(router.replace).toHaveBeenCalledWith("/connected/join")
+    expect(router.dismissTo).toHaveBeenCalledWith({
       pathname: "/",
       params: { destination: "play" },
     })

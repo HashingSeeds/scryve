@@ -31,7 +31,7 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
       <Button text="Try again" preset="reversed" onPress={() => void retry()} />
       <Button
         text="Open Play"
-        onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+        onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
       />
     </Screen>
   )
@@ -75,7 +75,7 @@ export default function DeleteAccountRoute() {
           ) : null}
           <Button
             text="Open Play"
-            onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+            onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
           />
         </Screen>
       )
@@ -104,7 +104,7 @@ function SignedOutDeletionReceipt({
         <Text text="Checking your deletion receipt…" accessibilityLiveRegion="polite" />
         <Button
           text="Open Play"
-          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+          onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
     )
@@ -115,7 +115,7 @@ function SignedOutDeletionReceipt({
       updatedAt={receipt.updatedAt}
       onBack={() => router.back()}
       onSignIn={receipt.canRetry ? onSignIn : undefined}
-      onReturnHome={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      onReturnHome={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
     />
   )
 }
@@ -147,7 +147,7 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
         <Text accessibilityRole="alert" text="Reconnect to Scryve before deleting your account." />
         <Button
           text="Open Play"
-          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+          onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
     )

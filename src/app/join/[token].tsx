@@ -13,7 +13,7 @@ export default function InviteRoute() {
   if (!isInviteToken(token ?? "")) {
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Header title="Invitation" leftTx="common:back" onLeftPress={() => router.replace("/")} />
+        <Header title="Invitation" leftTx="common:back" onLeftPress={() => router.dismissTo("/")} />
         <Text preset="heading" accessibilityRole="header" text="Invalid invitation" />
         <Text
           accessibilityRole="alert"
@@ -22,18 +22,18 @@ export default function InviteRoute() {
         <Button text="Enter a manual code" onPress={() => router.replace("/connected/join")} />
         <Button
           text="Open Play"
-          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+          onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
     )
   }
   return (
-    <CloudScreen multiplayer onBack={() => router.replace("/")}>
+    <CloudScreen multiplayer onBack={() => router.dismissTo("/")}>
       {(access) => (
         <JoinConnectedScreen
           access={access}
           inviteToken={token}
-          onBack={() => router.replace("/")}
+          onBack={() => router.dismissTo("/")}
           onJoined={(id) =>
             router.replace({ pathname: "/connected/lobby/[gameId]", params: { gameId: id } })
           }

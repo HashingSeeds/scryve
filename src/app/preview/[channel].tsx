@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
 import { canOpenPrPreview, openPrPreview } from "@/features/updates/appUpdate"
 
-const goHome = () => router.replace("/")
+const goHome = () => router.dismissTo("/")
 
 export default function PrPreviewRoute() {
   const { channel } = useLocalSearchParams<{ channel: string }>()
