@@ -112,7 +112,6 @@ interface ActiveMetadata {
 }
 
 interface ActiveEventLayout {
-  gameId?: string
   chunkStart: number
   chunkCount: number
   tail?: { eventCount: number; lastOperationId: string }
@@ -138,10 +137,8 @@ function readActiveLayout(raw: unknown): ActiveEventLayout | null {
   const { eventChunkCount: chunkCount, eventChunkStart: chunkStart = 0 } = raw
   if (!isCount(chunkCount) || chunkCount > MAX_ACTIVE_EVENTS / EVENT_CHUNK_SIZE) return null
   if (!isCount(chunkStart)) return null
-  const gameId = isRecord(raw.game) && typeof raw.game.id === "string" ? raw.game.id : undefined
   const { eventCount, lastOperationId } = raw
   return {
-    gameId,
     chunkStart,
     chunkCount,
     ...(isCount(eventCount) && typeof lastOperationId === "string"
@@ -622,10 +619,7 @@ export class LocalGameRepository {
     if (game.status !== "active") return
     const previous = readActiveLayout(parseJson(this.storage.getString(LOCAL_KEYS.active)))
     const { events, ...gameWithoutEvents } = game
-    const { firstEventNumber, dirtyChunk } = appendPoint(
-      events,
-      previous?.gameId === game.id ? previous.tail : undefined,
-    )
+    const { firstEventNumber, dirtyChunk } = appendPoint(events, previous?.tail)
     const eventCount = firstEventNumber + events.length
     const chunkStart = Math.ceil(Math.max(0, eventCount - MAX_ACTIVE_EVENTS) / EVENT_CHUNK_SIZE)
     const chunkEnd = Math.ceil(eventCount / EVENT_CHUNK_SIZE)
@@ -671,7 +665,11 @@ export class LocalGameRepository {
         events.push(event)
       }
     }
-    const game = parseGame(raw.game, events)
+    // why: chunks are written before the metadata that commits them, so a save killed in between leaves an event the stored life totals never counted.
+    const committed = layout.tail
+      ? layout.tail.eventCount - chunkStart * EVENT_CHUNK_SIZE
+      : undefined
+    const game = parseGame(raw.game, events.slice(0, committed))
     return game?.status === "active" ? game : null
   }
 
