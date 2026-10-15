@@ -86,6 +86,7 @@ class LanSession {
   }
 
   async host() {
+    this.session += 1
     const name = defaultName()
     const game = createLanGame(createClientId("lan"), { playerId: this.playerId, name })
     this.set({
@@ -158,17 +159,16 @@ class LanSession {
   async join(service: Service) {
     this.ownLife = undefined
     this.replace({ role: "guest", status: "connecting", serviceName: service.name })
-    const session = this.session
+    const session = ++this.session
     try {
-      await this.connect(service)
+      await this.connect(service, session)
     } catch (error) {
       if (session === this.session)
         this.replace({ ...IDLE, error: `Could not join: ${String(error)}` })
     }
   }
 
-  private async connect(service: Service) {
-    const session = this.session
+  private async connect(service: Service, session: number) {
     const connection = await connectLan<LanHostMessage, LanGuestMessage>(
       service,
       parseHostMessage,
@@ -178,7 +178,7 @@ class LanSession {
           if (session !== this.session) return
           this.connection = undefined
           this.set({ status: "reconnecting" })
-          this.scheduleReconnect()
+          this.scheduleReconnect(session)
         },
       },
     )
@@ -206,15 +206,16 @@ class LanSession {
       this.connection?.send({ type: "life", ...this.ownLife })
   }
 
-  private scheduleReconnect() {
+  private scheduleReconnect(session: number) {
     clearTimeout(this.reconnectTimer)
     this.reconnectTimer = setTimeout(async () => {
       const { serviceName } = this.state
-      if (this.state.role !== "guest" || !serviceName) return
+      if (session !== this.session || !serviceName) return
       try {
-        await this.connect(await resolveLanService(serviceName))
+        const service = await resolveLanService(serviceName)
+        if (session === this.session) await this.connect(service, session)
       } catch {
-        this.scheduleReconnect()
+        if (session === this.session) this.scheduleReconnect(session)
       }
     }, RECONNECT_DELAY_MS)
   }
