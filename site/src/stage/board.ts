@@ -92,6 +92,28 @@ function pentagonSvg(): string {
 
 // Matches the app (LifeCard DELTA_VISIBLE_MS): how long the running change shows in a glyph.
 const DELTA_VISIBLE_MS = 1800
+// Like the app's getDeltaFontSizeThatFits: the smallest a running change shrinks, and the gap it
+// keeps from the total.
+const DELTA_FONT_MIN_PX = 9
+const DELTA_LIFE_GAP_PX = 4
+
+// A running change keeps its glyph's spot, shrinking to the room between the total and the edge.
+// Offsets ignore the seat's rotation, so this measures along the seat's own reading direction.
+function fitDeltas(root: Element) {
+  for (const glyph of root.querySelectorAll<HTMLElement>(".glyph")) {
+    glyph.style.fontSize = ""
+    const parent = glyph.parentElement
+    const total = parent?.querySelector<HTMLElement>(".life, .pk-hp")
+    if (!glyph.classList.contains("delta") || !parent || !total) continue
+    const inset = glyph.classList.contains("plus")
+      ? parent.clientWidth - glyph.offsetLeft - glyph.offsetWidth
+      : glyph.offsetLeft
+    const room = (parent.clientWidth - total.offsetWidth) / 2 - inset - DELTA_LIFE_GAP_PX
+    if (glyph.offsetWidth <= room) continue
+    const size = parseFloat(getComputedStyle(glyph).fontSize)
+    glyph.style.fontSize = `${Math.max(DELTA_FONT_MIN_PX, (size * room) / glyph.offsetWidth)}px`
+  }
+}
 
 export function seatColor(seat: number): string {
   return PLAYER_COLOR_CHOICES[seat % PLAYER_COLOR_CHOICES.length] ?? PLAYER_COLOR_CHOICES[0]
@@ -578,7 +600,7 @@ function seatInnerHtml(game: DemoGame, seat: number, interactive: boolean) {
     ? `<button class="hit minus" data-seat="${seat}" data-dir="-1" aria-label="${name}, minus"></button><button class="hit plus" data-seat="${seat}" data-dir="1" aria-label="${name}, plus"></button>`
     : ""
   return `<span class="glyph minus" data-glyph="${seat}:-1">−</span>
-      <span class="center"><span class="life" data-life="${seat}" data-digits="${String(value).length}">${value}</span><span class="delta-above" data-above="${seat}"></span></span>
+      <span class="center"><span class="life" data-life="${seat}" data-digits="${String(value).length}">${value}</span></span>
       <span class="glyph plus" data-glyph="${seat}:1">+</span>
       <span class="who">${markSvg(seatShape(seat), "#fff")}<span>${name}</span></span>
       ${controls}`
@@ -636,6 +658,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       ? (document.activeElement as HTMLElement).dataset
       : undefined
     inner.innerHTML = pokemonHtml(placement)
+    fitDeltas(inner)
     if (!focused?.pk) return
     const id = focused.id ? `[data-id="${focused.id}"]` : ""
     const dir = focused.dir ? `[data-dir="${focused.dir}"]` : ""
@@ -644,14 +667,8 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       ?.focus({ preventScroll: true })
   }
 
-  // Like the app's LifeControls: the running change replaces the glyph on its side, or sits
-  // above the total for a calculator counter (RecentDeltaLabel), whose amounts run long.
+  // Like the app's LifeControls: the running change replaces the glyph on its side.
   function showGlyphs(seat: number, total: number) {
-    if (playSystemRules(game.setup.system).counter.calculator) {
-      const above = el.querySelector<HTMLElement>(`[data-above="${seat}"]`)
-      if (above) above.textContent = total ? `${total > 0 ? "+" : "−"}${Math.abs(total)}` : ""
-      return
-    }
     for (const direction of [-1, 1] as const) {
       const glyph = el.querySelector<HTMLElement>(`[data-glyph="${seat}:${direction}"]`)
       if (!glyph) continue
@@ -663,6 +680,8 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
           : "−"
       glyph.classList.toggle("delta", showing)
     }
+    const inner = el.querySelector(`.seat[data-player="${seat}"] .seat-in`)
+    if (inner) fitDeltas(inner)
   }
 
   function showChange(seat: number, delta: number) {

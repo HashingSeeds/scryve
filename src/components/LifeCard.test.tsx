@@ -1181,13 +1181,17 @@ describe("LifeCard", () => {
     expect(view.getByText("− → 0 · + → 1500")).toBeTruthy()
   })
 
-  it("keeps the Yu-Gi-Oh! glyphs and shows the running change above the total", () => {
+  it("shrinks the Yu-Gi-Oh! running change in its glyph to fit beside the total", () => {
     const view = render(yugiohCard(8000))
+    fireEvent(view.getByTestId("life-control-zones"), "layout", {
+      nativeEvent: { layout: { width: 360, height: 240 } },
+    })
     view.rerender(yugiohCard(7000))
-    expect(
-      view.getByTestId("life-recent-delta-seat-1", { includeHiddenElements: true }),
-    ).toHaveTextContent("-1000")
-    expect(view.getByTestId("life-seat-1--1000")).toHaveTextContent("−")
+    const delta = within(view.getByTestId("life-seat-1--1000")).getByText("-1000")
+    const plus = within(view.getByTestId("life-seat-1-1000")).getByText("+")
+    expect(StyleSheet.flatten(delta.props.style).fontSize).toBeLessThan(
+      StyleSheet.flatten(plus.props.style).fontSize,
+    )
   })
 
   it("removes steppers from a view-only card instead of dimming them", () => {

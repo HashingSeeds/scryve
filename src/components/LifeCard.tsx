@@ -37,7 +37,7 @@ import { CounterChips, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
-import { LifeControls, RecentDeltaLabel, useRecentDelta } from "./LifeControls"
+import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
@@ -453,17 +453,6 @@ export const LifeCard = memo(function LifeCard({
               { color: foreground },
             ]}
           />
-          {calculator ? (
-            <RecentDeltaLabel
-              seatNumber={seatNumber}
-              recentDelta={recentDelta}
-              pendingDelta={preview}
-              lifeFontSize={resolvedLifeFontSize}
-              compact={compact}
-              contentRotation={contentRotation}
-              foreground={foreground}
-            />
-          ) : null}
         </Animated.View>
       </View>
       {eliminated ? (
@@ -581,6 +570,8 @@ export const LifeCard = memo(function LifeCard({
           lifeStep={lifeStep}
           recentDelta={recentDelta}
           pendingDelta={preview}
+          lifeFontSize={resolvedLifeFontSize}
+          lifeDigits={shownDigits}
           onChange={onChange}
           onPreview={setPreview}
           onLongChange={() => setEditorOpen(true)}

@@ -43,6 +43,7 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatO
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   cornerOffset,
+  getDeltaFontSizeThatFits,
   getLifeLineHeight,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
@@ -805,7 +806,12 @@ function PokemonHero({
   onEdit: () => void
   onHoldChange: (held: boolean) => void
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
+  const { fontScale } = useWindowDimensions()
+  const [heroWidth, setHeroWidth] = useState(0)
   const remaining = remainingHp(pokemon)
   const name = pokemonName(pokemon)
   const slotLabel = bench ? `Bench, ${name}` : name
@@ -825,13 +831,19 @@ function PokemonHero({
   ]
   const recentHp = -recentDelta
   return (
-    <View testID={`pokemon-hero-seat-${seatNumber}`} style={themed($hero)}>
+    <View
+      testID={`pokemon-hero-seat-${seatNumber}`}
+      onLayout={(event) => setHeroWidth(event.nativeEvent.layout.width)}
+      style={themed($hero)}
+    >
       {interactive ? (
         <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, themed($zones)]}>
           {zones.map(({ direction, glyph, align }) => {
             const delta = -direction * step
-            const feedback =
-              direction * recentHp > 0 ? `${recentHp > 0 ? "+" : "-"}${Math.abs(recentHp)}` : glyph
+            const showingDelta = direction * recentHp > 0
+            const feedback = showingDelta
+              ? `${recentHp > 0 ? "+" : "-"}${Math.abs(recentHp)}`
+              : glyph
             return (
               <BoardPressable
                 key={delta}
@@ -870,7 +882,21 @@ function PokemonHero({
                   text={feedback}
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
-                  style={[themed(compact ? $compactGlyph : $glyph), { color: ink }]}
+                  style={[
+                    themed(compact ? $compactGlyph : $glyph),
+                    showingDelta && {
+                      fontSize: getDeltaFontSizeThatFits({
+                        text: feedback,
+                        baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
+                        run: heroWidth,
+                        inset: spacing.xs,
+                        lifeFontSize: fontSize,
+                        lifeDigits: String(remaining).length,
+                        fontScale,
+                      }),
+                    },
+                    { color: ink },
+                  ]}
                 />
               </BoardPressable>
             )
@@ -1216,8 +1242,18 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
   borderRadius: 12,
 })
-const $glyph: ThemedStyle<TextStyle> = () => ({ fontSize: 44, lineHeight: 50, opacity: 0.6 })
-const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 30, lineHeight: 34, opacity: 0.6 })
+const GLYPH_SIZE = 44
+const COMPACT_GLYPH_SIZE = 30
+const $glyph: ThemedStyle<TextStyle> = () => ({
+  fontSize: GLYPH_SIZE,
+  lineHeight: 50,
+  opacity: 0.6,
+})
+const $compactGlyph: ThemedStyle<TextStyle> = () => ({
+  fontSize: COMPACT_GLYPH_SIZE,
+  lineHeight: 34,
+  opacity: 0.6,
+})
 const $bottomRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
