@@ -16,8 +16,7 @@ describe("pokemonCardLayout", () => {
     for (const compact of [false, true])
       for (const fontScale of [0.82, 1, 1.12, 1.3, 2]) {
         const chip = benchChipMetrics(compact, fontScale)
-        const lines = (chip.nameLine + chip.hpLine) * Math.min(fontScale, chip.maxFontScale)
-        expect(focusedBorder + topPadding + lines).toBeLessThanOrEqual(
+        expect(focusedBorder + topPadding + chip.nameLine + chip.hpLine).toBeLessThanOrEqual(
           chip.height - focusedBorder - CHIP_BAR_HEIGHT,
         )
       }

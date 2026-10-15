@@ -1093,16 +1093,19 @@ function BenchChip({
     >
       <Text
         text={name}
-        size="xxs"
-        maxFontSizeMultiplier={chip.maxFontScale}
+        allowFontScaling={false}
         numberOfLines={1}
-        style={[$chipName, { lineHeight: chip.nameLine, color: ink }, $dim85]}
+        style={[
+          $chipName,
+          { fontSize: chip.nameSize, lineHeight: chip.nameLine, color: ink },
+          $dim85,
+        ]}
       />
       <Text
         testID={`pokemon-bench-hp-${pokemon.id}`}
         text={String(remaining)}
         weight="bold"
-        maxFontSizeMultiplier={chip.maxFontScale}
+        allowFontScaling={false}
         numberOfLines={1}
         style={[$chipHp, { fontSize: chip.hpSize, lineHeight: chip.hpLine, color: ink }]}
       />

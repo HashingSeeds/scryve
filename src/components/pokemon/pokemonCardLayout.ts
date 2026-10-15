@@ -106,17 +106,20 @@ export function heroFontSize(input: {
 export const CHIP_BAR_HEIGHT = 3
 const BENCH_MAX_FONT_SCALE = 1.3
 const BENCH_CHIP = {
-  regular: { height: 56, nameLine: 18, hpSize: 22, hpLine: 24 },
-  compact: { height: 44, nameLine: 14, hpSize: 17, hpLine: 19 },
+  regular: { height: 56, nameSize: 12, nameLine: 18, hpSize: 22, hpLine: 24 },
+  compact: { height: 44, nameSize: 12, nameLine: 14, hpSize: 17, hpLine: 19 },
 }
 
+// why: Android caps a font's size at maxFontSizeMultiplier but not its explicit lineHeight, so chip text opts out of system scaling and takes these sizes, scaled once here, on both platforms.
 export function benchChipMetrics(compact: boolean, fontScale: number) {
   const chip = compact ? BENCH_CHIP.compact : BENCH_CHIP.regular
   const scale = Math.min(fontScale, BENCH_MAX_FONT_SCALE)
   return {
-    ...chip,
     height: chip.height + (chip.nameLine + chip.hpLine) * (scale - 1),
-    maxFontScale: BENCH_MAX_FONT_SCALE,
+    nameSize: chip.nameSize * scale,
+    nameLine: chip.nameLine * scale,
+    hpSize: chip.hpSize * scale,
+    hpLine: chip.hpLine * scale,
   }
 }
 export type BenchChipMetrics = ReturnType<typeof benchChipMetrics>
