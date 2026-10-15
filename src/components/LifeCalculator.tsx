@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Rect } from "react-native-svg"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
+import type { PlaySystemId } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
@@ -27,6 +28,7 @@ import {
 } from "./pokemon/pokemonCardLayout"
 import { DELETE_PATHS, KeyIcon } from "./pokemon/PokemonKeypad"
 import { Text } from "./Text"
+import { flooredLifeDelta } from "../../convex/lib/systems"
 
 const COLUMN_KEYS = ["1", "2", "3", "00", "4", "5", "6", "0", "7", "8", "9", "⌫"] as const
 const BESIDE_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "⌫"] as const
@@ -39,6 +41,7 @@ type Props = {
   seatNumber: number
   playerName: string
   life: number
+  system?: PlaySystemId
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -68,6 +71,7 @@ export function LifeCalculator({
   seatNumber,
   playerName,
   life,
+  system,
   color,
   rotation,
   cardWidth,
@@ -82,8 +86,10 @@ export function LifeCalculator({
   const reducedMotion = useReducedMotion()
   const [entry, setEntry] = useState("")
   const amount = Number(entry)
-  // why: halving rounds the total up, as Yu-Gi-Oh! rounds halved Life Points.
-  const halving = Math.ceil(life / 2) - life
+  // why: halving rounds the total up, as Yu-Gi-Oh! rounds halved Life Points; past the largest accepted change, ½ stays off rather than closing with nothing applied.
+  const halved = Math.ceil(life / 2) - life
+  const halving = Math.abs(halved) <= MAX_LIFE_DELTA ? halved : 0
+  const damaged = life + flooredLifeDelta(system, life, -amount)
   const background = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(background)
   const damage = mixColorsInLinearLight(theme.colors.error, background, 0.55)
@@ -202,7 +208,7 @@ export function LifeCalculator({
         ]}
       />
       <Text
-        text={entry ? `− → ${life - amount} · + → ${life + amount}` : "Type an amount"}
+        text={entry ? `− → ${damaged} · + → ${life + amount}` : "Type an amount"}
         size="xxs"
         numberOfLines={beside ? 2 : 1}
         style={[inkText, $hint, !beside && $centeredText]}

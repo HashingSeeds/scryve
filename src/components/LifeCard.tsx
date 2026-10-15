@@ -762,6 +762,7 @@ export const LifeCard = memo(function LifeCard({
           seatNumber={seatNumber}
           playerName={displayName}
           life={life}
+          system={system}
           color={color}
           rotation={contentRotation}
           cardWidth={cardSize.width}

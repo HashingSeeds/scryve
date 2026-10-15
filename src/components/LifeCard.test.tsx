@@ -1172,6 +1172,15 @@ describe("LifeCard", () => {
     expect(onChange).toHaveBeenCalledWith(-2025)
   })
 
+  it("previews Yu-Gi-Oh! damage floored at zero", () => {
+    const view = render(yugiohCard(500))
+    fireEvent.press(view.getByTestId("life-calculator-open-seat-1"))
+    fireEvent.press(view.getByTestId("life-calculator-key-1-seat-1"))
+    fireEvent.press(view.getByTestId("life-calculator-key-00-seat-1"))
+    fireEvent.press(view.getByTestId("life-calculator-key-0-seat-1"))
+    expect(view.getByText("− → 0 · + → 1500")).toBeTruthy()
+  })
+
   it("keeps the Yu-Gi-Oh! glyphs and shows the running change above the total", () => {
     const view = render(yugiohCard(8000))
     view.rerender(yugiohCard(7000))
