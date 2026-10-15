@@ -245,6 +245,7 @@ type ConnectedBoardReadyProps = {
   view: ConnectedBoardReadyView
   controls: ConnectedBoardControls
   ownerId: string
+  moderation: boolean
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -313,6 +314,8 @@ interface ConnectedBoardRuntimeProps {
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
   ownerId: string
+  // why: report and block are Convex mutations on gamePlayers ids, which LAN seats don't have.
+  moderation?: boolean
 }
 
 function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
@@ -333,6 +336,7 @@ export function ConnectedBoardWithRuntime({
   onAccount,
   accountLabel,
   ownerId,
+  moderation = true,
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
@@ -480,6 +484,7 @@ export function ConnectedBoardWithRuntime({
             view={view}
             controls={controls}
             ownerId={ownerId}
+            moderation={moderation}
           />
         </ConnectedUnsentContext.Provider>
       </ConnectedTableContext.Provider>
@@ -502,6 +507,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   view,
   controls,
   ownerId,
+  moderation,
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -732,15 +738,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         },
       },
       { kind: "dice", label: "Dice", tools: diceTools },
-      {
-        kind: "players",
-        label: "Players",
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
-          setMenuOpen(false)
-          setPlayerActionsOpen(true)
-        },
-      },
+      ...(moderation
+        ? [
+            {
+              kind: "players",
+              label: "Players",
+              onPress: (event?: GestureResponderEvent) => {
+                captureMenuDialogOrigin(event)
+                setMenuOpen(false)
+                setPlayerActionsOpen(true)
+              },
+            } satisfies RadialMenuAction,
+          ]
+        : []),
       {
         kind: "history",
         label: "History",
@@ -779,6 +789,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       diceTools,
       finishBlocker,
       layoutOptions.length,
+      moderation,
       onHistory,
     ],
   )

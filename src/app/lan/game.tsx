@@ -15,6 +15,7 @@ export default function LanGameRoute() {
       publicId={runtime.projection.publicId}
       ownerId={lanSession.playerId}
       runtime={runtime}
+      moderation={false}
       onGameEnded={backToLobby}
       onGameAbandoned={backToLobby}
       onBack={backToLobby}
