@@ -594,7 +594,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     [controlled, game.players],
   )
   // why: dice stay on this device; other seats never see these rolls.
-  const dice = useDice(players, publicId)
+  const dice = useDice(players, publicId, system)
   const diceTools = useMemo(
     () =>
       dice.tools.map((tool) => ({

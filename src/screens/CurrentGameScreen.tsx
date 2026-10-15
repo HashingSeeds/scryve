@@ -113,7 +113,7 @@ export function CurrentGameScreen({
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
-  const dice = useDice(runtime.game.players, runtime.game.id)
+  const dice = useDice(runtime.game.players, runtime.game.id, system)
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
   const markFirstPlayerUsed = runtime.markFirstPlayerUsed
@@ -123,7 +123,7 @@ export function CurrentGameScreen({
   const firstPlayerUsed = runtime.game.firstPlayerOffered === true
   const loserSeat = runtime.game.firstChooserSeat
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
-  const { ask: diceAsk, flip: diceFlip, rollOff: diceRollOff } = dice
+  const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
   const badge = useMemo<GameMenuBadge | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
@@ -148,7 +148,7 @@ export function CurrentGameScreen({
       }
     return {
       color: colors.gameMenu.actions.dice,
-      glyph: { tool: "d20" },
+      glyph: { tool: die },
       accessibilityLabel: "Roll for who goes first",
       onPress: offer(diceRollOff),
     }
@@ -156,6 +156,7 @@ export function CurrentGameScreen({
     colors.gameMenu.actions.dice,
     diceAsk,
     diceFlip,
+    die,
     diceRollOff,
     firstPlayerUsed,
     loser,

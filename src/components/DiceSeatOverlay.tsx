@@ -12,10 +12,12 @@ import Animated, {
 } from "react-native-reanimated"
 
 import {
+  DIE_SIDES,
   toolLabel,
   type DiceSeatChip,
   type DiceSeatView,
   type DiceTool,
+  type Die,
 } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -58,7 +60,6 @@ const GATED_MOTION = ReduceMotion.Never
 const BLOOM_EXITING = ZoomOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
 const TUMBLE_TICKS = 9
 const tumbleStepMs = (step: number) => 30 + step * step * 1.2
-const D20_SIDES = 20
 const COIN_FLIP_MS = 640
 const COIN_HALF_TURNS = 6
 
@@ -153,8 +154,8 @@ type Tumble = { face?: number; flipping: boolean; flip: SharedValue<number> }
 function useTumble(view: DiceSeatView | undefined): Tumble {
   const rolling = view ? rollingTool(view) : undefined
   const [state, setState] = useState<{ face?: number; flipping: boolean }>(() =>
-    rolling === "d20"
-      ? { face: passingFace(0), flipping: false }
+    rolling && rolling !== "coin"
+      ? { face: passingFace(0, rolling), flipping: false }
       : { flipping: rolling === "coin" },
   )
   const flip = useSharedValue(0)
@@ -175,7 +176,9 @@ function useTumble(view: DiceSeatView | undefined): Tumble {
     let delay = 0
     for (let step = 1; step < TUMBLE_TICKS; step += 1) {
       delay += tumbleStepMs(step)
-      timers.push(setTimeout(() => setState({ face: passingFace(step), flipping: false }), delay))
+      timers.push(
+        setTimeout(() => setState({ face: passingFace(step, rolling), flipping: false }), delay),
+      )
     }
     timers.push(setTimeout(() => setState({ flipping: false }), delay + tumbleStepMs(TUMBLE_TICKS)))
     return () => timers.forEach(clearTimeout)
@@ -183,15 +186,15 @@ function useTumble(view: DiceSeatView | undefined): Tumble {
   return { ...state, flip }
 }
 
-function passingFace(step: number) {
+function passingFace(step: number, die: Die) {
   let seed = 7
   for (let i = 0; i <= step; i += 1) seed = (seed * 1103515245 + 12345) % 2147483648
-  return (seed % D20_SIDES) + 1
+  return (seed % DIE_SIDES[die]) + 1
 }
 
 function rollingTool(view: DiceSeatView): DiceTool | undefined {
   if (view.kind === "roll") return view.roll.tool
-  if (view.kind === "rolloff") return "d20"
+  if (view.kind === "rolloff") return view.die
   return undefined
 }
 
@@ -272,7 +275,7 @@ function Result({
   if (view.kind === "rolloff")
     return (
       <>
-        {label("d20")}
+        {label(view.die)}
         <Text
           text={String(tumble.face ?? view.value)}
           weight="medium"
@@ -352,7 +355,7 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
   if (view?.kind === "waiting") return "Waiting for the choice"
   if (view?.kind === "first")
     return view.status === "won" ? `${playerName} goes first` : `${playerName} does not go first`
-  return armed === "coin" ? `Flip a coin for ${playerName}` : `Roll a d20 for ${playerName}`
+  return armed === "coin" ? `Flip a coin for ${playerName}` : `Roll a ${armed} for ${playerName}`
 }
 
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.

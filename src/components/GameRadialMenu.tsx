@@ -14,6 +14,7 @@ import Animated, {
   ZoomOut,
 } from "react-native-reanimated"
 
+import type { DiceTool } from "@/features/game/dice"
 import { nearestEquivalentAngle } from "@/features/game/pinnedBoardGeometry"
 import {
   rotateGameBoardAnchor,
@@ -79,7 +80,7 @@ export interface GameMenuStatusLine {
 
 export interface GameMenuBadge {
   color: string
-  glyph: { tool: "d20" | "coin" } | { seatNumber: number; shape?: PlayerMarkShape }
+  glyph: { tool: DiceTool } | { seatNumber: number; shape?: PlayerMarkShape }
   accessibilityLabel: string
   onPress: () => void
 }

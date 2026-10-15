@@ -1,8 +1,9 @@
 import type { GamePlayer, PlayerId } from "./types"
 
-export type DiceTool = "d20" | "coin"
+export type Die = "d6" | "d20"
+export type DiceTool = Die | "coin"
 export type CoinFace = "Heads" | "Tails"
-export type DiceRoll = { tool: "d20"; value: number } | { tool: "coin"; value: CoinFace }
+export type DiceRoll = { tool: Die; value: number } | { tool: "coin"; value: CoinFace }
 
 export type DicePhase = "bloom" | "chip"
 
@@ -13,6 +14,7 @@ export type ChoiceReason = "flip" | "loss"
 export type FirstPlayer =
   | {
       kind: "rolloff"
+      die: Die
       rolls: Partial<Record<PlayerId, number>>
       attempts: Partial<Record<PlayerId, number>>
       pool: PlayerId[]
@@ -29,7 +31,13 @@ export interface DiceState {
 
 export type DiceSeatView =
   | { kind: "roll"; roll: DiceRoll; attempt: number }
-  | { kind: "rolloff"; value: number; attempt: number; status: "won" | "tied" | "out" | "lost" }
+  | {
+      kind: "rolloff"
+      die: Die
+      value: number
+      attempt: number
+      status: "won" | "tied" | "out" | "lost"
+    }
   | { kind: "choice"; reason: ChoiceReason }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
@@ -37,25 +45,30 @@ export type DiceSeatView =
 export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" }
 
 export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
-const D20_SIDES = 20
+export const DIE_SIDES: Record<Die, number> = { d6: 6, d20: 20 }
 const COIN_FACES: readonly CoinFace[] = ["Heads", "Tails"]
 
 export function randomIndex(count: number, random = Math.random) {
   return Math.floor(random() * count)
 }
 
-export function rollD20(random = Math.random) {
-  return randomIndex(D20_SIDES, random) + 1
+/** why: Yu-Gi-Oh! tournament rules use a six-sided die; a d20 has no use there. */
+export function systemDie(system: unknown): Die {
+  return system === "ygo" ? "d6" : "d20"
+}
+
+function rollDie(die: Die, random: () => number) {
+  return randomIndex(DIE_SIDES[die], random) + 1
 }
 
 export function roll(tool: DiceTool, random = Math.random): DiceRoll {
-  return tool === "d20"
-    ? { tool, value: rollD20(random) }
-    : { tool, value: COIN_FACES[randomIndex(COIN_FACES.length, random)] }
+  return tool === "coin"
+    ? { tool, value: COIN_FACES[randomIndex(COIN_FACES.length, random)] }
+    : { tool, value: rollDie(tool, random) }
 }
 
 export function toolLabel(tool: DiceTool) {
-  return tool === "d20" ? "d20" : "Coin"
+  return tool === "coin" ? "Coin" : tool
 }
 
 export function armTool(state: DiceState, tool: DiceTool): DiceState {
@@ -93,20 +106,28 @@ export function clearResult(state: DiceState, seatId: PlayerId): DiceState {
 export function startRollOff(
   state: DiceState,
   seatIds: readonly PlayerId[],
+  die: Die,
   random = Math.random,
 ): DiceState {
-  return { ...state, first: resolveRollOff({}, {}, seatIds, random) }
+  return { ...state, first: resolveRollOff(die, {}, {}, seatIds, random) }
 }
 
 export function rerollTies(state: DiceState, random = Math.random): DiceState {
   if (state.first?.kind !== "rolloff" || state.first.pool.length < 2) return state
   return {
     ...state,
-    first: resolveRollOff(state.first.rolls, state.first.attempts, state.first.pool, random),
+    first: resolveRollOff(
+      state.first.die,
+      state.first.rolls,
+      state.first.attempts,
+      state.first.pool,
+      random,
+    ),
   }
 }
 
 function resolveRollOff(
+  die: Die,
   previous: Partial<Record<PlayerId, number>>,
   previousAttempts: Partial<Record<PlayerId, number>>,
   pool: readonly PlayerId[],
@@ -115,12 +136,13 @@ function resolveRollOff(
   const rolls = { ...previous }
   const attempts = { ...previousAttempts }
   for (const seatId of pool) {
-    rolls[seatId] = rollD20(random)
+    rolls[seatId] = rollDie(die, random)
     attempts[seatId] = (attempts[seatId] ?? 0) + 1
   }
   const high = Math.max(...pool.map((seatId) => rolls[seatId] ?? 0))
   return {
     kind: "rolloff",
+    die,
     rolls,
     attempts,
     pool: pool.filter((seatId) => rolls[seatId] === high),
@@ -189,6 +211,7 @@ export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView |
       const decided = first.pool.length === 1
       return {
         kind: "rolloff",
+        die: first.die,
         value,
         attempt: first.attempts[seatId] ?? 1,
         status: decided ? (inPool ? "won" : "lost") : inPool ? "tied" : "out",
