@@ -596,6 +596,16 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("start-game-button").props.accessibilityState.disabled).toBe(true)
   })
 
+  it("offers Nearby beside hosting only in connected mode", () => {
+    const onNearby = jest.fn()
+    const connected = setup({ mode: "connected", connected: readyHost, onNearby })
+
+    fireEvent.press(connected.getByTestId("nearby-game-button"))
+    expect(onNearby).toHaveBeenCalledTimes(1)
+    connected.unmount()
+    expect(setup({ mode: "local", onNearby }).queryByTestId("nearby-game-button")).toBeNull()
+  })
+
   it("swaps to seats, ruleset, and hosting in connected mode", () => {
     const host = jest.fn()
     const view = setup({ mode: "connected", connected: { ...readyHost, host } })

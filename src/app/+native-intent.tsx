@@ -1,4 +1,5 @@
 import { normalizeInvitePayload } from "@/features/connected/inviteLinks"
+import { isPreviewBuild } from "@/features/lan/lanAvailability"
 
 function isSafeInternalPath(path: string): boolean {
   if (path === "/") return true
@@ -17,6 +18,10 @@ const DEV_SEED_LINK =
 const PR_PREVIEW_LINK =
   /^(?:(?:scryve|count)-preview:\/\/(?:\/?preview\/|expo-development-client\/\?url=https:\/\/u\.expo\.dev\/[0-9a-f-]+\?channel-name=)|\/preview\/)(pr-[0-9]+)$/
 
+// why: agents drive nearby games on devices they can't tap through these links, including release-mode preview builds.
+const LAN_TEST_LINK =
+  /^(?:(?:scryve|count)-(?:dev|preview):\/\/\/?|\/)lan(\?(?:[A-Za-z0-9=&]|%[0-9A-Fa-f]{2})+)?$/
+
 function devSeedPath(path: string): string | null {
   const match = DEV_SEED_LINK.exec(path)
   return match ? `/dev/seed/${match[1]}${match[2] ?? ""}` : null
@@ -31,6 +36,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (preview) return `/preview/${preview}`
   const seed = __DEV__ ? devSeedPath(path) : null
   if (seed) return seed
+  const lan = __DEV__ || isPreviewBuild() ? LAN_TEST_LINK.exec(path) : null
+  if (lan) return `/lan${lan[1] ?? ""}`
   // Warm intents may preserve only a deliberately small absolute in-app route grammar.
   return !initial && isSafeInternalPath(path) ? path : "/"
 }

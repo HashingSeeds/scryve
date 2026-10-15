@@ -220,7 +220,7 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
         )
       }}
     >
-      <ConnectedBoardRuntime key={runtimeKey} {...props} ownerId={ownerId} />
+      <ConvexConnectedBoard key={runtimeKey} {...props} ownerId={ownerId} />
     </ConvexQueryBoundary>
   )
 }
@@ -246,6 +246,7 @@ type ConnectedBoardReadyProps = {
   view: ConnectedBoardReadyView
   controls: ConnectedBoardControls
   ownerId: string
+  cloud: boolean
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -301,20 +302,7 @@ function finishBlockerFor(runtime: ConnectedGameRuntime): FinishBlocker | undefi
 
 const NO_LIVES: Readonly<Record<string, number>> = {}
 
-function ConnectedBoardRuntime({
-  publicId,
-  initialInviteOpen,
-  onGameEnded,
-  onRematch,
-  onGameAbandoned,
-  onBack,
-  onHistory,
-  onDecks,
-  onSettings,
-  onAccount,
-  accountLabel,
-  ownerId,
-}: {
+interface ConnectedBoardRuntimeProps {
   publicId: string
   initialInviteOpen?: boolean
   onGameEnded?: (publicId: string) => void
@@ -327,9 +315,32 @@ function ConnectedBoardRuntime({
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
   ownerId: string
-}) {
+  // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
+  cloud?: boolean
+}
+
+function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
+  const runtime = useConnectedGame(props.publicId, props.ownerId)
+  return <ConnectedBoardWithRuntime {...props} runtime={runtime} />
+}
+
+export function ConnectedBoardWithRuntime({
+  publicId,
+  initialInviteOpen,
+  onGameEnded,
+  onRematch,
+  onGameAbandoned,
+  onBack,
+  onHistory,
+  onDecks,
+  onSettings,
+  onAccount,
+  accountLabel,
+  ownerId,
+  cloud = true,
+  runtime,
+}: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
-  const runtime = useConnectedGame(publicId, ownerId)
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
     connectionStatus: runtime.connectionStatus,
     unsent: runtime.pending.length,
@@ -361,8 +372,8 @@ function ConnectedBoardRuntime({
   )
   const { pending } = runtime
   const lifeLog = useMemo(
-    (): LifeLogSource => ({ kind: "connected", publicId, pending }),
-    [publicId, pending],
+    (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
+    [cloud, publicId, pending],
   )
   const tableState = useStructurallyStable(runtime.table)
   const {
@@ -480,6 +491,7 @@ function ConnectedBoardRuntime({
               view={view}
               controls={controls}
               ownerId={ownerId}
+              cloud={cloud}
             />
           </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
@@ -503,6 +515,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   view,
   controls,
   ownerId,
+  cloud,
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -733,15 +746,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         },
       },
       { kind: "dice", label: "Dice", tools: diceTools },
-      {
-        kind: "players",
-        label: "Players",
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
-          setMenuOpen(false)
-          setPlayerActionsOpen(true)
-        },
-      },
+      ...(cloud
+        ? [
+            {
+              kind: "players",
+              label: "Players",
+              onPress: (event?: GestureResponderEvent) => {
+                captureMenuDialogOrigin(event)
+                setMenuOpen(false)
+                setPlayerActionsOpen(true)
+              },
+            } satisfies RadialMenuAction,
+          ]
+        : []),
       {
         kind: "history",
         label: "History",
@@ -780,6 +797,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       diceTools,
       finishBlocker,
       layoutOptions.length,
+      cloud,
       onHistory,
     ],
   )

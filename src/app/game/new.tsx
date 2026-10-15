@@ -18,6 +18,7 @@ import {
 } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { LocalGame, LocalGameResult, MatchSeatOutcome } from "@/features/game/types"
+import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 import {
   NewGameScreen,
@@ -185,6 +186,7 @@ export default function NewLocalGameRoute() {
             )}
           </CloudScreen>
         }
+        onNearby={lanPlayAvailable() ? () => router.push("/lan") : undefined}
         onResumeConnected={(game) =>
           router.replace({
             pathname:
