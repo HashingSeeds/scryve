@@ -69,7 +69,7 @@ class LanSession {
     // why: iOS tears down the host's listening socket while the app is in the background.
     AppState.addEventListener("change", (appState) => {
       if (appState === "active" && this.state.role === "host" && this.serverClosed)
-        void this.listen()
+        void this.listen({ recovering: true })
     })
   }
 
@@ -103,7 +103,7 @@ class LanSession {
     await this.listen()
   }
 
-  private async listen() {
+  private async listen({ recovering = false }: { recovering?: boolean } = {}) {
     const { serviceName } = this.state
     if (!serviceName) return
     const session = this.session
@@ -120,10 +120,17 @@ class LanSession {
       )
       if (session !== this.session) return void server.stop()
       this.server = server
-      this.set({ status: "connected", serviceName: server.name })
+      this.set({ status: "connected", serviceName: server.name, error: undefined })
     } catch (error) {
-      if (session === this.session)
-        this.replace({ ...IDLE, error: `Could not host: ${String(error)}` })
+      if (session !== this.session) return
+      const message = `Could not host: ${String(error)}`
+      if (!recovering) return this.replace({ ...IDLE, error: message })
+      // why: a game in progress outlives a failed restart; guests keep retrying until the host is back.
+      this.serverClosed = true
+      this.set({ status: "reconnecting", error: message })
+      setTimeout(() => {
+        if (session === this.session && this.serverClosed) void this.listen({ recovering: true })
+      }, RECONNECT_DELAY_MS)
     }
   }
 
