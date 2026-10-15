@@ -159,9 +159,11 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     delete stage.dataset.rewinding
   }
   // A keyboard activation has no point, so it goes to the redrawn control with the same data
-  // attributes (seat, direction, action, picker value), anywhere on the page. A control the landed
-  // game lacks gets nothing.
-  const sameControl = (old: Element) => {
+  // attributes (seat, direction, action, picker value) in the same board or picker, which outlive
+  // the redraw. A control the landed game lacks gets nothing.
+  const ownerOf = (el: Element): ParentNode =>
+    el.closest<HTMLElement>("[data-board], [data-pick]") ?? document
+  const sameControl = (old: Element, owner: ParentNode) => {
     const control = old.closest<HTMLElement>("button")
     if (!control) return null
     const match = Object.entries(control.dataset)
@@ -170,7 +172,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
           `[data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${value}"]`,
       )
       .join("")
-    return match ? document.querySelector<HTMLElement>(`button${match}`) : null
+    return match ? owner.querySelector<HTMLElement>(`button${match}`) : null
   }
   // A tap anywhere lands the rewind first, so the tap changes the visitor's table and no later
   // frame overwrites it. Capture runs before the boards' and pickers' own handlers.
@@ -178,6 +180,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     "click",
     (event) => {
       if (!event.isTrusted || rewinding === undefined) return
+      const owner = event.target instanceof Element ? ownerOf(event.target) : document
       stopRewind()
       if (leaving) game.restore(leaving)
       // Landing redraws the board, so a tap on it goes to whatever control is there now.
@@ -186,7 +189,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
       event.preventDefault()
       const now =
         event.detail === 0
-          ? sameControl(event.target)
+          ? sameControl(event.target, owner)
           : document.elementFromPoint(event.clientX, event.clientY)
       if (!(now instanceof HTMLElement)) return
       if (event.detail === 0) now.focus({ preventScroll: true })
@@ -215,9 +218,10 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
       if (!frame) return stopRewind()
       // A frame redraws the boards, so keyboard focus moves to the same control in the redraw.
       const focused = document.activeElement
+      const owner = focused ? ownerOf(focused) : document
       game.restore(frame)
       if (focused instanceof Element && !focused.isConnected)
-        sameControl(focused)?.focus({ preventScroll: true })
+        sameControl(focused, owner)?.focus({ preventScroll: true })
       if (frames.length) rewinding = window.setTimeout(next, every)
       else stopRewind()
     }
