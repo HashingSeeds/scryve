@@ -529,11 +529,12 @@ figure {
   opacity: 0.7;
 }
 
+/* The mark and the prize grid share their outer edge, as in the app's bottom row. */
 .pk-foot {
   display: flex;
   height: calc(var(--u) * 0.12);
   flex: none;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   padding: 0 calc(var(--u) * 0.02);
 }
@@ -541,6 +542,7 @@ figure {
 .pk .who {
   position: static;
   min-width: 0;
+  line-height: 1;
 }
 
 .pk .pk-prizes {
