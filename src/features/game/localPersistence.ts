@@ -49,6 +49,7 @@ export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
 export const MAX_HISTORY_EVENTS = 250
 const EVENT_CHUNK_SIZE = 100
+const ACTIVE_SCHEMA_VERSION = 1
 
 export const LOCAL_KEYS = {
   device: "count.local.device.v1",
@@ -98,10 +99,25 @@ export interface StringStorage {
   delete(key: string): void
 }
 
+/**
+ * why: a life tap appends one event, so a save rewrites only the newest chunk. Past
+ * MAX_ACTIVE_EVENTS the oldest whole chunk of events is dropped in one rewrite, so chunks always
+ * start at 0 where schema 1 builds read them, and any older JS a crash or rollback falls back to
+ * can still open the game. `eventCount` and `lastOperationId` mark what the last save committed;
+ * a save from an older build has neither, so the next save rewrites every chunk. A newer format
+ * must keep this key and raise `schemaVersion`, so this build keeps that game instead of replacing it.
+ */
 interface ActiveMetadata {
-  schemaVersion: 1
+  schemaVersion: typeof ACTIVE_SCHEMA_VERSION
   game: Omit<LocalGame, "events">
   eventChunkCount: number
+  eventCount: number
+  lastOperationId?: string
+}
+
+interface ActiveEventLayout {
+  chunkCount: number
+  tail?: { eventCount: number; lastOperationId: string }
 }
 
 interface HistoryDetail {
@@ -117,6 +133,62 @@ function parseJson(value: string | undefined): unknown {
   } catch {
     return null
   }
+}
+
+function readActiveLayout(raw: unknown): ActiveEventLayout | null {
+  if (!isRecord(raw) || raw.schemaVersion !== ACTIVE_SCHEMA_VERSION) return null
+  const { eventChunkCount: chunkCount, eventCount, lastOperationId } = raw
+  if (!isCount(chunkCount) || chunkCount > MAX_ACTIVE_EVENTS / EVENT_CHUNK_SIZE) return null
+  return {
+    chunkCount,
+    ...(isCount(eventCount) &&
+    eventCount <= MAX_ACTIVE_EVENTS &&
+    typeof lastOperationId === "string"
+      ? { tail: { eventCount, lastOperationId } }
+      : {}),
+  }
+}
+
+function isNewerActiveGame(raw: unknown) {
+  return (
+    isRecord(raw) &&
+    typeof raw.schemaVersion === "number" &&
+    raw.schemaVersion > ACTIVE_SCHEMA_VERSION
+  )
+}
+
+function storedWindow(
+  events: readonly GameEvent[],
+  tail: ActiveEventLayout["tail"],
+): { keepFrom: number; dirtyChunk: number } {
+  const last = tail
+    ? events.findLastIndex(({ operationId }) => operationId === tail.lastOperationId)
+    : -1
+  const storedFrom = tail && last >= 0 ? last + 1 - tail.eventCount : -1
+  if (tail && storedFrom >= 0 && events.length - storedFrom <= MAX_ACTIVE_EVENTS)
+    return { keepFrom: storedFrom, dirtyChunk: Math.floor(tail.eventCount / EVENT_CHUNK_SIZE) }
+  const from = Math.max(0, storedFrom)
+  const excess = Math.max(0, events.length - from - MAX_ACTIVE_EVENTS)
+  return { keepFrom: from + Math.ceil(excess / EVENT_CHUNK_SIZE) * EVENT_CHUNK_SIZE, dirtyChunk: 0 }
+}
+
+/**
+ * why: chunks are written before the metadata that commits them, so a killed save can leave an
+ * event past the committed one, or a half-done rewrite that repeats a chunk. Keeping each operation
+ * once, up to the committed one, matches the life totals the metadata stored.
+ */
+function committedEvents(events: readonly GameEvent[], tail: ActiveEventLayout["tail"]) {
+  const seen = new Set<string>()
+  const unique: GameEvent[] = []
+  for (const event of events) {
+    if (seen.has(event.operationId)) continue
+    seen.add(event.operationId)
+    unique.push(event)
+  }
+  const end = tail
+    ? unique.findLastIndex(({ operationId }) => operationId === tail.lastOperationId)
+    : -1
+  return end < 0 ? unique : unique.slice(0, end + 1)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -595,44 +667,38 @@ export class LocalGameRepository {
 
   saveActiveGame(game: LocalGame): void {
     if (game.status !== "active") return
-    const previous = parseJson(this.storage.getString(LOCAL_KEYS.active))
-    const previousChunkCount =
-      isRecord(previous) && typeof previous.eventChunkCount === "number"
-        ? previous.eventChunkCount
-        : 0
-    const events = game.events.slice(-MAX_ACTIVE_EVENTS)
-    const chunkCount = Math.ceil(events.length / EVENT_CHUNK_SIZE)
-    const { events: _events, ...gameWithoutEvents } = game
-    const metadata: ActiveMetadata = {
-      schemaVersion: 1,
-      game: gameWithoutEvents,
-      eventChunkCount: chunkCount,
-    }
-    this.storage.set(LOCAL_KEYS.active, JSON.stringify(metadata))
-    for (let index = 0; index < chunkCount; index += 1) {
+    const previousRaw = parseJson(this.storage.getString(LOCAL_KEYS.active))
+    if (isNewerActiveGame(previousRaw)) return
+    const previous = readActiveLayout(previousRaw)
+    const { events, ...gameWithoutEvents } = game
+    const { keepFrom, dirtyChunk } = storedWindow(events, previous?.tail)
+    const kept = events.slice(keepFrom)
+    const chunkCount = Math.ceil(kept.length / EVENT_CHUNK_SIZE)
+    for (let index = dirtyChunk; index < chunkCount; index += 1) {
       this.storage.set(
         LOCAL_KEYS.activeEvents(index),
-        JSON.stringify(events.slice(index * EVENT_CHUNK_SIZE, (index + 1) * EVENT_CHUNK_SIZE)),
+        JSON.stringify(kept.slice(index * EVENT_CHUNK_SIZE, (index + 1) * EVENT_CHUNK_SIZE)),
       )
     }
-    for (let index = chunkCount; index < previousChunkCount; index += 1) {
+    const metadata: ActiveMetadata = {
+      schemaVersion: ACTIVE_SCHEMA_VERSION,
+      game: gameWithoutEvents,
+      eventChunkCount: chunkCount,
+      eventCount: kept.length,
+      ...(kept.length > 0 ? { lastOperationId: kept[kept.length - 1].operationId } : {}),
+    }
+    this.storage.set(LOCAL_KEYS.active, JSON.stringify(metadata))
+    for (let index = chunkCount; index < (previous?.chunkCount ?? 0); index += 1) {
       this.storage.delete(LOCAL_KEYS.activeEvents(index))
     }
   }
 
   loadActiveGame(): LocalGame | null {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
-    if (!isRecord(raw) || raw.schemaVersion !== 1 || !isRecord(raw.game)) return null
-    const chunkCount = raw.eventChunkCount
-    if (
-      typeof chunkCount !== "number" ||
-      chunkCount < 0 ||
-      chunkCount > MAX_ACTIVE_EVENTS / EVENT_CHUNK_SIZE
-    ) {
-      return null
-    }
+    const layout = readActiveLayout(raw)
+    if (!layout || !isRecord(raw) || !isRecord(raw.game)) return null
     const events: GameEvent[] = []
-    for (let index = 0; index < chunkCount; index += 1) {
+    for (let index = 0; index < layout.chunkCount; index += 1) {
       const chunk = parseJson(this.storage.getString(LOCAL_KEYS.activeEvents(index)))
       if (!Array.isArray(chunk)) return null
       for (const rawEvent of chunk) {
@@ -641,8 +707,12 @@ export class LocalGameRepository {
         events.push(event)
       }
     }
-    const game = parseGame(raw.game, events)
+    const game = parseGame(raw.game, committedEvents(events, layout.tail))
     return game?.status === "active" ? game : null
+  }
+
+  hasNewerActiveGame(): boolean {
+    return isNewerActiveGame(parseJson(this.storage.getString(LOCAL_KEYS.active)))
   }
 
   updateActivePlayers(
