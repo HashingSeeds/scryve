@@ -44,7 +44,7 @@ export function LanLobbyScreen({
   // why: Android 17 refuses to browse or publish until the app itself requests ACCESS_LOCAL_NETWORK.
   const [access, setAccess] = useState<Awaited<ReturnType<typeof checkLocalNetworkAccess>>>()
   useEffect(() => {
-    void checkLocalNetworkAccess().then(setAccess)
+    checkLocalNetworkAccess().then(setAccess, () => setAccess("denied"))
   }, [])
   const ready = access !== undefined && access !== "denied"
   const { services } = useZeroconf({

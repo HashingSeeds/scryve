@@ -144,7 +144,7 @@ class LanSession {
           previous?.close()
           return this.publish(joined)
         }
-        if (peerId) this.publish(setLanLife(game, peerId, message))
+        if (peerId && game.status === "active") this.publish(setLanLife(game, peerId, message))
       },
       onClose: () => {
         this.accepted.delete(peer)
