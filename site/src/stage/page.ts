@@ -39,6 +39,7 @@ const DEMOS = ["commander", "pokemon"] as const
 const REWIND_MS = 1500
 const REWIND_MIN_STEP_MS = 30
 const REWIND_MAX_STEP_MS = 220
+const VISITOR_TAP = "scryve:visitor-tap"
 const REWIND_MAX_FRAMES = Math.floor(REWIND_MS / REWIND_MIN_STEP_MS)
 type Demo = (typeof DEMOS)[number]
 
@@ -187,6 +188,8 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
       if (!(event.target instanceof Element) || event.target.isConnected) return
       event.stopPropagation()
       event.preventDefault()
+      if (owner instanceof Element && owner.matches("[data-board]"))
+        stage.dispatchEvent(new Event(VISITOR_TAP))
       const now =
         event.detail === 0
           ? sameControl(event.target, owner)
@@ -511,11 +514,15 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
     pending = window.setTimeout(press, HINT_PRESS_MS)
   }
   const timer = window.setInterval(tap, DEMO_TAP_MS)
-  stage.addEventListener("click", (event) => {
-    if (!event.isTrusted || !(event.target as Element).closest(".hit, [data-pk]")) return
+  const stopTaps = () => {
     window.clearInterval(timer)
     window.clearTimeout(pending)
+  }
+  stage.addEventListener("click", (event) => {
+    if (event.isTrusted && (event.target as Element).closest(".hit, [data-pk]")) stopTaps()
   })
+  // The demo step's rewind replays a visitor's tap as a script click, so it says so itself.
+  stage.addEventListener(VISITOR_TAP, stopTaps)
 }
 
 // On wide screens the stage's phone starts out filling the hero, on its side, and shrinks
