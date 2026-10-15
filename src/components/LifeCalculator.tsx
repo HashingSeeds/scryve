@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react"
 import type { LayoutChangeEvent, TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Rect } from "react-native-svg"
 
@@ -42,6 +42,8 @@ const TRAIL_WIDE = 520
 const TRAIL_GAP = 7
 // why: a generous per-character width at the trail's text size, so six-digit totals drop older steps instead of overflowing.
 const TRAIL_CHAR_WIDTH = 7.5
+// why: large system text still grows the trail, but only so far, so the fit estimate holds and the keypad keeps its room.
+const TRAIL_MAX_FONT_SCALE = 1.3
 const FADE_MS = 160
 
 type Props = {
@@ -332,6 +334,8 @@ function LifeTrail({
   gain: string
 }) {
   const [width, setWidth] = useState(0)
+  const charWidth =
+    TRAIL_CHAR_WIDTH * Math.min(useWindowDimensions().fontScale, TRAIL_MAX_FONT_SCALE)
   if (steps.length < 2) return null
   const label = steps
     .map(({ delta, life }) => (delta === undefined ? `${life}` : `${signed(delta)} to ${life}`))
@@ -351,8 +355,8 @@ function LifeTrail({
       .slice(changes.length - count)
       .reduce(
         (sum, { delta, from }) =>
-          sum + (`${from}`.length + signed(delta).length) * TRAIL_CHAR_WIDTH + TRAIL_GAP * 2,
-        count < changes.length ? TRAIL_CHAR_WIDTH + TRAIL_GAP : 0,
+          sum + (`${from}`.length + signed(delta).length) * charWidth + TRAIL_GAP * 2,
+        count < changes.length ? charWidth + TRAIL_GAP : 0,
       ) <= width
   let count = Math.min(cap, changes.length)
   // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
@@ -370,14 +374,25 @@ function LifeTrail({
       {count > 0 ? (
         <>
           {count < changes.length ? (
-            <Text text="…" size="xxs" style={[$trailTotal, { color: ink }]} />
+            <Text
+              text="…"
+              size="xxs"
+              maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
+              style={[$trailTotal, { color: ink }]}
+            />
           ) : null}
           {shown.map(({ id, delta, from }) => (
             <Fragment key={id}>
-              <Text text={String(from)} size="xxs" style={[$trailTotal, { color: ink }]} />
+              <Text
+                text={String(from)}
+                size="xxs"
+                maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
+                style={[$trailTotal, { color: ink }]}
+              />
               <Text
                 text={signed(delta)}
                 size="xxs"
+                maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
                 weight="bold"
                 style={[$trailText, { color: delta < 0 ? damage : gain }]}
               />
