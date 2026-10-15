@@ -6,7 +6,9 @@ import { createClientId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 
 import {
+  connectedSeatCount,
   createLanGame,
+  LAN_MIN_PLAYERS,
   joinLanGame,
   mergeHostGame,
   parseGuestMessage,
@@ -237,7 +239,8 @@ class LanSession {
 
   start(startingLife: number) {
     const { game, role } = this.state
-    if (role === "host" && game) this.publish(startLanGame(game, startingLife))
+    if (role === "host" && game && connectedSeatCount(game) >= LAN_MIN_PLAYERS)
+      this.publish(startLanGame(game, startingLife))
   }
 
   finish() {

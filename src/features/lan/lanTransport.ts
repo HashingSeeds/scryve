@@ -89,7 +89,11 @@ function wrapSocket<In, Out>(
   }, HEARTBEAT_MS)
   socket.on("data", (data) => {
     lastHeard = Date.now()
-    read(typeof data === "string" ? Buffer.from(data) : data)
+    try {
+      read(typeof data === "string" ? Buffer.from(data) : data)
+    } catch {
+      shutdown()
+    }
   })
   socket.on("error", shutdown)
   socket.on("close", shutdown)

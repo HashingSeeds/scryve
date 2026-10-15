@@ -1,6 +1,6 @@
 import { Buffer } from "buffer"
 
-import { createLineReader } from "./lineReader"
+import { createLineReader, MAX_LINE_BYTES } from "./lineReader"
 
 describe("createLineReader", () => {
   it("rebuilds a character split across chunks and skips heartbeat lines", () => {
@@ -13,5 +13,11 @@ describe("createLineReader", () => {
     read(bytes.subarray(splitInsideE))
 
     expect(lines).toEqual(['{"name":"José"}', '{"name":"Zoë"}'])
+  })
+
+  it("refuses a line that never ends", () => {
+    const read = createLineReader(() => {})
+
+    expect(() => read(new Uint8Array(MAX_LINE_BYTES + 1).fill(0x61))).toThrow("too long")
   })
 })

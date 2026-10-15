@@ -3,7 +3,6 @@ import { Redirect, router, useLocalSearchParams } from "expo-router"
 
 import { LanLobbyScreen } from "@/screens/LanLobbyScreen"
 
-// why: LAN play is a proof of concept, so it stays out of release builds.
 export default function LanLobbyRoute() {
   const { host, join, start, players } = useLocalSearchParams<{
     host?: string

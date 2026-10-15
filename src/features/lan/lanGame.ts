@@ -3,6 +3,10 @@ import { EMPTY_TABLE } from "../../../convex/lib/table"
 import type { ConnectedDisplayProjection } from "../connected/model"
 
 export const LAN_MAX_SEATS = 8
+export const LAN_MIN_PLAYERS = 2
+
+export const connectedSeatCount = (game: LanGame) =>
+  game.seats.filter((seat) => seat.connected).length
 
 export interface LanSeat {
   playerId: string

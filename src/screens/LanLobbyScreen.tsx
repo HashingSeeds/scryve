@@ -8,7 +8,7 @@ import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { lanProjection } from "@/features/lan/lanGame"
+import { connectedSeatCount, LAN_MIN_PLAYERS, lanProjection } from "@/features/lan/lanGame"
 import { lanSession, useLanSession } from "@/features/lan/lanSession"
 import {
   checkLocalNetworkAccess,
@@ -56,6 +56,7 @@ export function LanLobbyScreen({
   const [startingLife, setStartingLife] = useState<number>(automation.start ?? 20)
   const projection = game ? lanProjection(game, lanSession.playerId) : undefined
   const players = projection?.players ?? []
+  const readyPlayers = game ? connectedSeatCount(game) : 0
 
   const previousStatus = useRef(game?.status)
   useEffect(() => {
@@ -83,10 +84,10 @@ export function LanLobbyScreen({
       automation.start &&
       role === "host" &&
       game?.status === "lobby" &&
-      players.length >= (automation.players ?? 2)
+      readyPlayers >= (automation.players ?? LAN_MIN_PLAYERS)
     )
       lanSession.start(automation.start)
-  }, [automation.start, automation.players, role, game?.status, players.length])
+  }, [automation.start, automation.players, role, game?.status, readyPlayers])
 
   const heading = !inGame
     ? "Nearby games"
@@ -167,7 +168,7 @@ export function LanLobbyScreen({
                 </View>
                 <Button
                   preset="primary"
-                  disabled={players.length < 2}
+                  disabled={readyPlayers < LAN_MIN_PLAYERS}
                   text={game?.status === "lobby" ? "Start game" : "Start again"}
                   onPress={() => lanSession.start(startingLife)}
                 />
