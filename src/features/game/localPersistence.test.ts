@@ -9,9 +9,11 @@ import {
   DEFAULT_LOCAL_SETTINGS,
   LOCAL_KEYS,
   LocalGameRepository,
+  MAX_ACTIVE_EVENTS,
   MAX_HISTORY_GAMES,
   type StringStorage,
 } from "./localPersistence"
+import type { LocalGame } from "./types"
 
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
@@ -35,6 +37,17 @@ function makeGame(now = 1) {
       { name: "Grace", color: "#111", shape: "circle" },
     ],
   })
+}
+
+const tapContext = defaultCommandContext(asDeviceId("device"))
+
+function tap(game: LocalGame) {
+  const delta = game.events.length % 2 === 0 ? -1 : 1
+  return applyGameCommand(
+    game,
+    { type: "life.change", playerId: game.players[0].id, delta },
+    tapContext,
+  )
 }
 
 describe("LocalGameRepository", () => {
@@ -156,6 +169,51 @@ describe("LocalGameRepository", () => {
       [commanderDamageKey(grace.id, ada.id)]: 3,
     })
     expect(loaded?.players.map((player) => player.life)).toEqual([37, 33])
+  })
+
+  it("loads an active game stored in the schema 1 layout and keeps appending to it", () => {
+    const storage = new MemoryStorage()
+    let game = makeGame()
+    for (let index = 0; index < 150; index += 1) game = tap(game)
+    const { events, ...rest } = game
+    storage.set(
+      LOCAL_KEYS.active,
+      JSON.stringify({ schemaVersion: 1, game: rest, eventChunkCount: 2 }),
+    )
+    storage.set(LOCAL_KEYS.activeEvents(0), JSON.stringify(events.slice(0, 100)))
+    storage.set(LOCAL_KEYS.activeEvents(1), JSON.stringify(events.slice(100)))
+    const repository = new LocalGameRepository(storage)
+
+    expect(repository.loadActiveGame()).toEqual(game)
+    game = tap(game)
+    repository.saveActiveGame(game)
+    expect(repository.loadActiveGame()).toEqual(game)
+  })
+
+  it("writes only the newest chunk per tap and drops the oldest chunk past the cap", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    let game = makeGame()
+    for (let index = 0; index < MAX_ACTIVE_EVENTS; index += 1) {
+      game = tap(game)
+      repository.saveActiveGame(game)
+    }
+    expect(repository.loadActiveGame()?.events).toEqual(game.events)
+
+    const set = jest.spyOn(storage, "set")
+    game = tap(game)
+    repository.saveActiveGame(game)
+    expect(set.mock.calls.map(([key]) => key)).toEqual([
+      LOCAL_KEYS.activeEvents(5),
+      LOCAL_KEYS.active,
+    ])
+    expect(storage.getString(LOCAL_KEYS.activeEvents(0))).toBeUndefined()
+
+    const reopened = repository.loadActiveGame()
+    expect(reopened?.events).toEqual(game.events.slice(100))
+    const tappedAfterReopen = tap(reopened ?? makeGame())
+    repository.saveActiveGame(tappedAfterReopen)
+    expect(repository.loadActiveGame()?.events).toEqual(tappedAfterReopen.events)
   })
 
   it("falls back safely when active/settings schemas are corrupt", () => {

@@ -97,10 +97,25 @@ export interface StringStorage {
   delete(key: string): void
 }
 
+/**
+ * why: event N of the game lives in chunk floor(N / EVENT_CHUNK_SIZE), so a life tap rewrites only
+ * the chunk its event lands in. Schema 1 numbered the kept chunks from 0 and had no append
+ * bookkeeping; it still loads, and its next save rewrites every chunk in this layout.
+ */
 interface ActiveMetadata {
-  schemaVersion: 1
+  schemaVersion: 2
   game: Omit<LocalGame, "events">
   eventChunkCount: number
+  eventChunkStart: number
+  eventCount: number
+  lastOperationId?: string
+}
+
+interface ActiveEventLayout {
+  gameId?: string
+  chunkStart: number
+  chunkCount: number
+  tail?: { eventCount: number; lastOperationId: string }
 }
 
 interface HistoryDetail {
@@ -116,6 +131,39 @@ function parseJson(value: string | undefined): unknown {
   } catch {
     return null
   }
+}
+
+function readActiveLayout(raw: unknown): ActiveEventLayout | null {
+  if (!isRecord(raw) || (raw.schemaVersion !== 1 && raw.schemaVersion !== 2)) return null
+  const { eventChunkCount: chunkCount, eventChunkStart: chunkStart = 0 } = raw
+  if (!isCount(chunkCount) || chunkCount > MAX_ACTIVE_EVENTS / EVENT_CHUNK_SIZE) return null
+  if (!isCount(chunkStart)) return null
+  const gameId = isRecord(raw.game) && typeof raw.game.id === "string" ? raw.game.id : undefined
+  const { eventCount, lastOperationId } = raw
+  return {
+    gameId,
+    chunkStart,
+    chunkCount,
+    ...(isCount(eventCount) && typeof lastOperationId === "string"
+      ? { tail: { eventCount, lastOperationId } }
+      : {}),
+  }
+}
+
+function appendPoint(
+  events: readonly GameEvent[],
+  tail: ActiveEventLayout["tail"],
+): { firstEventNumber: number; dirtyChunk: number } {
+  const last = tail
+    ? events.findLastIndex(({ operationId }) => operationId === tail.lastOperationId)
+    : -1
+  if (!tail || last < 0) return { firstEventNumber: 0, dirtyChunk: 0 }
+  const firstEventNumber = tail.eventCount - 1 - last
+  const dirtyChunk = Math.floor(tail.eventCount / EVENT_CHUNK_SIZE)
+  // why: rewriting the newest stored chunk needs its earlier events in memory; without them, renumber from 0.
+  return dirtyChunk * EVENT_CHUNK_SIZE >= firstEventNumber
+    ? { firstEventNumber, dirtyChunk }
+    : { firstEventNumber: 0, dirtyChunk: 0 }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -565,46 +613,56 @@ export class LocalGameRepository {
     )
   }
 
+  /**
+   * why: when the stored events are a prefix of this game's, only the chunks holding new events are
+   * written, so a life tap costs one chunk however long the game is. Anything else, such as a new
+   * game, rewrites every kept chunk. Past MAX_ACTIVE_EVENTS the oldest whole chunk is dropped.
+   */
   saveActiveGame(game: LocalGame): void {
     if (game.status !== "active") return
-    const previous = parseJson(this.storage.getString(LOCAL_KEYS.active))
-    const previousChunkCount =
-      isRecord(previous) && typeof previous.eventChunkCount === "number"
-        ? previous.eventChunkCount
-        : 0
-    const events = game.events.slice(-MAX_ACTIVE_EVENTS)
-    const chunkCount = Math.ceil(events.length / EVENT_CHUNK_SIZE)
-    const { events: _events, ...gameWithoutEvents } = game
-    const metadata: ActiveMetadata = {
-      schemaVersion: 1,
-      game: gameWithoutEvents,
-      eventChunkCount: chunkCount,
-    }
-    this.storage.set(LOCAL_KEYS.active, JSON.stringify(metadata))
-    for (let index = 0; index < chunkCount; index += 1) {
+    const previous = readActiveLayout(parseJson(this.storage.getString(LOCAL_KEYS.active)))
+    const { events, ...gameWithoutEvents } = game
+    const { firstEventNumber, dirtyChunk } = appendPoint(
+      events,
+      previous?.gameId === game.id ? previous.tail : undefined,
+    )
+    const eventCount = firstEventNumber + events.length
+    const chunkStart = Math.ceil(Math.max(0, eventCount - MAX_ACTIVE_EVENTS) / EVENT_CHUNK_SIZE)
+    const chunkEnd = Math.ceil(eventCount / EVENT_CHUNK_SIZE)
+    for (let index = Math.max(chunkStart, dirtyChunk); index < chunkEnd; index += 1) {
+      const from = index * EVENT_CHUNK_SIZE - firstEventNumber
       this.storage.set(
         LOCAL_KEYS.activeEvents(index),
-        JSON.stringify(events.slice(index * EVENT_CHUNK_SIZE, (index + 1) * EVENT_CHUNK_SIZE)),
+        JSON.stringify(events.slice(from, from + EVENT_CHUNK_SIZE)),
       )
     }
-    for (let index = chunkCount; index < previousChunkCount; index += 1) {
-      this.storage.delete(LOCAL_KEYS.activeEvents(index))
+    const metadata: ActiveMetadata = {
+      schemaVersion: 2,
+      game: gameWithoutEvents,
+      eventChunkCount: chunkEnd - chunkStart,
+      eventChunkStart: chunkStart,
+      eventCount,
+      ...(events.length > 0 ? { lastOperationId: events[events.length - 1].operationId } : {}),
+    }
+    this.storage.set(LOCAL_KEYS.active, JSON.stringify(metadata))
+    if (!previous) return
+    for (
+      let index = previous.chunkStart;
+      index < previous.chunkStart + previous.chunkCount;
+      index += 1
+    ) {
+      if (index < chunkStart || index >= chunkEnd)
+        this.storage.delete(LOCAL_KEYS.activeEvents(index))
     }
   }
 
   loadActiveGame(): LocalGame | null {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
-    if (!isRecord(raw) || raw.schemaVersion !== 1 || !isRecord(raw.game)) return null
-    const chunkCount = raw.eventChunkCount
-    if (
-      typeof chunkCount !== "number" ||
-      chunkCount < 0 ||
-      chunkCount > MAX_ACTIVE_EVENTS / EVENT_CHUNK_SIZE
-    ) {
-      return null
-    }
+    const layout = readActiveLayout(raw)
+    if (!layout || !isRecord(raw) || !isRecord(raw.game)) return null
+    const { chunkStart, chunkCount } = layout
     const events: GameEvent[] = []
-    for (let index = 0; index < chunkCount; index += 1) {
+    for (let index = chunkStart; index < chunkStart + chunkCount; index += 1) {
       const chunk = parseJson(this.storage.getString(LOCAL_KEYS.activeEvents(index)))
       if (!Array.isArray(chunk)) return null
       for (const rawEvent of chunk) {
@@ -642,11 +700,10 @@ export class LocalGameRepository {
   }
 
   clearActiveGame(): void {
-    const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
-    const chunkCount =
-      isRecord(raw) && typeof raw.eventChunkCount === "number" ? raw.eventChunkCount : 0
+    const layout = readActiveLayout(parseJson(this.storage.getString(LOCAL_KEYS.active)))
     this.storage.delete(LOCAL_KEYS.active)
-    for (let index = 0; index < chunkCount; index += 1) {
+    if (!layout) return
+    for (let index = layout.chunkStart; index < layout.chunkStart + layout.chunkCount; index += 1) {
       this.storage.delete(LOCAL_KEYS.activeEvents(index))
     }
   }
