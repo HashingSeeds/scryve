@@ -1,9 +1,4 @@
-import {
-  counterValueLabel,
-  NO_PLAY_SYSTEM,
-  playFormatLabel,
-  playSystemId,
-} from "@/features/game/playSystems"
+import { counterValueLabel, playFormatLabel, storedPlaySystem } from "@/features/game/playSystems"
 
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
@@ -46,7 +41,7 @@ export function resumeTitle(game: ResumableGame) {
 }
 
 export function resumeDetail(game: ResumableGame, now: number) {
-  const system = game.system === NO_PLAY_SYSTEM ? undefined : playSystemId(game.system)
+  const system = storedPlaySystem(game.system)
   return [
     `${game.playerCount} seats`,
     system ? playFormatLabel(system, game.format || game.ruleset) : undefined,
@@ -73,7 +68,7 @@ export function lobbyDetail(
   system?: string,
   format?: string,
 ) {
-  const resolvedSystem = system === NO_PLAY_SYSTEM ? undefined : playSystemId(system)
+  const resolvedSystem = storedPlaySystem(system)
   return [
     counterValueLabel(resolvedSystem, startingLife),
     resolvedSystem ? playFormatLabel(resolvedSystem, format || ruleset) : undefined,

@@ -2,6 +2,7 @@ import {
   counterDeltaFromStartLabel,
   defaultStartingLife,
   playSystemRules,
+  storedPlaySystem,
   supportsCommanderDamage,
 } from "./playSystems"
 
@@ -22,6 +23,13 @@ describe("play system defaults", () => {
     expect(defaultStartingLife("mtg", "commander", 4)).toBe(40)
     expect(supportsCommanderDamage("mtg", "brawl")).toBe(false)
     expect(supportsCommanderDamage("mtg", "commander")).toBe(true)
+  })
+
+  it("reads a saved game's system as Magic only when it predates systems", () => {
+    expect(storedPlaySystem(undefined)).toBe("mtg")
+    expect(storedPlaySystem("pokemon")).toBe("pokemon")
+    expect(storedPlaySystem("none")).toBeUndefined()
+    expect(storedPlaySystem("a-later-system")).toBeUndefined()
   })
 
   it("reports prizes taken for down counters", () => {
