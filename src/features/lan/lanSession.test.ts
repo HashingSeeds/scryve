@@ -124,7 +124,7 @@ describe("LAN session commander damage", () => {
     const { session, alice, bob } = await startedGame("commander")
     const hostKey = session.getState().seatKey!
 
-    alice.send({ type: "commander.claim", id: "c1", to: bob.pass().key, delta: 6 })
+    alice.send({ type: "commander.claim", id: "c1", to: bob.pass().key, delta: 6, round: 1 })
     alice.send({ type: "commander.resolve", id: "c1", accepted: true })
     session.resolveCommanderDamage("c1", true)
     bob.send({ type: "commander.resolve", id: "c1", accepted: true })
@@ -187,6 +187,7 @@ describe("LAN session guest", () => {
       id: "c1",
       to: "guest",
       delta: 5,
+      round: 1,
     })
     host?.onMessage({ type: "game", game })
     return { guest, game, sent, host: () => host }
@@ -216,6 +217,26 @@ describe("LAN session guest", () => {
 
     expect(guest.getState().game?.commander?.claims).toEqual([])
     expect(lifeOf(guest, "guest")).toBe(35)
+  })
+
+  it("replays a claim until the host has seen it", async () => {
+    const { guest, game, host, sent } = await guestFacingClaim()
+    jest.mocked(resolveLanService).mockResolvedValue({ name: "Host game" } as never)
+    const replays = () =>
+      sent.filter((message) => (message as LanGuestMessage).type === "commander.claim")
+
+    host()?.onClose()
+    guest.claimCommanderDamage("guest", [{ toPlayerId: "host", delta: 3 }])
+    await jest.advanceTimersByTimeAsync(2_000)
+    const [replayed] = replays() as Extract<LanGuestMessage, { type: "commander.claim" }>[]
+    host()?.onMessage({
+      type: "game",
+      game: claimLanCommanderDamage(game, "guest", replayed!),
+    })
+    host()?.onClose()
+    await jest.advanceTimersByTimeAsync(2_000)
+
+    expect(replays()).toEqual([expect.objectContaining({ to: "host", delta: 3, round: 1 })])
   })
 
   it("replays a confirm the host never received after reconnecting", async () => {

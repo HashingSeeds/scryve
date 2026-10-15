@@ -5,6 +5,7 @@ import {
   isCommanderDamageDelta,
   isCommanderLethal,
   MAX_LIFE_DELTA,
+  MAX_PENDING_COMMANDER_CLAIMS,
 } from "../../../convex/lib/gameRules"
 import { EMPTY_TABLE } from "../../../convex/lib/table"
 import type { ConnectedDisplayProjection } from "../connected/model"
@@ -42,7 +43,11 @@ export interface LanCommanderClaim {
 export interface LanCommanderDamage {
   totals: { from: string; to: string; total: number }[]
   claims: LanCommanderClaim[]
+  // why: a guest replays a claim until it sees it here or in claims, so a settled claim can't come back as new.
+  settled: string[]
 }
+
+export type LanClaimRequest = { id: string; to: string; delta: number; round: number }
 
 export interface LanGame {
   id: string
@@ -71,7 +76,7 @@ export interface LanSeatPass {
 export type LanGuestMessage =
   | { type: "join"; name: string; pass?: LanSeatPass; life?: LanLife }
   | ({ type: "life" } & LanLife)
-  | { type: "commander.claim"; id: string; to: string; delta: number }
+  | ({ type: "commander.claim" } & LanClaimRequest)
   | { type: "commander.resolve"; id: string; accepted: boolean; life?: LanLife }
 
 export type LanHostMessage =
@@ -164,7 +169,7 @@ export function startLanGame(
     round: game.round + 1,
     startingLife,
     format,
-    ...(format === "commander" ? { commander: { totals: [], claims: [] } } : {}),
+    ...(format === "commander" ? { commander: { totals: [], claims: [], settled: [] } } : {}),
     seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: 0 })),
   }
 }
@@ -172,22 +177,27 @@ export function startLanGame(
 const commanderTotal = (commander: LanCommanderDamage, from: string, to: string) =>
   commander.totals.find((total) => total.from === from && total.to === to)?.total ?? 0
 
+const settle = (commander: LanCommanderDamage, id: string) =>
+  [...commander.settled, id].slice(-MAX_PENDING_COMMANDER_CLAIMS)
+
 // why: the same decision Convex makes, so a claim that could never land is dropped on arrival instead of waiting on the defender.
 export function claimLanCommanderDamage(
   game: LanGame,
   from: string,
-  claim: { id: string; to: string; delta: number },
+  claim: LanClaimRequest,
 ): LanGame {
   const { commander } = game
   const seated = (key: string) => game.seats.some((seat) => seat.key === key)
   if (
     !commander ||
     game.status !== "active" ||
+    claim.round !== game.round ||
     from === claim.to ||
     !seated(from) ||
     !seated(claim.to) ||
     !isCommanderDamageDelta(claim.delta) ||
-    commander.claims.some((existing) => existing.id === claim.id)
+    commander.claims.some((existing) => existing.id === claim.id) ||
+    commander.settled.includes(claim.id)
   )
     return game
   const outcome = commanderClaimOutcome({
@@ -198,10 +208,12 @@ export function claimLanCommanderDamage(
       (existing) => existing.from === from && existing.to === claim.to,
     ),
   })
-  if (outcome === "declined") return game
+  if (outcome === "declined")
+    return { ...game, commander: { ...commander, settled: settle(commander, claim.id) } }
+  const { id, to, delta } = claim
   return {
     ...game,
-    commander: { ...commander, claims: [...commander.claims, { ...claim, from }] },
+    commander: { ...commander, claims: [...commander.claims, { id, from, to, delta }] },
   }
 }
 
@@ -218,6 +230,7 @@ export function resolveLanCommanderClaim(
   const seat = game.seats.find((candidate) => candidate.key === defender)
   if (!commander || !claim || !seat || game.status !== "active") return game
   const claims = commander.claims.filter((candidate) => candidate !== claim)
+  const settled = settle(commander, claim.id)
   const confirmed = resolution.accepted
     ? confirmCommanderClaim({
         total: commanderTotal(commander, claim.from, claim.to),
@@ -225,7 +238,7 @@ export function resolveLanCommanderClaim(
         delta: claim.delta,
       })
     : null
-  if (!confirmed) return { ...game, commander: { ...commander, claims } }
+  if (!confirmed) return { ...game, commander: { ...commander, claims, settled } }
   const totals = [
     ...commander.totals.filter((total) => !(total.from === claim.from && total.to === claim.to)),
     { from: claim.from, to: claim.to, total: confirmed.total },
@@ -236,7 +249,7 @@ export function resolveLanCommanderClaim(
       life: confirmed.currentLife,
       version: owned.version + 1,
     })),
-    commander: { totals, claims },
+    commander: { totals, claims, settled },
   }
 }
 
@@ -364,7 +377,10 @@ const isCommander = (value: unknown): value is LanCommanderDamage =>
       isId(claim.from) &&
       isId(claim.to) &&
       isCommanderDamageDelta(claim.delta),
-  )
+  ) &&
+  Array.isArray(value.settled) &&
+  value.settled.length <= MAX_PENDING_COMMANDER_CLAIMS &&
+  value.settled.every(isId)
 
 const isPass = (value: unknown): value is LanSeatPass =>
   isRecord(value) &&
@@ -396,9 +412,16 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
     value.type === "commander.claim" &&
     isId(value.id) &&
     isId(value.to) &&
-    isCommanderDamageDelta(value.delta)
+    isCommanderDamageDelta(value.delta) &&
+    isCount(value.round)
   )
-    return { type: "commander.claim", id: value.id, to: value.to, delta: value.delta }
+    return {
+      type: "commander.claim",
+      id: value.id,
+      to: value.to,
+      delta: value.delta,
+      round: value.round,
+    }
   if (
     value.type === "commander.resolve" &&
     isId(value.id) &&

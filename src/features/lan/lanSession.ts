@@ -20,6 +20,7 @@ import {
   resolveLanGuestCommanderClaim,
   setLanLife,
   startLanGame,
+  type LanClaimRequest,
   type LanFormat,
   type LanGame,
   type LanGuestMessage,
@@ -90,6 +91,8 @@ export class LanSession {
   private ownLife?: LanLife
   // why: kept until a host snapshot drops the claim, so a resolve lost to a dropped connection is replayed and never offered twice.
   private resolutions = new Map<string, boolean>()
+  // why: kept until the host shows the claim pending or settled, so a claim lost to a dropped connection is replayed.
+  private claims = new Map<string, LanClaimRequest>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private reconnectingSince?: number
   private unreachableAt = new Map<string, number>()
@@ -234,6 +237,7 @@ export class LanSession {
   async join(service: Service) {
     this.ownLife = undefined
     this.resolutions.clear()
+    this.claims.clear()
     this.pass = savedPass(service.name)
     const session = ++this.session
     this.replace({
@@ -274,6 +278,8 @@ export class LanSession {
       ...(this.pass ? { pass: this.pass } : {}),
       ...(this.ownLife ? { life: this.ownLife } : {}),
     })
+    for (const claim of this.claims.values())
+      this.connection.send({ type: "commander.claim", ...claim })
     for (const [id, accepted] of this.resolutions) this.sendResolution(id, accepted)
   }
 
@@ -300,8 +306,12 @@ export class LanSession {
     this.reconnectingSince = undefined
     const { seatKey } = this.state
     if (this.ownLife?.round !== message.game.round) this.ownLife = undefined
-    const hostClaims = new Set(message.game.commander?.claims.map((claim) => claim.id))
+    const { commander, round } = message.game
+    const hostClaims = new Set(commander?.claims.map((claim) => claim.id))
     for (const id of this.resolutions.keys()) if (!hostClaims.has(id)) this.resolutions.delete(id)
+    for (const [id, claim] of this.claims)
+      if (claim.round !== round || hostClaims.has(id) || commander?.settled.includes(id))
+        this.claims.delete(id)
     const resolved = new Set(this.resolutions.keys())
     const game = seatKey
       ? mergeHostGame(message.game, seatKey, this.ownLife, resolved)
@@ -353,12 +363,16 @@ export class LanSession {
       id: createClientId("claim"),
       to: toPlayerId,
       delta,
+      round: game.round,
     }))
     if (role === "host")
       return this.publish(
         claims.reduce((next, claim) => claimLanCommanderDamage(next, from, claim), game),
       )
-    for (const claim of claims) this.connection?.send({ type: "commander.claim", ...claim })
+    for (const claim of claims) {
+      this.claims.set(claim.id, claim)
+      this.connection?.send({ type: "commander.claim", ...claim })
+    }
   }
 
   resolveCommanderDamage(id: string, accepted: boolean) {
@@ -410,6 +424,7 @@ export class LanSession {
     this.connection = undefined
     this.ownLife = undefined
     this.resolutions.clear()
+    this.claims.clear()
     this.replace(keepGame && game ? { ...IDLE, game } : IDLE)
   }
 }

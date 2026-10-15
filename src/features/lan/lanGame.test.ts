@@ -126,7 +126,7 @@ describe("LAN game", () => {
 describe("LAN commander damage", () => {
   const commanderGame = () => startLanGame(seatGuest(lobby(), "guest"), 40, "commander")
   const claim = (game: LanGame, delta: number, id = "claim") =>
-    claimLanCommanderDamage(game, "host", { id, to: "guest", delta })
+    claimLanCommanderDamage(game, "host", { id, to: "guest", delta, round: game.round })
 
   it("changes the defender's life only when the defender confirms", () => {
     const claimed = claim(commanderGame(), 7)
@@ -141,7 +141,21 @@ describe("LAN commander damage", () => {
     expect(confirmed.commander).toEqual({
       totals: [{ from: "host", to: "guest", total: 7 }],
       claims: [],
+      settled: ["claim"],
     })
+  })
+
+  it("never takes a settled or earlier-round claim again", () => {
+    const settled = resolveLanCommanderClaim(claim(commanderGame(), 7), "guest", {
+      id: "claim",
+      accepted: false,
+    })
+    const restarted = startLanGame(commanderGame(), 40, "commander")
+
+    expect(claim(settled, 7)).toBe(settled)
+    expect(
+      claimLanCommanderDamage(restarted, "host", { id: "old", to: "guest", delta: 7, round: 1 }),
+    ).toBe(restarted)
   })
 
   it("marks a player out at 21 and drops claims Convex would decline", () => {
@@ -150,7 +164,10 @@ describe("LAN commander damage", () => {
       game = resolveLanCommanderClaim(claim(game, 7, id), "guest", { id, accepted: true })
 
     expect(lanProjection(game, "host").commanderDamage?.eliminatedPlayerIds).toEqual(["guest"])
-    expect(claim(game, -22)).toBe(game)
+    expect(claim(game, -22, "d").commander).toMatchObject({
+      claims: [],
+      settled: ["a", "b", "c", "d"],
+    })
     expect(claim(claim(game, 1, "x"), 1, "y").commander?.claims).toHaveLength(1)
     expect(claim(startLanGame(seatGuest(lobby(), "guest"), 20), 5)).toEqual(
       startLanGame(seatGuest(lobby(), "guest"), 20),
@@ -171,6 +188,7 @@ describe("LAN commander damage", () => {
     expect(replayed.commander).toEqual({
       totals: [{ from: "host", to: "guest", total: 7 }],
       claims: [],
+      settled: ["claim"],
     })
   })
 
@@ -180,7 +198,11 @@ describe("LAN commander damage", () => {
       accepted: true,
     })
 
-    expect(startLanGame(hit, 40, "commander").commander).toEqual({ totals: [], claims: [] })
+    expect(startLanGame(hit, 40, "commander").commander).toEqual({
+      totals: [],
+      claims: [],
+      settled: [],
+    })
     expect(startLanGame(hit, 20)).not.toHaveProperty("commander")
   })
 })
