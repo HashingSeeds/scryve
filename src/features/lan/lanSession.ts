@@ -114,9 +114,7 @@ class LanSession {
         serviceName,
         parseGuestMessage,
         (peer) => this.acceptPeer(peer),
-        () => {
-          this.serverClosed = true
-        },
+        () => session === this.session && this.recoverHost(session),
       )
       if (session !== this.session) return void server.stop()
       this.server = server
@@ -125,13 +123,18 @@ class LanSession {
       if (session !== this.session) return
       const message = `Could not host: ${String(error)}`
       if (!recovering) return this.replace({ ...IDLE, error: message })
-      // why: a game in progress outlives a failed restart; guests keep retrying until the host is back.
-      this.serverClosed = true
-      this.set({ status: "reconnecting", error: message })
-      setTimeout(() => {
-        if (session === this.session && this.serverClosed) void this.listen({ recovering: true })
-      }, RECONNECT_DELAY_MS)
+      this.recoverHost(session, message)
     }
+  }
+
+  // why: a game in progress outlives its listener; guests keep retrying until the host listens again.
+  private recoverHost(session: number, error?: string) {
+    this.serverClosed = true
+    this.set({ status: "reconnecting", ...(error ? { error } : {}) })
+    if (AppState.currentState !== "active") return
+    setTimeout(() => {
+      if (session === this.session && this.serverClosed) void this.listen({ recovering: true })
+    }, RECONNECT_DELAY_MS)
   }
 
   private acceptPeer(peer: LanConnection<LanHostMessage>) {
