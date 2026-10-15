@@ -6,6 +6,7 @@ import Svg, { Path } from "react-native-svg"
 
 import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
+import { spacing } from "@/theme/spacing"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -16,6 +17,15 @@ import { Text } from "../Text"
 const LETTERS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"] as const
 const DIGITS = ["123", "456", "789"] as const
 const SYMBOLS = ["-", "'", ".", ":", "é", "&", "♀", "♂"] as const
+
+const KEY_HEIGHT = 40
+const COMPACT_KEY_HEIGHT = 32
+const ROW_GAP = spacing.xxs + 1
+
+export function tallestKeypadHeight(compact?: boolean) {
+  const rows = DIGITS.length + 2
+  return rows * (compact ? COMPACT_KEY_HEIGHT : KEY_HEIGHT) + (rows - 1) * ROW_GAP
+}
 
 type Key = {
   label: string
@@ -130,9 +140,12 @@ export function PokemonKeypad({
       ]
 
   return (
-    <View testID={`pokemon-keypad-seat-${seatNumber}`} style={themed($keypad)}>
+    <View testID={`pokemon-keypad-seat-${seatNumber}`} style={$keypad}>
       {rows.map((row, index) => (
-        <View key={index} style={themed($row)}>
+        <View
+          key={index}
+          style={[themed($row), { height: compact ? COMPACT_KEY_HEIGHT : KEY_HEIGHT }]}
+        >
           {row.map((key) => (
             <BoardPressable
               key={key.accessibilityLabel}
@@ -204,16 +217,17 @@ export function KeyIcon({
 
 const $wide: ViewStyle = { flex: 2 }
 const $label: TextStyle = { textAlign: "center" }
-const $keypad: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs + 1 })
+// why: beside the form on a short seat, the number layer is taller than the seat, so rows give up height instead of spilling over the header.
+const $keypad: ViewStyle = { gap: ROW_GAP, flexShrink: 1 }
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   justifyContent: "center",
   gap: spacing.xxs,
+  flexShrink: 1,
 })
 const $key: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   minWidth: 0,
-  height: 40,
   borderRadius: 7,
   alignItems: "center",
   justifyContent: "center",
@@ -221,7 +235,6 @@ const $key: ThemedStyle<ViewStyle> = () => ({
 const $compactKey: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   minWidth: 0,
-  height: 32,
   borderRadius: 6,
   alignItems: "center",
   justifyContent: "center",

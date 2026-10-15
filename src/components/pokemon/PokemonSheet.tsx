@@ -11,6 +11,7 @@ import {
 } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
+import { spacing } from "@/theme/spacing"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
@@ -22,7 +23,7 @@ import {
   type BenchClearance,
 } from "./pokemonCardLayout"
 import { catalogRows, hitDetail, pokemonPrintingLabel } from "./pokemonCatalogHits"
-import { PokemonKeypad } from "./PokemonKeypad"
+import { PokemonKeypad, tallestKeypadHeight } from "./PokemonKeypad"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
 import { usePokemonDeck, type SeatDeck } from "./usePokemonDeck"
 import {
@@ -65,10 +66,24 @@ export interface PokemonSheetProps {
 
 const PRIZE_CHOICES = [1, 2, 3] as const
 const KEYPAD_BESIDE_RATIO = 1.6
+const HEADER_HEIGHT = 28
+const FIELD_HEIGHT = 42
 const FIELD_LENGTH = { query: 120, name: 100, hp: 3 } as const
 type Field = keyof typeof FIELD_LENGTH
 const MAX_RESULTS = 12
 const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
+
+export function keypadBesideForm(
+  layer: { width: number; height: number },
+  contentHeight: number,
+  compact = false,
+) {
+  const gap = compact ? spacing.xxs : spacing.xs
+  const stackedHeight = HEADER_HEIGHT + gap + FIELD_HEIGHT + gap + tallestKeypadHeight(compact)
+  const wide = layer.width > layer.height * KEYPAD_BESIDE_RATIO
+  const tooShortToStack = layer.height > 0 && contentHeight < stackedHeight
+  return wide || tooShortToStack
+}
 
 export function PokemonSheet({
   seatNumber,
@@ -281,10 +296,21 @@ export function PokemonSheet({
   ]
   // why: a catalog pick closes the search field without a blur, so the keypad follows the field instead.
   const keypadField = typingInto === "query" && !showSearch ? undefined : typingInto
-  // why: under the results, the keypad pushes them off a short sideways seat.
   const sideways = Math.abs(rotation) === 90
-  const keypadBeside =
-    (sideways ? cardHeight : cardWidth) > (sideways ? cardWidth : cardHeight) * KEYPAD_BESIDE_RATIO
+  const layer = sideways
+    ? { width: cardHeight, height: cardWidth }
+    : { width: cardWidth, height: cardHeight }
+  const padding = {
+    paddingTop: (compact ? 6 : 10) + insets.top + clearance.top,
+    paddingBottom: (compact ? 6 : 10) + insets.bottom,
+    paddingLeft: (compact ? 8 : 12) + insets.left,
+    paddingRight: (compact ? 8 : 12) + insets.right,
+  }
+  const keypadBeside = keypadBesideForm(
+    layer,
+    layer.height - padding.paddingTop - padding.paddingBottom,
+    compact,
+  )
   // why: a search pick places in one tap, so placing only shows the typed form when search can't help, and a reconnect must not hide a half-typed Pokémon behind search.
   const drafting =
     draft.name !== "" || draft.hp !== "" || typingInto === "name" || typingInto === "hp"
@@ -363,13 +389,7 @@ export function PokemonSheet({
         StyleSheet.absoluteFill,
         rotatedLayerStyle(rotation, cardWidth, cardHeight),
         themed(compact ? $compactSheet : $sheet),
-        {
-          backgroundColor: sheetColor,
-          paddingTop: (compact ? 6 : 10) + insets.top + clearance.top,
-          paddingBottom: (compact ? 6 : 10) + insets.bottom,
-          paddingLeft: (compact ? 8 : 12) + insets.left,
-          paddingRight: (compact ? 8 : 12) + insets.right,
-        },
+        { backgroundColor: sheetColor, ...padding },
       ]}
     >
       <View style={[themed($header), { marginLeft: clearance.left, marginRight: clearance.right }]}>
@@ -662,7 +682,7 @@ const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   justifyContent: "space-between",
   gap: spacing.xs,
-  minHeight: 28,
+  minHeight: HEADER_HEIGHT,
 })
 const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
