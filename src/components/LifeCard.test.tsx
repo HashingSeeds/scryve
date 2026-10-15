@@ -1204,11 +1204,7 @@ describe("LifeCard", () => {
     })
     const view = render(
       <LifeLogContext.Provider
-        value={{
-          kind: "local",
-          startingLife: 8000,
-          events: [change("op-1", -2000), change("op-2", 800)],
-        }}
+        value={{ kind: "local", events: [change("op-1", -2000), change("op-2", 800)] }}
       >
         <ThemeProvider initialContext="dark">
           <LifeCard

@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { createContext, useContext, type ReactNode } from "react"
 import { usePaginatedQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import type { PendingLifeAction } from "@/features/connected/model"
 
-import type { GameEvent } from "./types"
+import type { CommanderDamageAssignedEvent, GameEvent, LifeChangedEvent } from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
 
@@ -19,54 +20,54 @@ interface LifeLogChange {
 }
 
 export type LifeLogSource =
-  | { kind: "local"; startingLife: number; events: readonly GameEvent[] }
-  | { kind: "connected"; startingLife: number; publicId: string }
+  | { kind: "local"; events: readonly GameEvent[] }
+  | { kind: "connected"; publicId: string; pending: readonly PendingLifeAction[] }
 
 export const LifeLogContext = createContext<LifeLogSource | undefined>(undefined)
 
-export function lifeLog(startingLife: number, changes: readonly LifeLogChange[]): LifeLogStep[] {
-  let life = startingLife
-  return [
-    { id: "start", life },
-    ...changes.map(({ id, delta }) => {
-      life += delta
-      return { id, delta, life }
-    }),
-  ]
+// why: built back from the total the card shows, the log agrees with the card even when only the newest changes are at hand.
+export function lifeLog(life: number, newestFirst: readonly LifeLogChange[]): LifeLogStep[] {
+  const steps: LifeLogStep[] = []
+  let total = life
+  for (const { id, delta } of newestFirst) {
+    steps.push({ id, delta, life: total })
+    total -= delta
+  }
+  steps.push({ id: "before", life: total })
+  return steps.reverse()
 }
 
 // why: an undo leaves the log as if the change never happened, so both it and the change it reverses drop out.
 export function localLifeChanges(events: readonly GameEvent[], playerId: string): LifeLogChange[] {
-  const undone = new Set(
-    events.flatMap((event) =>
-      event.type === "life.changed" && event.compensatesOperationId
-        ? [event.compensatesOperationId]
-        : [],
-    ),
+  const lifeEvents = events.filter(
+    (event): event is LifeChangedEvent | CommanderDamageAssignedEvent =>
+      event.type === "life.changed" || event.type === "commanderDamage.assigned",
   )
-  return events.flatMap((event) =>
-    event.type === "life.changed" &&
-    event.playerId === playerId &&
-    !event.compensatesOperationId &&
-    !undone.has(event.operationId)
-      ? [{ id: event.operationId, delta: event.delta }]
-      : [],
-  )
+  const undone = new Set(lifeEvents.map(({ compensatesOperationId }) => compensatesOperationId))
+  return lifeEvents
+    .flatMap((event) => {
+      if (event.compensatesOperationId || undone.has(event.operationId)) return []
+      if (event.type === "life.changed")
+        return event.playerId === playerId ? [{ id: event.operationId, delta: event.delta }] : []
+      return event.toPlayerId === playerId ? [{ id: event.operationId, delta: -event.delta }] : []
+    })
+    .reverse()
 }
 
 type LifeLogProps = {
   playerId: string
+  life: number
   children: (steps: readonly LifeLogStep[]) => ReactNode
 }
 
-export function LifeLog({ playerId, children }: LifeLogProps) {
+export function LifeLog({ playerId, life, children }: LifeLogProps) {
   const source = useContext(LifeLogContext)
   if (!source) return null
   if (source.kind === "local")
-    return children(lifeLog(source.startingLife, localLifeChanges(source.events, playerId)))
+    return children(lifeLog(life, localLifeChanges(source.events, playerId)))
   return (
     <ConvexQueryBoundary resetKey={source.publicId} fallback={() => null}>
-      <ConnectedLifeLog source={source} playerId={playerId}>
+      <ConnectedLifeLog source={source} playerId={playerId} life={life}>
         {children}
       </ConnectedLifeLog>
     </ConvexQueryBoundary>
@@ -76,25 +77,34 @@ export function LifeLog({ playerId, children }: LifeLogProps) {
 function ConnectedLifeLog({
   source,
   playerId,
+  life,
   children,
 }: LifeLogProps & { source: Extract<LifeLogSource, { kind: "connected" }> }) {
-  const events = usePaginatedQuery(
+  // why: one page holds more steps than fit on a line, and an unsent change still shows from the pending queue offline.
+  const { results } = usePaginatedQuery(
     api.games.connectedEvents,
     { publicId: source.publicId },
     { initialNumItems: CONNECTED_EVENT_PAGE_MAX_ITEMS },
   )
-  const { status, loadMore } = events
-  // why: totals add up from the starting value, so the log waits for every page rather than showing wrong totals.
-  useEffect(() => {
-    if (status === "CanLoadMore") loadMore(CONNECTED_EVENT_PAGE_MAX_ITEMS)
-  }, [status, loadMore])
-  if (status !== "Exhausted") return null
-  const changes = events.results
-    .flatMap((event) =>
-      event.kind === "life.changed" && event.playerId === playerId && event.delta !== undefined
+  const confirmed = new Set(results.map(({ operationId }) => operationId))
+  const pending = source.pending
+    .flatMap(({ event }) =>
+      event.type === "life.changed" &&
+      event.gameId === source.publicId &&
+      event.playerId === playerId &&
+      !confirmed.has(event.operationId)
         ? [{ id: event.operationId, delta: event.delta }]
         : [],
     )
     .reverse()
-  return children(lifeLog(source.startingLife, changes))
+  const synced = results.flatMap((event) =>
+    event.playerId === playerId && event.delta !== undefined
+      ? event.kind === "life.changed"
+        ? [{ id: event.operationId, delta: event.delta }]
+        : event.kind === "commanderDamage.confirmed"
+          ? [{ id: event.operationId, delta: -event.delta }]
+          : []
+      : [],
+  )
+  return children(lifeLog(life, [...pending, ...synced]))
 }

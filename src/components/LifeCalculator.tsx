@@ -271,7 +271,7 @@ export function LifeCalculator({
         </View>
       </View>
       {playerId ? (
-        <LifeLog playerId={playerId}>
+        <LifeLog playerId={playerId} life={life}>
           {(steps) => (
             <LifeLogRow
               steps={steps}

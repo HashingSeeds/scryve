@@ -126,11 +126,8 @@ export function CurrentGameScreen({
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
   const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
-  const { startingLife, events } = runtime.game
-  const lifeLog = useMemo(
-    (): LifeLogSource => ({ kind: "local", startingLife, events }),
-    [startingLife, events],
-  )
+  const { events } = runtime.game
+  const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events }), [events])
   const badge = useMemo<GameMenuBadge | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
