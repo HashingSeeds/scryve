@@ -169,7 +169,6 @@ function storedWindow(
     return { keepFrom: storedFrom, dirtyChunk: Math.floor(tail.eventCount / EVENT_CHUNK_SIZE) }
   const from = Math.max(0, storedFrom)
   const excess = Math.max(0, events.length - from - MAX_ACTIVE_EVENTS)
-  // why: dropping one event per tap would shift and rewrite every chunk on every tap; dropping a whole chunk leaves room for the next taps to append.
   return { keepFrom: from + Math.ceil(excess / EVENT_CHUNK_SIZE) * EVENT_CHUNK_SIZE, dirtyChunk: 0 }
 }
 
@@ -712,7 +711,6 @@ export class LocalGameRepository {
     return game?.status === "active" ? game : null
   }
 
-  /** why: a game saved by a newer version cannot load here, and Play must say so rather than start over it. */
   hasNewerActiveGame(): boolean {
     return isNewerActiveGame(parseJson(this.storage.getString(LOCAL_KEYS.active)))
   }

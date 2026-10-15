@@ -40,10 +40,9 @@ class MemoryStorage implements StringStorage {
   }
 }
 
-/** why: storage keeps at most the last 500 events, so a board carries its whole history to check what loads back. */
 interface Board {
   game: LocalGame
-  history: readonly GameEvent[]
+  fullHistory: readonly GameEvent[]
 }
 
 function newBoard(now: number): Board {
@@ -55,18 +54,18 @@ function newBoard(now: number): Board {
       { name: "Grace", color: "#111", shape: "circle" },
     ],
   })
-  return { game, history: [] }
+  return { game, fullHistory: [] }
 }
 
 function tap(board: Board, seat = 0): Board {
-  const delta = board.history.length % 2 === 0 ? -1 : 1
+  const delta = board.fullHistory.length % 2 === 0 ? -1 : 1
   const game = applyGameCommand(
     board.game,
     { type: "life.change", playerId: board.game.players[seat].id, delta },
     context,
   )
   const event = game.events.at(-1)
-  return event ? { game, history: [...board.history, event] } : board
+  return event ? { game, fullHistory: [...board.fullHistory, event] } : board
 }
 
 function tapTimes(board: Board, count: number): Board {
@@ -75,7 +74,6 @@ function tapTimes(board: Board, count: number): Board {
   return next
 }
 
-/** why: a failure names its seed and step, and the same seed replays the same walk. */
 function seededRandom(seed: number) {
   let state = seed
   return () => {
@@ -105,9 +103,8 @@ function expectStored(storage: MemoryStorage, saved: Board) {
   const { events, ...rest } = loaded
   const { events: _savedEvents, ...savedRest } = saved.game
   expect(rest).toEqual(savedRest)
-  // why: toEqual on hundreds of events every step makes the walk too slow to run with the suite.
   expect(JSON.stringify(events)).toBe(
-    JSON.stringify(saved.history.slice(saved.history.length - events.length)),
+    JSON.stringify(saved.fullHistory.slice(saved.fullHistory.length - events.length)),
   )
   expect(events.length).toBeLessThanOrEqual(MAX_ACTIVE_EVENTS)
   expect(events.length).toBeGreaterThanOrEqual(Math.min(saved.game.events.length, MIN_KEPT_EVENTS))
@@ -157,9 +154,8 @@ describe("active game persistence under random play", () => {
         const kind = pickStep(random)
         try {
           if (kind === "tap") {
-            if (board.game.events.length < board.history.length) reached.reopenedAppend += 1
+            if (board.game.events.length < board.fullHistory.length) reached.reopenedAppend += 1
             save(tap(board, step % 2))
-            // why: a tap from the board that wrote last rewrites one chunk, except the one tap in 100 past the cap that drops the oldest chunk.
             const sets = storage.mutations.filter(({ op }) => op === "set").length
             expect(storage.mutations.some(({ op }) => op === "delete")).toBe(false)
             if (sets > 2) {
@@ -176,7 +172,7 @@ describe("active game persistence under random play", () => {
           } else if (kind === "reload") {
             const game = repository.loadActiveGame()
             if (!game) throw new Error("reload found no game")
-            board = { game, history: board.history }
+            board = { game, fullHistory: board.fullHistory }
             continue
           } else if (kind === "stale") {
             const stale = snapshots[Math.floor(random() * snapshots.length)]
@@ -194,14 +190,13 @@ describe("active game persistence under random play", () => {
             save(tap(newBoard(seed * 10_000 + step)))
           }
           expectStored(storage, board)
-          if (board.history.length > MAX_ACTIVE_EVENTS) reached.pastCap += 1
+          if (board.fullHistory.length > MAX_ACTIVE_EVENTS) reached.pastCap += 1
           if (step % 25 === 0) snapshots = [...snapshots.slice(-4), board]
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error)
           throw new Error(`seed ${seed} step ${step} (${kind}): ${reason}`, { cause: error })
         }
       }
-      // why: a walk that never reaches these paths would pass while testing nothing.
       expect(Object.values(reached).every((count) => count > 0)).toBe(true)
     },
   )
@@ -233,7 +228,7 @@ describe("active game persistence when the app is killed mid-save", () => {
       }
       const game = repository.loadActiveGame()
       if (!game) throw new Error("setup game did not load")
-      return { game, history: board.history }
+      return { game, fullHistory: board.fullHistory }
     }
   }
 
@@ -253,7 +248,7 @@ describe("active game persistence when the app is killed mid-save", () => {
           JSON.stringify(kept.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE)),
         )
       }
-      return { game: { ...board.game, events: kept }, history: board.history }
+      return { game: { ...board.game, events: kept }, fullHistory: board.fullHistory }
     }
   }
 
@@ -302,7 +297,6 @@ describe("active game persistence when the app is killed mid-save", () => {
       killed.killAfter = kill
       expect(() => new LocalGameRepository(killed).saveActiveGame(next.game)).toThrow(ProcessKilled)
       const reopened = new LocalGameRepository(killed).loadActiveGame()
-      // why: an older build's save marks no committed event, so the first rewrite after the update can keep the new tap's event without its life change.
       const history = reopened?.events.filter(
         (event) => event !== tapped && event.operationId !== tapped?.operationId,
       )
@@ -318,7 +312,6 @@ describe("active game persistence when the app is killed mid-save", () => {
   })
 })
 
-/** why: a save killed partway through dropping the oldest chunk may reload without that chunk's history; the life totals and every newer event must still match. */
 function withoutOldestChunk(reopened: LocalGame | null, before: LocalGame | null) {
   if (!reopened || !before || reopened.events.length >= before.events.length) return reopened
   expect(reopened.events.length).toBeGreaterThanOrEqual(before.events.length - CHUNK_SIZE)
