@@ -51,6 +51,11 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import {
+  defaultRoundClockMinutes,
+  ROUND_CLOCK_MINUTES,
+  type RoundClockSetup,
+} from "@/features/game/roundClock"
 import type {
   LocalGame,
   LocalGameResult,
@@ -126,6 +131,7 @@ export interface NewGameScreenProps {
       lifeStep: number
       account?: LocalGameAccountInput
       match?: { bestOf: MatchBestOf }
+      clock?: RoundClockSetup
     },
   ) => void
   connected?: ConnectedHostFeed
@@ -155,6 +161,12 @@ export interface LocalConnectFeed {
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
 const MAX_SEATS = 6
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
+const CLOCK_MODES = [
+  { id: "off", label: "Off" },
+  { id: "countdown", label: "Countdown" },
+  { id: "stopwatch", label: "Stopwatch" },
+] as const
+type ClockMode = (typeof CLOCK_MODES)[number]["id"]
 
 export function NewGameScreen({
   defaults,
@@ -237,6 +249,11 @@ export function NewGameScreen({
   const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(
     initialGame?.match?.bestOf,
   )
+  const [clockMode, setClockMode] = useState<ClockMode>(initialGame?.clock?.setup.mode ?? "off")
+  const initialClock = initialGame?.clock?.setup
+  const [chosenClockMinutes, setChosenClockMinutes] = useState(
+    initialClock?.mode === "countdown" ? initialClock.minutes : undefined,
+  )
   const [showOptions, setShowOptions] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
@@ -274,6 +291,13 @@ export function NewGameScreen({
   const matchBestOf = matchOn
     ? (chosenBestOf ?? (format === "commander" || playerCount > 2 ? 1 : 3))
     : undefined
+  const clockMinutes = chosenClockMinutes ?? defaultRoundClockMinutes(system, matchBestOf)
+  const clockSetup: RoundClockSetup | undefined =
+    clockMode === "off"
+      ? undefined
+      : clockMode === "countdown"
+        ? { mode: "countdown", minutes: clockMinutes }
+        : { mode: "stopwatch" }
   const matchLocked = Boolean(
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
   )
@@ -362,6 +386,7 @@ export function NewGameScreen({
         ...setup,
         account: accountInput,
         ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
+        ...(clockSetup ? { clock: clockSetup } : {}),
       })
   }
 
@@ -617,6 +642,33 @@ export function NewGameScreen({
                     onSelect={(value) =>
                       setChosenBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
                     }
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
+            {!connectedMode && !localGame ? (
+              <View style={themed($section)}>
+                <Text text="Clock" preset="subheading" accessibilityRole="header" />
+                <SegmentedControl
+                  testID="clock-mode"
+                  accessibilityLabel="Clock"
+                  segments={CLOCK_MODES}
+                  selectedId={clockMode}
+                  onSelect={(value) => {
+                    const mode = CLOCK_MODES.find(({ id }) => id === value)?.id
+                    if (mode) setClockMode(mode)
+                  }}
+                />
+                {clockMode === "countdown" ? (
+                  <ValueField
+                    testID="clock-minutes"
+                    label="Minutes left"
+                    value={clockMinutes}
+                    min={ROUND_CLOCK_MINUTES.min}
+                    max={ROUND_CLOCK_MINUTES.max}
+                    longStep={ROUND_CLOCK_MINUTES.step}
+                    onChange={setChosenClockMinutes}
                   />
                 ) : null}
               </View>

@@ -263,4 +263,26 @@ describe("local match", () => {
       ],
     })
   })
+
+  it("keeps one round clock across a match's games and starts a fresh one on rematch", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+      match: { bestOf: 3 },
+      clock: { mode: "countdown", minutes: 50 },
+    })
+    const first = { ...game, clock: { ...game.clock!, pausedAt: 5, turn: 1 } }
+    const second = createNextMatchGame(finish(first, 0, 10), 20)
+    repository.saveActiveGame(second)
+    expect(repository.loadActiveGame()?.clock).toEqual(first.clock)
+    expect(createRematch(first, 30).clock).toEqual({
+      setup: { mode: "countdown", minutes: 50 },
+      startedAt: 30,
+    })
+  })
 })

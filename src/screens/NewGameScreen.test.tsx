@@ -1159,6 +1159,22 @@ describe("NewGameScreen", () => {
     expect(screen.getByTestId("match-best-of-1").props.accessibilityState.selected).toBe(true)
   })
 
+  it("starts without a clock unless one is chosen, counting down from the minutes left", () => {
+    const onStartLocal = jest.fn()
+    setup({ onStartLocal })
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[0][2].clock).toBeUndefined()
+
+    fireEvent.press(screen.getByTestId("clock-mode-countdown"))
+    fireEvent.press(screen.getByTestId("clock-minutes-decrement"))
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[1][2].clock).toEqual({ mode: "countdown", minutes: 49 })
+
+    fireEvent.press(screen.getByTestId("clock-mode-stopwatch"))
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[2][2].clock).toEqual({ mode: "stopwatch" })
+  })
+
   it("keeps match mode off the form while a game is running", () => {
     setup({ localGame: runningLocalGame() })
     expect(screen.queryByTestId("match-mode")).toBeNull()
