@@ -19,6 +19,15 @@ import { requireHost, requireMembership, requireSeatOwner, requireUser } from ".
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { limitGameRate } from "./lib/gameRateLimits"
+import {
+  applyLifeChange,
+  COMMANDER_LETHAL_DAMAGE,
+  controlsSeat,
+  isCommanderDamageDelta,
+  isLifeDelta,
+  isSameLifeChange,
+  MAX_COMMANDER_DAMAGE,
+} from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
@@ -47,7 +56,7 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
-import { flooredLifeDelta, tableRules } from "./lib/systems"
+import { tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
@@ -68,7 +77,6 @@ import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
-const MAX_COMMANDER_DAMAGE = 99
 const MAX_PENDING_COMMANDER_CLAIMS = 100
 const NO_GAME_SYSTEM = "none"
 
@@ -104,17 +112,13 @@ function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boole
     })
 }
 
-function isValidLifeDelta(delta: number) {
-  return Number.isInteger(delta) && delta !== 0 && Math.abs(delta) <= 999_999
-}
-
 function assertLifeDelta(delta: number) {
-  if (!isValidLifeDelta(delta))
+  if (!isLifeDelta(delta))
     throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
 }
 
 function assertGameWriteLifeDelta(delta: number) {
-  if (!isValidLifeDelta(delta))
+  if (!isLifeDelta(delta))
     throw gameWriteError(
       "invalid_life_delta",
       "Life delta must be a non-zero whole number from -999999 to 999999",
@@ -122,7 +126,7 @@ function assertGameWriteLifeDelta(delta: number) {
 }
 
 function assertCommanderDelta(delta: number) {
-  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > MAX_COMMANDER_DAMAGE)
+  if (!isCommanderDamageDelta(delta))
     throw new Error("Commander damage delta must be a non-zero whole number from -99 to 99")
 }
 
@@ -395,7 +399,7 @@ async function commanderDamageProjection(
   )
   const eliminatedPlayerIds = new Set<Id<"gamePlayers">>()
   for (const total of totals) {
-    if (total.total >= 21) eliminatedPlayerIds.add(total.toPlayerId)
+    if (total.total >= COMMANDER_LETHAL_DAMAGE) eliminatedPlayerIds.add(total.toPlayerId)
   }
   return {
     totals: totals.map((total) => ({
@@ -1866,8 +1870,11 @@ export const changeLife = mutation({
     if (
       !target ||
       target.gameId !== game._id ||
-      (target.userId === undefined ? game.hostUserId !== user._id : target.userId !== user._id) ||
-      (target.deviceId !== undefined && target.deviceId !== args.deviceId)
+      !controlsSeat(target, {
+        userId: user._id,
+        deviceId: args.deviceId,
+        isHost: game.hostUserId === user._id,
+      })
     )
       throw gameWriteError("seat_owner_required", "Seat-owner permission required")
 
@@ -1878,14 +1885,15 @@ export const changeLife = mutation({
       )
       .unique()
     if (duplicate) {
-      if (
-        duplicate.playerId !== target._id ||
-        duplicate.actorUserId !== user._id ||
-        requestedLifeDelta(duplicate) !== args.delta ||
-        duplicate.deviceId !== args.deviceId ||
-        duplicate.clientCreatedAt !== args.clientCreatedAt
-      )
-        throw syncOperationMismatch()
+      const request = {
+        playerId: target._id,
+        actorUserId: user._id,
+        delta: args.delta,
+        deviceId: args.deviceId,
+        clientCreatedAt: args.clientCreatedAt,
+      }
+      const recorded = { ...duplicate, delta: requestedLifeDelta(duplicate) }
+      if (!isSameLifeChange(recorded, request)) throw syncOperationMismatch()
       return {
         operationId: duplicate.operationId,
         eventId: duplicate._id,
@@ -1898,12 +1906,11 @@ export const changeLife = mutation({
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
-    const delta = flooredLifeDelta(
+    const { delta, currentLife } = applyLifeChange(
       game.system ?? game.game ?? DEFAULT_DECK_GAME,
       target.currentLife,
       args.delta,
     )
-    const currentLife = target.currentLife + delta
     const eventId = await ctx.db.insert("gameEvents", {
       gameId: game._id,
       playerId: target._id,
@@ -2019,8 +2026,11 @@ export const tableAction = mutation({
     if (
       !actor ||
       actor.gameId !== game._id ||
-      (actor.userId === undefined ? game.hostUserId !== user._id : actor.userId !== user._id) ||
-      (actor.deviceId !== undefined && actor.deviceId !== args.deviceId)
+      !controlsSeat(actor, {
+        userId: user._id,
+        deviceId: args.deviceId,
+        isHost: game.hostUserId === user._id,
+      })
     )
       throw gameWriteError("seat_owner_required", "Seat-owner permission required")
 
@@ -2123,8 +2133,7 @@ async function commanderPlayerForWrite(
   if (
     !player ||
     player.gameId !== game._id ||
-    (player.userId === undefined ? game.hostUserId !== user._id : player.userId !== user._id) ||
-    (player.deviceId !== undefined && player.deviceId !== deviceId)
+    !controlsSeat(player, { userId: user._id, deviceId, isHost: game.hostUserId === user._id })
   )
     throw gameWriteError(
       "seat_owner_required",
