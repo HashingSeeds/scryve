@@ -11,7 +11,9 @@ import { BoardPressable } from "./BoardPressable"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   getDeltaFontSizeThatFits,
+  getDeltaTextWidth,
   LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_MAX_FONT_SCALE,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
 import { Text } from "./Text"
@@ -166,6 +168,25 @@ export function LifeControls({
           const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
           const showingDelta = direction * recentDelta > 0
           const feedback = showingDelta ? deltaText(recentDelta) : glyph
+          const deltaSize = showingDelta
+            ? getDeltaFontSizeThatFits({
+                text: feedback,
+                baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
+                run: sideways ? zonesSize.height : zonesSize.width,
+                inset: spacing.xs,
+                lifeFontSize,
+                lifeDigits,
+                fontScale,
+              })
+            : undefined
+          // why: a sideways glyph turns inside its unturned box, so a delta wider than the line height would reach past the card edge; move it inward by that overhang.
+          const lineHeight =
+            (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) *
+            Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+          const overhang =
+            sideways && deltaSize
+              ? Math.max((getDeltaTextWidth(feedback, deltaSize, fontScale) - lineHeight) / 2, 0)
+              : 0
           return (
             <BoardPressable
               key={delta}
@@ -220,18 +241,15 @@ export function LifeControls({
                 numberOfLines={1}
                 style={[
                   themed(compact ? $compactGlyph : $glyph),
-                  showingDelta && {
-                    fontSize: getDeltaFontSizeThatFits({
-                      text: feedback,
-                      baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
-                      run: sideways ? zonesSize.height : zonesSize.width,
-                      inset: spacing.xs,
-                      lifeFontSize,
-                      lifeDigits,
-                      fontScale,
-                    }),
-                  },
-                  contentRotationStyle,
+                  deltaSize !== undefined && { fontSize: deltaSize },
+                  overhang
+                    ? {
+                        transform: [
+                          { translateY: pinsToTopEdge ? overhang : -overhang },
+                          { rotate: `${contentRotation}deg` },
+                        ],
+                      }
+                    : contentRotationStyle,
                   { color: foreground },
                 ]}
               />

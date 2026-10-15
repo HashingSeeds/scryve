@@ -57,6 +57,27 @@ describe("LifeControls", () => {
     }
   })
 
+  it("keeps a wide sideways delta inside the card edge", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls
+          playerName="Ada"
+          system="ygo"
+          contentRotation={90}
+          recentDelta={{ get: () => 1000, subscribe: () => () => {} }}
+          lifeFontSize={52}
+          lifeDigits={4}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-control-zones"), "layout", {
+      nativeEvent: { layout: { width: 193, height: 388 } },
+    })
+    const { transform } = StyleSheet.flatten(view.getByText("+1000").props.style)
+    expect(transform).toEqual([{ translateY: expect.any(Number) }, { rotate: "90deg" }])
+  })
+
   it("uses Yu-Gi-Oh! Life Point increments", () => {
     const onChange = jest.fn()
     const onLongChange = jest.fn()

@@ -92,8 +92,8 @@ function pentagonSvg(): string {
 
 // Matches the app (LifeCard DELTA_VISIBLE_MS): how long the running change shows in a glyph.
 const DELTA_VISIBLE_MS = 1800
-// Like the app's getDeltaFontSizeThatFits: the smallest a running change shrinks, and the gap it
-// keeps from the total.
+// The smallest a running change shrinks, and the gap it keeps from the total. The demo's seats run
+// smaller than the app's, so its floor sits below the app's 12.
 const DELTA_FONT_MIN_PX = 9
 const DELTA_LIFE_GAP_PX = 4
 
