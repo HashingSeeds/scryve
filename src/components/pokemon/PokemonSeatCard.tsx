@@ -18,7 +18,10 @@ import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
+  benchChipMetrics,
+  type BenchChipMetrics,
   benchMenuClearance,
+  CHIP_BAR_HEIGHT,
   CONTENT_EDGES,
   contentInsetsFor,
   heroFontSize,
@@ -86,11 +89,9 @@ export interface PokemonSeatCardProps {
 const KNOCKOUT_TOAST_MS = 6_000
 const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
-const BENCH_HEIGHT = 56
 const CUTOUT_ENDS_ABOVE_INSET = 11
 const NAME_LINE_HEIGHT = 26
 const NAME_MAX_FONT_SCALE = 1.3
-const COMPACT_BENCH_HEIGHT = 44
 const PRIZE_PIP_ASPECT = 4 / 5
 const HERO_CAPTION_HEIGHT = 44
 const COMPACT_HERO_CAPTION_HEIGHT = 24
@@ -153,7 +154,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     : { width: cardSize.width, height: cardSize.height }
   const cramped = Boolean(compact) || (layer.height > 0 && layer.height < CRAMPED_CONTENT_HEIGHT)
   const padding = cramped ? spacing.xxs : spacing.xs
-  const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
+  const benchChip = benchChipMetrics(cramped, fontScale)
   const identityMetrics = seatIdentityMetrics(cramped)
   const benchSide = (inset: number, menu: number) =>
     Math.max(identityMetrics.edge, menu - inset) - padding
@@ -367,7 +368,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.top -
       insets.bottom -
       clearance.top -
-      benchHeight -
+      benchChip.height -
       prizeRowHeight -
       bottomRowLift -
       (cramped ? COMPACT_HERO_CAPTION_HEIGHT : HERO_CAPTION_HEIGHT),
@@ -436,7 +437,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           style={[
             themed($bench),
             {
-              height: benchHeight,
+              height: benchChip.height,
               marginLeft: benchSide(insets.left, clearance.left),
               marginRight: benchSide(insets.right, clearance.right),
             },
@@ -450,7 +451,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   key={pokemon.id}
                   pokemon={pokemon}
                   ink={ink}
-                  compact={cramped}
+                  chip={benchChip}
                   interactive={controlsLive}
                   promotes={!board.active}
                   focused={focused?.id === pokemon.id}
@@ -1024,7 +1025,7 @@ function useRecentDeltaValue(damage: number) {
 function BenchChip({
   pokemon,
   ink,
-  compact,
+  chip,
   interactive,
   promotes,
   focused,
@@ -1034,7 +1035,7 @@ function BenchChip({
 }: {
   pokemon: PokemonInPlay
   ink: string
-  compact?: boolean
+  chip: BenchChipMetrics
   interactive: boolean
   promotes: boolean
   focused: boolean
@@ -1090,13 +1091,20 @@ function BenchChip({
         pressed && { backgroundColor: overlayTint(ink, 0.14) },
       ]}
     >
-      <Text text={name} size="xxs" numberOfLines={1} style={[$chipName, { color: ink }, $dim85]} />
+      <Text
+        text={name}
+        size="xxs"
+        maxFontSizeMultiplier={chip.maxFontScale}
+        numberOfLines={1}
+        style={[$chipName, { lineHeight: chip.nameLine, color: ink }, $dim85]}
+      />
       <Text
         testID={`pokemon-bench-hp-${pokemon.id}`}
         text={String(remaining)}
         weight="bold"
+        maxFontSizeMultiplier={chip.maxFontScale}
         numberOfLines={1}
-        style={[themed(compact ? $compactChipHp : $chipHp), { color: ink }]}
+        style={[$chipHp, { fontSize: chip.hpSize, lineHeight: chip.hpLine, color: ink }]}
       />
       <View style={$chipPips} pointerEvents="none">
         {Array.from({ length: pokemon.prizes }, (_, index) => (
@@ -1137,7 +1145,13 @@ const $chipPips: ViewStyle = {
   gap: 2,
 }
 const $chipPip: ViewStyle = { width: 5, height: 7, borderRadius: 1, opacity: 0.8 }
-const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 3, opacity: 0.85 }
+const $chipBar: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  bottom: 0,
+  height: CHIP_BAR_HEIGHT,
+  opacity: 0.85,
+}
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeRow: ViewStyle = { flexDirection: "row" }
@@ -1185,16 +1199,7 @@ const $benchChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.xxxs,
   paddingHorizontal: spacing.xxs + 2,
 })
-const $chipHp: ThemedStyle<TextStyle> = () => ({
-  fontSize: 22,
-  lineHeight: 24,
-  fontVariant: ["tabular-nums"],
-})
-const $compactChipHp: ThemedStyle<TextStyle> = () => ({
-  fontSize: 17,
-  lineHeight: 19,
-  fontVariant: ["tabular-nums"],
-})
+const $chipHp: TextStyle = { fontVariant: ["tabular-nums"] }
 const $hero: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",

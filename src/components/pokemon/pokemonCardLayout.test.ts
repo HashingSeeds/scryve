@@ -1,5 +1,7 @@
 import {
+  benchChipMetrics,
   benchMenuClearance,
+  CHIP_BAR_HEIGHT,
   contentInsetsFor,
   heroFontSize,
   knockoutMessage,
@@ -8,6 +10,19 @@ import {
 } from "./pokemonCardLayout"
 
 describe("pokemonCardLayout", () => {
+  it("keeps a bench chip's HP number above its bar at every text size", () => {
+    const topPadding = 2
+    const focusedBorder = 2
+    for (const compact of [false, true])
+      for (const fontScale of [0.82, 1, 1.12, 1.3, 2]) {
+        const chip = benchChipMetrics(compact, fontScale)
+        const lines = (chip.nameLine + chip.hpLine) * Math.min(fontScale, chip.maxFontScale)
+        expect(focusedBorder + topPadding + lines).toBeLessThanOrEqual(
+          chip.height - focusedBorder - CHIP_BAR_HEIGHT,
+        )
+      }
+  })
+
   it("maps screen insets onto the turned seat so the bench stays on the inner edge", () => {
     const insets = { top: 50, right: 0, bottom: 34, left: 0 }
     expect(contentInsetsFor(0, insets)).toEqual(insets)
