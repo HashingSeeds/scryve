@@ -6,7 +6,7 @@ import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
-import { PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
+import { keypadBesideForm, PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
 
 const mockAction = jest.fn()
 const mockQuery = jest.fn()
@@ -62,6 +62,13 @@ function sheet(props: Partial<PokemonSheetProps> = {}) {
 
 const flush = () => act(() => Promise.resolve())
 const typeItIn = () => fireEvent.press(screen.getByTestId("pokemon-type-in-seat-1"))
+
+describe("keypadBesideForm", () => {
+  it("puts the keypad beside the form on a five-player sideways seat, too short to stack them", () => {
+    expect(keypadBesideForm({ width: 300, height: 194 }, 182, true)).toBe(true)
+    expect(keypadBesideForm({ width: 390, height: 400 }, 380)).toBe(false)
+  })
+})
 
 describe("PokemonSheet", () => {
   beforeEach(() => {
