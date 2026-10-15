@@ -17,8 +17,8 @@ A connected game whose authority is Convex, so players can be anywhere.
 _Avoid_: Convex game, online game
 
 **Nearby game**:
-A connected game whose authority is the host device, played by devices on the same network.
-_Avoid_: LAN game, local game, offline game
+A connected game whose authority is the host device, played by devices on the same network. Code may call its transport `lan`; players only ever see "Nearby".
+_Avoid_ (in copy): LAN game, local game, offline game
 
 **Authority**:
 The one place that decides a connected game's state: Convex or the host device.
