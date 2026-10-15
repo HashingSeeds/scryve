@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from "react-native"
+import { Linking, Pressable, StyleSheet } from "react-native"
 import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
@@ -14,9 +14,14 @@ import {
   createLocalGame,
   PLAYER_COLORS,
 } from "@/features/game/domain"
-import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  LOCAL_KEYS,
+  localGameRepository,
+} from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
+import { storage } from "@/utils/storage"
 
 import Index from "../src/app/index"
 
@@ -134,6 +139,30 @@ describe("shipping index route", () => {
       }
     },
   )
+
+  it("keeps a game saved by a newer version until the player replaces it", () => {
+    storage.set(
+      LOCAL_KEYS.active,
+      JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
+    )
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
+
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Update Scryve")).toBeTruthy()
+    expect(view.queryByTestId("game-board")).toBeNull()
+    fireEvent.press(view.getByRole("button", { name: "Open App Store" }))
+    expect(openURL).toHaveBeenCalledWith("https://apps.apple.com/app/id6798955244")
+    expect(localGameRepository.hasNewerActiveGame()).toBe(true)
+
+    fireEvent.press(view.getByRole("button", { name: "Replace with a new game" }))
+    expect(view.getByTestId("game-board")).toBeTruthy()
+    expect(localGameRepository.hasNewerActiveGame()).toBe(false)
+  })
 
   it("uses saved system defaults on the immediate play mat", () => {
     localGameRepository.saveSettings({

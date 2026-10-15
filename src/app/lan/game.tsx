@@ -16,7 +16,7 @@ export default function LanGameRoute() {
       publicId={runtime.projection.publicId}
       ownerId={lanSession.getState().seatKey ?? "nearby"}
       runtime={runtime}
-      moderation={false}
+      cloud={false}
       onGameEnded={backToLobby}
       onGameAbandoned={backToLobby}
       onBack={backToLobby}

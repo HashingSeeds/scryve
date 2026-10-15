@@ -32,6 +32,7 @@ import {
 } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
+import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
@@ -113,7 +114,7 @@ export function CurrentGameScreen({
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
-  const dice = useDice(runtime.game.players, runtime.game.id)
+  const dice = useDice(runtime.game.players, runtime.game.id, system)
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
   const markFirstPlayerUsed = runtime.markFirstPlayerUsed
@@ -123,8 +124,10 @@ export function CurrentGameScreen({
   const firstPlayerUsed = runtime.game.firstPlayerOffered === true
   const loserSeat = runtime.game.firstChooserSeat
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
-  const { ask: diceAsk, flip: diceFlip, rollOff: diceRollOff } = dice
+  const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
+  const { events } = runtime.game
+  const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events }), [events])
   const badge = useMemo<GameMenuBadge | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
@@ -148,7 +151,7 @@ export function CurrentGameScreen({
       }
     return {
       color: colors.gameMenu.actions.dice,
-      glyph: { tool: "d20" },
+      glyph: { tool: die },
       accessibilityLabel: "Roll for who goes first",
       onPress: offer(diceRollOff),
     }
@@ -156,6 +159,7 @@ export function CurrentGameScreen({
     colors.gameMenu.actions.dice,
     diceAsk,
     diceFlip,
+    die,
     diceRollOff,
     firstPlayerUsed,
     loser,
@@ -361,76 +365,78 @@ export function CurrentGameScreen({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <GameBoardStage
-        playerCount={playerCount}
-        layoutVariant={layoutVariant}
-        renderGrid={(boardOrientation) => (
-          <PlayerGrid
-            boardOrientation={boardOrientation}
-            players={runtime.game.players}
-            system={system}
-            lifeStep={runtime.game.lifeStep}
-            layoutVariant={layoutVariant}
-            disabled={menuOpen}
-            isPlayerEliminated={
-              commanderDamageEnabled
-                ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)
-                : undefined
-            }
-            commanderDamage={
-              commanderDamageEnabled
-                ? {
-                    incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
-                    armedPlayerId,
-                    inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
-                    onPressSword: toggleSword,
-                    onStage: assignCommanderDamage,
-                  }
-                : undefined
-            }
-            getSeatDeck={(player) => {
-              const account = runtime.game.account
-              return player.id === account?.mePlayerId && account.deckVersionId
-                ? { ownerId: account.ownerId, versionId: account.deckVersionId }
-                : undefined
-            }}
-            table={runtime.tableRuntime}
-            dice={dice.grid}
-            onChange={runtime.changeLife}
-          />
-        )}
-        menu={{
-          open: menuOpen,
-          actions: radialActions,
-          variant: menuButtonStyle,
-          seatColors,
-          exitAction,
-          ...(match
-            ? {
-                statusLine: {
-                  text: `${matchContextLabel(runtime.game)} · Best of ${match.bestOf}`,
-                  tone: "caughtUp" as const,
-                  onPress: openMatchScore,
-                },
+      <LifeLogContext.Provider value={lifeLog}>
+        <GameBoardStage
+          playerCount={playerCount}
+          layoutVariant={layoutVariant}
+          renderGrid={(boardOrientation) => (
+            <PlayerGrid
+              boardOrientation={boardOrientation}
+              players={runtime.game.players}
+              system={system}
+              lifeStep={runtime.game.lifeStep}
+              layoutVariant={layoutVariant}
+              disabled={menuOpen}
+              isPlayerEliminated={
+                commanderDamageEnabled
+                  ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)
+                  : undefined
               }
-            : {}),
-          heldAction: diceOpen ? "dice" : undefined,
-          badge,
-          onToggle: toggleMenu,
-          onClose: closeMenu,
-        }}
-        windowOverlay={
-          menuOpen && onDecks && onSettings && onAccount ? (
-            <FloatingAppNavigation
-              destinationLabel="Decks"
-              accountLabel={accountLabel}
-              onDestination={onDecks}
-              onSettings={onSettings}
-              onAccount={onAccount}
+              commanderDamage={
+                commanderDamageEnabled
+                  ? {
+                      incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
+                      armedPlayerId,
+                      inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
+                      onPressSword: toggleSword,
+                      onStage: assignCommanderDamage,
+                    }
+                  : undefined
+              }
+              getSeatDeck={(player) => {
+                const account = runtime.game.account
+                return player.id === account?.mePlayerId && account.deckVersionId
+                  ? { ownerId: account.ownerId, versionId: account.deckVersionId }
+                  : undefined
+              }}
+              table={runtime.tableRuntime}
+              dice={dice.grid}
+              onChange={runtime.changeLife}
             />
-          ) : null
-        }
-      />
+          )}
+          menu={{
+            open: menuOpen,
+            actions: radialActions,
+            variant: menuButtonStyle,
+            seatColors,
+            exitAction,
+            ...(match
+              ? {
+                  statusLine: {
+                    text: `${matchContextLabel(runtime.game)} · Best of ${match.bestOf}`,
+                    tone: "caughtUp" as const,
+                    onPress: openMatchScore,
+                  },
+                }
+              : {}),
+            heldAction: diceOpen ? "dice" : undefined,
+            badge,
+            onToggle: toggleMenu,
+            onClose: closeMenu,
+          }}
+          windowOverlay={
+            menuOpen && onDecks && onSettings && onAccount ? (
+              <FloatingAppNavigation
+                destinationLabel="Decks"
+                accountLabel={accountLabel}
+                onDestination={onDecks}
+                onSettings={onSettings}
+                onAccount={onAccount}
+              />
+            ) : null
+          }
+        />
+      </LifeLogContext.Provider>
       <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
 
       {layoutPickerOpen ? (

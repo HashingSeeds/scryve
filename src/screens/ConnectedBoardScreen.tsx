@@ -57,6 +57,7 @@ import {
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
+import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
@@ -245,7 +246,7 @@ type ConnectedBoardReadyProps = {
   view: ConnectedBoardReadyView
   controls: ConnectedBoardControls
   ownerId: string
-  moderation: boolean
+  cloud: boolean
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -314,8 +315,8 @@ interface ConnectedBoardRuntimeProps {
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
   ownerId: string
-  // why: report and block are Convex mutations on gamePlayers ids, which LAN seats don't have.
-  moderation?: boolean
+  // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
+  cloud?: boolean
 }
 
 function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
@@ -336,7 +337,7 @@ export function ConnectedBoardWithRuntime({
   onAccount,
   accountLabel,
   ownerId,
-  moderation = true,
+  cloud = true,
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
@@ -368,6 +369,11 @@ export function ConnectedBoardWithRuntime({
   )
   const lives = useStructurallyStable(
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
+  )
+  const { pending } = runtime
+  const lifeLog = useMemo(
+    (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
+    [cloud, publicId, pending],
   )
   const tableState = useStructurallyStable(runtime.table)
   const {
@@ -469,23 +475,25 @@ export function ConnectedBoardWithRuntime({
     <ConnectedLivesContext.Provider value={lives}>
       <ConnectedTableContext.Provider value={table}>
         <ConnectedUnsentContext.Provider value={runtime.pending.length}>
-          <ConnectedBoardReady
-            publicId={publicId}
-            initialInviteOpen={initialInviteOpen}
-            onBack={onBack}
-            onHistory={onHistory}
-            onDecks={onDecks}
-            onSettings={onSettings}
-            onAccount={onAccount}
-            accountLabel={accountLabel}
-            onGameEnded={onGameEnded}
-            onRematch={onRematch}
-            onGameAbandoned={onGameAbandoned}
-            view={view}
-            controls={controls}
-            ownerId={ownerId}
-            moderation={moderation}
-          />
+          <LifeLogContext.Provider value={lifeLog}>
+            <ConnectedBoardReady
+              publicId={publicId}
+              initialInviteOpen={initialInviteOpen}
+              onBack={onBack}
+              onHistory={onHistory}
+              onDecks={onDecks}
+              onSettings={onSettings}
+              onAccount={onAccount}
+              accountLabel={accountLabel}
+              onGameEnded={onGameEnded}
+              onRematch={onRematch}
+              onGameAbandoned={onGameAbandoned}
+              view={view}
+              controls={controls}
+              ownerId={ownerId}
+              cloud={cloud}
+            />
+          </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
       </ConnectedTableContext.Provider>
     </ConnectedLivesContext.Provider>
@@ -507,7 +515,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   view,
   controls,
   ownerId,
-  moderation,
+  cloud,
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -607,7 +615,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     [controlled, game.players],
   )
   // why: dice stay on this device; other seats never see these rolls.
-  const dice = useDice(players, publicId)
+  const dice = useDice(players, publicId, system)
   const diceTools = useMemo(
     () =>
       dice.tools.map((tool) => ({
@@ -738,7 +746,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         },
       },
       { kind: "dice", label: "Dice", tools: diceTools },
-      ...(moderation
+      ...(cloud
         ? [
             {
               kind: "players",
@@ -789,7 +797,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       diceTools,
       finishBlocker,
       layoutOptions.length,
-      moderation,
+      cloud,
       onHistory,
     ],
   )

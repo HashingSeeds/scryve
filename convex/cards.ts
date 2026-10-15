@@ -8,10 +8,15 @@ import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCa
 import { cardImageCandidates } from "./lib/cardImageFallback"
 import { limitCardLookup } from "./lib/deckRateLimits"
 import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
+import { CARD_CATALOGS } from "./lib/games/catalogs"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
-import { pokemonCardById, pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
-import { cardsByYgoIds, searchYgo } from "./lib/games/yugioh"
-import { assertGameSystem, requireReleasedCapability, type GameSystemId } from "./lib/integrations"
+import { pokemonCardByReference } from "./lib/games/pokemon"
+import {
+  assertGameSystem,
+  integrationFor,
+  requireReleasedCapability,
+  type GameSystemId,
+} from "./lib/integrations"
 import {
   type CardReference,
   fetchScryfall,
@@ -127,13 +132,10 @@ export const search = action({
       if (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage)))
         return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
       await limitCardLookup(ctx, args.deviceId)
-      const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
+      const provider = integrationFor(game).capabilities.cardCatalog.provider
       const startedAt = Date.now()
       try {
-        const result =
-          game === "ygo"
-            ? await searchYgo(ctx, query, includeImages)
-            : await searchPokemon(ctx, query, includeImages)
+        const result = await CARD_CATALOGS[game].search(ctx, query, includeImages)
         if (result.cards.length > 0)
           await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
         await recordHealth(ctx, {
@@ -263,13 +265,11 @@ export const byCatalogId = action({
         code: "card_not_found",
         message: "Rush Duel card is not in the catalog",
       })
-    const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
+    const provider = integrationFor(game).capabilities.cardCatalog.provider
     const startedAt = Date.now()
     const result = await (async () => {
       try {
-        return game === "ygo"
-          ? await cardsByYgoIds(ctx, [cardId], includeImages)
-          : await pokemonCardById(ctx, cardId, includeImages)
+        return await CARD_CATALOGS[game].byId(ctx, cardId, includeImages)
       } catch (error) {
         await recordHealth(ctx, {
           game,

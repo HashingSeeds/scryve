@@ -2,7 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Animated, { ReduceMotion, ZoomIn } from "react-native-reanimated"
 
-import type { DiceSeatChip } from "@/features/game/dice"
+import { toolLabel, type DiceSeatChip } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -47,7 +47,7 @@ export function DiceChips({
         const label =
           chip.kind === "first"
             ? `${playerName} goes first`
-            : `${playerName}, ${chip.roll.tool === "coin" ? "Coin" : "d20"}, ${chip.roll.value}`
+            : `${playerName}, ${toolLabel(chip.roll.tool)}, ${chip.roll.value}`
         return (
           <Animated.View key={key} entering={entering}>
             <BoardPressable

@@ -17,8 +17,8 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
-function Table({ gameId = "game-1" }: { gameId?: string }) {
-  const dice = useDice(players, gameId)
+function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?: string }) {
+  const dice = useDice(players, gameId, system)
   const { grid } = dice
   return (
     <>
@@ -72,10 +72,10 @@ function Table({ gameId = "game-1" }: { gameId?: string }) {
   )
 }
 
-function renderTable() {
+function renderTable(system?: string) {
   const view = render(
     <ThemeProvider initialContext="dark">
-      <Table />
+      <Table system={system} />
     </ThemeProvider>,
   )
   return Object.assign(view, {
@@ -112,6 +112,17 @@ describe("useDice", () => {
 
     fireEvent.press(view.getByTestId("dice-d20"))
     expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(false)
+  })
+
+  it("offers Yu-Gi-Oh! a d6 instead of a d20", () => {
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable("ygo")
+    expect(view.queryByTestId("dice-d20")).toBeNull()
+
+    fireEvent.press(view.getByTestId("dice-d6"))
+    fireEvent.press(view.getByTestId("dice-seat-2"))
+    expect(view.getByTestId("dice-chip-2-d6")).toHaveTextContent("4")
+    expect(view.getByTestId("dice-seat-2").props.accessibilityLabel).toBe("Roll a d6 for Grace")
   })
 
   it("shrinks a roll into a chip after a beat, which the next roll replaces and close clears", () => {
@@ -222,6 +233,27 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-chip-3-first")).toBeTruthy()
     expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
     expect(announce).toHaveBeenLastCalledWith("Katherine goes first")
+  })
+
+  it("shows the Yu-Gi-Oh! roll, then asks its winner to go first or second", () => {
+    jest.useFakeTimers()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
+    const rolls = [0.1, 0.9, 0.2]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const view = renderTable("ygo")
+
+    fireEvent.press(view.getByTestId("dice-rolloff"))
+    expect(announce).toHaveBeenLastCalledWith("Grace rolled 6. Go first or second")
+    act(() => jest.advanceTimersByTime(700))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/d66Won the roll$/)
+
+    act(() => jest.advanceTimersByTime(1800))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the rollGoes first\?/)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
+
+    fireEvent.press(view.getByTestId("dice-go-first"))
+    expect(announce).toHaveBeenLastCalledWith("Grace goes first")
   })
 
   it("drops a pending settle when the game changes, so the next game's dice stay untouched", () => {

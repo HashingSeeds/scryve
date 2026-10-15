@@ -1,4 +1,5 @@
 import { readPublicCloudConfig } from "@/features/auth/config"
+import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import {
   DurableOutbox,
   type DurableEnqueueResult,
@@ -376,7 +377,7 @@ function toResumableEntry(projection: ConnectedProjection): ResumableGame | null
     playerCount: projection.playerCount,
     ruleset: projection.ruleset,
     updatedAt: projection.serverUpdatedAt,
-    ...(projection.system ? { system: projection.system } : {}),
+    system: projection.system ?? NO_PLAY_SYSTEM,
     ...(projection.format ? { format: projection.format } : {}),
     ...(projection.deckRequired ? { deckRequired: true } : {}),
     ...(projection.startingLife ? { startingLife: projection.startingLife } : {}),
@@ -454,7 +455,7 @@ export class ConnectedGameRepository {
   saveProjection(projection: ConnectedProjection): void {
     this.storage.set(
       CONNECTED_KEYS.projection(projection.publicId, this.ownerId),
-      JSON.stringify(projection),
+      JSON.stringify({ ...projection, system: projection.system ?? NO_PLAY_SYSTEM }),
     )
   }
 

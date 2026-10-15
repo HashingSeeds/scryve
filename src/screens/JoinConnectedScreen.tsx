@@ -20,6 +20,7 @@ import { connectedProfileName } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { hasLocalGameStarted } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -30,6 +31,9 @@ import { emitTelemetry } from "@/utils/telemetry"
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { api } from "../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
+
+// why: the server refuses games in a system this build cannot play, rather than letting it render as another one.
+const PLAYABLE_SYSTEMS = [...PLAY_SYSTEM_IDS]
 
 const INVALID_INVITE = "Invite is invalid, expired, or revoked"
 
@@ -130,7 +134,11 @@ export function JoinConnectedScreen({
         return
       }
       failureReason = "request"
-      const lookup = await claimableSeats({ token, manualCode: manualCode ?? undefined })
+      const lookup = await claimableSeats({
+        token,
+        manualCode: manualCode ?? undefined,
+        systems: PLAYABLE_SYSTEMS,
+      })
       if ("invalid" in lookup) throw new Error(INVALID_INVITE)
       const seats = lookup.seats
       if (seats.length > 1 && seat === undefined) {
@@ -149,6 +157,7 @@ export function JoinConnectedScreen({
         displayName: profileName,
         color: PLAYER_COLOR_CHOICES[0],
         deviceId,
+        systems: PLAYABLE_SYSTEMS,
       })
       if (!result) throw new Error(INVALID_INVITE)
       requestSucceeded = true

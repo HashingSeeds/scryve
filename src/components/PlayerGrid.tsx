@@ -367,6 +367,7 @@ export function PlayerGrid({
                   style={themed($cell)}
                 >
                   <LifeCard
+                    playerId={player.id}
                     playerName={player.name}
                     seatNumber={seatNumber}
                     shape={player.shape}

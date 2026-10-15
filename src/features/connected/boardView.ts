@@ -5,6 +5,7 @@ import type {
   ConnectedPlayerProjection,
   ConnectedProjection,
 } from "./model"
+import { isCounterOut } from "../../../convex/lib/systems"
 import { isOutByTableCounters } from "../../../convex/lib/table"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
@@ -45,13 +46,15 @@ export function connectedLives(
 export function connectedLastStanding(projection: ConnectedDisplayProjection): string | undefined {
   const { players, system, format, table } = projection
   const rules = playTableRules(system, format)
-  const countsDown = playSystemRules(system).counter.direction === "down"
+  const { counter } = playSystemRules(system)
   const isOut = (player: ConnectedPlayerProjection) =>
-    countsDown
-      ? players.some((other) => other.playerId !== player.playerId && other.currentLife <= 0)
-      : player.currentLife <= 0 ||
-        player.eliminatedByCommanderDamage === true ||
-        isOutByTableCounters(table, player.playerId, rules)
+    isCounterOut(
+      counter,
+      player.currentLife,
+      players.filter((other) => other !== player).map((other) => other.currentLife),
+    ) ||
+    player.eliminatedByCommanderDamage === true ||
+    isOutByTableCounters(table, player.playerId, rules)
   const standing = players.filter((player) => !isOut(player))
   return standing.length === 1 ? standing[0].playerId : undefined
 }

@@ -2,6 +2,7 @@ import { deckFormatLabel, deckFormats } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
   isSystemId,
+  lowerLeads,
   NO_TABLE,
   SYSTEM_IDS,
   SYSTEMS,
@@ -50,7 +51,7 @@ const GENERIC_COUNTER: CounterRules = {
   scrubStep: 1,
   scrubSteps: 20,
   longPressStep: undefined,
-  direction: "open",
+  goal: { kind: "survive" },
   maxStartingValue: 999,
 }
 
@@ -68,6 +69,12 @@ export const isPlaySystemId = isSystemId
 
 export function playSystemId(value: unknown): PlaySystemId {
   return isPlaySystemId(value) ? value : "mtg"
+}
+
+/** why: games saved before `system` existed are Magic, but a system this build doesn't know must show as No system rather than pass for Magic. */
+export function storedPlaySystem(value: unknown): PlaySystemId | undefined {
+  if (value === undefined) return "mtg"
+  return isPlaySystemId(value) ? value : undefined
 }
 
 export function playSystemRules(value?: unknown) {
@@ -129,7 +136,7 @@ export function counterDeltaFromStartLabel(
   startingValue: number,
 ): string {
   const delta = current - startingValue
-  if (playSystemRules(value).counter.direction === "down") {
+  if (lowerLeads(playSystemRules(value).counter)) {
     const taken = startingValue - current
     return taken === 0 ? "none taken" : `${taken} taken`
   }

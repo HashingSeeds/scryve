@@ -1,18 +1,21 @@
 import type { GamePlayer, PlayerId } from "./types"
 
-export type DiceTool = "d20" | "coin"
+export type Die = "d6" | "d20"
+export type DiceTool = Die | "coin"
 export type CoinFace = "Heads" | "Tails"
-export type DiceRoll = { tool: "d20"; value: number } | { tool: "coin"; value: CoinFace }
+export type DiceRoll = { tool: Die; value: number } | { tool: "coin"; value: CoinFace }
 
 export type DicePhase = "bloom" | "chip"
 
 export type SeatResult = { roll: DiceRoll; phase: DicePhase; attempt: number }
 
-export type ChoiceReason = "flip" | "loss"
+export type ChoiceReason = "flip" | "roll" | "loss"
 
 export type FirstPlayer =
   | {
       kind: "rolloff"
+      die: Die
+      winnerChooses: boolean
       rolls: Partial<Record<PlayerId, number>>
       attempts: Partial<Record<PlayerId, number>>
       pool: PlayerId[]
@@ -29,7 +32,13 @@ export interface DiceState {
 
 export type DiceSeatView =
   | { kind: "roll"; roll: DiceRoll; attempt: number }
-  | { kind: "rolloff"; value: number; attempt: number; status: "won" | "tied" | "out" | "lost" }
+  | {
+      kind: "rolloff"
+      die: Die
+      value: number
+      attempt: number
+      status: "won" | "chooses" | "tied" | "out" | "lost"
+    }
   | { kind: "choice"; reason: ChoiceReason }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
@@ -37,25 +46,35 @@ export type DiceSeatView =
 export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" }
 
 export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
-const D20_SIDES = 20
+export const DIE_SIDES: Record<Die, number> = { d6: 6, d20: 20 }
 const COIN_FACES: readonly CoinFace[] = ["Heads", "Tails"]
 
 export function randomIndex(count: number, random = Math.random) {
   return Math.floor(random() * count)
 }
 
-export function rollD20(random = Math.random) {
-  return randomIndex(D20_SIDES, random) + 1
+export type DiceRules = { die: Die; winnerChooses: boolean }
+
+const DEFAULT_DICE: DiceRules = { die: "d20", winnerChooses: false }
+// why: Yu-Gi-Oh! rules use a six-sided die, and the roll's winner picks whether to go first or second.
+const YGO_DICE: DiceRules = { die: "d6", winnerChooses: true }
+
+export function systemDice(system: unknown): DiceRules {
+  return system === "ygo" ? YGO_DICE : DEFAULT_DICE
+}
+
+function rollDie(die: Die, random: () => number) {
+  return randomIndex(DIE_SIDES[die], random) + 1
 }
 
 export function roll(tool: DiceTool, random = Math.random): DiceRoll {
-  return tool === "d20"
-    ? { tool, value: rollD20(random) }
-    : { tool, value: COIN_FACES[randomIndex(COIN_FACES.length, random)] }
+  return tool === "coin"
+    ? { tool, value: COIN_FACES[randomIndex(COIN_FACES.length, random)] }
+    : { tool, value: rollDie(tool, random) }
 }
 
 export function toolLabel(tool: DiceTool) {
-  return tool === "d20" ? "d20" : "Coin"
+  return tool === "coin" ? "Coin" : tool
 }
 
 export function armTool(state: DiceState, tool: DiceTool): DiceState {
@@ -93,20 +112,28 @@ export function clearResult(state: DiceState, seatId: PlayerId): DiceState {
 export function startRollOff(
   state: DiceState,
   seatIds: readonly PlayerId[],
+  rules: DiceRules,
   random = Math.random,
 ): DiceState {
-  return { ...state, first: resolveRollOff({}, {}, seatIds, random) }
+  return { ...state, first: resolveRollOff(rules, {}, {}, seatIds, random) }
 }
 
 export function rerollTies(state: DiceState, random = Math.random): DiceState {
   if (state.first?.kind !== "rolloff" || state.first.pool.length < 2) return state
   return {
     ...state,
-    first: resolveRollOff(state.first.rolls, state.first.attempts, state.first.pool, random),
+    first: resolveRollOff(
+      state.first,
+      state.first.rolls,
+      state.first.attempts,
+      state.first.pool,
+      random,
+    ),
   }
 }
 
 function resolveRollOff(
+  { die, winnerChooses }: DiceRules,
   previous: Partial<Record<PlayerId, number>>,
   previousAttempts: Partial<Record<PlayerId, number>>,
   pool: readonly PlayerId[],
@@ -115,12 +142,14 @@ function resolveRollOff(
   const rolls = { ...previous }
   const attempts = { ...previousAttempts }
   for (const seatId of pool) {
-    rolls[seatId] = rollD20(random)
+    rolls[seatId] = rollDie(die, random)
     attempts[seatId] = (attempts[seatId] ?? 0) + 1
   }
   const high = Math.max(...pool.map((seatId) => rolls[seatId] ?? 0))
   return {
     kind: "rolloff",
+    die,
+    winnerChooses,
     rolls,
     attempts,
     pool: pool.filter((seatId) => rolls[seatId] === high),
@@ -135,7 +164,10 @@ export function rollOffAnnouncement(
   if (first?.kind !== "rolloff") return undefined
   const name = (seatId: PlayerId) => players.find(({ id }) => id === seatId)?.name ?? "Player"
   const high = first.rolls[first.pool[0]]
-  if (first.pool.length === 1) return `${name(first.pool[0])} rolled ${high}, goes first`
+  if (first.pool.length === 1)
+    return first.winnerChooses
+      ? `${name(first.pool[0])} rolled ${high}. Go first or second`
+      : `${name(first.pool[0])} rolled ${high}, goes first`
   return `Tie at ${high}, ${first.pool.map(name).join(" and ")}. Roll again`
 }
 
@@ -156,7 +188,9 @@ export function settleFirst(state: DiceState): DiceState {
   if (!first || first.kind === "choice" || first.phase === "chip") return state
   if (first.kind === "rolloff") {
     if (first.pool.length !== 1) return state
-    return { ...state, first: { kind: "picked", seatId: first.pool[0], phase: "chip" } }
+    return first.winnerChooses
+      ? offerChoice(state, first.pool[0], "roll")
+      : { ...state, first: { kind: "picked", seatId: first.pool[0], phase: "chip" } }
   }
   return { ...state, first: { ...first, phase: "chip" } }
 }
@@ -168,7 +202,8 @@ export function clearFirst(state: DiceState): DiceState {
 export function firstPlayerSeat(state: DiceState): PlayerId | undefined {
   const { first } = state
   if (first?.kind === "picked") return first.seatId
-  if (first?.kind === "rolloff" && first.pool.length === 1) return first.pool[0]
+  if (first?.kind === "rolloff" && first.pool.length === 1 && !first.winnerChooses)
+    return first.pool[0]
   return undefined
 }
 
@@ -189,9 +224,18 @@ export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView |
       const decided = first.pool.length === 1
       return {
         kind: "rolloff",
+        die: first.die,
         value,
         attempt: first.attempts[seatId] ?? 1,
-        status: decided ? (inPool ? "won" : "lost") : inPool ? "tied" : "out",
+        status: decided
+          ? inPool
+            ? first.winnerChooses
+              ? "chooses"
+              : "won"
+            : "lost"
+          : inPool
+            ? "tied"
+            : "out",
       }
     }
   }

@@ -89,6 +89,38 @@ describe("Convex connected-game authorization", () => {
     ).rejects.toThrow("Lobby is full")
   })
 
+  it("keeps clients out of games in a system they cannot play", async () => {
+    const t = makeConvexTest()
+    const { created } = await lobby(t)
+    await t.run(async (ctx) => {
+      const game = await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", created.publicId))
+        .unique()
+      await ctx.db.patch(game!._id, { system: "lorcana" })
+    })
+    const joiner = await synced(t, "joiner", "Joiner")
+    const updateRequired = { data: { code: "update_required" } }
+    await expect(joiner.mutation(api.games.claimableSeats, { token })).rejects.toMatchObject(
+      updateRequired,
+    )
+    await expect(
+      joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" }),
+    ).rejects.toMatchObject(updateRequired)
+    const systems = ["mtg", "ygo", "pokemon", "lorcana"]
+    await expect(
+      joiner.mutation(api.games.claimableSeats, { token, systems }),
+    ).resolves.toMatchObject({ seats: [] })
+    await expect(
+      joiner.mutation(api.games.claimSeat, {
+        token,
+        displayName: "Joiner",
+        color: "#2563EB",
+        systems,
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+  })
+
   it("prevents a host from accumulating simultaneous lobbies", async () => {
     const t = makeConvexTest()
     const { host } = await lobby(t)
@@ -1421,6 +1453,26 @@ function commanderArgs(
 }
 
 describe("connected commander damage claims", () => {
+  it("refuses to treat a commander claim as a replayed life change", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const operationId = "commander-or-life-0001"
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, 7),
+    )
+    await t.run((ctx) =>
+      ctx.db.patch(game.joinerPlayerId, { userId: undefined, deviceId: undefined }),
+    )
+
+    await expect(
+      game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.joinerPlayerId, operationId, 7),
+      ),
+    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+  })
+
   it("projects defender-only pending claims and confirms them atomically", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

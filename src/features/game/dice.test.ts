@@ -15,6 +15,7 @@ import {
   settleFirst,
   settleResult,
   startRollOff,
+  systemDice,
 } from "./dice"
 import { asPlayerId } from "./domain"
 
@@ -25,6 +26,9 @@ const players = [
   { id: kat, name: "Katherine" },
 ]
 
+const magic = systemDice("mtg")
+const ygo = systemDice("ygo")
+
 function d20s(...values: number[]) {
   const queue = values.map((value) => (value - 1) / 20)
   return () => queue.shift() ?? 0
@@ -32,9 +36,10 @@ function d20s(...values: number[]) {
 
 describe("dice roll-off", () => {
   it("hands the highest roll the first turn, blooming on every seat and settling into one chip", () => {
-    const state = startRollOff(EMPTY_DICE, [ada, grace, kat], d20s(7, 18, 3))
+    const state = startRollOff(EMPTY_DICE, [ada, grace, kat], magic, d20s(7, 18, 3))
     expect(diceSeatView(state, grace)).toEqual({
       kind: "rolloff",
+      die: "d20",
       value: 18,
       attempt: 1,
       status: "won",
@@ -51,7 +56,7 @@ describe("dice roll-off", () => {
   })
 
   it("re-rolls only the tied seats and leaves the rest out", () => {
-    const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], d20s(18, 18, 3))
+    const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], magic, d20s(18, 18, 3))
     expect(diceSeatView(tied, ada)).toMatchObject({ value: 18, attempt: 1, status: "tied" })
     expect(diceSeatView(tied, kat)).toMatchObject({ value: 3, attempt: 1, status: "out" })
     expect(rollOffAnnouncement(tied.first, players)).toBe("Tie at 18, Ada and Grace. Roll again")
@@ -63,6 +68,27 @@ describe("dice roll-off", () => {
     expect(diceSeatView(settled, grace)).toMatchObject({ value: 20, attempt: 2, status: "won" })
     expect(diceSeatView(settled, kat)).toMatchObject({ value: 3, attempt: 1, status: "lost" })
     expect(rerollTies(settled)).toBe(settled)
+  })
+
+  it("rolls Yu-Gi-Oh!'s d6 for the roll-off and its tie rerolls", () => {
+    expect(magic.die).toBe("d20")
+    const top = () => 0.99
+    const tied = startRollOff(EMPTY_DICE, [ada, grace], ygo, top)
+    expect(diceSeatView(tied, ada)).toMatchObject({ die: "d6", value: 6, status: "tied" })
+    expect(diceSeatView(rerollTies(tied, top), ada)).toMatchObject({ die: "d6", value: 6 })
+  })
+
+  it("lets the Yu-Gi-Oh! roll winner choose first or second instead of crowning them", () => {
+    const rolls = [0.1, 0.9]
+    const state = startRollOff(EMPTY_DICE, [ada, grace], ygo, () => rolls.shift() ?? 0)
+    expect(diceSeatView(state, grace)).toMatchObject({ value: 6, status: "chooses" })
+    expect(diceSeatView(state, ada)).toMatchObject({ value: 1, status: "lost" })
+    expect(rollOffAnnouncement(state.first, players)).toBe("Grace rolled 6. Go first or second")
+    expect(firstPlayerSeat(state)).toBeUndefined()
+
+    const asked = settleFirst(state)
+    expect(diceSeatView(asked, grace)).toEqual({ kind: "choice", reason: "roll" })
+    expect(diceSeatView(asked, ada)).toEqual({ kind: "waiting" })
   })
 })
 

@@ -1,4 +1,13 @@
-import { formatDefinition, hasCommandZone, SYSTEM_IDS, SYSTEMS, tableRules } from "."
+import {
+  counterStanding,
+  formatDefinition,
+  hasCommandZone,
+  isCounterOut,
+  SYSTEM_IDS,
+  SYSTEMS,
+  tableRules,
+  type CounterDefinition,
+} from "."
 
 describe("system definitions", () => {
   it("plays Brawl from the command zone without the 21 commander damage loss", () => {
@@ -19,10 +28,20 @@ describe("system definitions", () => {
     expect(formats).toEqual(["commander"])
   })
 
-  it("counts Pokémon prizes down and other systems open", () => {
-    expect(SYSTEMS.pokemon.counter.direction).toBe("down")
-    expect(SYSTEMS.mtg.counter.direction).toBe("open")
-    expect(SYSTEMS.ygo.counter.direction).toBe("open")
+  it("knocks a survivor out at 0 and ends a race when anyone reaches the goal", () => {
+    const life = SYSTEMS.mtg.counter
+    expect(isCounterOut(life, 0, [20])).toBe(true)
+    expect(isCounterOut(life, 1, [-3])).toBe(false)
+
+    const prizes = SYSTEMS.pokemon.counter
+    expect(isCounterOut(prizes, 4, [0])).toBe(true)
+    expect(isCounterOut(prizes, 0, [1])).toBe(false)
+
+    const lore: CounterDefinition = { ...life, defaultValue: 0, goal: { kind: "race", to: 20 } }
+    expect(isCounterOut(lore, 0, [21])).toBe(true)
+    expect(isCounterOut(lore, 20, [19])).toBe(false)
+    expect(counterStanding(lore, 12)).toBeGreaterThan(counterStanding(lore, 3))
+    expect(counterStanding(prizes, 1)).toBeGreaterThan(counterStanding(prizes, 3))
   })
 
   it("offers commander tax only where a command zone exists, and a Pokémon board only in Pokémon", () => {
