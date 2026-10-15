@@ -37,15 +37,6 @@ function sampleValues(system: PlaySystemId, count: number): readonly number[] {
 const DEMOS = ["commander", "pokemon"] as const
 type Demo = (typeof DEMOS)[number]
 
-// The Pokémon demo's two-player table.
-const POKEMON_TOUR_SETUP: DemoGameSetup = {
-  system: "pokemon",
-  startingLife: startingLife("pokemon"),
-  names: NAMES.slice(0, 2),
-  values: SAMPLE_PRIZES.slice(0, 2),
-  layout: "auto",
-}
-
 function commanderSetup(count: number): DemoGameSetup {
   return {
     system: "mtg",
@@ -130,19 +121,17 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   game.subscribe((event) => event.type === "reset" && syncPickers())
   syncPickers()
 
-  // The details step plays one demo at a time on the shared game: Commander damage, or a
-  // Pokémon turn on a fresh two-player table. It opens on the visitor's own game when that game
-  // has a demo, and the step's picker switches between them. It borrows the visitor's table and
-  // gives it back when the step leaves the screen.
+  // The details step plays one demo at a time on the visitor's own table: Commander damage, or a
+  // Pokémon turn. Seats and layout stay theirs; only the game changes when the demo needs it. It
+  // opens on the visitor's game when that game has a demo, and the step's picker switches between
+  // them. Each switch or replay starts again from the visitor's table, and the step gives that
+  // table back when it leaves the screen.
   const demos: Record<Demo, { start: () => void; stop: () => void }> = {
     commander: createCommanderDemo(board, game, {
       damage: SAMPLE_COMMANDER_DAMAGE,
       reducedMotion: prefersReducedMotion,
     }),
-    pokemon: createPokemonDemo(board, game, {
-      setup: POKEMON_TOUR_SETUP,
-      reducedMotion: prefersReducedMotion,
-    }),
+    pokemon: createPokemonDemo(board, game, { reducedMotion: prefersReducedMotion }),
   }
   const step = query<HTMLElement>(".steps [data-step='details']")
   const demoPicker = query<HTMLElement>("[data-pick='demo']", step)
@@ -153,6 +142,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
 
   function show(demo: Demo) {
     if (showing) demos[showing].stop()
+    if (showing && borrowed) game.restore(borrowed)
     showing = demo
     press(demoPicker, demo)
     step.querySelectorAll<HTMLElement>("[data-demo-copy]").forEach((copy) => {
