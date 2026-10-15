@@ -21,12 +21,18 @@ import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { limitGameRate } from "./lib/gameRateLimits"
 import {
   applyLifeChange,
-  COMMANDER_LETHAL_DAMAGE,
+  commanderClaimOutcome,
+  confirmCommanderClaim,
   controlsSeat,
   isCommanderDamageDelta,
+  isCommanderFormat,
+  isCommanderLethal,
   isLifeDelta,
+  isSameCommanderClaim,
+  isSameCommanderResolution,
   isSameLifeChange,
   MAX_COMMANDER_DAMAGE,
+  MAX_PENDING_COMMANDER_CLAIMS,
 } from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
@@ -77,7 +83,6 @@ import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
-const MAX_PENDING_COMMANDER_CLAIMS = 100
 const NO_GAME_SYSTEM = "none"
 
 async function findGameByPublicId(ctx: QueryCtx, publicId: string) {
@@ -131,9 +136,9 @@ function assertCommanderDelta(delta: number) {
 }
 
 function isCommanderGame(game: Doc<"games">) {
-  return (
-    (game.system ?? game.game ?? DEFAULT_DECK_GAME) === "mtg" &&
-    (game.format ?? game.ruleset) === "commander"
+  return isCommanderFormat(
+    game.system ?? game.game ?? DEFAULT_DECK_GAME,
+    game.format ?? game.ruleset,
   )
 }
 
@@ -399,7 +404,7 @@ async function commanderDamageProjection(
   )
   const eliminatedPlayerIds = new Set<Id<"gamePlayers">>()
   for (const total of totals) {
-    if (total.total >= COMMANDER_LETHAL_DAMAGE) eliminatedPlayerIds.add(total.toPlayerId)
+    if (isCommanderLethal(total.total)) eliminatedPlayerIds.add(total.toPlayerId)
   }
   return {
     totals: totals.map((total) => ({
@@ -2142,29 +2147,6 @@ async function commanderPlayerForWrite(
   return player
 }
 
-function commanderClaimMatches(
-  claim: Doc<"gameCommanderClaims">,
-  args: {
-    operationId: string
-    fromPlayerId: Id<"gamePlayers">
-    toPlayerId: Id<"gamePlayers">
-    delta: number
-    deviceId: string
-    clientCreatedAt: number
-  },
-  userId: Id<"users">,
-) {
-  return (
-    claim.operationId === args.operationId &&
-    claim.fromPlayerId === args.fromPlayerId &&
-    claim.toPlayerId === args.toPlayerId &&
-    claim.delta === args.delta &&
-    claim.actorUserId === userId &&
-    claim.deviceId === args.deviceId &&
-    claim.clientCreatedAt === args.clientCreatedAt
-  )
-}
-
 export const submitCommanderDamage = mutation({
   args: {
     publicId: v.string(),
@@ -2206,7 +2188,8 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     if (existing) {
-      if (!commanderClaimMatches(existing, args, user._id)) throw syncOperationMismatch()
+      if (!isSameCommanderClaim(existing, { ...args, actorUserId: user._id }))
+        throw syncOperationMismatch()
       return {
         operationId: existing.operationId,
         claimId: existing._id,
@@ -2229,17 +2212,19 @@ export const submitCommanderDamage = mutation({
         q.eq("gameId", game._id).eq("fromPlayerId", source._id).eq("toPlayerId", target._id),
       )
       .unique()
-    const nextTotal = (pair?.total ?? 0) + args.delta
     const pending = await ctx.db
       .query("gameCommanderClaims")
       .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
       .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
-    // why: a claim that can never land is stored as declined instead of thrown, so every installed outbox sees a success and stops retrying it.
     const declined =
-      nextTotal < 0 ||
-      nextTotal > MAX_COMMANDER_DAMAGE ||
-      pending.length >= MAX_PENDING_COMMANDER_CLAIMS ||
-      pending.some((claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id)
+      commanderClaimOutcome({
+        total: pair?.total ?? 0,
+        delta: args.delta,
+        pendingClaims: pending.length,
+        pairHasPendingClaim: pending.some(
+          (claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id,
+        ),
+      }) === "declined"
     const declineOperationId = `${args.operationId}_declined`
     if (
       declined &&
@@ -2383,13 +2368,14 @@ async function resolveCommanderClaim(
       const event = await commanderResolutionEvent(ctx, claim)
       if (
         !event ||
-        event.kind !== `commanderDamage.${claim.status}` ||
-        event.claimOperationId !== claim.operationId ||
-        event.playerId !== claim.toPlayerId ||
-        event.toPlayerId !== claim.toPlayerId ||
-        event.actorUserId !== user._id ||
-        event.deviceId !== args.deviceId ||
-        event.clientCreatedAt !== args.clientCreatedAt
+        !isSameCommanderResolution(event, {
+          kind: `commanderDamage.${claim.status}`,
+          claimOperationId: claim.operationId,
+          defenderPlayerId: claim.toPlayerId,
+          actorUserId: user._id,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        })
       )
         throw syncOperationMismatch()
       if (!claim.resolutionOperationId)
@@ -2436,9 +2422,13 @@ async function resolveCommanderClaim(
           .eq("toPlayerId", claim.toPlayerId),
       )
       .unique()
-    const total = (pair?.total ?? 0) + claim.delta
-    if (total < 0 || total > MAX_COMMANDER_DAMAGE)
-      throw new Error("Commander damage total must remain between 0 and 99")
+    const confirmed = confirmCommanderClaim({
+      total: pair?.total ?? 0,
+      life: target.currentLife,
+      delta: claim.delta,
+    })
+    if (!confirmed) throw new Error("Commander damage total must remain between 0 and 99")
+    const { total, currentLife } = confirmed
     await ctx.db.insert("gameEvents", {
       gameId: game._id,
       playerId: target._id,
@@ -2463,7 +2453,7 @@ async function resolveCommanderClaim(
         updatedAt: now,
       })
     await ctx.db.patch(target._id, {
-      currentLife: target.currentLife - claim.delta,
+      currentLife,
       eventCount: (target.eventCount ?? 0) + 1,
       lastEventAt: now,
     })
@@ -2478,7 +2468,7 @@ async function resolveCommanderClaim(
       claimId: claim._id,
       status: "confirmed" as const,
       total,
-      currentLife: target.currentLife - claim.delta,
+      currentLife,
       deduplicated: false,
     }
   }

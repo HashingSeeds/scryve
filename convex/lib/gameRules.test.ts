@@ -1,4 +1,11 @@
-import { applyLifeChange, controlsSeat, isSameLifeChange } from "./gameRules"
+import {
+  applyLifeChange,
+  commanderClaimOutcome,
+  confirmCommanderClaim,
+  controlsSeat,
+  isSameLifeChange,
+  MAX_PENDING_COMMANDER_CLAIMS,
+} from "./gameRules"
 
 const player = { userId: "player", deviceId: "phone", isHost: false }
 const host = { userId: "host", deviceId: "tablet", isHost: true }
@@ -31,5 +38,25 @@ describe("game rules", () => {
   it("floors life at zero only for systems that stop there", () => {
     expect(applyLifeChange("ygo", 500, -800)).toEqual({ delta: -500, currentLife: 0 })
     expect(applyLifeChange("mtg", 5, -8)).toEqual({ delta: -8, currentLife: -3 })
+  })
+
+  it("declines a commander claim on arrival when it could never be confirmed", () => {
+    const open = { total: 10, delta: 5, pendingClaims: 0, pairHasPendingClaim: false }
+
+    expect(commanderClaimOutcome(open)).toBe("pending")
+    expect(commanderClaimOutcome({ ...open, delta: 90 })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, delta: -11 })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, pairHasPendingClaim: true })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, pendingClaims: MAX_PENDING_COMMANDER_CLAIMS })).toBe(
+      "declined",
+    )
+  })
+
+  it("moves life one for one when a claim is confirmed, and refuses totals outside 0 to 99", () => {
+    expect(confirmCommanderClaim({ total: 18, life: 4, delta: 7 })).toEqual({
+      total: 25,
+      currentLife: -3,
+    })
+    expect(confirmCommanderClaim({ total: 95, life: 40, delta: 5 })).toBeNull()
   })
 })

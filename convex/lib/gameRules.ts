@@ -55,3 +55,79 @@ export function applyLifeChange(system: unknown, currentLife: number, requestedD
   const delta = flooredLifeDelta(system, currentLife, requestedDelta)
   return { delta, currentLife: currentLife + delta }
 }
+
+export const MAX_PENDING_COMMANDER_CLAIMS = 100
+
+export const isCommanderFormat = (system: unknown, format: unknown) =>
+  system === "mtg" && format === "commander"
+
+export const isCommanderLethal = (total: number) => total >= COMMANDER_LETHAL_DAMAGE
+
+// why: a claim that can never land is declined when it arrives instead of rejected, so every installed outbox sees a success and stops retrying it.
+export function commanderClaimOutcome(claim: {
+  total: number
+  delta: number
+  pendingClaims: number
+  pairHasPendingClaim: boolean
+}): "pending" | "declined" {
+  const nextTotal = claim.total + claim.delta
+  return nextTotal < 0 ||
+    nextTotal > MAX_COMMANDER_DAMAGE ||
+    claim.pendingClaims >= MAX_PENDING_COMMANDER_CLAIMS ||
+    claim.pairHasPendingClaim
+    ? "declined"
+    : "pending"
+}
+
+// why: commander damage moves life one for one and never floors it, so a confirm outside 0..99 is refused rather than clamped.
+export function confirmCommanderClaim(state: { total: number; life: number; delta: number }) {
+  const total = state.total + state.delta
+  if (total < 0 || total > MAX_COMMANDER_DAMAGE) return null
+  return { total, currentLife: state.life - state.delta }
+}
+
+export interface CommanderClaimRequest {
+  operationId: string
+  fromPlayerId: string
+  toPlayerId: string
+  delta: number
+  actorUserId: string
+  deviceId: string
+  clientCreatedAt: number
+}
+
+export const isSameCommanderClaim = (
+  recorded: Partial<CommanderClaimRequest>,
+  request: CommanderClaimRequest,
+) =>
+  recorded.operationId === request.operationId &&
+  recorded.fromPlayerId === request.fromPlayerId &&
+  recorded.toPlayerId === request.toPlayerId &&
+  recorded.delta === request.delta &&
+  recorded.actorUserId === request.actorUserId &&
+  recorded.deviceId === request.deviceId &&
+  recorded.clientCreatedAt === request.clientCreatedAt
+
+export interface CommanderResolutionRequest {
+  kind: string
+  claimOperationId: string
+  defenderPlayerId: string
+  actorUserId: string
+  deviceId: string
+  clientCreatedAt: number
+}
+
+export const isSameCommanderResolution = (
+  recorded: Partial<Omit<CommanderResolutionRequest, "defenderPlayerId">> & {
+    playerId?: string
+    toPlayerId?: string
+  },
+  request: CommanderResolutionRequest,
+) =>
+  recorded.kind === request.kind &&
+  recorded.claimOperationId === request.claimOperationId &&
+  recorded.playerId === request.defenderPlayerId &&
+  recorded.toPlayerId === request.defenderPlayerId &&
+  recorded.actorUserId === request.actorUserId &&
+  recorded.deviceId === request.deviceId &&
+  recorded.clientCreatedAt === request.clientCreatedAt
