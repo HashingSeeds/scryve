@@ -211,6 +211,8 @@ export const SYSTEMS = {
     table: {
       counters: [
         { id: "poison", label: "Poison", step: 1, max: 99, losesAt: 10 },
+        { id: "energy", label: "Energy", step: 1, max: 99 },
+        { id: "experience", label: "Experience", step: 1, max: 99, commandZoneOnly: true },
         { id: "commanderTax", label: "Commander tax", step: 2, max: 98, commandZoneOnly: true },
       ],
       designations: [

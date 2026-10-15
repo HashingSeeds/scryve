@@ -57,6 +57,8 @@ export function losingCounter({ rules, counters }: Pick<SeatTable, "rules" | "co
 
 const GLYPHS: Record<string, string> = {
   poison: "M12 2v20",
+  energy: "M13 2 4 14h7l-1 8 9-12h-7z",
+  experience: "M6 13l6-6 6 6M6 19l6-6 6 6",
   commanderTax: "M6 3h12v18l-6-4-6 4zM12 7v6M9 10h6",
   monarch: "M3 19h18M4.5 15.5 3 7l5 4 4-6 4 6 5-4-1.5 8.5z",
   initiative: "M6 21V10a6 6 0 0 1 12 0v11M3 21h18M12 13v4",
