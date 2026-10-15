@@ -100,28 +100,33 @@ describe("observability initialization", () => {
   })
 
   it.each([
-    ["production", "production", "production"],
-    ["production", "beta", "beta"],
-    ["production", null, "local"],
-    ["preview", "preview", "preview"],
-    ["development", null, "development"],
-    ["perf", "", "perf"],
-    ["local", "production", "production"],
-    ["local", "", "local"],
-    [undefined, null, "local"],
-  ] as const)("reports a %s build on channel %s as %s", (appVariant, channel, environment) => {
-    const development = __DEV__
-    Reflect.set(globalThis, "__DEV__", false)
-    mockExpoConfig.extra = { appVariant }
-    mockUpdatesState.channel = channel
-    try {
-      initObservability()
-    } finally {
-      Reflect.set(globalThis, "__DEV__", development)
-    }
+    ["production", "production", "production", true],
+    ["production", "beta", "beta", true],
+    ["production", null, "local", false],
+    ["preview", "preview", "preview", false],
+    ["development", null, "development", false],
+    ["perf", "", "perf", false],
+    ["local", "production", "production", true],
+    ["local", "", "local", false],
+    [undefined, null, "local", false],
+  ] as const)(
+    "reports a %s build on channel %s as %s",
+    (appVariant, channel, environment, watchdog) => {
+      const development = __DEV__
+      Reflect.set(globalThis, "__DEV__", false)
+      mockExpoConfig.extra = { appVariant }
+      mockUpdatesState.channel = channel
+      try {
+        initObservability()
+      } finally {
+        Reflect.set(globalThis, "__DEV__", development)
+      }
 
-    expect(Sentry.init).toHaveBeenCalledWith(expect.objectContaining({ environment }))
-  })
+      expect(Sentry.init).toHaveBeenCalledWith(
+        expect.objectContaining({ environment, enableWatchdogTerminationTracking: watchdog }),
+      )
+    },
+  )
 
   it("reports any __DEV__ bundle as development", () => {
     mockExpoConfig.extra = { appVariant: "production" }

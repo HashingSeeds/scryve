@@ -28,10 +28,13 @@ function buildEnvironment() {
 
 export function initObservability() {
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? FALLBACK_SENTRY_DSN
+  const environment = buildEnvironment()
 
   Sentry.init({
     dsn,
-    environment: buildEnvironment(),
+    environment,
+    // why: agents relaunch internal builds on test devices by killing them, which Sentry cannot tell apart from an iOS memory kill.
+    enableWatchdogTerminationTracking: environment === "production" || environment === "beta",
     sendDefaultPii: false,
     enableLogs: false,
     replaysSessionSampleRate: 0,
