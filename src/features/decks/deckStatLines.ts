@@ -1,12 +1,15 @@
+import { translate } from "@/i18n/translate"
+
 import type { DeckRecord } from "./deckCopy"
 
-export type StatsSource = "scryve" | "manual" | "all"
+export const STATS_SOURCES = ["scryve", "manual", "all"] as const
 
-export const STATS_SOURCES: { value: StatsSource; label: string }[] = [
-  { value: "scryve", label: "Scryve" },
-  { value: "manual", label: "Manual" },
-  { value: "all", label: "All" },
-]
+export type StatsSource = (typeof STATS_SOURCES)[number]
+
+export function statsSourceLabel(source: StatsSource) {
+  if (source === "scryve") return "Scryve"
+  return source === "manual" ? translate("decks:stats.manual") : translate("decks:stats.all")
+}
 
 type Tally = { total: number; wins: number; losses: number; draws: number }
 
@@ -19,6 +22,18 @@ export type DeckStatsRecord = DeckRecord & {
 }
 
 export type StatLine = { label: "Matches" | "Games"; text: string }
+
+export function statLineLabel(line: StatLine) {
+  return line.label === "Matches"
+    ? translate("decks:stats.matches")
+    : translate("decks:stats.games")
+}
+
+export function statLineSummary(line: StatLine) {
+  return line.label === "Matches"
+    ? translate("decks:stats.matchesRecord", { record: line.text })
+    : translate("decks:stats.gamesRecord", { record: line.text })
+}
 
 function add(left: Tally | undefined, right: Tally | undefined): Tally | undefined {
   if (!left) return right

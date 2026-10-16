@@ -16,6 +16,7 @@ import {
   type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
+import { translate } from "@/i18n/translate"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
@@ -26,7 +27,7 @@ import {
   type DeckSyncController,
   type SyncedDeck,
 } from "./decksSync"
-import { DECK_CONFLICT_REASON } from "./deckSyncReasons"
+import { DECK_CONFLICT_REASON, DECK_REJECTED_REASON } from "./deckSyncReasons"
 import { api } from "../../../convex/_generated/api"
 import { assertDeckName, assertDeckFormat, assertDeckNote } from "../../../convex/lib/policy"
 
@@ -56,11 +57,10 @@ export interface DeckSyncWriteSnapshot {
   capacityBlocked: boolean
 }
 
-export { DECK_CONFLICT_REASON }
+export { DECK_CONFLICT_REASON, DECK_REJECTED_REASON }
 
 const SCOPE = "metadata"
 const RETRY_DELAY_MS = 2_000
-export const DECK_REJECTED_REASON = "The server can't accept this edit. Discard it and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -374,7 +374,7 @@ export class DeckMetadataWriteController {
         return code && permanentErrors.has(code)
           ? {
               kind: "reject" as const,
-              reason: convexErrorMessage(cause, "Could not sync this edit"),
+              reason: convexErrorMessage(cause, translate("decks:sync.editFailed")),
             }
           : { kind: "retry" as const }
       },

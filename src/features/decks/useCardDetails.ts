@@ -3,6 +3,7 @@ import { useAction, useConvexConnectionState } from "convex/react"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
 import { loadCardDetails, readCardDetail, saveCardDetails } from "./cardDetailsCache"
@@ -87,8 +88,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
       if (offline) {
         if (warmed && !detailsByKey[detailKey])
           setDetailsByKey((current) => ({ ...current, [detailKey]: warmed }))
-        if (active)
-          setFailure({ key: detailKey, message: "You're offline. Showing saved card info." })
+        if (active) setFailure({ key: detailKey, message: translate("decks:cardDetails.offline") })
         return
       }
       try {
@@ -108,7 +108,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
           if (needsFaces && details.faceDetails === undefined) {
             setFailure({
               key: detailKey,
-              message: "Could not load both faces. Showing saved card info.",
+              message: translate("decks:cardDetails.facesFailed"),
             })
           } else if (
             requireCommanderRules &&
@@ -116,15 +116,15 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
           ) {
             setFailure({
               key: detailKey,
-              message: "Commander rules could not be refreshed. Showing saved card info.",
+              message: translate("decks:cardDetails.commanderRulesStale"),
             })
           }
-        } else setFailure({ key: detailKey, message: "No additional card details are available." })
+        } else setFailure({ key: detailKey, message: translate("decks:cardDetails.none") })
       } catch (cause) {
         if (active)
           setFailure({
             key: detailKey,
-            message: convexErrorMessage(cause, "Could not load card details"),
+            message: convexErrorMessage(cause, translate("decks:cardDetails.loadFailed")),
             retryAfterMs: convexRetryAfterMs(cause),
           })
       }

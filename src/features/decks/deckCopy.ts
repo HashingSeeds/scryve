@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { HIDDEN_DECK_NAME, nameFailsGate } from "../../../convex/lib/nameFilter"
 
 export type DeckRecord = {
@@ -9,15 +11,20 @@ export type DeckRecord = {
 }
 
 export function cardCountLabel(quantity: number) {
-  return `${quantity} ${quantity === 1 ? "card" : "cards"}`
+  return translate("decks:cardCount", { count: quantity })
 }
 
 export function deckNameWarning(name: string) {
-  return nameFailsGate(name) ? `Other players will see "${HIDDEN_DECK_NAME}" instead.` : undefined
+  return nameFailsGate(name)
+    ? translate("decks:hiddenNameWarning", { hiddenName: HIDDEN_DECK_NAME })
+    : undefined
 }
 
 export function recordSummary(record: DeckRecord | undefined) {
   if (!record) return undefined
-  if (record.games === 0) return "No games yet"
-  return `${Math.round((record.wins / record.games) * 100)}% of ${record.games}`
+  if (record.games === 0) return translate("decks:record.noGames")
+  return translate("decks:record.winRate", {
+    percent: Math.round((record.wins / record.games) * 100),
+    games: record.games,
+  })
 }

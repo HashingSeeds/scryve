@@ -23,6 +23,7 @@ import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
 
@@ -61,13 +62,15 @@ type DeckCollection = "all" | "favorites" | "recent"
 
 const ALL_SYSTEMS = "all"
 const COLLECTIONS = [
-  { id: "all", label: "All" },
-  { id: "favorites", label: "Favorites" },
-  { id: "recent", label: "Recent" },
+  { id: "all", labelTx: "decks:shelf.collectionAll" },
+  { id: "favorites", labelTx: "decks:shelf.collectionFavorites" },
+  { id: "recent", labelTx: "decks:shelf.collectionRecent" },
 ] as const
 
 function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
-  const cards = deck.cardQuantity ? cardCountLabel(deck.cardQuantity) : "Empty list"
+  const cards = deck.cardQuantity
+    ? cardCountLabel(deck.cardQuantity)
+    : translate("decks:shelf.emptyList")
   const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel
   return [showGame ? gameLabel : null, deckFormatLabel(game, deck.format), cards]
     .filter(Boolean)
@@ -108,7 +111,10 @@ function DeckRow({
   const favorite = deck.favoritedAt !== undefined
   const record = recordSummary(deck.record)
   const versions =
-    deck.versionCount && deck.versionCount > 1 ? `${deck.versionCount} versions` : undefined
+    deck.versionCount && deck.versionCount > 1
+      ? translate("decks:shelf.versionCount", { count: deck.versionCount })
+      : undefined
+
   return (
     <View testID={`deck-card-${deck._id}`} style={themed($row)}>
       <View
@@ -118,7 +124,9 @@ function DeckRow({
       <TouchableOpacity
         style={themed($openButton)}
         accessibilityRole="button"
-        accessibilityLabel={`${deck.name}${needsReview ? ". Needs review" : ""}`}
+        accessibilityLabel={
+          needsReview ? translate("decks:shelf.needsReview", { name: deck.name }) : deck.name
+        }
         activeOpacity={0.75}
         onPress={() => onPress()}
       >
@@ -144,7 +152,7 @@ function DeckRow({
         <TouchableOpacity
           testID={`deck-needs-review-${deck._id}`}
           accessibilityRole="button"
-          accessibilityLabel={`Review deck changes: ${deck.name}`}
+          accessibilityLabel={translate("decks:shelf.reviewChanges", { name: deck.name })}
           style={themed($favoriteButton)}
           onPress={() => onPress(true)}
         >
@@ -155,7 +163,11 @@ function DeckRow({
         <TouchableOpacity
           testID={`favorite-deck-${deck._id}`}
           accessibilityRole="button"
-          accessibilityLabel={`${favorite ? "Remove" : "Add"} ${deck.name} ${favorite ? "from" : "to"} favorites`}
+          accessibilityLabel={
+            favorite
+              ? translate("decks:shelf.removeFavorite", { name: deck.name })
+              : translate("decks:shelf.addFavorite", { name: deck.name })
+          }
           hitSlop={8}
           style={themed($favoriteButton)}
           onPress={onToggleFavorite}
@@ -187,7 +199,7 @@ function StarIcon({ selected, color }: { selected: boolean; color: string }) {
 function DeckShelfSkeleton() {
   const { themed } = useAppTheme()
   return (
-    <View accessibilityRole="progressbar" accessibilityLabel="Loading decks">
+    <View accessibilityRole="progressbar" accessibilityLabel={translate("decks:shelf.loading")}>
       {Array.from({ length: 4 }).map((_, index) => (
         <View key={index} testID="deck-skeleton-row" style={themed($row)}>
           <View testID="deck-skeleton-marker" style={themed($skeletonMarker)} />
@@ -207,9 +219,9 @@ function DeckShelfUnavailable({ retry }: { retry: () => void }) {
   const { themed } = useAppTheme()
   return (
     <View testID="decks-unavailable" style={themed($empty)}>
-      <Text preset="subheading" text="Decks unavailable" />
-      <Text size="sm" style={themed($dimmedText)} text="Could not load your decks." />
-      <Button testID="retry-decks" text="Retry" onPress={retry} />
+      <Text preset="subheading" tx="decks:shelf.unavailable" />
+      <Text size="sm" style={themed($dimmedText)} tx="decks:shelf.loadFailed" />
+      <Button testID="retry-decks" tx="common:retry" onPress={retry} />
     </View>
   )
 }
@@ -286,16 +298,16 @@ function DeckShelf({
   const filtered = collectionDecks.length > 0 && visibleDecks.length === 0
   const emptyTitle =
     collection === "favorites"
-      ? "No favorite decks yet"
+      ? "decks:shelf.noFavorites"
       : collection === "recent"
-        ? "No recent decks yet"
-        : "No decks yet"
+        ? "decks:shelf.noRecent"
+        : "decks:shelf.noDecks"
   const emptyDetail =
     collection === "favorites"
-      ? "Use the star beside a deck to add it here."
+      ? "decks:shelf.noFavoritesDetail"
       : collection === "recent"
-        ? "Open a deck to add it here."
-        : "Add a deck to get started."
+        ? "decks:shelf.noRecentDetail"
+        : "decks:shelf.noDecksDetail"
 
   async function toggleFavorite(deck: ShelfDeck) {
     try {
@@ -305,7 +317,7 @@ function DeckShelf({
         favorite: deck.favoritedAt === undefined,
       })
     } catch {
-      setFavoriteError("Could not update this favorite.")
+      setFavoriteError(translate("decks:shelf.favoriteFailed"))
     }
   }
 
@@ -325,9 +337,9 @@ function DeckShelf({
           ) : null}
           {writes.capacityBlocked && writes.failures[0] ? (
             <View>
-              <Text text="Sync paused. Resolve a saved local edit to continue." />
+              <Text tx="decks:saveStatus.paused" />
               <Button
-                text="Review saved edit"
+                tx="decks:shelf.reviewSavedEdit"
                 onPress={() => {
                   const { deckId, name, game, format } = writes.failures[0].action
                   onSelect({ deckId, name, game, format, reviewChanges: true })
@@ -358,19 +370,19 @@ function DeckShelf({
       ListEmptyComponent={
         syncEnabled && synced.unavailable && synced.decks.length === 0 ? (
           <View style={themed($empty)}>
-            <Text text="Reconnect to load your decks." />
-            <Button text="Try again" onPress={() => void synced.retry()} />
+            <Text tx="decks:shelf.reconnect" />
+            <Button tx="common:tryAgain" onPress={() => void synced.retry()} />
           </View>
         ) : mine ? (
           <View style={themed($empty)}>
-            <Text preset="subheading" text={filtered ? "Nothing matches" : emptyTitle} />
+            <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : emptyTitle} />
             <Text
               size="sm"
               style={themed($dimmedText)}
-              text={filtered ? "Try another search or clear the filters." : emptyDetail}
+              tx={filtered ? "decks:shelf.tryAnotherSearch" : emptyDetail}
             />
             {filtered ? (
-              <Button text="Clear search and filters" onPress={clearVisibleFilters} />
+              <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} />
             ) : null}
           </View>
         ) : (
@@ -429,7 +441,7 @@ export function DecksScreen({
       id: candidate.id,
       label: candidate.label,
     }))
-    return [{ id: ALL_FORMATS, label: "All formats" }, ...known]
+    return [{ id: ALL_FORMATS, label: translate("decks:shelf.allFormats") }, ...known]
   }, [system])
   const selectedFormat = formatChips.find((candidate) => candidate.id === format)
   const selectedSystem = DECK_GAME_LIST.find((candidate) => candidate.id === system)
@@ -480,31 +492,31 @@ export function DecksScreen({
       contentContainerStyle={themed($screen)}
     >
       <Header
-        title="Decks"
+        titleTx="decks:shelf.title"
         titleAccessory={
           (access?.ready ?? true) && !unavailableMessage ? <DeckCount access={access} /> : undefined
         }
-        leftText={onBack ? "Back to lobby" : undefined}
+        leftTx={onBack ? "decks:shelf.backToLobby" : undefined}
         onLeftPress={onBack}
         backgroundColor={theme.colors.surface}
-        rightText="Add deck"
+        rightTx="decks:shelf.addDeck"
         onRightPress={onAddDeck}
       />
       <View style={themed($content)}>
         <View style={themed($filterRow)}>
           <ScrollView
             testID="collection-filter"
-            accessibilityLabel="Deck collection"
+            accessibilityLabel={translate("decks:shelf.collection")}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={$filterScroll}
             contentContainerStyle={themed($collectionFilter)}
           >
-            {COLLECTIONS.map(({ id, label }) => (
+            {COLLECTIONS.map(({ id, labelTx }) => (
               <FilterPill
                 key={id}
                 testID={`collection-filter-${id}`}
-                label={label}
+                label={translate(labelTx)}
                 selected={collection === id}
                 onPress={() => setCollection(id)}
               />
@@ -518,7 +530,7 @@ export function DecksScreen({
         </View>
         <TextField
           testID="deck-search-input"
-          placeholder="Search decks"
+          placeholderTx="decks:shelf.search"
           value={search}
           maxLength={80}
           autoCorrect={false}
@@ -551,7 +563,7 @@ export function DecksScreen({
         ) : null}
         {visibleGuestRows.length ? (
           <View>
-            <Text size="xs" text="On this device" />
+            <Text size="xs" tx="decks:shelf.onDevice" />
             {visibleGuestRows.map((guestRow) => (
               <DeckRow
                 key={guestRow._id}
@@ -576,19 +588,15 @@ export function DecksScreen({
             <View style={themed($empty)}>
               <Text
                 preset="subheading"
-                text={guestDecks.length ? "Nothing matches" : "No decks yet"}
+                tx={guestDecks.length ? "decks:shelf.nothingMatches" : "decks:shelf.noDecks"}
               />
               <Text
                 size="sm"
-                text={
-                  guestDecks.length
-                    ? "Try another search or clear the filters."
-                    : "Save a deck on this device. No account needed."
-                }
+                tx={guestDecks.length ? "decks:shelf.tryAnotherSearch" : "decks:shelf.guestEmpty"}
               />
               {guestDecks.length ? (
                 <Button
-                  text="Clear search and filters"
+                  tx="decks:shelf.clearSearch"
                   onPress={() => {
                     clearVisibleFilters()
                     setCollection("all")
@@ -602,13 +610,16 @@ export function DecksScreen({
             <DeckShelfSkeleton />
           ) : (
             <View style={themed($empty)}>
-              <Text text={access.message ?? "Decks unavailable"} />
-              <Button text={access.actionLabel ?? "Try again"} onPress={access.request} />
+              <Text text={access.message ?? translate("decks:shelf.unavailable")} />
+              <Button
+                text={access.actionLabel ?? translate("common:tryAgain")}
+                onPress={access.request}
+              />
             </View>
           )
         ) : unavailableMessage ? (
           <View testID="decks-offline-state" style={themed($empty)}>
-            <Text preset="subheading" text="Decks unavailable" />
+            <Text preset="subheading" tx="decks:shelf.unavailable" />
             <Text size="sm" style={themed($dimmedText)} text={unavailableMessage} />
           </View>
         ) : (
@@ -641,29 +652,30 @@ export function DecksScreen({
         onClose={() => setFiltersOpen(false)}
         dialogTestID="deck-filters-dialog"
         dialogAccessibilityRole="alert"
-        backdropAccessibilityLabel="Dismiss filters"
+        backdropAccessibilityLabel={translate("decks:shelf.dismissFilters")}
         style={$filtersDialog}
       >
-        <Text preset="subheading" text="Filters" />
+        <Text preset="subheading" tx="decks:filters.label" />
         <ScrollView style={$filtersScroll} contentContainerStyle={themed($dialogBody)}>
-          <View testID="system-filter" accessibilityLabel="System">
-            <FilterGroup heading="System">
-              {[{ id: ALL_SYSTEMS, shortLabel: "All systems" }, ...DECK_GAME_LIST].map(
-                (candidate) => (
-                  <FilterPill
-                    key={candidate.id}
-                    testID={`system-filter-${candidate.id}`}
-                    label={candidate.shortLabel}
-                    selected={system === candidate.id}
-                    onPress={() => chooseSystem(candidate.id)}
-                  />
-                ),
-              )}
+          <View testID="system-filter" accessibilityLabel={translate("decks:shelf.system")}>
+            <FilterGroup heading={translate("decks:shelf.system")}>
+              {[
+                { id: ALL_SYSTEMS, shortLabel: translate("decks:shelf.allSystems") },
+                ...DECK_GAME_LIST,
+              ].map((candidate) => (
+                <FilterPill
+                  key={candidate.id}
+                  testID={`system-filter-${candidate.id}`}
+                  label={candidate.shortLabel}
+                  selected={system === candidate.id}
+                  onPress={() => chooseSystem(candidate.id)}
+                />
+              ))}
             </FilterGroup>
           </View>
           {system !== ALL_SYSTEMS && formatChips.length > 1 ? (
-            <View testID="format-filter" accessibilityLabel="Format">
-              <FilterGroup heading="Format">
+            <View testID="format-filter" accessibilityLabel={translate("decks:shelf.format")}>
+              <FilterGroup heading={translate("decks:shelf.format")}>
                 {formatChips.map((candidate) => (
                   <FilterPill
                     key={candidate.id}
@@ -676,17 +688,13 @@ export function DecksScreen({
               </FilterGroup>
             </View>
           ) : system === ALL_SYSTEMS ? (
-            <Text
-              size="xs"
-              style={themed($dimmedText)}
-              text="Choose a system to filter by format."
-            />
+            <Text size="xs" style={themed($dimmedText)} tx="decks:shelf.chooseSystem" />
           ) : null}
         </ScrollView>
         <View style={themed($dialogActions)}>
           <Button
             style={themed($dialogButton)}
-            text="Clear filters"
+            tx="decks:shelf.clearFilters"
             disabled={filterCount === 0}
             onPress={clearFilters}
           />
@@ -694,7 +702,7 @@ export function DecksScreen({
             testID="deck-filters-done"
             style={themed($dialogButton)}
             preset="primary"
-            text="Show decks"
+            tx="decks:shelf.showDecks"
             onPress={() => setFiltersOpen(false)}
           />
         </View>

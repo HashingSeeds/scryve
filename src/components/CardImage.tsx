@@ -6,6 +6,7 @@ import { useConvex } from "convex/react"
 
 import { Text } from "@/components/Text"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { convexErrorCode, convexErrorRetryAfterMs } from "@/utils/convexError"
 
@@ -222,11 +223,15 @@ export function CardImage({
       accessible
       accessibilityRole="image"
       testID={testID ? `${testID}-placeholder` : undefined}
-      accessibilityLabel={`${accessibilityLabel}: ${active?.loading ? "Loading image" : "No image found"}`}
+      accessibilityLabel={
+        active?.loading
+          ? translate("decks:image.loadingLabel", { card: accessibilityLabel })
+          : translate("decks:image.missingLabel", { card: accessibilityLabel })
+      }
       style={[style as StyleProp<ViewStyle>, $placeholder]}
     >
       <Text
-        text={active?.loading ? "Loading…" : "No image found"}
+        tx={active?.loading ? "decks:image.loading" : "decks:image.missing"}
         style={[{ color: theme.colors.textDim }, compact ? $compactLabel : $label]}
       />
     </View>

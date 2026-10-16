@@ -4,6 +4,7 @@ import Svg, { Path } from "react-native-svg"
 
 import { CardImage } from "@/components/CardImage"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -59,7 +60,11 @@ export function DeckCardRow({
         <View style={$row}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={`${card.quantity === 1 ? "Remove" : "Decrease"} ${card.name}`}
+            accessibilityLabel={
+              card.quantity === 1
+                ? translate("decks:cardRow.remove", { card: card.name })
+                : translate("decks:cardRow.decrease", { card: card.name })
+            }
             disabled={disabled}
             style={$touch}
             onPress={() => onDecrement(card)}
@@ -82,7 +87,7 @@ export function DeckCardRow({
           <Text size="sm" text={String(card.quantity)} style={$quantity} />
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={`Increase ${card.name}`}
+            accessibilityLabel={translate("decks:cardRow.increase", { card: card.name })}
             disabled={
               disabled ||
               card.quantity >= 999 ||
@@ -120,12 +125,20 @@ export function DeckCardSectionHeader({
         <TouchableOpacity
           testID="choose-commander"
           accessibilityRole="button"
-          accessibilityLabel={quantity ? "Change commander" : "Choose commander"}
+          accessibilityLabel={
+            quantity
+              ? translate("decks:cardRow.changeCommander")
+              : translate("decks:cardRow.chooseCommander")
+          }
           disabled={disabled}
           style={$touch}
           onPress={onChooseCommander}
         >
-          <Text size="xs" style={themed($action)} text={quantity ? "Change" : "Choose"} />
+          <Text
+            size="xs"
+            style={themed($action)}
+            tx={quantity ? "decks:cardRow.change" : "decks:cardRow.choose"}
+          />
         </TouchableOpacity>
       ) : (
         <Text size="sm" style={themed($dim)} text={String(quantity)} />

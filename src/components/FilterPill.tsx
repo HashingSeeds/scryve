@@ -3,11 +3,14 @@ import { TouchableOpacity, View } from "react-native"
 import type { ViewStyle, TextStyle } from "react-native"
 import Svg, { Circle, Path } from "react-native-svg"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
 import { Text } from "./Text"
+
+const REMOVE_MARK = "  ✕"
 
 export function FilterPill({
   label,
@@ -27,7 +30,7 @@ export function FilterPill({
     <TouchableOpacity
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={removable ? `Remove filter ${label}` : label}
+      accessibilityLabel={removable ? translate("decks:filters.remove", { label }) : label}
       accessibilityState={{ selected: Boolean(selected) }}
       activeOpacity={0.8}
       style={[themed($chip), selected ? themed($chipSelected) : undefined]}
@@ -38,7 +41,7 @@ export function FilterPill({
         maxFontSizeMultiplier={PILL_MAX_FONT_SCALE}
         weight={selected ? "medium" : "normal"}
         style={selected ? themed($chipSelectedText) : themed($dimmedText)}
-        text={removable ? `${label}  ✕` : label}
+        text={removable ? label + REMOVE_MARK : label}
       />
     </TouchableOpacity>
   )
@@ -54,7 +57,9 @@ export function FilterButton({
   testID?: string
 }) {
   const { themed, theme } = useAppTheme()
-  const label = count ? `Filters (${count})` : "Filters"
+  const label = count
+    ? translate("decks:filters.withCount", { count })
+    : translate("decks:filters.label")
   return (
     <View style={themed($filterOverlap)}>
       <TouchableOpacity

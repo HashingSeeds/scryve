@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
 
 export type CommanderSelectionDetails = {
@@ -18,30 +20,31 @@ export function selectCommander<T extends DeckCard>(
       0,
     ) > 1
   ) {
-    return { error: "Changing decks with multiple commanders is not supported yet." }
+    return { error: translate("decks:commander.multipleUnsupported") }
   }
   const selected = cards.find((card) => printingKey(card) === selectedKey)
-  if (!selected || selected.quantity < 1) return { error: "Choose a card already in this deck." }
+  if (!selected || selected.quantity < 1)
+    return { error: translate("decks:commander.chooseCardInDeck") }
   const details = detailsFor(selected)
   if (details?.commanderEligibility === "ineligible") {
-    return { error: "This card cannot be a commander." }
+    return { error: translate("decks:commander.ineligible") }
   }
   if (
     details?.commanderEligibility !== "eligible" &&
     details?.commanderEligibility !== "color-choice"
   ) {
-    return { error: "Commander eligibility has not been checked for this card." }
+    return { error: translate("decks:commander.eligibilityUnchecked") }
   }
   if (details.commanderLegality !== "legal") {
     return {
       error:
         details.commanderLegality === "banned"
-          ? "This card is banned in Commander."
-          : "Commander legality has not been confirmed for this card.",
+          ? translate("decks:commander.banned")
+          : translate("decks:commander.legalityUnconfirmed"),
     }
   }
   if (details.commanderEligibility === "color-choice" && !/^[WUBRG]$/.test(commanderColor ?? "")) {
-    return { error: "Choose a color for this commander." }
+    return { error: translate("decks:commander.chooseColor") }
   }
 
   const result: T[] = []
@@ -85,7 +88,7 @@ export function selectCommander<T extends DeckCard>(
   }
   const nextCards = [...merged.values()]
   if (nextCards.some((card) => card.quantity > 999)) {
-    return { error: "This change would exceed the 999-copy limit for a card entry." }
+    return { error: translate("decks:commander.copyLimit") }
   }
   return {
     cards: nextCards,
@@ -103,8 +106,7 @@ export function getCommanderWarnings<T extends DeckCard>(
   if (commanders.length !== 1 || commanders[0].quantity !== 1) return []
   const commander = commanders[0]
   const details = detailsFor(commander)
-  if (!details)
-    return ["Some card details are missing. Deck color identity has not been fully checked."]
+  if (!details) return [translate("decks:commander.detailsMissing")]
   const warnings: string[] = []
   const sameCard = cards.filter((card) =>
     commander.oracleId && card.oracleId
@@ -112,7 +114,7 @@ export function getCommanderWarnings<T extends DeckCard>(
       : card.name === commander.name,
   )
   if (sameCard.reduce((count, card) => count + card.quantity, 0) > 1) {
-    warnings.push("Another copy of this commander remains in the deck.")
+    warnings.push(translate("decks:commander.duplicateCommander"))
   }
   const identity = `${details.colorIdentity ?? ""}${details.commanderEligibility === "color-choice" ? (commander.commanderColor ?? "") : ""}`
   let incomplete = details.colorIdentity === undefined
@@ -129,13 +131,17 @@ export function getCommanderWarnings<T extends DeckCard>(
   }
   if (conflicts.length > 0) {
     const names = [...new Set(conflicts)]
-    const more = names.length > 3 ? ` and ${names.length - 3} more` : ""
+    const shown = names.slice(0, 3).join(", ")
     warnings.push(
-      `Outside this commander's color identity: ${names.slice(0, 3).join(", ")}${more}.`,
+      names.length > 3
+        ? translate("decks:commander.colorIdentityConflictMore", {
+            names: shown,
+            count: names.length - 3,
+          })
+        : translate("decks:commander.colorIdentityConflict", { names: shown }),
     )
   }
-  if (incomplete)
-    warnings.push("Some card details are missing. Deck color identity has not been fully checked.")
+  if (incomplete) warnings.push(translate("decks:commander.detailsMissing"))
   return warnings
 }
 

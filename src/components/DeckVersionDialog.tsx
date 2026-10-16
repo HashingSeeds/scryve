@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -52,7 +53,7 @@ export function DeckVersionDialog({
       onClose={onClose}
       closeDisabled={busy}
       backdropTestID="deck-version-backdrop"
-      backdropAccessibilityLabel="Close version editor"
+      backdropAccessibilityLabel={translate("decks:versionDialog.close")}
       dialogTestID="deck-version-dialog"
       accessibilityViewIsModal
       placement="bottom"
@@ -61,8 +62,8 @@ export function DeckVersionDialog({
       <Text preset="subheading" text={title} />
       <TextField
         testID="version-name-input"
-        label="Version name"
-        helper='Something you will recognise later, like "vs Control" or "Budget swap".'
+        labelTx="decks:versionDialog.name"
+        helperTx="decks:versionDialog.nameHelper"
         value={name}
         maxLength={40}
         onChangeText={setName}
@@ -70,8 +71,8 @@ export function DeckVersionDialog({
       {notesLocked ? null : (
         <TextField
           testID="version-note-input"
-          label="Notes"
-          helper="What changed, and what are you testing?"
+          labelTx="decks:versionDialog.notes"
+          helperTx="decks:versionDialog.notesHelper"
           value={note}
           multiline
           numberOfLines={3}
@@ -84,15 +85,15 @@ export function DeckVersionDialog({
         <View style={themed($choices)}>
           <ChoiceButton
             testID="version-copy-cards"
-            text={`Copy ${copyFromLabel}`}
-            detail="Start from the current list"
+            text={translate("decks:versionDialog.copyFrom", { version: copyFromLabel })}
+            detail={translate("decks:versionDialog.copyDetail")}
             selected={copyCards}
             onPress={() => setCopyCards(true)}
           />
           <ChoiceButton
             testID="version-empty-cards"
-            text="Start empty"
-            detail="Build this version from scratch"
+            tx="decks:versionDialog.empty"
+            detail={translate("decks:versionDialog.emptyDetail")}
             selected={!copyCards}
             onPress={() => setCopyCards(false)}
           />
@@ -101,7 +102,7 @@ export function DeckVersionDialog({
       {error ? <AlertNote text={error} /> : null}
       <Button
         testID="version-submit"
-        text={busy ? "Saving…" : submitLabel}
+        text={busy ? translate("decks:saving") : submitLabel}
         preset="reversed"
         disabled={busy || !name.trim()}
         onPress={() => onSubmit({ name, note, copyCards })}
@@ -109,7 +110,7 @@ export function DeckVersionDialog({
       {onDelete ? (
         <Button
           testID="delete-version-button"
-          text="Delete version"
+          tx="decks:versionDialog.delete"
           style={themed($destructiveButton)}
           textStyle={themed($destructiveText)}
           disabled={busy}

@@ -4,6 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
 import { localGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { DecksScreen } from "@/screens/DecksScreen"
 import { captureAnalytics } from "@/utils/analytics"
 
@@ -50,7 +51,7 @@ export default function DecksRoute() {
       }
       unavailableMessage={
         !auth.configured
-          ? auth.configurationMessage || "Deck sync is unavailable in this build."
+          ? auth.configurationMessage || translate("decks:shelf.syncUnavailable")
           : undefined
       }
     />
