@@ -35,7 +35,6 @@ const play = {
     resumeHostedGame: "Resume hosted game",
     system: "System",
     gameSystem: "Game system",
-    noSystem: "No system",
     format: "Format",
     seats: "Seats",
     players: "Players",

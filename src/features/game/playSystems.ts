@@ -1,6 +1,7 @@
+import systems from "@/i18n/en/systems"
 import { translate } from "@/i18n/translate"
 
-import { deckFormatLabel, deckFormats } from "../../../convex/lib/deckGames"
+import { deckFormatLabel, deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
   isSystemId,
@@ -10,6 +11,7 @@ import {
   SYSTEMS,
   tableRules,
   type CounterDefinition,
+  type DeckSection,
   type SystemId,
   type TableDefinition,
 } from "../../../convex/lib/systems"
@@ -59,13 +61,9 @@ const GENERIC_COUNTER: CounterRules = {
 
 const GENERIC_PLAY_RULES = {
   id: NO_PLAY_SYSTEM,
-  label: "No system",
-  shortLabel: "No system",
   defaultFormat: "",
   counter: GENERIC_COUNTER,
 } as const
-
-export const PLAY_SYSTEM_LIST = PLAY_SYSTEM_IDS.map((id) => PLAY_SYSTEMS[id])
 
 export const isPlaySystemId = isSystemId
 
@@ -144,4 +142,70 @@ export function counterDeltaFromStartLabel(
   return delta === 0
     ? translate("systems:even")
     : translate("systems:fromStart", { delta: `${delta > 0 ? "+" : ""}${delta}` })
+}
+
+function hasOwnKey<Table extends object>(
+  table: Table,
+  key: string,
+): key is Extract<keyof Table, string> {
+  return Object.hasOwn(table, key)
+}
+
+export function playSystemShortLabel(value: unknown): string {
+  return isPlaySystemId(value) ? SYSTEMS[value].shortLabel : translate("systems:noSystem")
+}
+
+export function playSystemChoices() {
+  return [NO_PLAY_SYSTEM, ...PLAY_SYSTEM_IDS].map((id) => ({ id, label: playSystemShortLabel(id) }))
+}
+
+export function counterHeading(value: unknown): string {
+  return translate(`systems:counterHeading.${playSystemRules(value).id}`)
+}
+
+export function counterLabel(value: unknown): string {
+  return translate(`systems:counterLabel.${playSystemRules(value).id}`)
+}
+
+export function startingValueRangeMessage(value: unknown): string {
+  const { id, counter } = playSystemRules(value)
+  return translate(`systems:startingValueRange.${id}`, { max: counter.maxStartingValue })
+}
+
+export function tableItemLabel({ id, label }: { id: string; label: string }): string {
+  return hasOwnKey(systems.tableItem, id) ? translate(`systems:tableItem.${id}`) : label
+}
+
+export function deckSectionLabel(game: string, { id, label }: DeckSection): string {
+  if (id === "main") return isPlaySystemId(game) ? translate(`systems:section.main.${game}`) : label
+  return hasOwnKey(systems.section, id) ? translate(`systems:section.${id}`) : label
+}
+
+const localizedSectionsCache = new Map<string, readonly DeckSection[]>()
+
+export function localizedDeckSections(game: string, format: string): readonly DeckSection[] {
+  const key = `${game}:${format}`
+  const cached = localizedSectionsCache.get(key)
+  if (cached) return cached
+  const sections = deckSections(game, format).map((section) => ({
+    id: section.id,
+    label: deckSectionLabel(game, section),
+  }))
+  localizedSectionsCache.set(key, sections)
+  return sections
+}
+
+function formatBlurb(system: PlaySystemId, id: string, blurb: string): string {
+  return system === "mtg" && hasOwnKey(systems.formatBlurb.mtg, id)
+    ? translate(`systems:formatBlurb.mtg.${id}`)
+    : blurb
+}
+
+export function playFormatOptions(value: unknown) {
+  const system = playSystemId(value)
+  return deckFormats(system).map(({ id, label, blurb }) => ({
+    id,
+    label,
+    ...(blurb ? { detail: formatBlurb(system, id, blurb) } : {}),
+  }))
 }

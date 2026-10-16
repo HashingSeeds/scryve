@@ -613,7 +613,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [])
 
   const system = game.system
-  const counter = playSystemRules(system).counter
   const active = game.status === "active"
   const finished = game.status === "finished"
 
@@ -654,9 +653,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const commanderTotals = game.commanderDamage?.totals ?? []
   const failedActionLabel = (event: PendingLifeAction["event"]) => {
     if (event.type === "life.changed")
-      return translate("connected:board.failedAction.life", {
+      return translate(`connected:board.failedAction.life.${playSystemRules(system).id}`, {
         delta: `${event.delta > 0 ? "+" : ""}${event.delta}`,
-        counter: counter.label,
       })
     if (event.type === "commanderDamage.submitted")
       return translate("connected:board.failedAction.commanderDamage", {

@@ -1,10 +1,18 @@
 import {
   counterDeltaFromStartLabel,
+  counterHeading,
+  counterLabel,
   defaultStartingLife,
+  localizedDeckSections,
+  PLAY_SYSTEM_IDS,
+  playFormatOptions,
   playSystemRules,
   storedPlaySystem,
   supportsCommanderDamage,
+  tableItemLabel,
 } from "./playSystems"
+import { deckSections } from "../../../convex/lib/deckGames"
+import { SYSTEMS } from "../../../convex/lib/systems"
 
 describe("play system defaults", () => {
   it("uses one point taps for Magic", () => {
@@ -41,5 +49,26 @@ describe("play system defaults", () => {
     expect(defaultStartingLife("ygo")).toBe(8000)
     expect(defaultStartingLife("pokemon")).toBe(6)
     expect(defaultStartingLife()).toBe(20)
+  })
+})
+
+describe("shared system labels", () => {
+  it("reads the same English as the shared definitions", () => {
+    for (const id of PLAY_SYSTEM_IDS) {
+      const { counter, formats, table } = SYSTEMS[id]
+      expect(counterHeading(id)).toBe(counter.heading)
+      expect(counterLabel(id)).toBe(counter.label)
+      expect(playFormatOptions(id)).toEqual(
+        formats.map(({ id: format, label, blurb }) => ({
+          id: format,
+          label,
+          ...(blurb ? { detail: blurb } : {}),
+        })),
+      )
+      for (const format of formats)
+        expect(localizedDeckSections(id, format.id)).toEqual(deckSections(id, format.id))
+      for (const item of [...table.counters, ...table.designations])
+        expect(tableItemLabel(item)).toBe(item.label)
+    }
   })
 })

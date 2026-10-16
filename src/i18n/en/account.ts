@@ -30,7 +30,6 @@ const account = {
     launchDestinationHint: "Play resumes a current game or opens a fresh board.",
     gameSystem: "Game system",
     defaultGameSystem: "Default game system",
-    noSystem: "No system",
     format: "Format",
     noDefault: "No default",
     defaultsHint:

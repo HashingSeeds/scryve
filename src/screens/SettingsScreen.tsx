@@ -19,11 +19,12 @@ import { ValueField } from "@/components/ValueField"
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/features/game/domain"
 import type { LocalSettings, ThemePreference } from "@/features/game/localPersistence"
 import {
+  counterLabel,
   isPlaySystemId,
   NO_PLAY_SYSTEM,
-  PLAY_SYSTEM_LIST,
   defaultStartingLife,
-  playSystemFormats,
+  playFormatOptions,
+  playSystemChoices,
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
@@ -198,7 +199,7 @@ export function SettingsScreen({
       : {}
   }
   const themes: ThemePreference[] = ["system", "light", "dark"]
-  const formats = settings.defaultSystem ? playSystemFormats(settings.defaultSystem) : []
+  const formats = settings.defaultSystem ? playFormatOptions(settings.defaultSystem) : []
   const counter = playSystemRules(settings.defaultSystem).counter
   return (
     <Screen
@@ -227,7 +228,7 @@ export function SettingsScreen({
           <View style={themed($counterValue)}>
             <ValueField
               testID="default-starting-life"
-              label={counter.label}
+              label={counterLabel(settings.defaultSystem)}
               value={settings.defaultStartingLife}
               min={MIN_STARTING_LIFE}
               max={counter.maxStartingValue}
@@ -257,10 +258,7 @@ export function SettingsScreen({
           testID="default-system"
           accessibilityLabel={copy.defaultGameSystem}
           selectedId={settings.defaultSystem ?? NO_PLAY_SYSTEM}
-          segments={[
-            { id: NO_PLAY_SYSTEM, label: translate("account:settings.noSystem") },
-            ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
-          ]}
+          segments={playSystemChoices()}
           onSelect={(id) => selectSystem(isPlaySystemId(id) ? id : undefined)}
         />
         {formats.length > 0 ? (
@@ -270,11 +268,7 @@ export function SettingsScreen({
             placeholder={copy.noDefault}
             clearLabel={copy.noDefault}
             value={settings.defaultFormat}
-            options={formats.map(({ id, label, blurb }) => ({
-              id,
-              label,
-              ...(blurb ? { detail: blurb } : {}),
-            }))}
+            options={formats}
             onSelect={selectFormat}
           />
         ) : null}

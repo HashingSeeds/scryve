@@ -44,12 +44,13 @@ import {
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 import {
+  counterHeading,
   defaultStartingLife,
   isPlaySystemId,
   NO_PLAY_SYSTEM,
-  PLAY_SYSTEM_LIST,
+  playFormatOptions,
+  playSystemChoices,
   playSystemFormat,
-  playSystemFormats,
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
@@ -610,10 +611,7 @@ export function NewGameScreen({
               <SegmentedControl
                 testID="play-system"
                 accessibilityLabel={translate("play:newGame.gameSystem")}
-                segments={[
-                  { id: NO_PLAY_SYSTEM, label: translate("play:newGame.noSystem") },
-                  ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
-                ]}
+                segments={playSystemChoices()}
                 selectedId={system ?? NO_PLAY_SYSTEM}
                 onSelect={chooseSystem}
               />
@@ -622,11 +620,7 @@ export function NewGameScreen({
                   testID="play-format"
                   label={translate("play:newGame.format")}
                   value={format}
-                  options={playSystemFormats(system).map(({ id, label, blurb }) => ({
-                    id,
-                    label,
-                    ...(blurb ? { detail: blurb } : {}),
-                  }))}
+                  options={playFormatOptions(system)}
                   onSelect={chooseFormat}
                 />
               ) : null}
@@ -662,7 +656,7 @@ export function NewGameScreen({
               <View style={themed($counterValue)}>
                 <ValueField
                   testID="starting-counter"
-                  label={counter.heading}
+                  label={counterHeading(system)}
                   value={startingLife}
                   min={1}
                   max={counter.maxStartingValue}

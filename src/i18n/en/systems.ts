@@ -1,4 +1,54 @@
 const systems = {
+  noSystem: "No system",
+  counterHeading: {
+    none: "Life",
+    mtg: "Life",
+    ygo: "Life Points",
+    pokemon: "Prize cards",
+  },
+  counterLabel: {
+    none: "life",
+    mtg: "life",
+    ygo: "Life Points",
+    pokemon: "Prize cards",
+  },
+  startingValueRange: {
+    none: "Starting life must be a whole number from 1 to {{max}}.",
+    mtg: "Starting life must be a whole number from 1 to {{max}}.",
+    ygo: "Starting Life Points must be a whole number from 1 to {{max}}.",
+    pokemon: "Starting Prize cards must be a whole number from 1 to {{max}}.",
+  },
+  tableItem: {
+    poison: "Poison",
+    commanderTax: "Commander tax",
+    monarch: "Monarch",
+    initiative: "Initiative",
+  },
+  section: {
+    commander: "Commander",
+    sideboard: "Sideboard",
+    extra: "Extra Deck",
+    side: "Side Deck",
+    main: {
+      mtg: "Main deck",
+      ygo: "Main Deck",
+      pokemon: "Deck",
+    },
+  },
+  formatBlurb: {
+    mtg: {
+      commander: "100 cards, singleton",
+      standard: "Recent sets",
+      pioneer: "Return to Ravnica forward",
+      modern: "8th Edition forward",
+      legacy: "Nearly every set",
+      vintage: "Restricted list",
+      pauper: "Commons only",
+      brawl: "60 cards, singleton",
+      limited: "Draft and sealed",
+      constructed: "Anything else",
+    },
+  },
   counterValue: {
     none_one: "{{count}} life",
     none_other: "{{count}} life",

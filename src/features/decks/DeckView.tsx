@@ -7,6 +7,7 @@ import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -16,7 +17,7 @@ import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckC
 import { cardCountLabel } from "./deckCopy"
 import type { DeckStatsRecord, StatsSource } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
-import { deckFormatLabel, deckGame, deckSections } from "../../../convex/lib/deckGames"
+import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 
 export function DeckView({
   tab,
@@ -92,9 +93,14 @@ export function DeckView({
   }
 }) {
   const { themed, theme } = useAppTheme()
-  const sections = groupedCards(cards, deckSections(game, format))
+  const sections = groupedCards(cards, localizedDeckSections(game, format))
   if (onChooseCommander && !sections.some((section) => section.board === "commander")) {
-    sections.unshift({ board: "commander", label: "Commander", data: [], quantity: 0 })
+    sections.unshift({
+      board: "commander",
+      label: translate("systems:section.commander"),
+      data: [],
+      quantity: 0,
+    })
   }
   return (
     <>

@@ -45,6 +45,7 @@ import {
 import { GuestDeckImportNotice } from "@/features/decks/GuestDeckImportNotice"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
+import { localizedDeckSections } from "@/features/game/playSystems"
 import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -58,7 +59,6 @@ import {
   DECK_GAME_LIST,
   deckFormatLabel,
   deckFormats,
-  deckSections,
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
@@ -279,7 +279,9 @@ function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
 }
 
 function normalizeImportedCards(cards: GuestDeckPayload["cards"], game: string, format: string) {
-  const supportsCommander = deckSections(game, format).some((section) => section.id === "commander")
+  const supportsCommander = localizedDeckSections(game, format).some(
+    (section) => section.id === "commander",
+  )
   const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
   for (const entry of cards) {
     const card = { ...entry }
@@ -1220,14 +1222,18 @@ export function AddDeckScreen({
         : []
     const sections = catalogPreviewSections(
       pastedCards.map((card) => ({ ...card, section: cardSection(card) })),
-      deckSections(pastedDraft.game, pastedDraft.format),
+      localizedDeckSections(pastedDraft.game, pastedDraft.format),
     )
     if (
       editingPasted &&
       singleCommander &&
       !sections.some((section) => section.id === "commander")
     ) {
-      sections.unshift({ id: "commander", label: "Commander", entries: [] })
+      sections.unshift({
+        id: "commander",
+        label: translate("systems:section.commander"),
+        entries: [],
+      })
     }
     return (
       <Screen
@@ -1528,7 +1534,7 @@ export function AddDeckScreen({
           </View>
           {catalogPreviewSections(
             entries,
-            deckSections(
+            localizedDeckSections(
               selectedCatalogDeck.game,
               selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
             ),
@@ -1628,7 +1634,7 @@ export function AddDeckScreen({
       }
     })
     const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
-    const configuredSections = deckSections(game, previewFormat)
+    const configuredSections = localizedDeckSections(game, previewFormat)
     const sections = previewSections(cards, configuredSections)
     const unresolved = resolvedPrecon?.unresolved.length ?? 0
     const cannotImport =

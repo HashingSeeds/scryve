@@ -280,12 +280,6 @@ const board = {
     showOverviewFor: "Show commander damage for {{identity}}",
     expandsGrid: "Expands the commander damage grid",
   },
-  tableItem: {
-    poison: "Poison",
-    commanderTax: "Commander tax",
-    monarch: "Monarch",
-    initiative: "Initiative",
-  },
   outReason: {
     commanderDamage: "commander damage",
     poison: "poison",

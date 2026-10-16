@@ -276,7 +276,12 @@ const connected = {
     anotherSeat: "Another seat",
     closeLayout: "Close layout chooser",
     failedAction: {
-      life: "A {{delta}} {{counter}} change could not sync",
+      life: {
+        none: "A {{delta}} life change could not sync",
+        mtg: "A {{delta}} life change could not sync",
+        ygo: "A {{delta}} Life Points change could not sync",
+        pokemon: "A {{delta}} Prize cards change could not sync",
+      },
       commanderDamage: "A {{delta}} commander damage assignment could not sync",
       table: "A table change could not sync",
       confirmCommanderDamage: "Confirming commander damage could not sync",
