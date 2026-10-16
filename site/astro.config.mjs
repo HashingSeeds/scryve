@@ -9,7 +9,13 @@ export default defineConfig({
   vite: {
     resolve: {
       // Shared game modules in the app import each other through the app's `@/` alias.
-      alias: { "@/": fileURLToPath(new URL("../src/", import.meta.url)) },
+      alias: [
+        {
+          find: /^@\/i18n\/translate$/,
+          replacement: fileURLToPath(new URL("./src/translate.ts", import.meta.url)),
+        },
+        { find: "@/", replacement: fileURLToPath(new URL("../src/", import.meta.url)) },
+      ],
     },
   },
 })

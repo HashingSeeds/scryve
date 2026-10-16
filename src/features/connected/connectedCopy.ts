@@ -1,4 +1,6 @@
 import { counterValueLabel, playFormatLabel, storedPlaySystem } from "@/features/game/playSystems"
+import { appLocale } from "@/i18n"
+import { translate } from "@/i18n/translate"
 
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
@@ -21,29 +23,34 @@ export type ResumableGame = {
 
 export function relativeTime(timestamp: number, now: number) {
   const elapsed = Math.max(0, now - timestamp)
-  if (elapsed < MINUTE_MS) return "just now"
+  if (elapsed < MINUTE_MS) return translate("connected:relativeTime.justNow")
   if (elapsed < HOUR_MS) {
     const minutes = Math.floor(elapsed / MINUTE_MS)
-    return `${minutes}m ago`
+    return translate("connected:relativeTime.minutes", { minutes })
   }
   if (elapsed < DAY_MS) {
     const hours = Math.floor(elapsed / HOUR_MS)
-    return `${hours}h ago`
+    return translate("connected:relativeTime.hours", { hours })
   }
   const days = Math.floor(elapsed / DAY_MS)
-  if (days < 7) return `${days}d ago`
-  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+  if (days < 7) return translate("connected:relativeTime.days", { days })
+  return new Date(timestamp).toLocaleDateString(appLocale, { month: "short", day: "numeric" })
 }
 
 export function resumeTitle(game: ResumableGame) {
-  const role = game.isHost ? "Hosting" : "Playing"
-  return game.status === "lobby" ? `${role} · waiting to start` : `${role} · in progress`
+  if (game.isHost)
+    return game.status === "lobby"
+      ? translate("connected:resumeTitle.hostingLobby")
+      : translate("connected:resumeTitle.hostingActive")
+  return game.status === "lobby"
+    ? translate("connected:resumeTitle.playingLobby")
+    : translate("connected:resumeTitle.playingActive")
 }
 
 export function resumeDetail(game: ResumableGame, now: number) {
   const system = storedPlaySystem(game.system)
   return [
-    `${game.playerCount} seats`,
+    translate("connected:seatCount", { count: game.playerCount }),
     system ? playFormatLabel(system, game.format || game.ruleset) : undefined,
     game.startingLife ? counterValueLabel(system, game.startingLife) : undefined,
     relativeTime(game.updatedAt, now),
@@ -54,12 +61,12 @@ export function resumeDetail(game: ResumableGame, now: number) {
 
 export function seatSummary(claimed: number, total: number) {
   const open = Math.max(0, total - claimed)
-  if (open === 0) return "All seats claimed"
-  return `Waiting for ${open} more ${open === 1 ? "player" : "players"}`
+  if (open === 0) return translate("connected:allSeatsClaimed")
+  return translate("connected:waitingForPlayers", { count: open })
 }
 
 export function deckRequirementLabel(required: boolean) {
-  return required ? "Decks required" : "Decks optional"
+  return required ? translate("connected:decksRequired") : translate("connected:decksOptional")
 }
 
 export function lobbyDetail(
@@ -90,38 +97,25 @@ export function seatDetail({
   deckName?: string
   versionName?: string
 }) {
-  const who = controlledByMe ? "Your seat" : `Seat ${seat}`
-  const deck = deckName ? [deckName, versionName].filter(Boolean).join(" · ") : "No deck selected"
+  const who = controlledByMe
+    ? translate("connected:yourSeat")
+    : translate("connected:seatNumber", { seat })
+  const deck = deckName
+    ? [deckName, versionName].filter(Boolean).join(" · ")
+    : translate("connected:noDeckSelected")
   return `${who} · ${deck}`
 }
 
 export type LobbyExitAction = "leave" | "abandon"
 
 export function lobbyExitCopy(action: LobbyExitAction) {
-  if (action === "abandon")
-    return {
-      title: "Abandon this lobby?",
-      message:
-        "This closes the lobby for everyone and saves a terminal summary. It cannot be undone.",
-      confirmText: "Abandon lobby",
-    }
   return {
-    title: "Leave this lobby?",
-    message:
-      "The lobby drops off your resume list. Other players and their history stay unchanged.",
-    confirmText: "Leave lobby",
+    title: translate(`connected:lobbyExit.${action}.title`),
+    message: translate(`connected:lobbyExit.${action}.message`),
+    confirmText: translate(`connected:lobbyExit.${action}.confirmText`),
   }
 }
 
 export function onlineOnlyNotice(action: "start" | "exit" | "join" | "deck") {
-  switch (action) {
-    case "start":
-      return "Reconnect to start the game. Starting is online-only and is never queued."
-    case "exit":
-      return "Reconnect to leave or abandon this lobby. These actions are online-only and are never queued."
-    case "join":
-      return "Reconnect to claim a seat. Seat claims are online-only and are never queued."
-    case "deck":
-      return "Reconnect to change decks. Deck choices are online-only and are never queued."
-  }
+  return translate(`connected:onlineOnly.${action}`)
 }

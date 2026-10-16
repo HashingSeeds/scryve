@@ -5,10 +5,6 @@ import { ThemeProvider } from "@/theme/context"
 
 import { Header } from "./Header"
 
-jest.mock("@/i18n/translate", () => ({
-  translate: (key: string) => (key === "common:back" ? "Back" : key),
-}))
-
 describe("Header", () => {
   it("exposes translated text actions as 56-point buttons with explicit state", () => {
     const view = render(

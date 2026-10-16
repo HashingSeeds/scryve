@@ -46,6 +46,8 @@
     "align-deps": "expo install --fix",
     "test": "jest",
     "test:scripts": "node --test scripts/*.test.cjs",
+    "i18n:translate": "node scripts/i18n.cjs translate",
+    "i18n:check": "node scripts/i18n.cjs check",
     "test:watch": "jest --watch",
     "test:ygo-worker": "jest workers/ygo-image-mirror/src/index.test.ts workers/ygo-image-mirror/sync/index.test.ts --runInBand && vitest run --config workers/ygo-image-mirror/vitest.config.mts",
     "check:ygo-worker": "wrangler types --check --cwd workers/ygo-image-mirror && tsc --noEmit -p workers/ygo-image-mirror/tsconfig.json && tsc --noEmit -p workers/ygo-image-mirror/sync/tsconfig.json && tsc --noEmit -p workers/ygo-image-mirror/test/tsconfig.json && pnpm test:ygo-worker && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env= --outdir .wrangler/dry-run-preview && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env production --outdir .wrangler/dry-run-production",
@@ -131,6 +133,7 @@
     "svix": "^1.99.1"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@babel/core": "^7.20.0",
     "@babel/plugin-transform-dynamic-import": "^7.29.7",
     "@babel/runtime": "^7.20.0",
@@ -146,6 +149,7 @@
     "eslint": "^8.57.0",
     "eslint-config-expo": "~57.0.2",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-i18next": "^6.1.5",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-native": "^4.1.0",

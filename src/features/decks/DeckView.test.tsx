@@ -4,10 +4,6 @@ import { ThemeProvider } from "@/theme/context"
 
 import { DeckView } from "./DeckView"
 
-jest.mock("@/i18n/translate", () => ({
-  translate: (key: string) => (key === "common:back" ? "Back" : key),
-}))
-
 it("keeps the back action available in read-only mode", () => {
   const onBack = jest.fn()
   const noop = jest.fn()

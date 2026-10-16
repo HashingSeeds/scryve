@@ -114,5 +114,40 @@ module.exports = {
         "@typescript-eslint/no-explicit-any": "error",
       },
     },
+    {
+      files: ["src/**/*.tsx"],
+      excludedFiles: ["**/*.test.tsx", "src/app/dev/**"],
+      plugins: ["i18next"],
+      rules: {
+        "i18next/no-literal-string": [
+          "warn",
+          {
+            "mode": "jsx-only",
+            "should-validate-template": true,
+            "callees": {
+              exclude: [
+                "translate",
+                "i18n(ext)?",
+                "t",
+                "require",
+                "addEventListener",
+                "removeEventListener",
+                "includes",
+                "indexOf",
+                "endsWith",
+                "startsWith",
+              ],
+            },
+            "jsx-attributes": {
+              include: [
+                "^(text|title|subtitle|label|placeholder|heading|content|message|description|helper|caption)$",
+                "^(leftText|rightText|confirmText|cancelText|emptyText|buttonText|actionText)$",
+                "^accessibility(Label|Hint|Value)$",
+              ],
+            },
+          },
+        ],
+      },
+    },
   ],
 }

@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { deckFormatLabel, deckFormats } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
@@ -120,14 +122,11 @@ export function playFormatLabel(value: unknown, format?: string): string {
 }
 
 export function counterValueLabel(value: unknown, count: number): string {
-  const { singular, plural } = playSystemRules(value).counter
-  return `${count} ${Math.abs(count) === 1 ? singular : plural}`
+  return translate(`systems:counterValue.${playSystemRules(value).id}`, { count })
 }
 
 export function counterChangeLabel(value: unknown, count: number): string {
-  const { singular, plural } = playSystemRules(value).counter
-  const one = Math.abs(count) === 1
-  return `${count} ${(one ? singular : plural).toLowerCase()} ${one ? "change" : "changes"}`
+  return translate(`systems:counterChange.${playSystemRules(value).id}`, { count })
 }
 
 export function counterDeltaFromStartLabel(
@@ -138,7 +137,11 @@ export function counterDeltaFromStartLabel(
   const delta = current - startingValue
   if (lowerLeads(playSystemRules(value).counter)) {
     const taken = startingValue - current
-    return taken === 0 ? "none taken" : `${taken} taken`
+    return taken === 0
+      ? translate("systems:noneTaken")
+      : translate("systems:taken", { amount: taken })
   }
-  return delta === 0 ? "even" : `${delta > 0 ? "+" : ""}${delta} from start`
+  return delta === 0
+    ? translate("systems:even")
+    : translate("systems:fromStart", { delta: `${delta > 0 ? "+" : ""}${delta}` })
 }

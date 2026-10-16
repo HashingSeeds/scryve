@@ -1196,7 +1196,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-connected-finish-button"
-              tx="game:cancel"
+              tx="common:cancel"
               disabled={view.finishing}
               style={themed($dialogAction)}
               onPress={() => setConfirmingFinish(false)}
@@ -1205,10 +1205,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               testID="confirm-connected-finish-button"
               tx={
                 view.finishing
-                  ? "game:ending"
+                  ? "play:ending"
                   : finishResultSelected
-                    ? "game:finish"
-                    : "game:abandon"
+                    ? "play:finish"
+                    : "play:abandon"
               }
               preset={finishResultSelected ? "reversed" : "filled"}
               disabled={view.finishing || Boolean(finishBlocker)}

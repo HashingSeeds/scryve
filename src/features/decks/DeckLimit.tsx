@@ -231,6 +231,7 @@ function DeckLimitOptions({
           </View>
           <View style={themed($row)}>
             <Button
+              testID="deck-limit-cancel-delete"
               text="Back"
               style={$flex1}
               disabled={busy}
