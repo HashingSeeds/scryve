@@ -422,7 +422,7 @@ export class LanSession {
       rememberSeatClaim({ publicId: round, token: this.pass.token, savedAt: Date.now() })
     )
       this.claimedRound = round
-    if (status === "finished" && this.finishedRound !== round) {
+    if (status === "finished" && this.claimedRound === round && this.finishedRound !== round) {
       this.finishedRound = round
       retrySeatClaims()
     }
@@ -457,7 +457,6 @@ export class LanSession {
       this.publish(startLanRound(game, Date.now()))
   }
 
-  // why: a seat whose hash failed still finishes; it just can't be claimed later.
   private hashPass({ key, token }: LanSeatPass) {
     this.passHashes.set(
       key,
@@ -465,16 +464,17 @@ export class LanSession {
     )
   }
 
-  // why: the round is saved before it ends, so a failed save leaves it open to finish again.
   async finish(result?: ConnectedGameResult) {
-    if (this.state.role !== "host" || this.game?.status !== "active") return
+    const { game: started, session } = this
+    if (this.state.role !== "host" || started?.status !== "active") return
     const hashes = new Map<string, string>()
     for (const [key, hash] of this.passHashes) {
       const value = await hash
       if (value) hashes.set(key, value)
     }
     const game = this.game
-    if (game?.status !== "active") return
+    if (session !== this.session || game?.status !== "active" || game.round !== started.round)
+      return
     const now = Date.now()
     archiveLanGame({ ...game, updatedAt: now }, result, hashes)
     this.publish(endLanRound(game, "finished", now))

@@ -113,17 +113,21 @@ function ActivePublish({
   }, [finishCount, finishMatch, online, ownerId, publish, ready, repository])
 
   useEffect(() => {
-    const retry = () => setClaimCount((count) => count + 1)
-    const foreground = AppState.addEventListener("change", (state) => state === "active" && retry())
-    const unsubscribe = onSeatClaim(() => {
+    const retry = () => {
       claimRetries.current = 0
-      retry()
-    })
+      setClaimCount((count) => count + 1)
+    }
+    const foreground = AppState.addEventListener("change", (state) => state === "active" && retry())
+    const unsubscribe = onSeatClaim(retry)
     return () => {
       foreground.remove()
       unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (online) claimRetries.current = 0
+  }, [online])
 
   useEffect(() => {
     if (!ready || !online || !ownerId) return

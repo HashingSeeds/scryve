@@ -171,6 +171,17 @@ describe("nearby host", () => {
     expect(jest.mocked(archiveLanGame).mock.calls[0][2].get(alice.pass().key)).toBe("late-hash")
   })
 
+  it("still finishes when a guest's pass can't be hashed, leaving that seat unclaimable", async () => {
+    jest.mocked(hashSeatPassToken).mockRejectedValueOnce(new Error("No digest"))
+    const { session, alice, bob } = await startedGame()
+
+    await session.writes.finish()
+
+    const hashes = jest.mocked(archiveLanGame).mock.calls[0][2]
+    expect(hashes.has(alice.pass().key)).toBe(false)
+    expect(hashes.get(bob.pass().key)).toBe(`hash-${bob.pass().token}`)
+  })
+
   it("keeps the round open when saving it fails, so the host can finish again", async () => {
     const { session } = await startedGame()
     jest.mocked(archiveLanGame).mockImplementationOnce(() => {
