@@ -180,6 +180,7 @@ function ConnectedHostQuerySource({
       requestSucceeded = true
       captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })
       localRepository.saveLayoutPreference(setup.playerCount, layout)
+      localRepository.rememberSetup({ mode: "connected", lobby: setup })
       onLobbyCreated(lobby)
     } catch (cause) {
       if (!requestSucceeded)

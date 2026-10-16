@@ -10,6 +10,7 @@ import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
+import { gameSetupHref } from "@/features/game/gameSetup"
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
 import type { TxKeyPath } from "@/i18n"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
@@ -190,7 +191,7 @@ export default function Index() {
       initialEndOpen={staleChoice === "end"}
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
-      onSetup={() => router.push(activeGame ? "/game/new?setup=1" : "/game/new")}
+      onSetup={() => router.push(gameSetupHref())}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
       onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}

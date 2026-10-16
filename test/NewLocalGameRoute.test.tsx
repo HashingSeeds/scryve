@@ -84,21 +84,6 @@ jest.mock("@/features/connected/LocalGamePublishSource", () => {
   }
 })
 
-jest.mock("@/features/auth/CloudScreen", () => ({
-  CloudScreen: ({ children }: { children: (access: object) => import("react").ReactNode }) =>
-    children({ ready: true, loading: false, request: jest.fn() }),
-}))
-jest.mock("@/screens/JoinConnectedScreen", () => ({
-  JoinConnectedScreen: () =>
-    jest
-      .requireActual<typeof import("react")>("react")
-      .createElement(
-        jest.requireActual<typeof import("react-native")>("react-native").Text,
-        { testID: "inline-join" },
-        "Join with code",
-      ),
-}))
-
 describe("new local game route", () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -344,10 +329,8 @@ describe("new local game route", () => {
     )
 
     expect(view.getByTestId("host-connected-button")).toBeTruthy()
-    fireEvent.press(view.getByTestId("connected-action-join"))
-    expect(router.push).not.toHaveBeenCalled()
-    expect(view.getByTestId("inline-join")).toBeTruthy()
-    fireEvent.press(view.getByTestId("connected-action-host"))
+    fireEvent.press(view.getByTestId("join-with-code-button"))
+    expect(router.push).toHaveBeenCalledWith("/connected/join")
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("resume-connected-active-game"))
     expect(router.replace).toHaveBeenCalledWith({
