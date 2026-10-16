@@ -53,10 +53,6 @@ export function isLand(details: AnalysisDetails) {
   return /\bLand\b/.test(details.typeLine?.split(" // ")[0] ?? "")
 }
 
-function isModalLand(details: AnalysisDetails) {
-  return !isLand(details) && /\bLand\b/.test(details.typeLine?.split(" // ")[1] ?? "")
-}
-
 const MANA_ABILITY =
   /\badd (\{[WUBRGC0-9X]|(one|two|three|four|five|x|that much) mana|an amount of)/i
 const LAND_SEARCH =
@@ -65,6 +61,15 @@ const LAND_SEARCH =
 function frontText(details: AnalysisDetails) {
   const faces = readCardFaces(details.faceDetails)
   return (faces.length === 2 ? faces[0].oracleText : details.oracleText) ?? ""
+}
+
+function isModalLand(details: AnalysisDetails) {
+  return (
+    !isLand(details) &&
+    /\bLand\b/.test(details.typeLine?.split(" // ")[1] ?? "") &&
+    // why: the cache has no layout; every transforming card with a land back says "transform" on its front, and no modal one does.
+    !/transform/i.test(frontText(details))
+  )
 }
 
 export function isRamp(details: AnalysisDetails) {

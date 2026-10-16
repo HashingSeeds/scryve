@@ -211,7 +211,21 @@ describe("analyzeDeck", () => {
   const forest = { typeLine: "Basic Land — Forest", oracleText: "({T}: Add {G}.)" }
   const elves = { manaCost: "{G}", typeLine: "Creature — Elf Druid", oracleText: "{T}: Add {G}." }
   const bear = { manaCost: "{1}{G}", typeLine: "Creature — Bear" }
+  const legionsLanding = {
+    manaCost: "{W}",
+    typeLine: "Enchantment // Land",
+    faceDetails: JSON.stringify([
+      {
+        name: "Legion's Landing",
+        manaCost: "{W}",
+        typeLine: "Enchantment",
+        oracleText: "When you attack with three or more creatures, transform Legion's Landing.",
+      },
+      { name: "Adanto, the First Fort", typeLine: "Legendary Land", oracleText: "{T}: Add {W}." },
+    ]),
+  }
   const byName: Record<string, object> = {
+    "Legion's Landing": legionsLanding,
     "Forest": forest,
     "Llanowar Elves": elves,
     "Grizzly Bears": bear,
@@ -231,6 +245,7 @@ describe("analyzeDeck", () => {
         card("Llanowar Elves", 4),
         card("Grizzly Bears", 30),
         card("Emeria's Call", 1),
+        card("Legion's Landing", 1),
         card("Unknown", 1),
         card("Grizzly Bears", 15, "sideboard"),
       ],
@@ -241,14 +256,14 @@ describe("analyzeDeck", () => {
       lands: 24,
       modalLands: 1,
       ramp: 4,
-      curve: [0, 4, 30, 0, 0, 0, 0, 1],
+      curve: [0, 5, 30, 0, 0, 0, 0, 1],
       colors: [
-        { color: "W", pips: 3, sources: 1 },
+        { color: "W", pips: 4, sources: 1 },
         { color: "G", pips: 34, sources: 24 },
       ],
       onThePlay: true,
     })
-    expect(analysis.averageManaValue).toBeCloseTo((4 + 60 + 7) / 35)
+    expect(analysis.averageManaValue).toBeCloseTo((5 + 60 + 7) / 36)
     expect(analysis.suggestedLands).toBeDefined()
     expect(analysis.landDrops).toHaveLength(5)
   })
