@@ -619,6 +619,7 @@ export function NewGameScreen({
                 <SelectField
                   testID="play-format"
                   label={translate("play:newGame.format")}
+                  field="format"
                   value={format}
                   options={playFormatOptions(system)}
                   onSelect={chooseFormat}
@@ -755,6 +756,7 @@ export function NewGameScreen({
                   <SelectField
                     testID="life-step"
                     label={translate("play:newGame.changeBy")}
+                    field="changeBy"
                     value={String(lifeStep)}
                     options={LIFE_STEP_OPTIONS.map((step) => ({
                       id: String(step),
@@ -832,6 +834,7 @@ export function NewGameScreen({
                     <SelectField
                       testID="me-seat"
                       label={translate("play:newGame.thisIsMe")}
+                      field="thisIsMe"
                       value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
                       placeholder={translate("play:newGame.noSeat")}
                       clearLabel={translate("play:newGame.noSeat")}
@@ -846,6 +849,7 @@ export function NewGameScreen({
                       <SelectField
                         testID="me-deck"
                         label={translate("play:newGame.yourDeck")}
+                        field="yourDeck"
                         value={deck?.versionId}
                         placeholder={
                           account.decks === "unavailable"

@@ -38,7 +38,6 @@ import { api } from "../../../convex/_generated/api"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
-const COMMANDER_TITLE = "Commander"
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 
@@ -405,7 +404,9 @@ export function CardSearchScreen({
         contentContainerStyle={$screen}
       >
         <Header
-          title={choosingCommander ? COMMANDER_TITLE : translate("decks:cardSearch.title")}
+          title={translate(
+            choosingCommander ? "systems:section.commander" : "decks:cardSearch.title",
+          )}
           leftTx="common:back"
           onLeftPress={onClose}
           rightTx="common:done"
@@ -427,6 +428,7 @@ export function CardSearchScreen({
           {initialSection !== "commander" ? (
             <SelectField
               label={translate("decks:cardSearch.addTo")}
+              field="addTo"
               options={sections}
               value={section}
               onSelect={(value) => {

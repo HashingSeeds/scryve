@@ -35,8 +35,24 @@ const common = {
   selectField: {
     none: "None",
     triggerLabel: "{{label}}, {{value}}",
-    openHint: "Opens the {{label}} choices",
-    closeLabel: "Close {{label}} choices",
+    openHint: {
+      format: "Opens the format choices",
+      commanderColor: "Opens the commander color choices",
+      addTo: "Opens the add to choices",
+      changeBy: "Opens the change by choices",
+      thisIsMe: "Opens the this is me choices",
+      yourDeck: "Opens the your deck choices",
+      system: "Opens the system choices",
+    },
+    closeLabel: {
+      format: "Close format choices",
+      commanderColor: "Close commander color choices",
+      addTo: "Close add to choices",
+      changeBy: "Close change by choices",
+      thisIsMe: "Close this is me choices",
+      yourDeck: "Close your deck choices",
+      system: "Close system choices",
+    },
   },
   valueField: {
     readoutLabel: "{{label}}, {{value}}",

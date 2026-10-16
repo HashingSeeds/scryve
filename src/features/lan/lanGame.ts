@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
 import {
   commanderTotals,
@@ -127,6 +129,21 @@ const withSeat = (game: LanGame, key: string, update: (seat: LanSeat) => LanSeat
   seats: game.seats.map((seat) => (seat.key === key ? update(seat) : seat)),
 })
 
+const LAN_REJECTION_IDS = ["seatTaken", "started", "full", "update"] as const
+
+/** why: the wire carries English so hosts and guests on different builds still understand each other; each device translates on receipt. */
+const LAN_REJECTIONS: Record<(typeof LAN_REJECTION_IDS)[number], string> = {
+  seatTaken: "That seat belongs to another device.",
+  started: "This game has already started.",
+  full: "This game is full.",
+  update: "Update Scryve to join this game.",
+}
+
+export function lanRejectionMessage(reason: string) {
+  const id = LAN_REJECTION_IDS.find((candidate) => LAN_REJECTIONS[candidate] === reason)
+  return id ? translate(`connected:nearby.rejected.${id}`) : reason
+}
+
 // why: the host's seat has no token anywhere, so no pass can ever claim it; a pass for a seat the lobby already freed just gets a new one.
 export function admitLanGuest(
   game: LanGame,
@@ -134,18 +151,18 @@ export function admitLanGuest(
   join: Extract<LanGuestMessage, { type: "join" }>,
   fresh: LanSeatPass,
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
-  if (join.protocol !== LAN_PROTOCOL) return { rejected: "Update Scryve to join this game." }
+  if (join.protocol !== LAN_PROTOCOL) return { rejected: LAN_REJECTIONS.update }
   const { pass } = join
   const owned = pass && game.seats.some((seat) => seat.key === pass.key)
   if (pass && (pass.key === game.hostKey || (owned && tokens.get(pass.key) !== pass.token)))
-    return { rejected: "That seat belongs to another device." }
+    return { rejected: LAN_REJECTIONS.seatTaken }
   if (pass && owned)
     return {
       game: withSeat(game, pass.key, (seat) => ({ ...seat, name: join.name, connected: true })),
       pass,
     }
-  if (game.status !== "lobby") return { rejected: "This game has already started." }
-  if (game.seats.length >= game.setup.playerCount) return { rejected: "This game is full." }
+  if (game.status !== "lobby") return { rejected: LAN_REJECTIONS.started }
+  if (game.seats.length >= game.setup.playerCount) return { rejected: LAN_REJECTIONS.full }
   const seat: LanSeat = {
     key: fresh.key,
     seat: game.seats.length + 1,

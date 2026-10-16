@@ -17,6 +17,7 @@ function renderField(onSelect = jest.fn(), value?: string) {
         <SelectField
           testID="format"
           label="Format"
+          field="format"
           placeholder="No default"
           clearLabel="No default"
           value={value}

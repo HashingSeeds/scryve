@@ -437,6 +437,13 @@ const connected = {
       unreachable: "{{name}} isn't reachable. The game may have ended.",
       lostHost: "Lost the host. The game may have ended.",
     },
+    rejected: {
+      seatTaken: "That seat belongs to another device.",
+      started: "This game has already started.",
+      full: "This game is full.",
+      update: "Update Scryve to join this game.",
+      hostOutdated: "The host needs to update Scryve first.",
+    },
   },
 }
 

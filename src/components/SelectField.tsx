@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
+import type common from "@/i18n/en/common"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -17,8 +18,11 @@ export interface SelectOption {
   detail?: string
 }
 
+export type SelectFieldName = keyof (typeof common)["selectField"]["openHint"]
+
 export interface SelectFieldProps {
   label: string
+  field: SelectFieldName
   options: readonly SelectOption[]
   value?: string
   placeholder?: string
@@ -60,6 +64,7 @@ export function menuPlacement(
 
 export function SelectField({
   label,
+  field,
   options,
   value,
   placeholder = translate("common:selectField.none"),
@@ -116,7 +121,7 @@ export function SelectField({
           label,
           value: selected?.label ?? placeholder,
         })}
-        accessibilityHint={translate("common:selectField.openHint", { label: label.toLowerCase() })}
+        accessibilityHint={translate(`common:selectField.openHint.${field}`)}
         accessibilityState={{ expanded: open, disabled }}
         disabled={disabled}
         style={({ pressed }) => [
@@ -141,9 +146,7 @@ export function SelectField({
         <Pressable
           testID={testID ? `${testID}-backdrop` : undefined}
           accessibilityRole="button"
-          accessibilityLabel={translate("common:selectField.closeLabel", {
-            label: label.toLowerCase(),
-          })}
+          accessibilityLabel={translate(`common:selectField.closeLabel.${field}`)}
           style={[StyleSheet.absoluteFill, themed($scrim)]}
           onPress={() => setOpen(false)}
         />

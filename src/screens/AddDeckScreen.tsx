@@ -1277,6 +1277,7 @@ export function AddDeckScreen({
                 <SelectField
                   testID="format-picker-options"
                   label={translate("decks:settings.format")}
+                  field="format"
                   value={format}
                   disabled={busy}
                   options={deckFormats(game)}
@@ -1801,6 +1802,7 @@ export function AddDeckScreen({
             <SelectField
               testID="game-picker-options"
               label={translate("decks:shelf.system")}
+              field="system"
               value={game}
               options={DECK_GAME_LIST.map((candidate) => ({
                 id: candidate.id,
@@ -1815,6 +1817,7 @@ export function AddDeckScreen({
             <SelectField
               testID="format-picker-options"
               label={translate("decks:settings.format")}
+              field="format"
               value={format}
               options={deckFormats(game).map((candidate) => ({
                 id: candidate.id,

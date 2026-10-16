@@ -265,6 +265,7 @@ export function SettingsScreen({
           <SelectField
             testID="default-format"
             label={copy.format}
+            field="format"
             placeholder={copy.noDefault}
             clearLabel={copy.noDefault}
             value={settings.defaultFormat}
