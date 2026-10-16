@@ -596,8 +596,14 @@ figure {
   padding: 0.7em 0.8em;
   gap: 0.5em 0.8em;
   border-radius: 12px;
-  background: rgb(0 0 0 / 62%);
+  /* The app's 62% black over the seat, mixed solid so the HP behind it doesn't show through. */
+  background: color-mix(in srgb, var(--seat) 38%, #000);
   font-size: var(--small);
+}
+
+/* The ask covers the Pokémon it's about, so nothing of it peeks out around the bar. */
+.pk:has(> .pk-bar:not(.pk-toast)) > .pk-hero {
+  visibility: hidden;
 }
 
 .pk-bar > span:first-child {
