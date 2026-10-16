@@ -6,6 +6,7 @@ import { useMutation } from "convex/react"
 import { Button } from "@/components/Button"
 import { DialogCard, type DialogOrigin } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
+import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -56,7 +57,7 @@ export function TreacheryRoleDialog({
     try {
       setBusy(true)
       setError(undefined)
-      await reveal({ publicId })
+      await reveal({ publicId, deviceId: localGameRepository.getDeviceId() })
       setConfirming(false)
     } catch (cause) {
       setError(convexErrorMessage(cause, "Could not reveal your role"))

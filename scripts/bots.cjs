@@ -305,7 +305,7 @@ class Bot {
     let tick = 0
     const { lifeEvery, commanderEvery, dropEvery, burst, reveal } = this.options
     if (reveal && this.me?.role && !this.me.roleRevealed)
-      this.send(api.games.revealMyRole, { publicId: this.publicId })
+      this.send(api.games.revealMyRole, { publicId: this.publicId, deviceId: this.deviceId })
     if (lifeEvery)
       this.every(lifeEvery, () => {
         for (let i = 0; i < burst; i += 1, tick += 1) this.changeLife(tick % 2 === 0 ? -1 : 1)
