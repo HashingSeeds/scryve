@@ -3171,6 +3171,42 @@ describe("Treachery", () => {
     ).rejects.toMatchObject({ data: { code: "game_not_active" } })
   })
 
+  it("keeps a role on the device whose seat it is, even for one account", async () => {
+    const t = makeConvexTest()
+    const host = await treacheryLobby(t)
+    await host.mutation(api.games.claimSeat, {
+      token,
+      displayName: "Host tablet",
+      color: "#2563EB",
+      deviceId: "device-host-0002",
+      variants,
+    })
+    for (const [index, color] of ["#16A34A", "#DC2626"].entries()) {
+      const player = await synced(t, `player-${index}`, `Player ${index}`)
+      await player.mutation(api.games.claimSeat, {
+        token,
+        displayName: `P${index}`,
+        color,
+        variants,
+      })
+    }
+    await host.mutation(api.games.startGame, { publicId })
+    const seats = await t.run((ctx) => ctx.db.query("gamePlayers").collect())
+    const phone = seats.find((seat) => seat.deviceId === "device-host-0001")!
+    const tablet = seats.find((seat) => seat.deviceId === "device-host-0002")!
+    const rolesOn = async (deviceId: string) =>
+      (await host.query(api.games.lobbyProjection, { publicId, deviceId })).players
+        .filter((player) => player.role !== undefined && player.roleRevealed !== true)
+        .map((player) => player.playerId)
+    const hidden = (seat: typeof phone) => (seat.role === "leader" ? [] : [seat._id])
+
+    expect(await rolesOn("device-host-0001")).toEqual(hidden(phone))
+    expect(await rolesOn("device-host-0002")).toEqual(hidden(tablet))
+    await expect(
+      host.mutation(api.games.revealMyRole, { publicId, deviceId: "device-host-0002" }),
+    ).resolves.toEqual({ role: tablet.role })
+  })
+
   it("tells only the host who won, once the rules decide it", async () => {
     const t = makeConvexTest()
     const [host, guest] = await treacheryGame(t)

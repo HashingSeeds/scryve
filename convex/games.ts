@@ -1600,7 +1600,7 @@ export const lobbyProjection = query({
             controlledByMe:
               (p.userId === user._id || (p.userId === undefined && isHost)) &&
               (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
-            ...roleForViewer(game, p, user._id),
+            ...roleForViewer(game, p, user._id, args.deviceId),
           })),
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
@@ -1612,10 +1612,23 @@ export const lobbyProjection = query({
   },
 })
 
-function roleForViewer(game: Doc<"games">, player: Doc<"gamePlayers">, viewerId: Id<"users">) {
+// why: one account may hold seats on two devices, and each device must see only its own role.
+function ownsSeatOnDevice(player: Doc<"gamePlayers">, userId: Id<"users">, deviceId?: string) {
+  return (
+    player.userId === userId &&
+    (deviceId === undefined || player.deviceId === undefined || player.deviceId === deviceId)
+  )
+}
+
+function roleForViewer(
+  game: Doc<"games">,
+  player: Doc<"gamePlayers">,
+  viewerId: Id<"users">,
+  deviceId?: string,
+) {
   if (player.role === undefined) return {}
   const roleRevealed = player.roleRevealed === true
-  return roleRevealed || player.userId === viewerId || game.status !== "active"
+  return roleRevealed || ownsSeatOnDevice(player, viewerId, deviceId) || game.status !== "active"
     ? { role: player.role, roleRevealed }
     : { roleRevealed }
 }
@@ -1897,10 +1910,18 @@ export const startGame = mutation({
 })
 
 export const revealMyRole = mutation({
-  args: { publicId: v.string() },
+  args: { publicId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    if (args.deviceId) assertDeviceId(args.deviceId)
     const game = await gameByPublicIdForWrite(ctx, args.publicId)
-    const { user, player } = await requireMembership(ctx, game._id)
+    const user = await requireUser(ctx)
+    const player = (
+      await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
+        .take(MAX_PLAYERS_PER_GAME_READ)
+    ).find((seat) => ownsSeatOnDevice(seat, user._id, args.deviceId))
+    if (!player) throw new Error("Game membership required")
     if (player.role === undefined) throw new Error("This game has no hidden roles")
     if (player.roleRevealed !== true) {
       await limitGameRate(ctx, "gameWrite", user._id)
