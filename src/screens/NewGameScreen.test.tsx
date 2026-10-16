@@ -400,6 +400,18 @@ describe("NewGameScreen", () => {
     })
   })
 
+  it("follows Speed Duel to 4000 Life Points and back to 8000 for Advanced", () => {
+    const view = setup()
+
+    fireEvent.press(view.getByTestId("play-system-ygo"))
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-speed"))
+    expect(view.getByLabelText("Life Points, 4000")).toBeTruthy()
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-advanced"))
+    expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
+  })
+
   it("preselects the saved system and format defaults", () => {
     const onStartLocal = jest.fn()
     const view = setup({
