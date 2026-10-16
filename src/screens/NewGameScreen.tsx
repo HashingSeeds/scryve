@@ -426,6 +426,7 @@ export function NewGameScreen({
     const next = isPlaySystemId(value) ? value : undefined
     const nextCounter = playSystemRules(next).counter
     setSystem(next)
+    setTreacheryChosen(false)
     setFormat(next ? playSystemFormat(next) : undefined)
     setStartingLife(defaultStartingLife(next, undefined, playerCount))
     setLifeStep(nextCounter.tapStep)
@@ -494,6 +495,7 @@ export function NewGameScreen({
   }
 
   function choosePlayerCount(value: number) {
+    if (!isTreacheryPlayerCount(value)) setTreacheryChosen(false)
     if (value > playerCount)
       setAppearances((current) => {
         const next = confirmedFree ? withoutProMarks(current) : [...current]

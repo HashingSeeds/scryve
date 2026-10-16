@@ -16,7 +16,7 @@ const { previewKey, previewName } = require("./preview.cjs")
 const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
-                 [--variant treachery]
+                 [--variant treachery]  (players default to 4)
   pnpm bots join <CODE> [--count 1] [--first 1]
 
 Play
@@ -65,7 +65,7 @@ function parseCli(argv) {
     allowPositionals: true,
     options: {
       "preview": { type: "string" },
-      "players": { type: "string", default: "2" },
+      "players": { type: "string" },
       "fill": { type: "string", default: "0" },
       "format": { type: "string", default: "commander" },
       "variant": { type: "string" },
@@ -98,7 +98,9 @@ function parseCli(argv) {
     throw new Error("--variant must be treachery")
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
-  const players = parseCount(values.players, "players", 2, 6)
+  const players = parseCount(values.players ?? (values.variant ? "4" : "2"), "players", 2, 6)
+  if (values.variant === "treachery" && players < 4)
+    throw new Error("--variant treachery needs --players 4 to 6")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
   return {
