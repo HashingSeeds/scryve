@@ -342,6 +342,8 @@ export const LifeCard = memo(function LifeCard({
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
+  const commanderStripShown =
+    !!commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers
   const identityMetrics = seatIdentityMetrics(compact)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
@@ -590,7 +592,7 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
+      {commanderDamage?.inspection && commanderStripShown ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -649,7 +651,11 @@ export const LifeCard = memo(function LifeCard({
               pointerEvents="box-none"
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
-              style={[$cornerIdentity, { maxWidth: identityCorner.position.maxWidth }]}
+              style={[
+                $cornerIdentity,
+                // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
+                commanderStripShown && { maxWidth: identityCorner.position.maxWidth },
+              ]}
             >
               {commanderDamage?.inspection ? (
                 <BoardPressable

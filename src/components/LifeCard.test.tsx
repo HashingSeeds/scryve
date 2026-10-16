@@ -596,6 +596,32 @@ describe("LifeCard", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
+  it("lets the name run the whole row when no commander strip holds the far corner", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 3"
+          seatNumber={3}
+          life={40}
+          color="#41476E"
+          compact
+          contentRotation={-90}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-3"), "layout", {
+      nativeEvent: { layout: { width: 157, height: 185 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style),
+    ).toMatchObject({ maxWidth: 185 - 12 * 2 })
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-identity-seat-3").props.style).maxWidth,
+    ).toBeUndefined()
+  })
+
   it("keeps room for the name when a side notch is not at the card's middle", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
