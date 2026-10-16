@@ -7,7 +7,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { PLAYER_COLORS } from "@/features/game/domain"
-import { playSystemRules } from "@/features/game/playSystems"
+import { playSystemShortLabel } from "@/features/game/playSystems"
 import { recentSetupLabel, type RecentSetup } from "@/features/game/recentSetups"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -29,7 +29,7 @@ export interface StartGameScreenProps {
 
 function setupDetail(setup: RecentSetup) {
   const { system } = setup.mode === "local" ? setup.game : setup.lobby
-  const systemLabel = system ? playSystemRules(system).shortLabel : undefined
+  const systemLabel = system ? playSystemShortLabel(system) : undefined
   if (setup.mode === "connected")
     return systemLabel
       ? translate("play:recentSetups.connectedSeats", {
