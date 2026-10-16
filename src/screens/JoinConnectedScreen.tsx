@@ -34,6 +34,7 @@ import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
 
 // why: the server refuses games in a system this build cannot play, rather than letting it render as another one.
 const PLAYABLE_SYSTEMS = [...PLAY_SYSTEM_IDS]
+const PLAYABLE_VARIANTS = ["treachery"]
 
 const INVALID_INVITE = "Invite is invalid, expired, or revoked"
 
@@ -138,6 +139,7 @@ export function JoinConnectedScreen({
         token,
         manualCode: manualCode ?? undefined,
         systems: PLAYABLE_SYSTEMS,
+        variants: PLAYABLE_VARIANTS,
       })
       if ("invalid" in lookup) throw new Error(INVALID_INVITE)
       const seats = lookup.seats
@@ -158,6 +160,7 @@ export function JoinConnectedScreen({
         color: PLAYER_COLOR_CHOICES[0],
         deviceId,
         systems: PLAYABLE_SYSTEMS,
+        variants: PLAYABLE_VARIANTS,
       })
       if (!result) throw new Error(INVALID_INVITE)
       requestSucceeded = true

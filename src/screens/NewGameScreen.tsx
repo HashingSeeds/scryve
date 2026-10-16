@@ -81,6 +81,7 @@ import {
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
+import { isTreacheryPlayerCount, type GameVariant } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
 
@@ -101,6 +102,7 @@ export interface ConnectedHostFeed {
     ruleset: string
     system?: PlaySystemId
     format?: string
+    variant?: GameVariant
     deckRequired: boolean
     layout: PlayerGridLayoutVariant
     lifeStep: number
@@ -165,6 +167,7 @@ export interface LocalConnectFeed {
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
+const TREACHERY_MIN_SEATS = 4
 const MAX_SEATS = 6
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 const CLOCK_MODES = [
@@ -240,6 +243,7 @@ export function NewGameScreen({
     initialGame?.startingLife ?? defaults.defaultStartingLife,
   )
   const [deckRequired, setDeckRequired] = useState(false)
+  const [treacheryChosen, setTreacheryChosen] = useState(false)
   const [lifeStep, setLifeStep] = useState(
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
@@ -281,6 +285,8 @@ export function NewGameScreen({
   const [connectedAction, setConnectedAction] = useState("host")
   const [pickingHostSeat, setPickingHostSeat] = useState(false)
   const connectedMode = mode === "connected"
+  const treacheryAvailable = connectedMode && system === "mtg"
+  const treachery = treacheryAvailable && treacheryChosen
   const joining = connectedMode && connectedAction === "join" && Boolean(joinContent)
   const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
@@ -399,6 +405,7 @@ export function NewGameScreen({
         startingLife,
         ruleset: format ?? NO_PLAY_SYSTEM,
         deckRequired,
+        ...(treachery ? { variant: "treachery" as const } : {}),
         ...setup,
       })
     else
@@ -419,6 +426,7 @@ export function NewGameScreen({
     const next = isPlaySystemId(value) ? value : undefined
     const nextCounter = playSystemRules(next).counter
     setSystem(next)
+    setTreacheryChosen(false)
     setFormat(next ? playSystemFormat(next) : undefined)
     setStartingLife(defaultStartingLife(next, undefined, playerCount))
     setLifeStep(nextCounter.tapStep)
@@ -481,7 +489,13 @@ export function NewGameScreen({
     if (exited) setGameToExit(undefined)
   }
 
+  function chooseTreachery(on: boolean) {
+    setTreacheryChosen(on)
+    if (on && !isTreacheryPlayerCount(playerCount)) choosePlayerCount(TREACHERY_MIN_SEATS)
+  }
+
   function choosePlayerCount(value: number) {
+    if (!isTreacheryPlayerCount(value)) setTreacheryChosen(false)
     if (value > playerCount)
       setAppearances((current) => {
         const next = confirmedFree ? withoutProMarks(current) : [...current]
@@ -610,6 +624,18 @@ export function NewGameScreen({
                   onSelect={chooseFormat}
                 />
               ) : null}
+              {treacheryAvailable ? (
+                <SegmentedControl
+                  testID="variant"
+                  accessibilityLabel="Variant"
+                  segments={[
+                    { id: "standard", label: "Standard" },
+                    { id: "treachery", label: "Treachery" },
+                  ]}
+                  selectedId={treachery ? "treachery" : "standard"}
+                  onSelect={(value) => chooseTreachery(value === "treachery")}
+                />
+              ) : null}
             </View>
 
             <View style={themed($valueGrid)}>
@@ -618,7 +644,7 @@ export function NewGameScreen({
                   testID="player-count"
                   label={connectedMode ? "Seats" : "Players"}
                   value={playerCount}
-                  min={PLAYER_COUNTS[0]}
+                  min={treachery ? TREACHERY_MIN_SEATS : PLAYER_COUNTS[0]}
                   max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
                   onChange={choosePlayerCount}
                 />

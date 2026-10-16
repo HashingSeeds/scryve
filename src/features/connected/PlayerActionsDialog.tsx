@@ -46,12 +46,14 @@ export function PlayerActionsDialog({
   players,
   origin,
   onClose,
+  onRole,
   onInvite,
 }: {
   publicId: string
   players: ReportablePlayer[]
   origin?: DialogOrigin
   onClose: () => void
+  onRole?: () => void
   onInvite?: () => void
 }) {
   const { themed } = useAppTheme()
@@ -168,6 +170,9 @@ export function PlayerActionsDialog({
             style={themed($muted)}
             text="Report a name you find offensive, or block a player to stop being seated with them."
           />
+          {onRole ? (
+            <Button testID="role-from-players-button" text="Your role" onPress={onRole} />
+          ) : null}
           {onInvite ? (
             <Button testID="invite-from-players-button" text="Invite" onPress={onInvite} />
           ) : null}

@@ -9,6 +9,12 @@ import type {
 } from "@/features/game/types"
 
 import { parseTableState, type TableAction, type TableState } from "../../../convex/lib/table"
+import {
+  isTreacheryRole,
+  type GameVariant,
+  type TreacheryOutcome,
+  type TreacheryRole,
+} from "../../../convex/lib/treachery"
 
 export type ConnectedGameStatus = "lobby" | "active" | "finished" | "abandoned"
 export const CONNECTED_RECENT_OPERATION_LIMIT = 100
@@ -26,6 +32,8 @@ export interface ConnectedPlayerProjection {
   foil?: boolean
   currentLife: number
   controlledByMe: boolean
+  role?: TreacheryRole
+  roleRevealed?: boolean
 }
 
 export interface ConnectedCommanderDamageTotal {
@@ -101,11 +109,13 @@ export interface ConnectedProjection {
   playerCount: number
   system?: PlaySystemId
   format?: string
+  variant?: GameVariant
   deckRequired?: boolean
   startingLife: number
   lifeStep?: number
   ruleset: string
   isHost: boolean
+  treacheryOutcome?: TreacheryOutcome<string>
   rematchPublicId?: string
   eventSequence: number
   serverUpdatedAt: number
@@ -209,6 +219,8 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       ...(player.foil === true ? { foil: true } : {}),
       currentLife: player.currentLife,
       controlledByMe: player.controlledByMe,
+      ...(isTreacheryRole(player.role) ? { role: player.role } : {}),
+      ...(typeof player.roleRevealed === "boolean" ? { roleRevealed: player.roleRevealed } : {}),
     })
   }
   const invitationValue = value.invitation
@@ -304,6 +316,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
           format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
         }
       : {}),
+    ...(value.variant === "treachery" ? { variant: value.variant } : {}),
     deckRequired: value.deckRequired ?? false,
     startingLife: value.startingLife,
     ...(typeof value.lifeStep === "number" && Number.isInteger(value.lifeStep) && value.lifeStep > 0
@@ -311,6 +324,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       : {}),
     ruleset: value.ruleset,
     isHost: value.isHost,
+    ...treacheryOutcomeOf(value.treacheryOutcome),
     ...(typeof value.rematchPublicId === "string" && value.rematchPublicId
       ? { rematchPublicId: value.rematchPublicId }
       : {}),
@@ -324,6 +338,17 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     ...(invitation ? { invitation } : {}),
     players,
   }
+}
+
+function treacheryOutcomeOf(value: unknown): { treacheryOutcome?: TreacheryOutcome<string> } {
+  if (!isRecord(value)) return {}
+  if (value.kind === "draw") return { treacheryOutcome: { kind: "draw" } }
+  const winners = value.winnerPlayerIds
+  return value.kind === "win" &&
+    Array.isArray(winners) &&
+    winners.every((id): id is string => typeof id === "string")
+    ? { treacheryOutcome: { kind: "win", winnerPlayerIds: winners } }
+    : {}
 }
 
 export type ConnectionStatus = "connected" | "syncing" | "offline"

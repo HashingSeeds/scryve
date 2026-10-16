@@ -16,12 +16,14 @@ const { previewKey, previewName } = require("./preview.cjs")
 const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
+                 [--variant treachery]  (players default to 4)
   pnpm bots join <CODE> [--count 1] [--first 1]
 
 Play
   --life-every 3s          each bot changes its life (-1, +1, ...) this often
   --commander-every off    each bot deals 1 commander damage to a random opponent this often
   --claims confirm         answer commander damage claims: confirm, decline or ignore
+  --reveal                 turn each bot's Treachery role face up once the game starts
   --no-start               the host bot waits instead of starting when every seat is taken
   --duration 10m           stop after this long (off runs until the game ends or Ctrl-C)
   --end stay               then stay in the game, leave it, or finish it (host bot only)
@@ -63,9 +65,11 @@ function parseCli(argv) {
     allowPositionals: true,
     options: {
       "preview": { type: "string" },
-      "players": { type: "string", default: "2" },
+      "players": { type: "string" },
       "fill": { type: "string", default: "0" },
       "format": { type: "string", default: "commander" },
+      "variant": { type: "string" },
+      "reveal": { type: "boolean", default: false },
       "life": { type: "string" },
       "count": { type: "string", default: "1" },
       "first": { type: "string", default: "1" },
@@ -90,9 +94,13 @@ function parseCli(argv) {
   if (command === "join" && !code) throw new Error("join needs the lobby's invite code")
   if (!["confirm", "decline", "ignore"].includes(values.claims))
     throw new Error("--claims must be confirm, decline or ignore")
+  if (values.variant !== undefined && values.variant !== "treachery")
+    throw new Error("--variant must be treachery")
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
-  const players = parseCount(values.players, "players", 2, 6)
+  const players = parseCount(values.players ?? (values.variant ? "4" : "2"), "players", 2, 6)
+  if (values.variant === "treachery" && players < 4)
+    throw new Error("--variant treachery needs --players 4 to 6")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
   return {
@@ -103,6 +111,8 @@ function parseCli(argv) {
     fill,
     system: none ? "none" : "mtg",
     format: values.format,
+    variant: values.variant,
+    reveal: values.reveal,
     life: values.life
       ? parseCount(values.life, "life", 1, 999)
       : values.format === "commander"
@@ -219,7 +229,7 @@ class Bot {
       await this.client.mutation(api.games.abandonGame, { publicId: game.publicId })
       this.report(this, "abandoned-leftover", { publicId: game.publicId })
     }
-    const { players, system, format, life } = this.options
+    const { players, system, format, variant, life } = this.options
     const lobby = await this.client.mutation(api.games.createLobby, {
       ...lobbyIdentifiers(),
       playerCount: players,
@@ -227,6 +237,7 @@ class Bot {
       ruleset: format,
       system,
       ...(system === "none" ? {} : { format }),
+      ...(variant ? { variant } : {}),
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,
@@ -243,6 +254,7 @@ class Bot {
       displayName: this.name,
       color: COLORS[this.slot % COLORS.length],
       deviceId: this.deviceId,
+      variants: ["treachery"],
     })
     this.publicId = seat.publicId
     this.report(this, "joined", { seat: seat.seat })
@@ -293,7 +305,9 @@ class Bot {
     this.playing = true
     this.report(this, "playing", { seat: this.me?.seat, life: this.me?.currentLife })
     let tick = 0
-    const { lifeEvery, commanderEvery, dropEvery, burst } = this.options
+    const { lifeEvery, commanderEvery, dropEvery, burst, reveal } = this.options
+    if (reveal && this.me?.role && !this.me.roleRevealed)
+      this.send(api.games.revealMyRole, { publicId: this.publicId, deviceId: this.deviceId })
     if (lifeEvery)
       this.every(lifeEvery, () => {
         for (let i = 0; i < burst; i += 1, tick += 1) this.changeLife(tick % 2 === 0 ? -1 : 1)

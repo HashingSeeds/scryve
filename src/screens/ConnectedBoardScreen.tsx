@@ -54,6 +54,10 @@ import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
+import {
+  TREACHERY_ROLE_LABELS,
+  TreacheryRoleDialog,
+} from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
@@ -281,9 +285,12 @@ const ConnectedUnsentContext = createContext(0)
 const ConnectedTableContext = createContext<TableRuntime | undefined>(undefined)
 
 function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
+  // why: your own hidden role stays off the board, since the table can see your screen.
+  const role =
+    player.role && (player.roleRevealed || !player.controlledByMe) ? player.role : undefined
   return {
     id: asPlayerId(player.playerId),
-    name: player.displayName,
+    name: role ? `${player.displayName} · ${TREACHERY_ROLE_LABELS[role]}` : player.displayName,
     color: player.color,
     ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     seat: player.seat,
@@ -527,6 +534,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
+  const [roleOpen, setRoleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
   const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
@@ -733,6 +741,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }
 
   const canEnd = active && game.isHost && !view.finishing
+  const myRole = cloud
+    ? game.players.find((player) => player.controlledByMe && player.role)
+    : undefined
   const radialActions: RadialMenuAction[] = useMemo(
     () => [
       {
@@ -782,10 +793,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             setStatusOpen(true)
             return
           }
-          const standing =
-            runtime.status === "ready" ? connectedLastStanding(runtime.projection) : undefined
-          setDrawSelected(false)
-          setWinnerPlayerIds(standing ? [standing] : [])
+          const projection = runtime.status === "ready" ? runtime.projection : undefined
+          const outcome = projection?.treacheryOutcome
+          const standing = projection && !outcome ? connectedLastStanding(projection) : undefined
+          setDrawSelected(outcome?.kind === "draw")
+          setWinnerPlayerIds(
+            outcome?.kind === "win" ? outcome.winnerPlayerIds : standing ? [standing] : [],
+          )
           setConfirmingFinish(true)
         },
       },
@@ -821,6 +835,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     layoutPickerOpen ||
     confirmingFinish ||
     playerActionsOpen ||
+    roleOpen ||
     inviteDialogOpen ||
     abandonedOpen
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
@@ -1085,6 +1100,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           players={reportablePlayers}
           origin={menuDialogOrigin}
           onClose={() => setPlayerActionsOpen(false)}
+          onRole={
+            myRole
+              ? () => {
+                  setPlayerActionsOpen(false)
+                  setRoleOpen(true)
+                }
+              : undefined
+          }
           onInvite={
             invitation
               ? () => {
@@ -1093,6 +1116,17 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 }
               : undefined
           }
+        />
+      ) : null}
+
+      {roleOpen && myRole?.role ? (
+        <TreacheryRoleDialog
+          publicId={publicId}
+          role={myRole.role}
+          revealed={myRole.roleRevealed === true}
+          canReveal={active}
+          origin={menuDialogOrigin}
+          onClose={() => setRoleOpen(false)}
         />
       ) : null}
 

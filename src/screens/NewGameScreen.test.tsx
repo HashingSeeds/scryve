@@ -710,6 +710,40 @@ describe("NewGameScreen", () => {
     expect(view.queryByTestId("player-name-1")).toBeNull()
   })
 
+  it("hosts Treachery with 4–6 seats and drops it once the seats no longer fit", () => {
+    const host = jest.fn()
+    const props = { mode: "connected" as const, connected: { ...readyHost, host } }
+    const view = setup(props)
+    const rerender = (mode: "local" | "connected") =>
+      view.rerender(
+        <ThemeProvider initialContext="light">
+          <NewGameScreen
+            defaults={DEFAULT_LOCAL_SETTINGS}
+            onModeChange={jest.fn()}
+            onBack={jest.fn()}
+            onStartLocal={jest.fn()}
+            {...props}
+            mode={mode}
+          />
+        </ThemeProvider>,
+      )
+
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    fireEvent.press(view.getByTestId("variant-treachery"))
+    expect(view.getByLabelText("Seats, 4")).toBeTruthy()
+    fireEvent.press(view.getByTestId("host-connected-button"))
+    expect(host).toHaveBeenLastCalledWith(
+      expect.objectContaining({ playerCount: 4, variant: "treachery" }),
+    )
+
+    rerender("local")
+    fireEvent.press(view.getByTestId("player-count-decrement"))
+    rerender("connected")
+    expect(view.getByTestId("variant-standard").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(view.getByTestId("host-connected-button"))
+    expect(host).toHaveBeenLastCalledWith(expect.not.objectContaining({ variant: "treachery" }))
+  })
+
   it("opens resumable games without interrupting setup", () => {
     const onResumeConnected = jest.fn()
     const game = {
