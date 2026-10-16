@@ -636,6 +636,7 @@ export function NewGameScreen({
                 testID={`game-type-${type.id}`}
                 text={gameTypeLabel(type)}
                 detail={gameTypeDetail(type)}
+                detailShrinks
                 selected={type.id === selectedTypeId}
                 disabled={type.variant === "treachery" && !connectedMode}
                 onPress={() => chooseGameType(type)}

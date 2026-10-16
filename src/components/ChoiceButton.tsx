@@ -20,6 +20,8 @@ export interface ChoiceButtonProps extends Omit<
   detail?: string
   Leading?: (props: { color: string }) => ReactNode
   compact?: boolean
+  /** why: by default the detail stays whole (a winner's life total must not cut off), so only lists of long names opt in. */
+  detailShrinks?: boolean
 }
 
 export function ChoiceButton(props: ChoiceButtonProps) {
@@ -29,6 +31,7 @@ export function ChoiceButton(props: ChoiceButtonProps) {
     detail,
     Leading,
     compact,
+    detailShrinks,
     style: $styleOverride,
     TextProps,
     accessibilityState,
@@ -71,13 +74,13 @@ export function ChoiceButton(props: ChoiceButtonProps) {
         compact
           ? undefined
           : () => (
-              <View style={themed($trailing)}>
+              <View style={[themed($trailing), detailShrinks && $shrink]}>
                 {detail ? (
                   <Text
                     size="xs"
                     text={detail}
-                    numberOfLines={1}
-                    style={[themed($detail), { color: foreground }]}
+                    numberOfLines={detailShrinks ? 1 : undefined}
+                    style={[themed($detail), detailShrinks && $shrink, { color: foreground }]}
                   />
                 ) : null}
                 <CheckBadge selected={selected} color={foreground} />
@@ -131,7 +134,6 @@ const $leading: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginEnd: spacing.
 const $trailing: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  flexShrink: 1,
   gap: spacing.sm,
   marginStart: spacing.sm,
 })
@@ -145,4 +147,5 @@ const $badge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   justifyContent: "center",
 })
 const $check: ThemedStyle<TextStyle> = () => ({ lineHeight: 18 })
-const $detail: ThemedStyle<TextStyle> = () => ({ opacity: 0.75, flexShrink: 1 })
+const $detail: ThemedStyle<TextStyle> = () => ({ opacity: 0.75 })
+const $shrink = { flexShrink: 1 } as const
