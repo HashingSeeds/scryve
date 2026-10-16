@@ -955,7 +955,11 @@ function RadialTool({
           weight="bold"
           numberOfLines={1}
           maxFontSizeMultiplier={1.2}
-          style={[$toolText, { color: foreground }]}
+          style={[
+            $toolText,
+            tool.label.length > TOOL_LABEL_MAX_CHARACTERS && $compactToolText,
+            { color: foreground },
+          ]}
         />
       </BoardPressable>
     </View>
@@ -1058,6 +1062,9 @@ const $tool: ViewStyle = {
   borderRadius: TOOL_RADIUS,
 }
 const $toolText: TextStyle = { fontSize: 14, lineHeight: 18, letterSpacing: 0.2 }
+// why: the tool circle fits about five characters at full size; longer translations ("Moneda") would truncate.
+const TOOL_LABEL_MAX_CHARACTERS = 5
+const $compactToolText: TextStyle = { fontSize: 11, lineHeight: 14, letterSpacing: 0 }
 const $dimmedTool: ViewStyle = { opacity: 0.45 }
 const SIGNAL_BADGE_SIZE = 22
 // why: a zero-size box at the anchor centers the badge on its real width, so "100" sits where "1" does.
