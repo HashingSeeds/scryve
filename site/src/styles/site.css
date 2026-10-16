@@ -326,10 +326,12 @@ figure {
   outline-offset: 1px;
 }
 
+/* Like the app's benchChipMetrics, the bench grows to fit its chips: on a phone the border, bar
+   and name size floors outgrow a bench sized only by the seat. */
 .pk-bench {
   --bench: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
   display: flex;
-  height: var(--bench);
+  min-height: var(--bench);
   flex: none;
   gap: calc(var(--u) * 0.018);
 }
