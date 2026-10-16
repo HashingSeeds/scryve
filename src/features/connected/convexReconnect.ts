@@ -39,7 +39,7 @@ export function reconnectConvexOnNetworkReturn(client: ConvexReactClient) {
 }
 
 // why: convex 1.42 keeps tryReconnectImmediately private behind the internal `sync` client. The runtime checks leave a Convex upgrade that moves it on normal backoff, and convexReconnect.test.ts fails on that upgrade.
-function reconnectNow(client: ConvexReactClient) {
+export function reconnectNow(client: ConvexReactClient) {
   const sync = "sync" in client ? client.sync : undefined
   const manager =
     typeof sync === "object" && sync !== null && "webSocketManager" in sync
