@@ -16,6 +16,7 @@ import {
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { writeSessionHint } from "@/features/auth/sessionHint"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { AccountDeletionReceiptScreen, DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
 
 import { api } from "../../convex/_generated/api"
@@ -23,14 +24,15 @@ import { api } from "../../convex/_generated/api"
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <Screen preset="auto" safeAreaEdges={["bottom"]}>
-      <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
-      <Text
-        accessibilityRole="alert"
-        text="Scryve couldn't check your deletion status. Account deletion stays unavailable until the check succeeds."
+      <Header
+        titleTx="account:deleteAccount.title"
+        leftTx="common:back"
+        onLeftPress={() => router.back()}
       />
-      <Button text="Try again" preset="reversed" onPress={() => void retry()} />
+      <Text accessibilityRole="alert" tx="account:deleteAccount.route.statusCheckFailed" />
+      <Button tx="common:tryAgain" preset="reversed" onPress={() => void retry()} />
       <Button
-        text="Open Play"
+        tx="account:openPlay"
         onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
       />
     </Screen>
@@ -48,6 +50,8 @@ export default function DeleteAccountRoute() {
     }
     setReceiptToken(token)
   }, [])
+  const signInPrompt =
+    auth.configurationMessage || translate("account:deleteAccount.route.signInPrompt")
   if (!auth.configured || !auth.isSignedIn)
     if (auth.configured && receiptToken)
       return (
@@ -63,18 +67,17 @@ export default function DeleteAccountRoute() {
     else
       return (
         <Screen preset="auto" safeAreaEdges={["bottom"]}>
-          <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
-          <Text
-            accessibilityRole="alert"
-            text={
-              auth.configurationMessage || "Sign in to request deletion of your Scryve account."
-            }
+          <Header
+            titleTx="account:deleteAccount.title"
+            leftTx="common:back"
+            onLeftPress={() => router.back()}
           />
+          <Text accessibilityRole="alert" text={signInPrompt} />
           {auth.configured ? (
-            <Button text="Sign in" preset="reversed" onPress={auth.openAuth} />
+            <Button tx="account:signIn" preset="reversed" onPress={auth.openAuth} />
           ) : null}
           <Button
-            text="Open Play"
+            tx="account:openPlay"
             onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
           />
         </Screen>
@@ -100,10 +103,14 @@ function SignedOutDeletionReceipt({
   if (receipt === undefined || receipt === null)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
-        <Text text="Checking your deletion receipt…" accessibilityLiveRegion="polite" />
+        <Header
+          titleTx="account:deleteAccount.title"
+          leftTx="common:back"
+          onLeftPress={() => router.back()}
+        />
+        <Text tx="account:deleteAccount.route.checkingReceipt" accessibilityLiveRegion="polite" />
         <Button
-          text="Open Play"
+          tx="account:openPlay"
           onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
@@ -136,17 +143,25 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
   if (isLoading || !isUserLoaded)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
-        <Text text="Checking your account…" />
+        <Header
+          titleTx="account:deleteAccount.title"
+          leftTx="common:back"
+          onLeftPress={() => router.back()}
+        />
+        <Text tx="account:deleteAccount.route.checkingAccount" />
       </Screen>
     )
   if (!isAuthenticated)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
-        <Text accessibilityRole="alert" text="Reconnect to Scryve before deleting your account." />
+        <Header
+          titleTx="account:deleteAccount.title"
+          leftTx="common:back"
+          onLeftPress={() => router.back()}
+        />
+        <Text accessibilityRole="alert" tx="account:deleteAccount.route.reconnect" />
         <Button
-          text="Open Play"
+          tx="account:openPlay"
           onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
@@ -161,7 +176,11 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
       writeSessionHint({ userId: null })
       await clerk.signOut()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not submit the deletion request")
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : translate("account:deleteAccount.route.submitFailed"),
+      )
     } finally {
       setIsSubmitting(false)
     }

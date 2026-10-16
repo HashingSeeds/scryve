@@ -7,6 +7,7 @@ import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { ListItem } from "@/components/ListItem"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -40,11 +41,13 @@ export function AccountScreen({
   onSignOut,
 }: AccountScreenProps) {
   const { themed } = useAppTheme()
-  const primaryLabel = name || email || "Signed in"
+  const primaryLabel = name || email || translate("account:profile.signedIn")
+  const profileLabel = translate("account:profile.profileAndSecurity")
+  const profileHint = translate("account:profile.profileHint")
 
   return (
     <View style={$fill}>
-      <Header title="Account" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="account:profile.title" leftTx="common:back" onLeftPress={onBack} />
       <ScrollView contentContainerStyle={themed($content)}>
         <View style={themed($identity)}>
           <Avatar name={name} email={email} avatarUrl={avatarUrl} />
@@ -57,49 +60,41 @@ export function AccountScreen({
         </View>
 
         <View style={themed($section)}>
-          <Text text="Your account" preset="formLabel" accessibilityRole="header" />
+          <Text tx="account:profile.yourAccount" preset="formLabel" accessibilityRole="header" />
           <ListItem
             testID="manage-profile-item"
-            accessibilityLabel="Profile and security"
-            accessibilityHint="Opens the profile manager to change your name, email addresses, and password"
+            accessibilityLabel={profileLabel}
+            accessibilityHint={profileHint}
             rightIcon="caretRight"
             topSeparator
             bottomSeparator={!accountControls}
             onPress={onManageProfile}
           >
-            <Text text="Profile and security" />
+            <Text tx="account:profile.profileAndSecurity" />
             {"\n"}
-            <Text
-              text="Name, email, password, and sign-in methods."
-              size="xxs"
-              style={themed($muted)}
-            />
+            <Text tx="account:profile.profileDetails" size="xxs" style={themed($muted)} />
           </ListItem>
           {accountControls}
         </View>
 
         <View style={themed($section)}>
-          <Text text="Legal" preset="subheading" accessibilityRole="header" />
+          <Text tx="account:legal.heading" preset="subheading" accessibilityRole="header" />
           <View>
-            <ListItem text="Terms of Use" rightIcon="caretRight" onPress={onOpenTerms} />
+            <ListItem tx="account:legal.termsOfUse" rightIcon="caretRight" onPress={onOpenTerms} />
             <ListItem
-              text="Privacy Policy"
+              tx="account:legal.privacyPolicy"
               rightIcon="caretRight"
               topSeparator
               onPress={onOpenPrivacy}
             />
             <ListItem
-              text="Third-party game content"
+              tx="account:legal.gameContent"
               rightIcon="caretRight"
               topSeparator
               onPress={onOpenGameContentNotices}
             />
           </View>
-          <Text
-            text="Scryve is independent and is not affiliated with or endorsed by the game publishers, rights holders, or data providers named in our game-content notice."
-            size="xxs"
-            style={themed($muted)}
-          />
+          <Text tx="account:profile.independence" size="xxs" style={themed($muted)} />
         </View>
 
         <View style={themed($signOut)}>
@@ -108,13 +103,13 @@ export function AccountScreen({
           ) : null}
           <Button
             testID="sign-out-button"
-            text={isSigningOut ? "Signing out…" : "Sign out"}
+            tx={isSigningOut ? "account:profile.signingOut" : "account:profile.signOut"}
             disabled={isSigningOut}
             style={themed($signOutButton)}
             textStyle={themed($signOutText)}
             onPress={onSignOut}
           />
-          <Text text="Local games stay on this device." size="xxs" style={themed($muted)} />
+          <Text tx="account:localGamesStay" size="xxs" style={themed($muted)} />
         </View>
       </ScrollView>
     </View>

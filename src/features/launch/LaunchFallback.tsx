@@ -3,9 +3,13 @@ import { ActivityIndicator, Image, View } from "react-native"
 // eslint-disable-next-line no-restricted-imports
 import { Text as NativeText } from "react-native"
 
+import { translate } from "@/i18n/translate"
+
 export const LAUNCH_MARK: number = require("../../../assets/images/app-icon-android-adaptive-foreground.png")
 
 export function LaunchFallback() {
+  const starting = translate("account:launch.starting")
+  const startingLabel = translate("account:launch.startingAccessibilityLabel")
   return (
     <View testID="launch-fallback" style={$screen}>
       <Image
@@ -14,9 +18,9 @@ export function LaunchFallback() {
         style={$mark}
         accessibilityIgnoresInvertColors
       />
-      <View accessibilityRole="progressbar" accessibilityLabel="Starting Scryve" style={$status}>
+      <View accessibilityRole="progressbar" accessibilityLabel={startingLabel} style={$status}>
         <ActivityIndicator color="#FFFFFF" size="small" />
-        <NativeText style={$statusText}>Starting Scryve…</NativeText>
+        <NativeText style={$statusText}>{starting}</NativeText>
       </View>
     </View>
   )

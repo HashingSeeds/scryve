@@ -3,6 +3,7 @@ import { Modal, View } from "react-native"
 import { useClerk, useUser } from "@clerk/expo"
 import { UserProfileView } from "@clerk/expo/native"
 
+import { translate } from "@/i18n/translate"
 import { AccountScreen } from "@/screens/AccountScreen"
 
 import type { AccountProfileProps } from "./accountProfileProps"
@@ -36,7 +37,7 @@ export function AccountProfile({
       await clerk.signOut()
       onSignedOut?.()
     } catch {
-      setError("Could not sign out. Try again.")
+      setError(translate("account:profile.signOutFailed"))
     } finally {
       setIsSigningOut(false)
     }

@@ -4,6 +4,7 @@ import { View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -17,25 +18,29 @@ export function AppUpdateStatus() {
 
   if (update.status === "idle") return null
   if (update.status === "downloading") {
-    const percent = update.progress ? ` ${Math.round(update.progress * 100)}%` : "…"
+    const progress = update.progress
+      ? translate("account:updates.downloadingProgress", {
+          percent: Math.round(update.progress * 100),
+        })
+      : translate("account:updates.downloading")
     return (
       <Text
         testID="update-status"
         size="sm"
         accessibilityLiveRegion="polite"
-        text={`Downloading update${percent}`}
+        text={progress}
         style={themed($row)}
       />
     )
   }
   return (
     <View testID="update-status" style={themed($row)}>
-      <Text size="sm" weight="medium" text="Update ready" />
+      <Text size="sm" weight="medium" tx="account:updates.ready" />
       <UpdateInfoButton onPress={() => setDetailsOpen(true)} />
       <View style={$spacer} />
       <Button
         testID="settings-update-restart-button"
-        text="Restart"
+        tx="account:updates.restart"
         style={themed($restart)}
         textStyle={themed($restartText)}
         onPress={restartToUpdate}

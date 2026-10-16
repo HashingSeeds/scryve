@@ -3,6 +3,7 @@ import { Image } from "react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
 
 import { LAUNCH_MARK, LAUNCH_MARK_SIZE } from "@/features/launch/LaunchFallback"
+import { translate } from "@/i18n/translate"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { RESTART_FADE_MS, useRestarting } from "./appUpdate"
@@ -13,10 +14,11 @@ export function RestartCurtain() {
   const restarting = useRestarting()
   const reducedMotion = useReducedMotion()
   if (!restarting) return null
+  const label = translate("account:updates.restarting")
   return (
     <Animated.View
       testID="restart-curtain"
-      accessibilityLabel="Restarting Scryve"
+      accessibilityLabel={label}
       entering={reducedMotion === false ? CURTAIN_ENTERING : undefined}
       style={$curtain}
     >

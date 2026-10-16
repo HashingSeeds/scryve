@@ -8,9 +8,12 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import type { ConsentDocumentId } from "@/content/legal"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { analyticsConfigured, analyticsEnabled, setAnalyticsEnabled } from "@/utils/analytics"
+
+const BRAND_EYEBROW = "SCRYVE"
 
 export interface LegalConsentScreenProps {
   documents: readonly ConsentDocumentId[]
@@ -38,55 +41,45 @@ export function LegalConsentScreen({
   const [sharingError, setSharingError] = useState(false)
   const includesTerms = documents.includes("terms")
   const includesPrivacy = documents.includes("privacy")
-  const documentLabel =
-    includesTerms && includesPrivacy
-      ? "Terms of Use and Privacy Policy"
-      : includesTerms
-        ? "Terms of Use"
-        : "Privacy Policy"
-  const returningDescription = effectiveDate
-    ? `Our ${documentLabel} changed on ${effectiveDate}. Please review the update to keep using Scryve.`
-    : `Our ${documentLabel} have changed. Please review the updates to keep using Scryve.`
-  const acceptanceDescription = effectiveDate
-    ? `By tapping "I agree" you accept the ${documentLabel} dated ${effectiveDate}.`
-    : `By tapping "I agree" you accept the current ${documentLabel}.`
+  const changed = includesTerms && includesPrivacy ? "both" : includesTerms ? "terms" : "privacy"
+  const dating = effectiveDate ? "dated" : "undated"
+  const returningDescription = translate(`account:legalConsent.returning.${dating}.${changed}`, {
+    date: effectiveDate,
+  })
+  const intro = translate("account:legalConsent.intro")
+  const acceptanceDescription = translate(`account:legalConsent.acceptance.${dating}.${changed}`, {
+    date: effectiveDate,
+  })
 
   return (
     <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentContainerStyle={themed($screen)}>
       <View style={themed($body)}>
-        <Text text="SCRYVE" preset="formLabel" style={themed($eyebrow)} />
+        <Text text={BRAND_EYEBROW} preset="formLabel" style={themed($eyebrow)} />
         <Text
-          text={
+          tx={
             isReturningUser
               ? includesPrivacy && !includesTerms
-                ? "We have updated our privacy policy"
-                : "We have updated our terms"
-              : "Before you start"
+                ? "account:legalConsent.heading.updatedPrivacy"
+                : "account:legalConsent.heading.updatedTerms"
+              : "account:legalConsent.heading.beforeStart"
           }
           preset="heading"
           accessibilityRole="header"
         />
-        <Text
-          text={
-            isReturningUser
-              ? returningDescription
-              : "Please review our Terms of Use and Privacy Policy. You need to accept them to use Scryve."
-          }
-          style={themed($muted)}
-        />
+        <Text text={isReturningUser ? returningDescription : intro} style={themed($muted)} />
       </View>
 
       <View style={themed($links)}>
         {includesTerms ? (
           <Button
-            text="Read the Terms of Use"
+            tx="account:legalConsent.readTerms"
             style={themed($secondaryAction)}
             onPress={onOpenTerms}
           />
         ) : null}
         {includesPrivacy ? (
           <Button
-            text="Read the Privacy Policy"
+            tx="account:legalConsent.readPrivacy"
             style={themed($secondaryAction)}
             onPress={onOpenPrivacy}
           />
@@ -97,25 +90,21 @@ export function LegalConsentScreen({
         {!isReturningUser && analyticsConfigured() ? (
           <Switch
             testID="first-use-analytics-switch"
-            label="Share usage with Scryve"
+            labelTx="account:shareUsage"
             value={sharing}
-            helper="Off by default. Sharing helps us build what you want. Details in Privacy Policy."
+            helperTx="account:legalConsent.shareUsageHelper"
             onValueChange={setSharing}
           />
         ) : null}
         {sharingError ? (
-          <Text
-            accessibilityRole="alert"
-            size="xs"
-            text="Could not save your sharing choice. Try again or turn sharing off to continue."
-          />
+          <Text accessibilityRole="alert" size="xs" tx="account:legalConsent.sharingSaveFailed" />
         ) : null}
         {error ? (
           <Text accessibilityRole="alert" text={error} size="xs" style={themed($error)} />
         ) : null}
         <Button
           testID="accept-legal-button"
-          text={isSubmitting ? "Saving…" : "I agree"}
+          tx={isSubmitting ? "account:legalConsent.saving" : "account:legalConsent.agree"}
           preset="reversed"
           style={themed($primaryAction)}
           disabled={isSubmitting}

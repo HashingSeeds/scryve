@@ -8,6 +8,7 @@ import { AccountProfile } from "@/features/auth/AccountControls"
 import { AccountDataControls } from "@/features/auth/AccountDataControls"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { SubscriptionControls } from "@/features/billing/SubscriptionControls"
+import { translate } from "@/i18n/translate"
 
 export default function AccountRoute() {
   const auth = useAuthAccess()
@@ -15,23 +16,26 @@ export default function AccountRoute() {
   const openAccountData = () => {
     if (auth.isSignedIn) router.push("/delete-account")
   }
-  if (!auth.configured || !auth.isSignedIn)
+  if (!auth.configured || !auth.isSignedIn) {
+    const prompt = auth.configurationMessage || translate("account:profile.signInPrompt")
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header title="Account" leftTx="common:back" onLeftPress={() => router.back()} />
-        <Text
-          accessibilityRole="alert"
-          text={auth.configurationMessage || "Sign in before opening your profile."}
+        <Header
+          titleTx="account:profile.title"
+          leftTx="common:back"
+          onLeftPress={() => router.back()}
         />
+        <Text accessibilityRole="alert" text={prompt} />
         {auth.configured && !auth.isSignedIn ? (
-          <Button text="Re-authenticate" preset="reversed" onPress={auth.openAuth} />
+          <Button tx="account:profile.reauthenticate" preset="reversed" onPress={auth.openAuth} />
         ) : null}
         <Button
-          text="Open Play"
+          tx="account:openPlay"
           onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>
     )
+  }
   return (
     <Screen preset="fixed" contentContainerStyle={$profileScreen}>
       <AccountProfile

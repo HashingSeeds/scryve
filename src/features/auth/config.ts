@@ -1,3 +1,4 @@
+import { translate } from "@/i18n/translate"
 import { normalizeHttpsOrigin } from "@/utils/httpsOrigin"
 
 export const APP_ROOT_URL = `${process.env.EXPO_BASE_URL ?? ""}/`
@@ -43,7 +44,7 @@ export function validatePublicCloudConfig(
   if (!isClerkPublishableKey(CLERK_KEY) || !isHttpsUrl(CONVEX_URL) || !INVITE_ORIGIN) {
     return {
       configured: false,
-      message: "Connected features are unavailable in this build. Local play remains available.",
+      message: translate("account:cloud.notConfigured"),
     }
   }
 

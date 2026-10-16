@@ -9,6 +9,7 @@ import {
   ConnectedProfileProvider,
   useConnectedProfile,
 } from "@/features/connected/useConnectedProfile"
+import { translate } from "@/i18n/translate"
 
 import { useAuthAccess } from "./AuthContext"
 
@@ -45,11 +46,11 @@ function CloudSession({
   const message = loading
     ? undefined
     : !auth.isSignedIn
-      ? "Sign in to continue."
+      ? translate("account:cloud.signInToContinue")
       : missingUsername
-        ? "Choose your player username."
+        ? translate("account:cloud.chooseUsername")
         : profile.status === "offline"
-          ? "Reconnect to continue."
+          ? translate("account:cloud.reconnect")
           : profile.status === "error"
             ? profile.message
             : undefined
@@ -59,6 +60,11 @@ function CloudSession({
     else if (missingUsername) setUsernameOpen(true)
     else profile.retry()
   }
+  const actionLabel = !auth.isSignedIn
+    ? translate("account:signIn")
+    : missingUsername
+      ? translate("account:cloud.chooseUsernameAction")
+      : translate("common:tryAgain")
   return (
     <>
       {children({
@@ -68,11 +74,7 @@ function CloudSession({
         ownerId: auth.isSignedIn ? user?.id : undefined,
         message,
         request,
-        actionLabel: !auth.isSignedIn
-          ? "Sign in"
-          : missingUsername
-            ? "Choose username"
-            : "Try again",
+        actionLabel,
       })}
       {usernameOpen ? (
         <Modal onRequestClose={close}>
@@ -100,18 +102,20 @@ export function CloudScreen({
   multiplayer?: boolean
 }) {
   const auth = useAuthAccess()
-  if (!auth.configured)
+  if (!auth.configured) {
+    const content = auth.configurationMessage ?? translate("account:cloud.localPlayAvailable")
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentInset="standard">
         <EmptyState
           imageSource={null}
-          heading="Connected features unavailable"
-          content={auth.configurationMessage ?? "Local play remains available."}
-          button="Back"
+          headingTx="account:cloud.unavailableHeading"
+          content={content}
+          buttonTx="common:back"
           buttonOnPress={onBack}
         />
       </Screen>
     )
+  }
   return (
     <ConnectedProfileProvider>
       <CloudSession multiplayer={multiplayer}>{children}</CloudSession>

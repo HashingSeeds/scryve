@@ -7,6 +7,7 @@ import * as Sentry from "@sentry/react-native"
 import Head from "expo-router/head"
 
 import { openAppleStandardEula } from "@/content/legalLinks"
+import { translate } from "@/i18n/translate"
 import {
   SupportScreen,
   type SupportFeedback,
@@ -66,15 +67,13 @@ function submitFeedback({ kind, message, email, screenshot }: SupportFeedback) {
 }
 
 export default function SupportRoute() {
+  const pageTitle = translate("account:support.pageTitle")
   return (
     <>
       {Platform.OS === "web" ? (
         <Head>
-          <title>Scryve Help</title>
-          <meta
-            name="description"
-            content="Learn how to get started with Scryve, find answers to common questions, or contact support."
-          />
+          <title>{pageTitle}</title>
+          <meta name="description" content={translate("account:support.pageDescription")} />
         </Head>
       ) : null}
       <SupportScreen

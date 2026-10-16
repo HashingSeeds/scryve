@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react"
 import { useClerk, useUser } from "@clerk/expo"
 
+import { translate } from "@/i18n/translate"
 import { AccountScreen } from "@/screens/AccountScreen"
 import { useAppTheme } from "@/theme/context"
 
@@ -34,7 +35,9 @@ export function AccountProfile({
       await clerk.signOut()
       onSignedOut?.()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not sign out")
+      setError(
+        cause instanceof Error ? cause.message : translate("account:profile.signOutFailedShort"),
+      )
     } finally {
       setIsSigningOut(false)
     }

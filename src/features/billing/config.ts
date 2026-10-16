@@ -1,6 +1,8 @@
 import type { PlatformOSType } from "react-native"
 import { Platform } from "react-native"
 
+import { translate } from "@/i18n/translate"
+
 export const COUNT_PRO_ENTITLEMENT_ID = "Count Pro"
 export const FOIL_SUPPORTER_OFFERING_ID = "foil_supporter"
 export const FOIL_PRODUCT_ID = "foil_yearly"
@@ -46,8 +48,7 @@ export function validateRevenueCatConfig(
   if (!validPublicApiKey(apiKey)) {
     return {
       configured: false,
-      message:
-        "Scryve Pro purchases are unavailable because the RevenueCat public API key is not configured.",
+      message: translate("account:billing.missingApiKey"),
     }
   }
 

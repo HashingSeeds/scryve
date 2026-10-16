@@ -2,6 +2,8 @@ import { Linking, Platform } from "react-native"
 import type { CustomerInfo, PurchasesOffering } from "react-native-purchases"
 import RevenueCatUI, { PAYWALL_RESULT } from "react-native-purchases-ui"
 
+import { translate } from "@/i18n/translate"
+
 import { COUNT_PRO_ENTITLEMENT_ID } from "./config"
 
 export type CountPaywallResult = "not-presented" | "cancelled" | "purchased" | "restored" | "error"
@@ -37,6 +39,6 @@ export async function presentCountCustomerCenter(customerInfo: CustomerInfo | nu
 
   const managementUrl = customerInfo?.managementURL
   if (!managementUrl || !managementUrl.startsWith("https://"))
-    throw new Error("No subscription management page is available for this customer yet.")
+    throw new Error(translate("account:billing.errors.noManagementPage"))
   await Linking.openURL(managementUrl)
 }
