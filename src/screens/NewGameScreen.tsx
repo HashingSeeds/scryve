@@ -528,9 +528,10 @@ export function NewGameScreen({
 
   function saveAppearance() {
     if (appearanceSeat === undefined || !appearanceDraft) return
-    const next = seatAppearances.map((appearance, index) =>
+    const drafted = seatAppearances.map((appearance, index) =>
       index === appearanceSeat ? appearanceDraft : appearance,
     )
+    const next = confirmedFree ? withoutProMarks(drafted) : drafted
     setAppearances(next)
     savePlayers(next)
     closeAppearancePicker()
