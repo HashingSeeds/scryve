@@ -49,7 +49,7 @@ import {
   useDeckVersionCache,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
-import { DeckView } from "@/features/decks/DeckView"
+import { DECK_TAB_LABELS, deckTabs, DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
   deckQueryVersionId,
   isDeckKnownDeleted,
@@ -77,8 +77,6 @@ type DeckDialog =
   | "deleteDeck"
   | "discard"
   | "syncConflict"
-
-const DECK_TABS = ["cards", "notes"] as const
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -168,7 +166,7 @@ function DeckDetailPlaceholder({
             />
           </View>
           <View style={themed($tabs)} accessibilityRole="tablist">
-            {DECK_TABS.map((tab) => (
+            {deckTabs(summary?.game).map((tab) => (
               <TouchableOpacity
                 key={tab}
                 testID={`deck-tab-${tab}`}
@@ -180,7 +178,7 @@ function DeckDetailPlaceholder({
                 <Text
                   size="sm"
                   weight={tab === "cards" ? "bold" : "normal"}
-                  tx={tab === "cards" ? "decks:deckView.cardsTab" : "decks:deckView.notesTab"}
+                  tx={DECK_TAB_LABELS[tab]}
                 />
               </TouchableOpacity>
             ))}
@@ -316,7 +314,7 @@ function DeckDetailContent({
   const deleteVersion = useMutation(api.decks.deleteVersion)
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
-  const [tab, setTab] = useState<"cards" | "notes">("cards")
+  const [tab, setTab] = useState<DeckTab>("cards")
   const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
   const [draft, setDraftState] = useState(closedDeckDraft)
   // why: search taps can land before a re-render, so limit checks read this ref, which every draft write updates first.

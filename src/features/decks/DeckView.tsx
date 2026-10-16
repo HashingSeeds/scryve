@@ -12,12 +12,25 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { DeckAnalysis } from "./DeckAnalysis"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
 import type { DeckStatsRecord, StatsSource } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
+
+export type DeckTab = "cards" | "notes" | "analysis"
+
+export function deckTabs(game?: string): readonly DeckTab[] {
+  return game === "mtg" ? ["cards", "analysis", "notes"] : ["cards", "notes"]
+}
+
+export const DECK_TAB_LABELS = {
+  cards: "decks:deckView.cardsTab",
+  notes: "decks:deckView.notesTab",
+  analysis: "decks:deckView.analysisTab",
+} as const
 
 export function DeckView({
   tab,
@@ -54,8 +67,8 @@ export function DeckView({
   undo,
   stats,
 }: {
-  tab: "cards" | "notes"
-  onTabChange: (tab: "cards" | "notes") => void
+  tab: DeckTab
+  onTabChange: (tab: DeckTab) => void
   name: string
   game: string
   format: string
@@ -186,7 +199,7 @@ export function DeckView({
               ) : null}
             </View>
             <View style={themed($tabs)} accessibilityRole="tablist">
-              {(["cards", "notes"] as const).map((value) => (
+              {deckTabs(game).map((value) => (
                 <TouchableOpacity
                   key={value}
                   accessibilityRole="tab"
@@ -197,13 +210,21 @@ export function DeckView({
                 >
                   <Text
                     size="sm"
-                    tx={value === "cards" ? "decks:deckView.cardsTab" : "decks:deckView.notesTab"}
+                    tx={DECK_TAB_LABELS[value]}
                     style={tab === value ? undefined : themed($dim)}
                   />
                 </TouchableOpacity>
               ))}
             </View>
-            {tab === "notes" ? (
+            {tab === "analysis" ? (
+              cardsUnavailable ? (
+                <Text style={themed($notes)} tx="decks:deckView.cardsUnavailable" />
+              ) : cards.length === 0 ? (
+                <Text style={themed($notes)} tx="decks:deckView.noCards" />
+              ) : (
+                <DeckAnalysis game={game} format={format} cards={cards} />
+              )
+            ) : tab === "notes" ? (
               <View style={themed($notes)}>
                 {editing ? (
                   <TextField
