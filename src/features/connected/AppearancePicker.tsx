@@ -37,7 +37,7 @@ export function AppearancePicker({
   onLockedPress?: () => void
   onChange: (next: PlayerAppearance) => void
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const takenColors = new Set(taken.map((entry) => entry.color.toUpperCase()))
   const takenShapes = new Set<PlayerMarkShape>(taken.map((entry) => entry.shape))
 
@@ -70,6 +70,7 @@ export function AppearancePicker({
             shape={shape}
             color={value.color}
             foil={pro && foil}
+            foilBackdrop={theme.colors.background}
             size={32}
             spinning={false}
           />

@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native"
 import { render } from "@testing-library/react-native"
-import { Circle, LinearGradient } from "react-native-svg"
+import { Circle, LinearGradient, Stop } from "react-native-svg"
 
 import { PlayerMark } from "./PlayerMark"
 
@@ -49,6 +49,17 @@ describe("PlayerMark", () => {
 
     const foil = render(<PlayerMark seatNumber={1} color="#FFFFFF" shape="crown" foil />)
     expect(foil.UNSAFE_queryAllByType(LinearGradient)).toHaveLength(1)
+  })
+
+  it("darkens foil on a light backdrop and lightens it on a dark one", () => {
+    const firstStop = (props: { color: string; foilBackdrop?: string }) =>
+      render(<PlayerMark seatNumber={1} shape="crown" foil {...props} />).UNSAFE_getAllByType(
+        Stop,
+      )[0].props.stopColor
+    expect(firstStop({ color: "#B85636", foilBackdrop: "#F4F2F1" })).toBe("#4A3A0A")
+    expect(firstStop({ color: "#B85636", foilBackdrop: "#000000" })).toBe("#F6E7B0")
+    expect(firstStop({ color: "#000000" })).toBe("#4A3A0A")
+    expect(firstStop({ color: "#FFFFFF" })).toBe("#F6E7B0")
   })
 
   it("renders a standalone shape without a surrounding ring", () => {

@@ -50,6 +50,7 @@ export interface PlayerMarkProps {
   insetSwordColor?: string
   closeIcon?: boolean
   foil?: boolean
+  foilBackdrop?: string
   spinning?: boolean
   size?: number
   style?: StyleProp<ViewStyle>
@@ -66,6 +67,7 @@ export const PlayerMark = memo(function PlayerMark({
   insetSwordColor,
   closeIcon = false,
   foil = false,
+  foilBackdrop,
   spinning = false,
   size = 44,
   style,
@@ -105,7 +107,7 @@ export const PlayerMark = memo(function PlayerMark({
         style={[{ width: size, height: size }, spinStyle]}
       >
         <Svg width="100%" height="100%" viewBox="0 0 44 44">
-          {foil ? <FoilGradient id={foilId} color={color} /> : null}
+          {foil ? <FoilGradient id={foilId} color={color} backdrop={foilBackdrop} /> : null}
           <MarkShape
             shape={shape}
             color={foil ? `url(#${foilId})` : color}
@@ -141,14 +143,17 @@ export function MarkArt({
   )
 }
 
-// why: cards draw marks in black or white for contrast; a black mark gets the dark foil so it stays dark against a light card, every other mark the light foil.
+// why: foil must contrast with what sits behind the mark. Cards draw black marks only on light seat colors, so without a backdrop a black mark gets the dark foil; pickers sit on the app background and pass it.
 const FOIL_STOPS = {
   light: ["#F6E7B0", "#FFFFFF", "#B9E9FF", "#E6C2FF", "#F3D27A"],
   dark: ["#4A3A0A", "#000000", "#0E3446", "#30184A", "#3D2E05"],
 } as const
 
-function FoilGradient({ id, color }: { id: string; color: string }) {
-  const stops = FOIL_STOPS[relativeLuminance(color) < 0.05 ? "dark" : "light"]
+function FoilGradient({ id, color, backdrop }: { id: string; color: string; backdrop?: string }) {
+  const lightBackdrop = backdrop
+    ? relativeLuminance(backdrop) > 0.5
+    : relativeLuminance(color) < 0.05
+  const stops = FOIL_STOPS[lightBackdrop ? "dark" : "light"]
   return (
     <Defs>
       <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
