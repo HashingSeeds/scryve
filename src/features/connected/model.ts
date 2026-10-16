@@ -22,6 +22,8 @@ export interface ConnectedPlayerProjection {
   eliminatedByCommanderDamage?: boolean
   color: string
   shape?: string
+  proShape?: string
+  foil?: boolean
   currentLife: number
   controlledByMe: boolean
 }
@@ -203,6 +205,8 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
         : {}),
       color: player.color,
       ...(typeof player.shape === "string" ? { shape: player.shape } : {}),
+      ...(typeof player.proShape === "string" ? { proShape: player.proShape } : {}),
+      ...(player.foil === true ? { foil: true } : {}),
       currentLife: player.currentLife,
       controlledByMe: player.controlledByMe,
     })

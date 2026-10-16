@@ -9,11 +9,13 @@ import {
   appearanceIsTaken,
   ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
+  isProMarkShape,
   resolveAppearance,
   resolvePlayerAppearances,
   shapeForSeat,
   type PlayerAppearance,
   type PlayerMarkShape,
+  type ProMarkShape,
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
@@ -364,6 +366,27 @@ function appearanceOf(player: Doc<"gamePlayers">): PlayerAppearance {
     color: player.color,
     shape: isPlayerMarkShape(player.shape) ? player.shape : shapeForSeat(player.seat),
   }
+}
+
+/** why: a Pro mark is shown to the whole table, so the server, not the client, decides who may wear one and whether it is foil. */
+async function proMarkFor(ctx: MutationCtx, user: Doc<"users">, proShape: ProMarkShape) {
+  if (!(await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit))) return null
+  const foil = await hasFeature(ctx, user, PREMIUM_FEATURES.foil)
+  return { proShape, ...(foil ? { foil } : {}) }
+}
+
+async function requireProMark(ctx: MutationCtx, user: Doc<"users">, proShape: string) {
+  if (!isProMarkShape(proShape)) throw new Error("Choose an available player shape")
+  const mark = await proMarkFor(ctx, user, proShape)
+  if (!mark) throw new ConvexError({ code: "pro_required", message: "Pro marks need Scryve Pro" })
+  return mark
+}
+
+async function rematchProMark(ctx: MutationCtx, player: Doc<"gamePlayers">) {
+  const user = player.userId ? await ctx.db.get(player.userId) : null
+  return user && isProMarkShape(player.proShape)
+    ? ((await proMarkFor(ctx, user, player.proShape)) ?? {})
+    : {}
 }
 
 function takenAppearances(players: Doc<"gamePlayers">[], exceptPlayerId?: Id<"gamePlayers">) {
@@ -1540,6 +1563,8 @@ export const lobbyProjection = query({
                 : p.deckVersionId,
             color: p.color,
             shape: appearanceOf(p).shape,
+            ...(p.proShape ? { proShape: p.proShape } : {}),
+            ...(p.foil ? { foil: true } : {}),
             currentLife: p.currentLife,
             ...(commanderDamage
               ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
@@ -1680,6 +1705,8 @@ export const setMyAppearance = mutation({
     seat: v.number(),
     color: v.string(),
     shape: v.string(),
+    // why: installed clients omit it, which leaves the seat's Pro mark as it is; null clears it.
+    proShape: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {
     assertAllowedColor(args.color)
@@ -1692,7 +1719,18 @@ export const setMyAppearance = mutation({
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
     if (appearanceIsTaken(takenAppearances(players, player._id), requested))
       throw new Error("Another player already claimed that color or shape")
-    await ctx.db.patch(player._id, { color: requested.color, shape: requested.shape })
+    const proMark =
+      typeof args.proShape === "string"
+        ? { foil: undefined, ...(await requireProMark(ctx, user, args.proShape)) }
+        : args.proShape === null
+          ? { proShape: undefined, foil: undefined }
+          : {}
+    if (
+      proMark.proShape &&
+      players.some((other) => other._id !== player._id && other.proShape === proMark.proShape)
+    )
+      throw new Error("Another player already claimed that color or shape")
+    await ctx.db.patch(player._id, { color: requested.color, shape: requested.shape, ...proMark })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return requested
   },
@@ -2555,6 +2593,7 @@ async function startRematch(
       ...(deckVersionId ? { deckVersionId } : {}),
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
+      ...(await rematchProMark(ctx, player)),
       currentLife: finished.startingLife,
       eventCount: 0,
       resumable: true,

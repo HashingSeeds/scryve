@@ -146,6 +146,9 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
     color: v.string(),
     shape: v.optional(v.string()),
+    // why: installed clients only draw `shape`, so a Pro mark rides beside a free one they can still render.
+    proShape: v.optional(v.string()),
+    foil: v.optional(v.boolean()),
     currentLife: v.number(),
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
@@ -662,6 +665,7 @@ export default defineSchema({
   revenueCatCustomerStates: defineTable({
     appUserId: v.string(),
     enabled: v.boolean(),
+    foil: v.optional(v.boolean()),
     environment: v.union(v.literal("PRODUCTION"), v.literal("SANDBOX")),
     observedAt: v.number(),
     updatedAt: v.number(),

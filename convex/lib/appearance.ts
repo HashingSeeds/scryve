@@ -60,6 +60,15 @@ export function isProMarkShape(value: unknown): value is ProMarkShape {
   return PRO_MARK_SHAPES.some((shape) => shape === value)
 }
 
+/** why: a connected seat keeps the free `shape` installed clients draw, and builds that know Pro marks draw its `proShape` instead. */
+export function shownMarkShape(seat: {
+  shape?: string
+  proShape?: string
+}): PlayerMarkShape | undefined {
+  if (isProMarkShape(seat.proShape)) return seat.proShape
+  return isPlayerMarkShape(seat.shape) ? seat.shape : undefined
+}
+
 export function shapeForSeat(
   seat: number,
   shapes: readonly PlayerMarkShape[] = CONNECTED_PLAYER_MARK_SHAPES,

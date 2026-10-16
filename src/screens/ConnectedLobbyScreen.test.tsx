@@ -4,6 +4,7 @@ import { ConvexError } from "convex/values"
 
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
+import * as billingAccess from "@/features/billing/RevenueCatContext"
 import {
   ConnectedGameRepository,
   connectedDeploymentScope,
@@ -71,6 +72,7 @@ jest.mock("@/utils/analytics", () => ({
 
 describe("ConnectedLobbyScreen", () => {
   beforeEach(resetConnectedHarness)
+  afterEach(() => jest.restoreAllMocks())
 
   it("lets the host correct six players to two and require decks", async () => {
     connectedHarness.projection = {
@@ -620,11 +622,69 @@ describe("ConnectedLobbyScreen", () => {
       seat: 1,
       color: "#B85636",
       shape: "star",
+      proShape: null,
     })
 
     fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
     fireEvent.press(screen.getByTestId("appearance-color-41476e"))
     expect(screen.getByTestId("appearance-shape-square")).toBeDisabled()
+  })
+
+  it("sends a Pro mark beside the seat's free mark and keeps both of another seat's marks taken", async () => {
+    jest.spyOn(billingAccess, "useRevenueCat").mockReturnValue({
+      configured: true,
+      isReady: true,
+      isLoading: false,
+      isCountPro: true,
+      isFoil: false,
+      customerInfo: null,
+      currentOffering: null,
+      refreshCustomerInfo: jest.fn(),
+      purchase: jest.fn(),
+      restorePurchases: jest.fn(),
+      presentPaywall: jest.fn(),
+      presentCustomerCenter: jest.fn(),
+    })
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      invitation: null,
+      players: [
+        {
+          playerId: "player-1",
+          seat: 1,
+          displayName: "Ada",
+          color: "#B85636",
+          shape: "heart",
+          controlledByMe: true,
+        },
+        {
+          playerId: "player-2",
+          seat: 2,
+          displayName: "Grace",
+          color: "#39755C",
+          shape: "square",
+          proShape: "eye",
+          controlledByMe: false,
+        },
+      ],
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
+    expect(screen.getByTestId("appearance-shape-eye")).toBeDisabled()
+    expect(screen.getByTestId("appearance-shape-square")).toBeDisabled()
+
+    fireEvent.press(screen.getByTestId("appearance-shape-crown"))
+    await act(async () => fireEvent.press(screen.getByTestId("save-appearance-button")))
+    expect(mockSetAppearance).toHaveBeenLastCalledWith({
+      publicId: "game-public",
+      seat: 1,
+      color: "#B85636",
+      shape: "heart",
+      proShape: "crown",
+    })
   })
 
   it("explains online-only lobby exits when offline, including a dropped confirmation", () => {

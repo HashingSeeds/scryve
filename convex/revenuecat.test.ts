@@ -365,6 +365,30 @@ describe("RevenueCat entitlement sync", () => {
     })
   })
 
+  it("grants foil only to an active Foil subscription", async () => {
+    const t = makeConvexTest()
+    const actor = await createUser(t, "clerk_foil")
+    const fetchSpy = jest.spyOn(globalThis, "fetch")
+    const foil = async () =>
+      (await entitlements(t, "clerk_foil")).find(({ feature }) => feature === "foil")?.enabled
+
+    fetchSpy.mockResolvedValueOnce(
+      subscriberResponse({ enabled: true, observedAt: 800, productIdentifier: "foil_yearly" }),
+    )
+    await actor.action(api.revenuecat.syncCurrent, {})
+    expect(await foil()).toBe(true)
+
+    fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 900 }))
+    await actor.action(api.revenuecat.syncCurrent, {})
+    expect(await foil()).toBe(false)
+
+    fetchSpy.mockResolvedValueOnce(
+      subscriberResponse({ enabled: false, observedAt: 1000, productIdentifier: "foil_yearly" }),
+    )
+    await actor.action(api.revenuecat.syncCurrent, {})
+    expect(await foil()).toBe(false)
+  })
+
   it("lets only the authenticated caller refresh their current state", async () => {
     const t = makeConvexTest()
     const actor = await createUser(t, "clerk_action")
