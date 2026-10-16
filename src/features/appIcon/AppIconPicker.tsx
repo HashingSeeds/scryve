@@ -8,6 +8,7 @@ import {
 } from "expo-alternate-app-icons"
 
 import { Text } from "@/components/Text"
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -59,6 +60,8 @@ const ANDROID = Platform.OS === "android"
 export function AppIconPicker() {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
+  const auth = useAuthAccess()
+  const planLoading = auth.isSignedIn && billing.customerInfo === null
   const [current, setCurrent] = useState(() => (supportsAlternateIcons ? getAppIconName() : null))
   const [error, setError] = useState("")
   if (!supportsAlternateIcons) return null
@@ -103,11 +106,18 @@ export function AppIconPicker() {
               accessibilityLabel={
                 locked ? `${label}, Scryve ${name === "Foil" ? "Foil" : "Pro"}` : label
               }
-              accessibilityHint={locked ? "Opens Scryve Pro" : undefined}
-              accessibilityState={{ selected }}
+              accessibilityHint={
+                locked ? (auth.isSignedIn ? "Opens Scryve Pro" : "Opens sign in") : undefined
+              }
+              accessibilityState={{ selected, disabled: locked && planLoading }}
+              disabled={locked && planLoading}
               activeOpacity={0.75}
               style={[$option, locked && $locked]}
-              onPress={() => (locked ? void billing.presentPaywall() : void choose(name))}
+              onPress={() => {
+                if (!locked) void choose(name)
+                else if (auth.isSignedIn) void billing.presentPaywall()
+                else auth.openAuth()
+              }}
             >
               <View style={[themed($frame), selected && themed($selectedFrame)]}>
                 {ANDROID ? (
