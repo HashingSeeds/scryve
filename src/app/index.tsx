@@ -11,6 +11,7 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
+import type { TxKeyPath } from "@/i18n"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -120,20 +121,20 @@ export default function Index() {
         contentContainerStyle={themed($oldGame)}
       >
         <View style={themed($oldGameCopy)}>
-          <Text text="Update Scryve" preset="heading" accessibilityRole="header" />
-          <Text text="Your current game was saved by a newer version. Update to keep playing it." />
+          <Text tx="play:launch.updateTitle" preset="heading" accessibilityRole="header" />
+          <Text tx="play:launch.updateMessage" />
         </View>
         <View style={themed($oldGameActions)}>
           {STORE_PAGE ? (
             <Button
-              text={STORE_PAGE.label}
+              tx={STORE_PAGE.labelTx}
               preset="primary"
               style={themed($primaryAction)}
               onPress={() => void Linking.openURL(STORE_PAGE.url).catch(() => undefined)}
             />
           ) : null}
           <Button
-            text="Replace with a new game"
+            tx="play:launch.replaceWithNewGame"
             style={themed($secondaryAction)}
             onPress={() => {
               localGameRepository.clearActiveGame()
@@ -154,23 +155,23 @@ export default function Index() {
         contentContainerStyle={themed($oldGame)}
       >
         <View style={themed($oldGameCopy)}>
-          <Text text="Continue game?" preset="heading" accessibilityRole="header" />
-          <Text text="This game has been waiting for more than 24 hours. Nothing was discarded." />
+          <Text tx="play:launch.staleTitle" preset="heading" accessibilityRole="header" />
+          <Text tx="play:launch.staleMessage" />
         </View>
         <View style={themed($oldGameActions)}>
           <Button
-            text="Continue"
+            tx="play:launch.continue"
             preset="primary"
             style={themed($primaryAction)}
             onPress={() => setOldGameChoice({ gameId: activeGame.id, choice: "continue" })}
           />
           <Button
-            text="End game"
+            tx="play:launch.endGame"
             style={themed($secondaryAction)}
             onPress={() => setOldGameChoice({ gameId: activeGame.id, choice: "end" })}
           />
           <Button
-            text="Abandon"
+            tx="play:abandon"
             style={themed($secondaryAction)}
             onPress={() => {
               localGameRepository.clearActiveGame()
@@ -201,10 +202,10 @@ export default function Index() {
   )
 }
 
-const STORE_PAGE = Platform.select({
-  ios: { label: "Open App Store", url: "https://apps.apple.com/app/id6798955244" },
+const STORE_PAGE = Platform.select<{ labelTx: TxKeyPath; url: string }>({
+  ios: { labelTx: "play:launch.openAppStore", url: "https://apps.apple.com/app/id6798955244" },
   android: {
-    label: "Open Google Play",
+    labelTx: "play:launch.openGooglePlay",
     url: "https://play.google.com/store/apps/details?id=com.sowinghope.count",
   },
 })

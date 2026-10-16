@@ -66,6 +66,7 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -171,9 +172,9 @@ const TREACHERY_MIN_SEATS = 4
 const MAX_SEATS = 6
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 const CLOCK_MODES = [
-  { id: "off", label: "Off" },
-  { id: "countdown", label: "Countdown" },
-  { id: "stopwatch", label: "Stopwatch" },
+  { id: "off", labelTx: "play:newGame.clockOff" },
+  { id: "countdown", labelTx: "play:newGame.clockCountdown" },
+  { id: "stopwatch", labelTx: "play:newGame.clockStopwatch" },
 ] as const
 type ClockMode = (typeof CLOCK_MODES)[number]["id"]
 
@@ -370,22 +371,25 @@ export function NewGameScreen({
     : Boolean(localGame) || connectedBlocksLocal
   const statusText = connectedMode
     ? directResume
-      ? "Resume current game"
+      ? translate("play:newGame.resumeCurrentGame")
       : (connected?.error ??
         connected?.blockedReason ??
         (connectedGames.length
-          ? "Games in progress"
+          ? translate("play:newGame.gamesInProgress")
           : preparing && showPreparation
             ? connected?.status
             : ""))
     : localGame?.match
-      ? `${matchContextLabel(localGame)} · Best of ${localGame.match.bestOf}`
+      ? translate("play:newGame.matchStatus", {
+          context: matchContextLabel(localGame),
+          bestOf: localGame.match.bestOf,
+        })
       : localGame
-        ? "Resume current game"
+        ? translate("play:newGame.resumeCurrentGame")
         : connectedBlocksLocal
           ? singleBlockingConnected
-            ? "Resume current game"
-            : "Games in progress"
+            ? translate("play:newGame.resumeCurrentGame")
+            : translate("play:newGame.gamesInProgress")
           : ""
 
   function submit() {
@@ -454,7 +458,9 @@ export function NewGameScreen({
         nextAccount,
       )
     } catch (cause) {
-      setPlayerSaveError(cause instanceof Error ? cause.message : "Could not save players.")
+      setPlayerSaveError(
+        cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
+      )
     }
   }
 
@@ -556,17 +562,17 @@ export function NewGameScreen({
     <View style={[themed($root), $styles.flex1]}>
       <View style={themed($setupHeader)}>
         <Header
-          title={onSavePlayers ? "Game setup" : "New game"}
+          titleTx={onSavePlayers ? "play:newGame.setupTitle" : "play:newGame.newTitle"}
           leftTx="common:back"
           backgroundColor={colors.surface}
           onLeftPress={onBack}
         />
         <SegmentedControl
           testID="mode"
-          accessibilityLabel="Game connection"
+          accessibilityLabel={translate("play:newGame.connectionLabel")}
           segments={[
-            { id: "local", label: "On this device" },
-            { id: "connected", label: "Connected" },
+            { id: "local", label: translate("play:newGame.onThisDevice") },
+            { id: "connected", label: translate("play:newGame.connected") },
           ]}
           selectedId={mode}
           onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
@@ -575,10 +581,10 @@ export function NewGameScreen({
         {connectedMode && joinContent ? (
           <SegmentedControl
             testID="connected-action"
-            accessibilityLabel="Host or join"
+            accessibilityLabel={translate("play:newGame.hostOrJoin")}
             segments={[
-              { id: "host", label: "Host" },
-              { id: "join", label: "Join" },
+              { id: "host", label: translate("play:newGame.host") },
+              { id: "join", label: translate("play:newGame.join") },
             ]}
             selectedId={connectedAction}
             onSelect={setConnectedAction}
@@ -594,18 +600,18 @@ export function NewGameScreen({
               <View style={themed($section)}>
                 <Button
                   testID="resume-hosted-connected-button"
-                  text="Resume hosted game"
+                  tx="play:newGame.resumeHostedGame"
                   onPress={() => onResumeConnected?.(hostedResumable)}
                 />
               </View>
             ) : null}
             <View style={themed($section)}>
-              <Text text="System" preset="subheading" accessibilityRole="header" />
+              <Text tx="play:newGame.system" preset="subheading" accessibilityRole="header" />
               <SegmentedControl
                 testID="play-system"
-                accessibilityLabel="Game system"
+                accessibilityLabel={translate("play:newGame.gameSystem")}
                 segments={[
-                  { id: NO_PLAY_SYSTEM, label: "No system" },
+                  { id: NO_PLAY_SYSTEM, label: translate("play:newGame.noSystem") },
                   ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
                 ]}
                 selectedId={system ?? NO_PLAY_SYSTEM}
@@ -614,7 +620,7 @@ export function NewGameScreen({
               {system ? (
                 <SelectField
                   testID="play-format"
-                  label="Format"
+                  label={translate("play:newGame.format")}
                   value={format}
                   options={playSystemFormats(system).map(({ id, label, blurb }) => ({
                     id,
@@ -642,7 +648,11 @@ export function NewGameScreen({
               <View style={themed($playerValue)}>
                 <ValueField
                   testID="player-count"
-                  label={connectedMode ? "Seats" : "Players"}
+                  label={
+                    connectedMode
+                      ? translate("play:newGame.seats")
+                      : translate("play:newGame.players")
+                  }
                   value={playerCount}
                   min={treachery ? TREACHERY_MIN_SEATS : PLAYER_COUNTS[0]}
                   max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
@@ -665,13 +675,13 @@ export function NewGameScreen({
 
             {connectedMode ? (
               <View style={themed($section)}>
-                <Text text="Decks" preset="subheading" accessibilityRole="header" />
+                <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
                 <SegmentedControl
                   testID="deck-requirement"
-                  accessibilityLabel="Deck requirement"
+                  accessibilityLabel={translate("play:newGame.deckRequirement")}
                   segments={[
-                    { id: "optional", label: "Optional" },
-                    { id: "required", label: "Required" },
+                    { id: "optional", label: translate("play:newGame.optional") },
+                    { id: "required", label: translate("play:newGame.required") },
                   ]}
                   selectedId={deckRequired ? "required" : "optional"}
                   onSelect={(value) => setDeckRequired(value === "required")}
@@ -681,13 +691,13 @@ export function NewGameScreen({
 
             {!connectedMode && !localGame ? (
               <View style={themed($section)}>
-                <Text text="Match" preset="subheading" accessibilityRole="header" />
+                <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
                 <SegmentedControl
                   testID="match-mode"
-                  accessibilityLabel="Match"
+                  accessibilityLabel={translate("play:newGame.match")}
                   segments={[
-                    { id: "off", label: "Single game" },
-                    { id: "on", label: "Best of" },
+                    { id: "off", label: translate("play:newGame.singleGame") },
+                    { id: "on", label: translate("play:newGame.bestOf") },
                   ]}
                   selectedId={matchBestOf ? "on" : "off"}
                   onSelect={(value) => toggleMatch(value === "on")}
@@ -695,10 +705,10 @@ export function NewGameScreen({
                 {matchBestOf ? (
                   <SegmentedControl
                     testID="match-best-of"
-                    accessibilityLabel="Best of"
+                    accessibilityLabel={translate("play:newGame.bestOf")}
                     segments={MATCH_BEST_OF.map((bestOf) => ({
                       id: String(bestOf),
-                      label: `Best of ${bestOf}`,
+                      label: translate("play:newGame.bestOfCount", { bestOf }),
                     }))}
                     selectedId={String(matchBestOf)}
                     onSelect={(value) =>
@@ -711,11 +721,14 @@ export function NewGameScreen({
 
             {!connectedMode && !localGame ? (
               <View style={themed($section)}>
-                <Text text="Clock" preset="subheading" accessibilityRole="header" />
+                <Text tx="play:newGame.clock" preset="subheading" accessibilityRole="header" />
                 <SegmentedControl
                   testID="clock-mode"
-                  accessibilityLabel="Clock"
-                  segments={CLOCK_MODES}
+                  accessibilityLabel={translate("play:newGame.clock")}
+                  segments={CLOCK_MODES.map(({ id, labelTx }) => ({
+                    id,
+                    label: translate(labelTx),
+                  }))}
                   selectedId={clockMode}
                   onSelect={(value) => {
                     const mode = CLOCK_MODES.find(({ id }) => id === value)?.id
@@ -725,7 +738,7 @@ export function NewGameScreen({
                 {clockMode === "countdown" ? (
                   <ValueField
                     testID="clock-minutes"
-                    label="Minutes left"
+                    label={translate("play:newGame.minutesLeft")}
                     value={clockMinutes}
                     min={ROUND_CLOCK_MINUTES.min}
                     max={ROUND_CLOCK_MINUTES.max}
@@ -738,7 +751,7 @@ export function NewGameScreen({
 
             <Button
               testID="setup-options"
-              text={showOptions ? "Hide options" : "Layout and counter options"}
+              tx={showOptions ? "play:newGame.hideOptions" : "play:newGame.showOptions"}
               accessibilityState={{ expanded: showOptions }}
               onPress={() => setShowOptions((value) => !value)}
             />
@@ -747,7 +760,7 @@ export function NewGameScreen({
                 <View style={themed($section)}>
                   <SelectField
                     testID="life-step"
-                    label="Change by"
+                    label={translate("play:newGame.changeBy")}
                     value={String(lifeStep)}
                     options={LIFE_STEP_OPTIONS.map((step) => ({
                       id: String(step),
@@ -761,7 +774,7 @@ export function NewGameScreen({
                 </View>
 
                 <View style={themed($section)}>
-                  <Text text="Layout" preset="subheading" accessibilityRole="header" />
+                  <Text tx="play:newGame.layout" preset="subheading" accessibilityRole="header" />
                   <PlayerLayoutPicker
                     playerCount={playerCount}
                     value={layout}
@@ -780,7 +793,9 @@ export function NewGameScreen({
                       <TouchableOpacity
                         testID={`player-appearance-${index + 1}`}
                         accessibilityRole="button"
-                        accessibilityLabel={`Change appearance for ${player.name}`}
+                        accessibilityLabel={translate("play:newGame.changeAppearance", {
+                          name: player.name,
+                        })}
                         activeOpacity={0.75}
                         style={themed($appearanceButton)}
                         onPress={(event) => openAppearancePicker(index, event)}
@@ -796,13 +811,15 @@ export function NewGameScreen({
                         testID={`player-name-${index + 1}`}
                         value={names[index]}
                         placeholder={defaultName(index)}
-                        accessibilityLabel={`Name for player ${index + 1}`}
+                        accessibilityLabel={translate("play:newGame.nameForPlayer", {
+                          seat: index + 1,
+                        })}
                         maxLength={MAX_PLAYER_NAME_LENGTH}
                         status={nameValidation.errors[index] ? "error" : undefined}
                         helper={
                           nameValidation.errors[index] ??
                           (nameFailsGate(names[index])
-                            ? `Connected players will see "Player ${index + 1}" instead.`
+                            ? translate("play:newGame.nameGateHelper", { name: defaultName(index) })
                             : undefined)
                         }
                         containerStyle={themed($nameField)}
@@ -820,10 +837,10 @@ export function NewGameScreen({
                   <View style={themed($accountSeat)}>
                     <SelectField
                       testID="me-seat"
-                      label="This is me"
+                      label={translate("play:newGame.thisIsMe")}
                       value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
-                      placeholder="No seat"
-                      clearLabel="No seat"
+                      placeholder={translate("play:newGame.noSeat")}
+                      clearLabel={translate("play:newGame.noSeat")}
                       disabled={matchLocked}
                       options={players.map((player, index) => ({
                         id: String(index),
@@ -834,18 +851,18 @@ export function NewGameScreen({
                     {effectiveMeSeat !== undefined && system ? (
                       <SelectField
                         testID="me-deck"
-                        label="Your deck"
+                        label={translate("play:newGame.yourDeck")}
                         value={deck?.versionId}
                         placeholder={
                           account.decks === "unavailable"
-                            ? "Decks unavailable"
+                            ? translate("play:newGame.decksUnavailable")
                             : account.decks === undefined
-                              ? "Loading decks…"
+                              ? translate("play:newGame.loadingDecks")
                               : deckChoices.length === 0
-                                ? "No matching decks"
-                                : "No deck"
+                                ? translate("play:newGame.noMatchingDecks")
+                                : translate("play:newGame.noDeck")
                         }
-                        clearLabel="No deck"
+                        clearLabel={translate("play:newGame.noDeck")}
                         disabled={matchLocked || (deckList === undefined && !deck)}
                         options={[
                           ...(deck &&
@@ -874,10 +891,13 @@ export function NewGameScreen({
                   text={
                     gameBlocksStart
                       ? matchBlocks
-                        ? "Continue match"
-                        : "End current game…"
+                        ? translate("play:newGame.continueMatch")
+                        : translate("play:newGame.endCurrentGame")
                       : connectedMode
-                        ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
+                        ? (connected?.access?.label ??
+                          (busy
+                            ? translate("play:newGame.working")
+                            : translate("play:newGame.hostLobby")))
                         : undefined
                   }
                   tx={connectedMode || gameBlocksStart ? undefined : "play:startGame"}
@@ -902,11 +922,11 @@ export function NewGameScreen({
                   accessibilityHint={
                     gameBlocksStart
                       ? matchBlocks
-                        ? "Returns to the match in progress"
-                        : "Opens the end-game prompt before you can start another game"
+                        ? translate("play:newGame.continueMatchHint")
+                        : translate("play:newGame.endCurrentGameHint")
                       : connectedMode
-                        ? "Creates a lobby others can join"
-                        : "Starts this local game on the current device"
+                        ? translate("play:newGame.hostLobbyHint")
+                        : translate("play:newGame.startGameHint")
                   }
                   onPress={
                     localGameBlocksStart
@@ -925,10 +945,10 @@ export function NewGameScreen({
                 {showNearby ? (
                   <Button
                     testID="nearby-game-button"
-                    text="Nearby"
+                    tx="play:newGame.nearby"
                     TextProps={$footerButtonText}
                     style={footerRow ? themed($footerAction) : undefined}
-                    accessibilityHint="Plays with phones on this Wi-Fi, without accounts or the cloud"
+                    accessibilityHint={translate("play:newGame.nearbyHint")}
                     onPress={() =>
                       onNearby?.({
                         playerCount,
@@ -943,22 +963,22 @@ export function NewGameScreen({
                 {localMatchEnd ? (
                   <Button
                     testID="end-match-setup-button"
-                    text="End match…"
+                    tx="play:newGame.endMatch"
                     TextProps={$footerButtonText}
                     style={footerRow ? themed($footerAction) : undefined}
-                    accessibilityHint="Records the match result from its last finished game"
+                    accessibilityHint={translate("play:newGame.endMatchHint")}
                     onPress={() => setEndingMatch(true)}
                   />
                 ) : null}
                 {canConnectLocal ? (
                   <Button
                     testID="connect-local-button"
-                    text={localConnect?.access?.label ?? "Connect"}
+                    text={localConnect?.access?.label ?? translate("play:newGame.connect")}
                     TextProps={$footerButtonText}
                     preset="reversed"
                     style={footerRow ? themed($footerAction) : undefined}
                     disabled={localConnect?.busy || localConnect?.ready === false}
-                    accessibilityHint="Moves this game to the cloud so others can join it"
+                    accessibilityHint={translate("play:newGame.connectHint")}
                     onPress={() =>
                       localConnect?.access
                         ? localConnect.access.request()
@@ -973,12 +993,12 @@ export function NewGameScreen({
                   testID="setup-status"
                   accessible={Boolean(statusText)}
                   accessibilityRole={hasStatusDetails ? "button" : "text"}
-                  accessibilityLabel={statusText || "Game status"}
+                  accessibilityLabel={statusText || translate("play:newGame.gameStatus")}
                   accessibilityHint={
                     directResume
-                      ? "Returns to your current game"
+                      ? translate("play:newGame.resumeHint")
                       : hasStatusDetails
-                        ? "Opens game and connection details"
+                        ? translate("play:newGame.statusDetailsHint")
                         : undefined
                   }
                   disabled={!hasStatusDetails}
@@ -1041,7 +1061,7 @@ export function NewGameScreen({
               {connected.retry ? (
                 <Button
                   testID="retry-connected-host-preparation"
-                  text="Try again"
+                  tx="common:tryAgain"
                   style={themed($retryConnected)}
                   onPress={connected.retry}
                 />
@@ -1055,12 +1075,16 @@ export function NewGameScreen({
           connected.retry &&
           connected.blockedReason &&
           !connected.access ? (
-            <Button text="Retry connection" onPress={connected.retry} />
+            <Button tx="play:newGame.retryConnection" onPress={connected.retry} />
           ) : null}
 
           {connectedGames.length ? (
             <View style={themed($section)}>
-              <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
+              <Text
+                tx="play:newGame.yourConnectedGames"
+                preset="subheading"
+                accessibilityRole="header"
+              />
               {connectedGames.map((game) => (
                 <View key={game.publicId} style={themed($connectedGame)}>
                   <ConnectedGameRow
@@ -1080,7 +1104,11 @@ export function NewGameScreen({
                     }}
                   >
                     <Text
-                      text={game.isHost ? "End game…" : "Leave game…"}
+                      tx={
+                        game.isHost
+                          ? "play:newGame.endGameEllipsis"
+                          : "play:newGame.leaveGameEllipsis"
+                      }
                       style={themed($footerStatus)}
                     />
                   </TouchableOpacity>
@@ -1094,25 +1122,27 @@ export function NewGameScreen({
                 />
               ) : null}
               {connected?.activeGamesNextPage?.status === "available" ? (
-                <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
+                <Button tx="play:newGame.loadMore" onPress={connected.activeGamesNextPage.load} />
               ) : connected?.activeGamesNextPage?.status === "loading" ? (
-                <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
+                <Text size="xs" style={themed($footerStatus)} tx="play:newGame.loadingMoreGames" />
               ) : null}
             </View>
           ) : null}
         </ScrollView>
-        <Button text="Done" onPress={() => setShowStatus(false)} />
+        <Button tx="common:done" onPress={() => setShowStatus(false)} />
       </DialogCard>
       {gameToExit ? (
         <ConfirmDialog
           visible
-          title={gameToExit.isHost ? "End this game?" : "Leave this game?"}
-          message={
-            gameToExit.isHost
-              ? "This ends the game for everyone and records it as abandoned. This cannot be undone."
-              : "You will leave this game. Other players and their history stay unchanged."
-          }
-          confirmText={gameToExit.isHost ? "End game" : "Leave game"}
+          title={translate(
+            gameToExit.isHost ? "play:newGame.endGameTitle" : "play:newGame.leaveGameTitle",
+          )}
+          message={translate(
+            gameToExit.isHost ? "play:newGame.endGameMessage" : "play:newGame.leaveGameMessage",
+          )}
+          confirmText={translate(
+            gameToExit.isHost ? "play:newGame.endGameConfirm" : "play:newGame.leaveGameConfirm",
+          )}
           destructive={gameToExit.isHost}
           busy={exitingGameId === gameToExit.publicId}
           confirmDisabled={!connected?.ready || busy}
@@ -1131,11 +1161,15 @@ export function NewGameScreen({
           origin={appearanceOrigin}
           onClose={closeAppearancePicker}
           backdropTestID="local-appearance-backdrop"
-          backdropAccessibilityLabel="Close color and mark picker"
+          backdropAccessibilityLabel={translate("play:newGame.closeAppearancePicker")}
           dialogTestID="local-appearance-dialog"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text={`${players[appearanceSeat].name}'s color and mark`} />
+          <Text
+            preset="subheading"
+            tx="play:newGame.appearanceTitle"
+            txOptions={{ name: players[appearanceSeat].name }}
+          />
           <AppearancePicker
             value={appearanceDraft}
             taken={seatAppearances
@@ -1148,10 +1182,14 @@ export function NewGameScreen({
             onChange={setAppearanceDraft}
           />
           <View style={themed($dialogActions)}>
-            <Button text="Cancel" style={themed($dialogButton)} onPress={closeAppearancePicker} />
+            <Button
+              tx="common:cancel"
+              style={themed($dialogButton)}
+              onPress={closeAppearancePicker}
+            />
             <Button
               testID="save-local-appearance-button"
-              text="Save"
+              tx="common:save"
               preset="reversed"
               style={themed($dialogButton)}
               onPress={saveAppearance}
@@ -1166,12 +1204,8 @@ export function NewGameScreen({
           dialogTestID="host-seat-dialog"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Which seat is you?" />
-          <Text
-            size="xs"
-            text="The other seats stay open for players to claim with an invite."
-            style={themed($footerStatus)}
-          />
+          <Text preset="subheading" tx="play:newGame.hostSeatTitle" />
+          <Text size="xs" tx="play:newGame.hostSeatMessage" style={themed($footerStatus)} />
           {localGame.players.map((player) => (
             <Button
               key={player.id}
@@ -1182,7 +1216,7 @@ export function NewGameScreen({
             />
           ))}
           {localConnect.error ? <AlertNote text={localConnect.error} /> : null}
-          <Button text="Cancel" onPress={() => setPickingHostSeat(false)} />
+          <Button tx="common:cancel" onPress={() => setPickingHostSeat(false)} />
         </DialogCard>
       ) : null}
       {endingMatch && localMatchEnd ? (

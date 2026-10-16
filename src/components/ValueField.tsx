@@ -3,6 +3,8 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -23,10 +25,10 @@ export interface ValueFieldProps {
   onChange: (next: number) => void
 }
 
-const ZONES: readonly { direction: -1 | 1; glyph: string; word: string }[] = [
-  { direction: -1, glyph: "−", word: "Decrease" },
-  { direction: 1, glyph: "+", word: "Increase" },
-]
+const ZONES = [
+  { direction: -1, glyph: "−", labelTx: "common:valueField.decrease" },
+  { direction: 1, glyph: "+", labelTx: "common:valueField.increase" },
+] as const satisfies readonly { direction: -1 | 1; glyph: string; labelTx: TxKeyPath }[]
 
 export function ValueField({
   label,
@@ -70,7 +72,7 @@ export function ValueField({
           text={String(value)}
           maxFontSizeMultiplier={1.2}
           numberOfLines={1}
-          accessibilityLabel={`${label}, ${value}`}
+          accessibilityLabel={translate("common:valueField.readoutLabel", { label, value })}
           style={[
             themed($value),
             compactValue && themed($compactValue),
@@ -87,15 +89,19 @@ export function ValueField({
         style={themed($caption)}
       />
       <View style={themed($zones)}>
-        {ZONES.map(({ direction, glyph, word }) => {
+        {ZONES.map(({ direction, glyph, labelTx }) => {
           const atBound = disabled || (direction < 0 ? value <= min : value >= max)
           return (
             <Pressable
               key={direction}
               testID={testID ? `${testID}-${direction < 0 ? "decrement" : "increment"}` : undefined}
               accessibilityRole="button"
-              accessibilityLabel={`${word} ${label} by ${step}`}
-              accessibilityHint={longStep ? `Long press to change it by ${longStep}.` : undefined}
+              accessibilityLabel={translate(labelTx, { label, step })}
+              accessibilityHint={
+                longStep
+                  ? translate("common:valueField.longPressHint", { step: longStep })
+                  : undefined
+              }
               disabled={atBound}
               accessibilityState={{ disabled: atBound }}
               delayLongPress={450}

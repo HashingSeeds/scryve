@@ -14,6 +14,8 @@ import { Text } from "@/components/Text"
 import type { RemoteValue } from "@/features/async/remoteState"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { playFormatLabel } from "@/features/game/playSystems"
+import { appLocale, type TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -34,14 +36,17 @@ export interface ManualMatchScreenProps {
 }
 
 const OUTCOME_BADGES = {
-  win: { label: "W", accessibilityLabel: "Win" },
-  loss: { label: "L", accessibilityLabel: "Loss" },
-  draw: { label: "D", accessibilityLabel: "Draw" },
-  unknown: { label: "–", accessibilityLabel: "Result not recorded" },
-} as const
+  win: { labelTx: "play:summary.badge.win", accessibilityTx: "play:history.outcome.win" },
+  loss: { labelTx: "play:summary.badge.loss", accessibilityTx: "play:summary.outcome.loss" },
+  draw: { labelTx: "play:summary.badge.draw", accessibilityTx: "play:summary.outcome.draw" },
+  unknown: {
+    labelTx: "play:summary.badge.unrecorded",
+    accessibilityTx: "play:summary.outcome.unrecorded",
+  },
+} as const satisfies Record<string, { labelTx: TxKeyPath; accessibilityTx: TxKeyPath }>
 
 function dateLabel(finishedAt: number) {
-  return new Date(finishedAt).toLocaleDateString(undefined, {
+  return new Date(finishedAt).toLocaleDateString(appLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -50,9 +55,14 @@ function dateLabel(finishedAt: number) {
 
 export function matchMetaLine(match: ManualMatchView) {
   return [
-    `Best of ${match.bestOf}`,
+    translate("play:newGame.bestOfCount", { bestOf: match.bestOf }),
     match.system && match.format ? playFormatLabel(match.system, match.format) : undefined,
-    [match.eventName, match.roundNumber === undefined ? undefined : `Round ${match.roundNumber}`]
+    [
+      match.eventName,
+      match.roundNumber === undefined
+        ? undefined
+        : translate("play:manualMatch.round", { round: match.roundNumber }),
+    ]
       .filter(Boolean)
       .join(" "),
     dateLabel(match.finishedAt),
@@ -74,22 +84,29 @@ function SeatRow({ seat }: { seat: ManualMatchSeat }) {
     seat.gamesWon === undefined
       ? undefined
       : seat.gamesDrawn
-        ? `${seat.gamesWon} won · ${seat.gamesDrawn} drawn`
-        : `${seat.gamesWon} won`
+        ? translate("play:manualMatch.gamesWonDrawn", {
+            won: seat.gamesWon,
+            drawn: seat.gamesDrawn,
+          })
+        : translate("play:manualMatch.gamesWon", { won: seat.gamesWon })
   return (
     <View
       testID={`match-seat-${seat.seat}`}
-      accessibilityLabel={`${badge.accessibilityLabel} · ${seat.displayName}`}
+      accessibilityLabel={`${translate(badge.accessibilityTx)} · ${seat.displayName}`}
       style={themed($seatRow)}
     >
       <View style={[themed($badge), { borderColor: badgeTone }]}>
-        <Text weight="bold" size="sm" text={badge.label} style={{ color: badgeTone }} />
+        <Text weight="bold" size="sm" tx={badge.labelTx} style={{ color: badgeTone }} />
       </View>
       <View style={$styles.flex1}>
         <Text
           size="sm"
           weight="medium"
-          text={seat.mine ? `${seat.displayName} (you)` : seat.displayName}
+          text={
+            seat.mine
+              ? translate("play:manualMatch.you", { name: seat.displayName })
+              : seat.displayName
+          }
         />
         {seat.deckName ? <Text size="xxs" style={themed($dim)} text={seat.deckName} /> : null}
       </View>
@@ -116,7 +133,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
       onDeleted()
     } catch (cause) {
       setConfirming(false)
-      setError(convexErrorMessage(cause, "Could not delete this match. Try again."))
+      setError(convexErrorMessage(cause, translate("play:manualMatch.deleteFailed")))
       setBusy(false)
     }
   }
@@ -130,7 +147,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
       contentContainerStyle={$screen}
     >
       <Header
-        title="Match result"
+        titleTx="play:manualMatch.title"
         backgroundColor={theme.colors.surface}
         leftTx="common:back"
         onLeftPress={busy ? undefined : onBack}
@@ -138,34 +155,34 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
       {!access.ready && !access.loading ? (
         <EmptyState
           imageSource={null}
-          heading="Sign in to view this result"
+          headingTx="play:manualMatch.signInHeading"
           content={access.message}
-          button={access.actionLabel ?? "Sign in"}
+          button={access.actionLabel ?? translate("play:manualMatch.signIn")}
           buttonOnPress={access.request}
         />
       ) : match.status === "unavailable" ? (
         <EmptyState
           imageSource={null}
-          heading="Match unavailable"
-          content="Check your connection and try again."
-          button="Try again"
+          headingTx="play:manualMatch.unavailableHeading"
+          contentTx="play:summary.unavailableContent"
+          buttonTx="common:tryAgain"
           buttonOnPress={match.retry}
         />
       ) : match.status === "loading" || access.loading ? (
         <View
           testID="match-loading"
           accessibilityRole="progressbar"
-          accessibilityLabel="Loading match"
+          accessibilityLabel={translate("play:manualMatch.loading")}
           style={themed($content)}
         >
-          <Text size="xs" style={themed($dim)} text="Loading…" />
+          <Text size="xs" style={themed($dim)} tx="play:manualMatch.loadingEllipsis" />
         </View>
       ) : !value ? (
         <EmptyState
           imageSource={null}
-          heading="Match not found"
-          content="It may have been deleted."
-          button="Back"
+          headingTx="play:manualMatch.notFoundHeading"
+          contentTx="play:manualMatch.notFoundContent"
+          buttonTx="common:back"
           buttonOnPress={onBack}
         />
       ) : (
@@ -183,16 +200,16 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
             {error ? <AlertNote text={error} /> : null}
             <Button
               testID="match-delete"
-              text="Delete result"
+              tx="play:manualMatch.deleteResult"
               disabled={busy}
               onPress={() => setConfirming(true)}
             />
           </BottomActionBar>
           <ConfirmDialog
             visible={confirming}
-            title="Delete this result?"
-            message="Deck stats that count it will be updated."
-            confirmText="Delete"
+            title={translate("play:manualMatch.deleteTitle")}
+            message={translate("play:manualMatch.deleteMessage")}
+            confirmText={translate("common:delete")}
             destructive
             busy={busy}
             dialogTestID="match-delete-confirm"

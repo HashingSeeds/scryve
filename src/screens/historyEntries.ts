@@ -10,6 +10,8 @@ import {
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type { LocalGameMatch, LocalGameSummary } from "@/features/game/types"
+import { appLocale, type TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 
 export type HistorySource = "local" | "connected" | "manual"
 export type HistoryOutcome = "win" | "loss" | "draw" | "unrecorded"
@@ -65,10 +67,14 @@ export function matchGroupKey(publicId: string) {
   return `scryve-match:${publicId}`
 }
 
-export const SOURCE_LABELS: Record<HistorySource, string> = {
-  local: "Local",
-  connected: "Connected",
-  manual: "Manual",
+const SOURCE_TX = {
+  local: "play:history.source.local",
+  connected: "play:history.source.connected",
+  manual: "play:history.source.manual",
+} as const satisfies Record<HistorySource, TxKeyPath>
+
+export function sourceLabel(source: HistorySource) {
+  return translate(SOURCE_TX[source])
 }
 
 function toHistoryOutcome(outcome: string | undefined): HistoryOutcome {
@@ -126,7 +132,10 @@ export function manualHistoryEntry(match: {
       name: seat.displayName,
       deckName: seat.deckName,
     })),
-    format: system && match.format ? playFormatLabel(system, match.format) : "Match",
+    format:
+      system && match.format
+        ? playFormatLabel(system, match.format)
+        : translate("play:history.matchFormat"),
     match: {
       bestOf: match.bestOf,
       opponents: match.seats.filter((seat) => !seat.mine).map((seat) => seat.displayName),
@@ -294,7 +303,7 @@ export function connectedHistoryEntry(game: {
         ? playFormatLabel(system, game.format || game.ruleset)
         : game.startingLife !== undefined
           ? counterValueLabel(system, game.startingLife)
-          : "Connected",
+          : translate("play:history.source.connected"),
   }
 }
 
@@ -371,7 +380,9 @@ export function entrySystem(entry: HistoryEntry): HistorySystem {
 }
 
 export function systemLabel(system: HistorySystem) {
-  return playSystemRules(system).shortLabel
+  return system === NO_PLAY_SYSTEM
+    ? translate("play:newGame.noSystem")
+    : playSystemRules(system).shortLabel
 }
 
 export function entryFormatKey(entry: HistoryEntry): FormatKey {
@@ -413,23 +424,33 @@ export const NO_FILTERS: HistoryFilters = {
 const DAY_MS = 24 * 60 * 60 * 1000
 const RANGE_DAYS: Record<Exclude<DateRange, "any" | "year">, number> = { "7d": 7, "30d": 30 }
 
-export const DATE_RANGE_LABELS: Record<DateRange, string> = {
-  "any": "Any time",
-  "7d": "Last 7 days",
-  "30d": "Last 30 days",
-  "year": "This year",
+const DATE_RANGE_TX = {
+  "any": "play:history.dateRange.any",
+  "7d": "play:history.dateRange.last7Days",
+  "30d": "play:history.dateRange.last30Days",
+  "year": "play:history.dateRange.thisYear",
+} as const satisfies Record<DateRange, TxKeyPath>
+
+export function dateRangeLabel(range: DateRange) {
+  return translate(DATE_RANGE_TX[range])
 }
 
-export const OUTCOME_LABELS: Record<HistoryOutcome, string> = {
-  win: "Win",
-  loss: "Loss",
-  draw: "Draw",
-  unrecorded: "No result",
+const OUTCOME_TX = {
+  win: "play:history.outcome.win",
+  loss: "play:history.outcome.loss",
+  draw: "play:history.outcome.draw",
+  unrecorded: "play:history.outcome.unrecorded",
+} as const satisfies Record<HistoryOutcome, TxKeyPath>
+
+export function outcomeLabel(outcome: HistoryOutcome) {
+  return translate(OUTCOME_TX[outcome])
 }
 
 export function podSizeLabel(size: number) {
-  if (size === 1) return "Solo"
-  return size >= POD_SIZE_MAX ? `${POD_SIZE_MAX}+ players` : `${size} players`
+  if (size === 1) return translate("play:history.podSolo")
+  return size >= POD_SIZE_MAX
+    ? translate("play:history.podMax", { max: POD_SIZE_MAX })
+    : translate("play:history.podSize", { count: size })
 }
 
 function matchesDateRange(finishedAt: number, range: DateRange, now: number) {
@@ -510,7 +531,15 @@ export function formatChoices(formats: FormatKey[], systems: HistorySystem[]) {
   return available.map((key) => {
     const label = formatKeyLabel(key)
     const shared = labels.indexOf(label) !== labels.lastIndexOf(label)
-    return { key, label: shared ? `${label} (${systemLabel(formatKeySystem(key))})` : label }
+    return {
+      key,
+      label: shared
+        ? translate("play:history.formatWithSystem", {
+            format: label,
+            system: systemLabel(formatKeySystem(key)),
+          })
+        : label,
+    }
   })
 }
 
@@ -569,11 +598,11 @@ function startOfDay(timestamp: number) {
 
 export function dayLabel(timestamp: number, now: number) {
   const daysAgo = Math.round((startOfDay(now) - startOfDay(timestamp)) / DAY_MS)
-  if (daysAgo <= 0) return "Today"
-  if (daysAgo === 1) return "Yesterday"
+  if (daysAgo <= 0) return translate("play:history.today")
+  if (daysAgo === 1) return translate("play:history.yesterday")
   const date = new Date(timestamp)
-  if (daysAgo < 7) return date.toLocaleDateString(undefined, { weekday: "long" })
-  return date.toLocaleDateString(undefined, {
+  if (daysAgo < 7) return date.toLocaleDateString(appLocale, { weekday: "long" })
+  return date.toLocaleDateString(appLocale, {
     month: "long",
     day: "numeric",
     ...(date.getFullYear() === new Date(now).getFullYear() ? {} : { year: "numeric" }),

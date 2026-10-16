@@ -19,6 +19,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -43,12 +44,17 @@ export interface GameSummaryScreenProps {
   moderation?: { publicId: string; viewerPlayerIds: string[] }
 }
 
-const OUTCOME_BADGES: Record<SummaryOutcome, { label: string; accessibilityLabel: string }> = {
-  win: { label: "W", accessibilityLabel: "Winner" },
-  loss: { label: "L", accessibilityLabel: "Loss" },
-  draw: { label: "D", accessibilityLabel: "Draw" },
-  unrecorded: { label: "–", accessibilityLabel: "Result not recorded" },
-}
+type CounterSystemId = ReturnType<typeof playSystemRules>["id"]
+
+const OUTCOME_BADGES = {
+  win: { labelTx: "play:summary.badge.win", accessibilityTx: "play:summary.outcome.win" },
+  loss: { labelTx: "play:summary.badge.loss", accessibilityTx: "play:summary.outcome.loss" },
+  draw: { labelTx: "play:summary.badge.draw", accessibilityTx: "play:summary.outcome.draw" },
+  unrecorded: {
+    labelTx: "play:summary.badge.unrecorded",
+    accessibilityTx: "play:summary.outcome.unrecorded",
+  },
+} as const satisfies Record<SummaryOutcome, { labelTx: TxKeyPath; accessibilityTx: TxKeyPath }>
 
 function signed(delta: number) {
   return `${delta > 0 ? "+" : ""}${delta}`
@@ -82,20 +88,25 @@ function StandingRow({
   const detail = [
     player.username ? `@${player.username}` : undefined,
     player.deckLabel,
-    player.deleted ? "deleted player" : undefined,
+    player.deleted ? translate("play:summary.deletedPlayer") : undefined,
   ]
     .filter(Boolean)
     .join(" · ")
+  const value = counterValueLabel(system, player.life)
+  const rowLabel = showOutcome
+    ? translate("play:summary.standingWithOutcome", {
+        outcome: translate(badge.accessibilityTx),
+        name: player.name,
+        value,
+      })
+    : translate("play:summary.standing", { name: player.name, value })
 
   return (
-    <View
-      style={themed($standingRow)}
-      accessibilityLabel={`${showOutcome ? `${badge.accessibilityLabel}, ` : ""}${player.name}, ${counterValueLabel(system, player.life)}`}
-    >
+    <View style={themed($standingRow)} accessibilityLabel={rowLabel}>
       <View style={[themed($colorBar), { backgroundColor: player.color }]} />
       {showOutcome ? (
         <View style={[themed($badge), { borderColor: badgeTone }]}>
-          <Text weight="bold" size="xxs" text={badge.label} style={{ color: badgeTone }} />
+          <Text weight="bold" size="xxs" tx={badge.labelTx} style={{ color: badgeTone }} />
         </View>
       ) : (
         <View style={themed($badge)}>
@@ -108,7 +119,7 @@ function StandingRow({
           size="xxs"
           numberOfLines={1}
           style={themed($muted)}
-          text={detail || `Seat ${player.seat}`}
+          text={detail || translate("play:summary.seat", { seat: player.seat })}
         />
       </View>
       <View style={themed($lifeColumn)}>
@@ -130,7 +141,7 @@ function SummaryLoadingShell({ onBack }: { onBack: () => void }) {
         <View
           testID="summary-loading-shell"
           accessibilityRole="progressbar"
-          accessibilityLabel="Loading game summary"
+          accessibilityLabel={translate("play:summary.loading")}
         >
           <View style={themed($loadingHeader)}>
             <View style={themed($skeletonHeading)} />
@@ -159,13 +170,13 @@ function SummaryLoadingShell({ onBack }: { onBack: () => void }) {
   )
 }
 
-function TimelineLoading({ counterLabel }: { counterLabel: string }) {
+function TimelineLoading({ systemId }: { systemId: CounterSystemId }) {
   const { themed } = useAppTheme()
   return (
     <View
       testID="summary-timeline-loading"
       accessibilityRole="progressbar"
-      accessibilityLabel={`Loading ${counterLabel} changes`}
+      accessibilityLabel={translate(`play:summary.timeline.loading.${systemId}`)}
       style={themed($timeline)}
     >
       {Array.from({ length: 3 }).map((_, index) => (
@@ -215,9 +226,9 @@ export function GameSummaryScreen({
       <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
         <Header titleTx="play:gameSummary" leftTx="common:back" onLeftPress={onBack} />
         <EmptyState
-          heading="Summary unavailable"
-          content="Check your connection and try again."
-          button="Try again"
+          headingTx="play:summary.unavailableHeading"
+          contentTx="play:summary.unavailableContent"
+          buttonTx="common:tryAgain"
           buttonOnPress={summary.retry}
           ButtonProps={{ testID: "summary-retry" }}
         />
@@ -230,13 +241,16 @@ export function GameSummaryScreen({
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
         <Header titleTx="play:gameSummary" leftTx="common:back" onLeftPress={onBack} />
-        <EmptyState heading="Game not found" content="This game summary is no longer available." />
+        <EmptyState
+          headingTx="play:summary.notFoundHeading"
+          contentTx="play:summary.notFoundContent"
+        />
       </Screen>
     )
   }
 
   const showOutcome = anyResultRecorded(model)
-  const counter = playSystemRules(model.system).counter
+  const systemId = playSystemRules(model.system).id
   const rows = standings(model)
   const playersById = new Map(model.players.map((player) => [player.id, player]))
   const timelineItems = timeline.status === "ready" ? timeline.items : []
@@ -267,14 +281,16 @@ export function GameSummaryScreen({
           <Text
             preset="heading"
             accessibilityRole="header"
-            text={model.status === "finished" ? "Finished" : "Abandoned"}
+            tx={model.status === "finished" ? "play:summary.finished" : "play:summary.abandoned"}
           />
           <Text
             size="xs"
             style={themed($muted)}
             text={[
               finishedOnLabel(model.finishedAt),
-              model.source === "local" ? "Local" : "Connected",
+              model.source === "local"
+                ? translate("play:summary.local")
+                : translate("play:summary.connected"),
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -289,7 +305,11 @@ export function GameSummaryScreen({
           weight="bold"
           size="xs"
           style={themed($sectionHeading)}
-          text={showOutcome ? "Result" : `Final ${counter.heading}`}
+          text={
+            showOutcome
+              ? translate("play:summary.result")
+              : translate(`play:summary.finalCounter.${systemId}`)
+          }
         />
         <View>
           {rows.map((player, index) => (
@@ -304,12 +324,12 @@ export function GameSummaryScreen({
           ))}
         </View>
         {!showOutcome && model.source === "connected" ? (
-          <Text size="xxs" style={themed($footnote)} text="No winner was recorded for this game." />
+          <Text size="xxs" style={themed($footnote)} tx="play:summary.noWinner" />
         ) : null}
         {reportablePlayers.some((player) => !player.controlledByMe) ? (
           <Button
             testID="summary-report-player-button"
-            text="Report or block a player"
+            tx="play:summary.reportPlayer"
             style={themed($reportAction)}
             onPress={() => setPlayerActionsOpen(true)}
           />
@@ -332,10 +352,16 @@ export function GameSummaryScreen({
             weight="bold"
             size="xs"
             style={themed($toggleHeading)}
-            text={`${counter.heading} changes · ${model.changeCount}`}
+            text={translate(`play:summary.timeline.heading.${systemId}`, {
+              changes: model.changeCount,
+            })}
           />
           {model.changeCount > 0 ? (
-            <Text size="xxs" style={themed($muted)} text={timelineOpen ? "Hide" : "Show"} />
+            <Text
+              size="xxs"
+              style={themed($muted)}
+              tx={timelineOpen ? "play:summary.hide" : "play:summary.show"}
+            />
           ) : null}
         </TouchableOpacity>
 
@@ -343,22 +369,22 @@ export function GameSummaryScreen({
           <Text
             size="xs"
             style={themed($muted)}
-            text={`No ${counter.label} changes were recorded.`}
+            text={translate(`play:summary.timeline.noChanges.${systemId}`)}
           />
         ) : timelineOpen ? (
           timeline.status === "loading" || timeline.status === "idle" ? (
-            <TimelineLoading counterLabel={counter.label} />
+            <TimelineLoading systemId={systemId} />
           ) : timeline.status === "error" ? (
             <View
               testID="summary-timeline-error"
               accessibilityRole="alert"
               style={themed($timelineStatus)}
             >
-              <Text size="xs" text={`Could not load ${counter.label} changes.`} />
+              <Text size="xs" text={translate(`play:summary.timeline.loadFailed.${systemId}`)} />
               <Button
                 testID="summary-timeline-retry"
                 style={themed($timelineStatusButton)}
-                text="Try again"
+                tx="common:tryAgain"
                 onPress={timeline.retry}
               />
             </View>
@@ -368,7 +394,7 @@ export function GameSummaryScreen({
               accessibilityRole="alert"
               size="xs"
               style={themed($muted)}
-              text={`${counter.heading} change details are unavailable.`}
+              text={translate(`play:summary.timeline.detailsUnavailable.${systemId}`)}
             />
           ) : (
             <View style={themed($timeline)}>
@@ -386,9 +412,11 @@ export function GameSummaryScreen({
                       size="xs"
                       numberOfLines={1}
                       style={$styles.flex1}
-                      text={player?.name ?? "Player"}
+                      text={player?.name ?? translate("play:summary.unknownPlayer")}
                     />
-                    {change.undo ? <Text size="xxs" style={themed($muted)} text="undo" /> : null}
+                    {change.undo ? (
+                      <Text size="xxs" style={themed($muted)} tx="play:summary.undo" />
+                    ) : null}
                     <Text
                       size="xs"
                       weight="medium"
@@ -402,16 +430,16 @@ export function GameSummaryScreen({
                 <Text
                   size="xs"
                   style={themed($muted)}
-                  text={`No ${counter.label} change details were found.`}
+                  text={translate(`play:summary.timeline.noDetails.${systemId}`)}
                 />
               ) : null}
               {timeline.nextPage.status !== "exhausted" ? (
                 <Button
                   testID="summary-load-more"
-                  text={
+                  tx={
                     timeline.nextPage.status === "loading"
-                      ? "Loading older changes…"
-                      : "Load older changes"
+                      ? "play:summary.loadingOlder"
+                      : "play:summary.loadOlder"
                   }
                   disabled={timeline.nextPage.status === "loading"}
                   onPress={
@@ -420,27 +448,19 @@ export function GameSummaryScreen({
                 />
               ) : null}
               {timeline.olderEventsDropped ? (
-                <Text
-                  size="xxs"
-                  style={themed($footnote)}
-                  text="Older events were dropped to save space."
-                />
+                <Text size="xxs" style={themed($footnote)} tx="play:summary.olderDropped" />
               ) : null}
-              <Text
-                size="xxs"
-                style={themed($footnote)}
-                text="Undo stays in the record as a compensating change."
-              />
+              <Text size="xxs" style={themed($footnote)} tx="play:summary.undoNote" />
             </View>
           )
         ) : null}
       </ScrollView>
       {showHelp && onOpenSupport ? (
         <View testID="second-game-help" style={themed($helpBar)}>
-          <Text text="Having trouble?" weight="medium" size="sm" style={$styles.flex1} />
+          <Text tx="play:summary.helpPrompt" weight="medium" size="sm" style={$styles.flex1} />
           <Button
             testID="second-game-get-help"
-            text="Open Help"
+            tx="play:summary.openHelp"
             preset="reversed"
             style={themed($helpBarButton)}
             onPress={() => {
@@ -450,7 +470,7 @@ export function GameSummaryScreen({
           />
           <Button
             testID="second-game-dismiss"
-            text="Dismiss"
+            tx="play:summary.dismiss"
             style={themed($helpBarButton)}
             onPress={() => setShowHelp(false)}
           />

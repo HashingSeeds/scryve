@@ -9,12 +9,21 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { useAppUpdate } from "@/features/updates/appUpdate"
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { Text } from "./Text"
+
+export type AccountLabel = "Account" | "Sign in"
+
+const accountLabelTx = {
+  "Account": "common:appMenu.account",
+  "Sign in": "common:appMenu.signIn",
+} as const satisfies Record<AccountLabel, TxKeyPath>
 
 export function AppUtilityMenu({
   visible = true,
@@ -31,7 +40,7 @@ export function AppUtilityMenu({
   onSettings: () => void
   onAccount: () => void
   onOpenChange?: (open: boolean) => void
-  accountLabel?: "Account" | "Sign in"
+  accountLabel?: AccountLabel
 }) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
@@ -84,7 +93,7 @@ export function AppUtilityMenu({
       {open ? (
         <Pressable
           testID="utility-menu-backdrop"
-          accessibilityLabel="Close utility menu"
+          accessibilityLabel={translate("common:appMenu.closeMenu")}
           style={$backdrop}
           onPress={close}
         />
@@ -106,7 +115,9 @@ export function AppUtilityMenu({
           <Pressable
             testID="utility-menu-button"
             accessibilityRole="button"
-            accessibilityLabel={updateReady ? "More, update ready" : "More"}
+            accessibilityLabel={translate(
+              updateReady ? "common:appMenu.moreUpdateReady" : "common:appMenu.more",
+            )}
             accessibilityState={{ expanded: open }}
             style={themed($trigger)}
             onPress={() => {
@@ -122,7 +133,7 @@ export function AppUtilityMenu({
               </View>
             ) : (
               <Text
-                text="More"
+                tx="common:appMenu.more"
                 weight="bold"
                 size="xs"
                 numberOfLines={1}
@@ -141,12 +152,14 @@ export function AppUtilityMenu({
           <Pressable
             testID="utility-settings-button"
             accessibilityRole="button"
-            accessibilityLabel={updateReady ? "Settings, update ready" : "Settings"}
+            accessibilityLabel={translate(
+              updateReady ? "common:appMenu.settingsUpdateReady" : "common:appMenu.settings",
+            )}
             style={themed([$item, $settingsItem])}
             onPress={() => choose(onSettings)}
           >
             <Text
-              text="Settings"
+              tx="common:appMenu.settings"
               weight="medium"
               numberOfLines={1}
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
@@ -160,7 +173,7 @@ export function AppUtilityMenu({
             onPress={() => choose(onAccount)}
           >
             <Text
-              text={accountLabel}
+              tx={accountLabelTx[accountLabel]}
               weight="medium"
               numberOfLines={1}
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}

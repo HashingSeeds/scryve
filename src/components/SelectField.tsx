@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -34,6 +35,9 @@ const SCREEN_MARGIN = 12
 const MIN_MENU_HEIGHT = 180
 const MAX_MENU_HEIGHT = 360
 const OPEN_SPRING = { damping: 18, stiffness: 260, mass: 0.6 } as const
+const CARET_DOWN = "▾"
+const CARET_UP = "▴"
+const CHECK_MARK = "✓"
 
 export function menuPlacement(
   anchor: Anchor,
@@ -58,7 +62,7 @@ export function SelectField({
   label,
   options,
   value,
-  placeholder = "None",
+  placeholder = translate("common:selectField.none"),
   clearLabel,
   testID,
   disabled = false,
@@ -108,8 +112,11 @@ export function SelectField({
         ref={trigger}
         testID={testID}
         accessibilityRole="button"
-        accessibilityLabel={`${label}, ${selected?.label ?? placeholder}`}
-        accessibilityHint={`Opens the ${label.toLowerCase()} choices`}
+        accessibilityLabel={translate("common:selectField.triggerLabel", {
+          label,
+          value: selected?.label ?? placeholder,
+        })}
+        accessibilityHint={translate("common:selectField.openHint", { label: label.toLowerCase() })}
         accessibilityState={{ expanded: open, disabled }}
         disabled={disabled}
         style={({ pressed }) => [
@@ -128,13 +135,15 @@ export function SelectField({
             style={[themed($triggerValue), !selected && { color: colors.textDim }]}
           />
         </View>
-        <Text text={dropsDown || !open ? "▾" : "▴"} style={themed($caret)} />
+        <Text text={dropsDown || !open ? CARET_DOWN : CARET_UP} style={themed($caret)} />
       </Pressable>
       <Modal transparent visible={open} animationType="none" onRequestClose={() => setOpen(false)}>
         <Pressable
           testID={testID ? `${testID}-backdrop` : undefined}
           accessibilityRole="button"
-          accessibilityLabel={`Close ${label.toLowerCase()} choices`}
+          accessibilityLabel={translate("common:selectField.closeLabel", {
+            label: label.toLowerCase(),
+          })}
           style={[StyleSheet.absoluteFill, themed($scrim)]}
           onPress={() => setOpen(false)}
         />
@@ -212,7 +221,9 @@ function MenuOption({
           <Text size="xs" text={detail} numberOfLines={2} style={themed($optionDetail)} />
         ) : null}
       </View>
-      {selected ? <Text text="✓" style={[themed($optionCheck), { color: colors.tint }]} /> : null}
+      {selected ? (
+        <Text text={CHECK_MARK} style={[themed($optionCheck), { color: colors.tint }]} />
+      ) : null}
     </Pressable>
   )
 }

@@ -16,9 +16,9 @@ export default function CurrentLocalGameRoute() {
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <EmptyState
-          heading="No active local game"
-          content="Your next game is ready on Play."
-          button="Open Play"
+          headingTx="play:currentGame.emptyHeading"
+          contentTx="play:currentGame.emptyContent"
+          buttonTx="play:currentGame.openPlay"
           buttonOnPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>

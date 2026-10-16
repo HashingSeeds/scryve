@@ -25,6 +25,7 @@ import {
   type ManualMatchDraft,
   type SeatOutcome,
 } from "@/features/matches/manualMatchForm"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -45,11 +46,12 @@ type RecordMatchScreenProps = {
   onSaved: () => void
 }
 
-const OUTCOME_SEGMENTS = OUTCOME_OPTIONS.map(({ id, label }) => ({ id, label }))
-const BEST_OF_SEGMENTS = BEST_OF_OPTIONS.map((value) => ({
-  id: String(value),
-  label: `Best of ${value}`,
-}))
+const SCORE_FIELDS = [
+  { key: "wins", labelTx: "play:summary.badge.win" },
+  { key: "losses", labelTx: "play:summary.badge.loss" },
+  { key: "draws", labelTx: "play:summary.badge.draw" },
+] as const
+const ISO_DATE_PLACEHOLDER = "YYYY-MM-DD"
 
 export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatchScreenProps) {
   const { themed, theme } = useAppTheme()
@@ -60,6 +62,14 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const twoPlayer = draft.opponents.length === 1
+  const outcomeSegments = OUTCOME_OPTIONS.map(({ id, labelTx }) => ({
+    id,
+    label: translate(labelTx),
+  }))
+  const bestOfSegments = BEST_OF_OPTIONS.map((value) => ({
+    id: String(value),
+    label: translate("play:newGame.bestOfCount", { bestOf: value }),
+  }))
 
   function updateOpponent(index: number, patch: Partial<ManualMatchDraft["opponents"][number]>) {
     setDraft((current) => ({
@@ -86,7 +96,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       await recordMatch(built.args)
       onSaved()
     } catch (cause) {
-      setError(convexErrorMessage(cause, "Could not save this match. Try again."))
+      setError(convexErrorMessage(cause, translate("play:recordMatch.saveFailed")))
       setBusy(false)
     }
   }
@@ -99,7 +109,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       contentContainerStyle={$screen}
     >
       <Header
-        title="Add match result"
+        titleTx="play:recordMatch.title"
         backgroundColor={theme.colors.surface}
         leftTx="common:back"
         onLeftPress={busy ? undefined : onBack}
@@ -109,21 +119,25 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text weight="medium" text={deck ? deck.name : "No deck"} />
+        {deck ? (
+          <Text weight="medium" text={deck.name} />
+        ) : (
+          <Text weight="medium" tx="play:newGame.noDeck" />
+        )}
         <SegmentedControl
           testID="match-best-of"
-          accessibilityLabel="Best of"
-          segments={BEST_OF_SEGMENTS}
+          accessibilityLabel={translate("play:newGame.bestOf")}
+          segments={bestOfSegments}
           selectedId={String(draft.bestOf)}
           disabled={busy}
           onSelect={(id) => setDraft({ ...draft, bestOf: Number(id) as BestOf })}
         />
         <View style={themed($field)}>
-          <Text size="sm" text="My result" />
+          <Text size="sm" tx="play:recordMatch.myResult" />
           <SegmentedControl
             testID="match-my-result"
-            accessibilityLabel="My result"
-            segments={OUTCOME_SEGMENTS}
+            accessibilityLabel={translate("play:recordMatch.myResult")}
+            segments={outcomeSegments}
             selectedId={draft.outcome}
             disabled={busy}
             onSelect={(id) => setDraft(withSeatOutcome(draft, "me", id as SeatOutcome))}
@@ -131,13 +145,13 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         </View>
         {twoPlayer ? (
           <View style={themed($field)}>
-            <Text size="sm" text="Game score (optional)" />
+            <Text size="sm" tx="play:recordMatch.gameScore" />
             <View style={themed($row)}>
-              {(["wins", "losses", "draws"] as const).map((key) => (
+              {SCORE_FIELDS.map(({ key, labelTx }) => (
                 <TextField
                   key={key}
                   testID={`match-score-${key}`}
-                  label={key === "wins" ? "W" : key === "losses" ? "L" : "D"}
+                  labelTx={labelTx}
                   value={draft.score[key]}
                   keyboardType="number-pad"
                   maxLength={1}
@@ -154,7 +168,12 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         {draft.opponents.map((opponent, index) => (
           <View key={index} style={themed($opponent)}>
             <View style={themed($row)}>
-              <Text size="sm" style={$flex} text={`Opponent ${index + 1}`} />
+              <Text
+                size="sm"
+                style={$flex}
+                tx="play:recordMatch.opponent"
+                txOptions={{ number: index + 1 }}
+              />
               {draft.opponents.length > 1 ? (
                 <TouchableOpacity
                   testID={`match-remove-opponent-${index}`}
@@ -167,13 +186,13 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
                     })
                   }
                 >
-                  <Text size="sm" text="Remove" style={themed($action)} />
+                  <Text size="sm" tx="common:remove" style={themed($action)} />
                 </TouchableOpacity>
               ) : null}
             </View>
             <TextField
               testID={`match-opponent-name-${index}`}
-              placeholder="Name"
+              placeholder={translate("play:recordMatch.name")}
               value={opponent.name}
               maxLength={MAX_DISPLAY_NAME_LENGTH}
               editable={!busy}
@@ -181,7 +200,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
             />
             <TextField
               testID={`match-opponent-deck-${index}`}
-              placeholder="Deck or commander (optional)"
+              placeholder={translate("play:recordMatch.deckOptional")}
               value={opponent.deckName}
               maxLength={80}
               editable={!busy}
@@ -190,8 +209,10 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
             {twoPlayer ? null : (
               <SegmentedControl
                 testID={`match-opponent-result-${index}`}
-                accessibilityLabel={`Opponent ${index + 1} result`}
-                segments={OUTCOME_SEGMENTS}
+                accessibilityLabel={translate("play:recordMatch.opponentResult", {
+                  number: index + 1,
+                })}
+                segments={outcomeSegments}
                 selectedId={opponent.outcome}
                 disabled={busy}
                 onSelect={(id) => setDraft(withSeatOutcome(draft, index, id as SeatOutcome))}
@@ -207,13 +228,13 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
             disabled={busy}
             onPress={() => setDraft(withOpponentAdded(draft))}
           >
-            <Text size="sm" text="+ Add opponent" style={themed($action)} />
+            <Text size="sm" tx="play:recordMatch.addOpponent" style={themed($action)} />
           </TouchableOpacity>
         ) : null}
         <View style={themed($row)}>
           <TextField
             testID="match-event-name"
-            label="Event (optional)"
+            label={translate("play:recordMatch.eventOptional")}
             value={draft.eventName}
             maxLength={MAX_EVENT_NAME_LENGTH}
             editable={!busy}
@@ -222,7 +243,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
           />
           <TextField
             testID="match-round"
-            label="Round (optional)"
+            label={translate("play:recordMatch.roundOptional")}
             value={draft.round}
             keyboardType="number-pad"
             maxLength={2}
@@ -233,9 +254,9 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         </View>
         <TextField
           testID="match-date"
-          label="Date"
+          label={translate("play:recordMatch.date")}
           value={draft.date}
-          placeholder="YYYY-MM-DD"
+          placeholder={ISO_DATE_PLACEHOLDER}
           maxLength={10}
           editable={!busy}
           onChangeText={(date) => setDraft({ ...draft, date })}
@@ -246,7 +267,13 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         {access.message ? <Text size="xs" style={themed($dim)} text={access.message} /> : null}
         <Button
           testID="match-save"
-          text={busy ? "Saving…" : access.ready ? "Save result" : (access.actionLabel ?? "Sign in")}
+          text={
+            busy
+              ? translate("play:recordMatch.saving")
+              : access.ready
+                ? translate("play:recordMatch.saveResult")
+                : (access.actionLabel ?? translate("play:manualMatch.signIn"))
+          }
           preset="primary"
           disabled={busy || access.loading}
           onPress={save}

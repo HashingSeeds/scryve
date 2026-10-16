@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -54,7 +55,11 @@ export function RetryableError({ message, retryAfterMs, onRetry, testID }: Retry
       <AlertNote text={message} />
       <Button
         testID={testID}
-        text={coolingDown ? `Retrying in ${secondsLeft}s` : "Retry"}
+        text={
+          coolingDown
+            ? translate("common:retryableError.retryingIn", { seconds: secondsLeft })
+            : translate("common:retry")
+        }
         disabled={coolingDown}
         onPress={onRetry}
       />
