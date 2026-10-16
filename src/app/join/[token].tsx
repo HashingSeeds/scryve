@@ -13,15 +13,19 @@ export default function InviteRoute() {
   if (!isInviteToken(token ?? "")) {
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Header title="Invitation" leftTx="common:back" onLeftPress={() => router.dismissTo("/")} />
-        <Text preset="heading" accessibilityRole="header" text="Invalid invitation" />
-        <Text
-          accessibilityRole="alert"
-          text="This Scryve invitation is malformed or incomplete. Ask the host for a new link or enter the 6-character code."
+        <Header
+          titleTx="connected:invalidInvite.header"
+          leftTx="common:back"
+          onLeftPress={() => router.dismissTo("/")}
         />
-        <Button text="Enter a manual code" onPress={() => router.replace("/connected/join")} />
+        <Text preset="heading" accessibilityRole="header" tx="connected:invalidInvite.title" />
+        <Text accessibilityRole="alert" tx="connected:invalidInvite.message" />
         <Button
-          text="Open Play"
+          tx="connected:invalidInvite.enterCode"
+          onPress={() => router.replace("/connected/join")}
+        />
+        <Button
+          tx="connected:invalidInvite.openPlay"
           onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
         />
       </Screen>

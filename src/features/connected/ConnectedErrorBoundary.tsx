@@ -29,21 +29,22 @@ export class ConnectedErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Text accessibilityRole="header" preset="heading" text="Connected game unavailable" />
+        <Text accessibilityRole="header" preset="heading" tx="connected:errorBoundary.title" />
         <Text
           accessibilityRole="alert"
-          text={`Check your internet connection, invitation, and game membership, then retry. ${this.state.error.message}`}
+          tx="connected:errorBoundary.message"
+          txOptions={{ error: this.state.error.message }}
         />
         <Button
           testID="retry-connected-button"
-          text="Retry"
+          tx="common:retry"
           preset="reversed"
           onPress={() => this.setState({ error: undefined })}
         />
         {this.props.onBack ? (
           <Button
             testID="leave-connected-error-button"
-            text="Back to a safe screen"
+            tx="connected:errorBoundary.back"
             onPress={this.props.onBack}
           />
         ) : null}

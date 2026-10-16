@@ -11,6 +11,8 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { InvitePayload, normalizeInvitePayload } from "@/features/connected/inviteLinks"
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -58,9 +60,7 @@ export function InviteScannerScreen({
           )
         }
         await CameraView.dismissScanner().catch(() => undefined)
-        setError(
-          "That QR is not a trusted Scryve invitation. Try another code or enter it manually.",
-        )
+        setError(translate("connected:scanner.untrusted"))
         processing.current = false
         return
       }
@@ -91,9 +91,7 @@ export function InviteScannerScreen({
       })
     } catch (cause) {
       if (!accepted.current && !wasScannerCancellation(cause))
-        setError(
-          "The QR scanner couldn't open on this device. Try again or enter the code instead.",
-        )
+        setError(translate("connected:scanner.openFailed"))
     } finally {
       setOpeningScanner(false)
     }
@@ -122,9 +120,11 @@ export function InviteScannerScreen({
     return (
       <ScannerLayout
         embedded={embedded}
-        title="Scan invite"
-        body="Camera QR scanning is available in the iOS and Android app. Enter the 6-character code instead."
-        actions={<Button text="Enter code manually" preset="reversed" onPress={onCancel} />}
+        titleTx="connected:scanner.title"
+        bodyTx="connected:scanner.webUnavailable"
+        actions={
+          <Button tx="connected:scanner.enterManually" preset="reversed" onPress={onCancel} />
+        }
       />
     )
   }
@@ -134,32 +134,29 @@ export function InviteScannerScreen({
     return (
       <ScannerLayout
         embedded={embedded}
-        title="Camera permission"
-        body="Scryve uses the camera only while this screen is open to read an invitation QR. Images are not captured, stored, or uploaded."
+        titleTx="connected:scanner.permission.title"
+        bodyTx="connected:scanner.permission.body"
         notice={
           canAsk ? undefined : (
-            <AlertNote
-              tone="info"
-              text="Camera access is denied. You can enable it in system settings or enter the code manually."
-            />
+            <AlertNote tone="info" text={translate("connected:scanner.permission.denied")} />
           )
         }
         actions={
           <>
             {canAsk ? (
               <Button
-                text="Allow camera"
+                tx="connected:scanner.permission.allow"
                 preset="reversed"
                 onPress={() => void requestPermission()}
               />
             ) : (
               <Button
-                text="Open settings"
+                tx="connected:scanner.permission.openSettings"
                 preset="reversed"
                 onPress={() => void Linking.openSettings().then(() => AppState.currentState)}
               />
             )}
-            <Button text="Enter code manually" onPress={onCancel} />
+            <Button tx="connected:scanner.enterManually" onPress={onCancel} />
           </>
         }
       />
@@ -170,11 +167,11 @@ export function InviteScannerScreen({
     return (
       <ScannerLayout
         embedded={embedded}
-        title="Scan invite"
-        notice={
-          <AlertNote text="The native QR scanner is unavailable on this device. Enter the invitation code manually." />
+        titleTx="connected:scanner.title"
+        notice={<AlertNote text={translate("connected:scanner.nativeUnavailable")} />}
+        actions={
+          <Button tx="connected:scanner.enterManually" preset="reversed" onPress={onCancel} />
         }
-        actions={<Button text="Enter code manually" preset="reversed" onPress={onCancel} />}
       />
     )
   }
@@ -182,18 +179,18 @@ export function InviteScannerScreen({
   return (
     <ScannerLayout
       embedded={embedded}
-      title="Scan invite"
-      body="Use the device scanner to find a trusted Scryve invite QR. Recognition stays on-device and no image is saved."
+      titleTx="connected:scanner.title"
+      bodyTx="connected:scanner.body"
       notice={error ? <AlertNote text={error} /> : undefined}
       actions={
         <>
           <Button
-            text={openingScanner ? "Opening scanner…" : "Open QR scanner"}
+            tx={openingScanner ? "connected:scanner.opening" : "connected:scanner.open"}
             preset="reversed"
             disabled={openingScanner}
             onPress={() => void openScanner()}
           />
-          <Button text="Cancel and enter code" onPress={onCancel} />
+          <Button tx="connected:scanner.cancel" onPress={onCancel} />
         </>
       }
     />
@@ -202,14 +199,14 @@ export function InviteScannerScreen({
 
 function ScannerLayout({
   embedded,
-  title,
-  body,
+  titleTx,
+  bodyTx,
   notice,
   actions,
 }: {
   embedded?: boolean
-  title: string
-  body?: string
+  titleTx: TxKeyPath
+  bodyTx?: TxKeyPath
   notice?: ReactNode
   actions: ReactNode
 }) {
@@ -229,9 +226,9 @@ function ScannerLayout({
           <Text
             preset={embedded ? "subheading" : "heading"}
             accessibilityRole="header"
-            text={title}
+            tx={titleTx}
           />
-          {body ? <Text size="sm" style={themed($dimmed)} text={body} /> : null}
+          {bodyTx ? <Text size="sm" style={themed($dimmed)} tx={bodyTx} /> : null}
         </View>
         {notice}
       </ScrollView>

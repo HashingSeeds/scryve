@@ -7,6 +7,7 @@ import type { ConnectedProjection, PendingLifeAction } from "@/features/connecte
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
 import { createClientId } from "@/features/game/domain"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
+import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
 
 import { loadLanName } from "./lanAvailability"
@@ -190,7 +191,7 @@ export class LanSession {
       this.set({ status: "connected", serviceName: server.name, error: undefined })
     } catch (error) {
       if (session !== this.session) return
-      const message = `Could not host: ${String(error)}`
+      const message = translate("connected:nearby.errors.hostFailed", { error: String(error) })
       if (!recovering) return this.replace({ ...IDLE, error: message })
       this.recoverHost(session, message)
     }
@@ -338,7 +339,10 @@ export class LanSession {
     } catch {
       if (session !== this.session) return
       this.unreachableAt.set(service.name, Date.now())
-      this.replace({ ...IDLE, error: `${service.name} isn't reachable. The game may have ended.` })
+      this.replace({
+        ...IDLE,
+        error: translate("connected:nearby.errors.unreachable", { name: service.name }),
+      })
     }
   }
 
@@ -404,7 +408,7 @@ export class LanSession {
     clearTimeout(this.reconnectTimer)
     if (Date.now() - (this.reconnectingSince ?? Date.now()) > RECONNECT_GIVE_UP_MS) {
       this.leave({ keepGame: true })
-      return this.set({ error: "Lost the host. The game may have ended." })
+      return this.set({ error: translate("connected:nearby.errors.lostHost") })
     }
     this.reconnectTimer = setTimeout(async () => {
       const { serviceName } = this.state

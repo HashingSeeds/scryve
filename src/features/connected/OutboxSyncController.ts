@@ -16,6 +16,7 @@ import {
 } from "@/features/game/tableRuntime"
 import type { DeviceId, LifeDelta } from "@/features/game/types"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
+import { translate } from "@/i18n/translate"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import type { DrainOutboxSnapshot, OutboxAcknowledgement } from "./drainOutbox"
@@ -271,8 +272,7 @@ export class OutboxSyncController {
     }
     const result = this.options.repository.enqueue(action, this.pending)
     if (!result.accepted) {
-      this.changeError =
-        "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+      this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return
     }
@@ -286,12 +286,14 @@ export class OutboxSyncController {
     changes: readonly ConnectedCommanderDamageChange[],
   ): void => {
     if (!changes.every(({ delta }) => isCommanderDamageDelta(delta))) {
-      this.changeError = `Commander damage changes have to be between 1 and ${MAX_COMMANDER_DAMAGE}.`
+      this.changeError = translate("connected:outbox.commanderDamageRange", {
+        max: MAX_COMMANDER_DAMAGE,
+      })
       this.publish()
       return
     }
     if (changes.some(({ toPlayerId }) => toPlayerId === fromPlayerId)) {
-      this.changeError = "A commander cannot damage itself"
+      this.changeError = translate("connected:outbox.commanderSelfDamage")
       this.publish()
       return
     }
@@ -315,8 +317,7 @@ export class OutboxSyncController {
       }
       const result = this.options.repository.enqueue(action, this.pending)
       if (!result.accepted) {
-        this.changeError =
-          "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+        this.changeError = translate("connected:outbox.queueFull")
         this.publish()
         continue
       }
@@ -350,8 +351,7 @@ export class OutboxSyncController {
     }
     const result = this.options.repository.enqueue(action, this.pending)
     if (!result.accepted) {
-      this.changeError =
-        "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+      this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return
     }
@@ -394,8 +394,7 @@ export class OutboxSyncController {
       this.pending,
     )
     if (!result.accepted) {
-      this.changeError =
-        "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+      this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return false
     }
@@ -406,23 +405,23 @@ export class OutboxSyncController {
   }
 
   private endGame = async (
-    verb: "finishing" | "abandoning",
+    action: "finish" | "abandon",
     submit: () => Promise<unknown>,
   ): Promise<boolean> => {
     if (this.finishing) return false
     this.finishError = undefined
     if (!this.canSync()) {
-      this.finishError = `Connect and sign in before ${verb} this game.`
+      this.finishError = translate(`connected:outbox.${action}.signIn`)
       this.publish()
       return false
     }
     if (this.options.repository.loadOutbox(this.options.publicId).length > 0) {
-      this.finishError = `Wait for pending life changes to sync before ${verb} this game.`
+      this.finishError = translate(`connected:outbox.${action}.pendingChanges`)
       this.publish()
       return false
     }
     if (this.failed.length > 0) {
-      this.finishError = `Review failed life changes before ${verb} this game.`
+      this.finishError = translate(`connected:outbox.${action}.failedChanges`)
       this.publish()
       return false
     }
@@ -432,8 +431,8 @@ export class OutboxSyncController {
       await submit()
       return true
     } catch (cause) {
-      const fallback = verb === "finishing" ? "finish" : "abandon"
-      this.finishError = cause instanceof Error ? cause.message : `Could not ${fallback} the game`
+      this.finishError =
+        cause instanceof Error ? cause.message : translate(`connected:outbox.${action}.failed`)
       return false
     } finally {
       this.finishing = false
@@ -442,10 +441,9 @@ export class OutboxSyncController {
   }
 
   finish = async (result?: ConnectedGameResult): Promise<boolean> =>
-    this.endGame("finishing", () => this.options.finishGame(result))
+    this.endGame("finish", () => this.options.finishGame(result))
 
-  abandon = async (): Promise<boolean> =>
-    this.endGame("abandoning", () => this.options.abandonGame())
+  abandon = async (): Promise<boolean> => this.endGame("abandon", () => this.options.abandonGame())
 
   dismissFailed = (operationId: string): void => {
     this.dismissedFailureIds.add(operationId)
@@ -558,8 +556,7 @@ export class OutboxSyncController {
         failures: result.failures ?? this.failed,
       })
       if (result.blockedByFailureCapacity)
-        this.changeError =
-          "Failed changes need review before more rejected changes can be retained. Dismiss reviewed failures, then retry syncing."
+        this.changeError = translate("connected:outbox.failureCapacity")
       this.publish()
       return result
     } finally {

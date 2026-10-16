@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { suggestUsername } from "../../../convex/lib/usernameSuggestions"
 
 export { suggestUsername }
@@ -10,29 +12,29 @@ const NUMBERS_ONLY = /^[0-9]+$/
 
 export interface UsernameRule {
   id: string
-  label: string
+  label: () => string
   isMet: (username: string) => boolean
 }
 
 export const USERNAME_RULES: readonly UsernameRule[] = [
   {
     id: "minLength",
-    label: `At least ${USERNAME_MIN_LENGTH} characters`,
+    label: () => translate("connected:username.rules.minLength", { count: USERNAME_MIN_LENGTH }),
     isMet: (username) => username.length >= USERNAME_MIN_LENGTH,
   },
   {
     id: "maxLength",
-    label: `At most ${USERNAME_MAX_LENGTH} characters`,
+    label: () => translate("connected:username.rules.maxLength", { count: USERNAME_MAX_LENGTH }),
     isMet: (username) => username.length <= USERNAME_MAX_LENGTH,
   },
   {
     id: "allowedCharacters",
-    label: "Letters, numbers, dashes, and underscores only",
+    label: () => translate("connected:username.rules.allowedCharacters"),
     isMet: (username) => ALLOWED_USERNAME.test(username),
   },
   {
     id: "notNumbersAlone",
-    label: "At least one letter, dash, or underscore",
+    label: () => translate("connected:username.rules.notNumbersAlone"),
     isMet: (username) => !NUMBERS_ONLY.test(username),
   },
 ]
@@ -67,13 +69,13 @@ export function describeUsernameFailure(cause: unknown): string {
     failure?.code === "form_param_unknown" ||
     /not a valid parameter/i.test(failure?.message ?? "")
   )
-    return "Usernames are turned off for this app right now, so we could not save yours. Please try again later or contact support."
+    return translate("connected:username.errors.disabled")
   if (failure?.code === "form_identifier_exists")
-    return "That username is already taken. Try another one."
+    return translate("connected:username.errors.taken")
   const explanation = failure?.longMessage ?? failure?.message
   if (explanation) return explanation
   if (cause instanceof Error && cause.message) return cause.message
-  return "Could not save username"
+  return translate("connected:username.errors.saveFailed")
 }
 
 function firstClerkError(cause: unknown): ClerkFieldError | undefined {

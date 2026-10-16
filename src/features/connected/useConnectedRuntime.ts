@@ -7,6 +7,7 @@ import { playTableRules } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
+import { translate } from "@/i18n/translate"
 import { captureGame } from "@/utils/analytics"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
@@ -204,8 +205,7 @@ export function useConnectedRuntime(
         ? {
             ...runtime,
             status: "unavailable",
-            message:
-              "This board is not saved on this device. Reconnect so the game can be loaded here.",
+            message: translate("connected:board.notCached"),
             projection: null,
           }
         : { ...runtime, status: "loading", projection: null }

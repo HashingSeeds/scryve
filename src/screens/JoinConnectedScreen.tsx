@@ -21,6 +21,7 @@ import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { hasLocalGameStarted } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -36,7 +37,7 @@ import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
 const PLAYABLE_SYSTEMS = [...PLAY_SYSTEM_IDS]
 const PLAYABLE_VARIANTS = ["treachery"]
 
-const INVALID_INVITE = "Invite is invalid, expired, or revoked"
+const MANUAL_CODE_EXAMPLE = "ABC123"
 
 export function JoinConnectedScreen({
   inviteToken,
@@ -88,7 +89,7 @@ export function JoinConnectedScreen({
   const profileName = connectedProfileName(user?.username)
   const validInput = Boolean(token || normalizeManualCode(code))
   const picking = (openSeats?.length ?? 0) > 1
-  const title = token ? "Join invited lobby" : "Join with code"
+  const title = translate(token ? "connected:join.invitedTitle" : "connected:join.codeTitle")
 
   async function join(seat?: number) {
     captureAnalytics("connection_attempt", { action: "join", stage: "started" })
@@ -106,7 +107,7 @@ export function JoinConnectedScreen({
         stage: "failed",
         reason: "local-active",
       })
-      setError("Finish or abandon your active local game before joining a connected game.")
+      setError(translate("connected:join.localGameActive"))
       return
     }
     if (!isWebSocketConnected) {
@@ -120,7 +121,7 @@ export function JoinConnectedScreen({
       setError(undefined)
       if (!validInput) {
         captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "input" })
-        setError("Enter a valid invitation code.")
+        setError(translate("connected:join.invalidCode"))
         return
       }
       await syncUser({
@@ -131,7 +132,7 @@ export function JoinConnectedScreen({
       const manualCode = token ? undefined : normalizeManualCode(code)
       if (!token && !manualCode) {
         captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "input" })
-        setError("Enter a valid 6-character invitation code.")
+        setError(translate("connected:join.invalidManualCode"))
         return
       }
       failureReason = "request"
@@ -141,7 +142,7 @@ export function JoinConnectedScreen({
         systems: PLAYABLE_SYSTEMS,
         variants: PLAYABLE_VARIANTS,
       })
-      if ("invalid" in lookup) throw new Error(INVALID_INVITE)
+      if ("invalid" in lookup) throw new Error(translate("connected:join.invalidInvite"))
       const seats = lookup.seats
       if (seats.length > 1 && seat === undefined) {
         setOpenSeats(seats)
@@ -149,7 +150,7 @@ export function JoinConnectedScreen({
       }
       if (seat !== undefined && !seats.includes(seat)) {
         setOpenSeats(seats.length > 1 ? seats : undefined)
-        setError("That seat was just taken. Pick another seat.")
+        setError(translate("connected:join.seatTaken"))
         return
       }
       const result = await claimSeat({
@@ -162,7 +163,7 @@ export function JoinConnectedScreen({
         systems: PLAYABLE_SYSTEMS,
         variants: PLAYABLE_VARIANTS,
       })
-      if (!result) throw new Error(INVALID_INVITE)
+      if (!result) throw new Error(translate("connected:join.invalidInvite"))
       requestSucceeded = true
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
       captureAnalytics("connection_attempt", { action: "join", stage: "succeeded" })
@@ -177,12 +178,17 @@ export function JoinConnectedScreen({
         emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
       }
       setError(
-        convexErrorMessage(cause, cause instanceof Error ? cause.message : "Could not join lobby"),
+        convexErrorMessage(
+          cause,
+          cause instanceof Error ? cause.message : translate("connected:join.failed"),
+        ),
       )
     } finally {
       setBusy(false)
     }
   }
+
+  const joinOfflineNotice = onlineOnlyNotice("join")
 
   if (scanning)
     return (
@@ -231,11 +237,7 @@ export function JoinConnectedScreen({
           <Text
             size="sm"
             style={themed($dimmed)}
-            text={
-              token
-                ? "Join your friends using this invitation."
-                : "Enter the host's 6-character code."
-            }
+            tx={token ? "connected:join.invitedBody" : "connected:join.codeBody"}
           />
         </View>
         {!token ? (
@@ -245,8 +247,8 @@ export function JoinConnectedScreen({
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={7}
-              label="Invite code"
-              placeholder="ABC123"
+              labelTx="connected:invite.code"
+              placeholder={MANUAL_CODE_EXAMPLE}
               value={code}
               onChangeText={changeCode}
               style={themed($codeInput)}
@@ -254,7 +256,7 @@ export function JoinConnectedScreen({
             {onScan || embedded ? (
               <Button
                 testID="scan-invite-button"
-                text="Scan QR code"
+                tx="connected:join.scan"
                 style={themed($secondaryAction)}
                 onPress={onScan ?? (() => setScanning(true))}
               />
@@ -262,26 +264,28 @@ export function JoinConnectedScreen({
           </View>
         ) : null}
         {scannedToken ? (
-          <Button text="Use a different invitation" onPress={() => chooseToken(undefined)} />
+          <Button tx="connected:join.differentInvitation" onPress={() => chooseToken(undefined)} />
         ) : null}
         {user?.username ? (
           <View style={themed($section)}>
-            <Text testID="join-username" weight="medium" text={`Joining as @${user.username}`} />
+            <Text
+              testID="join-username"
+              weight="medium"
+              tx="connected:join.joiningAs"
+              txOptions={{ username: user.username }}
+            />
           </View>
         ) : null}
         {picking ? (
           <View style={themed($section)}>
-            <Text weight="medium" text="Pick your seat" />
-            <Text
-              size="xs"
-              style={themed($dimmed)}
-              text="Each open seat carries its own counters from the game already in progress."
-            />
+            <Text weight="medium" tx="connected:join.pickSeat" />
+            <Text size="xs" style={themed($dimmed)} tx="connected:join.pickSeatBody" />
             {openSeats?.map((seat) => (
               <Button
                 key={seat}
                 testID={`claim-seat-${seat}-button`}
-                text={`Seat ${seat}`}
+                tx="connected:seatNumber"
+                txOptions={{ seat }}
                 disabled={busy}
                 onPress={() => void join(seat)}
               />
@@ -290,7 +294,7 @@ export function JoinConnectedScreen({
         ) : null}
         {access?.message ? <Text size="xs" text={access.message} /> : null}
         {error ? <AlertNote testID="join-error" text={error} /> : null}
-        {!isWebSocketConnected ? <AlertNote text={onlineOnlyNotice("join")} /> : null}
+        {!isWebSocketConnected ? <AlertNote text={joinOfflineNotice} /> : null}
       </ScrollView>
       <BottomActionBar
         style={
@@ -311,10 +315,10 @@ export function JoinConnectedScreen({
             }
             text={
               busy
-                ? "Joining…"
+                ? translate("connected:join.joining")
                 : access && !access.ready && !access.loading
-                  ? (access.actionLabel ?? "Join game")
-                  : "Join game"
+                  ? (access.actionLabel ?? translate("connected:join.join"))
+                  : translate("connected:join.join")
             }
             preset="reversed"
             style={embedded ? undefined : themed($primaryAction)}
