@@ -264,6 +264,7 @@ export const SYSTEMS = {
       { id: "advanced", label: "Advanced", sections: YUGIOH_SECTIONS },
       { id: "traditional", label: "Traditional", sections: YUGIOH_SECTIONS },
       { id: "rush", label: "Rush Duel", sections: YUGIOH_SECTIONS },
+      { id: "speed", label: "Speed Duel", sections: YUGIOH_SECTIONS, startingValue: 4000 },
     ],
     table: { counters: [], designations: [] },
     integration: {
