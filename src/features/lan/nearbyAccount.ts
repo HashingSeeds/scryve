@@ -8,7 +8,7 @@ export interface SeatClaim {
   ownerId: string
   publicId: string
   token: string
-  finishedAt: number
+  savedAt: number
 }
 
 let owner: string | undefined
@@ -23,27 +23,30 @@ export const nearbyOwner = () => owner
 
 const isClaim = (value: unknown): value is SeatClaim => {
   if (typeof value !== "object" || value === null) return false
-  const { ownerId, publicId, token, finishedAt } = value as Record<string, unknown>
+  const { ownerId, publicId, token, savedAt } = value as Record<string, unknown>
   return (
     typeof ownerId === "string" &&
     typeof publicId === "string" &&
     typeof token === "string" &&
-    typeof finishedAt === "number"
+    typeof savedAt === "number"
   )
 }
 
 function loadClaims(now: number) {
   const saved = load(CLAIMS_KEY)
   return Array.isArray(saved)
-    ? saved.filter(isClaim).filter((claim) => now - claim.finishedAt < CLAIM_LIFETIME_MS)
+    ? saved.filter(isClaim).filter((claim) => now - claim.savedAt < CLAIM_LIFETIME_MS)
     : []
 }
 
 export function rememberSeatClaim(claim: Omit<SeatClaim, "ownerId">) {
   if (!owner) return
-  const claims = loadClaims(claim.finishedAt)
+  const claims = loadClaims(claim.savedAt)
   if (claims.some(({ publicId }) => publicId === claim.publicId)) return
   save(CLAIMS_KEY, [...claims, { ...claim, ownerId: owner }].slice(-MAX_CLAIMS))
+}
+
+export function retrySeatClaims() {
   for (const listener of listeners) listener()
 }
 

@@ -12,7 +12,7 @@ import {
 } from "./lanGame"
 import { LanSession } from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
-import { pendingSeatClaims, setNearbyOwner } from "./nearbyAccount"
+import { onSeatClaim, pendingSeatClaims, setNearbyOwner } from "./nearbyAccount"
 import type { PendingLifeAction } from "../connected/model"
 
 jest.mock("./lanTransport", () => ({
@@ -234,22 +234,30 @@ describe("nearby guest", () => {
     await expect(pending).rejects.toThrow("Lost the host")
   })
 
-  it("keeps one claim for its signed-in account when a round finishes", async () => {
+  it("keeps a claim from the round's start and asks for it once the round finishes", async () => {
     setNearbyOwner("guest-account")
+    const nudged = jest.fn()
+    const unsubscribe = onSeatClaim(nudged)
     const { host } = await guest()
     const game = { ...createLanGame("game", "host", "Host", setup, 1), round: 1 }
-    const finished = {
-      type: "state",
-      lobby: { ...lanLobbyOf(game), status: "finished" },
-      projection: { ...lanProjection(game, "guest"), status: "finished" },
-    } as const
+    const stateWith = (status: "active" | "finished") =>
+      ({
+        type: "state",
+        lobby: { ...lanLobbyOf(game), status },
+        projection: { ...lanProjection(game, "guest"), status },
+      }) as const
 
-    host()?.onMessage(finished)
-    host()?.onMessage(finished)
-
+    host()?.onMessage(stateWith("active"))
     expect(pendingSeatClaims("guest-account")).toEqual([
       expect.objectContaining({ publicId: "game-1", token: "token" }),
     ])
+    expect(nudged).not.toHaveBeenCalled()
+    host()?.onMessage(stateWith("finished"))
+    host()?.onMessage(stateWith("finished"))
+
+    expect(pendingSeatClaims("guest-account")).toHaveLength(1)
+    expect(nudged).toHaveBeenCalledTimes(1)
+    unsubscribe()
     setNearbyOwner(undefined)
   })
 

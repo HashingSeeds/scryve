@@ -120,7 +120,7 @@ describe("LocalGamePublishSession", () => {
     remove("lan.seatClaims")
     setNearbyOwner("owner-a")
     for (const publicId of ["game-claimed", "game-pending", "game-refused"])
-      rememberSeatClaim({ publicId, token: "token", finishedAt: Date.now() })
+      rememberSeatClaim({ publicId, token: "token", savedAt: Date.now() })
     setNearbyOwner(undefined)
     mockClaimSeat.mockImplementation(async ({ publicId }) => {
       if (publicId === "game-refused")
@@ -147,7 +147,7 @@ describe("LocalGamePublishSession", () => {
     jest.useFakeTimers()
     remove("lan.seatClaims")
     setNearbyOwner("owner-a")
-    rememberSeatClaim({ publicId: "game-racing", token: "token", finishedAt: Date.now() })
+    rememberSeatClaim({ publicId: "game-racing", token: "token", savedAt: Date.now() })
     setNearbyOwner(undefined)
     mockClaimSeat
       .mockResolvedValueOnce({ status: "pending" })

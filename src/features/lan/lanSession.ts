@@ -42,7 +42,7 @@ import {
   type LanConnection,
   type LanHost,
 } from "./lanTransport"
-import { rememberSeatClaim } from "./nearbyAccount"
+import { rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -114,6 +114,7 @@ export class LanSession {
   private connection?: LanConnection<LanGuestMessage>
   private pass?: LanSeatPass
   private claimedRound?: string
+  private finishedRound?: string
   private pendingWrites = new Map<string, PendingWrite>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private reconnectingSince?: number
@@ -406,9 +407,19 @@ export class LanSession {
     const { seatKey } = this.state
     this.set({ lobby: message.lobby, projection: message.projection, status: "connected" })
     const round = lanRoundId(message.lobby)
-    if (message.lobby.status === "finished" && this.pass && this.claimedRound !== round) {
+    const { status } = message.lobby
+    // why: a guest that drops before the finish may never see it, so the claim is kept from the start and stays pending until the host uploads.
+    if (
+      (status === "active" || status === "finished") &&
+      this.pass &&
+      this.claimedRound !== round
+    ) {
       this.claimedRound = round
-      rememberSeatClaim({ publicId: round, token: this.pass.token, finishedAt: Date.now() })
+      rememberSeatClaim({ publicId: round, token: this.pass.token, savedAt: Date.now() })
+    }
+    if (status === "finished" && this.finishedRound !== round) {
+      this.finishedRound = round
+      retrySeatClaims()
     }
     if (message.lobby.status === "abandoned") {
       this.leave({ keepGame: true })

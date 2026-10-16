@@ -8,7 +8,7 @@ import {
 } from "./nearbyAccount"
 
 const DAY = 24 * 60 * 60_000
-const claim = (publicId: string, finishedAt = 1_000) => ({ publicId, token: "token", finishedAt })
+const claim = (publicId: string, savedAt = 1_000) => ({ publicId, token: "token", savedAt })
 
 beforeEach(() => remove("lan.seatClaims"))
 
