@@ -79,6 +79,12 @@ function unflatten(flat) {
   return tree
 }
 
+function prototypeKeys(flat) {
+  return Object.keys(flat).filter((keyPath) =>
+    keyPath.split(".").some((segment) => segment in Object.prototype),
+  )
+}
+
 function hashText(text) {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 12)
 }
@@ -220,7 +226,10 @@ async function check() {
   }
 
   for (const namespace of namespaces) {
-    const units = translationUnits(flatten(english[namespace]))
+    const englishFlat = flatten(english[namespace])
+    for (const key of prototypeKeys(englishFlat))
+      problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
+    const units = translationUnits(englishFlat)
     const lock = readJson(lockPath(namespace), {})
     for (const locale of Object.keys(LOCALES)) {
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
@@ -364,6 +373,7 @@ if (require.main === module) {
 
 module.exports = {
   flatten,
+  prototypeKeys,
   unflatten,
   translationUnits,
   requiredKeys,

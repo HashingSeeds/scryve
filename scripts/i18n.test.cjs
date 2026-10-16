@@ -3,6 +3,7 @@ const test = require("node:test")
 
 const {
   flatten,
+  prototypeKeys,
   unflatten,
   translationUnits,
   requiredKeys,
@@ -86,5 +87,12 @@ test("rejects translations that drop, rename, or miss placeholders and plural fo
       "es",
     ),
     ["seats.waiting_many: missing translation"],
+  )
+})
+
+test("flags keys that i18next would resolve to built-in object properties", () => {
+  assert.deepEqual(
+    prototypeKeys({ "life.valueOf": "x", "life.valueOutOf": "y", "toString": "z" }),
+    ["life.valueOf", "toString"],
   )
 })
