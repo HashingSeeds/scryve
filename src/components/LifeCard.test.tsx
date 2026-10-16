@@ -28,6 +28,13 @@ import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
 const commanderSeats = commanderBoardSeats([[0], [1]], commanderIds)
+const commanderPlayers = commanderIds.map((id, seat) => ({
+  id,
+  seat,
+  name: `Player ${seat + 1}`,
+  life: 40,
+  color: "#41476E",
+}))
 
 function card(life: number) {
   return (
@@ -566,7 +573,8 @@ describe("LifeCard", () => {
             seats: commanderSeats.seats,
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
-            incoming: {},
+            players: commanderPlayers,
+            incoming: { [commanderIds[1]]: 3 },
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword,
           }}
@@ -596,6 +604,32 @@ describe("LifeCard", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
+  it("lets the name run the whole row when no commander strip holds the far corner", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 3"
+          seatNumber={3}
+          life={40}
+          color="#41476E"
+          compact
+          contentRotation={-90}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-3"), "layout", {
+      nativeEvent: { layout: { width: 157, height: 185 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style),
+    ).toMatchObject({ maxWidth: 185 - 12 * 2 })
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-identity-seat-3").props.style).maxWidth,
+    ).toBeUndefined()
+  })
+
   it("keeps room for the name when a side notch is not at the card's middle", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -613,7 +647,8 @@ describe("LifeCard", () => {
             seats: commanderSeats.seats,
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
-            incoming: {},
+            players: commanderPlayers,
+            incoming: { [commanderIds[1]]: 3 },
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword: jest.fn(),
           }}

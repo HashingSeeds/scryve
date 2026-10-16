@@ -32,7 +32,7 @@ import {
   type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
-import { CommanderStrip } from "./CommanderStrip"
+import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
 import { CounterChips, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
@@ -342,6 +342,16 @@ export const LifeCard = memo(function LifeCard({
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
+  const commanderStripShown =
+    !!commanderDamage?.inspection &&
+    !commanderCardMode &&
+    !tableSheetOpen &&
+    !diceCovers &&
+    commanderDamageDealers(
+      commanderDamage.players ?? [],
+      commanderDamage.ownerPlayerId,
+      commanderDamage.incoming,
+    ).length > 0
   const identityMetrics = seatIdentityMetrics(compact)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
@@ -649,7 +659,11 @@ export const LifeCard = memo(function LifeCard({
               pointerEvents="box-none"
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
-              style={[$cornerIdentity, { maxWidth: identityCorner.position.maxWidth }]}
+              style={[
+                $cornerIdentity,
+                // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
+                commanderStripShown && { maxWidth: identityCorner.position.maxWidth },
+              ]}
             >
               {commanderDamage?.inspection ? (
                 <BoardPressable

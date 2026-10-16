@@ -46,6 +46,14 @@ export interface CommanderStripProps {
   onToggle: () => void
 }
 
+export function commanderDamageDealers(
+  players: readonly CommanderBoardPlayer[],
+  ownerPlayerId: PlayerId,
+  incoming: Record<PlayerId, number>,
+) {
+  return players.filter(({ id }) => id !== ownerPlayerId && (incoming[id] ?? 0) > 0)
+}
+
 export const CommanderStrip = memo(function CommanderStrip({
   seatNumber,
   identity,
@@ -81,7 +89,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   }, [stripBounds, mapBounds, onBoundsChange])
   const disc = compact ? COMPACT_DISC_SIZE : DISC_SIZE
   const glyphRotation: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
-  const dealt = players.filter(({ id }) => id !== ownerPlayerId && (incoming[id] ?? 0) > 0)
+  const dealt = commanderDamageDealers(players, ownerPlayerId, incoming)
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
     .sort((a, b) => a - b)
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
