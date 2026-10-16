@@ -30,6 +30,7 @@ export default function DecksRoute() {
         (() => router.dismissTo({ pathname: "/", params: { destination: "play" } }))
       }
       hasCurrentGame={hasCurrentGame}
+      onHistory={() => router.push("/history")}
       onSettings={() => router.push("/settings")}
       accountEntry={auth.isSignedIn ? "account" : "signIn"}
       onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}

@@ -438,11 +438,12 @@ export function CurrentGameScreen({
             onClose: closeMenu,
           }}
           windowOverlay={
-            menuOpen && onDecks && onSettings && onAccount ? (
+            menuOpen && onDecks && onHistory && onSettings && onAccount ? (
               <FloatingAppNavigation
                 destination="decks"
                 accountEntry={accountEntry}
                 onDestination={onDecks}
+                onHistory={onHistory}
                 onSettings={onSettings}
                 onAccount={onAccount}
               />
