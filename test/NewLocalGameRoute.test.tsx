@@ -134,7 +134,7 @@ describe("new local game route", () => {
     mockSearchParams = {}
     view.rerender(renderRoute())
     expect(view.queryByTestId("guard-resume-game-button")).toBeNull()
-    expect(view.getByLabelText("Life, 40")).toBeTruthy()
+    expect(view.getByText(/players · 40 life/)).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(view.queryByText("Reset this game?")).toBeNull()
     expect(localGameRepository.loadActiveGame()).toBeNull()
@@ -220,11 +220,13 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.changeText(view.getByTestId("player-name-1"), "Alex")
+    fireEvent.press(view.getByTestId("setup-change-button"))
     fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("setup-options-done"))
     fireEvent.press(view.getByTestId("mode-connected"))
     fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
-    expect(view.getByLabelText("Life, 21")).toBeTruthy()
+    expect(view.getByText(/ 21 life/)).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
@@ -413,9 +415,7 @@ describe("new local game route while signed in", () => {
         <NewLocalGameRoute />
       </ThemeProvider>,
     )
-    fireEvent.press(view.getByTestId("play-system-mtg"))
-    fireEvent.press(view.getByTestId("play-format"))
-    fireEvent.press(view.getByTestId("play-format-option-commander"))
+    fireEvent.press(view.getByTestId("game-type-commander"))
     fireEvent.press(view.getByTestId("me-seat"))
     fireEvent.press(view.getByTestId("me-seat-option-1"))
     fireEvent.press(view.getByTestId("me-deck"))

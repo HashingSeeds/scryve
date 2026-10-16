@@ -20,6 +20,8 @@ export interface ChoiceButtonProps extends Omit<
   detail?: string
   Leading?: (props: { color: string }) => ReactNode
   compact?: boolean
+  /** why: by default the detail stays whole (a winner's life total must not cut off), so only lists of long names opt in. */
+  detailShrinks?: boolean
 }
 
 export function ChoiceButton(props: ChoiceButtonProps) {
@@ -29,6 +31,7 @@ export function ChoiceButton(props: ChoiceButtonProps) {
     detail,
     Leading,
     compact,
+    detailShrinks,
     style: $styleOverride,
     TextProps,
     accessibilityState,
@@ -71,9 +74,14 @@ export function ChoiceButton(props: ChoiceButtonProps) {
         compact
           ? undefined
           : () => (
-              <View style={themed($trailing)}>
+              <View style={[themed($trailing), detailShrinks && $shrink]}>
                 {detail ? (
-                  <Text size="xs" text={detail} style={[themed($detail), { color: foreground }]} />
+                  <Text
+                    size="xs"
+                    text={detail}
+                    numberOfLines={detailShrinks ? 1 : undefined}
+                    style={[themed($detail), detailShrinks && $shrink, { color: foreground }]}
+                  />
                 ) : null}
                 <CheckBadge selected={selected} color={foreground} />
               </View>
@@ -140,3 +148,4 @@ const $badge: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $check: ThemedStyle<TextStyle> = () => ({ lineHeight: 18 })
 const $detail: ThemedStyle<TextStyle> = () => ({ opacity: 0.75 })
+const $shrink = { flexShrink: 1 } as const
