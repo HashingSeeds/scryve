@@ -2,6 +2,8 @@ import { act, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
 import { resetConnectedProfileBootstrapForTests } from "@/features/connected/useConnectedProfile"
+import { pendingSeatClaims, rememberSeatClaim, setNearbyOwner } from "@/features/lan/nearbyAccount"
+import { remove } from "@/utils/storage"
 
 import { applyGameCommand, asDeviceId, createLocalGame, defaultCommandContext } from "./domain"
 import { LocalGamePublishSession } from "./LocalGamePublishSession"
@@ -22,6 +24,9 @@ const mockPublish = jest.fn(
 const mockFinishMatch = jest.fn(async (_args: { publicId: string; gameCount: number }) => ({
   matchId: "m",
 }))
+const mockClaimSeat = jest.fn(async (_args: { publicId: string; token: string }) => ({
+  status: "claimed" as "claimed" | "pending",
+}))
 let mockConnected = true
 
 jest.mock("@clerk/expo", () => ({
@@ -35,12 +40,17 @@ jest.mock("convex/react", () => ({
       ? mockPublish
       : reference === "matches.finishScryveMatch"
         ? mockFinishMatch
-        : mockSyncCurrent,
+        : reference === "games.claimNearbySeat"
+          ? mockClaimSeat
+          : mockSyncCurrent,
 }))
 jest.mock("../../../convex/_generated/api", () => ({
   api: {
     users: { syncCurrent: "users.syncCurrent" },
-    games: { publishFinishedLocalGame: "games.publishFinishedLocalGame" },
+    games: {
+      publishFinishedLocalGame: "games.publishFinishedLocalGame",
+      claimNearbySeat: "games.claimNearbySeat",
+    },
     matches: { finishScryveMatch: "matches.finishScryveMatch" },
   },
 }))
@@ -104,6 +114,59 @@ describe("LocalGamePublishSession", () => {
       "pending",
       "published",
     ])
+  })
+
+  it("claims nearby seats, keeping one the host has not uploaded and dropping a refused one", async () => {
+    remove("lan.seatClaims")
+    setNearbyOwner("owner-a")
+    for (const publicId of ["game-claimed", "game-pending", "game-refused"])
+      rememberSeatClaim({ publicId, token: "token", finishedAt: Date.now() })
+    setNearbyOwner(undefined)
+    mockClaimSeat.mockImplementation(async ({ publicId }) => {
+      if (publicId === "game-refused")
+        throw new ConvexError({ code: "seat_taken", message: "Another account claimed this seat" })
+      return { status: publicId === "game-pending" ? "pending" : "claimed" }
+    })
+
+    render(
+      <LocalGamePublishSession
+        ownerId="owner-a"
+        repository={new LocalGameRepository(new MemoryStorage())}
+      />,
+    )
+
+    await waitFor(() => expect(mockClaimSeat).toHaveBeenCalledTimes(3))
+    await waitFor(() =>
+      expect(pendingSeatClaims("owner-a").map(({ publicId }) => publicId)).toEqual([
+        "game-pending",
+      ]),
+    )
+  })
+
+  it("retries a claim that beat the host's upload a few seconds later", async () => {
+    jest.useFakeTimers()
+    remove("lan.seatClaims")
+    setNearbyOwner("owner-a")
+    rememberSeatClaim({ publicId: "game-racing", token: "token", finishedAt: Date.now() })
+    setNearbyOwner(undefined)
+    mockClaimSeat
+      .mockResolvedValueOnce({ status: "pending" })
+      .mockResolvedValueOnce({ status: "claimed" })
+
+    render(
+      <LocalGamePublishSession
+        ownerId="owner-a"
+        repository={new LocalGameRepository(new MemoryStorage())}
+      />,
+    )
+    await waitFor(() => expect(mockClaimSeat).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      jest.advanceTimersByTime(5_000)
+    })
+
+    await waitFor(() => expect(mockClaimSeat).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(pendingSeatClaims("owner-a")).toEqual([]))
+    jest.useRealTimers()
   })
 
   it("retries a failed upload on the next finish and keeps it pending meanwhile", async () => {

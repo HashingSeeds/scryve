@@ -1,5 +1,6 @@
 import { ConvexError } from "convex/values"
 
+import { archiveLanGame } from "./lanArchive"
 import {
   createLanGame,
   LAN_PROTOCOL,
@@ -11,6 +12,7 @@ import {
 } from "./lanGame"
 import { LanSession } from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
+import { pendingSeatClaims, setNearbyOwner } from "./nearbyAccount"
 import type { PendingLifeAction } from "../connected/model"
 
 jest.mock("./lanTransport", () => ({
@@ -18,6 +20,7 @@ jest.mock("./lanTransport", () => ({
   connectLan: jest.fn(),
   resolveLanService: jest.fn(),
 }))
+jest.mock("./lanArchive", () => ({ archiveLanGame: jest.fn(async () => null) }))
 
 type Accept = (peer: LanConnection<LanHostMessage>) => LanPeerHandlers<LanGuestMessage>
 
@@ -129,6 +132,25 @@ describe("nearby host", () => {
     expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "rate_limited" })
   })
 
+  it("archives a finished round once, with the winner and every guest's pass", async () => {
+    const { session, alice, bob } = await startedGame()
+    const result = { kind: "win" as const, winnerPlayerIds: [alice.pass().key] }
+
+    await session.writes.finish(result)
+    await session.writes.finish(result)
+
+    expect(archiveLanGame).toHaveBeenCalledTimes(1)
+    const [game, archivedResult, tokens] = jest.mocked(archiveLanGame).mock.calls[0]
+    expect(game.status).toBe("finished")
+    expect(archivedResult).toEqual(result)
+    expect(tokens).toEqual(
+      new Map([
+        [alice.pass().key, alice.pass().token],
+        [bob.pass().key, bob.pass().token],
+      ]),
+    )
+  })
+
   it("turns away a socket that names another guest's seat or the host's", async () => {
     const { session, alice } = await startedGame()
     const thief = socket()
@@ -210,6 +232,25 @@ describe("nearby guest", () => {
     host()?.onClose()
 
     await expect(pending).rejects.toThrow("Lost the host")
+  })
+
+  it("keeps one claim for its signed-in account when a round finishes", async () => {
+    setNearbyOwner("guest-account")
+    const { host } = await guest()
+    const game = { ...createLanGame("game", "host", "Host", setup, 1), round: 1 }
+    const finished = {
+      type: "state",
+      lobby: { ...lanLobbyOf(game), status: "finished" },
+      projection: { ...lanProjection(game, "guest"), status: "finished" },
+    } as const
+
+    host()?.onMessage(finished)
+    host()?.onMessage(finished)
+
+    expect(pendingSeatClaims("guest-account")).toEqual([
+      expect.objectContaining({ publicId: "game-1", token: "token" }),
+    ])
+    setNearbyOwner(undefined)
   })
 
   it("keeps its seat and the last board when the host ends the game", async () => {

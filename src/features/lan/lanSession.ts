@@ -4,12 +4,14 @@ import { ConvexError } from "convex/values"
 import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
+import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
 import { createClientId } from "@/features/game/domain"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
 
+import { archiveLanGame } from "./lanArchive"
 import { loadLanName } from "./lanAvailability"
 import {
   admitLanGuest,
@@ -20,6 +22,7 @@ import {
   lanLobbyOf,
   lanProjection,
   lanRejectionMessage,
+  lanRoundId,
   lanSeatsReady,
   parseGuestMessage,
   parseHostMessage,
@@ -39,6 +42,7 @@ import {
   type LanConnection,
   type LanHost,
 } from "./lanTransport"
+import { rememberSeatClaim } from "./nearbyAccount"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -109,6 +113,7 @@ export class LanSession {
   private hostAcks: (() => void)[] = []
   private connection?: LanConnection<LanGuestMessage>
   private pass?: LanSeatPass
+  private claimedRound?: string
   private pendingWrites = new Map<string, PendingWrite>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private reconnectingSince?: number
@@ -129,7 +134,7 @@ export class LanSession {
   readonly writes: ConnectedWrites = {
     send: (action) =>
       this.state.role === "host" ? this.hostWrite(action) : this.guestWrite(action),
-    finish: async () => this.finish(),
+    finish: async (result) => this.finish(result),
     abandon: async () => this.leave(),
   }
 
@@ -400,6 +405,11 @@ export class LanSession {
     this.reconnectingSince = undefined
     const { seatKey } = this.state
     this.set({ lobby: message.lobby, projection: message.projection, status: "connected" })
+    const round = lanRoundId(message.lobby)
+    if (message.lobby.status === "finished" && this.pass && this.claimedRound !== round) {
+      this.claimedRound = round
+      rememberSeatClaim({ publicId: round, token: this.pass.token, finishedAt: Date.now() })
+    }
     if (message.lobby.status === "abandoned") {
       this.leave({ keepGame: true })
       // why: the board needs the seat to stay open and tell this guest the host ended the game.
@@ -431,10 +441,12 @@ export class LanSession {
       this.publish(startLanRound(game, Date.now()))
   }
 
-  finish() {
+  finish(result?: ConnectedGameResult) {
     const game = this.game
-    if (this.state.role === "host" && game?.status === "active")
-      this.publish(endLanRound(game, "finished", Date.now()))
+    if (this.state.role !== "host" || game?.status !== "active") return
+    const ended = endLanRound(game, "finished", Date.now())
+    this.publish(ended)
+    void archiveLanGame(ended, result, new Map(this.tokens))
   }
 
   leave({ keepGame = false }: { keepGame?: boolean } = {}) {

@@ -35,6 +35,9 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
       ...(player.id === me && deckVersionId
         ? { deckVersionId: deckVersionId as Id<"deckVersions"> }
         : {}),
+      ...(player.id !== me && game.seatPassHashes?.[player.id]
+        ? { seatPassHash: game.seatPassHashes[player.id] }
+        : {}),
     })),
     result:
       result?.kind === "win"

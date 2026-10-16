@@ -69,6 +69,7 @@ export interface LanGame extends LanLobby {
   hostKey: string
   memory?: MemoryGame
   recentOperationIds: string[]
+  startedAt?: number
   updatedAt: number
 }
 
@@ -194,6 +195,7 @@ export function startLanRound(game: LanGame, now: number): LanGame {
     status: "active",
     round: game.round + 1,
     recentOperationIds: [],
+    startedAt: now,
     updatedAt: now,
     memory: {
       status: "active",
@@ -276,6 +278,11 @@ export function applyLanWrite(
   }
 }
 
+export const lanSeatAppearance = (seat: number) => ({
+  color: PLAYER_COLOR_CHOICES[(seat - 1) % PLAYER_COLOR_CHOICES.length],
+  shape: shapeForSeat(seat),
+})
+
 const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
   rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
 
@@ -335,8 +342,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       playerId: seat.key,
       seat: seat.seat,
       displayName: seat.name,
-      color: PLAYER_COLOR_CHOICES[(seat.seat - 1) % PLAYER_COLOR_CHOICES.length],
-      shape: shapeForSeat(seat.seat),
+      ...lanSeatAppearance(seat.seat),
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,

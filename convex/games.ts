@@ -65,6 +65,7 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
+import { hashSeatPassToken, isSeatPassHash } from "./lib/seatPass"
 import { isCounterOut, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
@@ -1266,6 +1267,7 @@ export const publishFinishedLocalGame = mutation({
       localSnapshotPlayer.extend({
         me: v.optional(v.boolean()),
         deckVersionId: v.optional(v.id("deckVersions")),
+        seatPassHash: v.optional(v.string()),
       }),
     ),
     result: v.union(
@@ -1299,6 +1301,13 @@ export const publishFinishedLocalGame = mutation({
     if (meSeats.length > 1) throw new Error("Only one seat can be yours")
     if (args.players.some((player) => player.deckVersionId && !player.me))
       throw new Error("Only your seat can record a deck")
+    const seatPassHashes = args.players.flatMap(({ seatPassHash }) => seatPassHash ?? [])
+    if (
+      args.players.some((player) => player.me && player.seatPassHash !== undefined) ||
+      !seatPassHashes.every(isSeatPassHash) ||
+      new Set(seatPassHashes).size !== seatPassHashes.length
+    )
+      throw new Error("Seat passes must be distinct hashes on other players' seats")
     if (args.result.kind === "win") {
       const winners = args.result.winnerLocalIds
       if (winners.length < 1) throw new Error("Choose at least one winner")
@@ -1365,6 +1374,7 @@ export const publishFinishedLocalGame = mutation({
         seat: player.seat,
         ...(player.me ? { userId: user._id, usernameAtJoin: user.username } : {}),
         ...(player.me && player.deckVersionId ? { deckVersionId: player.deckVersionId } : {}),
+        ...(player.seatPassHash ? { seatPassHash: player.seatPassHash } : {}),
         displayName: assertDisplayName(player.displayName),
         color: player.color,
         shape: player.shape,
@@ -1420,6 +1430,61 @@ export const publishFinishedLocalGame = mutation({
         outcome: "unknown",
       })
     return { publicId: args.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
+  },
+})
+
+const seatPassInvalid = () =>
+  new ConvexError({ code: "seat_pass_invalid", message: "That seat pass is not for this game" })
+
+// why: `pending` means the host has not uploaded yet; a guest that dropped its claim then would never see the game.
+export const claimNearbySeat = mutation({
+  args: { publicId: v.string(), token: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    if (args.token.length < 1 || args.token.length > 128) throw seatPassInvalid()
+    const game = await findGameByPublicId(ctx, args.publicId)
+    const summary =
+      game &&
+      (await ctx.db
+        .query("gameSummaries")
+        .withIndex("by_game", (q) => q.eq("gameId", game._id))
+        .unique())
+    if (!game || !summary) return { status: "pending" as const }
+    const hash = await hashSeatPassToken(args.token)
+    const players = await playersForGame(ctx, game._id)
+    const seat = players.find((player) => player.seatPassHash === hash)
+    if (!seat) throw seatPassInvalid()
+    if (seat.userId === user._id) return { status: "claimed" as const }
+    if (seat.userId)
+      throw new ConvexError({ code: "seat_taken", message: "Another account claimed this seat" })
+    if (players.some((player) => player.userId === user._id))
+      throw new ConvexError({
+        code: "already_seated",
+        message: "You already hold a seat in this game",
+      })
+    const identity = { userId: user._id, usernameAtJoin: user.username }
+    await ctx.db.patch(seat._id, identity)
+    await ctx.db.patch(summary._id, {
+      players: summary.players.map((player) =>
+        player.playerId === seat._id
+          ? {
+              ...player,
+              ...summaryIdentitySnapshotFor({ ...seat, ...identity }, user, true),
+              userId: user._id,
+            }
+          : player,
+      ),
+    })
+    await ctx.db.insert("gameHistoryEntries", {
+      userId: user._id,
+      source: "local",
+      gameId: game._id,
+      summaryId: summary._id,
+      ...(summary.matchId ? { matchId: summary.matchId } : {}),
+      finishedAt: summary.finishedAt,
+      outcome: summary.players.find((player) => player.playerId === seat._id)?.outcome ?? "unknown",
+    })
+    return { status: "claimed" as const }
   },
 })
 

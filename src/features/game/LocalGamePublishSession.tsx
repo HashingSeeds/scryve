@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { AppState } from "react-native"
 import { useMutation } from "convex/react"
 import { ConvexError } from "convex/values"
 
@@ -11,6 +12,12 @@ import {
   useConnectedProfile,
 } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import {
+  onSeatClaim,
+  pendingSeatClaims,
+  setNearbyOwner,
+  settleSeatClaim,
+} from "@/features/lan/nearbyAccount"
 import { convexErrorCode } from "@/utils/convexError"
 
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
@@ -21,6 +28,9 @@ function isPermanentRejection(cause: unknown) {
   if (cause instanceof ConvexError) return convexErrorCode(cause) !== "unauthenticated"
   return cause instanceof Error && cause.message.includes("Server Error")
 }
+
+// why: a guest's claim usually reaches Convex before the host's upload does, so a pending claim retries soon instead of waiting for the next launch.
+const CLAIM_RETRY_DELAYS_MS = [5_000, 30_000, 300_000]
 
 function isDeckRejection(cause: unknown) {
   return convexErrorCode(cause)?.startsWith("deck_") === true
@@ -45,7 +55,10 @@ function ActivePublish({
   const online = useConvexOnline()
   const publish = useMutation(api.games.publishFinishedLocalGame)
   const finishMatch = useMutation(api.matches.finishScryveMatch)
+  const claimSeat = useMutation(api.games.claimNearbySeat)
   const [finishCount, setFinishCount] = useState(0)
+  const [claimCount, setClaimCount] = useState(0)
+  const claimRetries = useRef(0)
 
   useEffect(
     () => repository.onGameFinished(() => setFinishCount((count) => count + 1)),
@@ -99,6 +112,48 @@ function ActivePublish({
     }
   }, [finishCount, finishMatch, online, ownerId, publish, ready, repository])
 
+  useEffect(() => {
+    const retry = () => setClaimCount((count) => count + 1)
+    const foreground = AppState.addEventListener("change", (state) => state === "active" && retry())
+    const unsubscribe = onSeatClaim(() => {
+      claimRetries.current = 0
+      retry()
+    })
+    return () => {
+      foreground.remove()
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !online || !ownerId) return
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    void (async () => {
+      let waiting = false
+      for (const claim of pendingSeatClaims(ownerId)) {
+        if (cancelled) return
+        try {
+          const { status } = await claimSeat({ publicId: claim.publicId, token: claim.token })
+          if (status === "claimed") settleSeatClaim(claim.publicId)
+          else waiting = true
+        } catch (cause) {
+          if (!isPermanentRejection(cause)) return
+          settleSeatClaim(claim.publicId)
+        }
+      }
+      const delay = CLAIM_RETRY_DELAYS_MS[claimRetries.current]
+      if (waiting && !cancelled && delay !== undefined) {
+        claimRetries.current += 1
+        retryTimer = setTimeout(() => setClaimCount((count) => count + 1), delay)
+      }
+    })()
+    return () => {
+      cancelled = true
+      clearTimeout(retryTimer)
+    }
+  }, [claimCount, claimSeat, online, ownerId, ready])
+
   return null
 }
 
@@ -109,6 +164,7 @@ export function LocalGamePublishSession({
   ownerId?: string
   repository?: LocalGameRepository
 }) {
+  useEffect(() => setNearbyOwner(ownerId), [ownerId])
   return (
     <ConnectedProfileProvider>
       <ActivePublish ownerId={ownerId} repository={repository} />

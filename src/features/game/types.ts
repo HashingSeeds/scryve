@@ -66,6 +66,8 @@ export type GameEvent =
 
 export type CommanderDamageTotals = Record<string, number>
 
+export type SeatPassHashes = Record<PlayerId, string>
+
 export interface LocalGameAccount {
   ownerId: string
   mePlayerId?: PlayerId
@@ -112,6 +114,7 @@ export interface LocalGame {
   clock?: RoundClock
   firstChooserSeat?: number
   firstPlayerOffered?: true
+  seatPassHashes?: SeatPassHashes
 }
 
 export interface NewPlayerInput {
@@ -156,4 +159,5 @@ export interface LocalGameSummary {
   skippedBy?: string[]
   match?: LocalGameMatch
   matchPublish?: "pending" | "published" | "failed"
+  seatPassHashes?: SeatPassHashes
 }

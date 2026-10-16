@@ -47,9 +47,11 @@ import type {
   LocalGameSummary,
   MatchSeatOutcome,
   NewPlayerInput,
+  SeatPassHashes,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
+import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { parseTableState } from "../../../convex/lib/table"
 
 export const MAX_HISTORY_GAMES = 30
@@ -541,6 +543,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
   const account = parseAccount(value.account)
   const skippedBy = parseSkippedBy(value.skippedBy)
   const match = players ? parseMatch(value.match, players.length) : undefined
+  const seatPassHashes = players ? parseSeatPassHashes(value.seatPassHashes, players) : undefined
   return players
     ? {
         schemaVersion: 1,
@@ -568,8 +571,19 @@ function parseSummary(value: unknown): LocalGameSummary | null {
           value.matchPublish === "failed")
           ? { matchPublish: value.matchPublish }
           : {}),
+        ...(seatPassHashes ? { seatPassHashes } : {}),
       }
     : null
+}
+
+function parseSeatPassHashes(value: unknown, players: GamePlayer[]): SeatPassHashes | undefined {
+  if (!isRecord(value)) return undefined
+  const hashes: SeatPassHashes = {}
+  for (const player of players) {
+    const hash = value[player.id]
+    if (typeof hash === "string" && isSeatPassHash(hash)) hashes[player.id] = hash
+  }
+  return Object.keys(hashes).length > 0 ? hashes : undefined
 }
 
 function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[] {
@@ -795,6 +809,7 @@ export class LocalGameRepository {
       ...(account ? { account } : {}),
       ...(account && game.status === "finished" ? { publish: "pending" as const } : {}),
       ...(game.match ? { match: game.match } : {}),
+      ...(game.seatPassHashes ? { seatPassHashes: game.seatPassHashes } : {}),
       ...(account && game.status === "finished" && game.match?.result
         ? { matchPublish: "pending" as const }
         : {}),
