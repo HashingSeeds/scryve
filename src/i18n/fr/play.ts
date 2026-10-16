@@ -203,8 +203,8 @@ export default {
       noDetails: {
         none: "Aucun détail de changement de vie trouvé.",
         mtg: "Aucun détail de changement de vie trouvé.",
-        ygo: "Aucun détail de changement de Life Points trouvé.",
-        pokemon: "Aucun détail de changement de cartes Récompense trouvé.",
+        ygo: "Aucun détail des changements de Life Points n'a été trouvé.",
+        pokemon: "Aucun détail des changements de cartes Récompense trouvé.",
       },
     },
   },

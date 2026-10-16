@@ -59,9 +59,9 @@ export default {
     pokemon_other: "사이드 카드 {{count}}장",
   },
   counterChange: {
-    none_other: "라이프 변동 {{count}}회",
-    mtg_other: "라이프 변동 {{count}}회",
-    ygo_other: "라이프 포인트 변동 {{count}}회",
+    none_other: "라이프 변경 {{count}}회",
+    mtg_other: "라이프 변경 {{count}}회",
+    ygo_other: "라이프 포인트 {{count}} 변경",
     pokemon_other: "사이드 카드 변동 {{count}}회",
   },
   noneTaken: "가져간 카드 없음",

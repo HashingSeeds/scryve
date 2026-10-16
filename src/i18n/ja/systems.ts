@@ -18,8 +18,8 @@ export default {
   startingValueRange: {
     none: "初期ライフは1から{{max}}までの整数で入力してください。",
     mtg: "初期ライフは1から{{max}}までの整数で入力してください。",
-    ygo: "初期ライフポイントは1から{{max}}までの整数で入力してください。",
-    pokemon: "初期のサイドは1から{{max}}までの整数で入力してください。",
+    ygo: "初期ライフポイントは1から{{max}}までの整数にしてください。",
+    pokemon: "初期サイドは1から{{max}}までの整数にしてください。",
   },
   tableItem: {
     poison: "毒",
@@ -53,15 +53,15 @@ export default {
     },
   },
   counterValue: {
-    none_other: "ライフ{{count}}",
-    mtg_other: "ライフ{{count}}",
-    ygo_other: "ライフポイント{{count}}",
-    pokemon_other: "サイド{{count}}枚",
+    none_other: "ライフ {{count}}",
+    mtg_other: "ライフ {{count}}",
+    ygo_other: "{{count}}ライフポイント",
+    pokemon_other: "サイド {{count}}枚",
   },
   counterChange: {
-    none_other: "ライフ変動{{count}}回",
-    mtg_other: "ライフ変動{{count}}回",
-    ygo_other: "ライフポイント変動{{count}}回",
+    none_other: "ライフの変動 {{count}}件",
+    mtg_other: "ライフの変動 {{count}}件",
+    ygo_other: "ライフポイントの変動: {{count}}",
     pokemon_other: "サイド変動{{count}}回",
   },
   noneTaken: "なし",

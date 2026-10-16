@@ -125,13 +125,13 @@ export default {
       none: "라이프 동점",
       mtg: "라이프 동점",
       ygo: "라이프 포인트 동점",
-      pokemon: "사이드 카드 동점",
+      pokemon: "사이드 카드 동률",
     },
     leads: {
       none: "{{name}} 라이프 우세",
       mtg: "{{name}} 라이프 우세",
-      ygo: "{{name}} 라이프 포인트 우세",
-      pokemon: "{{name}} 사이드 카드 우세",
+      ygo: "{{name}}님이 라이프 포인트 앞서는 중",
+      pokemon: "{{name}}님이 사이드 카드 앞서는 중",
     },
   },
   clock: {
@@ -356,14 +356,14 @@ export default {
     hint: {
       none: "탭하면 {{identity}}의 라이프가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
       mtg: "탭하면 {{identity}}의 라이프가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
-      ygo: "탭하면 {{identity}}의 라이프 포인트가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
+      ygo: "탭하면 {{identity}}의 라이프 포인트가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나타납니다.",
       pokemon:
-        "탭하면 {{identity}}의 사이드 카드가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
+        "탭하여 {{identity}}의 사이드 카드를 {{delta}}만큼 변경합니다. 길게 누르면 더 많은 조작이 나옵니다.",
     },
     moreControls: {
       none: "{{identity}}, 라이프 추가 조작",
       mtg: "{{identity}}, 라이프 추가 조작",
-      ygo: "{{identity}}, 라이프 포인트 추가 조작",
+      ygo: "{{identity}}, 라이프 포인트 조작 더 보기",
       pokemon: "{{identity}}, 사이드 카드 추가 조작",
     },
   },
@@ -371,8 +371,8 @@ export default {
     label: {
       none_other: "플레이어 {{count}}명 라이프 표",
       mtg_other: "플레이어 {{count}}명 라이프 표",
-      ygo_other: "플레이어 {{count}}명 라이프 포인트 표",
-      pokemon_other: "플레이어 {{count}}명 사이드 카드 표",
+      ygo_other: "플레이어 {{count}}명 라이프 포인트 격자",
+      pokemon_other: "{{count}}인 사이드 카드 그리드",
     },
   },
   pokemonSheet: {
@@ -455,20 +455,20 @@ export default {
     slider: {
       none: "{{name}} 라이프 변경",
       mtg: "{{name}} 라이프 변경",
-      ygo: "{{name}} Life Points 변경",
-      pokemon: "{{name}} 사이드 카드 변경",
+      ygo: "{{name}} 라이프 포인트 변경",
+      pokemon: "{{name}}의 사이드 카드 변경",
     },
     add: {
       none: "라이프 {{amount}} 더하기",
       mtg: "라이프 {{amount}} 더하기",
-      ygo: "Life Points {{amount}} 더하기",
-      pokemon: "사이드 카드 {{amount}}장 더하기",
+      ygo: "라이프 포인트 {{amount}} 추가",
+      pokemon: "사이드 카드 {{amount}}장 추가",
     },
     subtract: {
       none: "라이프 {{amount}} 빼기",
       mtg: "라이프 {{amount}} 빼기",
-      ygo: "Life Points {{amount}} 빼기",
-      pokemon: "사이드 카드 {{amount}}장 빼기",
+      ygo: "라이프 포인트 {{amount}} 차감",
+      pokemon: "사이드 카드 {{amount}}장 차감",
     },
   },
 } satisfies LocaleNamespace

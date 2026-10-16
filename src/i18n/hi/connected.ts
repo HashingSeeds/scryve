@@ -284,8 +284,8 @@ export default {
       life: {
         none: "{{delta}} का लाइफ बदलाव सिंक नहीं हो सका",
         mtg: "{{delta}} का लाइफ बदलाव सिंक नहीं हो सका",
-        ygo: "{{delta}} का Life Points बदलाव सिंक नहीं हो सका",
-        pokemon: "{{delta}} का Prize cards बदलाव सिंक नहीं हो सका",
+        ygo: "{{delta}} लाइफ़ पॉइंट का बदलाव सिंक नहीं हो सका",
+        pokemon: "{{delta}} प्राइज़ कार्ड का बदलाव सिंक नहीं हो सका",
       },
       commanderDamage: "{{delta}} commander damage का आवंटन सिंक नहीं हो सका",
       table: "टेबल का बदलाव सिंक नहीं हो सका",

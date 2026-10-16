@@ -126,14 +126,14 @@ export default {
     tied: {
       none: "लाइफ में बराबरी",
       mtg: "लाइफ में बराबरी",
-      ygo: "Life Points में बराबरी",
-      pokemon: "Prize cards में बराबरी",
+      ygo: "लाइफ़ पॉइंट बराबर हैं",
+      pokemon: "प्राइज़ कार्ड बराबर हैं",
     },
     leads: {
       none: "{{name}} लाइफ में आगे है",
       mtg: "{{name}} लाइफ में आगे है",
-      ygo: "{{name}} Life Points में आगे है",
-      pokemon: "{{name}} Prize cards में आगे है",
+      ygo: "{{name}} लाइफ़ पॉइंट में आगे है",
+      pokemon: "{{name}} प्राइज़ कार्ड में आगे है",
     },
   },
   clock: {
@@ -367,15 +367,15 @@ export default {
     hint: {
       none: "{{identity}} का लाइफ {{delta}} से बदलने के लिए टैप करें। और कंट्रोल के लिए देर तक दबाएं।",
       mtg: "{{identity}} का लाइफ {{delta}} से बदलने के लिए टैप करें। और कंट्रोल के लिए देर तक दबाएं।",
-      ygo: "{{identity}} के Life Points {{delta}} से बदलने के लिए टैप करें। और कंट्रोल के लिए देर तक दबाएं।",
+      ygo: "{{identity}} के लाइफ़ पॉइंट {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
       pokemon:
-        "{{identity}} के प्राइज़ कार्ड {{delta}} से बदलने के लिए टैप करें। और कंट्रोल के लिए देर तक दबाएं।",
+        "{{identity}} के प्राइज़ कार्ड {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
     },
     moreControls: {
       none: "{{identity}}, और लाइफ कंट्रोल",
       mtg: "{{identity}}, और लाइफ कंट्रोल",
-      ygo: "{{identity}}, और Life Points कंट्रोल",
-      pokemon: "{{identity}}, और प्राइज़ कार्ड कंट्रोल",
+      ygo: "{{identity}}, लाइफ़ पॉइंट के और विकल्प",
+      pokemon: "{{identity}}, प्राइज़ कार्ड के और विकल्प",
     },
   },
   grid: {
@@ -384,8 +384,8 @@ export default {
       none_other: "{{count}} खिलाड़ियों का लाइफ ग्रिड",
       mtg_one: "{{count}} खिलाड़ी का लाइफ ग्रिड",
       mtg_other: "{{count}} खिलाड़ियों का लाइफ ग्रिड",
-      ygo_one: "{{count}} खिलाड़ी का Life Points ग्रिड",
-      ygo_other: "{{count}} खिलाड़ियों का Life Points ग्रिड",
+      ygo_one: "{{count}} खिलाड़ी का लाइफ़ पॉइंट ग्रिड",
+      ygo_other: "{{count}} खिलाड़ियों का लाइफ़ पॉइंट ग्रिड",
       pokemon_one: "{{count}} खिलाड़ी का प्राइज़ कार्ड ग्रिड",
       pokemon_other: "{{count}} खिलाड़ियों का प्राइज़ कार्ड ग्रिड",
     },
@@ -471,20 +471,20 @@ export default {
     slider: {
       none: "{{name}} का life बदलाव",
       mtg: "{{name}} का life बदलाव",
-      ygo: "{{name}} के Life Points में बदलाव",
-      pokemon: "{{name}} के Prize cards में बदलाव",
+      ygo: "{{name}} के लाइफ़ पॉइंट में बदलाव",
+      pokemon: "{{name}} के प्राइज़ कार्ड में बदलाव",
     },
     add: {
       none: "{{amount}} life जोड़ें",
       mtg: "{{amount}} life जोड़ें",
-      ygo: "{{amount}} Life Points जोड़ें",
-      pokemon: "{{amount}} Prize cards जोड़ें",
+      ygo: "{{amount}} लाइफ़ पॉइंट जोड़ें",
+      pokemon: "{{amount}} प्राइज़ कार्ड जोड़ें",
     },
     subtract: {
       none: "{{amount}} life घटाएँ",
       mtg: "{{amount}} life घटाएँ",
-      ygo: "{{amount}} Life Points घटाएँ",
-      pokemon: "{{amount}} Prize cards घटाएँ",
+      ygo: "{{amount}} लाइफ़ पॉइंट घटाएँ",
+      pokemon: "{{amount}} प्राइज़ कार्ड घटाएँ",
     },
   },
 } satisfies LocaleNamespace

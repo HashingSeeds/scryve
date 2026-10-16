@@ -126,7 +126,7 @@ export default {
       none: "ライフが同点",
       mtg: "ライフが同点",
       ygo: "ライフポイントが同点",
-      pokemon: "サイドが同数",
+      pokemon: "サイドの枚数が同じ",
     },
     leads: {
       none: "{{name}}がライフでリード",
@@ -356,7 +356,8 @@ export default {
       none: "タップで{{identity}}のライフを{{delta}}変更。長押しでその他の操作。",
       mtg: "タップで{{identity}}のライフを{{delta}}変更。長押しでその他の操作。",
       ygo: "タップで{{identity}}のライフポイントを{{delta}}変更。長押しでその他の操作。",
-      pokemon: "タップで{{identity}}のサイドを{{delta}}変更。長押しでその他の操作。",
+      pokemon:
+        "タップで{{identity}}のサイドを{{delta}}変更します。長押しでその他の操作ができます。",
     },
     moreControls: {
       none: "{{identity}}、ライフのその他の操作",
@@ -459,14 +460,14 @@ export default {
     add: {
       none: "ライフを{{amount}}増やす",
       mtg: "ライフを{{amount}}増やす",
-      ygo: "ライフポイントを{{amount}}増やす",
-      pokemon: "サイドを{{amount}}枚増やす",
+      ygo: "ライフポイントを{{amount}}加算",
+      pokemon: "サイドを{{amount}}増やす",
     },
     subtract: {
       none: "ライフを{{amount}}減らす",
       mtg: "ライフを{{amount}}減らす",
-      ygo: "ライフポイントを{{amount}}減らす",
-      pokemon: "サイドを{{amount}}枚減らす",
+      ygo: "ライフポイントを{{amount}}減算",
+      pokemon: "サイドを{{amount}}減らす",
     },
   },
 } satisfies LocaleNamespace
