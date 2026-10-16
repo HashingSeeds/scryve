@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values"
 
-import { archiveLanGame } from "./lanArchive"
+import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
 import {
   createLanGame,
   LAN_PROTOCOL,
@@ -38,6 +38,7 @@ const setup: LanSetup = {
 let accept: Accept
 
 beforeEach(() => {
+  jest.clearAllMocks()
   jest.useFakeTimers()
   jest.mocked(hostLan).mockImplementation(async (name, _parse, onPeer) => {
     accept = onPeer as Accept
@@ -152,6 +153,22 @@ describe("nearby host", () => {
         [bob.pass().key, `hash-${bob.pass().token}`],
       ]),
     )
+  })
+
+  it("waits for a guest's pass hash before saving the round", async () => {
+    let release = (_hash: string) => {}
+    jest
+      .mocked(hashSeatPassToken)
+      .mockImplementationOnce(() => new Promise((resolve) => (release = resolve)))
+    const { session, alice } = await startedGame()
+
+    const finished = session.writes.finish()
+    await Promise.resolve()
+    expect(archiveLanGame).not.toHaveBeenCalled()
+    release("late-hash")
+    await finished
+
+    expect(jest.mocked(archiveLanGame).mock.calls[0][2].get(alice.pass().key)).toBe("late-hash")
   })
 
   it("keeps the round open when saving it fails, so the host can finish again", async () => {

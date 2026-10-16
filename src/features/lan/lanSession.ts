@@ -106,7 +106,7 @@ export class LanSession {
   private server?: LanHost
   private serverClosed = false
   private tokens = new Map<string, string>()
-  private passHashes = new Map<string, string>()
+  private passHashes = new Map<string, Promise<string | undefined>>()
   private peers = new Map<string, LanConnection<LanHostMessage>>()
   // why: a socket that hasn't sent its join yet isn't in peers, but still has to close when the host leaves.
   private accepted = new Set<LanConnection<LanHostMessage>>()
@@ -457,18 +457,26 @@ export class LanSession {
       this.publish(startLanRound(game, Date.now()))
   }
 
-  // why: hashing is async, so it runs at join; finishing then saves the round before ending it, and a failed save leaves the round open to finish again.
+  // why: a seat whose hash failed still finishes; it just can't be claimed later.
   private hashPass({ key, token }: LanSeatPass) {
-    void hashSeatPassToken(token).then((hash) => {
-      if (this.tokens.get(key) === token) this.passHashes.set(key, hash)
-    })
+    this.passHashes.set(
+      key,
+      hashSeatPassToken(token).catch(() => undefined),
+    )
   }
 
-  finish(result?: ConnectedGameResult) {
+  // why: the round is saved before it ends, so a failed save leaves it open to finish again.
+  async finish(result?: ConnectedGameResult) {
+    if (this.state.role !== "host" || this.game?.status !== "active") return
+    const hashes = new Map<string, string>()
+    for (const [key, hash] of this.passHashes) {
+      const value = await hash
+      if (value) hashes.set(key, value)
+    }
     const game = this.game
-    if (this.state.role !== "host" || game?.status !== "active") return
+    if (game?.status !== "active") return
     const now = Date.now()
-    archiveLanGame({ ...game, updatedAt: now }, result, this.passHashes)
+    archiveLanGame({ ...game, updatedAt: now }, result, hashes)
     this.publish(endLanRound(game, "finished", now))
   }
 
