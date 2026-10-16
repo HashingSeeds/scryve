@@ -9,6 +9,7 @@ import {
   PRO_MARK_SHAPES,
   resolveAppearance,
   shapeForSeat,
+  shownMarkShape,
   withoutProMarks,
   type PlayerAppearance,
 } from "./appearance"
@@ -45,6 +46,12 @@ describe("player appearance", () => {
       expect(ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES).not.toContain(shape)
     }
     expect(isProMarkShape("heart")).toBe(false)
+  })
+
+  it("shows a seat's Pro mark when this build knows it, else its free mark", () => {
+    expect(shownMarkShape({ shape: "star", proShape: "crown" })).toBe("crown")
+    expect(shownMarkShape({ shape: "star", proShape: "dragon" })).toBe("star")
+    expect(shownMarkShape({ shape: "octagon" })).toBeUndefined()
   })
 
   it("trades Pro marks for unused free marks and keeps every other choice", () => {

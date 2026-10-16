@@ -2363,6 +2363,75 @@ describe("hosted player appearances", () => {
   })
 })
 
+describe("Pro marks in hosted lobbies", () => {
+  async function grant(t: ConvexTestHarness, clerkUserId: string, feature: string) {
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId,
+      feature,
+      enabled: true,
+      source: "test",
+    })
+  }
+
+  it("lets a Pro player wear a Pro mark beside a free one that installed clients still draw", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t)
+    const joiner = await synced(t, "pro-mark-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
+    const appearance = { publicId: created.publicId, seat: 2, color: "#117B9C", shape: "star" }
+
+    await expect(
+      joiner.mutation(api.games.setMyAppearance, { ...appearance, proShape: "crown" }),
+    ).rejects.toThrow(
+      expect.objectContaining({ data: expect.objectContaining({ code: "pro_required" }) }),
+    )
+
+    await grant(t, "pro-mark-joiner", "pro_decks_limit")
+    await grant(t, "pro-mark-joiner", "foil")
+    await expect(
+      joiner.mutation(api.games.setMyAppearance, { ...appearance, proShape: "octagon" }),
+    ).rejects.toThrow("available player shape")
+    await joiner.mutation(api.games.setMyAppearance, { ...appearance, proShape: "crown" })
+    const seat = async () =>
+      (await host.query(api.games.lobbyProjection, { publicId: created.publicId })).players[1]
+    expect(await seat()).toMatchObject({ shape: "star", proShape: "crown", foil: true })
+
+    await joiner.mutation(api.games.setMyAppearance, appearance)
+    expect(await seat()).toMatchObject({ shape: "star", proShape: "crown" })
+
+    await joiner.mutation(api.games.setMyAppearance, { ...appearance, proShape: null })
+    expect(await seat()).not.toHaveProperty("proShape")
+    expect(await seat()).not.toHaveProperty("foil")
+  })
+
+  it("keeps each Pro mark to one seat", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t)
+    const joiner = await synced(t, "pro-mark-rival", "Rival")
+    await joiner.mutation(api.games.claimSeat, { token, displayName: "Rival" })
+    await grant(t, "host-subject", "pro_decks_limit")
+    await grant(t, "pro-mark-rival", "pro_decks_limit")
+    const [first] = (await host.query(api.games.lobbyProjection, { publicId: created.publicId }))
+      .players
+    await host.mutation(api.games.setMyAppearance, {
+      publicId: created.publicId,
+      seat: 1,
+      color: first.color,
+      shape: first.shape!,
+      proShape: "eye",
+    })
+    await expect(
+      joiner.mutation(api.games.setMyAppearance, {
+        publicId: created.publicId,
+        seat: 2,
+        color: "#117B9C",
+        shape: "star",
+        proShape: "eye",
+      }),
+    ).rejects.toThrow("color or shape")
+  })
+})
+
 describe("connected rematch", () => {
   const rematch = {
     publicId: "rematch-public-game-123",

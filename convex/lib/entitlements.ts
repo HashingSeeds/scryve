@@ -11,6 +11,7 @@ export const PREMIUM_FEATURES = {
   unlimitedDecks: "unlimited_decks",
   deckAnalytics: "deck_analytics",
   deckVersions: "deck_versions",
+  foil: "foil",
 } as const
 
 type Ctx = QueryCtx | MutationCtx

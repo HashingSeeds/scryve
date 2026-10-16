@@ -285,6 +285,32 @@ describe("RevenueCat entitlement sync", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
+  it("revokes foil from a transferred-away Foil subscription", async () => {
+    const t = makeConvexTest()
+    await createUser(t, "clerk_foil_source")
+    await createUser(t, "clerk_foil_destination")
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        subscriberResponse({ enabled: true, observedAt: 500, productIdentifier: "foil_yearly" }),
+      )
+    const foil = async (clerkUserId: string) =>
+      (await entitlements(t, clerkUserId)).find(({ feature }) => feature === "foil")?.enabled
+    await t.withIdentity({ subject: "clerk_foil_source" }).action(api.revenuecat.syncCurrent, {})
+    expect(await foil("clerk_foil_source")).toBe(true)
+
+    await sendWebhook(t, {
+      id: "event-foil-transfer",
+      type: "TRANSFER",
+      event_timestamp_ms: 500,
+      environment: "PRODUCTION",
+      transferred_from: ["clerk_foil_source"],
+      transferred_to: ["clerk_foil_destination"],
+    })
+    expect(await foil("clerk_foil_source")).toBe(false)
+    expect(await foil("clerk_foil_destination")).toBe(true)
+  })
+
   it.each(["scryve_pro_monthly", "foil_yearly"])(
     "maps %s subscription state to the same Pro access",
     async (productIdentifier) => {
@@ -363,6 +389,30 @@ describe("RevenueCat entitlement sync", () => {
     await expect(actor.query(api.decks.listMine, {})).resolves.toMatchObject({
       capacity: { premium: false, limit: 2 },
     })
+  })
+
+  it("grants foil only to an active Foil subscription", async () => {
+    const t = makeConvexTest()
+    const actor = await createUser(t, "clerk_foil")
+    const fetchSpy = jest.spyOn(globalThis, "fetch")
+    const foil = async () =>
+      (await entitlements(t, "clerk_foil")).find(({ feature }) => feature === "foil")?.enabled
+
+    fetchSpy.mockResolvedValueOnce(
+      subscriberResponse({ enabled: true, observedAt: 800, productIdentifier: "foil_yearly" }),
+    )
+    await actor.action(api.revenuecat.syncCurrent, {})
+    expect(await foil()).toBe(true)
+
+    fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 900 }))
+    await actor.action(api.revenuecat.syncCurrent, {})
+    expect(await foil()).toBe(false)
+
+    fetchSpy.mockResolvedValueOnce(
+      subscriberResponse({ enabled: false, observedAt: 1000, productIdentifier: "foil_yearly" }),
+    )
+    await actor.action(api.revenuecat.syncCurrent, {})
+    expect(await foil()).toBe(false)
   })
 
   it("lets only the authenticated caller refresh their current state", async () => {

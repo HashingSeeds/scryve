@@ -79,7 +79,7 @@ import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
 import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
-import { isPlayerMarkShape } from "../../convex/lib/appearance"
+import { shownMarkShape } from "../../convex/lib/appearance"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -285,7 +285,7 @@ function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
     id: asPlayerId(player.playerId),
     name: player.displayName,
     color: player.color,
-    ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
+    ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     seat: player.seat,
   }
 }
@@ -828,7 +828,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     seat: player.seat,
     displayName: player.displayName,
     color: player.color,
-    ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
+    ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     controlledByMe: player.controlledByMe,
   }))
 
@@ -853,6 +853,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             disabled={!active || overlayOpen}
             isPlayerDisabled={(player) => !controlled.has(player.id)}
             isPlayerOwned={(player) => controlled.has(player.id)}
+            isPlayerFoil={(player) =>
+              Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
+            }
             isPlayerEliminated={(player) =>
               commanderDamageEnabled &&
               Boolean(
@@ -1320,7 +1323,8 @@ function WinnerChoice({
       Leading={({ color }) => (
         <PlayerMark
           seatNumber={player.seat}
-          shape={isPlayerMarkShape(player.shape) ? player.shape : undefined}
+          shape={shownMarkShape(player)}
+          foil={player.foil}
           color={color}
           size={28}
         />

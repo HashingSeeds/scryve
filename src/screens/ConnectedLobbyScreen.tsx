@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, Share, View } from "react-native"
+import { Platform, ScrollView, Share, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -22,6 +22,7 @@ import { Switch } from "@/components/Toggle/Switch"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
 import { readPublicCloudConfig } from "@/features/auth/config"
+import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
   lobbyDetail,
@@ -53,7 +54,10 @@ import type { Id } from "../../convex/_generated/dataModel"
 import {
   CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
+  isProMarkShape,
+  PRO_MARK_SHAPES,
   shapeForSeat,
+  shownMarkShape,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
 import { versionLabel } from "../../convex/lib/deckVersions"
@@ -155,6 +159,9 @@ function ConnectedLobbyContent({
   const abandon = useMutation(api.games.abandonGame)
   const selectDeck = useMutation(api.decks.selectForSeat)
   const setAppearance = useMutation(api.games.setMyAppearance)
+  const billing = useRevenueCat()
+  // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
+  const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
   const [actionError, setActionError] = useState<string>()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteOrigin, setInviteOrigin] = useState<DialogOrigin>()
@@ -283,13 +290,36 @@ function ConnectedLobbyContent({
     try {
       setSavingAppearance(true)
       setActionError(undefined)
-      await setAppearance({ publicId, seat: appearanceSeat, ...appearanceDraft })
+      const freeShape = lobby?.players.find((player) => player.seat === appearanceSeat)?.shape
+      const pro = isProMarkShape(appearanceDraft.shape)
+      await setAppearance({
+        publicId,
+        seat: appearanceSeat,
+        color: appearanceDraft.color,
+        shape: !pro
+          ? appearanceDraft.shape
+          : isPlayerMarkShape(freeShape)
+            ? freeShape
+            : shapeForSeat(appearanceSeat),
+        proShape: pro ? appearanceDraft.shape : null,
+      })
       setAppearanceSeat(undefined)
     } catch (cause) {
       setActionError(convexErrorMessage(cause, "Could not update your color and mark"))
     } finally {
       setSavingAppearance(false)
     }
+  }
+
+  async function presentPaywall() {
+    setPaywall("open")
+    await billing.presentPaywall()
+    setPaywall("closed")
+  }
+
+  function openPaywall() {
+    if (Platform.OS === "ios") setPaywall("waitingForDismiss")
+    else void presentPaywall()
   }
 
   function openExitDialog(action: LobbyExitAction, event?: GestureResponderEvent) {
@@ -360,10 +390,14 @@ function ConnectedLobbyContent({
   const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
   const takenAppearances = lobby.players
     .filter((player) => player.seat !== appearanceSeat)
-    .map((player) => ({
-      color: player.color,
-      shape: isPlayerMarkShape(player.shape) ? player.shape : shapeForSeat(player.seat),
-    }))
+    .flatMap((player) => {
+      const free = isPlayerMarkShape(player.shape) ? player.shape : shapeForSeat(player.seat)
+      // why: the server still holds a Pro player's free mark for installed clients, so both stay taken.
+      return [...new Set([shownMarkShape(player) ?? free, free])].map((shape) => ({
+        color: player.color,
+        shape,
+      }))
+    })
 
   return (
     <Screen
@@ -500,7 +534,7 @@ function ConnectedLobbyContent({
                   )
                   setAppearanceDraft({
                     color: seat.color,
-                    shape: isPlayerMarkShape(seat.shape) ? seat.shape : shapeForSeat(seat.seat),
+                    shape: shownMarkShape(seat) ?? shapeForSeat(seat.seat),
                   })
                   setAppearanceSeat(seat.seat)
                 }}
@@ -511,7 +545,7 @@ function ConnectedLobbyContent({
                         seat: seat.seat,
                         displayName: seat.displayName,
                         color: seat.color,
-                        ...(isPlayerMarkShape(seat.shape) ? { shape: seat.shape } : {}),
+                        ...(shownMarkShape(seat) ? { shape: shownMarkShape(seat) } : {}),
                         controlledByMe: false,
                       })
                     : undefined
@@ -609,7 +643,8 @@ function ConnectedLobbyContent({
       ) : null}
       {appearanceSeat !== undefined && appearanceDraft ? (
         <DialogCard
-          visible
+          visible={paywall === "closed"}
+          onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
           onClose={() => setAppearanceSeat(undefined)}
           closeDisabled={savingAppearance}
           origin={appearanceOrigin}
@@ -623,6 +658,10 @@ function ConnectedLobbyContent({
             value={appearanceDraft}
             taken={takenAppearances}
             shapes={CONNECTED_PLAYER_MARK_SHAPES}
+            proShapes={PRO_MARK_SHAPES}
+            proLocked={!billing.isCountPro}
+            foil={billing.isFoil}
+            onLockedPress={openPaywall}
             onChange={setAppearanceDraft}
           />
           <View style={themed($dialogActions)}>

@@ -13,6 +13,7 @@ const environmentValidator = v.union(v.literal("PRODUCTION"), v.literal("SANDBOX
 const snapshotValidator = v.object({
   appUserIds: v.array(v.string()),
   enabled: v.boolean(),
+  foil: v.optional(v.boolean()),
   observedAt: v.number(),
   transferRevocation: v.optional(v.boolean()),
 })
@@ -66,6 +67,7 @@ export const commitSync = internalMutation({
           continue
         const value = {
           enabled: snapshot.enabled,
+          foil: snapshot.foil,
           environment: args.environment,
           observedAt: snapshot.observedAt,
           updatedAt: Date.now(),

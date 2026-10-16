@@ -3,6 +3,8 @@ import type { Doc } from "../_generated/dataModel"
 import type { MutationCtx } from "../_generated/server"
 
 export const COUNT_PRO_ENTITLEMENT_ID = "Count Pro"
+/** why: Foil sells the same entitlement as Pro, so only its product tells a Foil supporter apart. */
+export const FOIL_PRODUCT_ID = "foil_yearly"
 export const REVENUECAT_SOURCE = "revenuecat"
 export const REVENUECAT_ENVIRONMENTS = ["PRODUCTION", "SANDBOX"] as const
 
@@ -10,6 +12,7 @@ export type RevenueCatEnvironment = (typeof REVENUECAT_ENVIRONMENTS)[number]
 
 type RevenueCatSnapshot = {
   enabled: boolean
+  foil: boolean
   observedAt: number
 }
 
@@ -55,19 +58,17 @@ export function readRevenueCatSnapshot(
   )
     return null
   const countPro = asRecord(entitlements[COUNT_PRO_ENTITLEMENT_ID])
-  if (!countPro) return { enabled: false, observedAt }
+  if (!countPro) return { enabled: false, foil: false, observedAt }
   const productIdentifier = countPro.product_identifier
   const active =
     isActiveDate(countPro.expires_date, observedAt) ||
     (countPro.grace_period_expires_date !== null &&
       isActiveDate(countPro.grace_period_expires_date, observedAt))
-  return {
-    enabled:
-      active &&
-      typeof productIdentifier === "string" &&
-      matchesEnvironment(subscriber, productIdentifier, environment),
-    observedAt,
-  }
+  const enabled =
+    active &&
+    typeof productIdentifier === "string" &&
+    matchesEnvironment(subscriber, productIdentifier, environment)
+  return { enabled, foil: enabled && productIdentifier === FOIL_PRODUCT_ID, observedAt }
 }
 
 export async function fetchRevenueCatSnapshot(
@@ -91,7 +92,7 @@ export async function fetchRevenueCatSnapshot(
 export async function applyRevenueCatState(
   ctx: MutationCtx,
   user: Doc<"users">,
-  state: Pick<Doc<"revenueCatCustomerStates">, "enabled" | "observedAt">,
+  state: Pick<Doc<"revenueCatCustomerStates">, "enabled" | "foil" | "observedAt">,
 ) {
   const features = Object.values(PREMIUM_FEATURES)
   await Promise.all(
@@ -101,7 +102,7 @@ export async function applyRevenueCatState(
         .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", feature))
         .unique()
       const value = {
-        enabled: state.enabled,
+        enabled: state.enabled && (feature !== PREMIUM_FEATURES.foil || state.foil === true),
         source: REVENUECAT_SOURCE,
         updatedAt: state.observedAt,
       }

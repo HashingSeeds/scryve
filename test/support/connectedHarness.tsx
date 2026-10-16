@@ -21,6 +21,8 @@ type LobbyPlayer = {
   displayName: string
   color: string
   shape?: string
+  proShape?: string
+  foil?: boolean
   currentLife?: number
   controlledByMe?: boolean
   deckVersionId?: string

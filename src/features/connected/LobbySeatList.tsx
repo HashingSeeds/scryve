@@ -10,7 +10,7 @@ import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { shownMarkShape } from "../../../convex/lib/appearance"
 import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 
 export type LobbySeat = {
@@ -20,6 +20,8 @@ export type LobbySeat = {
   displayName: string
   color: string
   shape?: string
+  proShape?: string
+  foil?: boolean
   deckVersionId?: string
   controlledByMe: boolean
 }
@@ -65,7 +67,7 @@ export function LobbySeatList({
   onManageDecks?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const rows: LobbySeat[] = totalSeats
     ? Array.from({ length: totalSeats }, (_, index) => {
         const seat = index + 1
@@ -141,7 +143,9 @@ export function LobbySeatList({
                 >
                   <PlayerMark
                     seatNumber={seat.seat}
-                    shape={isPlayerMarkShape(seat.shape) ? seat.shape : undefined}
+                    shape={shownMarkShape(seat)}
+                    foil={seat.foil}
+                    foilBackdrop={theme.colors.background}
                     color={seat.color}
                     size={32}
                   />
@@ -149,7 +153,9 @@ export function LobbySeatList({
               ) : (
                 <PlayerMark
                   seatNumber={seat.seat}
-                  shape={isPlayerMarkShape(seat.shape) ? seat.shape : undefined}
+                  shape={shownMarkShape(seat)}
+                  foil={seat.foil}
+                  foilBackdrop={theme.colors.background}
                   color={seat.color}
                   size={32}
                 />
