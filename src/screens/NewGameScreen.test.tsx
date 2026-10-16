@@ -2,6 +2,7 @@ import { Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
+import * as authAccess from "@/features/auth/AuthContext"
 import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
 import {
   ConnectedProfileProvider,
@@ -109,6 +110,7 @@ describe("NewGameScreen", () => {
     resetConnectedHarness()
     resetConnectedProfileBootstrapForTests()
   })
+  afterEach(() => jest.restoreAllMocks())
 
   it("keeps arriving games out of the setup form until requested", () => {
     const props = {
@@ -480,6 +482,53 @@ describe("NewGameScreen", () => {
       "Ada",
       "Player 2",
     ])
+  })
+
+  function authAs(isSignedIn: boolean) {
+    const openAuth = jest.fn()
+    jest.spyOn(authAccess, "useAuthAccess").mockReturnValue({
+      configured: true,
+      isLoaded: true,
+      isSignedIn,
+      authVisible: false,
+      openAuth,
+      closeAuth: jest.fn(),
+    })
+    return openAuth
+  }
+
+  const crownGame = () =>
+    createLocalGame({
+      players: [
+        { name: "Ada", color: "#B85636", shape: "crown" },
+        { name: "Grace", color: "#41476E" },
+      ],
+      startingLife: 20,
+    })
+
+  it("keeps saved Pro marks while a signed-in account's billing is still loading", () => {
+    authAs(true)
+    const view = setup({ initialGame: crownGame() })
+
+    fireEvent.press(view.getByTestId("player-appearance-1"))
+    expect(view.getByTestId("appearance-shape-crown")).toHaveProp("accessibilityState", {
+      selected: true,
+      disabled: false,
+    })
+  })
+
+  it("gives a signed-out device free marks and sends its Pro taps to sign-in", () => {
+    const openAuth = authAs(false)
+    const view = setup({ initialGame: crownGame() })
+
+    fireEvent.press(view.getByTestId("player-appearance-1"))
+    expect(view.getByTestId("appearance-shape-heart")).toHaveProp("accessibilityState", {
+      selected: true,
+      disabled: false,
+    })
+    fireEvent.press(view.getByTestId("appearance-shape-flame"))
+    expect(openAuth).toHaveBeenCalledTimes(1)
+    expect(view.queryByTestId("local-appearance-dialog")).toBeNull()
   })
 
   it("edits a local player's color and mark from the mark beside their name", () => {

@@ -5,15 +5,14 @@ import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { COUNT_PRO_ENTITLEMENT_ID, FOIL_PRODUCT_ID } from "./config"
+import { COUNT_PRO_ENTITLEMENT_ID } from "./config"
 import { useRevenueCat } from "./RevenueCatContext"
 
 export function SubscriptionControls() {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
   const entitlement = billing.customerInfo?.entitlements.all[COUNT_PRO_ENTITLEMENT_ID]
-  const planName =
-    billing.isCountPro && entitlement?.productIdentifier === FOIL_PRODUCT_ID ? "Foil" : "Pro"
+  const planName = billing.isFoil ? "Foil" : "Pro"
   const expiration = entitlement?.expirationDate
     ? new Date(entitlement.expirationDate).toLocaleDateString()
     : null

@@ -64,6 +64,7 @@ interface RevenueCatAccess {
   configurationMessage?: string
   isLoading: boolean
   isCountPro: boolean
+  isFoil: boolean
   customerInfo: CustomerInfo | null
   currentOffering: PurchasesOffering | null
   error?: string
@@ -80,6 +81,7 @@ const RevenueCatContext = createContext<RevenueCatAccess>({
   isReady: false,
   isLoading: false,
   isCountPro: false,
+  isFoil: false,
   customerInfo: null,
   currentOffering: null,
   refreshCustomerInfo: unavailable,
@@ -126,6 +128,15 @@ export function revenueCatErrorMessage(cause: unknown) {
 export function hasCountPro(customerInfo: CustomerInfo | null) {
   const entitlement = customerInfo?.entitlements.active[COUNT_PRO_ENTITLEMENT_ID]
   return Boolean(entitlement && entitlement.verification !== "FAILED")
+}
+
+/** why: Foil sells the same Pro entitlement as a different product, so only the product tells a Foil supporter apart. */
+export function hasFoil(customerInfo: CustomerInfo | null) {
+  return (
+    hasCountPro(customerInfo) &&
+    customerInfo?.entitlements.active[COUNT_PRO_ENTITLEMENT_ID]?.productIdentifier ===
+      FOIL_PRODUCT_ID
+  )
 }
 
 function mostRecentlyFetchedCustomerInfo(current: CustomerInfo | null, next: CustomerInfo) {
@@ -325,6 +336,7 @@ export function RevenueCatProvider({
       configurationMessage,
       isLoading,
       isCountPro: hasCountPro(customerInfo),
+      isFoil: hasFoil(customerInfo),
       customerInfo,
       currentOffering,
       error,

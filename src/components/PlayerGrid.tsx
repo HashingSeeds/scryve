@@ -89,6 +89,7 @@ export interface PlayerGridProps {
   /** why: only decks the signed-in user owns can be read, so screens return a version only for seats they control. */
   getSeatDeck?: (player: GamePlayer) => SeatDeck | undefined
   isPlayerEliminated?: (player: GamePlayer) => boolean
+  isPlayerFoil?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
   table?: TableRuntime
   dice?: DiceGridBinding
@@ -108,6 +109,7 @@ export function PlayerGrid({
   getStaleSince,
   getSeatDeck,
   isPlayerEliminated,
+  isPlayerFoil,
   commanderDamage,
   table,
   dice,
@@ -371,6 +373,7 @@ export function PlayerGrid({
                     playerName={player.name}
                     seatNumber={seatNumber}
                     shape={player.shape}
+                    foil={isPlayerFoil?.(player)}
                     life={player.life}
                     color={player.color}
                     compact={layout.compact}

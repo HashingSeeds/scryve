@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
+import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -22,6 +22,8 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
 import type { NextPageState } from "@/features/async/remoteState"
+import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
@@ -71,8 +73,10 @@ import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
   PLAYER_MARK_SHAPES,
+  PRO_MARK_SHAPES,
   resolveAppearance,
   shapeForSeat,
+  withoutProMarks,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
@@ -211,6 +215,17 @@ export function NewGameScreen({
         shapeForSeat(index + 1, initialGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
     })),
   )
+  const auth = useAuthAccess()
+  const billing = useRevenueCat()
+  // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade.
+  const confirmedFree =
+    (auth.isLoaded && !auth.isSignedIn) || (billing.customerInfo !== null && !billing.isCountPro)
+  const seatAppearances = useMemo(
+    () => (confirmedFree ? withoutProMarks(appearances) : appearances),
+    [appearances, confirmedFree],
+  )
+  // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
+  const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
@@ -285,10 +300,10 @@ export function NewGameScreen({
     () =>
       nameValidation.names.map((name, index) => ({
         name,
-        color: appearances[index]?.color ?? PLAYER_COLORS[index],
-        shape: appearances[index]?.shape ?? shapeForSeat(index + 1, PLAYER_MARK_SHAPES),
+        color: seatAppearances[index]?.color ?? PLAYER_COLORS[index],
+        shape: seatAppearances[index]?.shape ?? shapeForSeat(index + 1, PLAYER_MARK_SHAPES),
       })),
-    [appearances, nameValidation.names],
+    [seatAppearances, nameValidation.names],
   )
   const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
   const matchBestOf = matchOn
@@ -418,7 +433,7 @@ export function NewGameScreen({
   }
 
   // why: only the seat and deck pickers may claim a game; a rename must not move it to whoever is signed in now.
-  function savePlayers(nextAppearances = appearances, nextAccount?: LocalGameAccountInput) {
+  function savePlayers(nextAppearances = seatAppearances, nextAccount?: LocalGameAccountInput) {
     if (!onSavePlayers || !initialGame) return
     const savedNames = validatePlayerNames(
       initialGame.players.map((_, index) => names[index].trim() || defaultName(index)),
@@ -440,7 +455,7 @@ export function NewGameScreen({
     setMeSeat(seat)
     if (seat === undefined) setDeck(undefined)
     if (accountInput)
-      savePlayers(appearances, {
+      savePlayers(seatAppearances, {
         ...accountInput,
         meSeat: seat,
         ...(seat === undefined ? { deckVersionId: undefined, deckName: undefined } : {}),
@@ -451,7 +466,7 @@ export function NewGameScreen({
     const choice = deckChoices.find((candidate) => candidate.versionId === versionId)
     setDeck(choice)
     if (accountInput)
-      savePlayers(appearances, {
+      savePlayers(seatAppearances, {
         ...accountInput,
         deckVersionId: choice?.versionId,
         deckName: choice?.name,
@@ -469,12 +484,13 @@ export function NewGameScreen({
   function choosePlayerCount(value: number) {
     if (value > playerCount)
       setAppearances((current) => {
-        const next = [...current]
+        const next = confirmedFree ? withoutProMarks(current) : [...current]
         for (let index = playerCount; index < value; index += 1)
           next[index] = resolveAppearance({
             preferred: current[index],
             taken: next.slice(0, index),
             seat: index + 1,
+            shapes: confirmedFree ? undefined : [...PLAYER_MARK_SHAPES, ...PRO_MARK_SHAPES],
           })
         return next
       })
@@ -488,7 +504,7 @@ export function NewGameScreen({
     setAppearanceOrigin(
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
-    setAppearanceDraft(appearances[index])
+    setAppearanceDraft(seatAppearances[index])
     setAppearanceSeat(index)
   }
 
@@ -497,11 +513,26 @@ export function NewGameScreen({
     setAppearanceDraft(undefined)
   }
 
+  async function presentPaywall() {
+    setPaywall("open")
+    await billing.presentPaywall()
+    setPaywall("closed")
+  }
+
+  function openPaywall() {
+    if (!auth.isSignedIn) {
+      closeAppearancePicker()
+      auth.openAuth()
+    } else if (Platform.OS === "ios") setPaywall("waitingForDismiss")
+    else void presentPaywall()
+  }
+
   function saveAppearance() {
     if (appearanceSeat === undefined || !appearanceDraft) return
-    const next = appearances.map((appearance, index) =>
+    const drafted = seatAppearances.map((appearance, index) =>
       index === appearanceSeat ? appearanceDraft : appearance,
     )
+    const next = confirmedFree ? withoutProMarks(drafted) : drafted
     setAppearances(next)
     savePlayers(next)
     closeAppearancePicker()
@@ -1069,7 +1100,8 @@ export function NewGameScreen({
       ) : null}
       {appearanceSeat !== undefined && appearanceDraft ? (
         <DialogCard
-          visible
+          visible={paywall === "closed"}
+          onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
           origin={appearanceOrigin}
           onClose={closeAppearancePicker}
           backdropTestID="local-appearance-backdrop"
@@ -1080,7 +1112,13 @@ export function NewGameScreen({
           <Text preset="subheading" text={`${players[appearanceSeat].name}'s color and mark`} />
           <AppearancePicker
             value={appearanceDraft}
-            taken={appearances.slice(0, playerCount).filter((_, index) => index !== appearanceSeat)}
+            taken={seatAppearances
+              .slice(0, playerCount)
+              .filter((_, index) => index !== appearanceSeat)}
+            proShapes={PRO_MARK_SHAPES}
+            proLocked={!billing.isCountPro}
+            foil={billing.isFoil}
+            onLockedPress={openPaywall}
             onChange={setAppearanceDraft}
           />
           <View style={themed($dialogActions)}>

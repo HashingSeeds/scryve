@@ -50,6 +50,7 @@ export interface SeatIdentityProps {
   compact?: boolean
   spinning?: boolean
   insetSwordColor?: string
+  foil?: boolean
   staleSince?: number
   style?: StyleProp<ViewStyle>
 }
@@ -63,6 +64,7 @@ export function SeatIdentity({
   compact,
   spinning,
   insetSwordColor,
+  foil,
   staleSince,
   style,
 }: SeatIdentityProps) {
@@ -76,6 +78,7 @@ export function SeatIdentity({
         color={color}
         spinning={spinning}
         insetSwordColor={insetSwordColor}
+        foil={foil}
         size={metrics.mark}
         style={[$mark, art.trim]}
       />

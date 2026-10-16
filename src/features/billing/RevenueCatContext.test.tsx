@@ -3,7 +3,7 @@ import { Platform } from "react-native"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 import Purchases from "react-native-purchases"
 
-import { RevenueCatProvider, useRevenueCat } from "./RevenueCatContext"
+import { hasFoil, RevenueCatProvider, useRevenueCat } from "./RevenueCatContext"
 import { presentCountProPaywall } from "./revenueCatUi"
 
 const customerInfo = {
@@ -279,5 +279,25 @@ describe("RevenueCatProvider", () => {
     await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_456"))
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.isCountPro).toBe(false)
+  })
+})
+
+describe("hasFoil", () => {
+  function entitledTo(productIdentifier: string, verification = "VERIFIED") {
+    return {
+      entitlements: {
+        active: { "Count Pro": { identifier: "Count Pro", productIdentifier, verification } },
+        all: {},
+        verification: "VERIFIED",
+      },
+      requestDate: "2026-09-27T06:08:26Z",
+    } as never
+  }
+
+  it("tells Foil supporters apart from Pro subscribers by product", () => {
+    expect(hasFoil(entitledTo("foil_yearly"))).toBe(true)
+    expect(hasFoil(entitledTo("yearly"))).toBe(false)
+    expect(hasFoil(entitledTo("foil_yearly", "FAILED"))).toBe(false)
+    expect(hasFoil(expiredCustomerInfo)).toBe(false)
   })
 })

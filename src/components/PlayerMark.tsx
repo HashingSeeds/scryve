@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react"
+import { memo, useEffect, useId } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
@@ -9,8 +9,9 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from "react-native-reanimated"
-import Svg, { Circle, G, Path, Rect } from "react-native-svg"
+import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
 
+import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -34,6 +35,10 @@ export const MARK_ART_BOUNDS: Record<
   plus: { top: 8, bottom: 36, left: 8, right: 36 },
   shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
   heart: { top: 9.15, bottom: 34.84, left: 8, right: 36 },
+  crown: { top: 10.25, bottom: 35, left: 8.25, right: 35.75 },
+  flame: { top: 8, bottom: 36, left: 11, right: 33 },
+  bolt: { top: 7.75, bottom: 36.25, left: 10.25, right: 33.75 },
+  eye: { top: 11.5, bottom: 32.5, left: 7.5, right: 36.5 },
 }
 export const MARK_VIEW_BOX = 44
 
@@ -44,6 +49,7 @@ export interface PlayerMarkProps {
   rotation?: LifeCardContentRotation
   insetSwordColor?: string
   closeIcon?: boolean
+  foil?: boolean
   spinning?: boolean
   size?: number
   style?: StyleProp<ViewStyle>
@@ -59,11 +65,13 @@ export const PlayerMark = memo(function PlayerMark({
   rotation = 0,
   insetSwordColor,
   closeIcon = false,
+  foil = false,
   spinning = false,
   size = 44,
   style,
 }: PlayerMarkProps) {
   const shape = chosenShape ?? shapeForSeat(seatNumber)
+  const foilId = `foil-${useId().replace(/[^A-Za-z0-9]/g, "")}`
   const reducedMotion = useReducedMotion()
   const spin = useSharedValue(0)
   const rotationStyle: ViewStyle | undefined = rotation
@@ -97,7 +105,13 @@ export const PlayerMark = memo(function PlayerMark({
         style={[{ width: size, height: size }, spinStyle]}
       >
         <Svg width="100%" height="100%" viewBox="0 0 44 44">
-          <MarkShape shape={shape} color={color} />
+          {foil ? <FoilGradient id={foilId} color={color} /> : null}
+          <MarkShape
+            shape={shape}
+            color={foil ? `url(#${foilId})` : color}
+            solid={!!insetSwordColor}
+            testID={`player-mark-shape-${shape}`}
+          />
           {insetSwordColor && !closeIcon ? (
             <SwordInset shape={shape} color={insetSwordColor} />
           ) : null}
@@ -109,6 +123,42 @@ export const PlayerMark = memo(function PlayerMark({
     </View>
   )
 }, structurallyEqual)
+
+/** why: the Pro corner watermark is the mark's art at card scale; it skips PlayerMark's seat testIDs so each seat still has exactly one mark to find. */
+export function MarkArt({
+  shape,
+  color,
+  size,
+}: {
+  shape: PlayerMarkShape
+  color: string
+  size: number
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 44 44">
+      <MarkShape shape={shape} color={color} />
+    </Svg>
+  )
+}
+
+// why: cards draw marks in black or white for contrast; a black mark gets the dark foil so it stays dark against a light card, every other mark the light foil.
+const FOIL_STOPS = {
+  light: ["#F6E7B0", "#FFFFFF", "#B9E9FF", "#E6C2FF", "#F3D27A"],
+  dark: ["#4A3A0A", "#000000", "#0E3446", "#30184A", "#3D2E05"],
+} as const
+
+function FoilGradient({ id, color }: { id: string; color: string }) {
+  const stops = FOIL_STOPS[relativeLuminance(color) < 0.05 ? "dark" : "light"]
+  return (
+    <Defs>
+      <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+        {stops.map((stop, index) => (
+          <Stop key={stop + index} offset={index / (stops.length - 1)} stopColor={stop} />
+        ))}
+      </LinearGradient>
+    </Defs>
+  )
+}
 
 export function DrawMark({ color, size = 44 }: { color: string; size?: number }) {
   return (
@@ -140,6 +190,10 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   plus: { centerX: 22, centerY: 22, size: 12 },
   shield: { centerX: 22, centerY: 21.5, size: 15 },
   heart: { centerX: 22, centerY: 22.5, size: 13 },
+  crown: { centerX: 22, centerY: 22.5, size: 11 },
+  flame: { centerX: 22, centerY: 27, size: 12 },
+  bolt: { centerX: 22, centerY: 22.5, size: 9 },
+  eye: { centerX: 22, centerY: 22, size: 13 },
 }
 
 function CloseIconOverlay({
@@ -193,8 +247,21 @@ function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string })
   )
 }
 
-function MarkShape({ shape, color }: { shape: PlayerMarkShape; color: string }) {
-  const common = { fill: color, testID: `player-mark-shape-${shape}` }
+const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const
+
+/** why: a sword inset over the eye's hole would vanish into the card, so `solid` fills it. */
+function MarkShape({
+  shape,
+  color,
+  solid = false,
+  testID,
+}: {
+  shape: PlayerMarkShape
+  color: string
+  solid?: boolean
+  testID?: string
+}) {
+  const common = { fill: color, testID }
   switch (shape) {
     case "circle":
       return <Circle {...common} cx="22" cy="22" r="12" />
@@ -247,6 +314,45 @@ function MarkShape({ shape, color }: { shape: PlayerMarkShape; color: string }) 
         <Path
           {...common}
           d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"
+        />
+      )
+    case "crown":
+      return (
+        <G {...common}>
+          <Path
+            {...ROUNDED_STROKE}
+            stroke={color}
+            d="M9.5 14.5 16 20.5 22 11.5 28 20.5 34.5 14.5 33 28.5H11Z"
+          />
+          <Rect x="11" y="31" width="22" height="4" rx="1.5" />
+        </G>
+      )
+    case "flame":
+      return (
+        <Path
+          {...common}
+          d="M22 36C15.4 36 11 31.8 11 26 11 21 14 18 16.4 15.2 16.8 18 18 19.8 19.6 20.6 19 15.6 21.2 11 25.6 8 25.8 12.6 28 15.2 30.2 17.8 32.2 20.2 33 22.8 33 26 33 31.8 28.6 36 22 36Z"
+        />
+      )
+    case "bolt":
+      return (
+        <Path
+          {...common}
+          {...ROUNDED_STROKE}
+          stroke={color}
+          d="M26 9 11.5 25.5H20.5L18 35 32.5 18H24Z"
+        />
+      )
+    case "eye":
+      return (
+        <Path
+          {...common}
+          fillRule="evenodd"
+          d={`M7.5 22C11.6 14.6 16.6 11.5 22 11.5S32.4 14.6 36.5 22C32.4 29.4 27.4 32.5 22 32.5S11.6 29.4 7.5 22Z${
+            solid
+              ? ""
+              : "M28.2 22A6.2 6.2 0 1 1 15.8 22 6.2 6.2 0 1 1 28.2 22ZM24.7 22A2.7 2.7 0 1 1 19.3 22 2.7 2.7 0 1 1 24.7 22Z"
+          }`}
         />
       )
   }
