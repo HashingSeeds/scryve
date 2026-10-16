@@ -18,6 +18,7 @@ import {
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { gatedTableAction, gatedTableState, tableRelatedSeatId } from "./lib/gameEngine"
 import { limitGameRate } from "./lib/gameRateLimits"
 import {
   applyLifeChange,
@@ -74,8 +75,6 @@ import {
   tableStateValidator,
   tableActionValidator,
   type PlayerTable,
-  type PokemonCard,
-  type TableAction,
   type TableState,
 } from "./lib/table"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
@@ -1964,52 +1963,6 @@ function playerTableFromRow(player: PlayerTable): PlayerTable {
   }
 }
 
-function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
-  if (
-    action.kind === "pokemon.knockedOut" ||
-    action.kind === "pokemon.damaged" ||
-    action.kind === "pokemon.checkedUp"
-  )
-    return action.takerPlayerId
-  if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
-  return undefined
-}
-
-function gatedCard<Card extends PokemonCard>(card: Card): Card {
-  return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card
-}
-
-function gatedTableAction(action: TableAction): TableAction {
-  if (action.kind !== "pokemon.placed" && action.kind !== "pokemon.updated") return action
-  return { ...action, card: gatedCard(action.card) }
-}
-
-function gatedTableState(table: TableState): TableState {
-  return {
-    ...table,
-    players: Object.fromEntries(
-      Object.entries(table.players).map(([playerId, player]) => {
-        const board = player.pokemon
-        if (!board) return [playerId, player]
-        const knockout = board.lastKnockout
-        return [
-          playerId,
-          {
-            ...player,
-            pokemon: {
-              ...(board.active ? { active: gatedCard(board.active) } : {}),
-              bench: board.bench.map(gatedCard),
-              ...(knockout
-                ? { lastKnockout: { ...knockout, pokemon: gatedCard(knockout.pokemon) } }
-                : {}),
-            },
-          },
-        ]
-      }),
-    ),
-  }
-}
-
 export const tableAction = mutation({
   args: {
     publicId: v.string(),
@@ -2065,7 +2018,7 @@ export const tableAction = mutation({
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const rows = new Map<string, Doc<"gamePlayers">>([[actor._id, actor]])
-    const relatedId = ctx.db.normalizeId("gamePlayers", relatedPlayerId(action, actor) ?? "")
+    const relatedId = ctx.db.normalizeId("gamePlayers", tableRelatedSeatId(action, actor) ?? "")
     const related = relatedId ? await ctx.db.get(relatedId) : null
     if (related?.gameId === game._id) rows.set(related._id, related)
     const table: TableState = {
