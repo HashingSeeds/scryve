@@ -2,7 +2,7 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
-  openPlay: "Partie libre",
+  openPlay: "Aller à Jouer",
   signIn: "Se connecter",
   localGamesStay: "Les parties locales restent sur cet appareil.",
   legal: {

@@ -2,7 +2,7 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
-  openPlay: "オープンプレイ",
+  openPlay: "プレイを開く",
   signIn: "サインイン",
   localGamesStay: "ローカルゲームはこのデバイスに保存されます。",
   legal: {
