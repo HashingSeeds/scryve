@@ -67,7 +67,7 @@ export function LobbySeatList({
   onManageDecks?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const rows: LobbySeat[] = totalSeats
     ? Array.from({ length: totalSeats }, (_, index) => {
         const seat = index + 1
@@ -145,6 +145,7 @@ export function LobbySeatList({
                     seatNumber={seat.seat}
                     shape={shownMarkShape(seat)}
                     foil={seat.foil}
+                    foilBackdrop={theme.colors.background}
                     color={seat.color}
                     size={32}
                   />
@@ -154,6 +155,7 @@ export function LobbySeatList({
                   seatNumber={seat.seat}
                   shape={shownMarkShape(seat)}
                   foil={seat.foil}
+                  foilBackdrop={theme.colors.background}
                   color={seat.color}
                   size={32}
                 />
