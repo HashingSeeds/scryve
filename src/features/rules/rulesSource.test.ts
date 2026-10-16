@@ -29,6 +29,22 @@ describe("downloadRules", () => {
     expect(loadStoredRules(store)).toEqual({ url: RULES_URL, rules })
   })
 
+  it("still returns the rules when the device can't cache them", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {})
+    const store = {
+      getString: () => undefined,
+      set: () => {
+        throw new Error("full")
+      },
+    }
+    const rules = await downloadRules(store, async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SOURCE,
+    }))
+    expect(rules.effectiveDate).toBe("September 25, 2026")
+  })
+
   it("keeps the previous copy when the download is not the rules", async () => {
     const store = memoryStore()
     await expect(

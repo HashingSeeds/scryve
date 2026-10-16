@@ -45,7 +45,11 @@ export async function downloadRules(
   const text = await response.text()
   const rules = parse(text)
   if (!rules) throw new Error("Rules download was not the Comprehensive Rules")
-  store.set(RULES_KEY, JSON.stringify({ url: RULES_URL, text }))
+  try {
+    store.set(RULES_KEY, JSON.stringify({ url: RULES_URL, text }))
+  } catch (error) {
+    console.error("[rules] failed to cache the rules", error)
+  }
   return rules
 }
 

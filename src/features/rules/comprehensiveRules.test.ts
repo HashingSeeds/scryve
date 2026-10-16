@@ -82,6 +82,7 @@ describe("parseComprehensiveRules", () => {
     ])
     expect(findRules(rules!, "100")?.rules).toHaveLength(4)
     expect(findRules(rules!, "999.1")).toBeUndefined()
+    expect(findRules(rules!, "100.1z")).toBeUndefined()
   })
 
   it("searches glossary terms first, then rule numbers and text", () => {

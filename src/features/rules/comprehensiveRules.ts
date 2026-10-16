@@ -80,7 +80,7 @@ export function findRules(rules: ComprehensiveRules, id: string) {
     (rule) =>
       rule.id === base || (rule.id.startsWith(base) && /^[a-z]+$/.test(rule.id.slice(base.length))),
   )
-  return group.length > 0 ? { section, rules: group } : undefined
+  return group.some((rule) => rule.id === id) ? { section, rules: group } : undefined
 }
 
 export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: "rule"; rule: Rule }
