@@ -1,6 +1,17 @@
-import type { LanGuestMessage, LanHostMessage } from "./lanGame"
+import { ConvexError } from "convex/values"
+
+import {
+  createLanGame,
+  LAN_PROTOCOL,
+  lanLobbyOf,
+  lanProjection,
+  type LanGuestMessage,
+  type LanHostMessage,
+  type LanSetup,
+} from "./lanGame"
 import { LanSession } from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
+import type { PendingLifeAction } from "../connected/model"
 
 jest.mock("./lanTransport", () => ({
   hostLan: jest.fn(),
@@ -10,6 +21,14 @@ jest.mock("./lanTransport", () => ({
 
 type Accept = (peer: LanConnection<LanHostMessage>) => LanPeerHandlers<LanGuestMessage>
 
+const setup: LanSetup = {
+  playerCount: 3,
+  startingLife: 40,
+  lifeStep: 1,
+  ruleset: "commander",
+  system: "mtg",
+  format: "commander",
+}
 let accept: Accept
 
 beforeEach(() => {
@@ -30,123 +49,183 @@ function socket() {
     close: jest.fn(),
   }
   const handlers = accept(peer)
-  const welcome = () => sent.find((message) => message.type === "welcome")
-  return {
-    sent,
-    peer,
-    send: (message: LanGuestMessage) => handlers.onMessage(message),
-    pass: () => {
-      const message = welcome()
-      if (message?.type !== "welcome") throw new Error("no welcome")
-      return message.pass
-    },
+  const pass = () => {
+    const welcome = sent.find((message) => message.type === "welcome")
+    if (welcome?.type !== "welcome") throw new Error("no welcome")
+    return welcome.pass
   }
+  return { sent, peer, send: (message: LanGuestMessage) => handlers.onMessage(message), pass }
 }
+
+const lifeEvent = (operationId: string, playerId: string, delta: number, gameId = "game") =>
+  ({
+    type: "life.changed",
+    operationId,
+    gameId,
+    actorId: "actor",
+    deviceId: "device-0001",
+    clientCreatedAt: 1_700_000_000_000,
+    playerId,
+    delta,
+  }) as PendingLifeAction["event"]
 
 async function startedGame() {
   const session = new LanSession()
-  await session.host()
+  await session.host(setup)
   const alice = socket()
-  alice.send({ type: "join", name: "Alice" })
+  alice.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice" })
   const bob = socket()
-  bob.send({ type: "join", name: "Bob" })
-  session.start(20)
+  bob.send({ type: "join", protocol: LAN_PROTOCOL, name: "Bob" })
+  jest.advanceTimersByTime(50)
+  session.start()
   jest.advanceTimersByTime(50)
   return { session, alice, bob }
 }
 
+const roundOf = (session: LanSession) => session.getState().projection?.publicId ?? ""
+
 const lifeOf = (session: LanSession, key: string) =>
-  session.getState().game?.seats.find((seat) => seat.key === key)?.life
+  session.getState().projection?.players.find((player) => player.playerId === key)?.currentLife
 
-describe("LAN session broadcasts", () => {
-  it("sends an idle host's change at once and batches a burst into the next window", async () => {
-    const { session, alice } = await startedGame()
-    const hostKey = session.getState().seatKey!
-    const games = () => alice.sent.filter((message) => message.type === "game").length
-    jest.advanceTimersByTime(1_000)
-    const before = games()
+describe("nearby host", () => {
+  it("sends a guest the projection with its change before acknowledging the change", async () => {
+    const { session, bob } = await startedGame()
+    const { key } = bob.pass()
+    bob.sent.length = 0
 
-    session.changeLife(hostKey, -1)
-    jest.advanceTimersByTime(0)
-    session.changeLife(hostKey, -1)
-    session.changeLife(hostKey, -1)
-    jest.advanceTimersByTime(32)
-    const duringWindow = games()
-    jest.advanceTimersByTime(1)
+    bob.send({ type: "op", event: lifeEvent("life-operation-0001", key, -3, roundOf(session)) })
+    jest.advanceTimersByTime(50)
 
-    expect([duringWindow - before, games() - before]).toEqual([1, 2])
-    expect(lifeOf(session, hostKey)).toBe(17)
-  })
-})
-
-describe("LAN session seats", () => {
-  it("turns away a socket that names another guest's seat without its token", async () => {
-    const { alice } = await startedGame()
-    const thief = socket()
-
-    thief.send({ type: "join", name: "Thief", pass: { key: alice.pass().key, token: "guess" } })
-
-    expect(thief.sent).toEqual([
-      { type: "rejected", reason: "That seat belongs to another device." },
+    expect(bob.sent.map((message) => message.type)).toEqual(["state", "ack"])
+    const state = bob.sent[0]
+    expect(state.type === "state" && state.projection.recentOperationIds).toEqual([
+      "life-operation-0001",
     ])
-    expect(alice.peer.close).not.toHaveBeenCalled()
+    expect(lifeOf(session, key)).toBe(37)
   })
 
-  it("turns away a socket that names the host's seat", async () => {
-    const { session } = await startedGame()
+  it("refuses a write to another player's seat", async () => {
+    const { session, alice, bob } = await startedGame()
+
+    bob.send({
+      type: "op",
+      event: lifeEvent("life-operation-0002", alice.pass().key, -3, roundOf(session)),
+    })
+    jest.advanceTimersByTime(50)
+
+    expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "seat_owner_required" })
+    expect(lifeOf(session, alice.pass().key)).toBe(40)
+  })
+
+  it("caps how fast one socket can write", async () => {
+    const { session, bob } = await startedGame()
+
+    for (let index = 0; index < 31; index++)
+      bob.send({
+        type: "op",
+        event: lifeEvent(`life-operation-${1000 + index}`, bob.pass().key, -1, roundOf(session)),
+      })
+
+    expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "rate_limited" })
+  })
+
+  it("turns away a socket that names another guest's seat or the host's", async () => {
+    const { session, alice } = await startedGame()
     const thief = socket()
+    const hostThief = socket()
 
     thief.send({
       type: "join",
+      protocol: LAN_PROTOCOL,
+      name: "Thief",
+      pass: { key: alice.pass().key, token: "guess" },
+    })
+    hostThief.send({
+      type: "join",
+      protocol: LAN_PROTOCOL,
       name: "Thief",
       pass: { key: session.getState().seatKey!, token: "" },
     })
 
-    expect(thief.sent[0]).toMatchObject({ type: "rejected" })
-  })
-
-  it("applies a guest's life change only to that guest's own seat", async () => {
-    const { session, alice, bob } = await startedGame()
-
-    bob.send({ type: "life", life: 7, version: 1, round: 1 })
-    jest.advanceTimersByTime(50)
-
-    expect(lifeOf(session, bob.pass().key)).toBe(7)
-    expect(lifeOf(session, alice.pass().key)).toBe(20)
-    expect(lifeOf(session, session.getState().seatKey!)).toBe(20)
-  })
-
-  it("ignores a version so large the seat could never be written again", async () => {
-    const { session, bob } = await startedGame()
-
-    bob.send({ type: "life", life: 1, version: 1e308, round: 1 })
-    bob.send({ type: "life", life: 15, version: 1, round: 1 })
-    jest.advanceTimersByTime(50)
-
-    expect(lifeOf(session, bob.pass().key)).toBe(15)
+    expect(thief.sent).toEqual([
+      { type: "rejected", reason: "That seat belongs to another device." },
+    ])
+    expect(hostThief.sent[0]).toMatchObject({ type: "rejected" })
+    expect(alice.peer.close).not.toHaveBeenCalled()
   })
 })
 
-describe("LAN session guest", () => {
-  it("keeps its seat on the board after the host ends the game", async () => {
+describe("nearby guest", () => {
+  async function guest() {
+    const sent: unknown[] = []
     let host: LanPeerHandlers<LanHostMessage> | undefined
     jest.mocked(connectLan).mockImplementation(async (_service, _parse, handlers) => {
       host = handlers as LanPeerHandlers<LanHostMessage>
-      return { send: jest.fn(), sendAndClose: jest.fn(), close: jest.fn() }
+      return {
+        send: (message: unknown) => sent.push(message),
+        sendAndClose: jest.fn(),
+        close: jest.fn(),
+      }
     })
-    const { session: hostSession } = await startedGame()
-    const guest = new LanSession()
-    await guest.join({ name: "Host game" } as Parameters<LanSession["join"]>[0])
-    const pass = { key: "seat-guest", token: "token" }
-    host?.onMessage({ type: "welcome", pass })
-    const game = hostSession.getState().game!
+    const session = new LanSession()
+    await session.join({ name: "Host game" } as Parameters<LanSession["join"]>[0])
+    host?.onMessage({ type: "welcome", pass: { key: "guest", token: "token" } })
+    const game = createLanGame("game", "host", "Host", setup, 1)
+    host?.onMessage({
+      type: "state",
+      lobby: lanLobbyOf(game),
+      projection: lanProjection(game, "guest"),
+    })
+    return { session, sent, host: () => host }
+  }
 
-    host?.onMessage({ type: "game", game: { ...game, status: "abandoned" } })
+  it("settles a write on the host's reply, refused or not", async () => {
+    const { session, host } = await guest()
+    const acked = session.writes.send({
+      event: lifeEvent("life-operation-0003", "guest", -1),
+    } as PendingLifeAction)
+    const refused = session.writes.send({
+      event: lifeEvent("life-operation-0004", "host", -1),
+    } as PendingLifeAction)
 
-    expect(guest.getState()).toMatchObject({
+    host()?.onMessage({ type: "ack", operationId: "life-operation-0003" })
+    host()?.onMessage({
+      type: "nack",
+      operationId: "life-operation-0004",
+      code: "seat_owner_required",
+      message: "Seat-owner permission required",
+    })
+    jest.advanceTimersByTime(50)
+
+    await expect(acked).resolves.toEqual({ operationId: "life-operation-0003" })
+    await expect(refused).rejects.toBeInstanceOf(ConvexError)
+  })
+
+  it("fails a write it never heard back about when the host drops, so the outbox retries it", async () => {
+    const { session, host } = await guest()
+    const pending = session.writes.send({
+      event: lifeEvent("life-operation-0005", "guest", -1),
+    } as PendingLifeAction)
+
+    host()?.onClose()
+
+    await expect(pending).rejects.toThrow("Lost the host")
+  })
+
+  it("keeps its seat and the last board when the host ends the game", async () => {
+    const { session, host } = await guest()
+    const game = createLanGame("game", "host", "Host", setup, 1)
+
+    host()?.onMessage({
+      type: "state",
+      lobby: { ...lanLobbyOf(game), status: "abandoned" },
+      projection: { ...lanProjection(game, "guest"), status: "abandoned" },
+    })
+
+    expect(session.getState()).toMatchObject({
       status: "idle",
-      seatKey: pass.key,
-      game: { status: "abandoned" },
+      seatKey: "guest",
+      projection: { status: "abandoned" },
     })
   })
 })

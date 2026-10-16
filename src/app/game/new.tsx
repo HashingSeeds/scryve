@@ -186,7 +186,11 @@ export default function NewLocalGameRoute() {
             )}
           </CloudScreen>
         }
-        onNearby={lanPlayAvailable() ? () => router.push("/lan") : undefined}
+        onNearby={
+          lanPlayAvailable()
+            ? (setup) => router.push({ pathname: "/lan", params: { setup: JSON.stringify(setup) } })
+            : undefined
+        }
         onResumeConnected={(game) =>
           router.replace({
             pathname:

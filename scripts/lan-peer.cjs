@@ -12,12 +12,13 @@ if (!host || !port) {
 
 let seatKey
 const log = (line) => console.log(`${new Date().toISOString().slice(11, 23)} ${line}`)
-let own = { life: 0, version: 0, round: 0 }
+let gameId
+let writes = 0
 let active = false
 
 const socket = net.connect(Number(port), host, () => {
   log(`connected to ${host}:${port}`)
-  send({ type: "join", name })
+  send({ type: "join", protocol: 2, name })
 })
 const send = (message) => socket.write(`${JSON.stringify(message)}\n`)
 
@@ -34,13 +35,14 @@ socket.on("data", (chunk) => {
     const message = JSON.parse(line)
     if (message.type === "rejected") log(`rejected: ${message.reason}`)
     if (message.type === "welcome") seatKey = message.pass.key
-    if (message.type !== "game") continue
-    const { game } = message
-    active = game.status === "active"
-    const seat = game.seats.find((candidate) => candidate.key === seatKey)
-    if (seat && (game.round !== own.round || seat.version >= own.version))
-      own = { life: seat.life, version: seat.version, round: game.round }
-    log(`${game.status}: ${game.seats.map((s) => `${s.name}=${s.life}`).join(" ")}`)
+    if (message.type === "nack") log(`refused ${message.operationId}: ${message.message}`)
+    if (message.type !== "state") continue
+    const { lobby, projection } = message
+    gameId = projection.publicId
+    active = lobby.status === "active"
+    log(
+      `${lobby.status}: ${projection.players.map((p) => `${p.displayName}=${p.currentLife}`).join(" ")}`,
+    )
   }
 })
 socket.on("error", (error) => log(`error: ${error.message}`))
@@ -49,7 +51,19 @@ socket.on("close", () => process.exit(0))
 const heartbeat = setInterval(() => socket.write("\n"), 1000)
 const lose = setInterval(() => {
   if (!active) return
-  own = { ...own, life: own.life - 1, version: own.version + 1 }
-  send({ type: "life", ...own })
+  writes += 1
+  send({
+    type: "op",
+    event: {
+      type: "life.changed",
+      operationId: `peer-${process.pid}-${String(writes).padStart(10, "0")}`,
+      gameId,
+      actorId: seatKey,
+      deviceId: "peer-device",
+      clientCreatedAt: Date.now(),
+      playerId: seatKey,
+      delta: -1,
+    },
+  })
 }, 3000)
 process.on("exit", () => [heartbeat, lose].forEach((timer) => timer.unref()))

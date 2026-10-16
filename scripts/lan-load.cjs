@@ -14,16 +14,18 @@ let bytesIn = 0
 let messagesIn = 0
 let rejected = 0
 let closedEarly = 0
+let refusedWrites = 0
 
 function guest(index) {
   let seatKey
+  let gameId
+  let writes = 0
   const sent = new Map()
-  let own = { life: 0, version: 0, round: 0 }
   let active = false
   let buffer = ""
   let tapper
   const socket = net.connect(Number(port), host, () =>
-    socket.write(`${JSON.stringify({ type: "join", name: `Load ${index}` })}\n`),
+    socket.write(`${JSON.stringify({ type: "join", protocol: 2, name: `Load ${index}` })}\n`),
   )
   socket.setEncoding("utf8")
   socket.setNoDelay(true)
@@ -39,17 +41,15 @@ function guest(index) {
       const message = JSON.parse(line)
       if (message.type === "rejected") rejected += 1
       if (message.type === "welcome") seatKey = message.pass.key
-      if (message.type !== "game") continue
-      const seat = message.game.seats.find((candidate) => candidate.key === seatKey)
-      if (!seat) continue
-      if (message.game.round !== own.round)
-        own = { life: seat.life, version: seat.version, round: message.game.round }
-      const sentAt = sent.get(seat.version)
-      if (sentAt !== undefined) {
-        latencies.push(Date.now() - sentAt)
-        sent.delete(seat.version)
+      if (message.type === "nack") refusedWrites += 1
+      if (message.type === "ack") {
+        const sentAt = sent.get(message.operationId)
+        if (sentAt !== undefined) latencies.push(Date.now() - sentAt)
+        sent.delete(message.operationId)
       }
-      active = message.game.status === "active"
+      if (message.type !== "state") continue
+      gameId = message.projection.publicId
+      active = message.lobby.status === "active"
     }
   })
   socket.on("close", () => {
@@ -61,9 +61,20 @@ function guest(index) {
   tapper = setInterval(
     () => {
       if (!active) return
-      own = { ...own, life: own.life - 1, version: own.version + 1 }
-      sent.set(own.version, Date.now())
-      socket.write(`${JSON.stringify({ type: "life", ...own })}\n`)
+      writes += 1
+      const operationId = `load-${process.pid}-${index}-${String(writes).padStart(10, "0")}`
+      const event = {
+        type: "life.changed",
+        operationId,
+        gameId,
+        actorId: seatKey,
+        deviceId: `load-device-${index}`,
+        clientCreatedAt: Date.now(),
+        playerId: seatKey,
+        delta: -1,
+      }
+      sent.set(operationId, Date.now())
+      socket.write(`${JSON.stringify({ type: "op", event })}\n`)
     },
     1000 / Number(rate),
   )
@@ -97,6 +108,7 @@ setTimeout(
           broadcastsPerSecond: Math.round(messagesIn / elapsed),
           kilobytesPerSecond: Math.round(bytesIn / 1024 / elapsed),
           rejected,
+          refusedWrites,
           closedEarly,
         },
         null,

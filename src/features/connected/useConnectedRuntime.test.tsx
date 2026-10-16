@@ -83,3 +83,42 @@ describe("connected runtime over any backend", () => {
     await waitFor(() => expect(result.current.pending).toEqual([]))
   })
 })
+
+describe("connected runtime without a projection barrier", () => {
+  it("keeps taking the authority's projections while its own changes are pending", async () => {
+    const writes: ConnectedWrites = {
+      send: () => new Promise(() => {}),
+      finish: async () => undefined,
+      abandon: async () => undefined,
+    }
+    const { result, rerender } = renderHook(
+      ({ remote }: { remote: unknown }) => {
+        const session = useConnectedSession({
+          publicId: "nearby-game",
+          ownerId: "seat-1",
+          scope: "lan",
+          writes,
+          awaitProjectionBarrier: false,
+        })
+        return useConnectedRuntime(session, { remote, environment: reachable })
+      },
+      { initialProps: { remote: projection as unknown } },
+    )
+    await waitFor(() => expect(result.current.status).toBe("ready"))
+    act(() => result.current.changeLife("seat-1", -3))
+    await waitFor(() => expect(result.current.pending).toHaveLength(1))
+
+    rerender({
+      remote: {
+        ...projection,
+        status: "abandoned",
+        eventSequence: 1,
+        serverUpdatedAt: 2,
+        players: [{ ...projection.players[0] }, { ...projection.players[1], currentLife: 12 }],
+      },
+    })
+
+    await waitFor(() => expect(result.current.projection?.status).toBe("abandoned"))
+    expect(result.current.projection?.players[1].currentLife).toBe(12)
+  })
+})
