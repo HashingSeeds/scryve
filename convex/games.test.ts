@@ -3044,3 +3044,165 @@ describe("connected table actions", () => {
     ])
   })
 })
+
+describe("Treachery", () => {
+  const publicId = "treachery-game-id-123456"
+  const variants = ["treachery"]
+
+  async function treacheryLobby(t: ConvexTestHarness, playerCount = 4) {
+    const host = await synced(t, "host-subject", "Host")
+    await host.mutation(api.games.createLobby, {
+      publicId,
+      playerCount,
+      startingLife: 40,
+      ruleset: "commander",
+      variant: "treachery",
+      inviteToken: token,
+      manualCodeCandidates: ["ABC234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: "device-host-0001",
+    })
+    return host
+  }
+
+  async function treacheryGame(t: ConvexTestHarness) {
+    const host = await treacheryLobby(t)
+    const seats = [host]
+    for (const [index, color] of ["#2563EB", "#16A34A", "#DC2626"].entries()) {
+      const player = await synced(t, `player-${index}`, `Player ${index}`)
+      await player.mutation(api.games.claimSeat, {
+        token,
+        displayName: `Player ${index}`,
+        color,
+        variants,
+      })
+      seats.push(player)
+    }
+    await host.mutation(api.games.startGame, { publicId })
+    return seats
+  }
+
+  it("keeps clients that cannot play Treachery out of its lobbies", async () => {
+    const t = makeConvexTest()
+    await treacheryLobby(t)
+    const joiner = await synced(t, "joiner", "Joiner")
+    const join = { token, displayName: "Joiner", color: "#2563EB" }
+    const updateRequired = { data: { code: "update_required" } }
+
+    await expect(joiner.mutation(api.games.claimableSeats, { token })).rejects.toMatchObject(
+      updateRequired,
+    )
+    await expect(joiner.mutation(api.games.claimSeat, join)).rejects.toMatchObject(updateRequired)
+    await expect(
+      joiner.mutation(api.games.claimSeat, { ...join, variants }),
+    ).resolves.toMatchObject({ seat: 2 })
+  })
+
+  it("plays only Magic with 4–6 seats", async () => {
+    const t = makeConvexTest()
+    const host = await synced(t, "host-subject", "Host")
+    const create = {
+      publicId,
+      playerCount: 4,
+      startingLife: 40,
+      ruleset: "commander",
+      variant: "treachery" as const,
+      inviteToken: token,
+      manualCodeCandidates: ["ABC234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+    }
+
+    await expect(
+      host.mutation(api.games.createLobby, { ...create, playerCount: 3 }),
+    ).rejects.toThrow("4–6 seats")
+    await expect(
+      host.mutation(api.games.createLobby, { ...create, system: "ygo", ruleset: "standard" }),
+    ).rejects.toThrow("Magic variant")
+    await host.mutation(api.games.createLobby, create)
+    await expect(
+      host.mutation(api.games.updateLobbySettings, { publicId, playerCount: 3 }),
+    ).rejects.toMatchObject({ data: { code: "invalid_player_count" } })
+  })
+
+  it("shows each player only their own role and the ones revealed", async () => {
+    const t = makeConvexTest()
+    const seats = await treacheryGame(t)
+    const view = async (seat: (typeof seats)[number]) =>
+      (await seat.query(api.games.lobbyProjection, { publicId })).players
+    const truth = (await t.run((ctx) => ctx.db.query("gamePlayers").collect())).sort(
+      (left, right) => left.seat - right.seat,
+    )
+
+    expect(truth.map((player) => player.role).sort()).toEqual([
+      "assassin",
+      "assassin",
+      "leader",
+      "traitor",
+    ])
+    for (const [index, seat] of seats.entries()) {
+      expect((await view(seat)).map((player) => player.role)).toEqual(
+        truth.map((player, other) =>
+          other === index || player.role === "leader" ? player.role : undefined,
+        ),
+      )
+    }
+
+    const revealer = truth.findIndex((player) => player.role !== "leader")
+    await expect(seats[revealer].mutation(api.games.revealMyRole, { publicId })).resolves.toEqual({
+      role: truth[revealer].role,
+    })
+    const watcher = seats[(revealer + 1) % seats.length]
+    expect((await view(watcher))[revealer]).toMatchObject({
+      role: truth[revealer].role,
+      roleRevealed: true,
+    })
+
+    await seats[0].mutation(api.games.finishGame, { publicId })
+    expect((await view(watcher)).map((player) => player.role)).toEqual(
+      truth.map((player) => player.role),
+    )
+    const hidden = truth.findIndex(
+      (player, index) => player.role !== "leader" && index !== revealer,
+    )
+    await expect(
+      seats[hidden].mutation(api.games.revealMyRole, { publicId }),
+    ).rejects.toMatchObject({ data: { code: "game_not_active" } })
+  })
+
+  it("deals fresh roles for a rematch", async () => {
+    const t = makeConvexTest()
+    const [host] = await treacheryGame(t)
+    const rematchPublicId = "treachery-rematch-123456"
+
+    await host.mutation(api.games.finishGame, {
+      publicId,
+      rematch: {
+        publicId: rematchPublicId,
+        inviteToken: "r".repeat(43),
+        manualCodeCandidates: ["REM234"],
+      },
+    })
+    await expect(
+      host.query(api.games.lobbyProjection, { publicId: rematchPublicId }),
+    ).resolves.toMatchObject({ status: "active", variant: "treachery" })
+    const roles = await t.run(async (ctx) => {
+      const game = await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", rematchPublicId))
+        .unique()
+      const players = await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game", (q) => q.eq("gameId", game!._id))
+        .collect()
+      return players.map((player) => [player.role, player.roleRevealed === true])
+    })
+    expect(roles.sort()).toEqual([
+      ["assassin", false],
+      ["assassin", false],
+      ["leader", true],
+      ["traitor", false],
+    ])
+  })
+})

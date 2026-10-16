@@ -3,6 +3,7 @@ import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
 import { pokemonBoardValidator } from "./lib/table"
+import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
 
 const genericDeckCardFields = {
   game: v.optional(v.string()),
@@ -117,6 +118,7 @@ export default defineSchema({
     game: v.optional(v.string()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),
+    variant: v.optional(gameVariantValidator),
     createdAt: v.number(),
     startedAt: v.optional(v.number()),
     updatedAt: v.number(),
@@ -158,6 +160,9 @@ export default defineSchema({
     joinedAt: v.number(),
     counters: v.optional(v.record(v.string(), v.number())),
     pokemon: v.optional(pokemonBoardValidator),
+    // why: other seats must not see a role until it is revealed or the game ends; only roleForViewer projects it.
+    role: v.optional(treacheryRoleValidator),
+    roleRevealed: v.optional(v.boolean()),
   })
     .index("by_game", ["gameId"])
     .index("by_game_seat", ["gameId", "seat"])
