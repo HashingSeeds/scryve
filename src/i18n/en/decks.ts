@@ -4,6 +4,7 @@ const decks = {
   saving: "Saving…",
   deleting: "Deleting…",
   hiddenNameWarning: 'Other players will see "{{hiddenName}}" instead.',
+  numberedVersion: "Version {{number}}",
   record: {
     noGames: "No games yet",
     winRate: "{{percent}}% of {{games}}",

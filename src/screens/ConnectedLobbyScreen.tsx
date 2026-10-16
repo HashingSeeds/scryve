@@ -41,6 +41,7 @@ import {
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { deckVersionLabel } from "@/features/decks/deckCopy"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -61,7 +62,6 @@ import {
   shownMarkShape,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
-import { versionLabel } from "../../convex/lib/deckVersions"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 function LobbySkeleton() {
@@ -550,7 +550,7 @@ function ConnectedLobbyContent({
                 system={lobby.system}
                 format={lobby.format}
                 onManageDecks={onManageDecks ? () => onManageDecks(lobby.system) : undefined}
-                versionLabel={versionLabel}
+                versionLabel={deckVersionLabel}
                 selectingDeckSeats={selectingDeckSeats}
                 deckRequired={Boolean(lobby.deckRequired)}
                 onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}

@@ -23,7 +23,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
-import { cardCountLabel } from "@/features/decks/deckCopy"
+import { cardCountLabel, deckVersionLabel } from "@/features/decks/deckCopy"
 import {
   addDraftCard,
   addDraftCommander,
@@ -67,7 +67,6 @@ import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
-import { versionLabel } from "../../convex/lib/deckVersions"
 
 type DeckDialog =
   | "none"
@@ -1127,7 +1126,7 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.newVersion")}
           submitLabel={translate("decks:detail.createVersion")}
-          copyFromLabel={copyFromVersion ? versionLabel(copyFromVersion) : undefined}
+          copyFromLabel={copyFromVersion ? deckVersionLabel(copyFromVersion) : undefined}
           busy={busy}
           error={error}
           onSubmit={submitNewVersion}
@@ -1139,7 +1138,7 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.versionDetails")}
           submitLabel={translate("common:save")}
-          initialName={versionLabel(activeVersionSummary)}
+          initialName={deckVersionLabel(activeVersionSummary)}
           initialNote={activeVersionSummary.note ?? ""}
           notesLocked={!view.premium}
           busy={busy}
@@ -1213,7 +1212,7 @@ function DeckDetailContent({
                       style={[themed($versionMark), selected && themed($versionMarkSelected)]}
                     />
                     <View style={themed($versionCopy)}>
-                      <Text weight="medium" text={versionLabel(candidate)} />
+                      <Text weight="medium" text={deckVersionLabel(candidate)} />
                       {candidate.note ? (
                         <Text
                           size="xxs"
