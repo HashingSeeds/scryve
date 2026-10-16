@@ -7,6 +7,7 @@ import Svg, { Circle, Rect } from "react-native-svg"
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { LifeLog, type LifeLogStep } from "@/features/game/LifeLog"
 import type { PlaySystemId } from "@/features/game/playSystems"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
@@ -134,7 +135,7 @@ export function LifeCalculator({
       key={label}
       testID={`life-calculator-key-${label === "⌫" ? "delete" : label}-seat-${seatNumber}`}
       accessibilityRole="button"
-      accessibilityLabel={label === "⌫" ? "Delete" : label}
+      accessibilityLabel={label === "⌫" ? translate("common:delete") : label}
       onPress={() => press(label)}
       style={({ pressed }) => [$key, { backgroundColor: overlayTint(ink, pressed ? 0.36 : 0.18) }]}
     >
@@ -160,49 +161,58 @@ export function LifeCalculator({
     </View>
   )
 
-  const action = (
-    id: "damage" | "half" | "gain",
-    label: string,
-    accessibilityLabel: string,
-    delta: number,
-    fill?: string,
-  ) => (
-    <BoardPressable
-      testID={`life-calculator-${id}-seat-${seatNumber}`}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: !delta }}
-      disabled={!delta}
-      onPress={() => apply(delta)}
-      style={({ pressed }) => [
-        $action,
-        fill
-          ? { backgroundColor: fill }
-          : { borderColor: theme.colors.tint, borderWidth: 1.5, backgroundColor: background },
-        pressed && $pressed,
-        !delta && $disabled,
-      ]}
-    >
-      <Text
-        text={label}
-        weight="bold"
-        size={beside ? "xs" : "sm"}
-        numberOfLines={1}
-        style={{ color: fill ? accessibleForeground(fill) : theme.colors.tint }}
-      />
-    </BoardPressable>
-  )
+  const actionSpecs = [
+    {
+      id: "damage",
+      label: beside ? "−" : translate("board:calculator.damage"),
+      accessibilityLabel: translate("board:calculator.subtractFrom", { amount, name: playerName }),
+      delta: -amount,
+      fill: damage,
+    },
+    {
+      id: "half",
+      label: "½",
+      accessibilityLabel: translate("board:calculator.halve", { name: playerName }),
+      delta: halving,
+      fill: undefined,
+    },
+    {
+      id: "gain",
+      label: beside ? "+" : translate("board:calculator.gain"),
+      accessibilityLabel: translate("board:calculator.addTo", { amount, name: playerName }),
+      delta: amount,
+      fill: gain,
+    },
+  ] as const
   const actions = (
     <View style={$actions}>
-      {action(
-        "damage",
-        beside ? "−" : "− Damage",
-        `Subtract ${amount} from ${playerName}`,
-        -amount,
-        damage,
-      )}
-      {action("half", "½", `Halve ${playerName}'s total`, halving)}
-      {action("gain", beside ? "+" : "+ Gain", `Add ${amount} to ${playerName}`, amount, gain)}
+      {actionSpecs.map(({ id, label, accessibilityLabel, delta, fill }) => (
+        <BoardPressable
+          key={id}
+          testID={`life-calculator-${id}-seat-${seatNumber}`}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          accessibilityState={{ disabled: !delta }}
+          disabled={!delta}
+          onPress={() => apply(delta)}
+          style={({ pressed }) => [
+            $action,
+            fill
+              ? { backgroundColor: fill }
+              : { borderColor: theme.colors.tint, borderWidth: 1.5, backgroundColor: background },
+            pressed && $pressed,
+            !delta && $disabled,
+          ]}
+        >
+          <Text
+            text={label}
+            weight="bold"
+            size={beside ? "xs" : "sm"}
+            numberOfLines={1}
+            style={{ color: fill ? accessibleForeground(fill) : theme.colors.tint }}
+          />
+        </BoardPressable>
+      ))}
     </View>
   )
   const trail = playerId ? (
@@ -236,7 +246,9 @@ export function LifeCalculator({
         ]}
       />
       <Text
-        text={entry ? `− → ${damaged} · + → ${life + amount}` : "Type an amount"}
+        text={
+          entry ? previewText(damaged, life + amount) : translate("board:calculator.typeAmount")
+        }
         size="xxs"
         numberOfLines={beside ? 2 : 1}
         style={[inkText, $hint, !beside && $centeredText]}
@@ -279,7 +291,7 @@ export function LifeCalculator({
           <BoardPressable
             testID={`life-calculator-close-seat-${seatNumber}`}
             accessibilityRole="button"
-            accessibilityLabel={`Close ${playerName}'s calculator`}
+            accessibilityLabel={translate("board:calculator.close", { name: playerName })}
             hitSlop={12}
             onPress={onClose}
             style={$close}
@@ -312,6 +324,10 @@ export function LifeCalculator({
   )
 }
 
+function previewText(damaged: number, gained: number) {
+  return `− → ${damaged} · + → ${gained}`
+}
+
 function signed(delta: number) {
   return `${delta < 0 ? "−" : "+"}${Math.abs(delta)}`
 }
@@ -342,7 +358,11 @@ function LifeTrail({
   if (steps.length < 2) return null
   const total = String(steps[steps.length - 1].life)
   const label = steps
-    .map(({ delta, life }) => (delta === undefined ? `${life}` : `${signed(delta)} to ${life}`))
+    .map(({ delta, life }) =>
+      delta === undefined
+        ? `${life}`
+        : translate("board:calculator.logStep", { delta: signed(delta), life }),
+    )
     .join(", ")
   const cap = beside
     ? TRAIL_STEPS.beside
@@ -382,7 +402,7 @@ function LifeTrail({
     <View
       testID={`life-calculator-log-seat-${seatNumber}`}
       accessible
-      accessibilityLabel={`${playerName}'s life log: ${label}`}
+      accessibilityLabel={translate("board:calculator.log", { name: playerName, steps: label })}
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
       style={[$trail, !beside && $trailCentered]}
     >

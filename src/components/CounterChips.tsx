@@ -5,6 +5,8 @@ import Svg, { Circle, Path } from "react-native-svg"
 
 import type { TableRules } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
+import board from "@/i18n/en/board"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -53,6 +55,20 @@ export function losingCounter({ rules, counters }: Pick<SeatTable, "rules" | "co
   return rules.counters.find(
     ({ id, losesAt }) => losesAt !== undefined && (counters[id] ?? 0) >= losesAt,
   )
+}
+
+type TableItemId = keyof typeof board.tableItem
+type OutReasonId = keyof typeof board.outReason
+
+const isTableItemId = (id: string): id is TableItemId => id in board.tableItem
+const isOutReasonId = (id: string): id is OutReasonId => id in board.outReason
+
+export function tableItemLabel({ id, label }: { id: string; label: string }) {
+  return isTableItemId(id) ? translate(`board:tableItem.${id}`) : label
+}
+
+export function counterOutReason({ id, label }: { id: string; label: string }) {
+  return isOutReasonId(id) ? translate(`board:outReason.${id}`) : label.toLowerCase()
 }
 
 const GLYPHS: Record<string, string> = {
@@ -266,9 +282,15 @@ export const CounterChips = memo(function CounterChips({
                   />
                 </>
               )
-              const label = `${identity}, ${counter.label}`
+              const counterLabel = tableItemLabel(counter)
+              const label = translate("board:counters.seatItem", {
+                identity,
+                label: counterLabel,
+              })
               const valueText =
-                counter.losesAt !== undefined ? `${value} of ${counter.losesAt}` : String(value)
+                counter.losesAt !== undefined
+                  ? translate("board:counters.valueOutOf", { value, max: counter.losesAt })
+                  : String(value)
               const chipStyle = [
                 themed(compact ? $compactChip : $chip),
                 lethal && { borderColor: foreground },
@@ -294,11 +316,14 @@ export const CounterChips = memo(function CounterChips({
                   accessibilityRole="adjustable"
                   accessibilityLabel={label}
                   accessibilityValue={{ text: valueText }}
-                  accessibilityHint={`Tap to add ${counter.step}. Long press to edit or remove.`}
+                  accessibilityHint={translate("board:counters.chipHint", { step: counter.step })}
                   accessibilityActions={[
                     { name: "increment" },
                     { name: "decrement" },
-                    { name: "longpress", label: `Edit ${counter.label}` },
+                    {
+                      name: "longpress",
+                      label: translate("board:counters.edit", { label: counterLabel }),
+                    },
                   ]}
                   onAccessibilityAction={({ nativeEvent }) => {
                     if (nativeEvent.actionName === "increment")
@@ -335,13 +360,16 @@ export const CounterChips = memo(function CounterChips({
                 key={designation.id}
                 testID={`designation-chip-${seatNumber}-${designation.id}`}
                 accessible
-                accessibilityLabel={`${identity}, ${designation.label}`}
+                accessibilityLabel={translate("board:counters.seatItem", {
+                  identity,
+                  label: tableItemLabel(designation),
+                })}
                 style={themed(compact ? $compactChip : $chip)}
               >
                 <TableGlyph id={designation.id} size={glyphSize} color={foreground} />
                 {compact ? null : (
                   <Text
-                    text={designation.label}
+                    text={tableItemLabel(designation)}
                     weight="bold"
                     size="xxs"
                     maxFontSizeMultiplier={1.2}
@@ -356,7 +384,7 @@ export const CounterChips = memo(function CounterChips({
                 ref={trigger(ADD_TRIGGER)}
                 testID={`counter-add-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${identity}, counters and designations`}
+                accessibilityLabel={translate("board:counters.addLabel", { identity })}
                 hitSlop={{ top: 6, bottom: 6 }}
                 onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
                 style={({ pressed }) => [
@@ -403,16 +431,23 @@ function useAnnouncements({ rules, counters, held }: SeatTable, identity: string
     const before = previous.current
     previous.current = { counters, held }
     const changes = [
-      ...rules.counters.flatMap(({ id, label }) => {
-        const value = counters[id] ?? 0
-        return value === (before.counters[id] ?? 0) ? [] : [`${label} ${value}`]
+      ...rules.counters.flatMap((counter) => {
+        const value = counters[counter.id] ?? 0
+        return value === (before.counters[counter.id] ?? 0)
+          ? []
+          : [translate("board:counters.changed", { label: tableItemLabel(counter), value })]
       }),
-      ...rules.designations.flatMap(({ id, label }) =>
-        held.includes(id) && !before.held.includes(id) ? [`now ${label}`] : [],
+      ...rules.designations.flatMap((designation) =>
+        held.includes(designation.id) && !before.held.includes(designation.id)
+          ? [translate("board:counters.nowHolds", { label: tableItemLabel(designation) })]
+          : [],
       ),
     ]
     if (changes.length === 0) return
-    const message = `${identity}, ${changes.join(", ")}`
+    const message = translate("board:counters.announcement", {
+      identity,
+      changes: changes.join(", "),
+    })
     if (Platform.OS !== "web") return AccessibilityInfo.announceForAccessibility(message)
     // why: a live region only speaks when its text changes, so it clears first and the message lands a beat later; retaking Monarch is read again.
     clearTimeout(reissue.current)
@@ -465,27 +500,10 @@ function CounterSheet({
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
+  const counterLabel = counter ? tableItemLabel(counter) : ""
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
-
-  function textButton(testID: string, text: string, onPress: () => void, label = text) {
-    return (
-      <BoardPressable
-        testID={testID}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        hitSlop={8}
-        onPress={onPress}
-        style={({ pressed }) => [
-          themed($textButton),
-          pressed && { backgroundColor: overlayTint(ink, 0.14) },
-        ]}
-      >
-        <Text text={text} weight="bold" size="xs" style={{ color: ink }} />
-      </BoardPressable>
-    )
-  }
 
   return (
     <View
@@ -502,7 +520,10 @@ function CounterSheet({
                 ref={direction < 0 ? firstControl : undefined}
                 testID={`counter-edit-${seatNumber}-${counter.id}-${direction > 0 ? "plus" : "minus"}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${identity}, ${direction > 0 ? "add" : "subtract"} ${counter.step} ${counter.label}`}
+                accessibilityLabel={translate(
+                  direction > 0 ? "board:counters.add" : "board:counters.subtract",
+                  { identity, step: counter.step, label: counterLabel },
+                )}
                 onPress={() =>
                   seat.adjustCounter(
                     counter.id,
@@ -525,7 +546,7 @@ function CounterSheet({
           <View pointerEvents="none" style={themed($sheetHeader)}>
             <TableGlyph id={counter.id} size={16} color={ink} />
             <Text
-              text={counter.label}
+              text={counterLabel}
               weight="bold"
               size="xs"
               numberOfLines={1}
@@ -541,16 +562,22 @@ function CounterSheet({
             />
           </View>
           <View pointerEvents="box-none" style={themed($sheetFooter)}>
-            {textButton(
-              `counter-remove-${seatNumber}`,
-              "Remove",
-              () => {
+            <SheetTextButton
+              testID={`counter-remove-${seatNumber}`}
+              text={translate("common:remove")}
+              accessibilityLabel={translate("board:counters.remove", { label: counterLabel })}
+              ink={ink}
+              onPress={() => {
                 if (value > 0) seat.adjustCounter(counter.id, -value)
                 onClose()
-              },
-              `Remove ${counter.label}`,
-            )}
-            {textButton(`counter-done-${seatNumber}`, "Done", onClose)}
+              }}
+            />
+            <SheetTextButton
+              testID={`counter-done-${seatNumber}`}
+              text={translate("common:done")}
+              ink={ink}
+              onPress={onClose}
+            />
           </View>
         </>
       ) : (
@@ -562,16 +589,22 @@ function CounterSheet({
           >
             {seat.rules.counters.map((option, index) => {
               const current = seat.counters[option.id] ?? 0
+              const optionLabel = tableItemLabel(option)
               return (
                 <SheetOption
                   key={option.id}
                   ref={index === 0 ? firstControl : undefined}
                   testID={`counter-option-${seatNumber}-${option.id}`}
                   id={option.id}
-                  label={option.label}
+                  label={optionLabel}
                   value={current > 0 ? current : undefined}
                   accessibilityLabel={
-                    current > 0 ? `Edit ${option.label}, ${current}` : `Add ${option.label}`
+                    current > 0
+                      ? translate("board:counters.editWithValue", {
+                          label: optionLabel,
+                          value: current,
+                        })
+                      : translate("board:counters.addCounter", { label: optionLabel })
                   }
                   ink={ink}
                   onPress={() => {
@@ -584,14 +617,18 @@ function CounterSheet({
             })}
             {seat.rules.designations.map((option, index) => {
               const holds = seat.held.includes(option.id)
+              const optionLabel = tableItemLabel(option)
               return (
                 <SheetOption
                   key={option.id}
                   ref={index === 0 && seat.rules.counters.length === 0 ? firstControl : undefined}
                   testID={`designation-option-${seatNumber}-${option.id}`}
                   id={option.id}
-                  label={option.label}
-                  accessibilityLabel={`${holds ? "Give up" : "Take"} ${option.label}`}
+                  label={optionLabel}
+                  accessibilityLabel={translate(
+                    holds ? "board:counters.giveUp" : "board:counters.take",
+                    { label: optionLabel },
+                  )}
                   selected={holds}
                   ink={ink}
                   onPress={() => {
@@ -604,11 +641,47 @@ function CounterSheet({
             })}
           </ScrollView>
           <View pointerEvents="box-none" style={themed($sheetFooter)}>
-            {textButton(`counter-close-${seatNumber}`, "Close", onClose)}
+            <SheetTextButton
+              testID={`counter-close-${seatNumber}`}
+              text={translate("common:close")}
+              ink={ink}
+              onPress={onClose}
+            />
           </View>
         </>
       )}
     </View>
+  )
+}
+
+function SheetTextButton({
+  testID,
+  text,
+  accessibilityLabel = text,
+  ink,
+  onPress,
+}: {
+  testID: string
+  text: string
+  accessibilityLabel?: string
+  ink: string
+  onPress: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <BoardPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={8}
+      onPress={onPress}
+      style={({ pressed }) => [
+        themed($textButton),
+        pressed && { backgroundColor: overlayTint(ink, 0.14) },
+      ]}
+    >
+      <Text text={text} weight="bold" size="xs" style={{ color: ink }} />
+    </BoardPressable>
   )
 }
 

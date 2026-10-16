@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 import type { ThemedStyle } from "@/theme/types"
@@ -154,14 +155,7 @@ export function PokemonSheet({
       (editing.name ?? "") !== (card?.name ?? "") ||
       editing.hp !== card?.hp ||
       editing.prizes !== card?.prizes)
-  const title =
-    mode.kind === "place"
-      ? mode.slot === "active"
-        ? "Place Active"
-        : "Add to bench"
-      : mode.slot === "active"
-        ? "Active"
-        : "Bench"
+  const title = translate(`board:pokemonSheet.title.${mode.kind}.${mode.slot}`)
 
   // why: keypad taps can land before the next render, so edits build on the latest draft, not this render's.
   function setName(name: string | ((current: string) => string)) {
@@ -236,7 +230,7 @@ export function PokemonSheet({
       }))
       setLookupOpen(false)
       setQuery("")
-      setPickError("Could not load that card. Type its HP instead.")
+      setPickError(translate("board:pokemonSheet.loadFailed"))
     } finally {
       if (mounted.current) setPicking(undefined)
     }
@@ -250,7 +244,7 @@ export function PokemonSheet({
 
   function place(next: PokemonCard) {
     if (onPlace(next)) return
-    setPickError("Could not place it. Try again.")
+    setPickError(translate("board:pokemonSheet.placeFailed"))
     setDraft({
       cardId: next.cardId,
       name: next.name ?? "",
@@ -263,8 +257,9 @@ export function PokemonSheet({
 
   function finish() {
     if (editing && changed && card) {
-      if (card.hp <= editing.damage) return refuseEdit("HP must be above the damage on it.")
-      if (!onUpdate(editing.id, card)) return refuseEdit("Could not save it. Try again.")
+      if (card.hp <= editing.damage)
+        return refuseEdit(translate("board:pokemonSheet.hpAboveDamage"))
+      if (!onUpdate(editing.id, card)) return refuseEdit(translate("board:pokemonSheet.saveFailed"))
     }
     onClose()
   }
@@ -343,7 +338,7 @@ export function PokemonSheet({
         <BoardPressable
           testID={`pokemon-lookup-seat-${seatNumber}`}
           accessibilityRole="button"
-          accessibilityLabel="Look up in the card catalog"
+          accessibilityLabel={translate("board:pokemonSheet.lookUpLabel")}
           onPress={() => {
             setQuery(draft.name)
             setLookupOpen(true)
@@ -354,12 +349,12 @@ export function PokemonSheet({
             pressed && button,
           ]}
         >
-          <Text text="Look up" size="xxs" weight="medium" style={inkStyle} />
+          <Text tx="board:pokemonSheet.lookUp" size="xxs" weight="medium" style={inkStyle} />
         </BoardPressable>
       ) : null}
     </>
   )
-  const prizesLabel = <Text text="Prizes" size="xxs" style={[inkStyle, $dim]} />
+  const prizesLabel = <Text tx="board:pokemonSheet.prizes" size="xxs" style={[inkStyle, $dim]} />
   const placeButton =
     mode.kind === "place" ? (
       <BoardPressable
@@ -376,7 +371,7 @@ export function PokemonSheet({
           !card && $disabled,
         ]}
       >
-        <Text text="Place" size="xs" weight="bold" style={onInk} />
+        <Text tx="board:pokemonSheet.place" size="xs" weight="bold" style={onInk} />
       </BoardPressable>
     ) : null
 
@@ -398,13 +393,19 @@ export function PokemonSheet({
           ref={firstControl}
           testID={`pokemon-sheet-done-seat-${seatNumber}`}
           accessibilityRole="button"
-          accessibilityLabel={editing && changed ? "Save and close" : editing ? "Close" : "Cancel"}
+          accessibilityLabel={
+            editing && changed
+              ? translate("board:pokemonSheet.saveAndClose")
+              : editing
+                ? translate("common:close")
+                : translate("common:cancel")
+          }
           hitSlop={8}
           onPress={finish}
           style={themed($headerAction)}
         >
           <Text
-            text={editing && changed ? "Save" : editing ? "Done" : "Cancel"}
+            tx={editing && changed ? "common:save" : editing ? "common:done" : "common:cancel"}
             weight="medium"
             size="xs"
             style={inkStyle}
@@ -418,8 +419,8 @@ export function PokemonSheet({
             <TextField
               ref={searchField}
               testID={`pokemon-search-seat-${seatNumber}`}
-              accessibilityLabel="Search the card catalog"
-              placeholder="Search cards"
+              accessibilityLabel={translate("board:pokemonSheet.searchLabel")}
+              placeholder={translate("board:pokemonSheet.searchPlaceholder")}
               value={query}
               selection={caretAtEnd(query)}
               autoFocus
@@ -444,7 +445,7 @@ export function PokemonSheet({
               {catalog.busy ? <ActivityIndicator color={ink} /> : null}
               {catalog.error ? <Text text={catalog.error} size="xxs" style={inkStyle} /> : null}
               {hits && results.length === 0 ? (
-                <Text text="No cards found" size="xxs" style={[inkStyle, $dim]} />
+                <Text tx="board:pokemonSheet.noResults" size="xxs" style={[inkStyle, $dim]} />
               ) : null}
               {results.slice(0, MAX_RESULTS).map(({ detail, ...hit }) => {
                 return (
@@ -486,8 +487,8 @@ export function PokemonSheet({
                 <View style={themed($row)}>
                   <TextField
                     testID={`pokemon-name-input-seat-${seatNumber}`}
-                    accessibilityLabel="Pokémon name"
-                    placeholder="Name"
+                    accessibilityLabel={translate("board:pokemonSheet.nameLabel")}
+                    placeholder={translate("board:pokemonSheet.namePlaceholder")}
                     value={draft.name}
                     selection={caretAtEnd(draft.name)}
                     autoCorrect={false}
@@ -513,7 +514,7 @@ export function PokemonSheet({
                 ) : null}
                 {!catalog.available ? (
                   <Text
-                    text="Catalog offline. Type the name and HP."
+                    tx="board:pokemonSheet.catalogOffline"
                     size="xxs"
                     style={[inkStyle, $dim]}
                   />
@@ -531,7 +532,7 @@ export function PokemonSheet({
                         testID={`pokemon-prizes-${count}-seat-${seatNumber}`}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: selected }}
-                        accessibilityLabel={`Worth ${count} ${count === 1 ? "prize" : "prizes"}`}
+                        accessibilityLabel={translate("board:pokemonSheet.worth", { count })}
                         onPress={() =>
                           setDraft((current) => ({ ...current, prizes: count, prizesChosen: true }))
                         }
@@ -554,7 +555,7 @@ export function PokemonSheet({
               <BoardPressable
                 testID={`pokemon-type-in-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel="Not listed? Type the name and HP"
+                accessibilityLabel={translate("board:pokemonSheet.notListedLabel")}
                 onPress={typeItIn}
                 style={({ pressed }) => [
                   themed($ghost),
@@ -562,7 +563,12 @@ export function PokemonSheet({
                   pressed && button,
                 ]}
               >
-                <Text text="Not listed? Type it in" size="xxs" weight="medium" style={inkStyle} />
+                <Text
+                  tx="board:pokemonSheet.notListed"
+                  size="xxs"
+                  weight="medium"
+                  style={inkStyle}
+                />
               </BoardPressable>
             )}
 
@@ -573,11 +579,17 @@ export function PokemonSheet({
                     testID={`pokemon-sheet-damage-seat-${seatNumber}`}
                     text={String(editing.damage)}
                     accessibilityLiveRegion="polite"
-                    accessibilityLabel={`${pokemonName(editing)}, ${editing.damage} damage, ${remainingHp(editing)} HP left`}
+                    accessibilityLabel={translate("board:pokemonSheet.damageLabel", {
+                      name: pokemonName(editing),
+                      damage: editing.damage,
+                      remaining: remainingHp(editing),
+                    })}
                     style={[themed(compact ? $compactBig : $big), inkStyle]}
                   />
                   <Text
-                    text={`damage · ${remainingHp(editing)} left`}
+                    text={translate("board:pokemonSheet.damageCaption", {
+                      remaining: remainingHp(editing),
+                    })}
                     size="xxs"
                     style={[inkStyle, $dim]}
                   />
@@ -588,7 +600,10 @@ export function PokemonSheet({
                       key={step}
                       testID={`pokemon-sheet-step-${step * damageStep}-seat-${seatNumber}`}
                       accessibilityRole="button"
-                      accessibilityLabel={`${step > 0 ? "Add" : "Heal"} ${Math.abs(step * damageStep)} damage`}
+                      accessibilityLabel={translate(
+                        step > 0 ? "board:pokemonSheet.addDamage" : "board:pokemonSheet.healDamage",
+                        { amount: Math.abs(step * damageStep) },
+                      )}
                       onPress={() => onDamage(editing.id, step * damageStep)}
                       style={({ pressed }) => [themed($step), button, pressed && $pressed]}
                     >
@@ -606,30 +621,46 @@ export function PokemonSheet({
                     <BoardPressable
                       testID={`pokemon-sheet-active-seat-${seatNumber}`}
                       accessibilityRole="button"
-                      accessibilityLabel={`Make ${pokemonName(editing)} Active`}
+                      accessibilityLabel={translate("board:pokemonSheet.makeActiveLabel", {
+                        name: pokemonName(editing),
+                      })}
                       onPress={() => onMakeActive(editing.id)}
                       style={[themed($action), button]}
                     >
-                      <Text text="Make Active" size="xxs" weight="medium" style={inkStyle} />
+                      <Text
+                        tx="board:pokemon.switch.makeActive"
+                        size="xxs"
+                        weight="medium"
+                        style={inkStyle}
+                      />
                     </BoardPressable>
                   ) : null}
                   <BoardPressable
                     testID={`pokemon-sheet-ko-seat-${seatNumber}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${pokemonName(editing)} knocked out`}
+                    accessibilityLabel={translate("board:pokemonSheet.knockedOutLabel", {
+                      name: pokemonName(editing),
+                    })}
                     onPress={() => onKnockOut(editing.id)}
                     style={[themed($action), button]}
                   >
-                    <Text text="Knocked out" size="xxs" weight="medium" style={inkStyle} />
+                    <Text
+                      tx="board:pokemonSheet.knockedOut"
+                      size="xxs"
+                      weight="medium"
+                      style={inkStyle}
+                    />
                   </BoardPressable>
                   <BoardPressable
                     testID={`pokemon-sheet-remove-seat-${seatNumber}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`Remove ${pokemonName(editing)} from play`}
+                    accessibilityLabel={translate("board:pokemonSheet.removeLabel", {
+                      name: pokemonName(editing),
+                    })}
                     onPress={() => onRemove(editing.id)}
                     style={[themed($action), button]}
                   >
-                    <Text text="Remove" size="xxs" weight="medium" style={inkStyle} />
+                    <Text tx="common:remove" size="xxs" weight="medium" style={inkStyle} />
                   </BoardPressable>
                 </View>
               </>

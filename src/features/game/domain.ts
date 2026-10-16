@@ -1,5 +1,7 @@
 import { randomUUID as secureRandomUUID } from "expo-crypto"
 
+import { translate } from "@/i18n/translate"
+
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import {
   isPlaySystemId,
@@ -79,10 +81,10 @@ export function validatePlayerNames(values: readonly string[]): {
   }
   for (const [key, count] of counts) if (count > 1) duplicateKeys.add(key)
   const errors = names.map((name) => {
-    if (!name) return "Enter a player name."
+    if (!name) return translate("board:playerNames.required")
     if (name.length > MAX_PLAYER_NAME_LENGTH)
-      return `Use ${MAX_PLAYER_NAME_LENGTH} characters or fewer.`
-    if (duplicateKeys.has(name.toLocaleLowerCase())) return "Player names must be unique."
+      return translate("board:playerNames.tooLong", { max: MAX_PLAYER_NAME_LENGTH })
+    if (duplicateKeys.has(name.toLocaleLowerCase())) return translate("board:playerNames.unique")
     return undefined
   })
   return { valid: errors.every((error) => error === undefined), names, errors }
@@ -208,7 +210,7 @@ export function completedMatchResult(
 }
 
 export function drawsLabel(draws: number) {
-  return `${draws} ${draws === 1 ? "draw" : "draws"}`
+  return translate("board:match.draws", { count: draws })
 }
 
 export function matchScoreLabel(score: { wins: number[]; draws: number }) {
@@ -220,7 +222,10 @@ export function matchScoreLabel(score: { wins: number[]; draws: number }) {
 export function matchContextLabel(game: Pick<LocalGame, "match">) {
   const match = game.match
   if (!match) return undefined
-  return `Game ${match.gameNumber} · ${matchScoreLabel(match)}`
+  return translate("board:match.context", {
+    number: match.gameNumber,
+    score: matchScoreLabel(match),
+  })
 }
 
 export function canContinueMatch(game: Pick<LocalGame, "status" | "match">) {

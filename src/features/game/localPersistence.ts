@@ -3,6 +3,7 @@ import {
   isMenuButtonStyle,
   type MenuButtonStyle,
 } from "@/components/GameMenuButtonShape"
+import { translate } from "@/i18n/translate"
 import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { storage as mmkvStorage } from "@/utils/storage"
 import { recordReviewCompletion } from "@/utils/storeReview"
@@ -722,9 +723,10 @@ export class LocalGameRepository {
   ): void {
     const game = this.loadActiveGame()
     if (!game || game.id !== gameId || game.players.length !== players.length)
-      throw new Error("This game changed. Reopen setup to edit its players.")
+      throw new Error(translate("board:playerNames.gameChanged"))
     const names = validatePlayerNames(players.map((player) => player.name))
-    if (!names.valid) throw new Error(names.errors.find(Boolean) ?? "Enter valid player names.")
+    if (!names.valid)
+      throw new Error(names.errors.find(Boolean) ?? translate("board:playerNames.invalid"))
     const nextPlayers = game.players.map((player, index) => ({
       ...player,
       name: names.names[index],

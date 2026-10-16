@@ -1,6 +1,7 @@
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 
 import type { LifeCardEdge } from "./playerCardTypes"
@@ -41,6 +42,13 @@ export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
 }
 
 const PLAYER_MARK_MUTED_OPACITY = 0.72
+
+export function seatIdentityLabel(seatNumber: number, playerName: string) {
+  return translate("board:seat.identity", {
+    seat: seatNumber,
+    name: playerName.trim() || translate("board:seat.unnamedPlayer"),
+  })
+}
 
 export interface SeatIdentityProps {
   seatNumber: number
@@ -103,7 +111,7 @@ function UpdatedAgo({ since, color }: { since: number; color: string }) {
   const elapsed = useElapsedSince(since)
   return (
     <Text
-      text={`Updated ${elapsed} ago`}
+      text={translate("board:seat.updatedAgo", { elapsed })}
       weight="bold"
       size="xxs"
       maxFontSizeMultiplier={1.3}

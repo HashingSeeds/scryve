@@ -12,6 +12,8 @@ import Animated, {
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
+import { appLocale } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
@@ -97,7 +99,8 @@ export function LifeEditor({
   const reducedMotion = useReducedMotion()
   const editorColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(editorColor)
-  const { quickAdjustments, scrubStep, scrubSteps, label } = playSystemRules(system).counter
+  const rules = playSystemRules(system)
+  const { quickAdjustments, scrubStep, scrubSteps } = rules.counter
   const [preview, setPreview] = useState(life)
   const [dragging, setDragging] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -287,7 +290,7 @@ export function LifeEditor({
         <BoardPressable
           testID={`life-editor-close-seat-${seatNumber}`}
           accessibilityRole="button"
-          accessibilityLabel="Close life controls"
+          accessibilityLabel={translate("board:lifeEditor.close")}
           onPress={closeEditor}
           hitSlop={12}
           style={styles.closeButton}
@@ -361,7 +364,9 @@ export function LifeEditor({
         <View
           testID={`life-editor-slider-seat-${seatNumber}`}
           accessibilityRole="adjustable"
-          accessibilityLabel={`${playerName} ${label} change`}
+          accessibilityLabel={translate(`board:lifeEditor.slider.${rules.id}`, {
+            name: playerName,
+          })}
           accessibilityValue={{ text: deltaLabel(preview - start.current.life) }}
           accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
           onAccessibilityAction={({ nativeEvent }) =>
@@ -425,7 +430,12 @@ export function LifeEditor({
             key={amount}
             testID={`life-editor-step-${seatNumber}-${amount}`}
             accessibilityRole="button"
-            accessibilityLabel={`${amount > 0 ? "Add" : "Subtract"} ${Math.abs(amount)} ${label}`}
+            accessibilityLabel={translate(
+              amount > 0
+                ? `board:lifeEditor.add.${rules.id}`
+                : `board:lifeEditor.subtract.${rules.id}`,
+              { amount: Math.abs(amount) },
+            )}
             onPress={() => apply(amount)}
             style={[
               styles.action,
@@ -434,7 +444,7 @@ export function LifeEditor({
             ]}
           >
             <Text
-              text={`${amount > 0 ? "+" : "−"}${Math.abs(amount).toLocaleString()}`}
+              text={`${amount > 0 ? "+" : "−"}${Math.abs(amount).toLocaleString(appLocale)}`}
               weight="bold"
               size={compact ? "xs" : "sm"}
               style={{ color: ink }}

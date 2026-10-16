@@ -3,6 +3,7 @@ import { Pressable, useWindowDimensions, View } from "react-native"
 
 import {
   getPlayerGridLayoutOptions,
+  playerGridLayoutAccessibilityLabel,
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 import { useAppTheme } from "@/theme/context"
@@ -37,7 +38,7 @@ export function PlayerLayoutPicker({
             key={option.variant}
             testID={`${testID}-${option.variant}`}
             accessibilityRole="radio"
-            accessibilityLabel={`${option.label} layout`}
+            accessibilityLabel={playerGridLayoutAccessibilityLabel(playerCount, option.variant)}
             accessibilityState={{ selected }}
             style={({ pressed }) => [
               themed($option),

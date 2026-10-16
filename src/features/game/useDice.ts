@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import type { RadialMenuTool } from "@/components/GameRadialMenu"
 import { useResultAnnouncer } from "@/components/ResultAnnouncer"
+import { translate } from "@/i18n/translate"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 
@@ -9,6 +10,7 @@ import {
   armTool,
   clearFirst,
   clearResult,
+  dicePlayerName,
   diceSeatChips,
   diceSeatView,
   EMPTY_DICE,
@@ -18,6 +20,7 @@ import {
   pickFirst,
   rerollTies,
   rollForSeat,
+  rollLabel,
   rollOffAnnouncement,
   settleFirst,
   settleResult,
@@ -100,7 +103,7 @@ export function useDice(
     return (dice: DiceState) => dice
   }
 
-  const name = (seatId: PlayerId) => players.find(({ id }) => id === seatId)?.name ?? "Player"
+  const name = (seatId: PlayerId) => dicePlayerName(players, seatId)
   const seatIds = () => players.map(({ id }) => id)
 
   const close = stable("close", () => {
@@ -116,7 +119,7 @@ export function useDice(
   }
   function crown(next: DiceState) {
     const winner = firstPlayerSeat(next)
-    if (winner) announce(`${name(winner)} goes first`)
+    if (winner) announce(translate("board:dice.goesFirst", { name: name(winner) }))
     return holdFirst(next)
   }
 
@@ -129,12 +132,12 @@ export function useDice(
 
   const flip = stable("flip", () => {
     const winner = flipForFirst(seatIds())
-    announce(`${name(winner)} won the flip. Go first or second`)
+    announce(translate("board:dice.wonFlipGoFirstOrSecond", { name: name(winner) }))
     set(offerChoice(dice, winner, "flip"))
   })
 
   const ask = stable("ask", (seatId: PlayerId, reason: ChoiceReason) => {
-    announce(`${name(seatId)}, go first or second`)
+    announce(translate("board:dice.goFirstOrSecond", { name: name(seatId) }))
     set(offerChoice(dice, seatId, reason))
   })
 
@@ -146,7 +149,7 @@ export function useDice(
   const pressSeat = stable("pressSeat", (player: GamePlayer) => {
     const rolled = rollForSeat(dice, player.id)
     if (rolled) {
-      announce(`${player.name}, ${toolLabel(rolled.roll.tool)}, ${rolled.roll.value}`)
+      announce(rollLabel(player.name, rolled.roll))
       const settle = (next: DiceState) => settleResult(next, player.id)
       return set(hold(player.id, BLOOM_MS[rolled.roll.tool], settle)(rolled.state))
     }
@@ -170,7 +173,8 @@ export function useDice(
   const choose = stable("choose", (player: GamePlayer, order: "first" | "second") => {
     const ids = seatIds()
     const winner = order === "first" ? player.id : ids[(ids.indexOf(player.id) + 1) % ids.length]
-    const note = order === "second" ? `${player.name} chose second` : undefined
+    const note =
+      order === "second" ? translate("board:dice.choseSecond", { name: player.name }) : undefined
     set(crown(pickFirst(dice, winner, note)))
   })
 
@@ -184,16 +188,22 @@ export function useDice(
     () => [
       {
         key: "coin",
-        label: "Coin",
-        accessibilityLabel: armed === "coin" ? "Coin armed, tap a seat" : "Flip a coin for a seat",
+        label: toolLabel("coin"),
+        accessibilityLabel:
+          armed === "coin"
+            ? translate("board:dice.coinArmed")
+            : translate("board:dice.flipCoinForSeat"),
         selected: armed === "coin",
         dimmed: armed !== null && armed !== "coin",
         onPress: () => arm("coin"),
       },
       {
         key: die,
-        label: die,
-        accessibilityLabel: armed === die ? `${die} armed, tap a seat` : `Roll a ${die} for a seat`,
+        label: toolLabel(die),
+        accessibilityLabel:
+          armed === die
+            ? translate("board:dice.dieArmed", { die: toolLabel(die) })
+            : translate("board:dice.rollDieForSeat", { die: toolLabel(die) }),
         selected: armed === die,
         dimmed: armed !== null && armed !== die,
         onPress: () => arm(die),

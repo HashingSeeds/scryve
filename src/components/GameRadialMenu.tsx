@@ -20,6 +20,7 @@ import {
   rotateGameBoardAnchor,
   type useGameBoardOrientation,
 } from "@/features/game/useGameBoardOrientation"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { GameMenuActionKind } from "@/theme/gameMenu"
 import type { ThemedStyle } from "@/theme/types"
@@ -337,7 +338,7 @@ function GameMenuStatusRow({
         testID="game-menu-status-line"
         accessibilityRole="button"
         accessibilityLabel={statusLine.text}
-        accessibilityHint="Shows connection details"
+        accessibilityHint={translate("board:menu.showsConnectionDetails")}
         style={({ pressed }) => [themed($statusLine), pressed && themed($pressedAction)]}
         onPress={statusLine.onPress}
       >
@@ -365,7 +366,7 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
     <BoardPressable
       testID="game-menu-backdrop"
       accessibilityRole="button"
-      accessibilityLabel="Close game options"
+      accessibilityLabel={translate("board:menu.close")}
       style={themed($backdrop)}
       onPress={onClose}
     />
@@ -562,7 +563,11 @@ function GameMenuAnchor({
         testID="game-menu-button"
         accessibilityRole="button"
         accessibilityLabel={[
-          exitAction ? exitAction.label : menuOpen ? "Close game options" : "Game options",
+          exitAction
+            ? exitAction.label
+            : menuOpen
+              ? translate("board:menu.close")
+              : translate("board:menu.open"),
           signal?.accessibilityText,
         ]
           .filter(Boolean)
@@ -571,8 +576,8 @@ function GameMenuAnchor({
           exitAction
             ? undefined
             : menuOpen
-              ? "Collapses the game controls"
-              : "Expands the game controls"
+              ? translate("board:menu.collapses")
+              : translate("board:menu.expands")
         }
         accessibilityState={{ expanded: menuOpen }}
         style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
@@ -838,7 +843,14 @@ function RadialAction({
         disabled={action.disabled || !open}
         tabIndex={open ? undefined : -1}
         accessibilityRole="button"
-        accessibilityLabel={action.detail ? `${action.label}, ${action.detail}` : action.label}
+        accessibilityLabel={
+          action.detail
+            ? translate("board:menu.actionWithDetail", {
+                label: action.label,
+                detail: action.detail,
+              })
+            : action.label
+        }
         accessibilityState={{ disabled: !!action.disabled }}
         style={({ pressed }) => [
           themed($action),

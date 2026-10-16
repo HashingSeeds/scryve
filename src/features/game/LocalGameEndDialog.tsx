@@ -11,6 +11,7 @@ import { Text } from "@/components/Text"
 import { lastPlayerStanding } from "@/features/game/domain"
 import { counterValueLabel } from "@/features/game/playSystems"
 import type { LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -39,7 +40,7 @@ export function LocalGameEndDialog({
     try {
       action()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not end this game.")
+      setError(cause instanceof Error ? cause.message : translate("board:endGame.failed"))
     }
   }
   const system = game.system
@@ -69,13 +70,13 @@ export function LocalGameEndDialog({
       onClose={onClose}
       origin={origin}
       backdropTestID="end-game-backdrop"
-      backdropAccessibilityLabel="Cancel ending the game"
+      backdropAccessibilityLabel={translate("board:endGame.cancel")}
       dialogTestID="end-game-dialog"
       dialogAccessibilityRole="alert"
     >
       <View style={themed($dialogHeader)}>
-        <Text text="Who won?" preset="subheading" />
-        <Text text="Choose a winner or record a draw." size="xs" style={themed($dialogSubtitle)} />
+        <Text tx="board:endGame.title" preset="subheading" />
+        <Text tx="board:endGame.subtitle" size="xs" style={themed($dialogSubtitle)} />
       </View>
       <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
         {game.players.map((player, seat) => {
@@ -90,7 +91,10 @@ export function LocalGameEndDialog({
               Leading={({ color }) => (
                 <PlayerMark seatNumber={seat + 1} shape={player.shape} color={color} size={28} />
               )}
-              accessibilityLabel={`${player.name}, ${counterValueLabel(system, player.life)}${selected ? ", winner" : ""}`}
+              accessibilityLabel={translate(
+                selected ? "board:endGame.playerWinner" : "board:endGame.player",
+                { name: player.name, value: counterValueLabel(system, player.life) },
+              )}
               selected={selected}
               onPress={() => toggleWinner(player.id)}
             />
@@ -98,7 +102,7 @@ export function LocalGameEndDialog({
         })}
         <ChoiceButton
           testID="end-game-result-draw"
-          text="Draw"
+          text={translate("board:endGame.draw")}
           accentColor={colors.palette.neutral400}
           Leading={({ color }) => <DrawMark color={color} />}
           selected={drawSelected}
@@ -109,14 +113,14 @@ export function LocalGameEndDialog({
       <View style={themed($dialogActions)}>
         <Button
           testID="abandon-game-button"
-          text="Abandon"
+          tx="board:endGame.abandon"
           disabled={!onAbandon}
           style={themed($dialogAction)}
           onPress={() => onAbandon && finish(onAbandon)}
         />
         <Button
           testID="confirm-end-game-button"
-          text="End game"
+          tx="board:endGame.end"
           disabled={!endResultSelected}
           preset="reversed"
           style={themed($dialogAction)}

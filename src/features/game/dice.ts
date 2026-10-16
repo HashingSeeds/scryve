@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import type { GamePlayer, PlayerId } from "./types"
 
 export type Die = "d6" | "d20"
@@ -74,7 +76,26 @@ export function roll(tool: DiceTool, random = Math.random): DiceRoll {
 }
 
 export function toolLabel(tool: DiceTool) {
-  return tool === "coin" ? "Coin" : tool
+  return translate(`board:dice.tool.${tool}`)
+}
+
+export function rollValueLabel(roll: DiceRoll) {
+  return roll.tool === "coin" ? translate(`board:dice.coinFace.${roll.value}`) : String(roll.value)
+}
+
+export function rollLabel(playerName: string, roll: DiceRoll) {
+  return translate("board:dice.rollResult", {
+    name: playerName,
+    tool: toolLabel(roll.tool),
+    value: rollValueLabel(roll),
+  })
+}
+
+export function dicePlayerName(
+  players: readonly Pick<GamePlayer, "id" | "name">[],
+  seatId: PlayerId,
+) {
+  return players.find(({ id }) => id === seatId)?.name ?? translate("board:dice.unnamedPlayer")
 }
 
 export function armTool(state: DiceState, tool: DiceTool): DiceState {
@@ -162,13 +183,16 @@ export function rollOffAnnouncement(
   players: readonly Pick<GamePlayer, "id" | "name">[],
 ) {
   if (first?.kind !== "rolloff") return undefined
-  const name = (seatId: PlayerId) => players.find(({ id }) => id === seatId)?.name ?? "Player"
-  const high = first.rolls[first.pool[0]]
+  const name = (seatId: PlayerId) => dicePlayerName(players, seatId)
+  const value = first.rolls[first.pool[0]]
   if (first.pool.length === 1)
     return first.winnerChooses
-      ? `${name(first.pool[0])} rolled ${high}. Go first or second`
-      : `${name(first.pool[0])} rolled ${high}, goes first`
-  return `Tie at ${high}, ${first.pool.map(name).join(" and ")}. Roll again`
+      ? translate("board:dice.rolledGoFirstOrSecond", { name: name(first.pool[0]), value })
+      : translate("board:dice.rolloffLabel.won", { name: name(first.pool[0]), value })
+  return translate("board:dice.tieRollAgain", {
+    value,
+    names: first.pool.map(name).join(translate("board:dice.nameSeparator")),
+  })
 }
 
 export function flipForFirst(seatIds: readonly PlayerId[], random = Math.random): PlayerId {

@@ -4,6 +4,7 @@ import { StyleSheet, useWindowDimensions, View } from "react-native"
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -16,6 +17,7 @@ import {
   LIFE_MAX_FONT_SCALE,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
+import { seatIdentityLabel } from "./SeatIdentity"
 import { Text } from "./Text"
 
 export interface LifeControlsProps {
@@ -134,17 +136,19 @@ export function LifeControls({
     if (disabled) onPreview?.(0)
     return () => onPreview?.(0)
   }, [disabled, onPreview])
-  const displayName = playerName.trim() || "unnamed player"
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
-  const identity = `Seat ${seatNumber}, ${displayName}`
+  const identity = seatIdentityLabel(seatNumber, playerName)
   const sideways = Math.abs(contentRotation) === 90
-  const counter = playSystemRules(system).counter
-  const tapStep = lifeStep ?? counter.tapStep
+  const rules = playSystemRules(system)
+  const tapStep = lifeStep ?? rules.counter.tapStep
 
   function labelFor(delta: LifeDelta) {
-    return `${identity}, ${delta > 0 ? "add" : "subtract"} ${counterValueLabel(system, Math.abs(delta))}`
+    return translate(delta > 0 ? "board:lifeControls.add" : "board:lifeControls.subtract", {
+      identity,
+      amount: counterValueLabel(system, Math.abs(delta)),
+    })
   }
 
   return (
@@ -195,11 +199,14 @@ export function LifeControls({
               accessibilityRole="button"
               accessibilityState={{ disabled: !!disabled }}
               accessibilityLabel={labelFor(delta)}
-              accessibilityHint={`Tap to change ${identity}'s ${counter.label} by ${delta}. Long press for more controls.`}
+              accessibilityHint={translate(`board:lifeControls.hint.${rules.id}`, {
+                identity,
+                delta,
+              })}
               accessibilityActions={[
                 {
                   name: "longpress",
-                  label: `${identity}, more ${counter.label} controls`,
+                  label: translate(`board:lifeControls.moreControls.${rules.id}`, { identity }),
                 },
               ]}
               style={({ pressed }) => [

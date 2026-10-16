@@ -18,6 +18,7 @@ import Animated, {
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -61,6 +62,7 @@ import { MarkArt, PlayerMark } from "./PlayerMark"
 import {
   SeatIdentity,
   seatIdentityBottomGap,
+  seatIdentityLabel,
   seatIdentityMetrics,
   seatMarkArt,
 } from "./SeatIdentity"
@@ -157,8 +159,8 @@ export const LifeCard = memo(function LifeCard({
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
-  const displayName = playerName.trim() || "unnamed player"
-  const identity = `Seat ${seatNumber}, ${displayName}`
+  const displayName = playerName.trim() || translate("board:seat.unnamedPlayer")
+  const identity = seatIdentityLabel(seatNumber, playerName)
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const [preview, setPreview] = useState(0)
   const shownLife = life + preview
@@ -297,26 +299,19 @@ export const LifeCard = memo(function LifeCard({
     previousLife.current = life
     if (Platform.OS === "ios") {
       AccessibilityInfo.announceForAccessibility(
-        `${identity}, now ${counterValueLabel(system, life)}`,
+        translate("board:lifeCard.now", { identity, value: counterValueLabel(system, life) }),
       )
     }
   }, [identity, life, system])
 
-  const ownershipLabel =
-    ownership === "owned"
-      ? "Your seat"
-      : ownership === "unowned"
-        ? "View only"
-        : ownership === "disabled"
-          ? "Controls unavailable"
-          : undefined
+  const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
   const armedCommanderId = commanderDamage?.armedPlayerId
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
           kind: "source",
           playerName: displayName,
-          submitLabel: commanderDamage.armBar ? "Send" : "Done",
+          submit: commanderDamage.armBar ? "send" : "done",
           mark: { color, shape, seatNumber },
           submitDisabled: commanderDamage.armBar?.stagedTargets === 0,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
@@ -325,7 +320,8 @@ export const LifeCard = memo(function LifeCard({
       : commanderDamage && armedCommanderId
         ? {
             kind: "target",
-            attackerName: commanderDamage.attackerName ?? "Commander",
+            attackerName:
+              commanderDamage.attackerName ?? translate("board:commander.unknownAttacker"),
             attacker: commanderDamage.attacker,
             total:
               (commanderDamage.incoming[armedCommanderId] ?? 0) +
@@ -406,9 +402,13 @@ export const LifeCard = memo(function LifeCard({
   return (
     <View
       testID={`life-card-seat-${seatNumber}`}
-      accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}${
-        eliminated ? `, out: ${eliminated}` : ""
-      }`}
+      accessibilityLabel={[
+        identity,
+        ownershipLabel,
+        eliminated && translate("board:lifeCard.out", { reason: eliminated }),
+      ]
+        .filter(Boolean)
+        .join(", ")}
       onLayout={measureCard}
       style={[
         themed($card),
@@ -469,7 +469,10 @@ export const LifeCard = memo(function LifeCard({
             text={String(shownLife)}
             weight="bold"
             accessible
-            accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
+            accessibilityLabel={translate("board:counters.seatItem", {
+              identity,
+              label: counterValueLabel(system, life),
+            })}
             accessibilityLiveRegion="polite"
             maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
             numberOfLines={1}
@@ -559,7 +562,7 @@ export const LifeCard = memo(function LifeCard({
               <BoardPressable
                 testID={`commander-overview-close-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Close commander damage for ${identity}`}
+                accessibilityLabel={translate("board:commander.closeFor", { identity })}
                 onPress={closeCommanderOverview}
                 hitSlop={12}
                 style={[themed($overviewClose), identityCorner.position]}
@@ -687,9 +690,12 @@ export const LifeCard = memo(function LifeCard({
                 <BoardPressable
                   testID={`commander-mark-seat-${seatNumber}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`Assign commander damage from ${identity}${
-                    staleSince !== undefined ? ", out of date" : ""
-                  }`}
+                  accessibilityLabel={translate(
+                    staleSince !== undefined
+                      ? "board:commander.assignFromStale"
+                      : "board:commander.assignFrom",
+                    { identity },
+                  )}
                   accessibilityState={{ disabled: !!disabled }}
                   disabled={disabled}
                   hitSlop={8}
@@ -702,8 +708,8 @@ export const LifeCard = memo(function LifeCard({
                 <BoardPressable
                   testID={`commander-mark-seat-${seatNumber}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`Show commander damage for ${identity}`}
-                  accessibilityHint="Expands the commander damage grid"
+                  accessibilityLabel={translate("board:commander.showOverviewFor", { identity })}
+                  accessibilityHint={translate("board:commander.expandsGrid")}
                   accessibilityState={{ expanded: false }}
                   hitSlop={12}
                   onPress={openCommanderOverview}
@@ -730,7 +736,7 @@ export const LifeCard = memo(function LifeCard({
             <BoardPressable
               testID={`life-calculator-open-seat-${seatNumber}`}
               accessibilityRole="button"
-              accessibilityLabel={`Open calculator for ${identity}`}
+              accessibilityLabel={translate("board:lifeCard.openCalculator", { identity })}
               hitSlop={12}
               onPress={() => setEditorOpen(true)}
               style={({ pressed }) => [

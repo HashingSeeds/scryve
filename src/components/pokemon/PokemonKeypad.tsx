@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics"
 import Svg, { Path } from "react-native-svg"
 
 import { localGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 import type { ThemedStyle } from "@/theme/types"
@@ -28,6 +29,7 @@ export function tallestKeypadHeight(compact?: boolean) {
 }
 
 type Key = {
+  id: string
   label: string
   icon?: ReactElement
   accessibilityLabel: string
@@ -75,6 +77,7 @@ export function PokemonKeypad({
   const typed = (char: string): Key => {
     const text = upper ? char : char.toLowerCase()
     return {
+      id: char.toLowerCase(),
       label: text,
       accessibilityLabel: char,
       onPress: () => {
@@ -84,23 +87,26 @@ export function PokemonKeypad({
     }
   }
   const shiftKey: Key = {
+    id: "shift",
     label: "⇧",
     icon: <KeyIcon paths={SHIFT_PATHS} color={ink} size={iconSize} filled={upper} />,
-    accessibilityLabel: "Shift",
+    accessibilityLabel: translate("board:keypad.shift"),
     wide: true,
     active: upper,
     onPress: () => setShift(!upper),
   }
   const del: Key = {
+    id: "delete",
     label: "⌫",
-    accessibilityLabel: "Delete",
+    accessibilityLabel: translate("common:delete"),
     wide: true,
     icon: <KeyIcon paths={DELETE_PATHS} color={ink} size={iconSize} />,
     onPress: onDelete,
   }
   const done: Key = {
-    label: "Done",
-    accessibilityLabel: "Hide keypad",
+    id: "hide-keypad",
+    label: translate("common:done"),
+    accessibilityLabel: translate("board:keypad.hide"),
     wide: true,
     onPress: onDone,
   }
@@ -112,8 +118,9 @@ export function PokemonKeypad({
           digitsOnly
             ? done
             : {
-                label: "ABC",
-                accessibilityLabel: "Letters",
+                id: "letters",
+                label: translate("board:keypad.lettersKey"),
+                accessibilityLabel: translate("board:keypad.letters"),
                 wide: true,
                 onPress: () => setDigitsChosen(false),
               },
@@ -129,12 +136,19 @@ export function PokemonKeypad({
         ),
         [
           {
+            id: "numbers",
             label: "123",
-            accessibilityLabel: "Numbers",
+            accessibilityLabel: translate("board:keypad.numbers"),
             wide: true,
             onPress: () => setDigitsChosen(true),
           },
-          { label: "space", accessibilityLabel: "Space", wide: true, onPress: () => onType(" ") },
+          {
+            id: "space",
+            label: translate("board:keypad.spaceKey"),
+            accessibilityLabel: translate("board:keypad.space"),
+            wide: true,
+            onPress: () => onType(" "),
+          },
           done,
         ],
       ]
@@ -148,8 +162,8 @@ export function PokemonKeypad({
         >
           {row.map((key) => (
             <BoardPressable
-              key={key.accessibilityLabel}
-              testID={`pokemon-key-${key.accessibilityLabel.toLowerCase().replace(" ", "-")}-seat-${seatNumber}`}
+              key={key.id}
+              testID={`pokemon-key-${key.id}-seat-${seatNumber}`}
               accessibilityRole="button"
               accessibilityLabel={key.accessibilityLabel}
               accessibilityState={key.active === undefined ? undefined : { selected: key.active }}

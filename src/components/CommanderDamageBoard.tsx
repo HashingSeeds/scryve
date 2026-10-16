@@ -3,6 +3,7 @@ import { View } from "react-native"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -91,7 +92,7 @@ export function CommanderDamageBoard({
   return (
     <View
       testID={`commander-board-seat-${seatNumber}`}
-      accessibilityLabel={`Commander damage taken by seat ${seatNumber}`}
+      accessibilityLabel={translate("board:commander.takenBySeat", { seat: seatNumber })}
       style={[themed($board), style]}
     >
       {grid.cells.map((cellRow, rowIndex) => (
@@ -113,8 +114,11 @@ export function CommanderDamageBoard({
                   accessible
                   accessibilityLabel={
                     ownSeat
-                      ? `${player.name}, own commander`
-                      : `${total} damage from ${player.name}`
+                      ? translate("board:commander.ownCommander", { name: player.name })
+                      : translate("board:commander.damageFrom", {
+                          damage: total,
+                          name: player.name,
+                        })
                   }
                   style={[
                     themed($inspectionCell),
@@ -166,8 +170,8 @@ export function CommanderDamageBoard({
                   accessibilityState={{ selected: armed }}
                   accessibilityLabel={
                     !armed
-                      ? `Assign commander damage from seat ${seatNumber}`
-                      : `Assigning commander damage from seat ${seatNumber}`
+                      ? translate("board:commander.assignFromSeat", { seat: seatNumber })
+                      : translate("board:commander.assigningFromSeat", { seat: seatNumber })
                   }
                   onPress={onPressSword}
                   hitSlop={7}

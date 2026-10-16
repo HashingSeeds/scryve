@@ -9,8 +9,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { counterValueLabel } from "@/features/game/playSystems"
 import type { TableKnockout, TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -28,7 +30,6 @@ import {
   knockoutMessage,
   moveFocus,
   pokemonName,
-  prizeWord,
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
@@ -57,6 +58,7 @@ import {
 import {
   SeatIdentity,
   seatIdentityBottomGap,
+  seatIdentityLabel,
   seatIdentityMetrics,
   seatMarkArt,
 } from "../SeatIdentity"
@@ -141,8 +143,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const readOnly = ownership === "unowned"
   const frozen = Boolean(disabled) || ownership === "disabled"
   const canEdit = !readOnly && !frozen
-  const displayName = playerName.trim() || "unnamed player"
-  const identity = `Seat ${seatNumber}, ${displayName}`
+  const displayName = playerName.trim() || translate("board:seat.unnamedPlayer")
+  const identity = seatIdentityLabel(seatNumber, playerName)
   const insets = contentInsetsFor(contentRotation, contentInsets)
   const clearance = benchMenuClearance(contentRotation, menuCorner, menuEdgeCenter)
   const sideways = Math.abs(contentRotation) === 90
@@ -267,17 +269,21 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     if (!pendingUndo) return
     setPendingUndo(null)
     if (lastKnockoutId === pendingUndo.operationId) {
-      announce(`Could not undo. ${pokemonName(pendingUndo.pokemon)} stays knocked out.`)
+      announce(translate("board:pokemon.undoFailed", { name: pokemonName(pendingUndo.pokemon) }))
       return
     }
     const restored = findPokemon(board, pendingUndo.pokemon.id)
     const takerName = opponents.find(({ id }) => id === pendingUndo.takerPlayerId)?.name
+    const slot = restored?.slot === "active" ? "active" : "bench"
+    const name = pokemonName(pendingUndo.pokemon)
     announce(
-      `Undo. ${pokemonName(pendingUndo.pokemon)} returns to ${restored?.slot === "active" ? "Active" : "the bench"}${
-        takerName && pendingUndo.prizesTaken > 0
-          ? `, ${takerName} gives back ${prizeWord(pendingUndo.prizesTaken)}`
-          : ""
-      }.`,
+      takerName && pendingUndo.prizesTaken > 0
+        ? translate(`board:pokemon.undoReturnsGivesBack.${slot}`, {
+            name,
+            taker: takerName,
+            count: pendingUndo.prizesTaken,
+          })
+        : translate(`board:pokemon.undoReturns.${slot}`, { name }),
     )
   }, [pendingUndo, lastKnockoutId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -351,14 +357,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     setFocus(null)
   }
 
-  const ownershipLabel =
-    ownership === "owned"
-      ? "Your seat"
-      : ownership === "unowned"
-        ? "View only"
-        : ownership === "disabled"
-          ? "Controls unavailable"
-          : undefined
+  const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
   const heroDigits = shown ? String(remainingHp(shown)).length : 1
   const fontSize = heroFontSize({
     width: layer.width - padding * 2 - insets.left - insets.right,
@@ -394,7 +393,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   return (
     <View
       testID={`pokemon-card-seat-${seatNumber}`}
-      accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}`}
+      accessibilityLabel={
+        ownershipLabel
+          ? translate("board:counters.seatItem", { identity, label: ownershipLabel })
+          : identity
+      }
       onLayout={measureCard}
       style={[
         themed($card),
@@ -433,7 +436,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       >
         <View
           testID={`pokemon-bench-seat-${seatNumber}`}
-          accessibilityLabel={`${identity}, bench, ${board.bench.length} of ${rules.benchSize}`}
+          accessibilityLabel={translate("board:pokemon.benchLabel", {
+            identity,
+            filled: board.bench.length,
+            size: rules.benchSize,
+          })}
           style={[
             themed($bench),
             {
@@ -469,7 +476,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   ref={trigger(ADD_TRIGGER)}
                   testID={`pokemon-bench-add-seat-${seatNumber}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`${identity}, add a bench Pokémon`}
+                  accessibilityLabel={translate("board:pokemon.addBench", { identity })}
                   onPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
                   style={({ pressed }) => [
                     themed($chip),
@@ -507,7 +514,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               focused && focus
                 ? {
                     restartKey: focus.tick,
-                    switchLabel: board.active ? "Switch in" : "Make Active",
+                    switchKind: board.active ? "switchIn" : "makeActive",
                     onSwitchIn: () => switchIn(focused.id),
                   }
                 : undefined
@@ -533,12 +540,12 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             ref={trigger(PLACE_ACTIVE_TRIGGER)}
             testID={`pokemon-place-active-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
-            accessibilityLabel={`${identity}, no Active Pokémon`}
+            accessibilityLabel={translate("board:pokemon.noActiveLabel", { identity })}
             accessibilityHint={
               canEdit
                 ? board.bench.length
-                  ? "Tap a bench Pokémon to make it Active, or tap here to place one"
-                  : "Tap to place an Active Pokémon"
+                  ? translate("board:pokemon.placeActiveFromBenchHint")
+                  : translate("board:pokemon.placeActiveHint")
                 : undefined
             }
             disabled={!controlsLive}
@@ -554,14 +561,14 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             ]}
           >
             <Text
-              text={canEdit ? "Place Active" : "No Active"}
+              tx={canEdit ? "board:pokemon.placeActive" : "board:pokemon.noActive"}
               size={cramped ? "md" : "lg"}
               maxFontSizeMultiplier={1.5}
               weight="medium"
               style={{ color: ink }}
             />
             {canEdit && board.bench.length ? (
-              <Text text="or tap a bench Pokémon" size="xxs" style={[{ color: ink }, $dim70]} />
+              <Text tx="board:pokemon.orTapBench" size="xxs" style={[{ color: ink }, $dim70]} />
             ) : null}
           </BoardPressable>
         )}
@@ -594,13 +601,16 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
-            accessibilityLabel={`${identity}, ${prizes} Prize ${prizes === 1 ? "card" : "cards"}`}
-            accessibilityHint={
-              controlsLive ? "Tap to take a prize. Long press to put one back." : undefined
-            }
+            accessibilityLabel={translate("board:counters.seatItem", {
+              identity,
+              label: counterValueLabel("pokemon", prizes),
+            })}
+            accessibilityHint={controlsLive ? translate("board:pokemon.prizesHint") : undefined}
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
-            accessibilityActions={[{ name: "longpress", label: "Put a prize back" }]}
+            accessibilityActions={[
+              { name: "longpress", label: translate("board:pokemon.putPrizeBack") },
+            ]}
             onAccessibilityAction={({ nativeEvent }) => {
               if (nativeEvent.actionName === "longpress") putPrizeBack()
             }}
@@ -648,7 +658,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             style={bar}
           >
             <Text
-              text={`${pokemonName(asking)} knocked out. Who takes ${prizeWord(asking.prizes)}?`}
+              text={translate("board:pokemon.whoTakes", {
+                name: pokemonName(asking),
+                count: asking.prizes,
+              })}
               size="xs"
               style={{ color: barInk }}
             />
@@ -658,7 +671,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   key={opponent.id}
                   testID={`pokemon-taker-${opponent.id}-seat-${seatNumber}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`${opponent.name} takes the prizes`}
+                  accessibilityLabel={translate("board:pokemon.takesPrizes", {
+                    name: opponent.name,
+                  })}
                   onPress={() => resolveTaker(opponent.id)}
                   style={[themed($barButton), { backgroundColor: overlayTint(barInk, 0.16) }]}
                 >
@@ -674,7 +689,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               <BoardPressable
                 testID={`pokemon-taker-cancel-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel="Cancel knockout"
+                accessibilityLabel={translate("board:pokemon.cancelKnockout")}
                 onPress={() => setTakerAsk(null)}
                 style={[
                   themed($barButton),
@@ -682,7 +697,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   { borderColor: overlayTint(barInk, 0.4) },
                 ]}
               >
-                <Text text="Cancel" size="xs" style={{ color: barInk }} />
+                <Text tx="common:cancel" size="xs" style={{ color: barInk }} />
               </BoardPressable>
             </View>
           </View>
@@ -703,16 +718,18 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               <BoardPressable
                 testID={`pokemon-knockout-undo-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Undo, ${pokemonName(knockout.pokemon)} returns`}
+                accessibilityLabel={translate("board:pokemon.undoKnockout", {
+                  name: pokemonName(knockout.pokemon),
+                })}
                 onPress={() => undo(knockout)}
                 style={[themed($barButton), $noGrow, { backgroundColor: barInk }]}
               >
-                <Text text="Undo" size="xs" weight="bold" style={{ color: onBarInk }} />
+                <Text tx="common:undo" size="xs" weight="bold" style={{ color: onBarInk }} />
               </BoardPressable>
             ) : (
               <Text
                 testID={`pokemon-knockout-no-undo-seat-${seatNumber}`}
-                text="No room to undo"
+                tx="board:pokemon.noRoomToUndo"
                 size="xxs"
                 style={[{ color: barInk }, $dim75]}
               />
@@ -774,7 +791,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
 
 type BenchFocus = {
   restartKey: number
-  switchLabel: string
+  switchKind: "switchIn" | "makeActive"
   onSwitchIn: () => void
 }
 
@@ -815,7 +832,7 @@ function PokemonHero({
   const [heroWidth, setHeroWidth] = useState(0)
   const remaining = remainingHp(pokemon)
   const name = pokemonName(pokemon)
-  const slotLabel = bench ? `Bench, ${name}` : name
+  const slotLabel = bench ? translate("board:pokemon.benchSlot", { name }) : name
   const onInk = accessibleForeground(ink)
   const recentDelta = useRecentDeltaValue(pokemon.damage)
   const longPressHandled = useRef<number | null>(null)
@@ -824,7 +841,9 @@ function PokemonHero({
     if (previous.current === remaining) return
     previous.current = remaining
     if (Platform.OS === "ios")
-      AccessibilityInfo.announceForAccessibility(`${name}, ${remaining} HP left`)
+      AccessibilityInfo.announceForAccessibility(
+        translate("board:pokemon.hpLeft", { name, remaining }),
+      )
   }, [name, remaining])
   const zones = [
     { direction: -1, glyph: "−", align: "flex-start" as const },
@@ -850,9 +869,14 @@ function PokemonHero({
                 key={delta}
                 testID={`pokemon-damage-seat-${seatNumber}-${delta}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${identity}, ${slotLabel}, ${delta > 0 ? `add ${delta} damage` : `heal ${Math.abs(delta)}`}`}
-                accessibilityHint={`Long press to edit ${name}`}
-                accessibilityActions={[{ name: "longpress", label: `Edit ${name}` }]}
+                accessibilityLabel={translate(
+                  delta > 0 ? "board:pokemon.addDamage" : "board:pokemon.heal",
+                  { identity, slot: slotLabel, amount: Math.abs(delta) },
+                )}
+                accessibilityHint={translate("board:pokemon.longPressToEdit", { name })}
+                accessibilityActions={[
+                  { name: "longpress", label: translate("board:pokemon.edit", { name }) },
+                ]}
                 delayLongPress={LONG_PRESS_MS}
                 onPressIn={() => {
                   longPressHandled.current = null
@@ -909,7 +933,13 @@ function PokemonHero({
           testID={`pokemon-hp-seat-${seatNumber}`}
           text={String(remaining)}
           accessible
-          accessibilityLabel={`${identity}, ${slotLabel}, ${remaining} HP left of ${pokemon.hp}, ${pokemon.damage} damage`}
+          accessibilityLabel={translate("board:pokemon.hpLabel", {
+            identity,
+            slot: slotLabel,
+            remaining,
+            hp: pokemon.hp,
+            damage: pokemon.damage,
+          })}
           accessibilityLiveRegion="polite"
           maxFontSizeMultiplier={1.3}
           numberOfLines={1}
@@ -919,7 +949,7 @@ function PokemonHero({
           {bench ? (
             <Text
               testID={`pokemon-hero-bench-tag-seat-${seatNumber}`}
-              text="BENCH"
+              tx="board:pokemon.benchTag"
               size="xxs"
               weight="medium"
               style={[$tag, { color: ink }, $dim75]}
@@ -934,7 +964,10 @@ function PokemonHero({
             style={[$shrink, { color: ink }]}
           />
           <Text
-            text={compact ? `${pokemon.damage} dmg` : `${pokemon.damage} damage · ${pokemon.hp} HP`}
+            text={translate(compact ? "board:pokemon.damageShort" : "board:pokemon.damageCaption", {
+              damage: pokemon.damage,
+              hp: pokemon.hp,
+            })}
             size="xxs"
             numberOfLines={1}
             style={[{ color: ink }, $dim75]}
@@ -944,7 +977,7 @@ function PokemonHero({
               ref={editRef}
               testID={`pokemon-edit-active-seat-${seatNumber}`}
               accessibilityRole="button"
-              accessibilityLabel={`Edit ${name}`}
+              accessibilityLabel={translate("board:pokemon.edit", { name })}
               hitSlop={8}
               onPressIn={() => onHoldChange(true)}
               onPressOut={() => onHoldChange(false)}
@@ -955,14 +988,16 @@ function PokemonHero({
                 pressed && $pressed,
               ]}
             >
-              <Text text="Edit" size="xxs" weight="medium" style={[{ color: ink }, $dim75]} />
+              <Text tx="common:edit" size="xxs" weight="medium" style={[{ color: ink }, $dim75]} />
             </BoardPressable>
           ) : null}
           {bench && interactive ? (
             <BoardPressable
               testID={`pokemon-switch-in-seat-${seatNumber}`}
               accessibilityRole="button"
-              accessibilityLabel={`${bench.switchLabel}, ${name} becomes Active`}
+              accessibilityLabel={translate(`board:pokemon.switchLabel.${bench.switchKind}`, {
+                name,
+              })}
               hitSlop={6}
               onPressIn={() => onHoldChange(true)}
               onPressOut={() => onHoldChange(false)}
@@ -974,7 +1009,12 @@ function PokemonHero({
                 pressed && $pressed,
               ]}
             >
-              <Text text={bench.switchLabel} size="xxs" weight="bold" style={{ color: onInk }} />
+              <Text
+                tx={`board:pokemon.switch.${bench.switchKind}`}
+                size="xxs"
+                weight="bold"
+                style={{ color: onInk }}
+              />
             </BoardPressable>
           ) : null}
         </View>
@@ -1052,17 +1092,24 @@ function BenchChip({
       ref={triggerRef}
       testID={`pokemon-bench-${pokemon.id}`}
       accessibilityRole={interactive ? "button" : undefined}
-      accessibilityLabel={`Bench, ${name}, ${remaining} of ${pokemon.hp} HP, ${pokemon.damage} damage`}
+      accessibilityLabel={translate("board:pokemon.benchChipLabel", {
+        name,
+        remaining,
+        hp: pokemon.hp,
+        damage: pokemon.damage,
+      })}
       accessibilityHint={
         interactive
           ? promotes
-            ? "Tap to make Active, or edit."
-            : "Tap to count damage on it or switch it in, or edit."
+            ? translate("board:pokemon.benchPromoteHint")
+            : translate("board:pokemon.benchFocusHint")
           : undefined
       }
       accessibilityState={interactive ? { selected: focused } : undefined}
       accessibilityActions={
-        interactive ? [{ name: "longpress", label: `Edit ${name}` }] : undefined
+        interactive
+          ? [{ name: "longpress", label: translate("board:pokemon.edit", { name }) }]
+          : undefined
       }
       disabled={!interactive}
       delayLongPress={LONG_PRESS_MS}

@@ -11,16 +11,13 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { isPlayerOut, matchScoreAfter } from "@/features/game/domain"
 import type { LocalGame, MatchSeatOutcome } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { assertGameScores } from "../../../convex/lib/matchResults"
 
-const OUTCOME_SEGMENTS = [
-  { id: "win", label: "Win" },
-  { id: "loss", label: "Loss" },
-  { id: "draw", label: "Draw" },
-] as const
+const OUTCOMES = ["win", "loss", "draw"] as const satisfies readonly MatchSeatOutcome[]
 
 function drawForRemaining(game: LocalGame): MatchSeatOutcome[] {
   return game.players.map((player) => (isPlayerOut(game, player.id) ? "loss" : "draw"))
@@ -49,6 +46,7 @@ export function LocalMatchEndDialog({
   const [outcomes, setOutcomes] = useState(() => defaultMatchOutcomes(game))
   const [error, setError] = useState<string>()
   const score = matchScoreAfter(game)
+  const segments = OUTCOMES.map((id) => ({ id, label: translate(`board:matchEnd.outcome.${id}`) }))
 
   function choose(seat: number, outcome: MatchSeatOutcome) {
     setError(undefined)
@@ -73,7 +71,7 @@ export function LocalMatchEndDialog({
       )
       onEnd(outcomes)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not end this match.")
+      setError(cause instanceof Error ? cause.message : translate("board:matchEnd.failed"))
     }
   }
 
@@ -82,12 +80,12 @@ export function LocalMatchEndDialog({
       visible
       onClose={onClose}
       backdropTestID="end-match-backdrop"
-      backdropAccessibilityLabel="Cancel ending the match"
+      backdropAccessibilityLabel={translate("board:matchEnd.cancel")}
       dialogTestID="end-match-dialog"
       dialogAccessibilityRole="alert"
       wide
     >
-      <Text text="Match result" preset="subheading" />
+      <Text tx="board:matchEnd.title" preset="subheading" />
       <View style={themed($seats)}>
         {game.players.map((player, seat) => (
           <View key={player.id} style={themed($seat)}>
@@ -104,12 +102,12 @@ export function LocalMatchEndDialog({
             <View style={themed($seatOutcome)}>
               <SegmentedControl
                 testID={`match-outcome-${seat}`}
-                accessibilityLabel={`${player.name} match result`}
-                segments={OUTCOME_SEGMENTS}
+                accessibilityLabel={translate("board:matchEnd.playerResult", { name: player.name })}
+                segments={segments}
                 selectedId={outcomes[seat]}
                 onSelect={(id) => {
-                  const chosen = OUTCOME_SEGMENTS.find((segment) => segment.id === id)
-                  if (chosen) choose(seat, chosen.id)
+                  const chosen = OUTCOMES.find((outcome) => outcome === id)
+                  if (chosen) choose(seat, chosen)
                 }}
               />
             </View>
@@ -118,16 +116,16 @@ export function LocalMatchEndDialog({
       </View>
       <Button
         testID="match-draw-remaining"
-        text="Draw for remaining"
-        accessibilityHint="Draws every seat still playing and gives eliminated seats a loss"
+        tx="board:matchEnd.drawRemaining"
+        accessibilityHint={translate("board:matchEnd.drawRemainingHint")}
         onPress={drawRemaining}
       />
       {error ? <AlertNote text={error} /> : null}
       <View style={themed($dialogActions)}>
-        <Button text="Cancel" style={themed($dialogAction)} onPress={onClose} />
+        <Button tx="common:cancel" style={themed($dialogAction)} onPress={onClose} />
         <Button
           testID="confirm-end-match-button"
-          text="End match"
+          tx="board:matchEnd.end"
           preset="reversed"
           style={themed($dialogAction)}
           onPress={confirm}

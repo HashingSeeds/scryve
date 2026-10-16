@@ -11,6 +11,8 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
+import { appLocale } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { entryPlayerNames, localHistoryEntry } from "@/screens/historyEntries"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -27,6 +29,8 @@ import {
   type PlayerMarkShape,
 } from "../../../convex/lib/appearance"
 
+const CHECK_MARK = "✓"
+
 function latestGame(unit: ClaimUnit) {
   return unit.games[unit.games.length - 1]
 }
@@ -35,18 +39,29 @@ function resultLabel(unit: ClaimUnit) {
   const game = latestGame(unit)
   if (unit.match) {
     const winner = unit.match.result?.outcomes.indexOf("win") ?? -1
-    const standing = `Best of ${unit.match.bestOf} · ${matchScoreLabel(matchScoreAfter(game))}`
-    if (winner >= 0) return `${standing} · Won by ${game.players[winner]?.name ?? "?"}`
-    return unit.match.result ? `${standing} · Draw` : standing
+    const standing = {
+      bestOf: unit.match.bestOf,
+      score: matchScoreLabel(matchScoreAfter(game)),
+    }
+    if (winner >= 0)
+      return translate("board:claim.matchWonBy", {
+        ...standing,
+        name: game.players[winner]?.name ?? "?",
+      })
+    return unit.match.result
+      ? translate("board:claim.matchDraw", standing)
+      : translate("board:claim.matchStanding", standing)
   }
   const entry = localHistoryEntry(game)
-  if (entry.outcome === "draw") return "Draw"
-  return entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : "No result"
+  if (entry.outcome === "draw") return translate("board:claim.draw")
+  return entry.winnerNames?.length
+    ? translate("board:claim.wonBy", { names: entry.winnerNames.join(" & ") })
+    : translate("board:claim.noResult")
 }
 
 function whenLabel(timestamp: number) {
   const date = new Date(timestamp)
-  return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
+  return `${date.toLocaleDateString(appLocale, { month: "short", day: "numeric" })} ${date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })}`
 }
 
 function detailLine(unit: ClaimUnit) {
@@ -66,7 +81,10 @@ function seatMark(seat: number, player?: Pick<GamePlayer, "name" | "color" | "sh
   return {
     color: player?.color || PLAYER_COLORS[seat],
     shape,
-    label: `${player?.name ?? `Seat ${seat + 1}`}, ${shape}`,
+    label: translate("board:claim.seatMark", {
+      name: player?.name ?? translate("board:claim.seatFallback", { seat: seat + 1 }),
+      shape: translate(`board:shape.${shape}`),
+    }),
   }
 }
 
@@ -119,7 +137,7 @@ function ClaimPicker({
         })),
       )
     } catch {
-      setError("Could not save your choice. Try again.")
+      setError(translate("board:claim.saveFailed"))
       return
     }
     setOpen(false)
@@ -131,23 +149,19 @@ function ClaimPicker({
       wide
       onClose={() => setOpen(false)}
       backdropTestID="claim-games-backdrop"
-      backdropAccessibilityLabel="Decide later"
+      backdropAccessibilityLabel={translate("board:claim.decideLater")}
       dialogTestID="claim-games-dialog"
       dialogAccessibilityRole="alert"
       accessibilityViewIsModal
     >
       <View style={themed($header)}>
-        <Text preset="subheading" text="Add games to this account?" />
-        <Text
-          size="xs"
-          style={themed($dim)}
-          text="These games were played signed out. Selected games are added to this account. The rest stay on this device only."
-        />
+        <Text preset="subheading" tx="board:claim.title" />
+        <Text size="xs" style={themed($dim)} tx="board:claim.body" />
       </View>
       {candidates.length > 1 ? (
         <SeatMarks
           testID="claim-me-all"
-          label="You were"
+          label={translate("board:claim.youWere")}
           marks={Array.from({ length: mostSeats }, (_, seat) => seatMark(seat))}
           value={allSeat}
           onSelect={chooseAllSeat}
@@ -165,12 +179,17 @@ function ClaimPicker({
                 testID={`claim-game-${unit.id}`}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
-                accessibilityLabel={`${names}, ${detailLine(unit)}`}
+                accessibilityLabel={translate("board:claim.gameLabel", {
+                  names,
+                  detail: detailLine(unit),
+                })}
                 style={themed($row)}
                 onPress={() => toggle(unit.id)}
               >
                 <View style={[themed($check), selected && themed($checkOn)]}>
-                  {selected ? <Text size="xxs" text="✓" style={themed($checkMark)} /> : null}
+                  {selected ? (
+                    <Text size="xxs" text={CHECK_MARK} style={themed($checkMark)} />
+                  ) : null}
                 </View>
                 <View style={$styles.flex1}>
                   <Text size="sm" weight="medium" numberOfLines={2} text={names} />
@@ -180,7 +199,7 @@ function ClaimPicker({
               {selected ? (
                 <SeatMarks
                   testID={`claim-me-${unit.id}`}
-                  label={candidates.length === 1 ? "You were" : undefined}
+                  label={candidates.length === 1 ? translate("board:claim.youWere") : undefined}
                   marks={game.players.map((player, seat) => seatMark(seat, player))}
                   value={meSeat}
                   style={themed($gameMarks)}
@@ -191,16 +210,12 @@ function ClaimPicker({
           )
         })}
       </ScrollView>
-      <Text
-        size="xxs"
-        style={themed($dim)}
-        text="Your seat sets your win record and can't be changed later. No seat records no win or loss."
-      />
+      <Text size="xxs" style={themed($dim)} tx="board:claim.seatNote" />
       {error ? <AlertNote text={error} /> : null}
       <View style={themed($dialogActions)}>
         <Button
           testID="claim-games-dismiss"
-          text="Not now"
+          tx="board:claim.notNow"
           style={themed($action)}
           onPress={() => setOpen(false)}
         />
@@ -208,8 +223,8 @@ function ClaimPicker({
           testID="claim-games-confirm"
           text={
             selectedCount === 0
-              ? "Keep on device"
-              : `Add ${selectedCount} game${selectedCount === 1 ? "" : "s"}`
+              ? translate("board:claim.keepOnDevice")
+              : translate("board:claim.addGames", { count: selectedCount })
           }
           preset="reversed"
           style={themed($action)}
@@ -241,7 +256,7 @@ function SeatMarks({
       {label ? <Text size="xs" weight="medium" text={label} /> : null}
       <View
         accessibilityRole="radiogroup"
-        accessibilityLabel={label ?? "You were"}
+        accessibilityLabel={label ?? translate("board:claim.youWere")}
         style={$markRow}
       >
         {marks.map((mark, seat) => {
