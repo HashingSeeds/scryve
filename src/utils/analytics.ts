@@ -23,6 +23,7 @@ const values = {
   surface: ["history", "deck"],
   end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"],
   timing: ["join.completed", "join.failed", "mutation.ack"],
+  write: ["life", "table", "commander.claim", "commander.resolve"],
 } as const
 
 export type GameEndSource = (typeof values.end_source)[number]
@@ -45,7 +46,12 @@ type Events = {
   }
   deck_used: { feature: "library" | "saved" | "assigned" }
   stats_viewed: { surface: "history" | "deck" }
-  sync_timing: { timing: SyncTiming; duration_ms: number; attempt_count?: number }
+  sync_timing: {
+    timing: SyncTiming
+    duration_ms: number
+    attempt_count?: number
+    write?: (typeof values.write)[number]
+  }
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -55,7 +61,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   connection_attempt: ["action", "stage", "reason"],
   deck_used: ["feature"],
   stats_viewed: ["surface"],
-  sync_timing: ["timing", "duration_ms", "attempt_count"],
+  sync_timing: ["timing", "duration_ms", "attempt_count", "write"],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"
@@ -271,6 +277,7 @@ export const syncTimingAdapter: TelemetryAdapter = {
       timing: name,
       duration_ms: metadata.durationMs,
       ...(metadata.attemptCount !== undefined && { attempt_count: metadata.attemptCount }),
+      ...(metadata.writeKind !== undefined && { write: metadata.writeKind }),
     })
   },
 }

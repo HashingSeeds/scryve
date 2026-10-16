@@ -1,5 +1,7 @@
 import { ConvexError } from "convex/values"
 
+import { setTelemetryAdapter } from "@/utils/telemetry"
+
 import { drainConnectedOutbox } from "./drainOutbox"
 import type { PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
@@ -59,6 +61,24 @@ describe("connected outbox drain", () => {
     })
 
     expect(storage.getAllKeysCalls).toBe(1)
+  })
+
+  it("reports which kind of write each acknowledgement was for", async () => {
+    const emitted: unknown[] = []
+    setTelemetryAdapter({ emit: ({ name, metadata }) => emitted.push({ name, ...metadata }) })
+    const repository = new ConnectedGameRepository(new MemoryStorage())
+    repository.enqueue(action("operation-kind-0001", 1, 1))
+
+    await drainConnectedOutbox({
+      repository,
+      publicId: "game-public",
+      send: async (queued) => ({ operationId: queued.event.operationId }),
+    })
+    setTelemetryAdapter()
+
+    expect(emitted).toContainEqual(
+      expect.objectContaining({ name: "mutation.ack", writeKind: "life" }),
+    )
   })
 
   it("sends oldest-first and cleans acknowledgements", async () => {

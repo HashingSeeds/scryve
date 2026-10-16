@@ -202,12 +202,19 @@ it("sends timed sync events as sync_timing only if sharing was on when they happ
     await tick(31_000)
     expect(body()).not.toContain("sync_timing")
 
-    emitTelemetry("mutation.ack", { durationMs: 120.4, attemptCount: 2, outcome: "success" })
+    emitTelemetry("mutation.ack", {
+      durationMs: 120.4,
+      attemptCount: 2,
+      outcome: "success",
+      writeKind: "commander.claim",
+    })
     emitTelemetry("outbox.drain", { acknowledgedCount: 1, outcome: "success" })
     emitTelemetry("join.completed", { outcome: "success" })
     await tick(31_000)
     expect(body().match(/"event":"sync_timing"/g)).toHaveLength(1)
-    expect(body()).toContain('"timing":"mutation.ack","duration_ms":120,"attempt_count":2')
+    expect(body()).toContain(
+      '"timing":"mutation.ack","duration_ms":120,"attempt_count":2,"write":"commander.claim"',
+    )
 
     fetchMock.mockClear()
     fetchMock.mockRejectedValue(new Error("offline"))

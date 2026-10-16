@@ -21,6 +21,7 @@ export type TelemetrySource = "link" | "scan" | "code" | "precon" | "manual"
 export type TelemetryReason =
   "expired" | "invalid" | "full" | "network" | "permission" | "rate_limited" | "unknown"
 export type TelemetryFeature = "deck_limit" | "version_limit" | "full_history" | "deck_analytics"
+export type TelemetryWriteKind = "life" | "table" | "commander.claim" | "commander.resolve"
 export type TelemetryErrorCode =
   "FATAL" | "HANDLED" | "AUTH_EXPIRED" | "MUTATION_REJECTED" | "NETWORK_UNAVAILABLE"
 
@@ -38,6 +39,7 @@ type SafeMetadata = {
   reason?: TelemetryReason
   feature?: TelemetryFeature
   errorCode?: TelemetryErrorCode
+  writeKind?: TelemetryWriteKind
   analyticsId?: string
 }
 
@@ -78,6 +80,7 @@ const VALIDATORS: Record<keyof SafeMetadata, (value: unknown) => boolean> = {
     "MUTATION_REJECTED",
     "NETWORK_UNAVAILABLE",
   ),
+  writeKind: isOneOf("life", "table", "commander.claim", "commander.resolve"),
   analyticsId: isLocallyMintedAnalyticsId,
 }
 
