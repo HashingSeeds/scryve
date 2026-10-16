@@ -13,6 +13,7 @@ import {
   PLAYER_COLOR_CHOICES,
   PLAYER_MARK_SHAPES,
   type PlayerMarkShape,
+  type ProMarkShape,
 } from "../../../convex/lib/appearance"
 import {
   applyTableAction,
@@ -115,15 +116,18 @@ function fitDeltas(root: Element) {
   }
 }
 
+// why: the demo seats only ever draw the free marks, so it mirrors those and not the Pro ones.
+type SiteMarkShape = Exclude<PlayerMarkShape, ProMarkShape>
+
 export function seatColor(seat: number): string {
   return PLAYER_COLOR_CHOICES[seat % PLAYER_COLOR_CHOICES.length] ?? PLAYER_COLOR_CHOICES[0]
 }
 
-export function seatShape(seat: number): PlayerMarkShape {
+export function seatShape(seat: number): SiteMarkShape {
   return PLAYER_MARK_SHAPES[seat % PLAYER_MARK_SHAPES.length] ?? PLAYER_MARK_SHAPES[0]
 }
 
-export function markSvg(shape: PlayerMarkShape, fill = "currentColor"): string {
+export function markSvg(shape: SiteMarkShape, fill = "currentColor"): string {
   // The app marks, cropped so their 8-36 box fills 2-22 of a 24 unit icon.
   return `<svg viewBox="5.2 5.2 33.6 33.6" fill="${fill}" aria-hidden="true">${APP_MARK_SHAPES[shape]}</svg>`
 }
@@ -287,7 +291,7 @@ function phoneRows(game: DemoGame) {
 // a mini map of the board with one cell per player at that player's seat position.
 
 // The app's mark shapes (src/components/PlayerMark.tsx), drawn on a 44 unit box.
-const APP_MARK_SHAPES: Record<PlayerMarkShape, string> = {
+const APP_MARK_SHAPES: Record<SiteMarkShape, string> = {
   circle: '<circle cx="22" cy="22" r="12"/>',
   triangle:
     '<path d="M19.83 9.82a2.5 2.5 0 0 1 4.34 0l11.91 20.94a2.5 2.5 0 0 1-2.18 3.74H10.1a2.5 2.5 0 0 1-2.18-3.74Z"/>',
@@ -306,7 +310,7 @@ const APP_MARK_SHAPES: Record<PlayerMarkShape, string> = {
 
 // Each shape's drawn edges on its 44 unit box (PlayerMark's MARK_ART_BOUNDS).
 const MARK_ART_BOUNDS: Record<
-  PlayerMarkShape,
+  SiteMarkShape,
   { top: number; bottom: number; left: number; right: number }
 > = {
   circle: { top: 10, bottom: 34, left: 10, right: 34 },
@@ -322,7 +326,7 @@ const MARK_ART_BOUNDS: Record<
 
 // A mark cropped to its drawn edges, so the shape itself, not its box, lines up with what sits
 // beside it (SeatIdentity's seatMarkArt). Its width follows the shape.
-export function croppedMarkSvg(shape: PlayerMarkShape, fill: string): string {
+export function croppedMarkSvg(shape: SiteMarkShape, fill: string): string {
   const { top, bottom, left, right } = MARK_ART_BOUNDS[shape]
   const width = (right - left).toFixed(2)
   const height = (bottom - top).toFixed(2)
@@ -330,7 +334,7 @@ export function croppedMarkSvg(shape: PlayerMarkShape, fill: string): string {
 }
 
 // Where the sword sits inside each shape (PlayerMark's SWORD_INSET_THAT_FITS_SHAPE).
-const SWORD_INSETS: Record<PlayerMarkShape, { centerY: number; size: number }> = {
+const SWORD_INSETS: Record<SiteMarkShape, { centerY: number; size: number }> = {
   circle: { centerY: 22, size: 14 },
   square: { centerY: 22, size: 15 },
   diamond: { centerY: 22, size: 14 },
@@ -347,7 +351,7 @@ const SWORD_PATHS =
   '<path d="M12 2.5 14.1 6.4V14.4H9.9V6.4z"/><rect x="6.8" y="14.6" width="10.4" height="1.9" rx="0.9"/><rect x="11.05" y="16.9" width="1.9" height="4.6" rx="0.9"/>'
 
 // A player's mark. `sword` cuts the sword into the shape, as the app does for the attacker.
-function appMarkSvg(shape: PlayerMarkShape, color: string, sword?: string): string {
+function appMarkSvg(shape: SiteMarkShape, color: string, sword?: string): string {
   const { centerY, size } = SWORD_INSETS[shape]
   const inset = sword
     ? `<g fill="${sword}" transform="translate(${22 - size / 2} ${centerY - size / 2}) scale(${size / 24})">${SWORD_PATHS}</g>`

@@ -26,6 +26,8 @@ import {
 } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 
+import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+
 import { SeedError, type SeedParams } from "./seedTypes"
 
 function integer(name: string, value: string): number {
@@ -65,6 +67,13 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   if (life.length > 0 && life.length !== playerCount)
     throw new SeedError(`life lists ${life.length} values for ${playerCount} players.`)
 
+  const marks = list(params.marks).map((value) => {
+    if (!isPlayerMarkShape(value)) throw new SeedError(`marks has an unknown mark "${value}".`)
+    return value
+  })
+  if (marks.length > playerCount)
+    throw new SeedError(`marks lists ${marks.length} marks for ${playerCount} players.`)
+
   const layouts = getPlayerGridLayoutOptions(playerCount).map(({ variant }) => variant)
   const layout = layouts.find((variant) => variant === (params.layout ?? "auto"))
   if (!layout)
@@ -76,6 +85,7 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       players: Array.from({ length: playerCount }, (_, index) => ({
         name: `Player ${index + 1}`,
         color: PLAYER_COLORS[index],
+        ...(marks[index] ? { shape: marks[index] } : {}),
       })),
       startingLife:
         params.start !== undefined

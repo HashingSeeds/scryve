@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native"
 import { render } from "@testing-library/react-native"
-import { Circle } from "react-native-svg"
+import { Circle, LinearGradient } from "react-native-svg"
 
 import { PlayerMark } from "./PlayerMark"
 
@@ -8,7 +8,7 @@ const MARK_CENTER = 22
 const SWORD_GLYPH_BOUNDS = { left: 6.8, right: 17.2, top: 2.5, bottom: 21.5 }
 
 describe("PlayerMark", () => {
-  it.each(["heart", "plus", "shield"] as const)(
+  it.each(["heart", "plus", "shield", "crown", "moon", "flame", "bolt", "eye", "key"] as const)(
     "renders the new %s mark and its sword",
     (shape) => {
       const view = render(
@@ -41,6 +41,14 @@ describe("PlayerMark", () => {
       transform: [{ rotate: "90deg" }],
     })
     expect(view.UNSAFE_getByType(View)).toBeTruthy()
+  })
+
+  it("fills only a foil mark with a gradient", () => {
+    const flat = render(<PlayerMark seatNumber={1} color="#FFFFFF" shape="crown" />)
+    expect(flat.UNSAFE_queryAllByType(LinearGradient)).toHaveLength(0)
+
+    const foil = render(<PlayerMark seatNumber={1} color="#FFFFFF" shape="crown" foil />)
+    expect(foil.UNSAFE_queryAllByType(LinearGradient)).toHaveLength(1)
   })
 
   it("renders a standalone shape without a surrounding ring", () => {

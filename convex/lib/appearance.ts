@@ -24,8 +24,15 @@ export const PLAYER_MARK_SHAPES = [
   "shield",
 ] as const
 
+/** why: Pro marks render only in builds that know them, so they never join the seat-default or connected lists that every installed client must draw. */
+export const PRO_MARK_SHAPES = ["crown", "moon", "flame", "bolt", "eye", "key"] as const
+
+export type ProMarkShape = (typeof PRO_MARK_SHAPES)[number]
+
 export type PlayerMarkShape =
-  (typeof PLAYER_MARK_SHAPES)[number] | (typeof ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)[number]
+  | (typeof PLAYER_MARK_SHAPES)[number]
+  | (typeof ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)[number]
+  | ProMarkShape
 
 export const PLAYER_COLOR_CHOICES = [
   "#B85636",
@@ -43,8 +50,14 @@ export type PlayerAppearance = { color: string; shape: PlayerMarkShape }
 export function isPlayerMarkShape(value: unknown): value is PlayerMarkShape {
   return (
     typeof value === "string" &&
-    (value === "circle" || PLAYER_MARK_SHAPES.some((shape) => shape === value))
+    (value === "circle" ||
+      PLAYER_MARK_SHAPES.some((shape) => shape === value) ||
+      isProMarkShape(value))
   )
+}
+
+export function isProMarkShape(value: unknown): value is ProMarkShape {
+  return PRO_MARK_SHAPES.some((shape) => shape === value)
 }
 
 export function shapeForSeat(
@@ -111,4 +124,21 @@ export function resolvePlayerAppearances<T extends { seat: number; color: string
       taken.push(appearance)
       return { ...player, ...appearance }
     })
+}
+
+/** why: a device that loses Pro keeps its saved seats, but its games start with free marks; each Pro mark gives way to the first free mark no other seat holds. */
+export function withoutProMarks(appearances: readonly PlayerAppearance[]): PlayerAppearance[] {
+  return appearances.reduce<PlayerAppearance[]>(
+    (resolved, appearance, index) => [
+      ...resolved,
+      isProMarkShape(appearance.shape)
+        ? resolveAppearance({
+            preferred: { color: appearance.color },
+            taken: [...resolved, ...appearances.slice(index + 1)],
+            seat: index + 1,
+          })
+        : appearance,
+    ],
+    [],
+  )
 }

@@ -19,6 +19,7 @@ import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import {
   canContinueMatch,
@@ -94,6 +95,7 @@ export function CurrentGameScreen({
   } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
+  const { isFoil } = useRevenueCat()
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
@@ -377,6 +379,7 @@ export function CurrentGameScreen({
               lifeStep={runtime.game.lifeStep}
               layoutVariant={layoutVariant}
               disabled={menuOpen}
+              isPlayerFoil={isFoil ? () => true : undefined}
               isPlayerEliminated={
                 commanderDamageEnabled
                   ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)

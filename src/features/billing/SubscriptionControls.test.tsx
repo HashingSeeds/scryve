@@ -14,6 +14,7 @@ const mockBilling = {
   configurationMessage: undefined as string | undefined,
   isLoading: false,
   isCountPro: false,
+  isFoil: false,
   customerInfo: null as unknown,
   currentOffering: null,
   error: undefined as string | undefined,
@@ -50,6 +51,7 @@ describe("SubscriptionControls", () => {
       configurationMessage: undefined,
       isLoading: false,
       isCountPro: false,
+      isFoil: false,
       customerInfo: null,
       error: undefined,
     })
@@ -98,6 +100,7 @@ describe("SubscriptionControls", () => {
 
   it("labels web Foil access and keeps the Pro renewal and management behavior", () => {
     mockBilling.isCountPro = true
+    mockBilling.isFoil = true
     mockBilling.customerInfo = entitledCustomerInfo({
       productIdentifier: "foil_yearly",
       expirationDate: "2027-09-01T00:00:00Z",

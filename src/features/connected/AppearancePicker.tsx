@@ -11,26 +11,73 @@ import {
   PLAYER_MARK_SHAPES,
   type PlayerAppearance,
   type PlayerMarkShape,
+  type ProMarkShape,
 } from "../../../convex/lib/appearance"
 
 function colorSlug(color: string) {
   return color.replace("#", "").toLowerCase()
 }
 
+/** why: a free player's tap on a Pro mark should open Pro instead of doing nothing, so locked marks stay pressable and call `onLockedPress`. */
 export function AppearancePicker({
   value,
   taken = [],
   shapes = PLAYER_MARK_SHAPES,
+  proShapes = [],
+  proLocked = false,
+  foil = false,
+  onLockedPress,
   onChange,
 }: {
   value: PlayerAppearance
   taken?: PlayerAppearance[]
   shapes?: readonly PlayerMarkShape[]
+  proShapes?: readonly ProMarkShape[]
+  proLocked?: boolean
+  foil?: boolean
+  onLockedPress?: () => void
   onChange: (next: PlayerAppearance) => void
 }) {
   const { themed } = useAppTheme()
   const takenColors = new Set(taken.map((entry) => entry.color.toUpperCase()))
-  const takenShapes = new Set(taken.map((entry) => entry.shape))
+  const takenShapes = new Set<PlayerMarkShape>(taken.map((entry) => entry.shape))
+
+  function shapeOption(shape: PlayerMarkShape, index: number, pro: boolean) {
+    const selected = shape === value.shape
+    const unavailable = takenShapes.has(shape)
+    const locked = pro && proLocked
+    return (
+      <View key={shape} style={$option}>
+        <TouchableOpacity
+          testID={`appearance-shape-${shape}`}
+          accessibilityRole="radio"
+          accessibilityLabel={
+            unavailable ? `${shape}, already taken` : locked ? `${shape}, Scryve Pro` : shape
+          }
+          accessibilityHint={locked && !unavailable ? "Opens Scryve Pro" : undefined}
+          accessibilityState={{ selected, disabled: unavailable }}
+          disabled={unavailable}
+          activeOpacity={0.75}
+          style={[
+            themed($swatch),
+            selected && themed($selectedSwatch),
+            unavailable && themed($exhausted),
+            locked && !unavailable && $locked,
+          ]}
+          onPress={() => (locked ? onLockedPress?.() : onChange({ color: value.color, shape }))}
+        >
+          <PlayerMark
+            seatNumber={index + 1}
+            shape={shape}
+            color={value.color}
+            foil={pro && foil}
+            size={32}
+            spinning={false}
+          />
+        </TouchableOpacity>
+      </View>
+    )
+  }
 
   return (
     <View style={themed($picker)}>
@@ -66,38 +113,17 @@ export function AppearancePicker({
       <View style={themed($group)}>
         <Text size="xs" style={themed($label)} text="Mark" />
         <View accessibilityRole="radiogroup" style={themed($row)}>
-          {shapes.map((shape, index) => {
-            const selected = shape === value.shape
-            const unavailable = takenShapes.has(shape)
-            return (
-              <View key={shape} style={$option}>
-                <TouchableOpacity
-                  testID={`appearance-shape-${shape}`}
-                  accessibilityRole="radio"
-                  accessibilityLabel={unavailable ? `${shape}, already taken` : shape}
-                  accessibilityState={{ selected, disabled: unavailable }}
-                  disabled={unavailable}
-                  activeOpacity={0.75}
-                  style={[
-                    themed($swatch),
-                    selected && themed($selectedSwatch),
-                    unavailable && themed($exhausted),
-                  ]}
-                  onPress={() => onChange({ color: value.color, shape })}
-                >
-                  <PlayerMark
-                    seatNumber={index + 1}
-                    shape={shape}
-                    color={value.color}
-                    size={32}
-                    spinning={false}
-                  />
-                </TouchableOpacity>
-              </View>
-            )
-          })}
+          {shapes.map((shape, index) => shapeOption(shape, index, false))}
         </View>
       </View>
+      {proShapes.length ? (
+        <View style={themed($group)}>
+          <Text size="xs" style={themed($label)} text="Pro" />
+          <View accessibilityRole="radiogroup" style={themed($row)}>
+            {proShapes.map((shape, index) => shapeOption(shape, index, true))}
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -127,4 +153,5 @@ const $exhausted: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.separator,
   borderStyle: "dashed",
 })
+const $locked: ViewStyle = { opacity: 0.45 }
 const $colorDot: ThemedStyle<ViewStyle> = () => ({ width: 28, height: 28, borderRadius: 14 })

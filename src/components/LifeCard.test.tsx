@@ -20,7 +20,7 @@ import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { LifeCard, seatIdentityPlacement } from "./LifeCard"
+import { LifeCard, proWatermarkPlacement, seatIdentityPlacement } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
 import { MARK_ART_BOUNDS } from "./PlayerMark"
@@ -56,6 +56,46 @@ const renderCard = (life: number) => render(card(life))
 
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
+
+  it("bleeds a Pro mark's watermark off the corner opposite the name", () => {
+    const proCard = (shape: "crown" | "heart") => (
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          shape={shape}
+          life={40}
+          color="#41476E"
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(proCard("crown"))
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 300 } },
+    })
+    const watermark = view.getByTestId("pro-mark-watermark-seat-1", {
+      includeHiddenElements: true,
+    })
+    expect(StyleSheet.flatten(watermark.props.style)).toMatchObject({ width: 240, top: -52.8 })
+    expect(StyleSheet.flatten(watermark.props.style).right).toBeCloseTo(-79.2)
+
+    view.rerender(proCard("heart"))
+    expect(
+      view.queryByTestId("pro-mark-watermark-seat-1", { includeHiddenElements: true }),
+    ).toBeNull()
+  })
+
+  it("turns the watermark corner with the seat", () => {
+    expect(proWatermarkPlacement(180, { width: 200, height: 300 })).toMatchObject({
+      bottom: -52.8,
+      transform: [{ rotate: "180deg" }],
+    })
+    expect(proWatermarkPlacement(90, { width: 300, height: 200 })).toMatchObject({
+      width: 240,
+      right: -52.8,
+    })
+  })
   afterEach(() => jest.useRealTimers())
 
   it("gives the seat to the dice: chips and life controls leave touch and focus, the overlay takes the tap", () => {

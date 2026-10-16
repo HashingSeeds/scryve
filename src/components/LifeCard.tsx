@@ -57,7 +57,7 @@ import {
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { PlayerMark } from "./PlayerMark"
+import { MarkArt, PlayerMark } from "./PlayerMark"
 import {
   SeatIdentity,
   seatIdentityBottomGap,
@@ -65,7 +65,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
-import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
+import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const COMMANDER_OVERVIEW_MS = 220
 
@@ -89,6 +89,7 @@ export interface LifeCardProps {
   playerName: string
   seatNumber: number
   shape?: PlayerMarkShape
+  foil?: boolean
   life: number
   color: string
   compact?: boolean
@@ -118,6 +119,7 @@ export const LifeCard = memo(function LifeCard({
   playerName,
   seatNumber,
   shape,
+  foil,
   life,
   color,
   compact,
@@ -370,6 +372,7 @@ export const LifeCard = memo(function LifeCard({
       compact={compact}
       spinning={ownership === "owned"}
       insetSwordColor={commanderDamage ? color : undefined}
+      foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
     />
   )
@@ -416,6 +419,21 @@ export const LifeCard = memo(function LifeCard({
         style,
       ]}
     >
+      {shape && isProMarkShape(shape) && cardSize.height > 0 ? (
+        <View
+          testID={`pro-mark-watermark-seat-${seatNumber}`}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={proWatermarkPlacement(contentRotation, cardSize)}
+        >
+          <MarkArt
+            shape={shape}
+            color={foreground}
+            size={(Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height) * 0.8}
+          />
+        </View>
+      ) : null}
       <View
         pointerEvents={
           commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
@@ -862,6 +880,25 @@ const CONTENT_RIGHT_EDGE = {
   90: "bottom",
   [-90]: "top",
 } as const
+
+const CONTENT_TOP_EDGE = { 0: "top", 180: "bottom", 90: "right", [-90]: "left" } as const
+
+/** why: a Pro mark's oversized copy bleeds off the corner diagonally opposite the name, so it reads as the seat's own without sitting behind the life total. */
+export function proWatermarkPlacement(
+  rotation: LifeCardContentRotation,
+  cardSize: { width: number; height: number },
+): ViewStyle {
+  const size = (Math.abs(rotation) === 90 ? cardSize.width : cardSize.height) * 0.8
+  return {
+    position: "absolute",
+    width: size,
+    height: size,
+    opacity: 0.11,
+    [CONTENT_TOP_EDGE[rotation]]: -size * 0.22,
+    [CONTENT_RIGHT_EDGE[rotation]]: -size * 0.33,
+    transform: [{ rotate: `${rotation}deg` }],
+  }
+}
 
 // why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
 const CUTOUT_HALF_WIDTH = 64

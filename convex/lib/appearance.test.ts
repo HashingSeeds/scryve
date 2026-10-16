@@ -3,10 +3,13 @@ import {
   appearanceIsTaken,
   CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
+  isProMarkShape,
   PLAYER_COLOR_CHOICES,
   PLAYER_MARK_SHAPES,
+  PRO_MARK_SHAPES,
   resolveAppearance,
   shapeForSeat,
+  withoutProMarks,
   type PlayerAppearance,
 } from "./appearance"
 import { MAX_PLAYERS } from "./policy"
@@ -32,6 +35,30 @@ describe("player appearance", () => {
     expect(isPlayerMarkShape(undefined)).toBe(false)
     expect(PLAYER_COLOR_CHOICES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
     expect(CONNECTED_PLAYER_MARK_SHAPES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
+  })
+
+  it("reads Pro marks without offering them to seat defaults or connected lobbies", () => {
+    for (const shape of PRO_MARK_SHAPES) {
+      expect(isPlayerMarkShape(shape)).toBe(true)
+      expect(isProMarkShape(shape)).toBe(true)
+      expect(PLAYER_MARK_SHAPES).not.toContain(shape)
+      expect(ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES).not.toContain(shape)
+    }
+    expect(isProMarkShape("heart")).toBe(false)
+  })
+
+  it("trades Pro marks for unused free marks and keeps every other choice", () => {
+    expect(
+      withoutProMarks([
+        { color: RED, shape: "crown" },
+        { color: BLUE, shape: "heart" },
+        { color: PLAYER_COLOR_CHOICES[2], shape: "eye" },
+      ]),
+    ).toEqual([
+      { color: RED, shape: "triangle" },
+      { color: BLUE, shape: "heart" },
+      { color: PLAYER_COLOR_CHOICES[2], shape: "square" },
+    ])
   })
 
   it("reserves colors and shapes independently, ignoring color casing", () => {

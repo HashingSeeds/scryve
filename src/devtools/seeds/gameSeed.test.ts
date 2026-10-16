@@ -35,6 +35,12 @@ describe("game seed", () => {
     expect(canUndo(game, asActorId(`actor_${repo.getDeviceId()}`))).toBe(true)
   })
 
+  it("gives seats the marks it lists, Pro marks included", () => {
+    const game = buildSeededGame({ players: "3", marks: "crown,eye" }, repository())
+    expect(game.players.map(({ shape }) => shape)).toEqual(["crown", "eye", "square"])
+    expect(() => buildSeededGame({ marks: "octagon" }, repository())).toThrow("unknown mark")
+  })
+
   it("uses system defaults and infers the player count from life", () => {
     const game = buildSeededGame({ system: "ygo", life: "8000,2500,100" }, repository())
     expect(game).toMatchObject({ system: "ygo", startingLife: 8000, layout: "auto" })
