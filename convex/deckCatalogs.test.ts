@@ -457,7 +457,9 @@ it("provides two complete, attributed examples for every selectable format witho
           const main = detail.entries
             .filter((c) => c.section === "main")
             .reduce((n, c) => n + c.quantity, 0)
-          expect(main).toBeGreaterThanOrEqual(game.id === "pokemon" ? 60 : 40)
+          expect(main).toBeGreaterThanOrEqual(
+            game.id === "pokemon" ? 60 : format.id === "speed" ? 20 : 40,
+          )
           if (game.id === "mtg")
             expect(detail.entries.every((c) => c.oracleId && c.scryfallId)).toBe(true)
         }
