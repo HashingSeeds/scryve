@@ -45,7 +45,6 @@ const RECONNECT_GIVE_UP_MS = 2 * 60_000
 const FLUSH_INTERVAL_MS = 33
 // why: a host that was killed never withdraws its Bonjour advert, which can outlive it by over an hour.
 const UNREACHABLE_HIDE_MS = 2 * 60_000
-// why: one misbehaving phone must not flood the host; an honest table never comes close, and a capped write simply retries.
 const WRITES_PER_SECOND = 30
 const PASS_KEY = "lan.seatPass"
 

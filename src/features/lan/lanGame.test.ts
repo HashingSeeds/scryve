@@ -216,6 +216,27 @@ describe("nearby rounds on the shared engine", () => {
     })
   })
 
+  it("refuses a write addressed to an earlier round", () => {
+    const again = startLanRound(endLanRound(started(), "finished", NOW), NOW)
+
+    expect(write(again, "guest", life("life-operation-0005", "guest", -1)).result).toMatchObject({
+      error: { code: "game_not_active" },
+    })
+    expect(
+      write(
+        again,
+        "guest",
+        op({
+          type: "life.changed",
+          operationId: "life-operation-0006",
+          playerId: "guest",
+          delta: -1,
+          gameId: "game-2",
+        }),
+      ).result,
+    ).toMatchObject({ ok: true })
+  })
+
   it("gives every round a new id and a fresh table", () => {
     const first = write(started(), "guest", life("life-operation-0004", "guest", -5)).next
     const again = startLanRound(endLanRound(first, "finished", NOW), NOW)

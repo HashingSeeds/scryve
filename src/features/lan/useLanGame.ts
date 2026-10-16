@@ -6,7 +6,6 @@ import {
 
 import { lanSession, useLanSession } from "./lanSession"
 
-// why: nearby games run the cloud game client against the host instead of Convex, so every system's board works the same either way.
 export function useLanGame(): ConnectedGameRuntime {
   const { projection, seatKey, status, role } = useLanSession()
   const session = useConnectedSession({

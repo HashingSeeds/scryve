@@ -57,11 +57,11 @@ function socket() {
   return { sent, peer, send: (message: LanGuestMessage) => handlers.onMessage(message), pass }
 }
 
-const lifeEvent = (operationId: string, playerId: string, delta: number) =>
+const lifeEvent = (operationId: string, playerId: string, delta: number, gameId = "game") =>
   ({
     type: "life.changed",
     operationId,
-    gameId: "game",
+    gameId,
     actorId: "actor",
     deviceId: "device-0001",
     clientCreatedAt: 1_700_000_000_000,
@@ -82,6 +82,8 @@ async function startedGame() {
   return { session, alice, bob }
 }
 
+const roundOf = (session: LanSession) => session.getState().projection?.publicId ?? ""
+
 const lifeOf = (session: LanSession, key: string) =>
   session.getState().projection?.players.find((player) => player.playerId === key)?.currentLife
 
@@ -91,7 +93,7 @@ describe("nearby host", () => {
     const { key } = bob.pass()
     bob.sent.length = 0
 
-    bob.send({ type: "op", event: lifeEvent("life-operation-0001", key, -3) })
+    bob.send({ type: "op", event: lifeEvent("life-operation-0001", key, -3, roundOf(session)) })
     jest.advanceTimersByTime(50)
 
     expect(bob.sent.map((message) => message.type)).toEqual(["state", "ack"])
@@ -105,7 +107,10 @@ describe("nearby host", () => {
   it("refuses a write to another player's seat", async () => {
     const { session, alice, bob } = await startedGame()
 
-    bob.send({ type: "op", event: lifeEvent("life-operation-0002", alice.pass().key, -3) })
+    bob.send({
+      type: "op",
+      event: lifeEvent("life-operation-0002", alice.pass().key, -3, roundOf(session)),
+    })
     jest.advanceTimersByTime(50)
 
     expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "seat_owner_required" })
@@ -113,12 +118,12 @@ describe("nearby host", () => {
   })
 
   it("caps how fast one socket can write", async () => {
-    const { bob } = await startedGame()
+    const { session, bob } = await startedGame()
 
     for (let index = 0; index < 31; index++)
       bob.send({
         type: "op",
-        event: lifeEvent(`life-operation-${1000 + index}`, bob.pass().key, -1),
+        event: lifeEvent(`life-operation-${1000 + index}`, bob.pass().key, -1, roundOf(session)),
       })
 
     expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "rate_limited" })

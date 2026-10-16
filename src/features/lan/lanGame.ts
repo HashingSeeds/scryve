@@ -70,7 +70,6 @@ export interface LanGame extends LanLobby {
   updatedAt: number
 }
 
-// why: seat keys are public in every projection, so reclaiming a seat also needs the token only its device was sent.
 export interface LanSeatPass {
   key: string
   token: string
@@ -234,14 +233,13 @@ const NOT_STARTED: MemoryWriteResult = {
   error: { kind: "rejected", code: "game_not_active", message: "Game is not active" },
 }
 
-// why: the sender's seat comes from the pass the host verified, never from the message, so a guest can only act as itself.
 export function applyLanWrite(
   game: LanGame,
   senderKey: string,
   event: ConnectedActionEvent,
   now: number,
 ): { game: LanGame; result: MemoryWriteResult } {
-  if (!game.memory) return { game, result: NOT_STARTED }
+  if (!game.memory || event.gameId !== lanRoundId(game)) return { game, result: NOT_STARTED }
   const result = writeMemoryGame(
     game.memory,
     { userId: senderKey, isHost: senderKey === game.hostKey },

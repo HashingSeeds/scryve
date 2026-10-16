@@ -1,7 +1,7 @@
 import { Redirect, router } from "expo-router"
 
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
-import { lanSession } from "@/features/lan/lanSession"
+import { lanSession, useLanSession } from "@/features/lan/lanSession"
 import { useLanGame } from "@/features/lan/useLanGame"
 import { ConnectedBoardWithRuntime } from "@/screens/ConnectedBoardScreen"
 
@@ -9,8 +9,10 @@ const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("
 
 export default function LanGameRoute() {
   const runtime = useLanGame()
+  const { projection } = useLanSession()
   if (!lanPlayAvailable()) return <Redirect href="/" />
-  if (runtime.status !== "ready") return <Redirect href="/lan" />
+  if (!projection) return <Redirect href="/lan" />
+  if (runtime.status !== "ready") return null
   return (
     <ConnectedBoardWithRuntime
       publicId={runtime.projection.publicId}
