@@ -39,7 +39,6 @@ import {
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
-import type { ConnectedSetup } from "@/features/game/recentSetups"
 import {
   playerGridLayoutForCount,
   type PlayerGridLayoutVariant,
@@ -55,6 +54,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import type { ConnectedSetup } from "@/features/game/recentSetups"
 import {
   defaultRoundClockMinutes,
   ROUND_CLOCK_MINUTES,

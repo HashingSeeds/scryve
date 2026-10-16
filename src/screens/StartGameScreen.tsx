@@ -9,6 +9,7 @@ import { Text } from "@/components/Text"
 import { PLAYER_COLORS } from "@/features/game/domain"
 import { playSystemRules } from "@/features/game/playSystems"
 import { recentSetupLabel, type RecentSetup } from "@/features/game/recentSetups"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -28,11 +29,18 @@ export interface StartGameScreenProps {
 
 function setupDetail(setup: RecentSetup) {
   const { system } = setup.mode === "local" ? setup.game : setup.lobby
-  const where =
-    setup.mode === "connected"
-      ? `Connected · ${setup.lobby.playerCount} seats`
-      : `On this device · ${setup.game.players.map((player) => player.name.trim()).join(", ")}`
-  return system ? `${playSystemRules(system).shortLabel} · ${where}` : where
+  const systemLabel = system ? playSystemRules(system).shortLabel : undefined
+  if (setup.mode === "connected")
+    return systemLabel
+      ? translate("play:recentSetups.connectedSeats", {
+          system: systemLabel,
+          count: setup.lobby.playerCount,
+        })
+      : translate("play:recentSetups.connectedSeatsNoSystem", { count: setup.lobby.playerCount })
+  const names = setup.game.players.map((player) => player.name.trim()).join(", ")
+  return systemLabel
+    ? translate("play:recentSetups.onThisDevice", { system: systemLabel, names })
+    : translate("play:recentSetups.onThisDeviceNoSystem", { names })
 }
 
 function setupColors(setup: RecentSetup) {
@@ -55,8 +63,8 @@ export function StartGameScreen({
   const { themed } = useAppTheme()
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]} contentContainerStyle={themed($form)}>
-      <Header title="New game" leftTx="common:back" onLeftPress={onBack} />
-      <Text text="Recent setups" preset="subheading" accessibilityRole="header" />
+      <Header titleTx="play:newGame.newTitle" leftTx="common:back" onLeftPress={onBack} />
+      <Text tx="play:recentSetups.title" preset="subheading" accessibilityRole="header" />
       <View>
         {setups.map((setup, index) => {
           const reason = blockedReason(setup)
@@ -97,7 +105,7 @@ export function StartGameScreen({
           style={themed($row)}
           onPress={onNewSetup}
         >
-          <Text weight="medium" style={themed($link)} text="New setup" />
+          <Text weight="medium" style={themed($link)} tx="play:recentSetups.newSetup" />
         </TouchableOpacity>
         <TouchableOpacity
           testID="join-with-code-button"
@@ -106,12 +114,12 @@ export function StartGameScreen({
           style={themed($row)}
           onPress={onJoin}
         >
-          <Text weight="medium" style={themed($link)} text="Join with code" />
+          <Text weight="medium" style={themed($link)} tx="play:newGame.joinWithCode" />
         </TouchableOpacity>
       </View>
       {error ? <AlertNote testID="start-game-error" text={error} /> : null}
       {error && onRetry ? (
-        <Button testID="retry-start-game-button" text="Try again" onPress={onRetry} />
+        <Button testID="retry-start-game-button" tx="common:tryAgain" onPress={onRetry} />
       ) : null}
     </Screen>
   )

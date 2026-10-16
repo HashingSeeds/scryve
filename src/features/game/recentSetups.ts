@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { createLocalGame } from "./domain"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import { isPlaySystemId, playFormatLabel, playSystemFormat, type PlaySystemId } from "./playSystems"
@@ -155,6 +157,7 @@ export function withRecentSetup(
 
 export function recentSetupLabel(setup: RecentSetup) {
   const { system, format } = setup.mode === "local" ? setup.game : setup.lobby
-  if (setup.mode === "connected" && setup.lobby.variant === "treachery") return "Treachery"
-  return system ? playFormatLabel(system, format) : "No system"
+  if (setup.mode === "connected" && setup.lobby.variant === "treachery")
+    return translate("play:recentSetups.treachery")
+  return system ? playFormatLabel(system, format) : translate("play:recentSetups.noSystem")
 }

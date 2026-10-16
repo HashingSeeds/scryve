@@ -7,6 +7,7 @@ import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
 import { activeGameBlocksSetup, startLocalGame } from "@/features/game/gameSetup"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { RecentSetup } from "@/features/game/recentSetups"
+import { translate } from "@/i18n/translate"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 import { StartGameScreen } from "@/screens/StartGameScreen"
 import { goBack } from "@/utils/navigation"
@@ -26,20 +27,26 @@ export default function StartGameRoute() {
   if (setups.length === 0) return <Redirect href="/game/new" />
 
   const connectedGames = connected?.activeGames ?? []
+  const localGameRunning = activeGameBlocksSetup()
   function blockedReason(setup: RecentSetup) {
-    if (activeGameBlocksSetup()) return "End the current game in Setup first."
+    if (localGameRunning) return translate("play:recentSetups.endCurrentGame")
     if (setup.mode === "connected") {
       if (connected?.access) return undefined
       if (!connected?.ready)
         return (
           connected?.blockedReason ??
           connected?.status ??
-          (connected?.error ? "Connected play is unavailable." : "Connecting…")
+          translate(
+            connected?.error ? "play:recentSetups.unavailable" : "play:recentSetups.connecting",
+          )
         )
-      return connected.blockedReason ?? (connected.busy ? "Working…" : undefined)
+      return (
+        connected.blockedReason ??
+        (connected.busy ? translate("play:recentSetups.working") : undefined)
+      )
     }
     return connected?.ready && connectedGames.length > 0
-      ? "Finish your connected game first."
+      ? translate("play:recentSetups.finishConnectedGame")
       : undefined
   }
 
