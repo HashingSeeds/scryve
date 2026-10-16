@@ -421,7 +421,6 @@ const connected = {
     hostHint: "To host, set up a game and choose Nearby.",
     summaryLife: "{{life}} life",
     summaryPlayers: "{{players}} players",
-    openSeat: "Open seat",
     you: "{{name}} (you)",
     away: "Away",
     startAgain: "Start again",

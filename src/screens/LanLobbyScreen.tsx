@@ -194,7 +194,7 @@ export function LanLobbyScreen({
               {Array.from({ length: openSeats }, (_, index) => (
                 <View key={`open-${index}`} style={themed($seatRow)}>
                   <View style={[themed($swatch), themed($openSwatch)]} />
-                  <Text style={[$styles.flex1, themed($dimmed)]} tx="connected:nearby.openSeat" />
+                  <Text style={[$styles.flex1, themed($dimmed)]} tx="connected:seats.openSeat" />
                 </View>
               ))}
             </View>
