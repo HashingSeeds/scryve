@@ -33,7 +33,6 @@ export default {
     launchDestinationHint: "Jugar retoma la partida actual o abre un tablero nuevo.",
     gameSystem: "Sistema de juego",
     defaultGameSystem: "Sistema de juego predeterminado",
-    noSystem: "Sin sistema",
     format: "Formato",
     noDefault: "Sin predeterminado",
     defaultsHint:
@@ -408,6 +407,7 @@ export default {
     downloading: "Descargando actualización…",
     downloadingProgress: "Descargando actualización {{percent}}%",
     ready: "Actualización lista",
+    cancelReady: "Cancelar actualización lista",
     restart: "Reiniciar",
     whatsNew: "Novedades de esta actualización",
     dialogMessage:

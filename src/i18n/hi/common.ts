@@ -32,17 +32,30 @@ export default {
     play: "खेलें",
     backToLobby: "लॉबी पर वापस जाएँ",
   },
-  confirmDialog: {
-    cancelAction: "{{action}} रद्द करें",
-  },
   retryableError: {
     retryingIn: "{{seconds}} सेकंड में फिर कोशिश होगी",
   },
   selectField: {
     none: "कोई नहीं",
     triggerLabel: "{{label}}, {{value}}",
-    openHint: "{{label}} के विकल्प खोलता है",
-    closeLabel: "{{label}} के विकल्प बंद करें",
+    openHint: {
+      format: "फ़ॉर्मैट के विकल्प खोलता है",
+      commanderColor: "कमांडर रंग के विकल्प खोलता है",
+      addTo: '"में जोड़ें" के विकल्प खोलता है',
+      changeBy: '"बदलाव की मात्रा" के विकल्प खोलता है',
+      thisIsMe: '"यह मैं हूँ" के विकल्प खोलता है',
+      yourDeck: "आपके डेक के विकल्प खोलता है",
+      system: "सिस्टम के विकल्प खोलता है",
+    },
+    closeLabel: {
+      format: "फ़ॉर्मैट के विकल्प बंद करें",
+      commanderColor: "कमांडर रंग के विकल्प बंद करें",
+      addTo: '"में जोड़ें" के विकल्प बंद करें',
+      changeBy: '"बदलाव की मात्रा" के विकल्प बंद करें',
+      thisIsMe: '"यह मैं हूँ" के विकल्प बंद करें',
+      yourDeck: "आपके डेक के विकल्प बंद करें",
+      system: "सिस्टम के विकल्प बंद करें",
+    },
   },
   valueField: {
     readoutLabel: "{{label}}, {{value}}",

@@ -267,7 +267,12 @@ export default {
     anotherSeat: "다른 자리",
     closeLayout: "레이아웃 선택 닫기",
     failedAction: {
-      life: "{{delta}} {{counter}} 변경을 동기화하지 못했습니다",
+      life: {
+        none: "{{delta}} 라이프 변경을 동기화하지 못했습니다",
+        mtg: "{{delta}} 라이프 변경을 동기화하지 못했습니다",
+        ygo: "{{delta}} 라이프 포인트 변경을 동기화하지 못했습니다",
+        pokemon: "{{delta}} 사이드 카드 변경을 동기화하지 못했습니다",
+      },
       commanderDamage: "{{delta}} 커맨더 피해 지정을 동기화하지 못했습니다",
       table: "테이블 변경을 동기화하지 못했습니다",
       confirmCommanderDamage: "커맨더 피해 확인을 동기화하지 못했습니다",
@@ -430,6 +435,11 @@ export default {
       hostFailed: "호스트할 수 없습니다: {{error}}",
       unreachable: "{{name}}에 연결할 수 없습니다. 게임이 종료되었을 수 있습니다.",
       lostHost: "호스트와 연결이 끊겼습니다. 게임이 종료되었을 수 있습니다.",
+    },
+    rejected: {
+      seatTaken: "해당 자리는 다른 기기에서 사용 중입니다.",
+      started: "이미 시작된 게임입니다.",
+      full: "게임이 가득 찼습니다.",
     },
   },
 } satisfies LocaleNamespace

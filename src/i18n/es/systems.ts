@@ -2,6 +2,56 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
+  noSystem: "Sin sistema",
+  counterHeading: {
+    none: "Vidas",
+    mtg: "Vidas",
+    ygo: "Puntos de vida",
+    pokemon: "Cartas de premio",
+  },
+  counterLabel: {
+    none: "vidas",
+    mtg: "vidas",
+    ygo: "Puntos de vida",
+    pokemon: "Cartas de premio",
+  },
+  startingValueRange: {
+    none: "Las vidas iniciales deben ser un número entero de 1 a {{max}}.",
+    mtg: "Las vidas iniciales deben ser un número entero de 1 a {{max}}.",
+    ygo: "Los Puntos de vida iniciales deben ser un número entero de 1 a {{max}}.",
+    pokemon: "Las cartas de premio iniciales deben ser un número entero de 1 a {{max}}.",
+  },
+  tableItem: {
+    poison: "Veneno",
+    commanderTax: "Impuesto de comandante",
+    monarch: "Monarca",
+    initiative: "Iniciativa",
+  },
+  section: {
+    commander: "Commander",
+    sideboard: "Banquillo",
+    extra: "Extra Deck",
+    side: "Side Deck",
+    main: {
+      mtg: "Mazo principal",
+      ygo: "Main Deck",
+      pokemon: "Mazo",
+    },
+  },
+  formatBlurb: {
+    mtg: {
+      commander: "100 cartas, singleton",
+      standard: "Ediciones recientes",
+      pioneer: "Desde Regreso a Ravnica",
+      modern: "Desde Octava Edición",
+      legacy: "Casi todas las ediciones",
+      vintage: "Lista de restringidas",
+      pauper: "Solo comunes",
+      brawl: "60 cartas, singleton",
+      limited: "Draft y sellado",
+      constructed: "Todo lo demás",
+    },
+  },
   counterValue: {
     none_one: "{{count}} vida",
     none_many: "{{count}} de vidas",

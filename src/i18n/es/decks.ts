@@ -8,6 +8,7 @@ export default {
   saving: "Guardando…",
   deleting: "Eliminando…",
   hiddenNameWarning: 'Los demás jugadores verán "{{hiddenName}}" en su lugar.',
+  numberedVersion: "Versión {{number}}",
   record: {
     noGames: "Aún no hay partidas",
     winRate: "{{percent}}% de {{games}}",
@@ -136,6 +137,7 @@ export default {
     deleteDeckTitle: "¿Eliminar este mazo?",
     keepEditing: "Seguir editando",
     discardTitle: "¿Descartar cambios?",
+    cancelDiscard: "¿Cancelar el descarte de cambios?",
     discardBody: "Se perderán tus cambios.",
     discard: "Descartar",
   },
@@ -371,6 +373,7 @@ export default {
     changedBeforeDelete: "Este mazo cambió en otro lugar. Recárgalo antes de eliminar.",
     reload: "Recargar mazo guardado",
     deleteTitle: "¿Eliminar mazo de invitado?",
+    cancelDelete: "¿Cancelar la eliminación del mazo de invitado?",
     deleteBody: "Esto elimina el mazo de este dispositivo.",
   },
   addDeck: {
@@ -412,6 +415,7 @@ export default {
     signInUpgrade: "Inicia sesión y pásate a Pro",
     proSubscription: "Pro es una suscripción en tu cuenta · {{limit}} mazos",
     replaceTitle: "¿Reemplazar el mazo local?",
+    cancelReplace: "¿Cancelar el reemplazo del mazo local?",
     replaceBody: "Se reemplazará {{name}}.",
     replaceSelectedBody: "Se reemplazará el mazo seleccionado.",
     replace: "Reemplazar",

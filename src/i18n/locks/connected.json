@@ -191,7 +191,10 @@
   "board.notCached": "6898603d2024",
   "board.anotherSeat": "946a18517c58",
   "board.closeLayout": "b790d46eea44",
-  "board.failedAction.life": "0fc495f8d7f4",
+  "board.failedAction.life.none": "d7038dc0a041",
+  "board.failedAction.life.mtg": "4de478bddb89",
+  "board.failedAction.life.ygo": "7b6b55b317d4",
+  "board.failedAction.life.pokemon": "662a1530420c",
   "board.failedAction.commanderDamage": "5893675cbbb4",
   "board.failedAction.table": "f888589566d5",
   "board.failedAction.confirmCommanderDamage": "6f365c9dc176",
@@ -317,5 +320,8 @@
   "nearby.leave": "18e0ed98ac4e",
   "nearby.errors.hostFailed": "267817fa573b",
   "nearby.errors.unreachable": "47a9135304d5",
-  "nearby.errors.lostHost": "d672cabb4f50"
+  "nearby.errors.lostHost": "d672cabb4f50",
+  "nearby.rejected.seatTaken": "e1e32098e2a3",
+  "nearby.rejected.started": "163d003325ae",
+  "nearby.rejected.full": "3ac308af14dc"
 }

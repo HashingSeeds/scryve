@@ -155,6 +155,7 @@ export default {
       draw: "Égalité",
     },
     failed: "Impossible de terminer ce match.",
+    noFinishedGame: "Ce match n'a aucune partie terminée à clore.",
     cancel: "Annuler la fin du match",
     title: "Résultat du match",
     playerResult: "Résultat du match de {{name}}",
@@ -162,6 +163,17 @@ export default {
     drawRemainingHint:
       "Déclare une égalité pour chaque place encore en jeu et une défaite pour les places éliminées",
     end: "Terminer le match",
+    scoreErrors: {
+      gamesWonRange:
+        "Les parties gagnées doivent être comprises entre 0 et {{max}} dans un match en {{bestOf}} manches gagnantes",
+      gamesDrawnRange: "Les parties nulles doivent être comprises entre 0 et {{max}}",
+      tooManyWins: "Un match au meilleur des {{bestOf}} ne peut pas avoir {{wins}} victoires",
+      partialScore: "Saisissez les parties gagnées pour chaque place ou laissez le score vide",
+      oneWinner: "Un match ne peut avoir qu'un seul vainqueur",
+      needsWinner: "Un match doit avoir un vainqueur, sauf s'il est nul",
+      winnerLeads: "Le vainqueur doit avoir le plus de parties gagnées",
+      leaderWins: "La place avec le plus de parties gagnées doit être le vainqueur",
+    },
   },
   claim: {
     matchStanding: "Au meilleur de {{bestOf}} · {{score}}",
@@ -325,12 +337,6 @@ export default {
     assignFromStale: "Attribuer des dégâts de commandant depuis {{identity}}, obsolète",
     showOverviewFor: "Afficher les dégâts de commandant de {{identity}}",
     expandsGrid: "Développe la grille des dégâts de commandant",
-  },
-  tableItem: {
-    poison: "Poison",
-    commanderTax: "Taxe du commandant",
-    monarch: "Monarque",
-    initiative: "Initiative",
   },
   outReason: {
     commanderDamage: "dégâts de commandant",

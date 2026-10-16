@@ -38,7 +38,6 @@ export default {
     resumeHostedGame: "होस्ट किया गेम फिर शुरू करें",
     system: "सिस्टम",
     gameSystem: "गेम सिस्टम",
-    noSystem: "कोई सिस्टम नहीं",
     format: "फ़ॉर्मैट",
     seats: "सीटें",
     players: "खिलाड़ी",
@@ -98,10 +97,12 @@ export default {
     loadMore: "और लोड करें",
     loadingMoreGames: "और गेम लोड हो रहे हैं…",
     endGameTitle: "यह गेम खत्म करें?",
+    cancelEndGame: "इस गेम को खत्म करना रद्द करें?",
     endGameMessage:
       "इससे सभी के लिए गेम खत्म हो जाएगा और यह छोड़ा हुआ दर्ज होगा। इसे पूर्ववत नहीं किया जा सकता।",
     endGameConfirm: "गेम खत्म करें",
     leaveGameTitle: "यह गेम छोड़ें?",
+    cancelLeaveGame: "इस गेम को छोड़ना रद्द करें?",
     leaveGameMessage: "आप यह गेम छोड़ देंगे। दूसरे खिलाड़ी और उनका इतिहास जैसा है वैसा रहेगा।",
     leaveGameConfirm: "गेम छोड़ें",
     closeAppearancePicker: "रंग और निशान चुनने वाला बंद करें",
@@ -295,6 +296,7 @@ export default {
     notFoundContent: "शायद इसे हटा दिया गया है।",
     deleteResult: "नतीजा हटाएं",
     deleteTitle: "यह नतीजा हटाएं?",
+    cancelDelete: "इस नतीजे को हटाना रद्द करें?",
     deleteMessage: "इसे गिनने वाले डेक के आँकड़े अपडेट हो जाएंगे।",
   },
   recordMatch: {

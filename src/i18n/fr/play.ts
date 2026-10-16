@@ -39,7 +39,6 @@ export default {
     resumeHostedGame: "Reprendre la partie hébergée",
     system: "Système",
     gameSystem: "Système de jeu",
-    noSystem: "Aucun système",
     format: "Format",
     seats: "Places",
     players: "Joueurs",
@@ -99,10 +98,12 @@ export default {
     loadMore: "Charger plus",
     loadingMoreGames: "Chargement d'autres parties…",
     endGameTitle: "Terminer cette partie ?",
+    cancelEndGame: "Annuler la fin de cette partie ?",
     endGameMessage:
       "Cela termine la partie pour tout le monde et l'enregistre comme abandonnée. Cette action est irréversible.",
     endGameConfirm: "Terminer la partie",
     leaveGameTitle: "Quitter cette partie ?",
+    cancelLeaveGame: "Annuler le départ de cette partie ?",
     leaveGameMessage:
       "Vous quitterez cette partie. Les autres joueurs et leur historique restent inchangés.",
     leaveGameConfirm: "Quitter la partie",
@@ -306,6 +307,7 @@ export default {
     notFoundContent: "Il a peut-être été supprimé.",
     deleteResult: "Supprimer le résultat",
     deleteTitle: "Supprimer ce résultat ?",
+    cancelDelete: "Annuler la suppression de ce résultat ?",
     deleteMessage: "Les statistiques de deck qui le comptent seront mises à jour.",
   },
   recordMatch: {

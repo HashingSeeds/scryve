@@ -39,7 +39,6 @@ export default {
     resumeHostedGame: "Reanudar partida creada",
     system: "Sistema",
     gameSystem: "Sistema de juego",
-    noSystem: "Sin sistema",
     format: "Formato",
     seats: "Asientos",
     players: "Jugadores",
@@ -99,10 +98,12 @@ export default {
     loadMore: "Cargar más",
     loadingMoreGames: "Cargando más partidas…",
     endGameTitle: "¿Terminar esta partida?",
+    cancelEndGame: "¿Cancelar el fin de esta partida?",
     endGameMessage:
       "Esto termina la partida para todos y la registra como abandonada. No se puede deshacer.",
     endGameConfirm: "Terminar partida",
     leaveGameTitle: "¿Salir de esta partida?",
+    cancelLeaveGame: "¿Cancelar la salida de esta partida?",
     leaveGameMessage: "Saldrás de esta partida. Los demás jugadores y su historial no cambian.",
     leaveGameConfirm: "Salir de la partida",
     closeAppearancePicker: "Cerrar selector de color y marca",
@@ -311,6 +312,7 @@ export default {
     notFoundContent: "Puede que se haya eliminado.",
     deleteResult: "Eliminar resultado",
     deleteTitle: "¿Eliminar este resultado?",
+    cancelDelete: "¿Cancelar la eliminación de este resultado?",
     deleteMessage: "Se actualizarán las estadísticas de mazo que lo incluyen.",
   },
   recordMatch: {

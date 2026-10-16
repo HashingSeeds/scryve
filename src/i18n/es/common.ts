@@ -32,17 +32,30 @@ export default {
     play: "Jugar",
     backToLobby: "Volver a la sala",
   },
-  confirmDialog: {
-    cancelAction: "Cancelar {{action}}",
-  },
   retryableError: {
     retryingIn: "Reintentando en {{seconds}} s",
   },
   selectField: {
     none: "Ninguno",
     triggerLabel: "{{label}}, {{value}}",
-    openHint: "Abre las opciones de {{label}}",
-    closeLabel: "Cerrar opciones de {{label}}",
+    openHint: {
+      format: "Abre las opciones de formato",
+      commanderColor: "Abre las opciones de color del comandante",
+      addTo: "Abre las opciones de «Sumar a»",
+      changeBy: "Abre las opciones de «Cambiar en»",
+      thisIsMe: "Abre las opciones de «Este soy yo»",
+      yourDeck: "Abre las opciones de «Tu mazo»",
+      system: "Abre las opciones de sistema",
+    },
+    closeLabel: {
+      format: "Cerrar opciones de formato",
+      commanderColor: "Cerrar opciones de color del comandante",
+      addTo: "Cerrar opciones de «Sumar a»",
+      changeBy: "Cerrar opciones de «Cambiar en»",
+      thisIsMe: "Cerrar opciones de «Este soy yo»",
+      yourDeck: "Cerrar opciones de «Tu mazo»",
+      system: "Cerrar opciones de sistema",
+    },
   },
   valueField: {
     readoutLabel: "{{label}}, {{value}}",

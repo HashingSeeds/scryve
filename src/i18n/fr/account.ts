@@ -33,7 +33,6 @@ export default {
     launchDestinationHint: "Jouer reprend une partie en cours ou ouvre un nouveau plateau.",
     gameSystem: "Jeu",
     defaultGameSystem: "Jeu par défaut",
-    noSystem: "Aucun jeu",
     format: "Format",
     noDefault: "Aucun par défaut",
     defaultsHint:
@@ -413,6 +412,7 @@ export default {
     downloading: "Téléchargement de la mise à jour…",
     downloadingProgress: "Téléchargement de la mise à jour {{percent}} %",
     ready: "Mise à jour prête",
+    cancelReady: "Annuler la mise à jour prête",
     restart: "Redémarrer",
     whatsNew: "Contenu de cette mise à jour",
     dialogMessage:

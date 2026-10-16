@@ -293,7 +293,12 @@ export default {
     anotherSeat: "Otro asiento",
     closeLayout: "Cerrar selector de disposición",
     failedAction: {
-      life: "No se pudo sincronizar un cambio de {{delta}} en {{counter}}",
+      life: {
+        none: "No se pudo sincronizar un cambio de vida de {{delta}}",
+        mtg: "No se pudo sincronizar un cambio de vida de {{delta}}",
+        ygo: "No se pudo sincronizar un cambio de Puntos de Vida de {{delta}}",
+        pokemon: "No se pudo sincronizar un cambio de cartas de premio de {{delta}}",
+      },
       commanderDamage: "No se pudo sincronizar una asignación de {{delta}} de daño de comandante",
       table: "No se pudo sincronizar un cambio en la mesa",
       confirmCommanderDamage: "No se pudo sincronizar la confirmación del daño de comandante",
@@ -462,6 +467,11 @@ export default {
       hostFailed: "No se pudo crear la partida: {{error}}",
       unreachable: "{{name}} no está accesible. Puede que la partida haya terminado.",
       lostHost: "Se perdió la conexión con el anfitrión. Puede que la partida haya terminado.",
+    },
+    rejected: {
+      seatTaken: "Ese asiento pertenece a otro dispositivo.",
+      started: "Esta partida ya ha empezado.",
+      full: "Esta partida está llena.",
     },
   },
 } satisfies LocaleNamespace

@@ -281,7 +281,12 @@ export default {
     anotherSeat: "दूसरी सीट",
     closeLayout: "लेआउट चयन बंद करें",
     failedAction: {
-      life: "{{delta}} {{counter}} बदलाव सिंक नहीं हो सका",
+      life: {
+        none: "{{delta}} का लाइफ बदलाव सिंक नहीं हो सका",
+        mtg: "{{delta}} का लाइफ बदलाव सिंक नहीं हो सका",
+        ygo: "{{delta}} का Life Points बदलाव सिंक नहीं हो सका",
+        pokemon: "{{delta}} का Prize cards बदलाव सिंक नहीं हो सका",
+      },
       commanderDamage: "{{delta}} commander damage का आवंटन सिंक नहीं हो सका",
       table: "टेबल का बदलाव सिंक नहीं हो सका",
       confirmCommanderDamage: "commander damage की पुष्टि सिंक नहीं हो सकी",
@@ -447,6 +452,11 @@ export default {
       hostFailed: "होस्ट नहीं हो सका: {{error}}",
       unreachable: "{{name}} तक पहुँचा नहीं जा सकता। हो सकता है गेम समाप्त हो गया हो।",
       lostHost: "होस्ट से कनेक्शन टूट गया। हो सकता है गेम समाप्त हो गया हो।",
+    },
+    rejected: {
+      seatTaken: "यह सीट किसी दूसरे डिवाइस की है।",
+      started: "यह गेम पहले ही शुरू हो चुका है।",
+      full: "यह गेम भर चुका है।",
     },
   },
 } satisfies LocaleNamespace

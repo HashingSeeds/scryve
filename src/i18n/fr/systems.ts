@@ -2,6 +2,56 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
+  noSystem: "Aucun système",
+  counterHeading: {
+    none: "Points de vie",
+    mtg: "Points de vie",
+    ygo: "Life Points",
+    pokemon: "Cartes Récompense",
+  },
+  counterLabel: {
+    none: "vie",
+    mtg: "vie",
+    ygo: "Life Points",
+    pokemon: "Cartes Récompense",
+  },
+  startingValueRange: {
+    none: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
+    mtg: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
+    ygo: "Les Life Points de départ doivent être un nombre entier de 1 à {{max}}.",
+    pokemon: "Le nombre de cartes Récompense de départ doit être un nombre entier de 1 à {{max}}.",
+  },
+  tableItem: {
+    poison: "Poison",
+    commanderTax: "Taxe du commandant",
+    monarch: "Monarque",
+    initiative: "Initiative",
+  },
+  section: {
+    commander: "Commandant",
+    sideboard: "Réserve",
+    extra: "Extra Deck",
+    side: "Side Deck",
+    main: {
+      mtg: "Deck principal",
+      ygo: "Main Deck",
+      pokemon: "Deck",
+    },
+  },
+  formatBlurb: {
+    mtg: {
+      commander: "100 cartes, singleton",
+      standard: "Éditions récentes",
+      pioneer: "Depuis Retour sur Ravnica",
+      modern: "Depuis la 8e édition",
+      legacy: "Presque toutes les éditions",
+      vintage: "Liste des cartes restreintes",
+      pauper: "Communes uniquement",
+      brawl: "60 cartes, singleton",
+      limited: "Draft et scellé",
+      constructed: "Tout le reste",
+    },
+  },
   counterValue: {
     none_one: "{{count}} vie",
     none_many: "{{count}} de vie",

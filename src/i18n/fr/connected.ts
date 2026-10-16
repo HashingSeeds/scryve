@@ -298,7 +298,12 @@ export default {
     anotherSeat: "Autre place",
     closeLayout: "Fermer le choix de disposition",
     failedAction: {
-      life: "Un changement de {{counter}} de {{delta}} n'a pas pu être synchronisé",
+      life: {
+        none: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
+        mtg: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
+        ygo: "Une modification de {{delta}} Life Points n'a pas pu être synchronisée",
+        pokemon: "Une modification de {{delta}} cartes Récompense n'a pas pu être synchronisée",
+      },
       commanderDamage:
         "Une attribution de {{delta}} dégâts de commandant n'a pas pu être synchronisée",
       table: "Un changement de table n'a pas pu être synchronisé",
@@ -469,6 +474,11 @@ export default {
       hostFailed: "Impossible d'héberger : {{error}}",
       unreachable: "{{name}} est injoignable. La partie est peut-être terminée.",
       lostHost: "Hôte perdu. La partie est peut-être terminée.",
+    },
+    rejected: {
+      seatTaken: "Cette place appartient à un autre appareil.",
+      started: "Cette partie a déjà commencé.",
+      full: "Cette partie est complète.",
     },
   },
 } satisfies LocaleNamespace

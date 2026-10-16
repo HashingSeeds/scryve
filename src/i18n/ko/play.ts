@@ -38,7 +38,6 @@ export default {
     resumeHostedGame: "호스트 게임 이어하기",
     system: "시스템",
     gameSystem: "게임 시스템",
-    noSystem: "시스템 없음",
     format: "포맷",
     seats: "좌석",
     players: "플레이어",
@@ -98,10 +97,12 @@ export default {
     loadMore: "더 보기",
     loadingMoreGames: "게임 더 불러오는 중…",
     endGameTitle: "이 게임을 종료할까요?",
+    cancelEndGame: "게임 종료를 취소할까요?",
     endGameMessage:
       "모든 사람의 게임이 종료되고 중단된 게임으로 기록됩니다. 이 작업은 되돌릴 수 없습니다.",
     endGameConfirm: "게임 종료",
     leaveGameTitle: "이 게임에서 나갈까요?",
+    cancelLeaveGame: "게임 나가기를 취소할까요?",
     leaveGameMessage: "이 게임에서 나갑니다. 다른 플레이어와 기록은 그대로 유지됩니다.",
     leaveGameConfirm: "게임 나가기",
     closeAppearancePicker: "색상 및 마크 선택 닫기",
@@ -288,6 +289,7 @@ export default {
     notFoundContent: "삭제되었을 수 있습니다.",
     deleteResult: "결과 삭제",
     deleteTitle: "이 결과를 삭제할까요?",
+    cancelDelete: "결과 삭제를 취소할까요?",
     deleteMessage: "이 결과가 포함된 덱 통계가 업데이트됩니다.",
   },
   recordMatch: {

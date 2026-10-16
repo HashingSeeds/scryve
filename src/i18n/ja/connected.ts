@@ -269,7 +269,12 @@ export default {
     anotherSeat: "別の席",
     closeLayout: "レイアウト選択を閉じる",
     failedAction: {
-      life: "{{delta}} の{{counter}}の変更を同期できませんでした",
+      life: {
+        none: "ライフの{{delta}}の変更を同期できませんでした",
+        mtg: "ライフの{{delta}}の変更を同期できませんでした",
+        ygo: "ライフポイントの{{delta}}の変更を同期できませんでした",
+        pokemon: "サイドカードの{{delta}}の変更を同期できませんでした",
+      },
       commanderDamage: "{{delta}} のコマンダーダメージの割り当てを同期できませんでした",
       table: "テーブルの変更を同期できませんでした",
       confirmCommanderDamage: "コマンダーダメージの承認を同期できませんでした",
@@ -437,6 +442,11 @@ export default {
       hostFailed: "ホストできませんでした: {{error}}",
       unreachable: "{{name}}に接続できません。ゲームが終了した可能性があります。",
       lostHost: "ホストとの接続が切れました。ゲームが終了した可能性があります。",
+    },
+    rejected: {
+      seatTaken: "その席は別のデバイスが使用中です。",
+      started: "このゲームはすでに開始されています。",
+      full: "このゲームは満員です。",
     },
   },
 } satisfies LocaleNamespace

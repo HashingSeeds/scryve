@@ -155,6 +155,7 @@ export default {
       draw: "Empate",
     },
     failed: "No se pudo terminar esta partida.",
+    noFinishedGame: "Esta partida no tiene ningún juego terminado que finalizar.",
     cancel: "Cancelar el fin de la partida",
     title: "Resultado de la partida",
     playerResult: "Resultado de la partida de {{name}}",
@@ -162,6 +163,18 @@ export default {
     drawRemainingHint:
       "Empata a todos los asientos que siguen jugando y da una derrota a los eliminados",
     end: "Terminar partida",
+    scoreErrors: {
+      gamesWonRange:
+        "Los juegos ganados deben estar entre 0 y {{max}} en un al mejor de {{bestOf}}",
+      gamesDrawnRange: "Los juegos empatados deben estar entre 0 y {{max}}",
+      tooManyWins: "Un al mejor de {{bestOf}} no puede tener {{wins}} victorias",
+      partialScore:
+        "Introduce los juegos ganados de todos los asientos o deja el resultado en blanco",
+      oneWinner: "Una partida solo puede tener un ganador",
+      needsWinner: "Una partida necesita un ganador, salvo que sea empate",
+      winnerLeads: "El ganador debe tener más juegos ganados",
+      leaderWins: "El asiento con más juegos ganados debe ser el ganador",
+    },
   },
   claim: {
     matchStanding: "Al mejor de {{bestOf}} · {{score}}",
@@ -325,12 +338,6 @@ export default {
     assignFromStale: "Asignar daño de comandante de {{identity}}, desactualizado",
     showOverviewFor: "Mostrar daño de comandante de {{identity}}",
     expandsGrid: "Expande la cuadrícula de daño de comandante",
-  },
-  tableItem: {
-    poison: "Veneno",
-    commanderTax: "Impuesto de comandante",
-    monarch: "El monarca",
-    initiative: "La iniciativa",
   },
   outReason: {
     commanderDamage: "daño de comandante",

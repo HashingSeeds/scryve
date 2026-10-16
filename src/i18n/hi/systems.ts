@@ -2,6 +2,56 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
+  noSystem: "कोई सिस्टम नहीं",
+  counterHeading: {
+    none: "लाइफ",
+    mtg: "लाइफ",
+    ygo: "Life Points",
+    pokemon: "प्राइज़ कार्ड",
+  },
+  counterLabel: {
+    none: "लाइफ",
+    mtg: "लाइफ",
+    ygo: "Life Points",
+    pokemon: "प्राइज़ कार्ड",
+  },
+  startingValueRange: {
+    none: "शुरुआती लाइफ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
+    mtg: "शुरुआती लाइफ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
+    ygo: "शुरुआती Life Points 1 से {{max}} के बीच की पूर्ण संख्या होने चाहिए।",
+    pokemon: "शुरुआती प्राइज़ कार्ड 1 से {{max}} के बीच की पूर्ण संख्या होने चाहिए।",
+  },
+  tableItem: {
+    poison: "पॉइज़न",
+    commanderTax: "कमांडर टैक्स",
+    monarch: "मोनार्क",
+    initiative: "इनिशिएटिव",
+  },
+  section: {
+    commander: "Commander",
+    sideboard: "साइडबोर्ड",
+    extra: "एक्स्ट्रा डेक",
+    side: "साइड डेक",
+    main: {
+      mtg: "मुख्य डेक",
+      ygo: "मेन डेक",
+      pokemon: "डेक",
+    },
+  },
+  formatBlurb: {
+    mtg: {
+      commander: "100 कार्ड, सिंगलटन",
+      standard: "हाल के सेट",
+      pioneer: "Return to Ravnica से आगे",
+      modern: "8th Edition से आगे",
+      legacy: "लगभग हर सेट",
+      vintage: "रिस्ट्रिक्टेड लिस्ट",
+      pauper: "सिर्फ़ कॉमन",
+      brawl: "60 कार्ड, सिंगलटन",
+      limited: "ड्राफ़्ट और सील्ड",
+      constructed: "बाकी सब",
+    },
+  },
   counterValue: {
     none_one: "{{count}} लाइफ़",
     none_other: "{{count}} लाइफ़",
