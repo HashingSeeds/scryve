@@ -31,7 +31,7 @@ export default function DecksRoute() {
       }
       hasCurrentGame={hasCurrentGame}
       onSettings={() => router.push("/settings")}
-      accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
+      accountEntry={auth.isSignedIn ? "account" : "signIn"}
       onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
       onAddDeck={() => router.push("/connected/decks/add")}
       onSelect={(deck) =>

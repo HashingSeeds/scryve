@@ -15,6 +15,7 @@ import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
 import { AlertNote } from "@/components/AlertNote"
+import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
@@ -98,7 +99,7 @@ type ConnectedBoardScreenProps = {
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
 }
 
 type ConnectedBoardShellState =
@@ -252,7 +253,7 @@ type ConnectedBoardReadyProps = {
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
@@ -329,7 +330,7 @@ interface ConnectedBoardRuntimeProps {
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
   ownerId: string
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
@@ -351,7 +352,7 @@ export function ConnectedBoardWithRuntime({
   onDecks,
   onSettings,
   onAccount,
-  accountLabel,
+  accountEntry,
   ownerId,
   cloud = true,
   runtime,
@@ -500,7 +501,7 @@ export function ConnectedBoardWithRuntime({
               onDecks={onDecks}
               onSettings={onSettings}
               onAccount={onAccount}
-              accountLabel={accountLabel}
+              accountEntry={accountEntry}
               onGameEnded={onGameEnded}
               onRematch={onRematch}
               onGameAbandoned={onGameAbandoned}
@@ -524,7 +525,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onDecks,
   onSettings,
   onAccount,
-  accountLabel,
+  accountEntry,
   onGameEnded,
   onRematch,
   onGameAbandoned,
@@ -966,8 +967,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         windowOverlay={
           menuOpen && onDecks && onSettings && onAccount ? (
             <FloatingAppNavigation
-              destinationLabel="Decks"
-              accountLabel={accountLabel}
+              destination="decks"
+              accountEntry={accountEntry}
               onDestination={onDecks}
               onSettings={onSettings}
               onAccount={onAccount}

@@ -4,6 +4,7 @@ import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import {
   $dialogActions,
@@ -65,7 +66,7 @@ export interface CurrentGameScreenProps {
   onConnect?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
   onViewSummary: (gameId: string) => void
   onGameAbandoned?: () => void
   repository?: LocalGameRepository
@@ -82,7 +83,7 @@ export function CurrentGameScreen({
   onConnect,
   onSettings,
   onAccount,
-  accountLabel = "Account",
+  accountEntry = "account",
   onViewSummary,
   onGameAbandoned,
   repository,
@@ -439,8 +440,8 @@ export function CurrentGameScreen({
           windowOverlay={
             menuOpen && onDecks && onSettings && onAccount ? (
               <FloatingAppNavigation
-                destinationLabel="Decks"
-                accountLabel={accountLabel}
+                destination="decks"
+                accountEntry={accountEntry}
                 onDestination={onDecks}
                 onSettings={onSettings}
                 onAccount={onAccount}

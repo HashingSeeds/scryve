@@ -34,7 +34,7 @@ describe("AppUtilityMenu", () => {
     const onSettings = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AppUtilityMenu accountLabel="Sign in" onSettings={onSettings} onAccount={jest.fn()} />
+        <AppUtilityMenu accountEntry="signIn" onSettings={onSettings} onAccount={jest.fn()} />
       </ThemeProvider>,
     )
 

@@ -9,7 +9,6 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { useAppUpdate } from "@/features/updates/appUpdate"
-import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -18,12 +17,7 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { Text } from "./Text"
 
-export type AccountLabel = "Account" | "Sign in"
-
-const accountLabelTx = {
-  "Account": "common:appMenu.account",
-  "Sign in": "common:appMenu.signIn",
-} as const satisfies Record<AccountLabel, TxKeyPath>
+export type AccountEntry = "account" | "signIn"
 
 export function AppUtilityMenu({
   visible = true,
@@ -32,7 +26,7 @@ export function AppUtilityMenu({
   onSettings,
   onAccount,
   onOpenChange,
-  accountLabel = "Account",
+  accountEntry = "account",
 }: {
   visible?: boolean
   compact?: boolean
@@ -40,7 +34,7 @@ export function AppUtilityMenu({
   onSettings: () => void
   onAccount: () => void
   onOpenChange?: (open: boolean) => void
-  accountLabel?: AccountLabel
+  accountEntry?: AccountEntry
 }) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
@@ -173,7 +167,7 @@ export function AppUtilityMenu({
             onPress={() => choose(onAccount)}
           >
             <Text
-              tx={accountLabelTx[accountLabel]}
+              tx={`common:appMenu.${accountEntry}`}
               weight="medium"
               numberOfLines={1}
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
