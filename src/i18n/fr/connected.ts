@@ -264,6 +264,7 @@ export default {
     title: "Joueurs",
     description:
       "Signalez un nom que vous jugez offensant, ou bloquez un joueur pour ne plus être placé avec lui.",
+    yourRole: "Votre rôle",
     close: "Fermer les actions sur les joueurs",
     thanks: "Merci, c'est enregistré",
     reportPlayer: "Signaler {{name}}",

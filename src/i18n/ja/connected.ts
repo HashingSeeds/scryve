@@ -236,6 +236,7 @@ export default {
   playerActions: {
     title: "プレイヤー",
     description: "不快な名前を報告するか、プレイヤーをブロックして同じ席にならないようにできます。",
+    yourRole: "あなたの役割",
     close: "プレイヤー操作を閉じる",
     thanks: "ありがとうございます。記録しました",
     reportPlayer: "{{name}} を報告",

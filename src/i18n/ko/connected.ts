@@ -234,6 +234,7 @@ export default {
   playerActions: {
     title: "플레이어",
     description: "불쾌한 이름을 신고하거나, 플레이어를 차단해 같은 자리에 배정되지 않도록 하세요.",
+    yourRole: "내 역할",
     close: "플레이어 작업 닫기",
     thanks: "감사합니다. 접수되었습니다",
     reportPlayer: "{{name}} 신고",

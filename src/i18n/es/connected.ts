@@ -259,6 +259,7 @@ export default {
     title: "Jugadores",
     description:
       "Denuncia un nombre que te parezca ofensivo o bloquea a un jugador para no coincidir con él en la mesa.",
+    yourRole: "Tu rol",
     close: "Cerrar acciones de jugadores",
     thanks: "Gracias, ha quedado registrado",
     reportPlayer: "Denunciar a {{name}}",
