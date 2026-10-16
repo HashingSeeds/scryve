@@ -8,7 +8,7 @@ const MARK_CENTER = 22
 const SWORD_GLYPH_BOUNDS = { left: 6.8, right: 17.2, top: 2.5, bottom: 21.5 }
 
 describe("PlayerMark", () => {
-  it.each(["heart", "plus", "shield", "crown", "moon", "flame", "bolt", "eye", "key"] as const)(
+  it.each(["heart", "plus", "shield", "crown", "flame", "bolt", "eye"] as const)(
     "renders the new %s mark and its sword",
     (shape) => {
       const view = render(

@@ -526,7 +526,7 @@ describe("NewGameScreen", () => {
       selected: true,
       disabled: false,
     })
-    fireEvent.press(view.getByTestId("appearance-shape-moon"))
+    fireEvent.press(view.getByTestId("appearance-shape-flame"))
     expect(openAuth).toHaveBeenCalledTimes(1)
     expect(view.queryByTestId("local-appearance-dialog")).toBeNull()
   })

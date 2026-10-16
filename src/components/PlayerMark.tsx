@@ -36,11 +36,9 @@ export const MARK_ART_BOUNDS: Record<
   shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
   heart: { top: 9.15, bottom: 34.84, left: 8, right: 36 },
   crown: { top: 10.25, bottom: 35, left: 8.25, right: 35.75 },
-  moon: { top: 8.02, bottom: 36.02, left: 9.35, right: 35.6 },
   flame: { top: 8, bottom: 36, left: 11, right: 33 },
   bolt: { top: 7.75, bottom: 36.25, left: 10.25, right: 33.75 },
   eye: { top: 11.5, bottom: 32.5, left: 7.5, right: 36.5 },
-  key: { top: 13.5, bottom: 30.5, left: 7.5, right: 36.5 },
 }
 export const MARK_VIEW_BOX = 44
 
@@ -193,11 +191,9 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   shield: { centerX: 22, centerY: 21.5, size: 15 },
   heart: { centerX: 22, centerY: 22.5, size: 13 },
   crown: { centerX: 22, centerY: 22.5, size: 11 },
-  moon: { centerX: 15.5, centerY: 23, size: 11 },
   flame: { centerX: 22, centerY: 27, size: 12 },
   bolt: { centerX: 22, centerY: 22.5, size: 9 },
   eye: { centerX: 22, centerY: 22, size: 13 },
-  key: { centerX: 16, centerY: 22, size: 11 },
 }
 
 function CloseIconOverlay({
@@ -253,7 +249,7 @@ function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string })
 
 const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const
 
-/** why: a sword inset over the eye's or key's hole would vanish into the card, so `solid` fills the holes. */
+/** why: a sword inset over the eye's hole would vanish into the card, so `solid` fills it. */
 function MarkShape({
   shape,
   color,
@@ -331,8 +327,6 @@ function MarkShape({
           <Rect x="11" y="31" width="22" height="4" rx="1.5" />
         </G>
       )
-    case "moon":
-      return <Path {...common} d="M26.6 8.4A14 14 0 1 0 35.6 28.8 11.2 11.2 0 0 1 26.6 8.4Z" />
     case "flame":
       return (
         <Path
@@ -360,20 +354,6 @@ function MarkShape({
               : "M28.2 22A6.2 6.2 0 1 1 15.8 22 6.2 6.2 0 1 1 28.2 22ZM24.7 22A2.7 2.7 0 1 1 19.3 22 2.7 2.7 0 1 1 24.7 22Z"
           }`}
         />
-      )
-    case "key":
-      return (
-        <G {...common}>
-          <Path
-            fillRule="evenodd"
-            d={`M16 13.5A8.5 8.5 0 1 1 16 30.5 8.5 8.5 0 1 1 16 13.5Z${
-              solid ? "" : "M16 18.5A3.5 3.5 0 1 0 16 25.5 3.5 3.5 0 1 0 16 18.5Z"
-            }`}
-          />
-          <Rect x="23" y="19.5" width="13.5" height="5" rx="1.5" />
-          <Rect x="27" y="22" width="3.6" height="8" rx="1.2" />
-          <Rect x="32.6" y="22" width="3.6" height="5.5" rx="1.2" />
-        </G>
       )
   }
 }
