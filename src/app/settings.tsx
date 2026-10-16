@@ -2,6 +2,7 @@ import { Platform } from "react-native"
 import { router } from "expo-router"
 
 import { openAppleStandardEula } from "@/content/legalLinks"
+import { AppIconPicker } from "@/features/appIcon/AppIconPicker"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { BlockedPlayersSection } from "@/features/connected/BlockedPlayersSection"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -26,6 +27,7 @@ export default function SettingsRoute() {
       onOpenCookiePolicy={() => router.push("/cookie-policy")}
       onOpenGameContentNotices={() => router.push("/game-content-notices")}
       BlockedPlayers={hasCloudSession ? <BlockedPlayersSection /> : undefined}
+      AppIcon={<AppIconPicker />}
       onSettingsChange={(settings) => {
         localGameRepository.saveSettings(settings)
         setThemeContextOverride(

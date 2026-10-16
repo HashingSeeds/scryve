@@ -61,6 +61,7 @@ export interface SettingsScreenProps {
   onOpenCookiePolicy?: () => void
   onOpenGameContentNotices?: () => void
   BlockedPlayers?: ReactNode
+  AppIcon?: ReactNode
 }
 
 export function SettingsScreen({
@@ -75,6 +76,7 @@ export function SettingsScreen({
   onOpenCookiePolicy,
   onOpenGameContentNotices,
   BlockedPlayers,
+  AppIcon,
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
@@ -284,6 +286,7 @@ export function SettingsScreen({
           size="xs"
           style={themed($muted)}
         />
+        {AppIcon}
         <Text text="Game menu button" preset="subheading" accessibilityRole="header" />
         <View style={themed($row)}>
           {MENU_BUTTON_STYLES.map((style) => (

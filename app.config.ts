@@ -1,5 +1,12 @@
 import type { ConfigContext, ExpoConfig } from "expo/config"
-import { CodeGenerator, withMainActivity } from "expo/config-plugins"
+import {
+  AndroidConfig,
+  CodeGenerator,
+  withAndroidManifest,
+  withMainActivity,
+} from "expo/config-plugins"
+
+import { APP_ICON_VARIANTS, appIconAssets } from "./src/features/appIcon/appIconVariants.ts"
 
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
@@ -101,6 +108,17 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       microphonePermission: false,
     },
   ])
+  plugins.push([
+    "expo-alternate-app-icons",
+    APP_ICON_VARIANTS.map(({ name, background }) => {
+      const assets = appIconAssets(name)
+      return {
+        name,
+        ios: assets.ios,
+        android: { foregroundImage: assets.androidForeground, backgroundColor: background },
+      }
+    }),
+  ])
 
   const normalizedInviteOrigin = normalizeHttpsOrigin(process.env.EXPO_PUBLIC_INVITE_ORIGIN)
   const inviteUrl = normalizedInviteOrigin ? new URL(normalizedInviteOrigin) : undefined
@@ -170,7 +188,7 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     },
   }
 
-  return withMainActivity(expoConfig, (config) => {
+  const withRotation = withMainActivity(expoConfig, (config) => {
     const { modResults } = config
     modResults.contents = CodeGenerator.mergeContents({
       src: modResults.contents,
@@ -181,6 +199,18 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       newSrc:
         "    window.attributes = window.attributes.apply { rotationAnimation = android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT }",
     }).contents
+    return config
+  })
+
+  // why: expo-alternate-app-icons launches through activity aliases but copies only android.intentFilters, so with an alternate icon on, scheme links and Clerk's sign-in callback would reach no enabled activity.
+  return withAndroidManifest(withRotation, (config) => {
+    const main = AndroidConfig.Manifest.getMainActivityOrThrow(config.modResults)
+    const application = AndroidConfig.Manifest.getMainApplicationOrThrow(config.modResults)
+    for (const alias of application["activity-alias"] ?? []) {
+      if (alias.$?.["android:targetActivity"] === ".MainActivity") {
+        alias["intent-filter"] = main["intent-filter"]
+      }
+    }
     return config
   })
 }
