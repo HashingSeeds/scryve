@@ -130,12 +130,23 @@ const board = {
   matchEnd: {
     outcome: { win: "Win", loss: "Loss", draw: "Draw" },
     failed: "Could not end this match.",
+    noFinishedGame: "This match has no finished game to end.",
     cancel: "Cancel ending the match",
     title: "Match result",
     playerResult: "{{name}} match result",
     drawRemaining: "Draw for remaining",
     drawRemainingHint: "Draws every seat still playing and gives eliminated seats a loss",
     end: "End match",
+    scoreErrors: {
+      gamesWonRange: "Games won must be 0–{{max}} in a best of {{bestOf}}",
+      gamesDrawnRange: "Games drawn must be 0–{{max}}",
+      tooManyWins: "A best of {{bestOf}} cannot have {{wins}} wins",
+      partialScore: "Enter games won for every seat or leave the score blank",
+      oneWinner: "A match can only have one winner",
+      needsWinner: "A match needs a winner unless it was drawn",
+      winnerLeads: "The winner must have the most game wins",
+      leaderWins: "The seat with the most game wins must be the winner",
+    },
   },
   claim: {
     matchStanding: "Best of {{bestOf}} · {{score}}",

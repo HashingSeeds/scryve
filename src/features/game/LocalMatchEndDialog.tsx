@@ -19,6 +19,48 @@ import { assertGameScores } from "../../../convex/lib/matchResults"
 
 const OUTCOMES = ["win", "loss", "draw"] as const satisfies readonly MatchSeatOutcome[]
 
+/** why: assertGameScores is shared with the server and throws English; matching its exact text here keeps convex/ unchanged for installed clients. */
+const SCORE_ERRORS: readonly [RegExp, (groups: string[]) => string][] = [
+  [
+    /^Games won must be 0–(\d+) in a best of (\d+)$/,
+    ([max, bestOf]) => translate("board:matchEnd.scoreErrors.gamesWonRange", { max, bestOf }),
+  ],
+  [
+    /^Games drawn must be 0–(\d+)$/,
+    ([max]) => translate("board:matchEnd.scoreErrors.gamesDrawnRange", { max }),
+  ],
+  [
+    /^A best of (\d+) cannot have (\d+) wins$/,
+    ([bestOf, wins]) => translate("board:matchEnd.scoreErrors.tooManyWins", { bestOf, wins }),
+  ],
+  [
+    /^Enter games won for every seat or leave the score blank$/,
+    () => translate("board:matchEnd.scoreErrors.partialScore"),
+  ],
+  [/^A match can only have one winner$/, () => translate("board:matchEnd.scoreErrors.oneWinner")],
+  [
+    /^A match needs a winner unless it was drawn$/,
+    () => translate("board:matchEnd.scoreErrors.needsWinner"),
+  ],
+  [
+    /^The winner must have the most game wins$/,
+    () => translate("board:matchEnd.scoreErrors.winnerLeads"),
+  ],
+  [
+    /^The seat with the most game wins must be the winner$/,
+    () => translate("board:matchEnd.scoreErrors.leaderWins"),
+  ],
+]
+
+function gameScoresErrorMessage(cause: unknown) {
+  const message = cause instanceof Error ? cause.message : ""
+  for (const [pattern, describe] of SCORE_ERRORS) {
+    const match = pattern.exec(message)
+    if (match) return describe(match.slice(1))
+  }
+  return cause instanceof Error ? cause.message : translate("board:matchEnd.failed")
+}
+
 function drawForRemaining(game: LocalGame): MatchSeatOutcome[] {
   return game.players.map((player) => (isPlayerOut(game, player.id) ? "loss" : "draw"))
 }
@@ -71,7 +113,7 @@ export function LocalMatchEndDialog({
       )
       onEnd(outcomes)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : translate("board:matchEnd.failed"))
+      setError(gameScoresErrorMessage(cause))
     }
   }
 
