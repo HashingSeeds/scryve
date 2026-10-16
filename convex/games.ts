@@ -3226,9 +3226,11 @@ export const activeConnectedGames = query({
 })
 
 // why: a published local game with no seat of the owner's has no membership row, only a host.
+// why: a local game's host may hold no seat, and a nearby guest who claimed a seat holds one.
 async function requireSummaryAccess(ctx: QueryCtx, game: Doc<"games">) {
-  if (game.mode === "local") await requireHost(ctx, game)
-  else await requireMembership(ctx, game._id)
+  const user = await requireUser(ctx)
+  if (game.mode === "local" && game.hostUserId === user._id) return
+  await requireMembership(ctx, game._id)
 }
 
 export const connectedSummary = query({

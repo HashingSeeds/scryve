@@ -107,6 +107,11 @@ describe("claimNearbySeat", () => {
     expect(summary?.players.filter((player) => player.userId).map((player) => player.seat)).toEqual(
       [1, 2],
     )
+    const opened = await guest.query(api.games.connectedSummary, { publicId: PUBLIC_ID })
+    expect(opened?.publicId).toBe(PUBLIC_ID)
+    await expect(
+      host.query(api.games.connectedSummary, { publicId: PUBLIC_ID }),
+    ).resolves.toBeTruthy()
   })
 
   it("refuses a wrong pass, a seat another account holds, and a second seat for one account", async () => {
@@ -130,6 +135,9 @@ describe("claimNearbySeat", () => {
       host.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: OTHER_TOKEN }),
     ).rejects.toThrow("already hold a seat")
     expect((await historyOf(intruder)).page).toHaveLength(0)
+    await expect(
+      intruder.query(api.games.connectedSummary, { publicId: PUBLIC_ID }),
+    ).rejects.toThrow("Game membership required")
   })
 
   it("rejects a pass hash on the host's own seat, a malformed hash, and a repeated hash", async () => {

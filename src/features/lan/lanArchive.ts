@@ -6,7 +6,6 @@ import { localGameRepository } from "@/features/game/localPersistence"
 import type { GameEvent, LocalGame, SeatPassHashes } from "@/features/game/types"
 
 import { lanProjection, lanRoundId, lanSeatAppearance, type LanGame } from "./lanGame"
-import { nearbyOwner } from "./nearbyAccount"
 import { commanderTotals } from "../../../convex/lib/gameEngineMemory"
 
 /** why: must match `convex/lib/seatPass.ts`, which checks each guest's claim; no test runs both sides. */
@@ -88,13 +87,12 @@ export function archiveLanGame(
   game: LanGame,
   result: ConnectedGameResult | undefined,
   passHashes: ReadonlyMap<string, string>,
+  ownerId: string | undefined,
 ) {
   const seatPassHashes: SeatPassHashes = {}
   for (const { key } of game.seats) {
     const hash = passHashes.get(key)
     if (hash && key !== game.hostKey) seatPassHashes[asPlayerId(key)] = hash
   }
-  return localGameRepository.archiveGame(
-    lanLocalGame(game, { result, ownerId: nearbyOwner(), seatPassHashes }),
-  )
+  return localGameRepository.archiveGame(lanLocalGame(game, { result, ownerId, seatPassHashes }))
 }

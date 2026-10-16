@@ -143,7 +143,7 @@ describe("publishFinishedLocalGame", () => {
     const other = await synced(t, "other", "Other")
     await expect(
       other.query(api.games.connectedSummary, { publicId: finishedGame().publicId }),
-    ).rejects.toThrow("Host permission required")
+    ).rejects.toThrow("Game membership required")
   })
 
   it("rejects decks the user does not own, decks on other seats, and other accounts' ids", async () => {

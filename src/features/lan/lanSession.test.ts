@@ -136,15 +136,19 @@ describe("nearby host", () => {
     expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "rate_limited" })
   })
 
-  it("archives a finished round once, with the winner and every guest's pass", async () => {
+  it("archives a finished round once, with the winner, every guest's pass, and the account that started it", async () => {
+    setNearbyOwner("host-account")
     const { session, alice, bob } = await startedGame()
+    setNearbyOwner("switched-account")
     const result = { kind: "win" as const, winnerPlayerIds: [alice.pass().key] }
 
     await session.writes.finish(result)
     await session.writes.finish(result)
 
     expect(archiveLanGame).toHaveBeenCalledTimes(1)
-    const [game, archivedResult, hashes] = jest.mocked(archiveLanGame).mock.calls[0]
+    const [game, archivedResult, hashes, ownerId] = jest.mocked(archiveLanGame).mock.calls[0]
+    setNearbyOwner(undefined)
+    expect(ownerId).toBe("host-account")
     expect(game.status).toBe("active")
     expect(archivedResult).toEqual(result)
     expect(hashes).toEqual(

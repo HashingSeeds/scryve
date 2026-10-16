@@ -42,7 +42,7 @@ import {
   type LanConnection,
   type LanHost,
 } from "./lanTransport"
-import { rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
+import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -115,6 +115,8 @@ export class LanSession {
   private connection?: LanConnection<LanGuestMessage>
   private pass?: LanSeatPass
   private claimedRound?: string
+  // why: the round belongs to the account that started it, even if the host signs out or switches before the finish.
+  private roundOwner?: string
   private finishedRound?: string
   private pendingWrites = new Map<string, PendingWrite>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
@@ -453,8 +455,10 @@ export class LanSession {
 
   start() {
     const game = this.game
-    if (this.state.role === "host" && game && game.status !== "active" && lanSeatsReady(game))
+    if (this.state.role === "host" && game && game.status !== "active" && lanSeatsReady(game)) {
+      this.roundOwner = nearbyOwner()
       this.publish(startLanRound(game, Date.now()))
+    }
   }
 
   private hashPass({ key, token }: LanSeatPass) {
@@ -476,7 +480,7 @@ export class LanSession {
     if (session !== this.session || game?.status !== "active" || game.round !== started.round)
       return
     const now = Date.now()
-    archiveLanGame({ ...game, updatedAt: now }, result, hashes)
+    archiveLanGame({ ...game, updatedAt: now }, result, hashes, this.roundOwner)
     this.publish(endLanRound(game, "finished", now))
   }
 
