@@ -5,8 +5,14 @@ import { load, save } from "@/utils/storage"
 import { lanPlayAvailable } from "./lanAvailability"
 
 const NEARBY_ONLY_KEY = "lan.nearbyOnly"
-// why: the reserved .invalid domain never resolves, so the Convex client behaves exactly as it does in a real outage.
-export const UNREACHABLE_CONVEX_URL = "https://convex.offline.invalid"
+const UNREACHABLE_SYNC_URL = "wss://convex.offline.invalid/api/sync"
+
+/** why: deck caches are keyed by the client's URL, so only the socket changes; the reserved .invalid domain never resolves, as in a real outage. */
+export class UnreachableWebSocket extends WebSocket {
+  constructor(_url: string | URL, protocols?: string | string[]) {
+    super(UNREACHABLE_SYNC_URL, protocols)
+  }
+}
 
 const listeners = new Set<() => void>()
 let nearbyOnly = load(NEARBY_ONLY_KEY) === true

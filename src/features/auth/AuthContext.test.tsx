@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native"
 import { ConvexReactClient } from "convex/react"
 
 import { Text } from "@/components/Text"
-import { setNearbyOnly, UNREACHABLE_CONVEX_URL } from "@/features/lan/nearbyOnly"
+import { setNearbyOnly, UnreachableWebSocket } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
 
 import { CloudProviders, useAuthAccess } from "./AuthContext"
@@ -89,7 +89,7 @@ describe("native auth experience", () => {
     expect(screen.getByTestId("auth-modal").props.visible).toBe(true)
   })
 
-  it("points Convex at an unreachable address while nearby only is on, closing the live client", () => {
+  it("cuts Convex off while nearby only is on, keeping its URL so local caches stay put", () => {
     render(
       <ThemeProvider initialContext="light">
         <CloudProviders>
@@ -100,14 +100,16 @@ describe("native auth experience", () => {
     const live = jest.mocked(ConvexReactClient).mock.results.at(-1)?.value
 
     act(() => setNearbyOnly(true))
-    expect(ConvexReactClient).toHaveBeenLastCalledWith(UNREACHABLE_CONVEX_URL, expect.anything())
+    expect(ConvexReactClient).toHaveBeenLastCalledWith("https://example.convex.cloud", {
+      initialAuthTokenReuse: true,
+      webSocketConstructor: UnreachableWebSocket,
+    })
     expect(live.close).toHaveBeenCalledTimes(1)
 
     act(() => setNearbyOnly(false))
-    expect(ConvexReactClient).toHaveBeenLastCalledWith(
-      "https://example.convex.cloud",
-      expect.anything(),
-    )
+    expect(ConvexReactClient).toHaveBeenLastCalledWith("https://example.convex.cloud", {
+      initialAuthTokenReuse: true,
+    })
   })
 
   it("passes the native Clerk resource cache alongside the token cache", () => {

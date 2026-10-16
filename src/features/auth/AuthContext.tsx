@@ -19,7 +19,7 @@ import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
 import { reconnectConvexOnNetworkReturn } from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
-import { UNREACHABLE_CONVEX_URL, useNearbyOnly } from "@/features/lan/nearbyOnly"
+import { UnreachableWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
@@ -93,10 +93,13 @@ export function ConfiguredAuth({
     [isLoaded, isSignedIn, user?.id, sessionHint, visible],
   )
   const nearbyOnly = useNearbyOnly()
-  const clientUrl = nearbyOnly ? UNREACHABLE_CONVEX_URL : convexUrl
   const client = useMemo(
-    () => new ConvexReactClient(clientUrl, { initialAuthTokenReuse: true }),
-    [clientUrl],
+    () =>
+      new ConvexReactClient(convexUrl, {
+        initialAuthTokenReuse: true,
+        ...(nearbyOnly ? { webSocketConstructor: UnreachableWebSocket } : {}),
+      }),
+    [convexUrl, nearbyOnly],
   )
   const previousClient = useRef(client)
   useEffect(() => {
