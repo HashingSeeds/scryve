@@ -106,13 +106,19 @@ export function useConnectedSession({
   )
   const snapshot = useValue(() => controller.state$.get())
   useEffect(() => () => controller.dispose(), [controller])
-  return { controller, snapshot, deviceId, head: snapshot.pending[0]?.event }
+  return {
+    controller,
+    snapshot,
+    deviceId,
+    awaitProjectionBarrier,
+    head: snapshot.pending[0]?.event,
+  }
 }
 
 export type ConnectedSession = ReturnType<typeof useConnectedSession>
 
 export function useConnectedRuntime(
-  { controller, snapshot, head }: ConnectedSession,
+  { controller, snapshot, head, awaitProjectionBarrier }: ConnectedSession,
   { remote, operationStatus, environment }: ConnectedFeed,
 ): ConnectedGameRuntime {
   const { isWebSocketConnected, isLoading, isRefreshing, remoteReady } = environment
@@ -164,9 +170,9 @@ export function useConnectedRuntime(
   }, [controller, isAuthenticated, isLoading, isRefreshing, isWebSocketConnected, remoteReady])
 
   useEffect(() => {
-    if (head && operationStatus?.operationId !== head.operationId) return
+    if (awaitProjectionBarrier && head && operationStatus?.operationId !== head.operationId) return
     controller.onRemoteProjection(remote, operationStatus)
-  }, [controller, isWebSocketConnected, remote, operationStatus, head])
+  }, [awaitProjectionBarrier, controller, isWebSocketConnected, remote, operationStatus, head])
 
   return useMemo((): ConnectedGameRuntime => {
     const projection = snapshot.projection

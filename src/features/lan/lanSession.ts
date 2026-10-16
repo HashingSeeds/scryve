@@ -281,7 +281,6 @@ export class LanSession {
     this.flushTimer ??= setTimeout(() => this.flush(), wait)
   }
 
-  // why: each write is acknowledged only after the projection that includes it, or the guest's board would briefly drop the change.
   private flush() {
     this.flushTimer = undefined
     this.flushedAt = Date.now()

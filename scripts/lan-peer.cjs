@@ -56,7 +56,7 @@ const lose = setInterval(() => {
     type: "op",
     event: {
       type: "life.changed",
-      operationId: `peer-${String(writes).padStart(12, "0")}`,
+      operationId: `peer-${process.pid}-${String(writes).padStart(10, "0")}`,
       gameId,
       actorId: seatKey,
       deviceId: "peer-device",

@@ -62,7 +62,7 @@ function guest(index) {
     () => {
       if (!active) return
       writes += 1
-      const operationId = `load-${index}-${String(writes).padStart(10, "0")}`
+      const operationId = `load-${process.pid}-${index}-${String(writes).padStart(10, "0")}`
       const event = {
         type: "life.changed",
         operationId,
