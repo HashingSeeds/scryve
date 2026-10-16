@@ -40,7 +40,7 @@ export default {
     endCurrentGame: "पहले सेटअप में मौजूदा गेम खत्म करें।",
     finishConnectedGame: "पहले अपना कनेक्टेड गेम पूरा करें।",
     connecting: "कनेक्ट हो रहा है…",
-    unavailable: "कनेक्टेड खेल उपलब्ध नहीं है।",
+    unavailable: "कनेक्टेड गेम उपलब्ध नहीं है।",
     working: "काम जारी है…",
   },
   newGame: {
