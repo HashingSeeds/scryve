@@ -1,6 +1,8 @@
 import type { HostInstance, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform } from "react-native"
 
+import { translate } from "@/i18n/translate"
+
 import type { PokemonInPlay } from "../../../convex/lib/table"
 import {
   getLifeFontSizeThatFits,
@@ -125,11 +127,7 @@ export function benchChipMetrics(compact: boolean, fontScale: number) {
 export type BenchChipMetrics = ReturnType<typeof benchChipMetrics>
 
 export function pokemonName(pokemon: Pick<PokemonInPlay, "name">): string {
-  return pokemon.name?.trim() || "Pokémon"
-}
-
-export function prizeWord(count: number): string {
-  return `${count} ${Math.abs(count) === 1 ? "prize" : "prizes"}`
+  return pokemon.name?.trim() || translate("board:pokemon.unnamed")
 }
 
 export function knockoutMessage(input: {
@@ -137,9 +135,14 @@ export function knockoutMessage(input: {
   takerName?: string
   prizesTaken: number
 }): string {
-  const head = `${pokemonName(input.pokemon)} knocked out.`
-  if (!input.takerName || input.prizesTaken === 0) return head
-  return `${head} ${input.takerName} takes ${prizeWord(input.prizesTaken)}.`
+  const name = pokemonName(input.pokemon)
+  if (!input.takerName || input.prizesTaken === 0)
+    return translate("board:pokemon.knockedOut", { name })
+  return translate("board:pokemon.knockedOutTakes", {
+    name,
+    taker: input.takerName,
+    count: input.prizesTaken,
+  })
 }
 
 export function parseHp(value: string): number | undefined {

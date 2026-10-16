@@ -4,6 +4,8 @@ import { StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import { counterValueLabel, type PlaySystemId } from "@/features/game/playSystems"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -21,6 +23,8 @@ import { Sword } from "./Sword"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
+const COMMANDER_SYSTEM = "mtg" satisfies PlaySystemId
+
 export type CommanderAttacker = { color: string; shape?: PlayerMarkShape; seatNumber: number }
 
 type AssignmentTarget = {
@@ -34,7 +38,7 @@ type AssignmentTarget = {
 type AssignmentSource = {
   kind: "source"
   playerName: string
-  submitLabel: "Done" | "Send"
+  submit: "done" | "send"
   mark?: CommanderAttacker
   submitDisabled?: boolean
   onSubmit: () => void
@@ -107,7 +111,7 @@ export function CommanderDamageCardControls({
           >
             <CommanderAction
               testID={`commander-stage-seat-${seatNumber}--1`}
-              label={`Remove one commander damage from seat ${seatNumber}`}
+              label={translate("board:commander.removeOneFromSeat", { seat: seatNumber })}
               text="−"
               foreground={controlForeground}
               rotationStyle={rotationStyle}
@@ -117,7 +121,7 @@ export function CommanderDamageCardControls({
             />
             <CommanderAction
               testID={`commander-stage-seat-${seatNumber}-1`}
-              label={`Add one commander damage to seat ${seatNumber}`}
+              label={translate("board:commander.addOneToSeat", { seat: seatNumber })}
               text="+"
               foreground={controlForeground}
               rotationStyle={rotationStyle}
@@ -131,8 +135,8 @@ export function CommanderDamageCardControls({
             {mode.onCancel ? (
               <CommanderAction
                 testID={`commander-cancel-seat-${seatNumber}`}
-                label={`Cancel assigning commander damage from seat ${seatNumber}`}
-                text="Cancel"
+                label={translate("board:commander.cancelAssigningFromSeat", { seat: seatNumber })}
+                text={translate("common:cancel")}
                 foreground={controlForeground}
                 rotationStyle={rotationStyle}
                 compact={compact}
@@ -140,9 +144,15 @@ export function CommanderDamageCardControls({
               />
             ) : null}
             <CommanderAction
-              testID={`commander-${mode.submitLabel === "Send" ? "send" : "done"}-seat-${seatNumber}`}
-              label={`${mode.submitLabel} assigning commander damage from seat ${seatNumber}`}
-              text={mode.submitLabel}
+              testID={`commander-${mode.submit}-seat-${seatNumber}`}
+              label={translate(`board:commander.submitAssigningFromSeat.${mode.submit}`, {
+                seat: seatNumber,
+              })}
+              text={
+                mode.submit === "send"
+                  ? translate("board:commander.send")
+                  : translate("common:done")
+              }
               foreground={controlForeground}
               rotationStyle={rotationStyle}
               compact={compact}
@@ -161,7 +171,12 @@ export function CommanderDamageCardControls({
           pointerEvents="none"
           accessible={life !== undefined}
           accessibilityLabel={
-            life !== undefined ? `${modeAccessibilityLabel(mode)}, ${life} life` : undefined
+            life !== undefined
+              ? translate("board:commander.targetWithLife", {
+                  target: modeAccessibilityLabel(mode),
+                  life: counterValueLabel(COMMANDER_SYSTEM, life),
+                })
+              : undefined
           }
           accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
           style={[themed($summary), rotationStyle]}
@@ -207,7 +222,7 @@ export function CommanderDamageCardControls({
             {life !== undefined ? (
               <Text
                 testID={`commander-life-seat-${seatNumber}`}
-                text={`${life} life`}
+                text={counterValueLabel(COMMANDER_SYSTEM, life)}
                 maxFontSizeMultiplier={1.2}
                 style={[themed($localLife), { color: foreground }]}
                 numberOfLines={1}
@@ -295,8 +310,9 @@ function zonesRotationStyle(rotation: LifeCardContentRotation): ViewStyle {
 }
 
 function modeAccessibilityLabel(mode: CommanderDamageCardMode) {
-  if (mode.kind === "target") return `${mode.total} commander damage from ${mode.attackerName}`
-  return `Assigning commander damage from ${mode.playerName}`
+  if (mode.kind === "target")
+    return translate("board:commander.totalFrom", { damage: mode.total, name: mode.attackerName })
+  return translate("board:commander.assigningFrom", { name: mode.playerName })
 }
 
 const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({

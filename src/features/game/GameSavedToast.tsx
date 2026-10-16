@@ -5,13 +5,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 const VISIBLE_MS = 6_000
 
 export function GameSavedToast({
-  message = "Game saved",
+  message = translate("board:savedToast.gameSaved"),
   onViewSummary,
   onDismiss,
 }: {
@@ -46,7 +47,7 @@ export function GameSavedToast({
         <Text size="xs" weight="medium" text={message} style={themed($message)} />
         <Button
           testID="game-saved-summary-button"
-          text="Summary"
+          tx="board:savedToast.summary"
           style={themed($action)}
           textStyle={themed($actionText)}
           onPress={() => {

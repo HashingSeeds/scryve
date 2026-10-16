@@ -1,3 +1,6 @@
+import type { Translations } from "@/i18n/en"
+import { translate } from "@/i18n/translate"
+
 export const PLAYER_GRID_LAYOUT_VARIANTS = [
   "auto",
   "featured-first",
@@ -8,31 +11,47 @@ export const PLAYER_GRID_LAYOUT_VARIANTS = [
 
 export type PlayerGridLayoutVariant = (typeof PLAYER_GRID_LAYOUT_VARIANTS)[number]
 
+type PlayerGridLayoutLabel = keyof Translations["board"]["layout"]
+
 export interface PlayerGridLayoutOption {
   variant: PlayerGridLayoutVariant
   label: string
 }
 
-export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayoutOption[] {
-  if (playerCount === 2) return [{ variant: "auto", label: "Balanced" }]
+function layoutLabels(playerCount: number): [PlayerGridLayoutVariant, PlayerGridLayoutLabel][] {
   if (playerCount === 3)
     return [
-      { variant: "auto", label: "Top focus" },
-      { variant: "featured-last", label: "Bottom focus" },
-      { variant: "even-grid", label: "Even grid" },
+      ["auto", "topFocus"],
+      ["featured-last", "bottomFocus"],
+      ["even-grid", "evenGrid"],
     ]
   if (playerCount === 4 || playerCount === 6)
     return [
-      { variant: "auto", label: "Balanced" },
-      { variant: "tabletop", label: "Table" },
+      ["auto", "balanced"],
+      ["tabletop", "table"],
     ]
   if (playerCount === 5)
     return [
-      { variant: "auto", label: "Bottom focus" },
-      { variant: "featured-first", label: "Top focus" },
-      { variant: "even-grid", label: "Even grid" },
+      ["auto", "bottomFocus"],
+      ["featured-first", "topFocus"],
+      ["even-grid", "evenGrid"],
     ]
-  return [{ variant: "auto", label: "Balanced" }]
+  return [["auto", "balanced"]]
+}
+
+export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayoutOption[] {
+  return layoutLabels(playerCount).map(([variant, label]) => ({
+    variant,
+    label: translate(`board:layout.${label}`),
+  }))
+}
+
+export function playerGridLayoutAccessibilityLabel(
+  playerCount: number,
+  variant: PlayerGridLayoutVariant,
+) {
+  const label = layoutLabels(playerCount).find(([candidate]) => candidate === variant)?.[1]
+  return label && translate(`board:layoutOption.${label}`)
 }
 
 export function playerGridLayoutForCount(

@@ -2,7 +2,8 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Animated, { ReduceMotion, ZoomIn } from "react-native-reanimated"
 
-import { toolLabel, type DiceSeatChip } from "@/features/game/dice"
+import { rollLabel, rollValueLabel, type DiceSeatChip } from "@/features/game/dice"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -43,18 +44,18 @@ export function DiceChips({
   return (
     <View testID={`dice-chips-seat-${seatNumber}`} pointerEvents="box-none" style={themed($row)}>
       {chips.map((chip) => {
-        const key = chip.kind === "first" ? "first" : chip.roll.tool
+        const key = chipKey(chip)
         const label =
           chip.kind === "first"
-            ? `${playerName} goes first`
-            : `${playerName}, ${toolLabel(chip.roll.tool)}, ${chip.roll.value}`
+            ? translate("board:dice.goesFirst", { name: playerName })
+            : rollLabel(playerName, chip.roll)
         return (
           <Animated.View key={key} entering={entering}>
             <BoardPressable
               testID={`dice-chip-${seatNumber}-${key}`}
               accessibilityRole="button"
               accessibilityLabel={label}
-              accessibilityHint="Clears this result"
+              accessibilityHint={translate("board:dice.clearsResult")}
               hitSlop={{ top: 6, bottom: 6 }}
               onPress={() => onClear(chip)}
               style={({ pressed }) => [
@@ -65,7 +66,7 @@ export function DiceChips({
             >
               {chip.kind === "first" ? (
                 <Text
-                  text="1st"
+                  tx="board:dice.firstShort"
                   weight="bold"
                   maxFontSizeMultiplier={1.2}
                   style={[themed(compact ? $compactValue : $value), { color: foreground }]}
@@ -74,7 +75,7 @@ export function DiceChips({
                 <>
                   <DiceGlyph tool={chip.roll.tool} size={compact ? 13 : 15} color={foreground} />
                   <Text
-                    text={String(chip.roll.value)}
+                    text={rollValueLabel(chip.roll)}
                     weight="bold"
                     maxFontSizeMultiplier={1.2}
                     style={[themed(compact ? $compactValue : $value), { color: foreground }]}
@@ -87,6 +88,10 @@ export function DiceChips({
       })}
     </View>
   )
+}
+
+function chipKey(chip: DiceSeatChip) {
+  return chip.kind === "first" ? "first" : chip.roll.tool
 }
 
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({

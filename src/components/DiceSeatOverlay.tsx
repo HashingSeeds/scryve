@@ -13,13 +13,15 @@ import Animated, {
 
 import {
   DIE_SIDES,
+  rollLabel,
+  rollValueLabel,
   toolLabel,
-  type ChoiceReason,
   type DiceSeatChip,
   type DiceSeatView,
   type DiceTool,
   type Die,
 } from "@/features/game/dice"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -50,6 +52,8 @@ export interface DiceSeatOverlayProps {
   compact?: boolean
   dice: LifeCardDice
 }
+
+const TURN_ORDERS = ["first", "second"] as const
 
 const BLOOM_SPRING = { damping: 14, stiffness: 180, mass: 0.8 } as const
 const BLOOM_START_SCALE = 0.4
@@ -138,7 +142,9 @@ function Bloom({
           testID={`dice-seat-${seatNumber}`}
           accessibilityRole={interactive ? "button" : undefined}
           accessibilityLabel={accessibilityLabel(playerName, view, armed)}
-          accessibilityHint={interactive && view ? "Settles this result" : undefined}
+          accessibilityHint={
+            interactive && view ? translate("board:dice.settlesResult") : undefined
+          }
           disabled={!interactive}
           onPress={dice.onPress}
           style={overlayStyle}
@@ -238,15 +244,15 @@ function Result({
   if (view.kind === "choice")
     return (
       <>
-        {label(CHOICE_LABEL[view.reason])}
-        {headline("Goes first?")}
+        {label(translate(`board:dice.choiceReason.${view.reason}`))}
+        {headline(translate("board:dice.goesFirstQuestion"))}
         <View style={themed($options)}>
-          {(["first", "second"] as const).map((order) => (
+          {TURN_ORDERS.map((order) => (
             <BoardPressable
               key={order}
               testID={`dice-go-${order}`}
               accessibilityRole="button"
-              accessibilityLabel={`${playerName} goes ${order}`}
+              accessibilityLabel={translate(`board:dice.goesOrder.${order}`, { name: playerName })}
               onPress={() => onChoose?.(order)}
               style={({ pressed }) => [
                 themed(compact ? $compactOption : $option),
@@ -255,7 +261,7 @@ function Result({
               ]}
             >
               <Text
-                text={order === "first" ? "Go first" : "Go second"}
+                tx={`board:dice.goOrder.${order}`}
                 weight="bold"
                 size={compact ? "xxs" : "xs"}
                 maxFontSizeMultiplier={1.2}
@@ -270,13 +276,13 @@ function Result({
     return (
       <>
         {view.note ? label(view.note) : null}
-        {headline("Goes first")}
+        {headline(translate("board:dice.goesFirstHeadline"))}
       </>
     )
   if (view.kind === "rolloff")
     return (
       <>
-        {label(view.die)}
+        {label(toolLabel(view.die))}
         <Text
           text={String(tumble.face ?? view.value)}
           weight="medium"
@@ -286,13 +292,13 @@ function Result({
         {tumbling
           ? null
           : view.status === "won"
-            ? label("Goes first")
+            ? label(translate("board:dice.goesFirstHeadline"))
             : view.status === "chooses"
-              ? label("Won the roll")
+              ? label(translate("board:dice.choiceReason.roll"))
               : view.status === "tied"
-                ? label("Tie. Tap to roll again")
+                ? label(translate("board:dice.tieTapToRollAgain"))
                 : view.status === "out"
-                  ? label("Out")
+                  ? label(translate("board:dice.out"))
                   : null}
       </>
     )
@@ -304,7 +310,7 @@ function Result({
         <FlippingCoin flip={tumble.flip} foreground={foreground} compact={compact} />
       ) : (
         <Text
-          text={String(tumble.face ?? view.roll.value)}
+          text={tumble.face === undefined ? rollValueLabel(view.roll) : String(tumble.face)}
           weight="medium"
           maxFontSizeMultiplier={1.2}
           style={[themed(compact ? $compactValue : $value), text]}
@@ -340,33 +346,20 @@ function FlippingCoin({
 }
 
 function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: DiceTool) {
-  if (view?.kind === "roll")
-    return `${playerName}, ${toolLabel(view.roll.tool)}, ${view.roll.value}`
-  if (view?.kind === "rolloff") {
-    const status =
-      view.status === "won"
-        ? ", goes first"
-        : view.status === "chooses"
-          ? ", won the roll"
-          : view.status === "tied"
-            ? ", tied, tap to roll again"
-            : view.status === "out"
-              ? ", out"
-              : ""
-    return `${playerName} rolled ${view.value}${status}`
-  }
+  if (view?.kind === "roll") return rollLabel(playerName, view.roll)
+  if (view?.kind === "rolloff")
+    return translate(`board:dice.rolloffLabel.${view.status}`, {
+      name: playerName,
+      value: view.value,
+    })
   if (view?.kind === "choice")
-    return `${playerName} ${CHOICE_LABEL[view.reason].toLowerCase()} and chooses who goes first`
-  if (view?.kind === "waiting") return "Waiting for the choice"
+    return translate(`board:dice.choiceLabel.${view.reason}`, { name: playerName })
+  if (view?.kind === "waiting") return translate("board:dice.waitingForChoice")
   if (view?.kind === "first")
-    return view.status === "won" ? `${playerName} goes first` : `${playerName} does not go first`
-  return armed === "coin" ? `Flip a coin for ${playerName}` : `Roll a ${armed} for ${playerName}`
-}
-
-const CHOICE_LABEL: Record<ChoiceReason, string> = {
-  flip: "Won the flip",
-  roll: "Won the roll",
-  loss: "Lost the last game",
+    return translate(`board:dice.firstLabel.${view.status}`, { name: playerName })
+  return armed === "coin"
+    ? translate("board:dice.flipCoinFor", { name: playerName })
+    : translate("board:dice.rollDieFor", { name: playerName, die: armed && toolLabel(armed) })
 }
 
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.

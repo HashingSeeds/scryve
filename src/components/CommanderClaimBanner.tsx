@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -68,8 +69,8 @@ export function CommanderClaimBanner({
   const gap = compact ? spacing.xxs : spacing.xs
   const ink = colors.board.text
   const actions = [
-    { kind: "decline", text: "Decline", onPress: claim.onDecline },
-    { kind: "confirm", text: "Confirm", onPress: claim.onConfirm },
+    { kind: "decline", onPress: claim.onDecline },
+    { kind: "confirm", onPress: claim.onConfirm },
   ] as const
 
   return (
@@ -93,7 +94,7 @@ export function CommanderClaimBanner({
       >
         <View style={themed($summary)}>
           <Text
-            text={`${claim.attackerName} dealt ${damage}`}
+            text={translate("board:commanderClaim.dealt", { name: claim.attackerName, damage })}
             weight="bold"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
@@ -102,8 +103,8 @@ export function CommanderClaimBanner({
           {more > 0 ? (
             <Text
               testID={`commander-claim-more-seat-${seatNumber}`}
-              text={`${more} more`}
-              accessibilityLabel={`${more} more pending`}
+              text={translate("board:commanderClaim.more", { count: more })}
+              accessibilityLabel={translate("board:commanderClaim.morePending", { count: more })}
               numberOfLines={1}
               maxFontSizeMultiplier={1.3}
               style={[themed($more), { color: ink }]}
@@ -111,12 +112,15 @@ export function CommanderClaimBanner({
           ) : null}
         </View>
         <View style={themed($actions)}>
-          {actions.map(({ kind, text, onPress }) => (
+          {actions.map(({ kind, onPress }) => (
             <BoardPressable
               key={kind}
               testID={`commander-${kind}-seat-${seatNumber}-${claim.claimId}`}
               accessibilityRole="button"
-              accessibilityLabel={`${text} ${damage} commander damage from ${claim.attackerName}`}
+              accessibilityLabel={translate(`board:commanderClaim.actionLabel.${kind}`, {
+                damage,
+                name: claim.attackerName,
+              })}
               accessibilityState={{ disabled: inert }}
               disabled={inert}
               onPress={() => {
@@ -130,7 +134,7 @@ export function CommanderClaimBanner({
               ]}
             >
               <Text
-                text={text}
+                tx={`board:commanderClaim.action.${kind}`}
                 weight="bold"
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.3}

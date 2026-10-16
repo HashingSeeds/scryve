@@ -3,6 +3,7 @@ import { useConvex } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../../convex/_generated/api"
@@ -51,7 +52,10 @@ export function usePokemonCatalog(query: string) {
         })
       } catch (cause) {
         if (active)
-          setState({ query: wanted, error: convexErrorMessage(cause, "Card search unavailable.") })
+          setState({
+            query: wanted,
+            error: convexErrorMessage(cause, translate("board:pokemon.searchUnavailable")),
+          })
       }
     }, SEARCH_DEBOUNCE_MS)
     return () => {

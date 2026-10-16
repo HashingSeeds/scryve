@@ -2,6 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -95,9 +96,7 @@ function ContextLine({
       {match?.line}
       {match && view ? " · " : null}
       {view?.kind === "time" ? (
-        <Text size="xxs" weight="semiBold" style={themed($text)}>
-          Time
-        </Text>
+        <Text size="xxs" weight="semiBold" style={themed($text)} tx="board:clock.time" />
       ) : null}
       {view?.kind === "time" && clockText ? " · " : null}
       {clockText ? (
@@ -105,7 +104,7 @@ function ContextLine({
           {clockText}
         </Text>
       ) : null}
-      {paused ? " · Paused" : null}
+      {paused ? ` · ${translate("board:clock.paused")}` : null}
     </Text>
   )
   if (!onPress) return line
@@ -113,7 +112,7 @@ function ContextLine({
     <Pressable
       testID={`${testID}-button`}
       accessibilityRole="button"
-      accessibilityHint="Opens the round clock"
+      accessibilityHint={translate("board:clock.opensRoundClock")}
       accessible={!hidden}
       focusable={!hidden}
       hitSlop={12}
@@ -125,10 +124,11 @@ function ContextLine({
 }
 
 function clockLabel(view: RoundClockView, text: string, paused: boolean) {
-  const state = paused ? ", paused" : ""
-  if (view.kind === "remaining") return `${text} left${state}`
-  if (view.kind === "elapsed") return `${text} elapsed${state}`
-  return text ? `Time, ${text}` : "Time"
+  if (view.kind === "remaining")
+    return translate(paused ? "board:clock.leftPaused" : "board:clock.left", { time: text })
+  if (view.kind === "elapsed")
+    return translate(paused ? "board:clock.elapsedPaused" : "board:clock.elapsed", { time: text })
+  return text ? translate("board:clock.timeWith", { time: text }) : translate("board:clock.time")
 }
 
 const $layer: ViewStyle = {

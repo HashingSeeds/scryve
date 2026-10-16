@@ -1,3 +1,4 @@
+import { translate } from "@/i18n/translate"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import type { PlaySystemId } from "./playSystems"
@@ -97,9 +98,9 @@ export function areRoundTurnsDone(view: RoundTimeView) {
 
 export function roundTurnText(view: RoundTimeView) {
   if (view.turns === 0) return ""
-  if (areRoundTurnsDone(view)) return "Turns done"
-  if (view.turn === 0) return "Finish turn"
-  return `Turn ${view.turn} of ${view.turns}`
+  if (areRoundTurnsDone(view)) return translate("board:roundClock.turnsDone")
+  if (view.turn === 0) return translate("board:roundClock.finishTurn")
+  return translate("board:roundClock.turnOf", { turn: view.turn, turns: view.turns })
 }
 
 export function roundClockText(view: RoundClockView) {

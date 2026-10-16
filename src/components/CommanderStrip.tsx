@@ -5,6 +5,7 @@ import Animated from "react-native-reanimated"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -118,8 +119,18 @@ export const CommanderStrip = memo(function CommanderStrip({
         accessibilityRole="button"
         accessibilityLabel={
           open
-            ? `Close commander damage for ${identity}`
-            : `Show commander damage for ${identity}, ${dealt.map((player) => `${incoming[player.id]} from ${player.name}`).join(", ")}`
+            ? translate("board:commander.closeFor", { identity })
+            : translate("board:commander.showFor", {
+                identity,
+                sources: dealt
+                  .map((player) =>
+                    translate("board:commander.amountFrom", {
+                      amount: incoming[player.id],
+                      name: player.name,
+                    }),
+                  )
+                  .join(", "),
+              })
         }
         accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
         disabled={inspectDisabled}

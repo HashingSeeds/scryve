@@ -10,13 +10,14 @@ import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { losingCounter, seatTableState } from "./CounterChips"
+import { counterOutReason, losingCounter, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
@@ -70,6 +71,42 @@ export interface DiceGridBinding {
   onPressSeat: (player: GamePlayer) => void
   onChoose: (player: GamePlayer, order: "first" | "second") => void
   onClearChip: (player: GamePlayer, chip: DiceSeatChip) => void
+}
+
+function seatOwnership(
+  player: GamePlayer,
+  {
+    isPlayerOwned,
+    isPlayerDisabled,
+    disabled,
+  }: Pick<PlayerGridProps, "isPlayerOwned" | "isPlayerDisabled" | "disabled">,
+) {
+  if (isPlayerOwned) return isPlayerOwned(player) ? "owned" : "unowned"
+  if (disabled) return "disabled"
+  if (isPlayerDisabled) return isPlayerDisabled(player) ? "unowned" : "owned"
+  return undefined
+}
+
+function seatDiceFor(
+  dice: DiceGridBinding | undefined,
+  player: GamePlayer,
+  stable: ReturnType<typeof useStableCallbacks>,
+): LifeCardDice | undefined {
+  const view = dice?.seatFor(player)
+  const chips = dice?.chipsFor(player)
+  if (!dice || !(view || dice.armed || chips?.length)) return undefined
+  return {
+    view,
+    armed: dice.armed ?? undefined,
+    chips,
+    onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
+    onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
+      dice.onChoose(player, order),
+    ),
+    onClearChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
+      dice.onClearChip(player, chip),
+    ),
+  }
 }
 
 export interface PlayerGridProps {
@@ -163,7 +200,7 @@ export function PlayerGrid({
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const stable = useStableCallbacks()
-  const counter = playSystemRules(system).counter
+  const systemId = playSystemRules(system).id
   const layout = getPlayerGridLayout({
     playerCount: players.length,
     width,
@@ -222,7 +259,7 @@ export function PlayerGrid({
     <View testID="player-grid-frame" style={$frame}>
       <Animated.View
         testID="player-grid"
-        accessibilityLabel={`${players.length} player ${counter.label} grid`}
+        accessibilityLabel={translate(`board:grid.label.${systemId}`, { count: players.length })}
         onLayout={measureBoard}
         style={[
           themed($grid),
@@ -261,7 +298,6 @@ export function PlayerGrid({
               const player = players[index]
               const seatNumber = index + 1
               const playerDisabled = Boolean(isPlayerDisabled?.(player))
-              const playerOwned = Boolean(isPlayerOwned?.(player))
               const contentRotation = getPlayerContentRotation({
                 playerCount: players.length,
                 layout,
@@ -270,17 +306,7 @@ export function PlayerGrid({
                 columnIndex,
                 playerIndex: index,
               })
-              const ownership = isPlayerOwned
-                ? playerOwned
-                  ? "owned"
-                  : "unowned"
-                : disabled
-                  ? "disabled"
-                  : isPlayerDisabled
-                    ? playerDisabled
-                      ? "unowned"
-                      : "owned"
-                    : undefined
+              const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
               const screenEdges = {
                 top: rowIndex === 0,
                 bottom: rowIndex === rows.length - 1,
@@ -299,27 +325,12 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
-              const diceView = dice?.seatFor(player)
-              const diceChips = dice?.chipsFor(player)
-              const seatDice =
-                dice && (diceView || dice.armed || diceChips?.length)
-                  ? {
-                      view: diceView,
-                      armed: dice.armed ?? undefined,
-                      chips: diceChips,
-                      onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
-                      onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
-                        dice.onChoose(player, order),
-                      ),
-                      onClearChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
-                        dice.onClearChip(player, chip),
-                      ),
-                    }
-                  : undefined
+              const seatDice = seatDiceFor(dice, player, stable)
               const seatTable = seatTableState(table, player.id)
+              const losing = seatTable && losingCounter(seatTable)
               const eliminated = isPlayerEliminated?.(player)
-                ? "commander damage"
-                : seatTable && losingCounter(seatTable)?.label.toLowerCase()
+                ? translate("board:outReason.commanderDamage")
+                : losing && counterOutReason(losing)
               if (table?.tableRules.pokemon) {
                 return (
                   <View

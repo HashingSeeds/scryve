@@ -4,6 +4,7 @@ import { View } from "react-native"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -56,20 +57,26 @@ export function RoundClockDialog({
       visible
       onClose={onClose}
       backdropTestID="round-clock-backdrop"
-      backdropAccessibilityLabel="Close round clock"
+      backdropAccessibilityLabel={translate("board:roundClock.close")}
       dialogTestID="round-clock-dialog"
       accessibilityViewIsModal
     >
       <Text
         testID="round-clock-heading"
-        text={view.kind === "time" ? roundTurnText(view) || "Time" : roundClockText(view)}
+        text={
+          view.kind === "time"
+            ? roundTurnText(view) || translate("board:clock.time")
+            : roundClockText(view)
+        }
         preset="heading"
         style={themed($heading)}
       />
       {view.kind === "time" && view.overtimeMs !== undefined ? (
         <Text
           size="xs"
-          text={`${formatRemaining(view.overtimeMs)} of overtime left`}
+          text={translate("board:roundClock.overtimeLeft", {
+            time: formatRemaining(view.overtimeMs),
+          })}
           style={themed($dialogText)}
         />
       ) : null}
@@ -80,14 +87,14 @@ export function RoundClockDialog({
           <View style={themed($dialogActions)}>
             <Button
               testID="round-clock-back"
-              text="Back"
+              tx="common:back"
               disabled={view.turn === 0}
               style={themed($dialogButton)}
               onPress={() => onChange((current) => stepRoundTurn(current, system, -1))}
             />
             <Button
               testID="round-clock-next"
-              text="Next turn"
+              tx="board:roundClock.nextTurn"
               preset="reversed"
               disabled={areRoundTurnsDone(view)}
               style={themed($dialogButton)}
@@ -101,16 +108,16 @@ export function RoundClockDialog({
             <View style={themed($dialogActions)}>
               <Button
                 testID="round-clock-minus"
-                text="−1 min"
-                accessibilityLabel="Remove a minute"
+                tx="board:roundClock.minusMinute"
+                accessibilityLabel={translate("board:roundClock.removeMinute")}
                 disabled={view.ms <= MINUTE_MS}
                 style={themed($dialogButton)}
                 onPress={() => onChange((current) => adjustRoundClock(current, -MINUTE_MS))}
               />
               <Button
                 testID="round-clock-plus"
-                text="+1 min"
-                accessibilityLabel="Add a minute"
+                tx="board:roundClock.plusMinute"
+                accessibilityLabel={translate("board:roundClock.addMinute")}
                 style={themed($dialogButton)}
                 onPress={() => onChange((current) => adjustRoundClock(current, MINUTE_MS))}
               />
@@ -118,7 +125,7 @@ export function RoundClockDialog({
           ) : null}
           <Button
             testID="round-clock-pause"
-            text={paused ? "Resume" : "Pause"}
+            tx={paused ? "board:roundClock.resume" : "board:roundClock.pause"}
             preset="reversed"
             style={themed($wide)}
             onPress={() =>
@@ -132,7 +139,7 @@ export function RoundClockDialog({
         {countdown && view.kind === "remaining" ? (
           <Button
             testID="round-clock-call"
-            text="Call time"
+            tx="board:roundClock.callTime"
             style={themed($dialogButton)}
             onPress={() => onChange((current) => callRoundTime(current))}
           />
@@ -140,14 +147,15 @@ export function RoundClockDialog({
         {system === "mtg" && view.kind === "time" ? (
           <Button
             testID="round-clock-bonus"
-            text={`+${SLOW_PLAY_TURNS} turns`}
+            tx="board:roundClock.bonusTurns"
+            txOptions={{ count: SLOW_PLAY_TURNS }}
             style={themed($dialogButton)}
             onPress={() => onChange((current) => addRoundBonusTurns(current, SLOW_PLAY_TURNS))}
           />
         ) : null}
         <Button
           testID="round-clock-off"
-          text="Turn off"
+          tx="board:roundClock.turnOff"
           style={themed($dialogButton)}
           onPress={() => {
             onChange(() => undefined)
@@ -164,8 +172,9 @@ function leaderLine(players: readonly GamePlayer[], system: PlaySystemId | undef
   const counter = playSystemRules(system).counter
   const best = Math.max(...players.map(({ life }) => counterStanding(counter, life)))
   const leaders = players.filter(({ life }) => counterStanding(counter, life) === best)
-  if (leaders.length !== 1) return `Tied on ${counter.label.toLowerCase()}`
-  return `${leaders[0].name} leads on ${counter.label.toLowerCase()}`
+  const id = playSystemRules(system).id
+  if (leaders.length !== 1) return translate(`board:roundClock.tied.${id}`)
+  return translate(`board:roundClock.leads.${id}`, { name: leaders[0].name })
 }
 
 const $heading: ThemedStyle<TextStyle> = () => ({

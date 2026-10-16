@@ -50,6 +50,7 @@ import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
@@ -140,7 +141,7 @@ export function CurrentGameScreen({
       return {
         color: loser.color,
         glyph: { seatNumber: loserSeat + 1, shape: loser.shape },
-        accessibilityLabel: `${loser.name} lost the last game. Choose who goes first`,
+        accessibilityLabel: translate("board:firstPlayer.loserChooses", { name: loser.name }),
         onPress: offer(() => diceAsk(loser.id, "loss")),
       }
     // why: official Pokémon rules only cover two players; larger tables roll off like other games.
@@ -148,13 +149,13 @@ export function CurrentGameScreen({
       return {
         color: colors.gameMenu.actions.dice,
         glyph: { tool: "coin" },
-        accessibilityLabel: "Flip for who goes first",
+        accessibilityLabel: translate("board:firstPlayer.flip"),
         onPress: offer(diceFlip),
       }
     return {
       color: colors.gameMenu.actions.dice,
       glyph: { tool: die },
-      accessibilityLabel: "Roll for who goes first",
+      accessibilityLabel: translate("board:firstPlayer.roll"),
       onPress: offer(diceRollOff),
     }
   }, [
@@ -221,14 +222,19 @@ export function CurrentGameScreen({
     }
     runtime.rematch()
     setEndSource(undefined)
-    setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
+    setSaved({
+      gameId: ended.id,
+      message: ended.match
+        ? translate("board:savedToast.matchSaved")
+        : translate("board:savedToast.gameSaved"),
+    })
   }
 
   function confirmEndMatch(outcomes: MatchSeatOutcome[]) {
     if (!matchEnding?.match) return
     const ended = runtime.endMatch(matchEnding.match.id, outcomes)
     setMatchEnding(undefined)
-    setSaved({ gameId: ended.id, message: "Match saved" })
+    setSaved({ gameId: ended.id, message: translate("board:savedToast.matchSaved") })
   }
 
   function cancelEndMatch() {
@@ -288,7 +294,7 @@ export function CurrentGameScreen({
     () => [
       {
         kind: "layout",
-        label: "Layout",
+        label: translate("board:menu.layout"),
         disabled: layoutOptions.length < 2,
         onPress: (event) => {
           captureMenuDialogOrigin(event)
@@ -296,10 +302,10 @@ export function CurrentGameScreen({
           setLayoutPickerOpen(true)
         },
       },
-      { kind: "dice", label: "Dice", tools: diceTools },
+      { kind: "dice", label: translate("board:menu.dice"), tools: diceTools },
       {
         kind: "setup",
-        label: "Game",
+        label: translate("board:menu.game"),
         disabled: !onSetup,
         onPress: () => {
           closeMenu()
@@ -308,7 +314,7 @@ export function CurrentGameScreen({
       },
       {
         kind: "history",
-        label: "History",
+        label: translate("board:menu.history"),
         disabled: !onHistory,
         onPress: () => {
           closeMenu()
@@ -318,7 +324,7 @@ export function CurrentGameScreen({
       isFresh
         ? {
             kind: "connect",
-            label: "Connect",
+            label: translate("board:menu.connect"),
             disabled: !onConnect,
             onPress: () => {
               closeMenu()
@@ -327,7 +333,7 @@ export function CurrentGameScreen({
           }
         : {
             kind: "end-game",
-            label: "End",
+            label: translate("board:menu.end"),
             onPress: (event) => {
               captureMenuDialogOrigin(event)
               showEndConfirmation()
@@ -353,9 +359,9 @@ export function CurrentGameScreen({
   const exitAction = useMemo(
     () =>
       diceOpen
-        ? { label: "Close dice", onPress: closeDice }
+        ? { label: translate("board:menu.closeDice"), onPress: closeDice }
         : armedPlayerId || inspectedPlayerId
-          ? { label: "Exit commander damage", onPress: exitCommanderMode }
+          ? { label: translate("board:menu.exitCommander"), onPress: exitCommanderMode }
           : undefined,
     [armedPlayerId, closeDice, diceOpen, inspectedPlayerId, exitCommanderMode],
   )
@@ -416,7 +422,10 @@ export function CurrentGameScreen({
             ...(match
               ? {
                   statusLine: {
-                    text: `${matchContextLabel(runtime.game)} · Best of ${match.bestOf}`,
+                    text: translate("board:match.statusLine", {
+                      context: matchContextLabel(runtime.game),
+                      bestOf: match.bestOf,
+                    }),
                     tone: "caughtUp" as const,
                     onPress: openMatchScore,
                   },
@@ -448,12 +457,12 @@ export function CurrentGameScreen({
           onClose={closePanel}
           origin={menuDialogOrigin}
           backdropTestID="layout-picker-backdrop"
-          backdropAccessibilityLabel="Close layout chooser"
+          backdropAccessibilityLabel={translate("board:menu.closeLayoutChooser")}
           dialogTestID="layout-picker-dialog"
           accessibilityViewIsModal
           wide
         >
-          <Text text="Layout" preset="subheading" style={themed($dialogText)} />
+          <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
           <PlayerLayoutPicker
             playerCount={playerCount}
             value={layoutVariant}
@@ -471,7 +480,13 @@ export function CurrentGameScreen({
         <BoardContextLabels
           match={
             match && matchLine
-              ? { line: matchLine, accessibilityLabel: `${matchLine}, best of ${match.bestOf}` }
+              ? {
+                  line: matchLine,
+                  accessibilityLabel: translate("board:match.contextLabel", {
+                    context: matchLine,
+                    bestOf: match.bestOf,
+                  }),
+                }
               : undefined
           }
           clock={clock}
@@ -508,11 +523,15 @@ export function CurrentGameScreen({
           visible
           onClose={() => setMatchOpen(false)}
           backdropTestID="match-backdrop"
-          backdropAccessibilityLabel="Close match score"
+          backdropAccessibilityLabel={translate("board:match.closeScore")}
           dialogTestID="match-dialog"
           accessibilityViewIsModal
         >
-          <Text text={`Best of ${match.bestOf} · Game ${match.gameNumber}`} preset="subheading" />
+          <Text
+            tx="board:match.scoreTitle"
+            txOptions={{ bestOf: match.bestOf, number: match.gameNumber }}
+            preset="subheading"
+          />
           <View style={themed($matchScore)}>
             {runtime.game.players.map((player, seat) => (
               <View key={player.id} style={themed($matchScoreRow)}>
@@ -526,13 +545,13 @@ export function CurrentGameScreen({
           </View>
           <Button
             testID="end-match-button"
-            text="End match"
+            tx="board:matchEnd.end"
             disabled={match.gameNumber === 1 || hasLocalGameStarted(runtime.game)}
-            accessibilityHint="Ends the match after its last finished game"
+            accessibilityHint={translate("board:match.endHint")}
             style={themed($menuItem)}
             onPress={openEndMatch}
           />
-          <Button text="Close" style={themed($menuItem)} onPress={() => setMatchOpen(false)} />
+          <Button tx="common:close" style={themed($menuItem)} onPress={() => setMatchOpen(false)} />
         </DialogCard>
       ) : null}
 
@@ -542,21 +561,26 @@ export function CurrentGameScreen({
           onClose={() => setMatchPrompt(undefined)}
           closeDisabled={!canContinueMatch(matchPrompt)}
           backdropTestID="match-prompt-backdrop"
-          backdropAccessibilityLabel="Continue to the next game"
+          backdropAccessibilityLabel={translate("board:match.continue")}
           dialogTestID="match-prompt-dialog"
           dialogAccessibilityRole="alert"
         >
-          <Text text={`Game ${matchPrompt.match.gameNumber} saved`} preset="subheading" />
+          <Text
+            tx="board:match.gameSaved"
+            txOptions={{ number: matchPrompt.match.gameNumber }}
+            preset="subheading"
+          />
           {canContinueMatch(matchPrompt) ? null : (
-            <Text
-              size="xs"
-              text="A match holds at most ten games, so this one ends here."
-              style={themed($dialogText)}
-            />
+            <Text size="xs" tx="board:match.limitReached" style={themed($dialogText)} />
           )}
           <Text
             text={matchPrompt.players
-              .map((player, seat) => `${player.name} ${matchScoreAfter(matchPrompt).wins[seat]}`)
+              .map((player, seat) =>
+                translate("board:match.playerScore", {
+                  name: player.name,
+                  wins: matchScoreAfter(matchPrompt).wins[seat],
+                }),
+              )
               .join(" · ")}
             style={themed($dialogText)}
           />
@@ -570,7 +594,7 @@ export function CurrentGameScreen({
           <View style={themed($dialogActions)}>
             <Button
               testID="match-prompt-end-button"
-              text="End match"
+              tx="board:matchEnd.end"
               style={themed($dialogButton)}
               onPress={() => {
                 setMatchEnding(matchPrompt)
@@ -580,7 +604,7 @@ export function CurrentGameScreen({
             {canContinueMatch(matchPrompt) ? (
               <Button
                 testID="next-game-button"
-                text="Next game"
+                tx="board:match.nextGame"
                 preset="reversed"
                 style={themed($dialogButton)}
                 onPress={() => setMatchPrompt(undefined)}
