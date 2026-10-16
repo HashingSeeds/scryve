@@ -79,6 +79,7 @@ export const colors = {
       "layout": palette.primary200,
       "dice": palette.success500,
       "players": "#B48CE0",
+      "role": "#9AA7E8",
       "status": "#7DB7E8",
       "home": palette.secondary100,
       "setup": "#D6A85F",

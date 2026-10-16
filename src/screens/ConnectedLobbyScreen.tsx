@@ -61,6 +61,7 @@ import {
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
 import { versionLabel } from "../../convex/lib/deckVersions"
+import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 const LOBBY_TITLE = "Lobby"
 
@@ -428,7 +429,13 @@ function ConnectedLobbyContent({
                 text={
                   manualCode
                     ? "Invite code"
-                    : lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)
+                    : lobbyDetail(
+                        lobby.startingLife,
+                        lobby.ruleset,
+                        lobby.system,
+                        lobby.format,
+                        lobby.variant,
+                      )
                 }
               />
             </View>
@@ -452,7 +459,13 @@ function ConnectedLobbyContent({
             <Text
               size="xs"
               style={themed($dimmed)}
-              text={lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)}
+              text={lobbyDetail(
+                lobby.startingLife,
+                lobby.ruleset,
+                lobby.system,
+                lobby.format,
+                lobby.variant,
+              )}
             />
           ) : null}
         </View>
@@ -470,7 +483,8 @@ function ConnectedLobbyContent({
                   !isWebSocketConnected ||
                   savingSettings ||
                   starting ||
-                  lobby.players.some((player) => player.seat > count),
+                  lobby.players.some((player) => player.seat > count) ||
+                  (lobby.variant === "treachery" && !isTreacheryPlayerCount(count)),
               }))}
               onSelect={(count) => void changeSettings({ playerCount: Number(count) })}
             />

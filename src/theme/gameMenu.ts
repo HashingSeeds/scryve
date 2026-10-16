@@ -2,6 +2,7 @@ export type GameMenuActionKind =
   | "layout"
   | "dice"
   | "players"
+  | "role"
   | "status"
   | "home"
   | "setup"

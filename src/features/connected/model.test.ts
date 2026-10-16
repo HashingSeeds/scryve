@@ -52,6 +52,27 @@ describe("connected projection parsing", () => {
     expect(toConnectedProjection({ ...legacyProjection, deckRequired: "required" })).toBeNull()
   })
 
+  it("keeps Treachery roles and the host's result, and drops unknown ones", () => {
+    const projection = toConnectedProjection({
+      ...legacyProjection,
+      variant: "treachery",
+      treacheryOutcome: { kind: "win", winnerPlayerIds: ["player-1"] },
+      players: [
+        { ...legacyProjection.players[0], role: "assassin", roleRevealed: false },
+        { ...legacyProjection.players[0], playerId: "player-2", seat: 2, role: "jester" },
+      ],
+    })
+
+    expect(projection).toMatchObject({
+      variant: "treachery",
+      treacheryOutcome: { kind: "win", winnerPlayerIds: ["player-1"] },
+    })
+    expect(projection?.players.map((player) => player.role)).toEqual(["assassin", undefined])
+    expect(
+      toConnectedProjection({ ...legacyProjection, treacheryOutcome: { kind: "win" } }),
+    ).not.toHaveProperty("treacheryOutcome")
+  })
+
   it("parses commander totals and pending claims", () => {
     const projection = toConnectedProjection({
       ...legacyProjection,

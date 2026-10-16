@@ -67,11 +67,13 @@ export function lobbyDetail(
   ruleset: string,
   system?: string,
   format?: string,
+  variant?: string,
 ) {
   const resolvedSystem = storedPlaySystem(system)
   return [
     counterValueLabel(resolvedSystem, startingLife),
     resolvedSystem ? playFormatLabel(resolvedSystem, format || ruleset) : undefined,
+    variant === "treachery" ? "Treachery" : undefined,
   ]
     .filter(Boolean)
     .join(" · ")

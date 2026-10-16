@@ -78,6 +78,9 @@ describe("connected copy", () => {
 
   it("omits format language for a no-system game", () => {
     expect(lobbyDetail(20, "none", "none")).toBe("20 life")
+    expect(lobbyDetail(40, "commander", "mtg", "commander", "treachery")).toBe(
+      "40 life · Commander · Treachery",
+    )
     expect(
       resumeDetail(
         {
