@@ -280,6 +280,8 @@ async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualC
 
 /** why: clients from before the `systems` argument show any system they don't know as Magic. None of them knows a system beyond these three, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those, as they did before this check. */
 const SYSTEMS_BEFORE_CLIENT_LIST: readonly string[] = ["mtg", "ygo", "pokemon"]
+// why: hidden roles are shown per device, so a Treachery seat must belong to one.
+const TREACHERY_DEVICE_MESSAGE = "Treachery seats need a device"
 
 /** why: clients list the variants they can play; ones from before the list play none. */
 function assertClientPlaysGame(
@@ -734,6 +736,7 @@ export const createLobby = mutation({
     if (args.variant !== undefined) {
       if (gameSystem !== "mtg") throw new Error("Treachery is a Magic variant")
       if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
+      if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     }
     assertStartingLife(
       args.startingLife,
@@ -931,6 +934,7 @@ export const claimSeat = mutation({
       return null
     }
     assertClientPlaysGame(game, args)
+    if (game.variant !== undefined && !args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -1612,12 +1616,9 @@ export const lobbyProjection = query({
   },
 })
 
-// why: one account may hold seats on two devices, and each device must see only its own role.
-function ownsSeatOnDevice(player: Doc<"gamePlayers">, userId: Id<"users">, deviceId?: string) {
-  return (
-    player.userId === userId &&
-    (deviceId === undefined || player.deviceId === undefined || player.deviceId === deviceId)
-  )
+// why: one account may hold seats on two devices, so a hidden role needs an exact device match.
+function holdsSeatOnDevice(player: Doc<"gamePlayers">, userId: Id<"users">, deviceId?: string) {
+  return player.userId === userId && deviceId !== undefined && player.deviceId === deviceId
 }
 
 function roleForViewer(
@@ -1628,7 +1629,7 @@ function roleForViewer(
 ) {
   if (player.role === undefined) return {}
   const roleRevealed = player.roleRevealed === true
-  return roleRevealed || ownsSeatOnDevice(player, viewerId, deviceId) || game.status !== "active"
+  return roleRevealed || holdsSeatOnDevice(player, viewerId, deviceId) || game.status !== "active"
     ? { role: player.role, roleRevealed }
     : { roleRevealed }
 }
@@ -1910,9 +1911,9 @@ export const startGame = mutation({
 })
 
 export const revealMyRole = mutation({
-  args: { publicId: v.string(), deviceId: v.optional(v.string()) },
+  args: { publicId: v.string(), deviceId: v.string() },
   handler: async (ctx, args) => {
-    if (args.deviceId) assertDeviceId(args.deviceId)
+    assertDeviceId(args.deviceId)
     const game = await gameByPublicIdForWrite(ctx, args.publicId)
     const user = await requireUser(ctx)
     const player = (
@@ -1920,7 +1921,7 @@ export const revealMyRole = mutation({
         .query("gamePlayers")
         .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
         .take(MAX_PLAYERS_PER_GAME_READ)
-    ).find((seat) => ownsSeatOnDevice(seat, user._id, args.deviceId))
+    ).find((seat) => holdsSeatOnDevice(seat, user._id, args.deviceId))
     if (!player) throw new Error("Game membership required")
     if (player.role === undefined) throw new Error("This game has no hidden roles")
     if (player.roleRevealed !== true) {
