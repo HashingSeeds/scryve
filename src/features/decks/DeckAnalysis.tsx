@@ -4,6 +4,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { useConvex } from "convex/react"
 
 import { Text } from "@/components/Text"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,9 +34,11 @@ export function DeckAnalysis({
 }) {
   const { themed } = useAppTheme()
   const client = useConvex()
+  const online = useConvexOnline()
   const [details, setDetails] = useState(loadCardDetails)
   const requested = useRef(new Set<string>())
   useEffect(() => {
+    if (!online) return
     const pending = cards.filter((card) => {
       const key = cardDetailsKey(card, game)
       if (requested.current.has(key)) return false
@@ -48,7 +51,7 @@ export function DeckAnalysis({
       .catch(() => {
         for (const card of pending) requested.current.delete(cardDetailsKey(card, game))
       })
-  }, [client, game, cards])
+  }, [client, game, cards, online])
   const analysis = useMemo(
     () => analyzeDeck({ cards, format, details: (card) => details[cardDetailsKey(card, game)] }),
     [cards, format, details, game],
