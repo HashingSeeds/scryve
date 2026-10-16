@@ -26,6 +26,8 @@ const play = {
   newGame: {
     setupTitle: "Game setup",
     newTitle: "New game",
+    variant: "Variant",
+    variantStandard: "Standard",
     connectionLabel: "Game connection",
     onThisDevice: "On this device",
     connected: "Connected",

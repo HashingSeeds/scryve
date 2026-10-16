@@ -30,6 +30,8 @@ export default {
   newGame: {
     setupTitle: "Configuration de la partie",
     newTitle: "Nouvelle partie",
+    variant: "Variante",
+    variantStandard: "Normale",
     connectionLabel: "Connexion de la partie",
     onThisDevice: "Sur cet appareil",
     connected: "Connectée",

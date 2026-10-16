@@ -628,10 +628,10 @@ export function NewGameScreen({
               {treacheryAvailable ? (
                 <SegmentedControl
                   testID="variant"
-                  accessibilityLabel="Variant"
+                  accessibilityLabel={translate("play:newGame.variant")}
                   segments={[
-                    { id: "standard", label: "Standard" },
-                    { id: "treachery", label: "Treachery" },
+                    { id: "standard", label: translate("play:newGame.variantStandard") },
+                    { id: "treachery", label: translate("connected:treachery.name") },
                   ]}
                   selectedId={treachery ? "treachery" : "standard"}
                   onSelect={(value) => chooseTreachery(value === "treachery")}

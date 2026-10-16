@@ -8,6 +8,7 @@ import { DialogCard, type DialogOrigin } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { localGameRepository } from "@/features/game/localPersistence"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -15,19 +16,8 @@ import { convexErrorMessage } from "@/utils/convexError"
 import { api } from "../../../convex/_generated/api"
 import type { TreacheryRole } from "../../../convex/lib/treachery"
 
-export const TREACHERY_ROLE_LABELS: Record<TreacheryRole, string> = {
-  leader: "Leader",
-  guardian: "Guardian",
-  assassin: "Assassin",
-  traitor: "Traitor",
-}
-
-const ROLE_GOALS: Record<TreacheryRole, string> = {
-  leader: "Win once every Assassin and Traitor is out.",
-  guardian: "Keep the Leader alive. You win with them.",
-  assassin: "Win when the Leader is out.",
-  traitor: "Be the last player standing.",
-}
+export const treacheryRoleLabel = (role: TreacheryRole) =>
+  translate(`connected:treachery.roles.${role}`)
 
 export function TreacheryRoleDialog({
   publicId,
@@ -62,7 +52,7 @@ export function TreacheryRoleDialog({
       await reveal({ publicId, deviceId: localGameRepository.getDeviceId() })
       setConfirming(false)
     } catch (cause) {
-      setError(convexErrorMessage(cause, "Could not reveal your role"))
+      setError(convexErrorMessage(cause, translate("connected:treachery.revealFailed")))
     } finally {
       setBusy(false)
     }
@@ -74,30 +64,36 @@ export function TreacheryRoleDialog({
       onClose={onClose}
       origin={origin}
       backdropTestID="treachery-role-backdrop"
-      backdropAccessibilityLabel="Hide your role"
+      backdropAccessibilityLabel={translate("connected:treachery.hideRole")}
       dialogTestID="treachery-role-dialog"
       style={themed($dialog)}
     >
-      <Text testID="treachery-role" preset="heading" text={TREACHERY_ROLE_LABELS[role]} />
-      <Text text={ROLE_GOALS[role]} />
+      <Text testID="treachery-role" preset="heading" text={treacheryRoleLabel(role)} />
+      <Text tx={`connected:treachery.goals.${role}`} />
       <Text
         size="xs"
         style={themed($muted)}
-        text={
+        tx={
           revealed
-            ? "Face up for the table."
+            ? "connected:treachery.faceUp"
             : canReveal && !online
-              ? "Hidden from the table. Reconnect to reveal it."
-              : "Hidden from the table."
+              ? "connected:treachery.hiddenOffline"
+              : "connected:treachery.hidden"
         }
       />
       {error ? <Text testID="treachery-role-error" accessibilityRole="alert" text={error} /> : null}
       <View style={themed($actions)}>
-        <Button text="Hide" style={themed($action)} onPress={onClose} />
+        <Button tx="connected:treachery.hide" style={themed($action)} onPress={onClose} />
         {canReveal && !revealed ? (
           <Button
             testID="reveal-role-button"
-            text={busy ? "Revealing…" : confirming ? "Reveal to all?" : "Reveal"}
+            tx={
+              busy
+                ? "connected:treachery.revealing"
+                : confirming
+                  ? "connected:treachery.revealConfirm"
+                  : "connected:treachery.reveal"
+            }
             preset={confirming ? "reversed" : "default"}
             disabled={busy || !online}
             style={themed($action)}

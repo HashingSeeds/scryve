@@ -55,10 +55,7 @@ import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
-import {
-  TREACHERY_ROLE_LABELS,
-  TreacheryRoleDialog,
-} from "@/features/connected/TreacheryRoleDialog"
+import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
@@ -300,7 +297,7 @@ function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
     player.role && (player.roleRevealed || !player.controlledByMe) ? player.role : undefined
   return {
     id: asPlayerId(player.playerId),
-    name: role ? `${player.displayName} · ${TREACHERY_ROLE_LABELS[role]}` : player.displayName,
+    name: role ? `${player.displayName} · ${treacheryRoleLabel(role)}` : player.displayName,
     color: player.color,
     ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     seat: player.seat,

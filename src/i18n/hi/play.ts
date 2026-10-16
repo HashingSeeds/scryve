@@ -29,6 +29,8 @@ export default {
   newGame: {
     setupTitle: "गेम सेटअप",
     newTitle: "नया गेम",
+    variant: "वेरिएंट",
+    variantStandard: "सामान्य",
     connectionLabel: "गेम कनेक्शन",
     onThisDevice: "इस डिवाइस पर",
     connected: "कनेक्टेड",

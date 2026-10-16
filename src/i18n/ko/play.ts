@@ -29,6 +29,8 @@ export default {
   newGame: {
     setupTitle: "게임 설정",
     newTitle: "새 게임",
+    variant: "변형",
+    variantStandard: "일반",
     connectionLabel: "게임 연결",
     onThisDevice: "이 기기",
     connected: "연결",

@@ -30,6 +30,8 @@ export default {
   newGame: {
     setupTitle: "ゲーム設定",
     newTitle: "新しいゲーム",
+    variant: "バリアント",
+    variantStandard: "通常",
     connectionLabel: "ゲームの接続",
     onThisDevice: "この端末",
     connected: "接続",
