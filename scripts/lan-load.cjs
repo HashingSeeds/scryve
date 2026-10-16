@@ -26,6 +26,7 @@ function guest(index) {
     socket.write(`${JSON.stringify({ type: "join", name: `Load ${index}` })}\n`),
   )
   socket.setEncoding("utf8")
+  socket.setNoDelay(true)
   socket.on("data", (chunk) => {
     bytesIn += Buffer.byteLength(chunk)
     buffer += chunk

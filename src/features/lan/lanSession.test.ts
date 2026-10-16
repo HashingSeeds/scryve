@@ -58,6 +58,27 @@ async function startedGame() {
 const lifeOf = (session: LanSession, key: string) =>
   session.getState().game?.seats.find((seat) => seat.key === key)?.life
 
+describe("LAN session broadcasts", () => {
+  it("sends an idle host's change at once and batches a burst into the next window", async () => {
+    const { session, alice } = await startedGame()
+    const hostKey = session.getState().seatKey!
+    const games = () => alice.sent.filter((message) => message.type === "game").length
+    jest.advanceTimersByTime(1_000)
+    const before = games()
+
+    session.changeLife(hostKey, -1)
+    jest.advanceTimersByTime(0)
+    session.changeLife(hostKey, -1)
+    session.changeLife(hostKey, -1)
+    jest.advanceTimersByTime(32)
+    const duringWindow = games()
+    jest.advanceTimersByTime(1)
+
+    expect([duringWindow - before, games() - before]).toEqual([1, 2])
+    expect(lifeOf(session, hostKey)).toBe(17)
+  })
+})
+
 describe("LAN session seats", () => {
   it("turns away a socket that names another guest's seat without its token", async () => {
     const { alice } = await startedGame()
