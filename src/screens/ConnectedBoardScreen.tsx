@@ -770,19 +770,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             } satisfies RadialMenuAction,
           ]
         : []),
-      ...(myRole
-        ? [
-            {
-              kind: "role",
-              label: "Role",
-              onPress: (event?: GestureResponderEvent) => {
-                captureMenuDialogOrigin(event)
-                setMenuOpen(false)
-                setRoleOpen(true)
-              },
-            } satisfies RadialMenuAction,
-          ]
-        : []),
       {
         kind: "history",
         label: "History",
@@ -825,7 +812,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       finishBlocker,
       layoutOptions.length,
       cloud,
-      myRole,
       onHistory,
     ],
   )
@@ -1114,6 +1100,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           players={reportablePlayers}
           origin={menuDialogOrigin}
           onClose={() => setPlayerActionsOpen(false)}
+          onRole={
+            myRole
+              ? () => {
+                  setPlayerActionsOpen(false)
+                  setRoleOpen(true)
+                }
+              : undefined
+          }
           onInvite={
             invitation
               ? () => {
