@@ -208,6 +208,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
           <ConfirmDialog
             visible={confirming}
             title={translate("play:manualMatch.deleteTitle")}
+            backdropAccessibilityLabel={translate("play:manualMatch.cancelDelete")}
             message={translate("play:manualMatch.deleteMessage")}
             confirmText={translate("common:delete")}
             destructive

@@ -396,6 +396,7 @@ const account = {
     downloading: "Downloading update…",
     downloadingProgress: "Downloading update {{percent}}%",
     ready: "Update ready",
+    cancelReady: "Cancel update ready",
     restart: "Restart",
     whatsNew: "What's in this update",
     dialogMessage: "Applies the next time you open Scryve. Your game is saved either way.",

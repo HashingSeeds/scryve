@@ -1131,6 +1131,9 @@ export function NewGameScreen({
           title={translate(
             gameToExit.isHost ? "play:newGame.endGameTitle" : "play:newGame.leaveGameTitle",
           )}
+          backdropAccessibilityLabel={translate(
+            gameToExit.isHost ? "play:newGame.cancelEndGame" : "play:newGame.cancelLeaveGame",
+          )}
           message={translate(
             gameToExit.isHost ? "play:newGame.endGameMessage" : "play:newGame.leaveGameMessage",
           )}

@@ -29,9 +29,6 @@ const common = {
     play: "Play",
     backToLobby: "Back to lobby",
   },
-  confirmDialog: {
-    cancelAction: "Cancel {{action}}",
-  },
   retryableError: {
     retryingIn: "Retrying in {{seconds}}s",
   },

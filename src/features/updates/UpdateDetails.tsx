@@ -49,6 +49,7 @@ export function UpdateDetailsDialog({
     <ConfirmDialog
       visible={visible}
       title={copy.title}
+      backdropAccessibilityLabel={translate("account:updates.cancelReady")}
       message={copy.message}
       confirmText={copy.confirm}
       cancelText={copy.cancel}

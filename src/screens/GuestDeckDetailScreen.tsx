@@ -422,6 +422,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       <ConfirmDialog
         visible={discarding}
         title={translate("decks:detail.discardTitle")}
+        backdropAccessibilityLabel={translate("decks:detail.cancelDiscard")}
         message={translate("decks:detail.discardBody")}
         confirmText={translate("decks:detail.discard")}
         cancelText={translate("decks:detail.keepEditing")}
@@ -446,6 +447,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       <ConfirmDialog
         visible={deleting}
         title={translate("decks:guestDetail.deleteTitle")}
+        backdropAccessibilityLabel={translate("decks:guestDetail.cancelDelete")}
         message={translate("decks:guestDetail.deleteBody")}
         confirmText={translate("common:delete")}
         destructive

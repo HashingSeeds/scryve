@@ -1143,6 +1143,7 @@ export function AddDeckScreen({
       <ConfirmDialog
         visible={confirmGuestReplace}
         title={translate("decks:addDeck.replaceTitle")}
+        backdropAccessibilityLabel={translate("decks:addDeck.cancelReplace")}
         message={
           guestReplacement
             ? translate("decks:addDeck.replaceBody", { name: guestReplacement.deck.name })
