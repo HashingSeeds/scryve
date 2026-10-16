@@ -142,7 +142,7 @@ describe("nearby host", () => {
     setNearbyOwner("switched-account")
     const result = { kind: "win" as const, winnerPlayerIds: [alice.pass().key] }
 
-    await session.writes.finish(result)
+    await Promise.all([session.writes.finish(result), session.writes.finish(result)])
     await session.writes.finish(result)
 
     expect(archiveLanGame).toHaveBeenCalledTimes(1)

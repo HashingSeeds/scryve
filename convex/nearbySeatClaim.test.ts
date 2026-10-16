@@ -140,6 +140,21 @@ describe("claimNearbySeat", () => {
     ).rejects.toThrow("Game membership required")
   })
 
+  it("refuses a seat to the host of a game it holds no seat in", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host")
+    const [mine, guest, other] = (await nearbyGame()).players
+    await host.mutation(
+      api.games.publishFinishedLocalGame,
+      await nearbyGame([{ ...mine, me: undefined }, guest, other]),
+    )
+
+    await expect(
+      host.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: GUEST_TOKEN }),
+    ).rejects.toThrow("already hold a seat")
+    expect((await historyOf(host)).page).toHaveLength(1)
+  })
+
   it("rejects a pass hash on the host's own seat, a malformed hash, and a repeated hash", async () => {
     const t = convexTest(schema, modules)
     const host = await synced(t, "host")

@@ -1457,7 +1457,7 @@ export const claimNearbySeat = mutation({
     if (seat.userId === user._id) return { status: "claimed" as const }
     if (seat.userId)
       throw new ConvexError({ code: "seat_taken", message: "Another account claimed this seat" })
-    if (players.some((player) => player.userId === user._id))
+    if (game.hostUserId === user._id || players.some((player) => player.userId === user._id))
       throw new ConvexError({
         code: "already_seated",
         message: "You already hold a seat in this game",
