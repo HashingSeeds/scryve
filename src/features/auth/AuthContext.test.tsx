@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native"
 import { ConvexReactClient } from "convex/react"
 
 import { Text } from "@/components/Text"
-import { reconnectNow } from "@/features/connected/convexReconnect"
+import { reconnectAfterOutage } from "@/features/connected/convexReconnect"
 import { NearbyOnlyWebSocket, setNearbyOnly } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
 
@@ -53,7 +53,7 @@ jest.mock("@/features/lan/nearbyOnly", () => ({
 }))
 jest.mock("@/features/connected/convexReconnect", () => ({
   reconnectConvexOnNetworkReturn: () => () => undefined,
-  reconnectNow: jest.fn(),
+  reconnectAfterOutage: jest.fn(() => () => undefined),
 }))
 jest.mock("convex/react", () => ({
   ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
@@ -112,14 +112,14 @@ describe("native auth experience", () => {
       initialAuthTokenReuse: true,
       webSocketConstructor: NearbyOnlyWebSocket,
     })
-    jest.mocked(reconnectNow).mockClear()
+    expect(reconnectAfterOutage).not.toHaveBeenCalled()
 
     act(() => setNearbyOnly(true))
-    expect(reconnectNow).not.toHaveBeenCalled()
+    expect(reconnectAfterOutage).not.toHaveBeenCalled()
     act(() => setNearbyOnly(false))
 
     expect(ConvexReactClient).toHaveBeenCalledTimes(1)
-    expect(reconnectNow).toHaveBeenCalledTimes(1)
+    expect(reconnectAfterOutage).toHaveBeenCalledTimes(1)
   })
 
   it("passes the native Clerk resource cache alongside the token cache", () => {

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import { Platform } from "react-native"
@@ -16,7 +17,10 @@ import { APP_ROOT_URL, readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
-import { reconnectConvexOnNetworkReturn, reconnectNow } from "@/features/connected/convexReconnect"
+import {
+  reconnectAfterOutage,
+  reconnectConvexOnNetworkReturn,
+} from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
 import { NearbyOnlyWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
@@ -101,8 +105,11 @@ export function ConfiguredAuth({
     [convexUrl],
   )
   const nearbyOnly = useNearbyOnly()
+  const wasNearbyOnly = useRef(nearbyOnly)
   useEffect(() => {
-    if (!nearbyOnly) reconnectNow(client)
+    const switchedOff = wasNearbyOnly.current && !nearbyOnly
+    wasNearbyOnly.current = nearbyOnly
+    return switchedOff ? reconnectAfterOutage(client) : undefined
   }, [client, nearbyOnly])
   useEffect(() => reconnectConvexOnNetworkReturn(client), [client])
   const convexUseAuth = useMemo(

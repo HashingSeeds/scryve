@@ -13,10 +13,7 @@ let nearbyOnly = load(NEARBY_ONLY_KEY) === true
 
 const cutOff = () => lanPlayAvailable() && nearbyOnly
 
-/**
- * why: the client and its URL stay put, because deck caches are keyed by that URL and pending
- * writes live in the client. Only the socket fails, on a reserved domain that never resolves.
- */
+/** why: deck caches and pending writes are scoped by the Convex URL, so a different URL would strand them; only the socket changes. */
 export class NearbyOnlyWebSocket extends WebSocket {
   constructor(url: string | URL, protocols?: string | string[]) {
     super(cutOff() ? UNREACHABLE_SYNC_URL : url, protocols)
