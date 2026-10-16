@@ -11,7 +11,7 @@ import {
   supportsCommanderDamage,
   tableItemLabel,
 } from "./playSystems"
-import { deckSections } from "../../../convex/lib/deckGames"
+import { deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import { SYSTEMS } from "../../../convex/lib/systems"
 
 describe("play system defaults", () => {
@@ -55,7 +55,8 @@ describe("play system defaults", () => {
 describe("shared system labels", () => {
   it("reads the same English as the shared definitions", () => {
     for (const id of PLAY_SYSTEM_IDS) {
-      const { counter, formats, table } = SYSTEMS[id]
+      const { counter, table } = SYSTEMS[id]
+      const formats = deckFormats(id)
       expect(counterHeading(id)).toBe(counter.heading)
       expect(counterLabel(id)).toBe(counter.label)
       expect(playFormatOptions(id)).toEqual(
