@@ -65,10 +65,11 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
-import { tableRules } from "./lib/systems"
+import { isCounterOut, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
+  isOutByTableCounters,
   isValidTableSnapshot,
   remapTableState,
   tableActionDelta,
@@ -79,6 +80,13 @@ import {
   type PlayerTable,
   type TableState,
 } from "./lib/table"
+import {
+  dealTreacheryRoles,
+  gameVariantValidator,
+  isTreacheryPlayerCount,
+  TREACHERY_SEATS_MESSAGE,
+  treacheryOutcome,
+} from "./lib/treachery"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
@@ -272,13 +280,23 @@ async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualC
 
 /** why: clients from before the `systems` argument show any system they don't know as Magic. None of them knows a system beyond these three, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those, as they did before this check. */
 const SYSTEMS_BEFORE_CLIENT_LIST: readonly string[] = ["mtg", "ygo", "pokemon"]
+// why: hidden roles are shown per device, so a Treachery seat must belong to one.
+const TREACHERY_DEVICE_MESSAGE = "Treachery seats need a device"
 
-function assertClientPlaysSystem(
+/** why: clients list the variants they can play; ones from before the list play none. */
+function assertClientPlaysGame(
   game: Doc<"games">,
-  systems: readonly string[] = SYSTEMS_BEFORE_CLIENT_LIST,
+  {
+    systems = SYSTEMS_BEFORE_CLIENT_LIST,
+    variants = [],
+  }: { systems?: readonly string[]; variants?: readonly string[] },
 ) {
   const system = game.system ?? game.game
-  if (system === undefined || system === NO_GAME_SYSTEM || systems.includes(system)) return
+  if (
+    (system === undefined || system === NO_GAME_SYSTEM || systems.includes(system)) &&
+    (game.variant === undefined || variants.includes(game.variant))
+  )
+    return
   throw new ConvexError({ code: "update_required", message: "Update Scryve to join this game" })
 }
 
@@ -695,6 +713,7 @@ export const createLobby = mutation({
     game: v.optional(v.string()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),
+    variant: v.optional(gameVariantValidator),
     inviteToken: v.string(),
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
@@ -714,6 +733,11 @@ export const createLobby = mutation({
     assertDeckRequirementSupported(gameSystem, args.deckRequired)
     if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
     assertPlayerCount(args.playerCount)
+    if (args.variant !== undefined) {
+      if (gameSystem !== "mtg") throw new Error("Treachery is a Magic variant")
+      if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
+      if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
+    }
     assertStartingLife(
       args.startingLife,
       gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
@@ -759,6 +783,7 @@ export const createLobby = mutation({
       game: gameSystem,
       system: gameSystem,
       ...(format ? { format } : {}),
+      ...(args.variant ? { variant: args.variant } : {}),
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -882,6 +907,7 @@ export const claimSeat = mutation({
     /** Imported games only: which existing seat to take. Lowest unclaimed when omitted. */
     seat: v.optional(v.number()),
     systems: v.optional(v.array(v.string())),
+    variants: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -907,7 +933,8 @@ export const claimSeat = mutation({
         throw new Error(INVALID_INVITE_MESSAGE)
       return null
     }
-    assertClientPlaysSystem(game, args.systems)
+    assertClientPlaysGame(game, args)
+    if (game.variant !== undefined && !args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -1408,6 +1435,7 @@ export const claimableSeats = mutation({
     token: v.optional(v.string()),
     manualCode: v.optional(v.string()),
     systems: v.optional(v.array(v.string())),
+    variants: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1428,7 +1456,7 @@ export const claimableSeats = mutation({
       // why: clients that predate `invalid` see no seats and fall through to claimSeat, which throws.
       return { invalid: true as const, seats: [] }
     }
-    assertClientPlaysSystem(game, args.systems)
+    assertClientPlaysGame(game, args)
     const players = await playersForGame(ctx, game._id)
     for (const seated of players) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -1514,6 +1542,10 @@ export const lobbyProjection = query({
     const displayNames = await displayNamesForViewer(ctx, { userId: user._id, isHost }, players)
     const commanderDamage = await commanderDamageProjection(ctx, game, user, players)
     const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
+    const decidedOutcome =
+      isHost && game.status === "active" && game.variant === "treachery"
+        ? decidedTreacheryOutcome(game, players, eliminatedPlayerIds)
+        : undefined
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
       (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
@@ -1531,6 +1563,7 @@ export const lobbyProjection = query({
       game: game.game ?? DEFAULT_DECK_GAME,
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
+      ...(game.variant ? { variant: game.variant } : {}),
       isHost,
       ...(game.rematchPublicId ? { rematchPublicId: game.rematchPublicId } : {}),
       eventSequence: eventCount,
@@ -1571,15 +1604,63 @@ export const lobbyProjection = query({
             controlledByMe:
               (p.userId === user._id || (p.userId === undefined && isHost)) &&
               (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
+            ...roleForViewer(game, p, user._id, args.deviceId),
           })),
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
+      ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
       ...(tableRulesApply(gameTableRules(game))
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }
   },
 })
+
+// why: one account may hold seats on two devices, so a hidden role needs an exact device match.
+function holdsSeatOnDevice(player: Doc<"gamePlayers">, userId: Id<"users">, deviceId?: string) {
+  return player.userId === userId && deviceId !== undefined && player.deviceId === deviceId
+}
+
+function roleForViewer(
+  game: Doc<"games">,
+  player: Doc<"gamePlayers">,
+  viewerId: Id<"users">,
+  deviceId?: string,
+) {
+  if (player.role === undefined) return {}
+  const roleRevealed = player.roleRevealed === true
+  return roleRevealed || holdsSeatOnDevice(player, viewerId, deviceId) || game.status !== "active"
+    ? { role: player.role, roleRevealed }
+    : { roleRevealed }
+}
+
+/* why: only Convex sees every hidden role, so it tells the host who won for the end screen.
+   It is undefined until the rules decide the game, so it names no team before then. */
+function decidedTreacheryOutcome(
+  game: Doc<"games">,
+  players: Doc<"gamePlayers">[],
+  eliminatedByCommanderDamage: ReadonlySet<Id<"gamePlayers">>,
+) {
+  const counter = systemDefinition(game.system ?? game.game)?.counter
+  const rules = gameTableRules(game)
+  const table = tableProjection(game, players)
+  const isOut = (player: Doc<"gamePlayers">) =>
+    eliminatedByCommanderDamage.has(player._id) ||
+    isOutByTableCounters(table, player._id, rules) ||
+    (counter !== undefined &&
+      isCounterOut(
+        counter,
+        player.currentLife,
+        players.filter((other) => other !== player).map((other) => other.currentLife),
+      ))
+  return treacheryOutcome(
+    players.flatMap((player) =>
+      player.role === undefined
+        ? []
+        : [{ playerId: player._id, role: player.role, inGame: !isOut(player) }],
+    ),
+  )
+}
 
 function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
   return rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
@@ -1760,6 +1841,8 @@ export const updateLobbySettings = mutation({
           message: error instanceof Error ? error.message : "Choose 2–6 seats",
         })
       }
+      if (game.variant === "treachery" && !isTreacheryPlayerCount(args.playerCount))
+        throw new ConvexError({ code: "invalid_player_count", message: TREACHERY_SEATS_MESSAGE })
       const players = await playersForGame(ctx, game._id)
       if (args.playerCount < Math.max(...players.map((player) => player.seat)))
         throw new ConvexError({
@@ -1779,6 +1862,14 @@ export const updateLobbySettings = mutation({
   },
 })
 
+function rolesFor(game: Doc<"games">, playerCount: number) {
+  if (game.variant !== "treachery") return undefined
+  return dealTreacheryRoles(playerCount).map((role) => ({
+    role,
+    roleRevealed: role === "leader",
+  }))
+}
+
 export const startGame = mutation({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
@@ -1797,9 +1888,13 @@ export const startGame = mutation({
           throw new Error("Every occupied seat must choose a deck before starting")
       }
     }
+    const roles = rolesFor(game, players.length)
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
-    for (const player of resolvePlayerAppearances(players, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)) {
+    for (const [index, player] of resolvePlayerAppearances(
+      players,
+      ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+    ).entries()) {
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
@@ -1808,9 +1903,33 @@ export const startGame = mutation({
         color: player.color,
         shape: player.shape,
         ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
+        ...roles?.[index],
       })
     }
     return { publicId: game.publicId }
+  },
+})
+
+export const revealMyRole = mutation({
+  args: { publicId: v.string(), deviceId: v.string() },
+  handler: async (ctx, args) => {
+    assertDeviceId(args.deviceId)
+    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const user = await requireUser(ctx)
+    const player = (
+      await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
+        .take(MAX_PLAYERS_PER_GAME_READ)
+    ).find((seat) => holdsSeatOnDevice(seat, user._id, args.deviceId))
+    if (!player) throw new Error("Game membership required")
+    if (player.role === undefined) throw new Error("This game has no hidden roles")
+    if (player.roleRevealed !== true) {
+      await limitGameRate(ctx, "gameWrite", user._id)
+      if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
+      await ctx.db.patch(player._id, { roleRevealed: true })
+    }
+    return { role: player.role }
   },
 })
 
@@ -2569,6 +2688,7 @@ async function startRematch(
     ...(finished.game === undefined ? {} : { game: finished.game }),
     ...(finished.system === undefined ? {} : { system: finished.system }),
     ...(finished.format === undefined ? {} : { format: finished.format }),
+    ...(finished.variant === undefined ? {} : { variant: finished.variant }),
     rematchOfGameId: finished._id,
     createdAt: now,
     startedAt: now,
@@ -2576,7 +2696,8 @@ async function startRematch(
     eventSequence: 0,
   })
   const game = (await ctx.db.get(gameId))!
-  for (const player of players.sort((left, right) => left.seat - right.seat)) {
+  const roles = rolesFor(game, players.length)
+  for (const [index, player] of players.sort((left, right) => left.seat - right.seat).entries()) {
     const deckVersionId =
       player.deckVersionId && (await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         ? player.deckVersionId
@@ -2597,6 +2718,7 @@ async function startRematch(
       eventCount: 0,
       resumable: true,
       joinedAt: now,
+      ...roles?.[index],
     })
   }
   if (players.some((player) => player.userId === undefined)) {
