@@ -29,6 +29,12 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "./playSystems"
+import {
+  parseRecentSetup,
+  withRecentSetup,
+  type NewRecentSetup,
+  type RecentSetup,
+} from "./recentSetups"
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
 import type {
   CommanderDamageTotals,
@@ -63,6 +69,7 @@ export const LOCAL_KEYS = {
   noSystemHistoryRepaired: "count.local.history.noSystemRepaired.v1",
   meSeat: "count.local.meSeat.v1",
   pendingMatchEnd: "count.local.matchEnd.v1",
+  recentSetups: "count.local.recentSetups.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
@@ -663,6 +670,20 @@ export class LocalGameRepository {
     this.storage.set(
       LOCAL_KEYS.layouts,
       JSON.stringify({ ...layouts, [playerCount]: playerGridLayoutForCount(playerCount, layout) }),
+    )
+  }
+
+  loadRecentSetups(): RecentSetup[] {
+    const stored = parseJson(this.storage.getString(LOCAL_KEYS.recentSetups))
+    return Array.isArray(stored)
+      ? stored.flatMap((entry: unknown) => parseRecentSetup(entry) ?? [])
+      : []
+  }
+
+  rememberSetup(setup: NewRecentSetup, savedAt = Date.now()): void {
+    this.storage.set(
+      LOCAL_KEYS.recentSetups,
+      JSON.stringify(withRecentSetup(this.loadRecentSetups(), setup, savedAt)),
     )
   }
 

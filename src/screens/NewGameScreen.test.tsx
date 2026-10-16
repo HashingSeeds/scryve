@@ -17,7 +17,6 @@ import {
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
-import { JoinConnectedScreen } from "./JoinConnectedScreen"
 import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "./NewGameScreen"
 import {
   connectedHarness,
@@ -744,7 +743,8 @@ describe("NewGameScreen", () => {
     expect(host).toHaveBeenLastCalledWith(expect.not.objectContaining({ variant: "treachery" }))
   })
 
-  it("opens resumable games without interrupting setup", () => {
+  it("opens resumable games and Join without interrupting setup", () => {
+    const onJoin = jest.fn()
     const onResumeConnected = jest.fn()
     const game = {
       publicId: "resume-game",
@@ -757,21 +757,13 @@ describe("NewGameScreen", () => {
     const view = setup({
       mode: "connected",
       connected: { ...readyHost, ready: false, activeGames: [game] },
-      joinContent: <JoinConnectedScreen embedded onJoined={jest.fn()} />,
+      onJoin,
       onResumeConnected,
     })
 
-    expect(view.getByTestId("connected-action-join")).toBeEnabled()
     fireEvent.press(view.getByTestId("player-count-increment"))
-    fireEvent.press(view.getByTestId("connected-action-join"))
-    expect(view.getByTestId("connected-action-join").props.accessibilityState.selected).toBe(true)
-    expect(view.getByTestId("connected-action-host").props.accessibilityState.selected).toBe(false)
-    expect(view.getByTestId("manual-code-input")).toBeTruthy()
-    expect(view.queryByTestId("play-system")).toBeNull()
-    expect(view.queryByTestId("deck-requirement")).toBeNull()
-    fireEvent.press(view.getByTestId("connected-action-host"))
-    expect(view.getByTestId("connected-action-host").props.accessibilityState.selected).toBe(true)
-    expect(view.getByTestId("connected-action-join").props.accessibilityState.selected).toBe(false)
+    fireEvent.press(view.getByTestId("join-with-code-button"))
+    expect(onJoin).toHaveBeenCalledTimes(1)
     expect(view.getByLabelText("Seats, 3")).toBeTruthy()
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("resume-connected-resume-game"))

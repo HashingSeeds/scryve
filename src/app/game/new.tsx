@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { CloudScreen } from "@/features/auth/CloudScreen"
 import type { CreatedLobby } from "@/features/connected/ConnectedHostSource"
 import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
 import {
@@ -16,11 +15,11 @@ import {
   hasLocalGameStarted,
   isMatchInProgress,
 } from "@/features/game/domain"
+import { startLocalGame } from "@/features/game/gameSetup"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { LocalGame, LocalGameResult, MatchSeatOutcome } from "@/features/game/types"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { translate } from "@/i18n/translate"
-import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 import {
   NewGameScreen,
   type ConnectedHostFeed,
@@ -65,7 +64,6 @@ export default function NewLocalGameRoute() {
   const auth = useAuthAccess()
   const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
   const [mode, setMode] = useState<NewGameMode>(params.mode === "connected" ? "connected" : "local")
-  const [joinCode, setJoinCode] = useState("")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [localConnect, setLocalConnect] = useState<LocalConnectFeed>()
   const [decks, setDecks] = useState<DeckChoices>()
@@ -148,21 +146,8 @@ export default function NewLocalGameRoute() {
         onModeChange={setMode}
         onBack={() => goBack({ pathname: "/", params: { destination: "play" } })}
         onStartLocal={(players, startingLife, setup) => {
-          const current = localGameRepository.loadActiveGame()
-          if (current && (hasLocalGameStarted(current) || isMatchInProgress(current))) {
-            setActiveGame(current)
-            return
-          }
-          if (current) localGameRepository.clearActiveGame()
-          if (setup.account) localGameRepository.saveMeSeat(setup.account.meSeat)
-          // why: setup sits above the board it came from, so replacing it would stack a second board that never unmounts.
-          router.dismissTo({
-            pathname: "/",
-            params: {
-              destination: "play",
-              prepared: JSON.stringify({ players, startingLife, ...setup }),
-            },
-          })
+          if (!startLocalGame({ players, startingLife, ...setup }))
+            setActiveGame(localGameRepository.loadActiveGame())
         }}
         connected={connected}
         localConnect={
@@ -174,19 +159,7 @@ export default function NewLocalGameRoute() {
               }
             : undefined
         }
-        joinContent={
-          <CloudScreen multiplayer onBack={() => setMode("local")}>
-            {(access) => (
-              <JoinConnectedScreen
-                embedded
-                access={access}
-                initialCode={joinCode}
-                onCodeChange={setJoinCode}
-                onJoined={(publicId) => openLobby({ publicId })}
-              />
-            )}
-          </CloudScreen>
-        }
+        onJoin={() => router.push("/connected/join")}
         onNearby={
           lanPlayAvailable()
             ? (setup) => router.push({ pathname: "/lan", params: { setup: JSON.stringify(setup) } })

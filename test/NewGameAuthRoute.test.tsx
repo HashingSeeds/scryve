@@ -87,15 +87,10 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
   view.rerender(route(true, false))
   fireEvent.press(view.getByTestId("host-connected-button"))
   expect(mockOpenAuth).toHaveBeenCalledTimes(1)
-  fireEvent.press(view.getByTestId("connected-action-join"))
+  fireEvent.press(view.getByTestId("join-with-code-button"))
   expect(mockOpenAuth).toHaveBeenCalledTimes(1)
-  expect(router.push).not.toHaveBeenCalled()
-  expect(view.getByTestId("manual-code-input")).toBeTruthy()
-  fireEvent.changeText(view.getByTestId("manual-code-input"), "AB12CD")
-  fireEvent.press(view.getByTestId("connected-action-host"))
-  fireEvent.press(view.getByTestId("connected-action-join"))
-  expect(view.getByTestId("manual-code-input").props.value).toBe("AB12CD")
-  fireEvent.press(view.getByTestId("connected-action-host"))
+  expect(router.push).toHaveBeenCalledWith("/connected/join")
+  expect(view.getByLabelText("Life, 21")).toBeTruthy()
   mockConnectedHarness.userId = "user-a"
   mockConnectedHarness.convexLoading = false
   mockConnectedHarness.convexAuthenticated = true
