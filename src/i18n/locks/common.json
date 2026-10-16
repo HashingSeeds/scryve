@@ -1,0 +1,15 @@
+{
+  "back": "3c6d6b16e0ce",
+  "cancel": "76982a57f829",
+  "close": "d4780810d57c",
+  "delete": "65d2bf891f8f",
+  "done": "e296febba90a",
+  "edit": "86614daaab78",
+  "remove": "c2b86de6431d",
+  "retry": "661689fc6fcb",
+  "save": "99edb765e6cd",
+  "tryAgain": "0c247bca1892",
+  "undo": "11783edaec17",
+  "emptyState.heading": "611b95a2a3aa",
+  "emptyState.content": "561aa13132cd"
+}

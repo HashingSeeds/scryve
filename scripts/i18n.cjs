@@ -8,7 +8,8 @@ const I18N_DIR = path.join(ROOT, "src/i18n")
 const LOCKS_DIR = path.join(I18N_DIR, "locks")
 const SOURCE_LOCALE = "en"
 const MODEL = "claude-sonnet-5-5"
-const UNITS_PER_REQUEST = 60
+const USD_PER_MILLION_TOKENS = { input: 2, output: 10 }
+const UNITS_PER_REQUEST = 100
 
 const LOCALES = {
   es: "Spanish (neutral, natural for both Spain and Latin America)",
@@ -33,10 +34,10 @@ Rules:
 - Use the publisher's official localized term where one exists: life (Magic), Life Points (Yu-Gi-Oh!), Prize cards and HP (Pokémon), poison counters, commander damage, commander tax, the Monarch, the Initiative.
 - Product vocabulary, translate consistently: "local game" is a game on one shared device; "connected game" is players on their own phones; "cloud" means synced through Scryve's servers; "nearby" means phones on the same Wi-Fi; "seat" is a player's place at the table; "host" is the player who created a connected game.
 - Keep the " · " separator, ellipsis characters, and abbreviations like "5m ago" equally compact.
-- The key path tells you where the string appears. Use it as context; never translate it.
-- For plural entries, return one string for every requested key, choosing the grammatically correct form for each CLDR plural category.
+- Each entry has a "context" key path that tells you where the string appears. Use it as context; never translate it.
+- Each entry lists "slots". Return one translation per slot id. A slot with a "form" is a CLDR plural category: write the grammatically correct form for it, using the English plural forms as reference.
 
-Return a translation for every requested key and nothing else.`
+Return a translation for every slot and nothing else.`
 
 const OUTPUT_FORMAT = {
   type: "json_schema",
@@ -47,8 +48,8 @@ const OUTPUT_FORMAT = {
         type: "array",
         items: {
           type: "object",
-          properties: { key: { type: "string" }, text: { type: "string" } },
-          required: ["key", "text"],
+          properties: { slot: { type: "string" }, text: { type: "string" } },
+          required: ["slot", "text"],
           additionalProperties: false,
         },
       },
@@ -258,17 +259,37 @@ function loadApiKey() {
 }
 
 function requestPayload(units, namespace, locale) {
-  return units.map((unit) => ({
-    keyPath: `${namespace}:${unit.id}`,
-    english: unit.english,
-    returnKeys: requiredKeys(unit, locale),
+  const slotKeys = new Map()
+  const entries = units.map((unit) => ({
+    context: `${namespace}:${unit.id}`,
+    english: unit.plural
+      ? Object.fromEntries(
+          Object.entries(unit.english).map(([key, text]) => [key.slice(unit.id.length + 1), text]),
+        )
+      : unit.english[unit.id],
+    slots: requiredKeys(unit, locale).map((key) => {
+      const slot = String(slotKeys.size)
+      slotKeys.set(slot, key)
+      return unit.plural ? { slot, form: key.slice(unit.id.length + 1) } : { slot }
+    }),
   }))
+  return { entries, slotKeys }
+}
+
+const usage = { input: 0, output: 0 }
+
+function usageSummary() {
+  const cost =
+    (usage.input * USD_PER_MILLION_TOKENS.input + usage.output * USD_PER_MILLION_TOKENS.output) /
+    1_000_000
+  return `${usage.input} input + ${usage.output} output tokens, about $${cost.toFixed(2)}`
 }
 
 async function requestTranslations(client, { units, namespace, locale, feedback }) {
+  const payload = requestPayload(units, namespace, locale)
   const request = [
     `Translate into ${LOCALES[locale]} (${locale}).`,
-    JSON.stringify(requestPayload(units, namespace, locale), null, 2),
+    JSON.stringify(payload.entries),
     ...(feedback.length
       ? [`Your previous answer had problems; fix them:\n${feedback.join("\n")}`]
       : []),
@@ -279,10 +300,12 @@ async function requestTranslations(client, { units, namespace, locale, feedback 
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    output_config: { effort: "medium", format: OUTPUT_FORMAT },
+    output_config: { effort: "low", format: OUTPUT_FORMAT },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: request }],
   })
+  usage.input += response.usage.input_tokens
+  usage.output += response.usage.output_tokens
 
   if (response.stop_reason === "refusal")
     throw new Error(
@@ -293,7 +316,11 @@ async function requestTranslations(client, { units, namespace, locale, feedback 
 
   const text = response.content.find((block) => block.type === "text")?.text ?? "{}"
   const { translations } = JSON.parse(text)
-  return Object.fromEntries(translations.map(({ key, text }) => [key, text]))
+  return Object.fromEntries(
+    translations.flatMap(({ slot, text }) =>
+      payload.slotKeys.has(slot) ? [[payload.slotKeys.get(slot), text]] : [],
+    ),
+  )
 }
 
 async function translateUnits(client, { units, namespace, locale }) {
@@ -354,6 +381,7 @@ async function translate({ onlyNamespace }) {
     fs.mkdirSync(LOCKS_DIR, { recursive: true })
     fs.writeFileSync(lockPath(namespace), `${JSON.stringify(nextLock, null, 2)}\n`)
   }
+  console.log(`Used ${usageSummary()}.`)
 }
 
 async function main() {
