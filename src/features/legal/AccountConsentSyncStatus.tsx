@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
@@ -22,12 +23,13 @@ export function AccountConsentSyncStatus({
     theme: { spacing },
   } = useAppTheme()
   const insets = useSafeAreaInsets()
+  const retryLabel = translate("account:consentSync.retryAccessibilityLabel")
   const topEdgeBand = useTopEdgeBand()
   const message = isSyncing
-    ? "Syncing your agreement…"
+    ? "account:consentSync.syncing"
     : retryFailed
-      ? "Account sync is still pending. Your agreement is saved on this device."
-      : "Agreement saved on this device. Account sync pending."
+      ? "account:consentSync.stillPending"
+      : "account:consentSync.pending"
 
   return (
     <View
@@ -40,11 +42,11 @@ export function AccountConsentSyncStatus({
         accessibilityLiveRegion="polite"
         style={themed($status)}
       >
-        <Text size="xs" weight="medium" text={message} style={themed($message)} />
+        <Text size="xs" weight="medium" tx={message} style={themed($message)} />
         <Button
           testID="retry-account-consent-sync"
-          text={isSyncing ? "Retrying…" : "Retry"}
-          accessibilityLabel="Retry account consent sync"
+          tx={isSyncing ? "account:consentSync.retrying" : "common:retry"}
+          accessibilityLabel={retryLabel}
           disabled={isSyncing}
           style={themed($retry)}
           textStyle={themed($retryText)}

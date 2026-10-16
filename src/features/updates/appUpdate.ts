@@ -4,6 +4,7 @@ import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 
 import { LAUNCH_MARK, LAUNCH_MARK_SIZE } from "@/features/launch/LaunchFallback"
+import { translate } from "@/i18n/translate"
 import { loadString, saveString } from "@/utils/storage"
 import { knownReducedMotion } from "@/utils/useReducedMotion"
 
@@ -86,7 +87,9 @@ export function betaUpdatesChosen() {
 export function updateChannelLabel() {
   const running = Updates.channel
   if (!running) return null
-  return switchedChannel ? `${running} (${switchedChannel} after restart)` : running
+  return switchedChannel
+    ? translate("account:updates.channelAfterRestart", { running, next: switchedChannel })
+    : running
 }
 
 // why: overriding works on existing store builds because EAS Build embeds this header key.

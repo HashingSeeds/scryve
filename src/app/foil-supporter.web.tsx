@@ -9,11 +9,19 @@ import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { FOIL_PRODUCT_ID } from "@/features/billing/config"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
+import { translate } from "@/i18n/translate"
 
 export default function FoilSupporterRoute() {
   const auth = useAuthAccess()
   const billing = useRevenueCat()
   const [purchasing, setPurchasing] = useState(false)
+
+  const copy = {
+    pageTitle: translate("account:foil.pageTitle"),
+    signInPrompt: auth.configurationMessage || translate("account:foil.signInPrompt"),
+    purchasesUnavailable:
+      billing.configurationMessage || translate("account:foil.purchasesUnavailable"),
+  }
 
   async function purchase() {
     setPurchasing(true)
@@ -27,53 +35,48 @@ export default function FoilSupporterRoute() {
   return (
     <>
       <Head>
-        <title>Scryve Foil Supporter</title>
+        <title>{copy.pageTitle}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <Screen
         preset="auto"
         contentInset="standard"
         header={{
-          title: "Foil Supporter",
+          titleTx: "account:foil.title",
           collapseTitle: false,
           leftTx: "common:back",
           onLeftPress: () => router.dismissTo("/"),
         }}
       >
         <View style={$content}>
-          <Text text="US$500/year" preset="heading" accessibilityRole="header" />
-          <Text text="The same Pro features. Optional support for Scryve. Renews yearly until canceled." />
+          <Text tx="account:foil.price" preset="heading" accessibilityRole="header" />
+          <Text tx="account:foil.description" />
           {!auth.isSignedIn ? (
             <>
-              <Text
-                text={auth.configurationMessage || "Sign in to link Foil to your Scryve account."}
-              />
+              <Text text={copy.signInPrompt} />
               <Button
-                text="Sign in"
+                tx="account:signIn"
                 disabled={!auth.configured || !auth.isLoaded}
                 onPress={auth.openAuth}
               />
             </>
           ) : billing.isCountPro ? (
             <>
-              <Text text="You already have Pro access. Manage your existing subscription before switching plans." />
+              <Text tx="account:foil.alreadyPro" />
               <Button
-                text="Manage subscription"
+                tx="account:foil.manageSubscription"
                 onPress={() => void billing.presentCustomerCenter()}
               />
             </>
           ) : (
             <Button
-              text={purchasing ? "Opening checkout…" : "Choose Foil Supporter"}
+              tx={purchasing ? "account:foil.openingCheckout" : "account:foil.choose"}
               disabled={!billing.isReady || billing.isLoading || purchasing}
               onPress={() => void purchase()}
             />
           )}
           {auth.isSignedIn && !billing.configured ? (
-            <Text
-              text={billing.configurationMessage || "Purchases are unavailable in this build."}
-              accessibilityRole="alert"
-            />
+            <Text text={copy.purchasesUnavailable} accessibilityRole="alert" />
           ) : null}
           {billing.error ? <Text text={billing.error} accessibilityRole="alert" /> : null}
         </View>

@@ -2,11 +2,15 @@ import { ActivityIndicator, type TextStyle, View, type ViewStyle } from "react-n
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import { appLocale } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { COUNT_PRO_ENTITLEMENT_ID } from "./config"
 import { useRevenueCat } from "./RevenueCatContext"
+
+const PLAN_TITLES = { Foil: "Scryve Foil", Pro: "Scryve Pro" } as const
 
 export function SubscriptionControls() {
   const { themed } = useAppTheme()
@@ -14,22 +18,34 @@ export function SubscriptionControls() {
   const entitlement = billing.customerInfo?.entitlements.all[COUNT_PRO_ENTITLEMENT_ID]
   const planName = billing.isFoil ? "Foil" : "Pro"
   const expiration = entitlement?.expirationDate
-    ? new Date(entitlement.expirationDate).toLocaleDateString()
+    ? new Date(entitlement.expirationDate).toLocaleDateString(appLocale)
     : null
   const accessStatus = billing.isLoading
-    ? "Checking access…"
+    ? translate("account:billing.access.checking")
     : billing.isCountPro
       ? expiration
-        ? `${entitlement?.willRenew ? "Renews" : "Available until"} ${expiration}`
-        : `${planName} access active`
+        ? translate(
+            entitlement?.willRenew
+              ? "account:billing.access.renews"
+              : "account:billing.access.availableUntil",
+            { date: expiration },
+          )
+        : translate("account:billing.access.active", { plan: planName })
       : billing.error
-        ? "Status unavailable"
-        : "Free plan"
+        ? translate("account:billing.access.unavailable")
+        : translate("account:billing.access.free")
+  const copy = {
+    loading: translate("account:billing.loading"),
+    buttonLabel: billing.isCountPro
+      ? translate("account:billing.manageAccessibilityLabel", { plan: planName })
+      : translate("account:billing.viewOptionsAccessibilityLabel"),
+    notConfigured: billing.configurationMessage || translate("account:billing.notConfigured"),
+  }
 
   return (
     <View style={themed($container)}>
       <View style={$headingText}>
-        <Text preset="subheading" text={`Scryve ${planName}`} accessibilityRole="header" />
+        <Text preset="subheading" text={PLAN_TITLES[planName]} accessibilityRole="header" />
         {billing.configured ? (
           <Text
             size="xs"
@@ -40,19 +56,15 @@ export function SubscriptionControls() {
         ) : null}
       </View>
 
-      {billing.isLoading ? <ActivityIndicator accessibilityLabel="Loading Scryve Pro" /> : null}
+      {billing.isLoading ? <ActivityIndicator accessibilityLabel={copy.loading} /> : null}
 
       {billing.configured ? (
         <Button
           testID={
             billing.isCountPro ? "count-pro-customer-center-button" : "count-pro-paywall-button"
           }
-          text={billing.isCountPro ? "Manage" : "View options"}
-          accessibilityLabel={
-            billing.isCountPro
-              ? `Manage Scryve ${planName} subscription`
-              : "View Scryve Pro options"
-          }
+          tx={billing.isCountPro ? "account:billing.manage" : "account:billing.viewOptions"}
+          accessibilityLabel={copy.buttonLabel}
           disabled={!billing.isReady || billing.isLoading}
           style={themed($button)}
           textStyle={themed($buttonText)}
@@ -63,11 +75,7 @@ export function SubscriptionControls() {
       ) : null}
 
       {!billing.configured ? (
-        <Text
-          accessibilityRole="alert"
-          size="xs"
-          text={billing.configurationMessage || "Scryve Pro purchases are not configured."}
-        />
+        <Text accessibilityRole="alert" size="xs" text={copy.notConfigured} />
       ) : null}
       {billing.error ? <Text accessibilityRole="alert" size="xs" text={billing.error} /> : null}
     </View>

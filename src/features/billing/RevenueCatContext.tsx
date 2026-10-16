@@ -17,6 +17,8 @@ import type {
   PurchasesPackage,
 } from "react-native-purchases"
 
+import { translate } from "@/i18n/translate"
+
 import {
   COUNT_PACKAGE_IDS,
   COUNT_PRO_ENTITLEMENT_ID,
@@ -85,10 +87,13 @@ const RevenueCatContext = createContext<RevenueCatAccess>({
   customerInfo: null,
   currentOffering: null,
   refreshCustomerInfo: unavailable,
-  purchase: async () => ({ status: "failed", message: "RevenueCat is not configured." }),
+  purchase: async () => ({
+    status: "failed",
+    message: translate("account:billing.errors.revenueCatNotConfigured"),
+  }),
   restorePurchases: async () => ({
     status: "failed",
-    message: "RevenueCat is not configured.",
+    message: translate("account:billing.errors.revenueCatNotConfigured"),
   }),
   presentPaywall: async () => "error",
   presentCustomerCenter: async () => undefined,
@@ -105,23 +110,23 @@ function purchasesError(cause: unknown): PurchasesError | null {
 export function revenueCatErrorMessage(cause: unknown) {
   const error = purchasesError(cause)
   if (!error)
-    return cause instanceof Error ? cause.message : "An unexpected purchase error occurred."
+    return cause instanceof Error ? cause.message : translate("account:billing.errors.unexpected")
   const code: string = error.code
   switch (code) {
     case ERROR_CODE.NETWORK_ERROR:
     case ERROR_CODE.OFFLINE_CONNECTION_ERROR:
-      return "Connect to the internet and try again."
+      return translate("account:billing.errors.offline")
     case ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR:
-      return "Purchases are not allowed on this device or store account."
+      return translate("account:billing.errors.notAllowed")
     case ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR:
-      return "This Scryve Pro option is not available from the current store."
+      return translate("account:billing.errors.productUnavailable")
     case ERROR_CODE.PAYMENT_PENDING_ERROR:
-      return "The store is still processing this purchase. Access will update when it completes."
+      return translate("account:billing.errors.pending")
     case ERROR_CODE.CONFIGURATION_ERROR:
     case ERROR_CODE.INVALID_CREDENTIALS_ERROR:
-      return "Scryve Pro is not configured correctly for this build."
+      return translate("account:billing.errors.misconfigured")
     default:
-      return error.message || "The purchase could not be completed."
+      return error.message || translate("account:billing.errors.failed")
   }
 }
 
@@ -255,14 +260,13 @@ export function RevenueCatProvider({
     async (productId: CountProductId | typeof FOIL_PRODUCT_ID): Promise<PurchaseResult> => {
       try {
         setError(undefined)
-        if (!isReady)
-          throw new Error("Wait for billing to connect to your account, then try again.")
+        if (!isReady) throw new Error(translate("account:billing.errors.waitForBilling"))
         const Purchases = await loadPurchases()
         if (productId === FOIL_PRODUCT_ID) {
           if (Platform.OS !== "web")
-            throw new Error("Foil purchases are only available on the web.")
+            throw new Error(translate("account:billing.errors.foilWebOnly"))
           if (hasCountPro(await Purchases.getCustomerInfo()))
-            throw new Error("Manage your existing subscription before switching to Foil.")
+            throw new Error(translate("account:billing.errors.manageBeforeFoil"))
         }
         const selectedPackage: PurchasesPackage | null | undefined =
           productId === FOIL_PRODUCT_ID
@@ -271,9 +275,9 @@ export function RevenueCatProvider({
               ]?.availablePackages.find((candidate) => candidate.identifier === FOIL_PRODUCT_ID)
             : packageForProduct(currentOffering, productId)
         if (!selectedPackage)
-          throw new Error(`${productId} is not available from the current store.`)
+          throw new Error(translate("account:billing.errors.productNotInStore", { productId }))
         if ((await Purchases.getAppUserID()) !== appUserID)
-          throw new Error("Wait for billing to connect to your account, then try again.")
+          throw new Error(translate("account:billing.errors.waitForBilling"))
         const result = await Purchases.purchasePackage(selectedPackage)
         acceptCustomerInfo(result.customerInfo)
         return { status: "purchased", customerInfo: result.customerInfo }
@@ -306,10 +310,10 @@ export function RevenueCatProvider({
     try {
       setError(undefined)
       if (!isReady || (await (await loadPurchases()).getAppUserID()) !== appUserID)
-        throw new Error("Wait for billing to connect to your account, then try again.")
+        throw new Error(translate("account:billing.errors.waitForBilling"))
       const { presentCountProPaywall } = await import("./sdk")
       const result = await presentCountProPaywall(currentOffering)
-      if (result === "error") setError("The Scryve Pro paywall could not complete the request.")
+      if (result === "error") setError(translate("account:billing.errors.paywallFailed"))
       if (result === "purchased" || result === "restored") await refreshCustomerInfo()
       return result
     } catch (cause) {

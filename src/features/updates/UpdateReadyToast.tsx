@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -49,7 +50,8 @@ export function UpdateReadyToastWithForegroundChecks() {
   const showing = visible && !held
   useEffect(() => {
     if (!showing) return
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility("Update ready")
+    if (Platform.OS === "ios")
+      AccessibilityInfo.announceForAccessibility(translate("account:updates.ready"))
     const timeout = setTimeout(() => setVisible(false), VISIBLE_MS)
     return () => clearTimeout(timeout)
   }, [showing])
@@ -64,7 +66,7 @@ export function UpdateReadyToastWithForegroundChecks() {
           style={[themed($layer), { top: insets.top + theme.spacing.md }]}
         >
           <View testID="update-ready-toast" accessibilityLiveRegion="polite" style={themed($toast)}>
-            <Text size="xs" weight="medium" text="Update ready" style={themed($message)} />
+            <Text size="xs" weight="medium" tx="account:updates.ready" style={themed($message)} />
             <UpdateInfoButton
               onPress={() => {
                 setVisible(false)
@@ -73,7 +75,7 @@ export function UpdateReadyToastWithForegroundChecks() {
             />
             <Button
               testID="update-toast-restart-button"
-              text="Restart"
+              tx="account:updates.restart"
               style={themed($restart)}
               textStyle={themed($restartText)}
               onPress={restartToUpdate}

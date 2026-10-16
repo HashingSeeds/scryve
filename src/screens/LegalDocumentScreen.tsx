@@ -5,8 +5,11 @@ import { LinkedText } from "@/components/LinkedText"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { LegalDocumentBlock, LegalDocumentContent } from "@/content/legal"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+
+const BULLET = "•"
 
 export interface LegalDocumentScreenProps {
   document: LegalDocumentContent
@@ -16,6 +19,9 @@ export interface LegalDocumentScreenProps {
 export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenProps) {
   const { theme, themed } = useAppTheme()
   const backgroundColor = theme.isDark ? theme.colors.palette.neutral100 : theme.colors.background
+  const lastUpdated = translate("account:legalDocument.lastUpdated", {
+    date: document.effectiveDate,
+  })
 
   return (
     <Screen
@@ -35,11 +41,7 @@ export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenPro
       <View style={themed($content)}>
         <View style={themed($documentHeader)}>
           <Text text={document.title} preset="heading" accessibilityRole="header" />
-          <Text
-            text={`Last updated ${document.effectiveDate}`}
-            size="xs"
-            style={themed($metadata)}
-          />
+          <Text text={lastUpdated} size="xs" style={themed($metadata)} />
         </View>
         {document.sections.map((section, index) => (
           <View key={`${section.heading ?? "section"}-${index}`} style={themed($section)}>
@@ -72,7 +74,7 @@ function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
       <View style={themed($list)}>
         {block.items.map((item, index) => (
           <View key={`${item}-${index}`} style={themed($listItem)}>
-            <Text text="•" weight="light" style={themed($bullet)} />
+            <Text text={BULLET} weight="light" style={themed($bullet)} />
             <LinkedText text={item} weight="light" style={themed($listText)} />
           </View>
         ))}

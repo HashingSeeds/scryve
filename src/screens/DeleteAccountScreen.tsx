@@ -7,11 +7,17 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { appLocale } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 export type AccountDeletionStatus = "processing" | "identity_pending" | "failed"
 export type AccountDeletionReceiptStatus = AccountDeletionStatus | "completed"
+
+const DELETE_CONFIRMATION = "DELETE"
+const STATUS_MARK = { failed: "!", completed: "✓", received: "…" } as const
+const DELETION_STEPS = ["cloud", "history", "local", "signOut"] as const
 
 export interface DeleteAccountScreenProps {
   email?: string
@@ -44,78 +50,56 @@ export function DeleteAccountScreen({
   const hasRequest = deletionStatus !== null && !isChecking
   const needsRetry = deletionStatus === "failed"
   const canRequestDeletion = deletionStatus === null || needsRetry
+  const lede = isChecking
+    ? translate("account:deleteAccount.checkingStatus")
+    : hasRequest
+      ? statusDescription(deletionStatus)
+      : translate("account:deleteAccount.intro")
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="Delete account" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="account:deleteAccount.title" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($content)}>
-        <Text text="ACCOUNT & DATA" preset="formLabel" style={themed($eyebrow)} />
+        <Text tx="account:deleteAccount.eyebrow" preset="formLabel" style={themed($eyebrow)} />
         <Text
-          text={
+          tx={
             isChecking
-              ? "Delete account"
+              ? "account:deleteAccount.title"
               : needsRetry
-                ? "Your deletion needs attention"
+                ? "account:deleteAccount.heading.needsAttention"
                 : hasRequest
-                  ? "Your deletion is in progress"
-                  : "Before you delete your account"
+                  ? "account:deleteAccount.heading.inProgress"
+                  : "account:deleteAccount.heading.before"
           }
           preset="heading"
           accessibilityRole="header"
         />
         <Text
-          text={
-            isChecking
-              ? "Checking deletion status…"
-              : hasRequest
-                ? statusDescription(deletionStatus)
-                : "This permanently deletes your Scryve account and anonymizes your connected-play history. Review what happens first."
-          }
+          text={lede}
           accessibilityLiveRegion={isChecking ? "polite" : undefined}
           style={themed($lede)}
         />
         {hasRequest ? <DeletionStatusPanel status={deletionStatus} /> : null}
         {deletionStatus === null ? (
           <View style={themed($stepList)}>
-            <Step
-              number="1"
-              title="Your cloud account is removed"
-              body="Your profile, avatar, sign-in, invitations, and account-linked connected data are deleted."
-            />
-            <Step
-              number="2"
-              title="Shared match history is anonymized"
-              body="Other players keep the match result, but your seats become unlinked “Deleted player” entries with a neutral avatar."
-            />
-            <Step
-              number="3"
-              title="Local games stay on this device"
-              body="Offline game history is stored only on this device. It is not linked to your account and is not remotely erased."
-            />
-            <Step
-              number="4"
-              title="All devices are signed out"
-              body="This device and any other signed-in devices are signed out automatically."
-            />
+            {DELETION_STEPS.map((step, index) => (
+              <Step key={step} number={String(index + 1)} step={step} />
+            ))}
           </View>
         ) : null}
         {canRequestDeletion ? (
           <>
             <View style={themed($subscriptionNotice)}>
-              <Text text="Have a Scryve Pro subscription?" style={themed($strong)} />
-              <Text
-                text="Deleting your account won't cancel it. You may keep being charged until you cancel through Apple or Google Play. You can still delete now, but you'll lose access to any paid time left."
-                size="xs"
-                style={themed($muted)}
-              />
+              <Text tx="account:deleteAccount.subscription.heading" style={themed($strong)} />
+              <Text tx="account:deleteAccount.subscription.body" size="xs" style={themed($muted)} />
               <Button
-                text="Manage Apple subscriptions"
+                tx="account:deleteAccount.subscription.manageApple"
                 accessibilityRole="link"
                 style={themed($subscriptionLink)}
                 textStyle={themed($subscriptionLinkText)}
                 onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions")}
               />
               <Button
-                text="Manage Google Play subscriptions"
+                tx="account:deleteAccount.subscription.manageGoogle"
                 accessibilityRole="link"
                 style={themed($subscriptionLink)}
                 textStyle={themed($subscriptionLinkText)}
@@ -125,11 +109,17 @@ export function DeleteAccountScreen({
               />
             </View>
             {email ? (
-              <Text text={`Signed in as ${email}`} size="xs" style={themed($muted)} />
+              <Text
+                tx="account:deleteAccount.signedInAs"
+                txOptions={{ email }}
+                size="xs"
+                style={themed($muted)}
+              />
             ) : null}
             <TextField
               testID="delete-confirmation-input"
-              label="Type DELETE to continue"
+              labelTx="account:deleteAccount.confirmLabel"
+              labelTxOptions={{ word: DELETE_CONFIRMATION }}
               value={confirmation}
               autoCapitalize="characters"
               autoCorrect={false}
@@ -139,23 +129,23 @@ export function DeleteAccountScreen({
             {error ? <Text accessibilityRole="alert" text={error} style={themed($error)} /> : null}
             <Button
               testID="confirm-account-deletion-button"
-              text={
+              tx={
                 isSubmitting
-                  ? "Submitting request…"
+                  ? "account:deleteAccount.submit.submitting"
                   : needsRetry
-                    ? "Retry account deletion"
-                    : "Permanently delete account"
+                    ? "account:deleteAccount.submit.retry"
+                    : "account:deleteAccount.submit.delete"
               }
-              disabled={confirmation.trim().toUpperCase() !== "DELETE" || isSubmitting}
+              disabled={confirmation.trim().toUpperCase() !== DELETE_CONFIRMATION || isSubmitting}
               style={themed($dangerButton)}
               textStyle={themed($dangerButtonText)}
               onPress={onRequestDeletion}
             />
             <Text
-              text={
+              tx={
                 needsRetry
-                  ? "Retrying continues from the last incomplete step; anonymized data is not restored."
-                  : "Deletion begins immediately and cannot be undone after processing starts."
+                  ? "account:deleteAccount.footnote.retry"
+                  : "account:deleteAccount.footnote.first"
               }
               size="xxs"
               style={themed($centerMuted)}
@@ -177,65 +167,64 @@ export function AccountDeletionReceiptScreen({
   const { themed } = useAppTheme()
   const completed = status === "completed"
   const failed = status === "failed"
+  const lede = completed
+    ? translate("account:deleteAccount.receipt.completedBody")
+    : failed
+      ? translate("account:deleteAccount.receipt.failedBody")
+      : statusDescription(status)
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="Delete account" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="account:deleteAccount.title" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($content)}>
-        <Text text="ACCOUNT & DATA" preset="formLabel" style={themed($eyebrow)} />
+        <Text tx="account:deleteAccount.eyebrow" preset="formLabel" style={themed($eyebrow)} />
         <Text
-          text={
+          tx={
             completed
-              ? "Your account was deleted"
+              ? "account:deleteAccount.heading.completed"
               : failed
-                ? "Your deletion needs attention"
-                : "Your deletion is in progress"
+                ? "account:deleteAccount.heading.needsAttention"
+                : "account:deleteAccount.heading.inProgress"
           }
           preset="heading"
           accessibilityRole="header"
         />
-        <Text
-          text={
-            completed
-              ? "Scryve removed your sign-in account and anonymized your connected-play history."
-              : failed
-                ? "Scryve could not finish the remaining deletion work automatically."
-                : statusDescription(status)
-          }
-          style={themed($lede)}
-        />
+        <Text text={lede} style={themed($lede)} />
         <DeletionStatusPanel status={status} />
         <Text
           testID="account-deletion-last-update"
-          text={`Last updated ${formatDeletionUpdate(updatedAt)}`}
+          text={formatDeletionUpdate(updatedAt)}
           size="xs"
           style={themed($muted)}
         />
         <Text
-          text={
+          tx={
             completed
-              ? "No further action is needed."
+              ? "account:deleteAccount.receipt.next.completed"
               : failed
-                ? "Sign in again, return to this page, and retry the request."
-                : "You can close Scryve. This page will keep checking when you return."
+                ? "account:deleteAccount.receipt.next.failed"
+                : "account:deleteAccount.receipt.next.pending"
           }
           size="xs"
           style={themed($muted)}
         />
         {failed && onSignIn ? (
-          <Button text="Sign in to retry" preset="reversed" onPress={onSignIn} />
+          <Button
+            tx="account:deleteAccount.receipt.signInToRetry"
+            preset="reversed"
+            onPress={onSignIn}
+          />
         ) : null}
-        <Button text="Return home" onPress={onReturnHome} />
+        <Button tx="account:deleteAccount.receipt.returnHome" onPress={onReturnHome} />
       </View>
     </Screen>
   )
 }
 
 function statusDescription(status: AccountDeletionStatus | null | undefined) {
-  if (status === "failed")
-    return "Scryve could not finish automatically. Return to this page and submit the request again to retry."
+  if (status === "failed") return translate("account:deleteAccount.status.failed")
   if (status === "identity_pending")
-    return "Your connected data is anonymized. Scryve is now removing your sign-in identity."
-  return "Scryve is anonymizing connected history and removing account-linked data. You can close this page safely."
+    return translate("account:deleteAccount.status.identityPending")
+  return translate("account:deleteAccount.status.processing")
 }
 
 function DeletionStatusPanel({
@@ -244,32 +233,18 @@ function DeletionStatusPanel({
   status: AccountDeletionReceiptStatus | null | undefined
 }) {
   const { themed } = useAppTheme()
-  const failed = status === "failed"
-  const completed = status === "completed"
+  const panel = status === "failed" ? "failed" : status === "completed" ? "completed" : "received"
+  const failed = panel === "failed"
   return (
     <View accessibilityRole="alert" style={themed(failed ? $failurePanel : $statusPanel)}>
       <View style={themed(failed ? $failureMark : $statusMark)}>
-        <Text text={failed ? "!" : completed ? "✓" : "…"} style={themed($statusMarkText)} />
+        <Text text={STATUS_MARK[panel]} style={themed($statusMarkText)} />
       </View>
       <View style={$flex}>
+        <Text tx={`account:deleteAccount.panel.${panel}.title`} preset="subheading" />
         <Text
-          text={
-            failed
-              ? "Deletion needs attention"
-              : completed
-                ? "Deletion complete"
-                : "Deletion request received"
-          }
-          preset="subheading"
-        />
-        <Text
-          text={
-            failed
-              ? "No account data will be restored. Type DELETE and submit again to retry the remaining work."
-              : completed
-                ? "This receipt contains no account details."
-                : "New connected activity is blocked while the request is processed."
-          }
+          tx={`account:deleteAccount.panel.${panel}.body`}
+          txOptions={{ word: DELETE_CONFIRMATION }}
           size="xs"
           style={themed($muted)}
         />
@@ -280,16 +255,16 @@ function DeletionStatusPanel({
 
 function formatDeletionUpdate(timestamp: number) {
   const date = new Date(timestamp)
-  const day = date.toLocaleDateString(undefined, {
+  const day = date.toLocaleDateString(appLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",
   })
-  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-  return `${day} at ${time}`
+  const time = date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
+  return translate("account:deleteAccount.receipt.lastUpdated", { day, time })
 }
 
-function Step({ number, title, body }: { number: string; title: string; body: string }) {
+function Step({ number, step }: { number: string; step: (typeof DELETION_STEPS)[number] }) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($step)}>
@@ -297,8 +272,8 @@ function Step({ number, title, body }: { number: string; title: string; body: st
         <Text text={number} size="xs" />
       </View>
       <View style={$flex}>
-        <Text text={title} style={themed($strong)} />
-        <Text text={body} size="xs" style={themed($muted)} />
+        <Text tx={`account:deleteAccount.steps.${step}.title`} style={themed($strong)} />
+        <Text tx={`account:deleteAccount.steps.${step}.body`} size="xs" style={themed($muted)} />
       </View>
     </View>
   )

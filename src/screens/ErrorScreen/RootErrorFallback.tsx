@@ -1,6 +1,8 @@
 // eslint-disable-next-line no-restricted-imports -- this fallback must not depend on app providers
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 
+import { translate } from "@/i18n/translate"
+
 interface RootErrorFallbackProps {
   error: Error
   onRetry(): Promise<void>
@@ -12,15 +14,18 @@ export function RootErrorFallback({
   onRetry,
   showDetails = __DEV__,
 }: RootErrorFallbackProps) {
+  const copy = {
+    title: translate("account:rootError.title"),
+    message: translate("account:rootError.message"),
+    retry: translate("common:tryAgain"),
+  }
   return (
     <View style={styles.screen}>
       <View style={styles.content}>
         <Text accessibilityRole="header" style={styles.title}>
-          Something went wrong
+          {copy.title}
         </Text>
-        <Text style={styles.message}>
-          Scryve hit an unexpected error. Try again, or restart the app if the problem continues.
-        </Text>
+        <Text style={styles.message}>{copy.message}</Text>
 
         {showDetails ? (
           <ScrollView style={styles.details} contentContainerStyle={styles.detailsContent}>
@@ -40,7 +45,7 @@ export function RootErrorFallback({
           onPress={() => void onRetry()}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
-          <Text style={styles.buttonText}>Try again</Text>
+          <Text style={styles.buttonText}>{copy.retry}</Text>
         </Pressable>
       </View>
     </View>

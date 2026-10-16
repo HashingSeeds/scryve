@@ -37,6 +37,7 @@ import {
   updateChannelLabel,
 } from "@/features/updates/appUpdate"
 import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import {
@@ -48,6 +49,17 @@ import {
 
 const MIN_STARTING_LIFE = 1
 const BETA_UNLOCK_TAPS = 5
+const DEBUG_INFO_TITLE = "Scryve"
+const LAUNCH_DESTINATIONS = ["play", "decks"] as const
+
+const APP_INFO_FIELDS = ["version", "build", "runtime", "update", "channel", "platform"] as const
+
+type AppInfoField = (typeof APP_INFO_FIELDS)[number]
+type CopyStatus = "idle" | "copied" | "failed"
+
+function appInfoLine(field: AppInfoField, value: string) {
+  return translate(`account:settings.appInfo.${field}`, { value })
+}
 
 export interface SettingsScreenProps {
   initialSettings: LocalSettings
@@ -80,46 +92,60 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
-  const [copyStatus, setCopyStatus] = useState("")
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle")
   const [sharing, setSharing] = useState(analyticsEnabled)
   const [analyticsError, setAnalyticsError] = useState("")
   const [beta, setBeta] = useState(betaUpdatesChosen)
   const [versionTaps, setVersionTaps] = useState(0)
   const [previewError, setPreviewError] = useState("")
-  const unavailable = Platform.OS === "web" ? "Not applicable" : "Unavailable"
-  const appInfo = {
-    Version:
+  const missing = translate("account:settings.appInfo.unavailable")
+  const unavailable =
+    Platform.OS === "web" ? translate("account:settings.appInfo.notApplicable") : missing
+  const bundled = translate("account:settings.appInfo.bundled")
+  const appInfo: Record<AppInfoField, string> = {
+    version:
       Platform.OS === "web"
-        ? (Constants.expoConfig?.version ?? "Unavailable")
-        : (Application.nativeApplicationVersion ?? "Unavailable"),
-    Build: Application.nativeBuildVersion ?? unavailable,
-    Runtime: Updates.runtimeVersion || unavailable,
-    Update:
+        ? (Constants.expoConfig?.version ?? missing)
+        : (Application.nativeApplicationVersion ?? missing),
+    build: Application.nativeBuildVersion ?? unavailable,
+    runtime: Updates.runtimeVersion || unavailable,
+    update:
       Platform.OS === "web"
         ? unavailable
         : Updates.isEnabled
           ? Updates.isEmbeddedLaunch
-            ? "Bundled"
-            : (Updates.updateId ?? "Unavailable")
+            ? bundled
+            : (Updates.updateId ?? missing)
           : __DEV__
-            ? "Development"
-            : "Bundled",
-    Channel: updateChannelLabel() || unavailable,
-    Platform: Platform.OS,
+            ? translate("account:settings.appInfo.development")
+            : bundled,
+    channel: updateChannelLabel() || unavailable,
+    platform: Platform.OS,
+  }
+  const appInfoEntries = APP_INFO_FIELDS.map((field) => [field, appInfo[field]] as const)
+  const currentAnalyticsId = analyticsId()
+  const copy = {
+    players: translate("account:settings.players"),
+    defaultGameSystem: translate("account:settings.defaultGameSystem"),
+    format: translate("account:settings.format"),
+    noDefault: translate("account:settings.noDefault"),
+    requestDeletionHint: translate("account:settings.accountData.requestDeletionHint"),
+    licenseAgreementHint: translate("account:legal.licenseAgreementHint"),
+    analyticsId: translate("account:settings.appInfo.analyticsId", { id: currentAnalyticsId }),
   }
   const copyDebugInfo = async () => {
     try {
       const id = analyticsId()
       const copied = await Clipboard.setStringAsync(
         [
-          "Scryve",
-          ...Object.entries(appInfo).map(([label, value]) => `${label}: ${value}`),
-          ...(id ? [`Analytics ID: ${id}`] : []),
+          DEBUG_INFO_TITLE,
+          ...appInfoEntries.map(([field, value]) => appInfoLine(field, value)),
+          ...(id ? [translate("account:settings.appInfo.analyticsId", { id })] : []),
         ].join("\n"),
       )
-      setCopyStatus(copied ? "Copied" : "Could not copy. Try again.")
+      setCopyStatus(copied ? "copied" : "failed")
     } catch {
-      setCopyStatus("Could not copy. Try again.")
+      setCopyStatus("failed")
     }
   }
   const update = (changes: Partial<LocalSettings>) => {
@@ -178,18 +204,18 @@ export function SettingsScreen({
     <Screen
       preset="scroll"
       safeAreaEdges={["bottom"]}
-      header={{ title: "Settings", leftTx: "common:back", onLeftPress: onBack }}
+      header={{ titleTx: "account:settings.title", leftTx: "common:back", onLeftPress: onBack }}
       contentContainerStyle={themed($scrollContent)}
       ScrollViewProps={{ testID: "settings-scroll" }}
     >
       <View style={themed($content)}>
-        <Text text="Settings" preset="heading" accessibilityRole="header" />
-        <Text text="Local game defaults" preset="subheading" accessibilityRole="header" />
+        <Text tx="account:settings.title" preset="heading" accessibilityRole="header" />
+        <Text tx="account:settings.localDefaults" preset="subheading" accessibilityRole="header" />
         <View style={themed($valueGrid)}>
           <View style={themed($playerValue)}>
             <ValueField
               testID="default-player-count"
-              label="players"
+              label={copy.players}
               value={settings.defaultPlayerCount}
               min={MIN_PLAYERS}
               max={MAX_PLAYERS}
@@ -211,32 +237,28 @@ export function SettingsScreen({
             />
           </View>
         </View>
-        <Text text="Open Scryve to" style={themed($label)} />
+        <Text tx="account:settings.openScryveTo" style={themed($label)} />
         <View style={themed($row)}>
-          {(["play", "decks"] as const).map((destination) => (
+          {LAUNCH_DESTINATIONS.map((destination) => (
             <ChoiceButton
               key={destination}
               compact
               testID={`launch-destination-${destination}`}
-              text={destination === "play" ? "Play" : "Decks"}
+              tx={`account:settings.launchDestination.${destination}`}
               selected={settings.launchDestination === destination}
               style={themed($choice)}
               onPress={() => update({ launchDestination: destination })}
             />
           ))}
         </View>
-        <Text
-          text="Play resumes a current game or opens a fresh board."
-          size="xs"
-          style={themed($muted)}
-        />
-        <Text text="Game system" style={themed($label)} />
+        <Text tx="account:settings.launchDestinationHint" size="xs" style={themed($muted)} />
+        <Text tx="account:settings.gameSystem" style={themed($label)} />
         <SegmentedControl
           testID="default-system"
-          accessibilityLabel="Default game system"
+          accessibilityLabel={copy.defaultGameSystem}
           selectedId={settings.defaultSystem ?? NO_PLAY_SYSTEM}
           segments={[
-            { id: NO_PLAY_SYSTEM, label: "No system" },
+            { id: NO_PLAY_SYSTEM, label: translate("account:settings.noSystem") },
             ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
           ]}
           onSelect={(id) => selectSystem(isPlaySystemId(id) ? id : undefined)}
@@ -244,9 +266,9 @@ export function SettingsScreen({
         {formats.length > 0 ? (
           <SelectField
             testID="default-format"
-            label="Format"
-            placeholder="No default"
-            clearLabel="No default"
+            label={copy.format}
+            placeholder={copy.noDefault}
+            clearLabel={copy.noDefault}
             value={settings.defaultFormat}
             options={formats.map(({ id, label, blurb }) => ({
               id,
@@ -256,38 +278,34 @@ export function SettingsScreen({
             onSelect={selectFormat}
           />
         ) : null}
-        <Text
-          text="Set these only when you want new games to start with the same system and format."
-          size="xs"
-          style={themed($muted)}
-        />
+        <Text tx="account:settings.defaultsHint" size="xs" style={themed($muted)} />
         <Switch
           testID="haptics-switch"
-          label="Haptic feedback"
-          helper="A subtle tap response after life changes. Failures never block play."
+          labelTx="account:settings.haptics.label"
+          helperTx="account:settings.haptics.helper"
           value={settings.hapticsEnabled}
           onValueChange={(value) => update({ hapticsEnabled: value })}
         />
-        <Text text="Theme" preset="subheading" accessibilityRole="header" />
+        <Text tx="account:settings.theme.heading" preset="subheading" accessibilityRole="header" />
         <View style={themed($row)}>
           {themes.map((theme) => (
             <ChoiceButton
               key={theme}
               compact
-              text={theme[0].toUpperCase() + theme.slice(1)}
+              tx={`account:settings.theme.${theme}`}
               selected={settings.themePreference === theme}
               style={themed($choice)}
               onPress={() => update({ themePreference: theme })}
             />
           ))}
         </View>
-        <Text
-          text="System follows your device appearance. Light and dark stay fixed until changed here."
-          size="xs"
-          style={themed($muted)}
-        />
+        <Text tx="account:settings.theme.hint" size="xs" style={themed($muted)} />
         {AppIcon}
-        <Text text="Game menu button" preset="subheading" accessibilityRole="header" />
+        <Text
+          tx="account:settings.menuButton.heading"
+          preset="subheading"
+          accessibilityRole="header"
+        />
         <View style={themed($row)}>
           {MENU_BUTTON_STYLES.map((style) => (
             <ChoiceButton
@@ -301,43 +319,36 @@ export function SettingsScreen({
             />
           ))}
         </View>
+        <Text tx="account:settings.menuButton.hint" size="xs" style={themed($muted)} />
         <Text
-          text="Changes the shape at the center of the board. Prism tints the button with the colors of everyone at the table."
-          size="xs"
-          style={themed($muted)}
+          tx="account:settings.privacy.heading"
+          preset="subheading"
+          accessibilityRole="header"
         />
-        <Text text="Privacy" preset="subheading" accessibilityRole="header" />
         <Switch
           testID="analytics-switch"
           disabled={!analyticsConfigured() && !sharing}
-          label="Share usage with Scryve"
-          helper="Off by default. Shares usage with a random ID that isn't linked to your account. Details in Privacy Policy."
+          labelTx="account:shareUsage"
+          helperTx="account:settings.privacy.shareUsageHelper"
           value={sharing}
           onValueChange={(value) => {
             const saved = setAnalyticsEnabled(value)
             setSharing(analyticsEnabled())
-            setAnalyticsError(saved ? "" : "Could not save your choice. Please try again.")
+            setAnalyticsError(saved ? "" : translate("account:settings.privacy.saveFailed"))
           }}
         />
         {!analyticsConfigured() ? (
-          <Text
-            size="xs"
-            text="Usage sharing is unavailable in this build. No PostHog events will be sent."
-          />
+          <Text size="xs" tx="account:settings.privacy.unavailable" />
         ) : null}
         {analyticsError ? <Text accessibilityRole="alert" size="xs" text={analyticsError} /> : null}
         {onRequestAccountDeletion ? (
           <View style={themed($accountSection)}>
-            <Text text="Account & data" preset="subheading" accessibilityRole="header" />
-            <Text
-              text="Manage the cloud data tied to your Scryve account. Local games stay on this device."
-              size="xs"
-              style={themed($muted)}
-            />
+            <Text tx="account:accountData.label" preset="subheading" accessibilityRole="header" />
+            <Text tx="account:settings.accountData.description" size="xs" style={themed($muted)} />
             <Button
               testID="request-account-deletion-button"
-              text="Request account deletion"
-              accessibilityHint="Opens the account deletion request page"
+              tx="account:settings.accountData.requestDeletion"
+              accessibilityHint={copy.requestDeletionHint}
               style={themed($dangerButton)}
               textStyle={themed($dangerText)}
               onPress={onRequestAccountDeletion}
@@ -347,24 +358,36 @@ export function SettingsScreen({
         {BlockedPlayers}
         {onOpenSupport ? (
           <View>
-            <Text text="Help" preset="subheading" accessibilityRole="header" />
-            <ListItem text="Help & support" rightIcon="caretRight" onPress={onOpenSupport} />
+            <Text
+              tx="account:settings.help.heading"
+              preset="subheading"
+              accessibilityRole="header"
+            />
+            <ListItem
+              tx="account:settings.help.support"
+              rightIcon="caretRight"
+              onPress={onOpenSupport}
+            />
           </View>
         ) : null}
         {onOpenPrivacy && onOpenTerms ? (
           <View>
-            <Text text="Legal" preset="subheading" accessibilityRole="header" />
-            <ListItem text="Privacy Policy" rightIcon="caretRight" onPress={onOpenPrivacy} />
+            <Text tx="account:legal.heading" preset="subheading" accessibilityRole="header" />
             <ListItem
-              text="Terms of Use"
+              tx="account:legal.privacyPolicy"
+              rightIcon="caretRight"
+              onPress={onOpenPrivacy}
+            />
+            <ListItem
+              tx="account:legal.termsOfUse"
               rightIcon="caretRight"
               topSeparator
               onPress={onOpenTerms}
             />
             {onOpenLicenseAgreement ? (
               <ListItem
-                text="License Agreement"
-                accessibilityHint="Opens Apple's standard license agreement in your browser"
+                tx="account:legal.licenseAgreement"
+                accessibilityHint={copy.licenseAgreementHint}
                 rightIcon="caretRight"
                 topSeparator
                 onPress={onOpenLicenseAgreement}
@@ -372,7 +395,7 @@ export function SettingsScreen({
             ) : null}
             {onOpenCookiePolicy ? (
               <ListItem
-                text="Cookie Policy"
+                tx="account:legal.cookiePolicy"
                 rightIcon="caretRight"
                 topSeparator
                 onPress={onOpenCookiePolicy}
@@ -380,7 +403,7 @@ export function SettingsScreen({
             ) : null}
             {onOpenGameContentNotices ? (
               <ListItem
-                text="Third-party game content"
+                tx="account:legal.gameContent"
                 rightIcon="caretRight"
                 topSeparator
                 onPress={onOpenGameContentNotices}
@@ -389,34 +412,38 @@ export function SettingsScreen({
           </View>
         ) : null}
         <View>
-          <Text text="App information" preset="subheading" accessibilityRole="header" />
+          <Text
+            tx="account:settings.appInfo.heading"
+            preset="subheading"
+            accessibilityRole="header"
+          />
           <AppUpdateStatus />
-          {analyticsId() ? (
+          {currentAnalyticsId ? (
             <>
               <Text
                 size="sm"
                 selectable
-                accessibilityLabel={`Analytics ID: ${analyticsId()}`}
-                text={`Analytics ID: ${analyticsId()}`}
+                accessibilityLabel={copy.analyticsId}
+                text={copy.analyticsId}
               />
               <Text
                 size="xs"
                 style={themed($muted)}
-                text="This ID helps us find your usage data. To ask us to delete it, email the ID to privacy@sowinghope.how."
+                tx="account:settings.appInfo.analyticsIdHint"
               />
             </>
           ) : null}
-          {Object.entries(appInfo).map(([label, value]) => {
-            const shorten = (label === "Runtime" || label === "Update") && value.length > 16
+          {appInfoEntries.map(([field, value]) => {
+            const shorten = (field === "runtime" || field === "update") && value.length > 16
             return (
               <Text
-                key={label}
+                key={field}
                 size="sm"
                 selectable
-                accessibilityLabel={`${label}: ${value}`}
-                text={`${label}: ${shorten ? `${value.slice(0, 12)}…` : value}`}
+                accessibilityLabel={appInfoLine(field, value)}
+                text={appInfoLine(field, shorten ? `${value.slice(0, 12)}…` : value)}
                 onPress={
-                  label === "Version" && canSwitchToBeta()
+                  field === "version" && canSwitchToBeta()
                     ? () => setVersionTaps((taps) => taps + 1)
                     : undefined
                 }
@@ -426,8 +453,8 @@ export function SettingsScreen({
           {canSwitchToBeta() && (beta || versionTaps >= BETA_UNLOCK_TAPS) ? (
             <Switch
               testID="beta-updates-switch"
-              label="Beta updates"
-              helper="Gets unreleased updates before everyone else. They may be unstable."
+              labelTx="account:settings.beta.label"
+              helperTx="account:settings.beta.helper"
               value={beta}
               onValueChange={(value) => {
                 if (setBetaUpdates(value)) setBeta(value)
@@ -437,11 +464,11 @@ export function SettingsScreen({
           {canOpenPrPreview() && isPrChannel(Updates.channel) ? (
             <Button
               testID="back-to-preview-button"
-              text="Back to preview"
+              tx="account:settings.backToPreview"
               onPress={() => {
                 setPreviewError("")
                 backToPreview().catch(() =>
-                  setPreviewError("Could not go back to preview. Try again."),
+                  setPreviewError(translate("account:settings.backToPreviewFailed")),
                 )
               }}
             />
@@ -452,12 +479,14 @@ export function SettingsScreen({
           <Button
             testID="copy-debug-info-button"
             preset="primary"
-            text={copyStatus === "Copied" ? "Copied" : "Copy debug info"}
+            tx={
+              copyStatus === "copied" ? "account:settings.copied" : "account:settings.copyDebugInfo"
+            }
             onPress={copyDebugInfo}
             style={themed($copyButton)}
           />
-          {copyStatus && copyStatus !== "Copied" ? (
-            <Text text={copyStatus} size="sm" accessibilityLiveRegion="polite" />
+          {copyStatus === "failed" ? (
+            <Text tx="account:settings.copyFailed" size="sm" accessibilityLiveRegion="polite" />
           ) : null}
         </View>
       </View>

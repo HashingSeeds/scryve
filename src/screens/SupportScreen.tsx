@@ -8,46 +8,17 @@ import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-const GETTING_STARTED = [
-  {
-    title: "Start a game",
-    body: "Open Play. Your fresh board uses the defaults saved in Settings.",
-  },
-  {
-    title: "Choose how to play",
-    body: "Play together on one device, or choose Connected to play on separate devices.",
-  },
-  {
-    title: "Set up the table",
-    body: "Select the number of players and starting life, then start the game.",
-  },
-]
+const GETTING_STARTED = ["startGame", "choosePlay", "setUpTable"] as const
 
-const FAQS = [
-  {
-    question: "Restore Scryve Pro",
-    answer:
-      "Open Scryve, go to your account, choose Scryve Pro, and tap Restore Purchases. Use the same Apple or Google account that made the original purchase.",
-  },
-  {
-    question: "Manage or cancel a subscription",
-    answer:
-      "Subscriptions are managed by the store where you purchased them. On iPhone or iPad, open Settings, tap your name, then Subscriptions. On Android, open Google Play, tap your profile, then Payments & subscriptions.",
-  },
-  {
-    question: "Having trouble with a game?",
-    answer:
-      "Restart Scryve and try again. If the problem continues, report it here with a short description of what happened.",
-  },
-  {
-    question: "Account or privacy questions",
-    answer:
-      "You can manage your account from Scryve’s account screen. Contact us if you need help accessing or deleting your account.",
-  },
-]
+const FAQS = ["restorePro", "manageSubscription", "gameTrouble", "accountPrivacy"] as const
+
+const BRAND_EYEBROW = "SCRYVE"
+const COPYRIGHT = "© 2026 Hashing Seeds LLC"
+const EMAIL_PLACEHOLDER = "you@example.com"
 
 export type SupportFeedback = {
   kind: "bug" | "help"
@@ -93,10 +64,13 @@ export function SupportScreen({
   const [screenshot, setScreenshot] = useState<SupportScreenshot | null>(null)
   const [pickingScreenshot, setPickingScreenshot] = useState(false)
   const [status, setStatus] = useState("")
-  const messageLabel = kind === "bug" ? "What happened?" : "How can we help?"
-  const emailLabel = kind === "bug" ? "Email for a reply (optional)" : "Email for a reply"
   const emailValid = /^[^\s@]+@(?:[^\s@.]+\.)+[^\s@.]+$/.test(email.trim())
   const canSubmit = !!message.trim() && (kind === "bug" ? !email.trim() || emailValid : emailValid)
+  const copy = {
+    contactReason: translate("account:support.contactReason"),
+    selectedScreenshot: translate("account:support.selectedScreenshot"),
+    licenseAgreementHint: translate("account:legal.licenseAgreementHint"),
+  }
 
   function submitFeedback() {
     if (!canSubmit || pickingScreenshot) return
@@ -109,9 +83,9 @@ export function SupportScreen({
       })
       setMessage("")
       setScreenshot(null)
-      setStatus("Feedback queued. If you are offline, it will send when you reconnect.")
+      setStatus(translate("account:support.status.queued"))
     } catch {
-      setStatus("Could not save your message. Try again or email us.")
+      setStatus(translate("account:support.status.saveFailed"))
     }
   }
 
@@ -124,7 +98,7 @@ export function SupportScreen({
         setStatus("")
       }
     } catch {
-      setStatus("Could not add that screenshot. Try another image.")
+      setStatus(translate("account:support.status.screenshotFailed"))
     } finally {
       setPickingScreenshot(false)
     }
@@ -134,41 +108,39 @@ export function SupportScreen({
     <Screen
       preset="scroll"
       safeAreaEdges={["bottom"]}
-      header={{ title: "Help", leftTx: "common:back", onLeftPress: onBack }}
+      header={{ titleTx: "account:support.title", leftTx: "common:back", onLeftPress: onBack }}
       contentContainerStyle={themed($scrollContent)}
       ScrollViewProps={{ testID: "support-scroll" }}
     >
       <View style={themed($content)}>
         <View style={themed($hero)}>
-          <Text text="SCRYVE" preset="formLabel" style={themed($eyebrow)} />
-          <Text text="Help" preset="heading" accessibilityRole="header" style={themed($title)} />
+          <Text text={BRAND_EYEBROW} preset="formLabel" style={themed($eyebrow)} />
           <Text
-            text="Answers about games, accounts, and Scryve Pro. Send us a message when you need help."
-            style={themed($subtitle)}
+            tx="account:support.title"
+            preset="heading"
+            accessibilityRole="header"
+            style={themed($title)}
           />
+          <Text tx="account:support.subtitle" style={themed($subtitle)} />
         </View>
 
         <View style={themed($contact)}>
-          <Text text="Contact us" preset="subheading" accessibilityRole="header" />
+          <Text tx="account:support.contactUs" preset="subheading" accessibilityRole="header" />
           <SegmentedControl
             segments={[
-              { id: "bug", label: "Report a problem" },
-              { id: "help", label: "Ask for help" },
+              { id: "bug", label: translate("account:support.kind.bug") },
+              { id: "help", label: translate("account:support.kind.help") },
             ]}
             selectedId={kind}
-            accessibilityLabel="Contact reason"
+            accessibilityLabel={copy.contactReason}
             onSelect={(id) => {
               setKind(id === "help" ? "help" : "bug")
               setStatus("")
             }}
           />
           <TextField
-            label={messageLabel}
-            placeholder={
-              kind === "bug"
-                ? "What happened? What did you expect?"
-                : "Tell us what you need help with"
-            }
+            labelTx={`account:support.messageLabel.${kind}`}
+            placeholderTx={`account:support.messagePlaceholder.${kind}`}
             multiline
             value={message}
             onChangeText={(value) => {
@@ -177,8 +149,8 @@ export function SupportScreen({
             }}
           />
           <TextField
-            label={emailLabel}
-            placeholder="you@example.com"
+            labelTx={`account:support.emailLabel.${kind}`}
+            placeholder={EMAIL_PLACEHOLDER}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
@@ -188,103 +160,111 @@ export function SupportScreen({
               setStatus("")
             }}
             status={email.trim() && !emailValid ? "error" : undefined}
-            helper={email.trim() && !emailValid ? "Enter a valid email address." : undefined}
+            helperTx={email.trim() && !emailValid ? "account:support.emailInvalid" : undefined}
           />
           {kind === "help" ? (
-            <Text
-              text="We usually reply within two business days."
-              size="xs"
-              style={themed($muted)}
-            />
+            <Text tx="account:support.replyTime" size="xs" style={themed($muted)} />
           ) : null}
           {screenshot ? (
             <View style={themed($screenshot)}>
               <Image
                 source={{ uri: screenshot.uri }}
                 style={$screenshotPreview}
-                accessibilityLabel="Selected screenshot"
+                accessibilityLabel={copy.selectedScreenshot}
               />
-              <Button text="Remove screenshot" onPress={() => setScreenshot(null)} />
+              <Button tx="account:support.removeScreenshot" onPress={() => setScreenshot(null)} />
             </View>
           ) : (
             <Button
-              text="Add screenshot"
+              tx="account:support.addScreenshot"
               disabled={pickingScreenshot}
               onPress={() => void pickScreenshot()}
             />
           )}
-          <Text
-            text="Sends your message, email if provided, app version, build, platform, and any screenshot you add to Sentry."
-            size="xs"
-            style={themed($muted)}
-          />
+          <Text tx="account:support.disclosure" size="xs" style={themed($muted)} />
           <Button
-            text="Send"
+            tx="account:support.send"
             preset="reversed"
             disabled={!canSubmit || pickingScreenshot}
             onPress={submitFeedback}
           />
           {status ? <Text text={status} accessibilityRole="alert" size="xs" /> : null}
-          <Text text="Prefer email?" size="xs" style={themed($muted)} />
-          <Button text="Email support" onPress={onEmailSupport} />
+          <Text tx="account:support.preferEmail" size="xs" style={themed($muted)} />
+          <Button tx="account:support.emailSupport" onPress={onEmailSupport} />
         </View>
 
         <View style={themed($section)}>
-          <Text text="Getting started" preset="subheading" accessibilityRole="header" />
+          <Text
+            tx="account:support.gettingStarted.heading"
+            preset="subheading"
+            accessibilityRole="header"
+          />
           <View style={themed($steps)}>
             {GETTING_STARTED.map((step, index) => (
-              <View key={step.title} style={themed($stepCard)}>
+              <View key={step} style={themed($stepCard)}>
                 <Text
                   text={String(index + 1).padStart(2, "0")}
                   size="xxs"
                   weight="bold"
                   style={themed($stepNumber)}
                 />
-                <Text text={step.title} weight="bold" style={themed($cardTitle)} />
-                <Text text={step.body} size="xs" style={themed($muted)} />
+                <Text
+                  tx={`account:support.gettingStarted.${step}.title`}
+                  weight="bold"
+                  style={themed($cardTitle)}
+                />
+                <Text
+                  tx={`account:support.gettingStarted.${step}.body`}
+                  size="xs"
+                  style={themed($muted)}
+                />
               </View>
             ))}
           </View>
         </View>
 
         <View style={themed($section)}>
-          <Text text="Frequently asked questions" preset="subheading" accessibilityRole="header" />
+          <Text tx="account:support.faq.heading" preset="subheading" accessibilityRole="header" />
           <View style={themed($faqs)}>
             {FAQS.map((faq) => (
-              <View key={faq.question} style={themed($faqCard)}>
+              <View key={faq} style={themed($faqCard)}>
                 <Text
-                  text={faq.question}
+                  tx={`account:support.faq.${faq}.question`}
                   weight="bold"
                   accessibilityRole="header"
                   style={themed($cardTitle)}
                 />
-                <Text text={faq.answer} size="xs" style={themed($answer)} />
+                <Text tx={`account:support.faq.${faq}.answer`} size="xs" style={themed($answer)} />
               </View>
             ))}
           </View>
         </View>
 
         <View style={themed($section)}>
-          <Text text="Legal" preset="subheading" accessibilityRole="header" />
+          <Text tx="account:legal.heading" preset="subheading" accessibilityRole="header" />
           <View>
-            <ListItem text="Privacy Policy" rightIcon="caretRight" onPress={onOpenPrivacy} />
             <ListItem
-              text="Terms of Use"
+              tx="account:legal.privacyPolicy"
+              rightIcon="caretRight"
+              onPress={onOpenPrivacy}
+            />
+            <ListItem
+              tx="account:legal.termsOfUse"
               rightIcon="caretRight"
               topSeparator
               onPress={onOpenTerms}
             />
             {onOpenLicenseAgreement ? (
               <ListItem
-                text="License Agreement"
-                accessibilityHint="Opens Apple's standard license agreement in your browser"
+                tx="account:legal.licenseAgreement"
+                accessibilityHint={copy.licenseAgreementHint}
                 rightIcon="caretRight"
                 topSeparator
                 onPress={onOpenLicenseAgreement}
               />
             ) : null}
             <ListItem
-              text="Cookie Policy"
+              tx="account:legal.cookiePolicy"
               rightIcon="caretRight"
               topSeparator
               onPress={onOpenCookiePolicy}
@@ -293,9 +273,14 @@ export function SupportScreen({
         </View>
 
         <View style={themed($footer)}>
-          <Text text="© 2026 Hashing Seeds LLC" size="xxs" style={themed($muted)} />
+          <Text text={COPYRIGHT} size="xxs" style={themed($muted)} />
           {appVersion ? (
-            <Text text={`Scryve ${appVersion}`} size="xxs" style={themed($muted)} />
+            <Text
+              tx="account:support.appVersion"
+              txOptions={{ version: appVersion }}
+              size="xxs"
+              style={themed($muted)}
+            />
           ) : null}
         </View>
       </View>

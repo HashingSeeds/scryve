@@ -2,6 +2,7 @@ import type { ViewStyle } from "react-native"
 import { Modal, Pressable, View } from "react-native"
 
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -16,6 +17,7 @@ export function ClerkAuthModal({
 }) {
   const { themed } = useAppTheme()
 
+  const closeLabel = translate("account:cloud.closeSignIn")
   return (
     <Modal
       testID="auth-modal"
@@ -28,11 +30,11 @@ export function ClerkAuthModal({
         <View style={themed($header)}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close sign in"
+            accessibilityLabel={closeLabel}
             onPress={onDismiss}
             style={themed($closeButton)}
           >
-            <Text preset="bold" text="Close" />
+            <Text preset="bold" tx="common:close" />
           </Pressable>
         </View>
         <ClerkAuthView onDismiss={onDismiss} />
