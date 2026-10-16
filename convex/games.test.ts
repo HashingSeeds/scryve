@@ -3171,6 +3171,25 @@ describe("Treachery", () => {
     ).rejects.toMatchObject({ data: { code: "game_not_active" } })
   })
 
+  it("tells only the host who won, once the rules decide it", async () => {
+    const t = makeConvexTest()
+    const [host, guest] = await treacheryGame(t)
+    const outcome = async (seat: typeof host) =>
+      (await seat.query(api.games.lobbyProjection, { publicId })).treacheryOutcome
+    const players = await t.run((ctx) => ctx.db.query("gamePlayers").collect())
+    const leader = players.find((player) => player.role === "leader")!
+
+    expect(await outcome(host)).toBeUndefined()
+    await t.run((ctx) => ctx.db.patch(leader._id, { currentLife: 0 }))
+    expect(await outcome(host)).toEqual({
+      kind: "win",
+      winnerPlayerIds: players
+        .filter((player) => player.role === "assassin")
+        .map((player) => player._id),
+    })
+    expect(await outcome(guest)).toBeUndefined()
+  })
+
   it("deals fresh roles for a rematch", async () => {
     const t = makeConvexTest()
     const [host] = await treacheryGame(t)

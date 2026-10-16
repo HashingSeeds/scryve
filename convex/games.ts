@@ -65,10 +65,11 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
-import { tableRules } from "./lib/systems"
+import { isCounterOut, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
+  isOutByTableCounters,
   isValidTableSnapshot,
   remapTableState,
   tableActionDelta,
@@ -84,6 +85,7 @@ import {
   gameVariantValidator,
   isTreacheryPlayerCount,
   TREACHERY_SEATS_MESSAGE,
+  treacheryOutcome,
 } from "./lib/treachery"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
@@ -1536,6 +1538,10 @@ export const lobbyProjection = query({
     const displayNames = await displayNamesForViewer(ctx, { userId: user._id, isHost }, players)
     const commanderDamage = await commanderDamageProjection(ctx, game, user, players)
     const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
+    const decidedOutcome =
+      isHost && game.status === "active" && game.variant === "treachery"
+        ? decidedTreacheryOutcome(game, players, eliminatedPlayerIds)
+        : undefined
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
       (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
@@ -1598,6 +1604,7 @@ export const lobbyProjection = query({
           })),
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
+      ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
       ...(tableRulesApply(gameTableRules(game))
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
@@ -1611,6 +1618,34 @@ function roleForViewer(game: Doc<"games">, player: Doc<"gamePlayers">, viewerId:
   return roleRevealed || player.userId === viewerId || game.status !== "active"
     ? { role: player.role, roleRevealed }
     : { roleRevealed }
+}
+
+/* why: only Convex sees every hidden role, so it tells the host who won for the end screen.
+   It is undefined until the rules decide the game, so it names no team before then. */
+function decidedTreacheryOutcome(
+  game: Doc<"games">,
+  players: Doc<"gamePlayers">[],
+  eliminatedByCommanderDamage: ReadonlySet<Id<"gamePlayers">>,
+) {
+  const counter = systemDefinition(game.system ?? game.game)?.counter
+  const rules = gameTableRules(game)
+  const table = tableProjection(game, players)
+  const isOut = (player: Doc<"gamePlayers">) =>
+    eliminatedByCommanderDamage.has(player._id) ||
+    isOutByTableCounters(table, player._id, rules) ||
+    (counter !== undefined &&
+      isCounterOut(
+        counter,
+        player.currentLife,
+        players.filter((other) => other !== player).map((other) => other.currentLife),
+      ))
+  return treacheryOutcome(
+    players.flatMap((player) =>
+      player.role === undefined
+        ? []
+        : [{ playerId: player._id, role: player.role, inGame: !isOut(player) }],
+    ),
+  )
 }
 
 function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
