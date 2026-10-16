@@ -5,13 +5,20 @@ import {
   type OutboxAcknowledgement,
 } from "@/features/sync/drainOutbox"
 import { convexErrorMessage } from "@/utils/convexError"
-import { emitTelemetry } from "@/utils/telemetry"
+import { emitTelemetry, type TelemetryWriteKind } from "@/utils/telemetry"
 
 import type { FailedLifeAction, PendingLifeAction } from "./model"
 import type { ConnectedGameRepository } from "./persistence"
 import { classifyWriteFailure } from "./reconciliation"
 
 export type { OutboxAcknowledgement }
+
+const WRITE_KINDS: Record<PendingLifeAction["event"]["type"], TelemetryWriteKind> = {
+  "life.changed": "life",
+  "table.action": "table",
+  "commanderDamage.submitted": "commander.claim",
+  "commanderDamage.resolved": "commander.resolve",
+}
 export type DrainOutboxResult = DurableDrainOutboxResult<PendingLifeAction, FailedLifeAction>
 export type DrainOutboxSnapshot = DurableDrainOutboxSnapshot<PendingLifeAction, FailedLifeAction>
 
@@ -58,6 +65,7 @@ export async function drainConnectedOutbox(options: {
         durationMs: Math.max(0, now() - action.queuedAt),
         attemptCount: action.attempts,
         outcome: "success",
+        writeKind: WRITE_KINDS[action.event.type],
       }),
     onSettled: options.onSettled,
     onChange: options.onChange,
