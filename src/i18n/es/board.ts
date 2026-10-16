@@ -128,14 +128,14 @@ export default {
     tied: {
       none: "Empate en vida",
       mtg: "Empate en vida",
-      ygo: "Empate en Life Points",
-      pokemon: "Empate en cartas de premio",
+      ygo: "Empate en Puntos de Vida",
+      pokemon: "Empate en cartas de Premio",
     },
     leads: {
       none: "{{name}} lidera en vida",
       mtg: "{{name}} lidera en vida",
-      ygo: "{{name}} lidera en Life Points",
-      pokemon: "{{name}} lidera en cartas de premio",
+      ygo: "{{name}} lidera en Puntos de Vida",
+      pokemon: "{{name}} lidera en cartas de Premio",
     },
   },
   clock: {
@@ -155,6 +155,7 @@ export default {
       draw: "Empate",
     },
     failed: "No se pudo terminar esta partida.",
+    noFinishedGame: "Esta partida no tiene ningún juego terminado que finalizar.",
     cancel: "Cancelar el fin de la partida",
     title: "Resultado de la partida",
     playerResult: "Resultado de la partida de {{name}}",
@@ -162,6 +163,18 @@ export default {
     drawRemainingHint:
       "Empata a todos los asientos que siguen jugando y da una derrota a los eliminados",
     end: "Terminar partida",
+    scoreErrors: {
+      gamesWonRange:
+        "Los juegos ganados deben estar entre 0 y {{max}} en un al mejor de {{bestOf}}",
+      gamesDrawnRange: "Los juegos empatados deben estar entre 0 y {{max}}",
+      tooManyWins: "Un al mejor de {{bestOf}} no puede tener {{wins}} victorias",
+      partialScore:
+        "Introduce los juegos ganados de todos los asientos o deja el resultado en blanco",
+      oneWinner: "Una partida solo puede tener un ganador",
+      needsWinner: "Una partida necesita un ganador, salvo que sea empate",
+      winnerLeads: "El ganador debe tener más juegos ganados",
+      leaderWins: "El asiento con más juegos ganados debe ser el ganador",
+    },
   },
   claim: {
     matchStanding: "Al mejor de {{bestOf}} · {{score}}",
@@ -326,12 +339,6 @@ export default {
     showOverviewFor: "Mostrar daño de comandante de {{identity}}",
     expandsGrid: "Expande la cuadrícula de daño de comandante",
   },
-  tableItem: {
-    poison: "Veneno",
-    commanderTax: "Impuesto de comandante",
-    monarch: "El monarca",
-    initiative: "La iniciativa",
-  },
   outReason: {
     commanderDamage: "daño de comandante",
     poison: "veneno",
@@ -374,15 +381,15 @@ export default {
     hint: {
       none: "Toca para cambiar la vida de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
       mtg: "Toca para cambiar la vida de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
-      ygo: "Toca para cambiar los Puntos de Vida de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
+      ygo: "Toca para cambiar los Puntos de Vida de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
       pokemon:
-        "Toca para cambiar las cartas de premio de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
+        "Toca para cambiar las cartas de Premio de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
     },
     moreControls: {
       none: "{{identity}}, más controles de vida",
       mtg: "{{identity}}, más controles de vida",
       ygo: "{{identity}}, más controles de Puntos de Vida",
-      pokemon: "{{identity}}, más controles de cartas de premio",
+      pokemon: "{{identity}}, más controles de cartas de Premio",
     },
   },
   grid: {
@@ -396,9 +403,9 @@ export default {
       ygo_one: "Cuadrícula de Puntos de Vida de {{count}} jugador",
       ygo_many: "Cuadrícula de Puntos de Vida de {{count}} de jugadores",
       ygo_other: "Cuadrícula de Puntos de Vida de {{count}} jugadores",
-      pokemon_one: "Cuadrícula de cartas de premio de {{count}} jugador",
-      pokemon_many: "Cuadrícula de cartas de premio de {{count}} de jugadores",
-      pokemon_other: "Cuadrícula de cartas de premio de {{count}} jugadores",
+      pokemon_one: "Cuadrícula de cartas de Premio de {{count}} jugador",
+      pokemon_many: "Cuadrícula de cartas de Premio de {{count}} de jugadores",
+      pokemon_other: "Cuadrícula de cartas de Premio de {{count}} jugadores",
     },
   },
   pokemonSheet: {
@@ -483,20 +490,20 @@ export default {
     slider: {
       none: "Cambio de vida de {{name}}",
       mtg: "Cambio de vida de {{name}}",
-      ygo: "Cambio de Life Points de {{name}}",
-      pokemon: "Cambio de cartas de premio de {{name}}",
+      ygo: "Cambio de Puntos de Vida de {{name}}",
+      pokemon: "Cambio de cartas de Premio de {{name}}",
     },
     add: {
       none: "Sumar {{amount}} de vida",
       mtg: "Sumar {{amount}} de vida",
-      ygo: "Sumar {{amount}} Life Points",
-      pokemon: "Sumar {{amount}} cartas de premio",
+      ygo: "Sumar {{amount}} Puntos de Vida",
+      pokemon: "Sumar {{amount}} cartas de Premio",
     },
     subtract: {
       none: "Restar {{amount}} de vida",
       mtg: "Restar {{amount}} de vida",
-      ygo: "Restar {{amount}} Life Points",
-      pokemon: "Restar {{amount}} cartas de premio",
+      ygo: "Restar {{amount}} Puntos de Vida",
+      pokemon: "Restar {{amount}} cartas de Premio",
     },
   },
 } satisfies LocaleNamespace

@@ -15,6 +15,7 @@ import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
 import { AlertNote } from "@/components/AlertNote"
+import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
@@ -54,10 +55,7 @@ import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
-import {
-  TREACHERY_ROLE_LABELS,
-  TreacheryRoleDialog,
-} from "@/features/connected/TreacheryRoleDialog"
+import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
@@ -98,7 +96,7 @@ type ConnectedBoardScreenProps = {
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
 }
 
 type ConnectedBoardShellState =
@@ -252,7 +250,7 @@ type ConnectedBoardReadyProps = {
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
@@ -299,7 +297,7 @@ function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
     player.role && (player.roleRevealed || !player.controlledByMe) ? player.role : undefined
   return {
     id: asPlayerId(player.playerId),
-    name: role ? `${player.displayName} · ${TREACHERY_ROLE_LABELS[role]}` : player.displayName,
+    name: role ? `${player.displayName} · ${treacheryRoleLabel(role)}` : player.displayName,
     color: player.color,
     ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     seat: player.seat,
@@ -329,7 +327,7 @@ interface ConnectedBoardRuntimeProps {
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
   ownerId: string
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
@@ -351,7 +349,7 @@ export function ConnectedBoardWithRuntime({
   onDecks,
   onSettings,
   onAccount,
-  accountLabel,
+  accountEntry,
   ownerId,
   cloud = true,
   runtime,
@@ -500,7 +498,7 @@ export function ConnectedBoardWithRuntime({
               onDecks={onDecks}
               onSettings={onSettings}
               onAccount={onAccount}
-              accountLabel={accountLabel}
+              accountEntry={accountEntry}
               onGameEnded={onGameEnded}
               onRematch={onRematch}
               onGameAbandoned={onGameAbandoned}
@@ -524,7 +522,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onDecks,
   onSettings,
   onAccount,
-  accountLabel,
+  accountEntry,
   onGameEnded,
   onRematch,
   onGameAbandoned,
@@ -613,7 +611,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [])
 
   const system = game.system
-  const counter = playSystemRules(system).counter
   const active = game.status === "active"
   const finished = game.status === "finished"
 
@@ -654,9 +651,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const commanderTotals = game.commanderDamage?.totals ?? []
   const failedActionLabel = (event: PendingLifeAction["event"]) => {
     if (event.type === "life.changed")
-      return translate("connected:board.failedAction.life", {
+      return translate(`connected:board.failedAction.life.${playSystemRules(system).id}`, {
         delta: `${event.delta > 0 ? "+" : ""}${event.delta}`,
-        counter: counter.label,
       })
     if (event.type === "commanderDamage.submitted")
       return translate("connected:board.failedAction.commanderDamage", {
@@ -968,8 +964,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         windowOverlay={
           menuOpen && onDecks && onSettings && onAccount ? (
             <FloatingAppNavigation
-              destinationLabel="Decks"
-              accountLabel={accountLabel}
+              destination="decks"
+              accountEntry={accountEntry}
               onDestination={onDecks}
               onSettings={onSettings}
               onAccount={onAccount}

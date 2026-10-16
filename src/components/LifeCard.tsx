@@ -403,12 +403,14 @@ export const LifeCard = memo(function LifeCard({
     <View
       testID={`life-card-seat-${seatNumber}`}
       accessibilityLabel={[
-        identity,
         ownershipLabel,
         eliminated && translate("board:lifeCard.out", { reason: eliminated }),
       ]
-        .filter(Boolean)
-        .join(", ")}
+        .filter((part): part is string => Boolean(part))
+        .reduce(
+          (label, part) => translate("board:counters.seatItem", { identity: label, label: part }),
+          identity,
+        )}
       onLayout={measureCard}
       style={[
         themed($card),

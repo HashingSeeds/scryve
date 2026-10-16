@@ -80,7 +80,7 @@ export function lobbyDetail(
   return [
     counterValueLabel(resolvedSystem, startingLife),
     resolvedSystem ? playFormatLabel(resolvedSystem, format || ruleset) : undefined,
-    variant === "treachery" ? "Treachery" : undefined,
+    variant === "treachery" ? translate("connected:treachery.name") : undefined,
   ]
     .filter(Boolean)
     .join(" · ")

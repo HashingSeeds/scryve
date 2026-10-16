@@ -6,7 +6,7 @@ import {
   isPlaySystemId,
   PLAY_SYSTEM_IDS,
   storedPlaySystem,
-  playSystemRules,
+  playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type { LocalGameMatch, LocalGameSummary } from "@/features/game/types"
@@ -380,9 +380,7 @@ export function entrySystem(entry: HistoryEntry): HistorySystem {
 }
 
 export function systemLabel(system: HistorySystem) {
-  return system === NO_PLAY_SYSTEM
-    ? translate("play:newGame.noSystem")
-    : playSystemRules(system).shortLabel
+  return playSystemShortLabel(system)
 }
 
 export function entryFormatKey(entry: HistoryEntry): FormatKey {

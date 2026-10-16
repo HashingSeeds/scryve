@@ -26,7 +26,7 @@ export interface ConfirmDialogProps {
   confirmTestID?: string
   cancelTestID?: string
   backdropTestID?: string
-  backdropAccessibilityLabel?: string
+  backdropAccessibilityLabel: string
   onConfirm: () => void
   onClose: () => void
 }
@@ -58,10 +58,7 @@ export function ConfirmDialog({
       closeDisabled={busy}
       origin={origin}
       backdropTestID={backdropTestID}
-      backdropAccessibilityLabel={
-        backdropAccessibilityLabel ??
-        translate("common:confirmDialog.cancelAction", { action: title.toLowerCase() })
-      }
+      backdropAccessibilityLabel={backdropAccessibilityLabel}
       dialogTestID={dialogTestID}
       dialogAccessibilityRole="alert"
       accessibilityViewIsModal

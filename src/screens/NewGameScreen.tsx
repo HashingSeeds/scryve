@@ -44,12 +44,13 @@ import {
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 import {
+  counterHeading,
   defaultStartingLife,
   isPlaySystemId,
   NO_PLAY_SYSTEM,
-  PLAY_SYSTEM_LIST,
+  playFormatOptions,
+  playSystemChoices,
   playSystemFormat,
-  playSystemFormats,
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
@@ -610,10 +611,7 @@ export function NewGameScreen({
               <SegmentedControl
                 testID="play-system"
                 accessibilityLabel={translate("play:newGame.gameSystem")}
-                segments={[
-                  { id: NO_PLAY_SYSTEM, label: translate("play:newGame.noSystem") },
-                  ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
-                ]}
+                segments={playSystemChoices()}
                 selectedId={system ?? NO_PLAY_SYSTEM}
                 onSelect={chooseSystem}
               />
@@ -621,22 +619,19 @@ export function NewGameScreen({
                 <SelectField
                   testID="play-format"
                   label={translate("play:newGame.format")}
+                  field="format"
                   value={format}
-                  options={playSystemFormats(system).map(({ id, label, blurb }) => ({
-                    id,
-                    label,
-                    ...(blurb ? { detail: blurb } : {}),
-                  }))}
+                  options={playFormatOptions(system)}
                   onSelect={chooseFormat}
                 />
               ) : null}
               {treacheryAvailable ? (
                 <SegmentedControl
                   testID="variant"
-                  accessibilityLabel="Variant"
+                  accessibilityLabel={translate("play:newGame.variant")}
                   segments={[
-                    { id: "standard", label: "Standard" },
-                    { id: "treachery", label: "Treachery" },
+                    { id: "standard", label: translate("play:newGame.variantStandard") },
+                    { id: "treachery", label: translate("connected:treachery.name") },
                   ]}
                   selectedId={treachery ? "treachery" : "standard"}
                   onSelect={(value) => chooseTreachery(value === "treachery")}
@@ -662,7 +657,7 @@ export function NewGameScreen({
               <View style={themed($counterValue)}>
                 <ValueField
                   testID="starting-counter"
-                  label={counter.heading}
+                  label={counterHeading(system)}
                   value={startingLife}
                   min={1}
                   max={counter.maxStartingValue}
@@ -761,6 +756,7 @@ export function NewGameScreen({
                   <SelectField
                     testID="life-step"
                     label={translate("play:newGame.changeBy")}
+                    field="changeBy"
                     value={String(lifeStep)}
                     options={LIFE_STEP_OPTIONS.map((step) => ({
                       id: String(step),
@@ -838,6 +834,7 @@ export function NewGameScreen({
                     <SelectField
                       testID="me-seat"
                       label={translate("play:newGame.thisIsMe")}
+                      field="thisIsMe"
                       value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
                       placeholder={translate("play:newGame.noSeat")}
                       clearLabel={translate("play:newGame.noSeat")}
@@ -852,6 +849,7 @@ export function NewGameScreen({
                       <SelectField
                         testID="me-deck"
                         label={translate("play:newGame.yourDeck")}
+                        field="yourDeck"
                         value={deck?.versionId}
                         placeholder={
                           account.decks === "unavailable"
@@ -1136,6 +1134,9 @@ export function NewGameScreen({
           visible
           title={translate(
             gameToExit.isHost ? "play:newGame.endGameTitle" : "play:newGame.leaveGameTitle",
+          )}
+          backdropAccessibilityLabel={translate(
+            gameToExit.isHost ? "play:newGame.cancelEndGame" : "play:newGame.cancelLeaveGame",
           )}
           message={translate(
             gameToExit.isHost ? "play:newGame.endGameMessage" : "play:newGame.leaveGameMessage",

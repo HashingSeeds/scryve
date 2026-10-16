@@ -7,6 +7,7 @@ export default {
   saving: "सहेजा जा रहा है…",
   deleting: "हटाया जा रहा है…",
   hiddenNameWarning: 'अन्य खिलाड़ियों को इसकी जगह "{{hiddenName}}" दिखेगा।',
+  numberedVersion: "संस्करण {{number}}",
   record: {
     noGames: "अभी तक कोई गेम नहीं",
     winRate: "{{games}} में से {{percent}}%",
@@ -125,6 +126,7 @@ export default {
     deleteDeckTitle: "यह डेक हटाएँ?",
     keepEditing: "संपादन जारी रखें",
     discardTitle: "बदलाव छोड़ दें?",
+    cancelDiscard: "बदलाव रद्द करने की क्रिया को रोकें?",
     discardBody: "आपके बदलाव खो जाएँगे।",
     discard: "छोड़ें",
   },
@@ -351,6 +353,7 @@ export default {
     changedBeforeDelete: "यह डेक कहीं और बदला गया है। हटाने से पहले इसे फिर से लोड करें।",
     reload: "सहेजा हुआ डेक फिर से लोड करें",
     deleteTitle: "अतिथि डेक हटाएँ?",
+    cancelDelete: "गेस्ट डेक हटाना रद्द करें?",
     deleteBody: "इससे डेक इस डिवाइस से हट जाएगा।",
   },
   addDeck: {
@@ -392,6 +395,7 @@ export default {
     signInUpgrade: "साइन इन करें, फिर Pro में अपग्रेड करें",
     proSubscription: "Pro आपके खाते पर एक सब्सक्रिप्शन है · {{limit}} डेक",
     replaceTitle: "स्थानीय डेक बदलें?",
+    cancelReplace: "लोकल डेक बदलना रद्द करें?",
     replaceBody: "{{name}} बदल दिया जाएगा।",
     replaceSelectedBody: "चुना गया डेक बदल दिया जाएगा।",
     replace: "बदलें",

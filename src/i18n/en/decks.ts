@@ -4,6 +4,7 @@ const decks = {
   saving: "Saving…",
   deleting: "Deleting…",
   hiddenNameWarning: 'Other players will see "{{hiddenName}}" instead.',
+  numberedVersion: "Version {{number}}",
   record: {
     noGames: "No games yet",
     winRate: "{{percent}}% of {{games}}",
@@ -122,6 +123,7 @@ const decks = {
     deleteDeckTitle: "Delete this deck?",
     keepEditing: "Keep editing",
     discardTitle: "Discard changes?",
+    cancelDiscard: "Cancel discard changes?",
     discardBody: "Your edits will be lost.",
     discard: "Discard",
   },
@@ -348,6 +350,7 @@ const decks = {
     changedBeforeDelete: "This deck changed elsewhere. Reload it before deleting.",
     reload: "Reload saved deck",
     deleteTitle: "Delete guest deck?",
+    cancelDelete: "Cancel delete guest deck?",
     deleteBody: "This removes the deck from this device.",
   },
   addDeck: {
@@ -387,6 +390,7 @@ const decks = {
     signInUpgrade: "Sign in, then upgrade to Pro",
     proSubscription: "Pro is a subscription on your account · {{limit}} decks",
     replaceTitle: "Replace local deck?",
+    cancelReplace: "Cancel replace local deck?",
     replaceBody: "{{name}} will be replaced.",
     replaceSelectedBody: "The selected deck will be replaced.",
     replace: "Replace",

@@ -33,7 +33,6 @@ export default {
     launchDestinationHint: "Jugar retoma la partida actual o abre un tablero nuevo.",
     gameSystem: "Sistema de juego",
     defaultGameSystem: "Sistema de juego predeterminado",
-    noSystem: "Sin sistema",
     format: "Formato",
     noDefault: "Sin predeterminado",
     defaultsHint:
@@ -49,6 +48,25 @@ export default {
       light: "Claro",
       dark: "Oscuro",
       hint: "Sistema sigue la apariencia de tu dispositivo. Claro y oscuro se mantienen fijos hasta que los cambies aquí.",
+    },
+    appIcon: {
+      heading: "Icono de la app",
+      changeFailed: "No se pudo cambiar el icono de la app. Inténtalo de nuevo.",
+      lockedPro: "{{name}}, Scryve Pro",
+      lockedFoil: "{{name}}, Scryve Foil",
+      opensPro: "Abre Scryve Pro",
+      opensSignIn: "Abre el inicio de sesión",
+      names: {
+        Default: "Predeterminado",
+        Two: "Dos",
+        Three: "Tres",
+        Midnight: "Medianoche",
+        Graphite: "Grafito",
+        Ink: "Tinta",
+        Outline: "Contorno",
+        Bone: "Hueso",
+        Foil: "Foil",
+      },
     },
     menuButton: {
       heading: "Botón del menú de partida",
@@ -408,6 +426,7 @@ export default {
     downloading: "Descargando actualización…",
     downloadingProgress: "Descargando actualización {{percent}}%",
     ready: "Actualización lista",
+    cancelReady: "Cancelar actualización lista",
     restart: "Reiniciar",
     whatsNew: "Novedades de esta actualización",
     dialogMessage:

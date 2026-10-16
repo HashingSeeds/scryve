@@ -269,7 +269,12 @@ export default {
     anotherSeat: "別の席",
     closeLayout: "レイアウト選択を閉じる",
     failedAction: {
-      life: "{{delta}} の{{counter}}の変更を同期できませんでした",
+      life: {
+        none: "ライフの{{delta}}の変更を同期できませんでした",
+        mtg: "ライフの{{delta}}の変更を同期できませんでした",
+        ygo: "{{delta}}のライフポイント変更を同期できませんでした",
+        pokemon: "サイドの{{delta}}の変更を同期できませんでした",
+      },
       commanderDamage: "{{delta}} のコマンダーダメージの割り当てを同期できませんでした",
       table: "テーブルの変更を同期できませんでした",
       confirmCommanderDamage: "コマンダーダメージの承認を同期できませんでした",
@@ -411,6 +416,30 @@ export default {
     joining: "参加中…",
     join: "ゲームに参加",
   },
+  treachery: {
+    name: "Treachery",
+    roles: {
+      leader: "リーダー",
+      guardian: "ガーディアン",
+      assassin: "アサシン",
+      traitor: "裏切り者",
+    },
+    goals: {
+      leader: "アサシンと裏切り者が全員脱落すれば勝利です。",
+      guardian: "リーダーを守り抜きましょう。リーダーと一緒に勝利します。",
+      assassin: "リーダーが脱落すれば勝利です。",
+      traitor: "最後まで生き残ったプレイヤーになりましょう。",
+    },
+    revealFailed: "役割を公開できませんでした",
+    hideRole: "役割を隠す",
+    faceUp: "テーブルに公開中です。",
+    hiddenOffline: "テーブルには非公開です。公開するには再接続してください。",
+    hidden: "テーブルには非公開です。",
+    hide: "隠す",
+    revealing: "公開中…",
+    revealConfirm: "全員に公開しますか?",
+    reveal: "公開",
+  },
   nearby: {
     title: "近くのゲーム",
     hosting: "{{name}}をホスト中",
@@ -437,6 +466,13 @@ export default {
       hostFailed: "ホストできませんでした: {{error}}",
       unreachable: "{{name}}に接続できません。ゲームが終了した可能性があります。",
       lostHost: "ホストとの接続が切れました。ゲームが終了した可能性があります。",
+    },
+    rejected: {
+      seatTaken: "その席は別のデバイスが使用中です。",
+      started: "このゲームはすでに開始されています。",
+      full: "このゲームは満員です。",
+      update: "このゲームに参加するにはScryveをアップデートしてください。",
+      hostOutdated: "ホストが先にScryveをアップデートする必要があります。",
     },
   },
 } satisfies LocaleNamespace

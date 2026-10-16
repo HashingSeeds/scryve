@@ -293,7 +293,12 @@ export default {
     anotherSeat: "Otro asiento",
     closeLayout: "Cerrar selector de disposición",
     failedAction: {
-      life: "No se pudo sincronizar un cambio de {{delta}} en {{counter}}",
+      life: {
+        none: "No se pudo sincronizar un cambio de vida de {{delta}}",
+        mtg: "No se pudo sincronizar un cambio de vida de {{delta}}",
+        ygo: "No se pudo sincronizar un cambio de {{delta}} Puntos de Vida",
+        pokemon: "No se pudo sincronizar un cambio de {{delta}} cartas de Premio",
+      },
       commanderDamage: "No se pudo sincronizar una asignación de {{delta}} de daño de comandante",
       table: "No se pudo sincronizar un cambio en la mesa",
       confirmCommanderDamage: "No se pudo sincronizar la confirmación del daño de comandante",
@@ -436,6 +441,30 @@ export default {
     joining: "Uniéndose…",
     join: "Unirse a la partida",
   },
+  treachery: {
+    name: "Treachery",
+    roles: {
+      leader: "Líder",
+      guardian: "Guardián",
+      assassin: "Asesino",
+      traitor: "Traidor",
+    },
+    goals: {
+      leader: "Gana cuando todos los Asesinos y Traidores estén fuera.",
+      guardian: "Mantén vivo al Líder. Ganas con él.",
+      assassin: "Gana cuando el Líder esté fuera.",
+      traitor: "Sé el último jugador en pie.",
+    },
+    revealFailed: "No se pudo revelar tu rol",
+    hideRole: "Ocultar tu rol",
+    faceUp: "Boca arriba para la mesa.",
+    hiddenOffline: "Oculto para la mesa. Reconéctate para revelarlo.",
+    hidden: "Oculto para la mesa.",
+    hide: "Ocultar",
+    revealing: "Revelando…",
+    revealConfirm: "¿Revelar a todos?",
+    reveal: "Revelar",
+  },
   nearby: {
     title: "Partidas cercanas",
     hosting: "Anfitrión de {{name}}",
@@ -462,6 +491,13 @@ export default {
       hostFailed: "No se pudo crear la partida: {{error}}",
       unreachable: "{{name}} no está accesible. Puede que la partida haya terminado.",
       lostHost: "Se perdió la conexión con el anfitrión. Puede que la partida haya terminado.",
+    },
+    rejected: {
+      seatTaken: "Ese asiento pertenece a otro dispositivo.",
+      started: "Esta partida ya ha empezado.",
+      full: "Esta partida está llena.",
+      update: "Actualiza Scryve para unirte a esta partida.",
+      hostOutdated: "El anfitrión tiene que actualizar Scryve primero.",
     },
   },
 } satisfies LocaleNamespace

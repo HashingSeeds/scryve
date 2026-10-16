@@ -281,7 +281,12 @@ export default {
     anotherSeat: "दूसरी सीट",
     closeLayout: "लेआउट चयन बंद करें",
     failedAction: {
-      life: "{{delta}} {{counter}} बदलाव सिंक नहीं हो सका",
+      life: {
+        none: "{{delta}} का लाइफ बदलाव सिंक नहीं हो सका",
+        mtg: "{{delta}} का लाइफ बदलाव सिंक नहीं हो सका",
+        ygo: "{{delta}} लाइफ़ पॉइंट का बदलाव सिंक नहीं हो सका",
+        pokemon: "{{delta}} प्राइज़ कार्ड का बदलाव सिंक नहीं हो सका",
+      },
       commanderDamage: "{{delta}} commander damage का आवंटन सिंक नहीं हो सका",
       table: "टेबल का बदलाव सिंक नहीं हो सका",
       confirmCommanderDamage: "commander damage की पुष्टि सिंक नहीं हो सकी",
@@ -422,6 +427,30 @@ export default {
     joining: "शामिल हो रहे हैं…",
     join: "गेम में शामिल हों",
   },
+  treachery: {
+    name: "Treachery",
+    roles: {
+      leader: "लीडर",
+      guardian: "गार्डियन",
+      assassin: "हत्यारा",
+      traitor: "गद्दार",
+    },
+    goals: {
+      leader: "सभी हत्यारे और गद्दार बाहर हो जाएँ, तो आप जीतते हैं।",
+      guardian: "लीडर को ज़िंदा रखें। उसके साथ आप जीतते हैं।",
+      assassin: "लीडर बाहर हो जाए, तो आप जीतते हैं।",
+      traitor: "आखिरी बचे खिलाड़ी बनें।",
+    },
+    revealFailed: "आपकी भूमिका नहीं दिखाई जा सकी",
+    hideRole: "अपनी भूमिका छिपाएँ",
+    faceUp: "टेबल के लिए खुला है।",
+    hiddenOffline: "टेबल से छिपा है। दिखाने के लिए दोबारा कनेक्ट करें।",
+    hidden: "टेबल से छिपा है।",
+    hide: "छिपाएँ",
+    revealing: "दिखाया जा रहा है…",
+    revealConfirm: "सबको दिखाएँ?",
+    reveal: "दिखाएँ",
+  },
   nearby: {
     title: "आस-पास के गेम",
     hosting: "{{name}} होस्ट कर रहे हैं",
@@ -447,6 +476,13 @@ export default {
       hostFailed: "होस्ट नहीं हो सका: {{error}}",
       unreachable: "{{name}} तक पहुँचा नहीं जा सकता। हो सकता है गेम समाप्त हो गया हो।",
       lostHost: "होस्ट से कनेक्शन टूट गया। हो सकता है गेम समाप्त हो गया हो।",
+    },
+    rejected: {
+      seatTaken: "यह सीट किसी दूसरे डिवाइस की है।",
+      started: "यह गेम पहले ही शुरू हो चुका है।",
+      full: "यह गेम भर चुका है।",
+      update: "इस गेम में शामिल होने के लिए Scryve अपडेट करें।",
+      hostOutdated: "होस्ट को पहले Scryve अपडेट करना होगा।",
     },
   },
 } satisfies LocaleNamespace

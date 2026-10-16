@@ -4,6 +4,7 @@ import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 import Svg, { Path } from "react-native-svg"
 
+import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
@@ -402,7 +403,7 @@ export function DecksScreen({
   onAddDeck,
   onSettings,
   onAccount,
-  accountLabel = "Account",
+  accountEntry = "account",
   unavailableMessage,
   access,
 }: {
@@ -414,7 +415,7 @@ export function DecksScreen({
   onAddDeck: () => void
   onSettings: () => void
   onAccount: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountEntry?: AccountEntry
   unavailableMessage?: string
   access?: CloudAccess
 }) {
@@ -641,8 +642,8 @@ export function DecksScreen({
         )}
       </View>
       <FloatingAppNavigation
-        destinationLabel={onBack ? "Back to lobby" : hasCurrentGame ? "Return to game" : "Play"}
-        accountLabel={accountLabel}
+        destination={onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play"}
+        accountEntry={accountEntry}
         onDestination={onPlay}
         onSettings={onSettings}
         onAccount={onAccount}

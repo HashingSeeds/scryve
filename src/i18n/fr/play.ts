@@ -30,6 +30,8 @@ export default {
   newGame: {
     setupTitle: "Configuration de la partie",
     newTitle: "Nouvelle partie",
+    variant: "Variante",
+    variantStandard: "Normale",
     connectionLabel: "Connexion de la partie",
     onThisDevice: "Sur cet appareil",
     connected: "Connectée",
@@ -39,7 +41,6 @@ export default {
     resumeHostedGame: "Reprendre la partie hébergée",
     system: "Système",
     gameSystem: "Système de jeu",
-    noSystem: "Aucun système",
     format: "Format",
     seats: "Places",
     players: "Joueurs",
@@ -99,10 +100,12 @@ export default {
     loadMore: "Charger plus",
     loadingMoreGames: "Chargement d'autres parties…",
     endGameTitle: "Terminer cette partie ?",
+    cancelEndGame: "Annuler la fin de cette partie ?",
     endGameMessage:
       "Cela termine la partie pour tout le monde et l'enregistre comme abandonnée. Cette action est irréversible.",
     endGameConfirm: "Terminer la partie",
     leaveGameTitle: "Quitter cette partie ?",
+    cancelLeaveGame: "Annuler le départ de cette partie ?",
     leaveGameMessage:
       "Vous quitterez cette partie. Les autres joueurs et leur historique restent inchangés.",
     leaveGameConfirm: "Quitter la partie",
@@ -202,8 +205,8 @@ export default {
       noDetails: {
         none: "Aucun détail de changement de vie trouvé.",
         mtg: "Aucun détail de changement de vie trouvé.",
-        ygo: "Aucun détail de changement de Life Points trouvé.",
-        pokemon: "Aucun détail de changement de cartes Récompense trouvé.",
+        ygo: "Aucun détail des changements de Life Points n'a été trouvé.",
+        pokemon: "Aucun détail des changements de cartes Récompense trouvé.",
       },
     },
   },
@@ -306,6 +309,7 @@ export default {
     notFoundContent: "Il a peut-être été supprimé.",
     deleteResult: "Supprimer le résultat",
     deleteTitle: "Supprimer ce résultat ?",
+    cancelDelete: "Annuler la suppression de ce résultat ?",
     deleteMessage: "Les statistiques de deck qui le comptent seront mises à jour.",
   },
   recordMatch: {

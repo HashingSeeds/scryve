@@ -10,6 +10,7 @@ import {
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -71,21 +72,23 @@ export function AppIconPicker() {
       setCurrent(await setAlternateAppIcon(name))
       setError("")
     } catch {
-      setError("Could not change the app icon. Please try again.")
+      setError(translate("account:settings.appIcon.changeFailed"))
     }
   }
 
   const options = [
     {
       name: null,
-      label: "Default",
+      id: "default",
+      label: translate("account:settings.appIcon.names.Default"),
       preview: DEFAULT_PREVIEW,
       background: "#000000",
       locked: false,
     },
     ...APP_ICON_VARIANTS.map(({ name, tier, background }) => ({
       name,
-      label: name,
+      id: name.toLowerCase(),
+      label: translate(`account:settings.appIcon.names.${name}`),
       preview: PREVIEWS[name],
       background,
       locked: tier === "foil" ? !billing.isFoil : !billing.isCountPro,
@@ -94,20 +97,33 @@ export function AppIconPicker() {
 
   return (
     <View style={themed($picker)}>
-      <Text text="App icon" preset="subheading" accessibilityRole="header" />
+      <Text tx="account:settings.appIcon.heading" preset="subheading" accessibilityRole="header" />
       <View accessibilityRole="radiogroup" style={themed($row)}>
-        {options.map(({ name, label, preview, background, locked }) => {
+        {options.map(({ name, id, label, preview, background, locked }) => {
           const selected = name === current
           return (
             <TouchableOpacity
-              key={label}
-              testID={`app-icon-${label.toLowerCase()}`}
+              key={id}
+              testID={`app-icon-${id}`}
               accessibilityRole="radio"
               accessibilityLabel={
-                locked ? `${label}, Scryve ${name === "Foil" ? "Foil" : "Pro"}` : label
+                locked
+                  ? translate(
+                      name === "Foil"
+                        ? "account:settings.appIcon.lockedFoil"
+                        : "account:settings.appIcon.lockedPro",
+                      { name: label },
+                    )
+                  : label
               }
               accessibilityHint={
-                locked ? (auth.isSignedIn ? "Opens Scryve Pro" : "Opens sign in") : undefined
+                locked
+                  ? translate(
+                      auth.isSignedIn
+                        ? "account:settings.appIcon.opensPro"
+                        : "account:settings.appIcon.opensSignIn",
+                    )
+                  : undefined
               }
               accessibilityState={{ selected, disabled: locked && planLoading }}
               disabled={locked && planLoading}

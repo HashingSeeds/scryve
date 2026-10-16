@@ -23,7 +23,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
-import { cardCountLabel } from "@/features/decks/deckCopy"
+import { cardCountLabel, deckVersionLabel } from "@/features/decks/deckCopy"
 import {
   addDraftCard,
   addDraftCommander,
@@ -56,6 +56,7 @@ import {
   resolveDeckView,
 } from "@/features/decks/resolveDeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -65,8 +66,7 @@ import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
-import { deckFormatLabel, deckGame, deckSections } from "../../convex/lib/deckGames"
-import { versionLabel } from "../../convex/lib/deckVersions"
+import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
 
 type DeckDialog =
   | "none"
@@ -122,7 +122,7 @@ function DeckDetailPlaceholder({
         .filter(Boolean)
         .join(" · ")
     : null
-  const loadingSections = summary ? deckSections(summary.game, summary.format) : []
+  const loadingSections = summary ? localizedDeckSections(summary.game, summary.format) : []
   const statusText =
     failure?.kind === "missing"
       ? translate("decks:detail.notFound")
@@ -742,7 +742,7 @@ function DeckDetailContent({
 
   if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
 
-  const configuredSections = deckSections(deck.game, deck.format)
+  const configuredSections = localizedDeckSections(deck.game, deck.format)
   const { accountMetadata, versionConflict, versionCardConflict, failureMessage } = view
   const copyFromVersion = activeVersionSummary ?? version
   const syncError =
@@ -1126,7 +1126,7 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.newVersion")}
           submitLabel={translate("decks:detail.createVersion")}
-          copyFromLabel={copyFromVersion ? versionLabel(copyFromVersion) : undefined}
+          copyFromLabel={copyFromVersion ? deckVersionLabel(copyFromVersion) : undefined}
           busy={busy}
           error={error}
           onSubmit={submitNewVersion}
@@ -1138,7 +1138,7 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.versionDetails")}
           submitLabel={translate("common:save")}
-          initialName={versionLabel(activeVersionSummary)}
+          initialName={deckVersionLabel(activeVersionSummary)}
           initialNote={activeVersionSummary.note ?? ""}
           notesLocked={!view.premium}
           busy={busy}
@@ -1212,7 +1212,7 @@ function DeckDetailContent({
                       style={[themed($versionMark), selected && themed($versionMarkSelected)]}
                     />
                     <View style={themed($versionCopy)}>
-                      <Text weight="medium" text={versionLabel(candidate)} />
+                      <Text weight="medium" text={deckVersionLabel(candidate)} />
                       {candidate.note ? (
                         <Text
                           size="xxs"

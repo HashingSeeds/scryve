@@ -26,6 +26,8 @@ const play = {
   newGame: {
     setupTitle: "Game setup",
     newTitle: "New game",
+    variant: "Variant",
+    variantStandard: "Standard",
     connectionLabel: "Game connection",
     onThisDevice: "On this device",
     connected: "Connected",
@@ -35,7 +37,6 @@ const play = {
     resumeHostedGame: "Resume hosted game",
     system: "System",
     gameSystem: "Game system",
-    noSystem: "No system",
     format: "Format",
     seats: "Seats",
     players: "Players",
@@ -95,10 +96,12 @@ const play = {
     loadMore: "Load more",
     loadingMoreGames: "Loading more games…",
     endGameTitle: "End this game?",
+    cancelEndGame: "Cancel end this game?",
     endGameMessage:
       "This ends the game for everyone and records it as abandoned. This cannot be undone.",
     endGameConfirm: "End game",
     leaveGameTitle: "Leave this game?",
+    cancelLeaveGame: "Cancel leave this game?",
     leaveGameMessage: "You will leave this game. Other players and their history stay unchanged.",
     leaveGameConfirm: "Leave game",
     closeAppearancePicker: "Close color and mark picker",
@@ -292,6 +295,7 @@ const play = {
     notFoundContent: "It may have been deleted.",
     deleteResult: "Delete result",
     deleteTitle: "Delete this result?",
+    cancelDelete: "Cancel delete this result?",
     deleteMessage: "Deck stats that count it will be updated.",
   },
   recordMatch: {

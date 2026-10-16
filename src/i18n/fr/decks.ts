@@ -8,6 +8,7 @@ export default {
   saving: "Enregistrement…",
   deleting: "Suppression…",
   hiddenNameWarning: "Les autres joueurs verront « {{hiddenName}} » à la place.",
+  numberedVersion: "Version {{number}}",
   record: {
     noGames: "Aucune partie",
     winRate: "{{percent}} % sur {{games}}",
@@ -141,6 +142,7 @@ export default {
     deleteDeckTitle: "Supprimer ce deck ?",
     keepEditing: "Continuer la modification",
     discardTitle: "Abandonner les changements ?",
+    cancelDiscard: "Annuler l'abandon des modifications ?",
     discardBody: "Vos modifications seront perdues.",
     discard: "Abandonner",
   },
@@ -378,6 +380,7 @@ export default {
     changedBeforeDelete: "Ce deck a été modifié ailleurs. Rechargez-le avant de le supprimer.",
     reload: "Recharger le deck enregistré",
     deleteTitle: "Supprimer le deck invité ?",
+    cancelDelete: "Annuler la suppression du deck invité ?",
     deleteBody: "Cela retire le deck de cet appareil.",
   },
   addDeck: {
@@ -419,6 +422,7 @@ export default {
     signInUpgrade: "Connectez-vous, puis passez à Pro",
     proSubscription: "Pro est un abonnement lié à votre compte · {{limit}} decks",
     replaceTitle: "Remplacer le deck local ?",
+    cancelReplace: "Annuler le remplacement du deck local ?",
     replaceBody: "{{name}} sera remplacé.",
     replaceSelectedBody: "Le deck sélectionné sera remplacé.",
     replace: "Remplacer",

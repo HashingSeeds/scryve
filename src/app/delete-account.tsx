@@ -18,6 +18,7 @@ import { writeSessionHint } from "@/features/auth/sessionHint"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { AccountDeletionReceiptScreen, DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
+import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 
@@ -177,9 +178,12 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
       await clerk.signOut()
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : translate("account:deleteAccount.route.submitFailed"),
+        convexErrorMessage(
+          cause,
+          cause instanceof Error
+            ? cause.message
+            : translate("account:deleteAccount.route.submitFailed"),
+        ),
       )
     } finally {
       setIsSubmitting(false)

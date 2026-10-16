@@ -32,17 +32,30 @@ export default {
     play: "플레이",
     backToLobby: "로비로 돌아가기",
   },
-  confirmDialog: {
-    cancelAction: "{{action}} 취소",
-  },
   retryableError: {
     retryingIn: "{{seconds}}초 후 다시 시도",
   },
   selectField: {
     none: "없음",
     triggerLabel: "{{label}}, {{value}}",
-    openHint: "{{label}} 선택지 열기",
-    closeLabel: "{{label}} 선택지 닫기",
+    openHint: {
+      format: "포맷 선택지를 엽니다",
+      commanderColor: "커맨더 색상 선택지를 엽니다",
+      addTo: "추가 대상 선택지를 엽니다",
+      changeBy: "변경 수치 선택지를 엽니다",
+      thisIsMe: "나예요 선택지를 엽니다",
+      yourDeck: "내 덱 선택지를 엽니다",
+      system: "시스템 선택지를 엽니다",
+    },
+    closeLabel: {
+      format: "포맷 선택지 닫기",
+      commanderColor: "커맨더 색상 선택지 닫기",
+      addTo: "추가 대상 선택지 닫기",
+      changeBy: "변경 수치 선택지 닫기",
+      thisIsMe: "나예요 선택지 닫기",
+      yourDeck: "내 덱 선택지 닫기",
+      system: "시스템 선택지 닫기",
+    },
   },
   valueField: {
     readoutLabel: "{{label}}, {{value}}",

@@ -28,11 +28,12 @@ import {
   type GuestDeckPayload,
 } from "@/features/decks/guestDeck"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { DEFAULT_DECK_GAME, deckSections } from "../../convex/lib/deckGames"
+import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
 type GuestDeckDetailScreenProps = { localId: string; onBack: () => void }
@@ -146,7 +147,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
   const commanderWarnings = commanderSelected
     ? getCommanderWarnings(current.cards, (card) => cachedRules[cardDetailsKey(card, game)])
     : []
-  const sections = deckSections(game, current.format)
+  const sections = localizedDeckSections(game, current.format)
   const sectionLabel = (card: GuestCard) => {
     const id = card.section ?? card.board ?? "main"
     return sections.find((section) => section.id === id)?.label ?? id
@@ -421,6 +422,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       <ConfirmDialog
         visible={discarding}
         title={translate("decks:detail.discardTitle")}
+        backdropAccessibilityLabel={translate("decks:detail.cancelDiscard")}
         message={translate("decks:detail.discardBody")}
         confirmText={translate("decks:detail.discard")}
         cancelText={translate("decks:detail.keepEditing")}
@@ -445,6 +447,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       <ConfirmDialog
         visible={deleting}
         title={translate("decks:guestDetail.deleteTitle")}
+        backdropAccessibilityLabel={translate("decks:guestDetail.cancelDelete")}
         message={translate("decks:guestDetail.deleteBody")}
         confirmText={translate("common:delete")}
         destructive

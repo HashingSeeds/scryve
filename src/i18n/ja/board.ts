@@ -126,7 +126,7 @@ export default {
       none: "ライフが同点",
       mtg: "ライフが同点",
       ygo: "ライフポイントが同点",
-      pokemon: "サイドが同数",
+      pokemon: "サイドの枚数が同じ",
     },
     leads: {
       none: "{{name}}がライフでリード",
@@ -152,12 +152,23 @@ export default {
       draw: "引き分け",
     },
     failed: "この対戦を終了できませんでした。",
+    noFinishedGame: "このマッチには終了できる終了済みのゲームがありません。",
     cancel: "対戦の終了をキャンセル",
     title: "対戦結果",
     playerResult: "{{name}}の対戦結果",
     drawRemaining: "残りは引き分け",
     drawRemainingHint: "プレイ中の全席を引き分けにし、脱落した席は負けにします",
     end: "対戦を終了",
+    scoreErrors: {
+      gamesWonRange: "勝利ゲーム数は0〜{{max}}で入力してください（{{bestOf}}戦先取）",
+      gamesDrawnRange: "引き分けゲーム数は0〜{{max}}で入力してください",
+      tooManyWins: "{{bestOf}}戦制では{{wins}}勝にはなりません",
+      partialScore: "全席の勝利ゲーム数を入力するか、スコアを空欄にしてください",
+      oneWinner: "マッチの勝者は1人だけです",
+      needsWinner: "引き分けでない限り、マッチには勝者が必要です",
+      winnerLeads: "勝者のゲーム勝利数が最多である必要があります",
+      leaderWins: "ゲーム勝利数が最多の席が勝者である必要があります",
+    },
   },
   claim: {
     matchStanding: "{{bestOf}}本勝負 · {{score}}",
@@ -302,12 +313,6 @@ export default {
     showOverviewFor: "{{identity}}のコマンダーダメージを表示",
     expandsGrid: "コマンダーダメージの一覧を広げる",
   },
-  tableItem: {
-    poison: "毒",
-    commanderTax: "統率者税",
-    monarch: "monarch",
-    initiative: "イニシアチブ",
-  },
   outReason: {
     commanderDamage: "コマンダーダメージ",
     poison: "毒",
@@ -351,7 +356,8 @@ export default {
       none: "タップで{{identity}}のライフを{{delta}}変更。長押しでその他の操作。",
       mtg: "タップで{{identity}}のライフを{{delta}}変更。長押しでその他の操作。",
       ygo: "タップで{{identity}}のライフポイントを{{delta}}変更。長押しでその他の操作。",
-      pokemon: "タップで{{identity}}のサイドを{{delta}}変更。長押しでその他の操作。",
+      pokemon:
+        "タップで{{identity}}のサイドを{{delta}}変更します。長押しでその他の操作ができます。",
     },
     moreControls: {
       none: "{{identity}}、ライフのその他の操作",
@@ -454,14 +460,14 @@ export default {
     add: {
       none: "ライフを{{amount}}増やす",
       mtg: "ライフを{{amount}}増やす",
-      ygo: "ライフポイントを{{amount}}増やす",
-      pokemon: "サイドを{{amount}}枚増やす",
+      ygo: "ライフポイントを{{amount}}加算",
+      pokemon: "サイドを{{amount}}増やす",
     },
     subtract: {
       none: "ライフを{{amount}}減らす",
       mtg: "ライフを{{amount}}減らす",
-      ygo: "ライフポイントを{{amount}}減らす",
-      pokemon: "サイドを{{amount}}枚減らす",
+      ygo: "ライフポイントを{{amount}}減算",
+      pokemon: "サイドを{{amount}}減らす",
     },
   },
 } satisfies LocaleNamespace

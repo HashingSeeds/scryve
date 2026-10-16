@@ -67,6 +67,7 @@ export function DeckSettingsDialog({
         <SelectField
           testID="deck-format-picker"
           label={translate("decks:settings.format")}
+          field="format"
           value={format}
           options={deckFormats(game).map((candidate) => ({
             id: candidate.id,

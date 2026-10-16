@@ -194,7 +194,7 @@ export default function Index() {
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
       onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
-      accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
+      accountEntry={auth.isSignedIn ? "account" : "signIn"}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}
       onGameAbandoned={() => router.replace({ pathname: "/", params: { destination: "play" } })}
       ownerId={auth.isSignedIn ? auth.userId : undefined}

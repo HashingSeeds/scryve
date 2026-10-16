@@ -3,6 +3,7 @@ import { Component, ErrorInfo, ReactNode } from "react"
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { convexErrorMessage } from "@/utils/convexError"
 
 interface Props {
   children: ReactNode
@@ -33,7 +34,7 @@ export class ConnectedErrorBoundary extends Component<Props, State> {
         <Text
           accessibilityRole="alert"
           tx="connected:errorBoundary.message"
-          txOptions={{ error: this.state.error.message }}
+          txOptions={{ error: convexErrorMessage(this.state.error, this.state.error.message) }}
         />
         <Button
           testID="retry-connected-button"

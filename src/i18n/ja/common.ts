@@ -32,17 +32,30 @@ export default {
     play: "プレイ",
     backToLobby: "ロビーに戻る",
   },
-  confirmDialog: {
-    cancelAction: "{{action}}をキャンセル",
-  },
   retryableError: {
     retryingIn: "{{seconds}}秒後に再試行",
   },
   selectField: {
     none: "なし",
     triggerLabel: "{{label}}、{{value}}",
-    openHint: "{{label}}の選択肢を開く",
-    closeLabel: "{{label}}の選択肢を閉じる",
+    openHint: {
+      format: "フォーマットの選択肢を開きます",
+      commanderColor: "統率者の色の選択肢を開きます",
+      addTo: "追加先の選択肢を開きます",
+      changeBy: "変更量の選択肢を開きます",
+      thisIsMe: "「これは自分」の選択肢を開きます",
+      yourDeck: "自分のデッキの選択肢を開きます",
+      system: "システムの選択肢を開きます",
+    },
+    closeLabel: {
+      format: "フォーマットの選択肢を閉じる",
+      commanderColor: "統率者の色の選択肢を閉じる",
+      addTo: "追加先の選択肢を閉じる",
+      changeBy: "変更量の選択肢を閉じる",
+      thisIsMe: "「これは自分」の選択肢を閉じる",
+      yourDeck: "自分のデッキの選択肢を閉じる",
+      system: "システムの選択肢を閉じる",
+    },
   },
   valueField: {
     readoutLabel: "{{label}}、{{value}}",

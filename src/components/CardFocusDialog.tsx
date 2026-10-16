@@ -232,6 +232,7 @@ export function CardFocusDialog({
             <SelectField
               testID="commander-color"
               label={translate("decks:cardFocus.commanderColor")}
+              field="commanderColor"
               options={COMMANDER_COLORS.map((id) => ({ id, label: colorLabel(id) }))}
               value={commanderColor}
               onSelect={(color) => setCommanderColor(COMMANDER_COLORS.find((id) => id === color))}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as Haptics from "expo-haptics"
 
+import { translate } from "@/i18n/translate"
 import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -190,7 +191,7 @@ export function useLocalGame(
   const endMatch = useCallback(
     (matchId: string, outcomes: MatchSeatOutcome[]) => {
       const ended = repository.finishMatch(matchId, outcomes)
-      if (!ended) throw new Error("This match has no finished game to end.")
+      if (!ended) throw new Error(translate("board:matchEnd.noFinishedGame"))
       if (gameRef.current.match?.id === matchId) {
         const last = repository.loadHistoryDetail(ended.id)?.game
         replaceBoard(

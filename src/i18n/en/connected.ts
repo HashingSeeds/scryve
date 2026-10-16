@@ -276,7 +276,12 @@ const connected = {
     anotherSeat: "Another seat",
     closeLayout: "Close layout chooser",
     failedAction: {
-      life: "A {{delta}} {{counter}} change could not sync",
+      life: {
+        none: "A {{delta}} life change could not sync",
+        mtg: "A {{delta}} life change could not sync",
+        ygo: "A {{delta}} Life Points change could not sync",
+        pokemon: "A {{delta}} Prize cards change could not sync",
+      },
       commanderDamage: "A {{delta}} commander damage assignment could not sync",
       table: "A table change could not sync",
       confirmCommanderDamage: "Confirming commander damage could not sync",
@@ -406,6 +411,30 @@ const connected = {
     joining: "Joining…",
     join: "Join game",
   },
+  treachery: {
+    name: "Treachery",
+    roles: {
+      leader: "Leader",
+      guardian: "Guardian",
+      assassin: "Assassin",
+      traitor: "Traitor",
+    },
+    goals: {
+      leader: "Win once every Assassin and Traitor is out.",
+      guardian: "Keep the Leader alive. You win with them.",
+      assassin: "Win when the Leader is out.",
+      traitor: "Be the last player standing.",
+    },
+    revealFailed: "Could not reveal your role",
+    hideRole: "Hide your role",
+    faceUp: "Face up for the table.",
+    hiddenOffline: "Hidden from the table. Reconnect to reveal it.",
+    hidden: "Hidden from the table.",
+    hide: "Hide",
+    revealing: "Revealing…",
+    revealConfirm: "Reveal to all?",
+    reveal: "Reveal",
+  },
   nearby: {
     title: "Nearby games",
     hosting: "Hosting {{name}}",
@@ -431,6 +460,13 @@ const connected = {
       hostFailed: "Could not host: {{error}}",
       unreachable: "{{name}} isn't reachable. The game may have ended.",
       lostHost: "Lost the host. The game may have ended.",
+    },
+    rejected: {
+      seatTaken: "That seat belongs to another device.",
+      started: "This game has already started.",
+      full: "This game is full.",
+      update: "Update Scryve to join this game.",
+      hostOutdated: "The host needs to update Scryve first.",
     },
   },
 }

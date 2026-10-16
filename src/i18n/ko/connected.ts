@@ -267,7 +267,12 @@ export default {
     anotherSeat: "다른 자리",
     closeLayout: "레이아웃 선택 닫기",
     failedAction: {
-      life: "{{delta}} {{counter}} 변경을 동기화하지 못했습니다",
+      life: {
+        none: "{{delta}} 라이프 변경을 동기화하지 못했습니다",
+        mtg: "{{delta}} 라이프 변경을 동기화하지 못했습니다",
+        ygo: "라이프 포인트 {{delta}} 변경을 동기화하지 못했습니다",
+        pokemon: "사이드 카드 {{delta}} 변경을 동기화하지 못했습니다",
+      },
       commanderDamage: "{{delta}} 커맨더 피해 지정을 동기화하지 못했습니다",
       table: "테이블 변경을 동기화하지 못했습니다",
       confirmCommanderDamage: "커맨더 피해 확인을 동기화하지 못했습니다",
@@ -405,6 +410,30 @@ export default {
     joining: "참가하는 중…",
     join: "게임 참가",
   },
+  treachery: {
+    name: "Treachery",
+    roles: {
+      leader: "리더",
+      guardian: "가디언",
+      assassin: "암살자",
+      traitor: "배신자",
+    },
+    goals: {
+      leader: "모든 암살자와 배신자가 탈락하면 승리합니다.",
+      guardian: "리더를 살려 두세요. 리더와 함께 승리합니다.",
+      assassin: "리더가 탈락하면 승리합니다.",
+      traitor: "마지막까지 살아남는 플레이어가 되세요.",
+    },
+    revealFailed: "역할을 공개할 수 없습니다",
+    hideRole: "내 역할 숨기기",
+    faceUp: "테이블에 공개되어 있습니다.",
+    hiddenOffline: "테이블에는 숨겨져 있습니다. 공개하려면 다시 연결하세요.",
+    hidden: "테이블에는 숨겨져 있습니다.",
+    hide: "숨기기",
+    revealing: "공개 중…",
+    revealConfirm: "모두에게 공개할까요?",
+    reveal: "공개",
+  },
   nearby: {
     title: "주변 게임",
     hosting: "{{name}} 호스트 중",
@@ -430,6 +459,13 @@ export default {
       hostFailed: "호스트할 수 없습니다: {{error}}",
       unreachable: "{{name}}에 연결할 수 없습니다. 게임이 종료되었을 수 있습니다.",
       lostHost: "호스트와 연결이 끊겼습니다. 게임이 종료되었을 수 있습니다.",
+    },
+    rejected: {
+      seatTaken: "해당 자리는 다른 기기에서 사용 중입니다.",
+      started: "이미 시작된 게임입니다.",
+      full: "게임이 가득 찼습니다.",
+      update: "이 게임에 참여하려면 Scryve를 업데이트하세요.",
+      hostOutdated: "호스트가 먼저 Scryve를 업데이트해야 합니다.",
     },
   },
 } satisfies LocaleNamespace

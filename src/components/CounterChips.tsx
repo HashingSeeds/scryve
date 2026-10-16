@@ -3,7 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
 import Svg, { Circle, Path } from "react-native-svg"
 
-import type { TableRules } from "@/features/game/playSystems"
+import { tableItemLabel, type TableRules } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
 import { translate } from "@/i18n/translate"
@@ -57,15 +57,9 @@ export function losingCounter({ rules, counters }: Pick<SeatTable, "rules" | "co
   )
 }
 
-type TableItemId = keyof typeof board.tableItem
 type OutReasonId = keyof typeof board.outReason
 
-const isTableItemId = (id: string): id is TableItemId => id in board.tableItem
-const isOutReasonId = (id: string): id is OutReasonId => id in board.outReason
-
-export function tableItemLabel({ id, label }: { id: string; label: string }) {
-  return isTableItemId(id) ? translate(`board:tableItem.${id}`) : label
-}
+const isOutReasonId = (id: string): id is OutReasonId => Object.hasOwn(board.outReason, id)
 
 export function counterOutReason({ id, label }: { id: string; label: string }) {
   return isOutReasonId(id) ? translate(`board:outReason.${id}`) : label.toLowerCase()

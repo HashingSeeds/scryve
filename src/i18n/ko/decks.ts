@@ -6,6 +6,7 @@ export default {
   saving: "저장 중…",
   deleting: "삭제 중…",
   hiddenNameWarning: '다른 플레이어에게는 "{{hiddenName}}"(이)가 대신 표시됩니다.',
+  numberedVersion: "버전 {{number}}",
   record: {
     noGames: "아직 게임 없음",
     winRate: "{{games}} 중 {{percent}}%",
@@ -121,6 +122,7 @@ export default {
     deleteDeckTitle: "이 덱을 삭제할까요?",
     keepEditing: "계속 편집",
     discardTitle: "변경 사항을 취소할까요?",
+    cancelDiscard: "변경 사항 취소를 취소할까요?",
     discardBody: "편집한 내용이 사라집니다.",
     discard: "취소",
   },
@@ -343,6 +345,7 @@ export default {
     changedBeforeDelete: "이 덱이 다른 곳에서 변경되었습니다. 삭제하기 전에 다시 불러오세요.",
     reload: "저장된 덱 다시 불러오기",
     deleteTitle: "게스트 덱을 삭제할까요?",
+    cancelDelete: "게스트 덱 삭제를 취소할까요?",
     deleteBody: "이 기기에서 덱이 제거됩니다.",
   },
   addDeck: {
@@ -384,6 +387,7 @@ export default {
     signInUpgrade: "로그인 후 Pro로 업그레이드",
     proSubscription: "Pro는 계정의 구독 상품입니다 · 덱 {{limit}}개",
     replaceTitle: "로컬 덱을 교체할까요?",
+    cancelReplace: "로컬 덱 교체를 취소할까요?",
     replaceBody: "{{name}}이(가) 교체됩니다.",
     replaceSelectedBody: "선택한 덱이 교체됩니다.",
     replace: "교체",

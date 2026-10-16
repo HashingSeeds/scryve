@@ -298,7 +298,12 @@ export default {
     anotherSeat: "Autre place",
     closeLayout: "Fermer le choix de disposition",
     failedAction: {
-      life: "Un changement de {{counter}} de {{delta}} n'a pas pu être synchronisé",
+      life: {
+        none: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
+        mtg: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
+        ygo: "Impossible de synchroniser la modification de {{delta}} Life Points",
+        pokemon: "Une modification de {{delta}} cartes Récompense n'a pas pu être synchronisée",
+      },
       commanderDamage:
         "Une attribution de {{delta}} dégâts de commandant n'a pas pu être synchronisée",
       table: "Un changement de table n'a pas pu être synchronisé",
@@ -443,6 +448,30 @@ export default {
     joining: "Connexion…",
     join: "Rejoindre la partie",
   },
+  treachery: {
+    name: "Treachery",
+    roles: {
+      leader: "Chef",
+      guardian: "Gardien",
+      assassin: "Assassin",
+      traitor: "Traître",
+    },
+    goals: {
+      leader: "Gagnez une fois tous les Assassins et Traîtres éliminés.",
+      guardian: "Gardez le Chef en vie. Vous gagnez avec lui.",
+      assassin: "Gagnez quand le Chef est éliminé.",
+      traitor: "Soyez le dernier joueur en lice.",
+    },
+    revealFailed: "Impossible de révéler votre rôle",
+    hideRole: "Masquer votre rôle",
+    faceUp: "Face visible pour la table.",
+    hiddenOffline: "Caché pour la table. Reconnectez-vous pour le révéler.",
+    hidden: "Caché pour la table.",
+    hide: "Masquer",
+    revealing: "Révélation…",
+    revealConfirm: "Révéler à tous ?",
+    reveal: "Révéler",
+  },
   nearby: {
     title: "Parties à proximité",
     hosting: "Hébergement de {{name}}",
@@ -469,6 +498,13 @@ export default {
       hostFailed: "Impossible d'héberger : {{error}}",
       unreachable: "{{name}} est injoignable. La partie est peut-être terminée.",
       lostHost: "Hôte perdu. La partie est peut-être terminée.",
+    },
+    rejected: {
+      seatTaken: "Cette place appartient à un autre appareil.",
+      started: "Cette partie a déjà commencé.",
+      full: "Cette partie est complète.",
+      update: "Mettez à jour Scryve pour rejoindre cette partie.",
+      hostOutdated: "L’hôte doit d’abord mettre à jour Scryve.",
     },
   },
 } satisfies LocaleNamespace

@@ -23,7 +23,7 @@ it.each([
     const view = render(
       <ThemeProvider initialContext="dark">
         <FloatingAppNavigation
-          destinationLabel="Decks"
+          destination="decks"
           onDestination={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
@@ -42,7 +42,7 @@ describe("FloatingAppNavigation", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <FloatingAppNavigation
-          destinationLabel="Return to game"
+          destination="returnToGame"
           onDestination={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}

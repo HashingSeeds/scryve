@@ -6,6 +6,7 @@ export default {
   saving: "保存中…",
   deleting: "削除中…",
   hiddenNameWarning: "他のプレイヤーには代わりに「{{hiddenName}}」と表示されます。",
+  numberedVersion: "バージョン {{number}}",
   record: {
     noGames: "対戦記録なし",
     winRate: "{{games}}中{{percent}}%",
@@ -125,6 +126,7 @@ export default {
     deleteDeckTitle: "このデッキを削除しますか?",
     keepEditing: "編集を続ける",
     discardTitle: "変更を破棄しますか?",
+    cancelDiscard: "変更の破棄をキャンセルしますか?",
     discardBody: "編集内容は失われます。",
     discard: "破棄",
   },
@@ -352,6 +354,7 @@ export default {
       "このデッキは別の場所で変更されました。削除する前に再読み込みしてください。",
     reload: "保存済みのデッキを再読み込み",
     deleteTitle: "ゲストデッキを削除しますか？",
+    cancelDelete: "ゲストデッキの削除をキャンセルしますか?",
     deleteBody: "このデッキはこの端末から削除されます。",
   },
   addDeck: {
@@ -394,6 +397,7 @@ export default {
     signInUpgrade: "サインインしてProにアップグレード",
     proSubscription: "Proはアカウントのサブスクリプションです · {{limit}}デッキ",
     replaceTitle: "ローカルデッキを置き換えますか?",
+    cancelReplace: "ローカルデッキの置き換えをキャンセルしますか?",
     replaceBody: "{{name}}が置き換えられます。",
     replaceSelectedBody: "選択したデッキが置き換えられます。",
     replace: "置き換える",

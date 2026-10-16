@@ -1,5 +1,6 @@
 import { translate } from "@/i18n/translate"
 
+import { versionLabel } from "../../../convex/lib/deckVersions"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "../../../convex/lib/nameFilter"
 
 export type DeckRecord = {
@@ -12,6 +13,12 @@ export type DeckRecord = {
 
 export function cardCountLabel(quantity: number) {
   return translate("decks:cardCount", { count: quantity })
+}
+
+export function deckVersionLabel(version: { name?: string; versionNumber: number }) {
+  return version.name?.trim()
+    ? versionLabel(version)
+    : translate("decks:numberedVersion", { number: version.versionNumber })
 }
 
 export function deckNameWarning(name: string) {

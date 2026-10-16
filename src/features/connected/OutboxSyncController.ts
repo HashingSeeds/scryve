@@ -17,6 +17,7 @@ import {
 import type { DeviceId, LifeDelta } from "@/features/game/types"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { translate } from "@/i18n/translate"
+import { convexErrorMessage } from "@/utils/convexError"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import type { DrainOutboxSnapshot, OutboxAcknowledgement } from "./drainOutbox"
@@ -431,8 +432,10 @@ export class OutboxSyncController {
       await submit()
       return true
     } catch (cause) {
-      this.finishError =
-        cause instanceof Error ? cause.message : translate(`connected:outbox.${action}.failed`)
+      this.finishError = convexErrorMessage(
+        cause,
+        cause instanceof Error ? cause.message : translate(`connected:outbox.${action}.failed`),
+      )
       return false
     } finally {
       this.finishing = false

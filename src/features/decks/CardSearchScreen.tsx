@@ -22,6 +22,7 @@ import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -34,11 +35,9 @@ import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
 import { api } from "../../../convex/_generated/api"
-import { deckSections } from "../../../convex/lib/deckGames"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
-const COMMANDER_TITLE = "Commander"
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 
@@ -67,7 +66,7 @@ export function CardSearchScreen({
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const connection = useConvexConnectionState()
   const { themed, theme } = useAppTheme()
-  const sections = deckSections(game, format)
+  const sections = localizedDeckSections(game, format)
   const [section, setSection] = useState(
     initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
@@ -405,7 +404,9 @@ export function CardSearchScreen({
         contentContainerStyle={$screen}
       >
         <Header
-          title={choosingCommander ? COMMANDER_TITLE : translate("decks:cardSearch.title")}
+          title={translate(
+            choosingCommander ? "systems:section.commander" : "decks:cardSearch.title",
+          )}
           leftTx="common:back"
           onLeftPress={onClose}
           rightTx="common:done"
@@ -427,6 +428,7 @@ export function CardSearchScreen({
           {initialSection !== "commander" ? (
             <SelectField
               label={translate("decks:cardSearch.addTo")}
+              field="addTo"
               options={sections}
               value={section}
               onSelect={(value) => {

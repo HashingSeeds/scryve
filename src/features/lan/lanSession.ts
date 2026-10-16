@@ -19,6 +19,7 @@ import {
   LAN_PROTOCOL,
   lanLobbyOf,
   lanProjection,
+  lanRejectionMessage,
   lanSeatsReady,
   parseGuestMessage,
   parseHostMessage,
@@ -378,7 +379,9 @@ export class LanSession {
       this.leave()
       return this.set({
         error:
-          message.type === "rejected" ? message.reason : "The host needs to update Scryve first.",
+          message.type === "rejected"
+            ? lanRejectionMessage(message.reason)
+            : translate("connected:nearby.rejected.hostOutdated"),
       })
     }
     if (message.type === "welcome") {

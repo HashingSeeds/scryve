@@ -155,6 +155,7 @@ export default {
       draw: "Égalité",
     },
     failed: "Impossible de terminer ce match.",
+    noFinishedGame: "Ce match n'a aucune partie terminée à clore.",
     cancel: "Annuler la fin du match",
     title: "Résultat du match",
     playerResult: "Résultat du match de {{name}}",
@@ -162,6 +163,17 @@ export default {
     drawRemainingHint:
       "Déclare une égalité pour chaque place encore en jeu et une défaite pour les places éliminées",
     end: "Terminer le match",
+    scoreErrors: {
+      gamesWonRange:
+        "Les parties gagnées doivent être comprises entre 0 et {{max}} dans un match en {{bestOf}} manches gagnantes",
+      gamesDrawnRange: "Les parties nulles doivent être comprises entre 0 et {{max}}",
+      tooManyWins: "Un match au meilleur des {{bestOf}} ne peut pas avoir {{wins}} victoires",
+      partialScore: "Saisissez les parties gagnées pour chaque place ou laissez le score vide",
+      oneWinner: "Un match ne peut avoir qu'un seul vainqueur",
+      needsWinner: "Un match doit avoir un vainqueur, sauf s'il est nul",
+      winnerLeads: "Le vainqueur doit avoir le plus de parties gagnées",
+      leaderWins: "La place avec le plus de parties gagnées doit être le vainqueur",
+    },
   },
   claim: {
     matchStanding: "Au meilleur de {{bestOf}} · {{score}}",
@@ -326,12 +338,6 @@ export default {
     showOverviewFor: "Afficher les dégâts de commandant de {{identity}}",
     expandsGrid: "Développe la grille des dégâts de commandant",
   },
-  tableItem: {
-    poison: "Poison",
-    commanderTax: "Taxe du commandant",
-    monarch: "Monarque",
-    initiative: "Initiative",
-  },
   outReason: {
     commanderDamage: "dégâts de commandant",
     poison: "poison",
@@ -374,15 +380,15 @@ export default {
     hint: {
       none: "Touchez pour changer les points de vie de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
       mtg: "Touchez pour changer les points de vie de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
-      ygo: "Touchez pour changer les Life Points de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
+      ygo: "Touchez pour modifier les Life Points de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
       pokemon:
-        "Touchez pour changer les cartes Récompense de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
+        "Touchez pour modifier les cartes Récompense de {{identity}} de {{delta}}. Appui long pour plus d'options.",
     },
     moreControls: {
       none: "{{identity}}, plus de commandes de points de vie",
       mtg: "{{identity}}, plus de commandes de points de vie",
       ygo: "{{identity}}, plus de commandes de Life Points",
-      pokemon: "{{identity}}, plus de commandes de cartes Récompense",
+      pokemon: "{{identity}}, plus d'options de cartes Récompense",
     },
   },
   grid: {
@@ -393,12 +399,12 @@ export default {
       mtg_one: "Grille de points de vie pour {{count}} joueur",
       mtg_many: "Grille de points de vie pour {{count}} de joueurs",
       mtg_other: "Grille de points de vie pour {{count}} joueurs",
-      ygo_one: "Grille de Life Points pour {{count}} joueur",
-      ygo_many: "Grille de Life Points pour {{count}} de joueurs",
-      ygo_other: "Grille de Life Points pour {{count}} joueurs",
-      pokemon_one: "Grille de cartes Récompense pour {{count}} joueur",
-      pokemon_many: "Grille de cartes Récompense pour {{count}} de joueurs",
-      pokemon_other: "Grille de cartes Récompense pour {{count}} joueurs",
+      ygo_one: "Grille des Life Points : {{count}} joueur",
+      ygo_many: "Grille des Life Points : {{count}} de joueurs",
+      ygo_other: "Grille des Life Points : {{count}} joueurs",
+      pokemon_one: "Grille des cartes Récompense de {{count}} joueur",
+      pokemon_many: "Grille des cartes Récompense de {{count}} de joueurs",
+      pokemon_other: "Grille des cartes Récompense de {{count}} joueurs",
     },
   },
   pokemonSheet: {
@@ -483,20 +489,20 @@ export default {
     slider: {
       none: "Changement de vie de {{name}}",
       mtg: "Changement de vie de {{name}}",
-      ygo: "Changement des Life Points de {{name}}",
-      pokemon: "Changement des cartes Prize de {{name}}",
+      ygo: "Modification des Life Points de {{name}}",
+      pokemon: "Modification des cartes Récompense de {{name}}",
     },
     add: {
       none: "Ajouter {{amount}} de vie",
       mtg: "Ajouter {{amount}} de vie",
       ygo: "Ajouter {{amount}} Life Points",
-      pokemon: "Ajouter {{amount}} cartes Prize",
+      pokemon: "Ajouter {{amount}} cartes Récompense",
     },
     subtract: {
       none: "Retirer {{amount}} de vie",
       mtg: "Retirer {{amount}} de vie",
       ygo: "Retirer {{amount}} Life Points",
-      pokemon: "Retirer {{amount}} cartes Prize",
+      pokemon: "Retirer {{amount}} cartes Récompense",
     },
   },
 } satisfies LocaleNamespace

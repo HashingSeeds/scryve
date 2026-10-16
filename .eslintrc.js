@@ -120,7 +120,7 @@ module.exports = {
       plugins: ["i18next"],
       rules: {
         "i18next/no-literal-string": [
-          "warn",
+          "error",
           {
             "mode": "jsx-only",
             "should-validate-template": true,

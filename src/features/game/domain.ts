@@ -8,6 +8,7 @@ import {
   playSystemFormat,
   playSystemRules,
   playTableRules,
+  startingValueRangeMessage,
   type PlaySystemId,
 } from "./playSystems"
 import { isRoundClockSetup, startRoundClock, type RoundClockSetup } from "./roundClock"
@@ -135,9 +136,7 @@ export function createLocalGame(input: {
     throw new Error("A local game requires 2–6 players.")
   }
   if (!validateStartingLife(input.startingLife, system)) {
-    throw new Error(
-      `Starting ${counter.label} must be a whole number from 1 to ${counter.maxStartingValue}.`,
-    )
+    throw new Error(startingValueRangeMessage(system))
   }
   if (!isLifeDelta(lifeStep) || lifeStep < 1)
     throw new Error("Life step must be a positive whole number.")

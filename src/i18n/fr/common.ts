@@ -32,17 +32,30 @@ export default {
     play: "Jouer",
     backToLobby: "Retour au lobby",
   },
-  confirmDialog: {
-    cancelAction: "Annuler : {{action}}",
-  },
   retryableError: {
     retryingIn: "Nouvel essai dans {{seconds}} s",
   },
   selectField: {
     none: "Aucun",
     triggerLabel: "{{label}}, {{value}}",
-    openHint: "Ouvre les choix pour {{label}}",
-    closeLabel: "Fermer les choix pour {{label}}",
+    openHint: {
+      format: "Ouvre les choix de format",
+      commanderColor: "Ouvre les choix de couleur du commandant",
+      addTo: "Ouvre les choix d'ajout à",
+      changeBy: "Ouvre les choix de modification par",
+      thisIsMe: "Ouvre les choix de « C'est moi »",
+      yourDeck: "Ouvre les choix de votre deck",
+      system: "Ouvre les choix de système",
+    },
+    closeLabel: {
+      format: "Fermer les choix de format",
+      commanderColor: "Fermer les choix de couleur du commandant",
+      addTo: "Fermer les choix d'ajout à",
+      changeBy: "Fermer les choix de modification par",
+      thisIsMe: "Fermer les choix de « C'est moi »",
+      yourDeck: "Fermer les choix de votre deck",
+      system: "Fermer les choix de système",
+    },
   },
   valueField: {
     readoutLabel: "{{label}}, {{value}}",
