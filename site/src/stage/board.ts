@@ -116,7 +116,6 @@ function fitDeltas(root: Element) {
   }
 }
 
-// why: the demo seats only ever draw the free marks, so it mirrors those and not the Pro ones.
 type SiteMarkShape = Exclude<PlayerMarkShape, ProMarkShape>
 
 export function seatColor(seat: number): string {

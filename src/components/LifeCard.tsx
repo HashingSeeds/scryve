@@ -883,7 +883,6 @@ const CONTENT_RIGHT_EDGE = {
 
 const CONTENT_TOP_EDGE = { 0: "top", 180: "bottom", 90: "right", [-90]: "left" } as const
 
-/** why: a Pro mark's oversized copy bleeds off the corner diagonally opposite the name, so it reads as the seat's own without sitting behind the life total. */
 export function proWatermarkPlacement(
   rotation: LifeCardContentRotation,
   cardSize: { width: number; height: number },

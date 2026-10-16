@@ -18,7 +18,6 @@ function colorSlug(color: string) {
   return color.replace("#", "").toLowerCase()
 }
 
-/** why: a free player's tap on a Pro mark should open Pro instead of doing nothing, so locked marks stay pressable and call `onLockedPress`. */
 export function AppearancePicker({
   value,
   taken = [],

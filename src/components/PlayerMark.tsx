@@ -251,7 +251,6 @@ function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string })
   )
 }
 
-// why: crown and bolt get their rounded corners from a stroke in the fill's own paint.
 const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const
 
 /** why: a sword inset over the eye's or key's hole would vanish into the card, so `solid` fills the holes. */
