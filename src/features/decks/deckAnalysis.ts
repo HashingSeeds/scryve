@@ -108,19 +108,24 @@ export function karstenCheapSpell(details: AnalysisDetails) {
   return undefined
 }
 
-export function landColors(details: AnalysisDetails, basicColors: ReadonlySet<ManaColor>) {
+function typeColors(text: string) {
+  return Object.entries(BASIC_TYPES).flatMap(([type, color]) =>
+    new RegExp(`\\b${type}\\b`).test(text) ? [color] : [],
+  )
+}
+
+export function landColors(
+  details: AnalysisDetails,
+  fetchable: { basic: ReadonlySet<ManaColor>; typed: ReadonlySet<ManaColor> },
+) {
   const text = details.oracleText ?? ""
-  const typeLine = details.typeLine ?? ""
   if (/mana of any (color|type)|any one color/i.test(text)) return new Set(MANA_COLORS)
-  const found = new Set<ManaColor>()
-  for (const [type, color] of Object.entries(BASIC_TYPES))
-    if (new RegExp(`\\b${type}\\b`).test(typeLine)) found.add(color)
+  const found = new Set(typeColors(details.typeLine ?? ""))
   for (const clause of text.matchAll(/\badd ([^.]*)/gi))
     for (const color of colorsIn(clause[1])) found.add(color)
   for (const clause of text.matchAll(/search your library for ([^.]*)/gi)) {
-    for (const [type, color] of Object.entries(BASIC_TYPES))
-      if (new RegExp(`\\b${type}\\b`).test(clause[1])) found.add(color)
-    if (/\bbasic land\b/i.test(clause[1])) for (const color of basicColors) found.add(color)
+    for (const color of typeColors(clause[1])) if (fetchable.typed.has(color)) found.add(color)
+    if (/\bbasic land\b/i.test(clause[1])) for (const color of fetchable.basic) found.add(color)
   }
   return found
 }
@@ -214,21 +219,25 @@ export function analyzeDeck({
     if (cheap === "draw") cheapDraw += quantity
   }
 
-  const basicColors = new Set(
-    known.flatMap(({ info }) =>
-      /\bBasic\b/.test(info.typeLine ?? "")
-        ? Object.entries(BASIC_TYPES).flatMap(([type, color]) =>
-            new RegExp(`\\b${type}\\b`).test(info.typeLine ?? "") ? [color] : [],
-          )
+  const landFaces = known.flatMap(({ quantity, info }) =>
+    isLand(info)
+      ? [{ quantity, face: info }]
+      : isModalLand(info)
+        ? [{ quantity, face: readCardFaces(info.faceDetails)[1] ?? info }]
         : [],
-    ),
   )
-  const sources = new Map<ManaColor, number>()
-  for (const { quantity, info } of known) {
-    if (!isLand(info)) continue
-    for (const color of landColors(info, basicColors))
-      sources.set(color, (sources.get(color) ?? 0) + quantity)
+  const fetchable = {
+    basic: new Set(
+      landFaces.flatMap(({ face }) =>
+        /\bBasic\b/.test(face.typeLine ?? "") ? typeColors(face.typeLine ?? "") : [],
+      ),
+    ),
+    typed: new Set(landFaces.flatMap(({ face }) => typeColors(face.typeLine ?? ""))),
   }
+  const sources = new Map<ManaColor, number>()
+  for (const { quantity, face } of landFaces)
+    for (const color of landColors(face, fetchable))
+      sources.set(color, (sources.get(color) ?? 0) + quantity)
 
   const averageManaValue = spells > 0 ? totalValue / spells : 0
   const library = played.reduce(

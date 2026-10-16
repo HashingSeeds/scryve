@@ -45,8 +45,8 @@ describe("manaValue", () => {
 })
 
 describe("landColors", () => {
-  it("reads basic types, Add clauses, any-color text, and fetchable basics", () => {
-    const basics = new Set(["G", "U"] as const)
+  it("reads basic types, Add clauses, any-color text, and fetchable lands", () => {
+    const basics = { basic: new Set(["G", "U"] as const), typed: new Set(["G", "U"] as const) }
     expect([...landColors({ typeLine: "Land — Plains Island", oracleText: "" }, basics)]).toEqual([
       "W",
       "U",
@@ -67,6 +67,16 @@ describe("landColors", () => {
         basics,
       ),
     ]).toEqual(["G", "U"])
+    expect([
+      ...landColors(
+        {
+          typeLine: "Land",
+          oracleText:
+            "{T}, Pay 1 life, Sacrifice this land: Search your library for a Plains or Island card, put it onto the battlefield, then shuffle.",
+        },
+        basics,
+      ),
+    ]).toEqual(["U"])
   })
 })
 
@@ -233,7 +243,7 @@ describe("analyzeDeck", () => {
       ramp: 4,
       curve: [0, 4, 30, 0, 0, 0, 0, 1],
       colors: [
-        { color: "W", pips: 3, sources: 0 },
+        { color: "W", pips: 3, sources: 1 },
         { color: "G", pips: 34, sources: 24 },
       ],
       onThePlay: true,
