@@ -208,7 +208,7 @@ export class LanSession {
     }
   }
 
-  // why: guests only ever need the latest snapshot, so one flush covers every change since the last; an idle host sends at once instead of waiting out a window.
+  // why: guests only ever need the latest snapshot, so one flush covers every change since the last.
   private publish(game: LanGame) {
     this.state = { ...this.state, game }
     const wait = Math.max(0, this.flushedAt + FLUSH_INTERVAL_MS - Date.now())
