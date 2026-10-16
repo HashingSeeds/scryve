@@ -26,9 +26,8 @@ import {
 } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 
-import { isPlayerMarkShape } from "../../../convex/lib/appearance"
-
 import { SeedError, type SeedParams } from "./seedTypes"
+import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
 function integer(name: string, value: string): number {
   const parsed = Number(value)
