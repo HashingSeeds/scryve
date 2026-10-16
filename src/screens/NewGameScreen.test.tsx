@@ -2,6 +2,7 @@ import { Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
+import * as authAccess from "@/features/auth/AuthContext"
 import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
 import {
   ConnectedProfileProvider,
@@ -109,6 +110,7 @@ describe("NewGameScreen", () => {
     resetConnectedHarness()
     resetConnectedProfileBootstrapForTests()
   })
+  afterEach(() => jest.restoreAllMocks())
 
   it("keeps arriving games out of the setup form until requested", () => {
     const props = {
@@ -480,6 +482,38 @@ describe("NewGameScreen", () => {
       "Ada",
       "Player 2",
     ])
+  })
+
+  it("keeps saved Pro marks while billing is unknown and sends a signed-out Pro tap to sign-in", () => {
+    const openAuth = jest.fn()
+    jest.spyOn(authAccess, "useAuthAccess").mockReturnValue({
+      configured: true,
+      isLoaded: true,
+      isSignedIn: false,
+      authVisible: false,
+      openAuth,
+      closeAuth: jest.fn(),
+    })
+    const onStartLocal = jest.fn()
+    const game = createLocalGame({
+      players: [
+        { name: "Ada", color: "#B85636", shape: "crown" },
+        { name: "Grace", color: "#41476E" },
+      ],
+      startingLife: 20,
+    })
+    const view = setup({ initialGame: game, onStartLocal })
+
+    fireEvent.press(view.getByTestId("player-appearance-2"))
+    fireEvent.press(view.getByTestId("appearance-shape-moon"))
+    expect(openAuth).toHaveBeenCalledTimes(1)
+    expect(view.queryByTestId("local-appearance-dialog")).toBeNull()
+
+    fireEvent.press(view.getByTestId("player-appearance-1"))
+    expect(view.getByTestId("appearance-shape-crown")).toHaveProp("accessibilityState", {
+      selected: true,
+      disabled: false,
+    })
   })
 
   it("edits a local player's color and mark from the mark beside their name", () => {

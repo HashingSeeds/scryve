@@ -22,6 +22,7 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
 import type { NextPageState } from "@/features/async/remoteState"
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
@@ -214,10 +215,13 @@ export function NewGameScreen({
         shapeForSeat(index + 1, initialGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
     })),
   )
+  const auth = useAuthAccess()
   const billing = useRevenueCat()
+  // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade.
+  const confirmedFree = billing.customerInfo !== null && !billing.isCountPro
   const seatAppearances = useMemo(
-    () => (billing.isCountPro ? appearances : withoutProMarks(appearances)),
-    [appearances, billing.isCountPro],
+    () => (confirmedFree ? withoutProMarks(appearances) : appearances),
+    [appearances, confirmedFree],
   )
   // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
   const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
@@ -485,7 +489,7 @@ export function NewGameScreen({
             preferred: current[index],
             taken: next.slice(0, index),
             seat: index + 1,
-            shapes: billing.isCountPro ? [...PLAYER_MARK_SHAPES, ...PRO_MARK_SHAPES] : undefined,
+            shapes: confirmedFree ? undefined : [...PLAYER_MARK_SHAPES, ...PRO_MARK_SHAPES],
           })
         return next
       })
@@ -515,7 +519,10 @@ export function NewGameScreen({
   }
 
   function openPaywall() {
-    if (Platform.OS === "ios") setPaywall("waitingForDismiss")
+    if (!auth.isSignedIn) {
+      closeAppearancePicker()
+      auth.openAuth()
+    } else if (Platform.OS === "ios") setPaywall("waitingForDismiss")
     else void presentPaywall()
   }
 
