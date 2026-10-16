@@ -387,11 +387,11 @@ function LifeTrail({
   // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
   while (count > 0 && !fits(count)) count--
   const shown = changes.slice(changes.length - count)
-  const item = (text: string, style: TextStyle, weight?: "bold") => (
+  const item = (text: string, style: TextStyle, bold = false) => (
     <Text
       text={text}
       size="xxs"
-      weight={weight}
+      weight={bold ? "bold" : undefined}
       numberOfLines={1}
       maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
       style={[{ color: ink }, style]}
@@ -410,7 +410,7 @@ function LifeTrail({
       {shown.map(({ id, delta, from }) => (
         <Fragment key={id}>
           {item(String(from), $trailTotal)}
-          {item(signed(delta), { ...$trailText, color: delta < 0 ? damage : gain }, "bold")}
+          {item(signed(delta), { ...$trailText, color: delta < 0 ? damage : gain }, true)}
         </Fragment>
       ))}
       {showTotal && width > 0 ? item(total, $trailText) : null}
