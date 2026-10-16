@@ -79,8 +79,8 @@ async function parityGame(
   }
   const clients = { host, joiner }
   const actors = {
-    host: { userId: hostRow.userId!, deviceId: HOST_DEVICE, isHost: true },
-    joiner: { userId: joinerRow.userId!, deviceId: JOINER_DEVICE, isHost: false },
+    host: { userId: hostRow.userId!, isHost: true },
+    joiner: { userId: joinerRow.userId!, isHost: false },
   }
   const publicId = created.publicId
 
@@ -262,6 +262,7 @@ describe("engine parity: changeLife", () => {
     await game.write("host", life("bad", -1))
     await game.write("host", { ...life("life-operation-0004", -1), deviceId: "x" })
     await game.write("host", { ...life("life-operation-0005", -1), clientCreatedAt: -1 })
+    await game.write("host", { ...life("life-operation-0006", -1), deviceId: "device-other-0003" })
     await game.expectSameState()
   })
 
@@ -339,6 +340,7 @@ describe("engine parity: tableAction", () => {
     )
     await game.write("joiner", table("table-poison-00002", poison, JOINER_DEVICE))
     await game.write("host", table("table-unknown-0001", { ...poison, counterId: "nope" }))
+    await game.write("host", table("table-other-device-1", poison, "device-other-0003"))
     await game.expectSameState()
   })
 

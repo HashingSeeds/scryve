@@ -99,10 +99,11 @@ function commit(
 
 export function writeMemoryGame(
   game: MemoryGame,
-  actor: SeatActor,
+  identity: Omit<SeatActor, "deviceId">,
   write: MemoryWrite,
   now: number,
 ): MemoryWriteResult {
+  const actor: SeatActor = { ...identity, deviceId: write.deviceId }
   const actorUserId = actor.userId
   if (write.kind === "life") {
     const request = { ...write, actorUserId }
