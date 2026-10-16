@@ -66,8 +66,13 @@ describe("shipping Maestro selectors", () => {
         }),
       ),
     )
-    for (const node of setup.UNSAFE_root.findAll((node) => typeof node.props.testID === "string"))
-      mountedIds.add(node.props.testID)
+    const rememberSetupIds = () => {
+      for (const node of setup.UNSAFE_root.findAll((node) => typeof node.props.testID === "string"))
+        mountedIds.add(node.props.testID)
+    }
+    rememberSetupIds()
+    fireEvent.press(setup.getByTestId("setup-change-button"))
+    rememberSetupIds()
     setup.unmount()
 
     localGameRepository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, defaultPlayerCount: 6 })

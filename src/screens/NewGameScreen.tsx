@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
+import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import {
   $dialogActions,
@@ -36,6 +37,14 @@ import {
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
+import {
+  FEATURED_GAME_TYPES,
+  gameTypeId,
+  gameTypeLabel,
+  isFeaturedGameType,
+  MORE_GAME_TYPES,
+  type GameType,
+} from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
@@ -45,13 +54,12 @@ import {
 } from "@/features/game/playerLayouts"
 import {
   counterHeading,
+  counterValueLabel,
   defaultStartingLife,
-  isPlaySystemId,
   NO_PLAY_SYSTEM,
-  playFormatOptions,
-  playSystemChoices,
   playSystemFormat,
   playSystemRules,
+  playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type { ConnectedSetup } from "@/features/game/recentSetups"
@@ -269,7 +277,8 @@ export function NewGameScreen({
   const [chosenClockMinutes, setChosenClockMinutes] = useState(
     initialClock?.mode === "countdown" ? initialClock.minutes : undefined,
   )
-  const [showOptions, setShowOptions] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [showAllFormats, setShowAllFormats] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
   const [playerSaveError, setPlayerSaveError] = useState<string>()
@@ -313,6 +322,27 @@ export function NewGameScreen({
       : clockMode === "countdown"
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
+  const selectedTypeId = gameTypeId(system, format, treachery)
+  const allFormatsShown = showAllFormats || !isFeaturedGameType(selectedTypeId)
+  const setupSummary = [
+    connectedMode
+      ? translate("play:newGame.seatsCount", { count: playerCount })
+      : translate("play:summary.playerCount", { count: playerCount }),
+    counterValueLabel(system, startingLife),
+    ...(connectedMode
+      ? [translate(deckRequired ? "play:newGame.decksRequired" : "play:newGame.decksOptional")]
+      : []),
+    ...(!connectedMode && !localGame && matchBestOf
+      ? [translate("play:newGame.bestOfCount", { bestOf: matchBestOf })]
+      : []),
+    ...(!connectedMode && !localGame && clockSetup
+      ? [
+          clockSetup.mode === "countdown"
+            ? translate("play:newGame.clockMinutes", { minutes: clockSetup.minutes })
+            : translate("play:newGame.clockStopwatch"),
+        ]
+      : []),
+  ].join(" · ")
   const matchLocked = Boolean(
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
   )
@@ -416,22 +446,34 @@ export function NewGameScreen({
     setChosenBestOf(undefined)
   }
 
-  function chooseSystem(value: string) {
-    const next = isPlaySystemId(value) ? value : undefined
-    const nextCounter = playSystemRules(next).counter
-    setSystem(next)
-    setTreacheryChosen(false)
-    setFormat(next ? playSystemFormat(next) : undefined)
-    setStartingLife(defaultStartingLife(next, undefined, playerCount))
-    setLifeStep(nextCounter.tapStep)
-    setDeck(undefined)
+  function chooseGameType(type: GameType) {
+    const nextTreachery = type.variant === "treachery"
+    const nextCount =
+      nextTreachery && !isTreacheryPlayerCount(playerCount) ? TREACHERY_MIN_SEATS : playerCount
+    if (type.system !== system) {
+      setSystem(type.system)
+      setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
+      setLifeStep(playSystemRules(type.system).counter.tapStep)
+    } else if (startingLife === defaultStartingLife(system, format, playerCount))
+      setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
+    if (type.system !== system || type.format !== format) {
+      setFormat(type.format)
+      setDeck(undefined)
+    }
+    setTreacheryChosen(nextTreachery)
+    if (nextCount !== playerCount) resizeSeats(nextCount)
   }
 
-  function chooseFormat(value: string | undefined) {
-    if (startingLife === defaultStartingLife(system, format, playerCount))
-      setStartingLife(defaultStartingLife(system, value, playerCount))
-    setFormat(value)
-    setDeck(undefined)
+  function gameTypeDetail(type: GameType) {
+    if (type.variant === "treachery" && !connectedMode)
+      return translate("play:newGame.connectedOnly")
+    const seats =
+      type.variant === "treachery" ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount
+    const life = counterValueLabel(
+      type.system,
+      defaultStartingLife(type.system, type.format, seats),
+    )
+    return type.system ? `${playSystemShortLabel(type.system)} · ${life}` : life
   }
 
   // why: only the seat and deck pickers may claim a game; a rename must not move it to whoever is signed in now.
@@ -485,13 +527,14 @@ export function NewGameScreen({
     if (exited) setGameToExit(undefined)
   }
 
-  function chooseTreachery(on: boolean) {
-    setTreacheryChosen(on)
-    if (on && !isTreacheryPlayerCount(playerCount)) choosePlayerCount(TREACHERY_MIN_SEATS)
-  }
-
   function choosePlayerCount(value: number) {
     if (!isTreacheryPlayerCount(value)) setTreacheryChosen(false)
+    if (startingLife === defaultStartingLife(system, format, playerCount))
+      setStartingLife(defaultStartingLife(system, format, value))
+    resizeSeats(value)
+  }
+
+  function resizeSeats(value: number) {
     if (value > playerCount)
       setAppearances((current) => {
         const next = confirmedFree ? withoutProMarks(current) : [...current]
@@ -504,8 +547,6 @@ export function NewGameScreen({
           })
         return next
       })
-    if (startingLife === defaultStartingLife(system, format, playerCount))
-      setStartingLife(defaultStartingLife(system, format, value))
     setPlayerCount(value)
     setLayout((current) => playerGridLayoutForCount(value, current))
   }
@@ -588,175 +629,39 @@ export function NewGameScreen({
               />
             </View>
           ) : null}
-          <View style={themed($section)}>
-            <Text tx="play:newGame.system" preset="subheading" accessibilityRole="header" />
-            <SegmentedControl
-              testID="play-system"
-              accessibilityLabel={translate("play:newGame.gameSystem")}
-              segments={playSystemChoices()}
-              selectedId={system ?? NO_PLAY_SYSTEM}
-              onSelect={chooseSystem}
+          <View style={themed($gameTypes)}>
+            {[...FEATURED_GAME_TYPES, ...(allFormatsShown ? MORE_GAME_TYPES : [])].map((type) => (
+              <ChoiceButton
+                key={type.id}
+                testID={`game-type-${type.id}`}
+                text={gameTypeLabel(type)}
+                detail={gameTypeDetail(type)}
+                selected={type.id === selectedTypeId}
+                disabled={type.variant === "treachery" && !connectedMode}
+                onPress={() => chooseGameType(type)}
+              />
+            ))}
+            {allFormatsShown ? null : (
+              <ChoiceButton
+                testID="game-type-all-formats"
+                tx="play:newGame.allFormats"
+                detail={translate("play:newGame.moreFormats", { count: MORE_GAME_TYPES.length })}
+                selected={false}
+                accessibilityState={{ expanded: false }}
+                onPress={() => setShowAllFormats(true)}
+              />
+            )}
+          </View>
+
+          <View style={themed($summaryRow)}>
+            <Text size="xs" text={setupSummary} style={themed($summaryText)} />
+            <Button
+              testID="setup-change-button"
+              tx="play:newGame.change"
+              style={themed($changeButton)}
+              onPress={() => setOptionsOpen(true)}
             />
-            {system ? (
-              <SelectField
-                testID="play-format"
-                label={translate("play:newGame.format")}
-                field="format"
-                value={format}
-                options={playFormatOptions(system)}
-                onSelect={chooseFormat}
-              />
-            ) : null}
-            {treacheryAvailable ? (
-              <SegmentedControl
-                testID="variant"
-                accessibilityLabel={translate("play:newGame.variant")}
-                segments={[
-                  { id: "standard", label: translate("play:newGame.variantStandard") },
-                  { id: "treachery", label: translate("connected:treachery.name") },
-                ]}
-                selectedId={treachery ? "treachery" : "standard"}
-                onSelect={(value) => chooseTreachery(value === "treachery")}
-              />
-            ) : null}
           </View>
-
-          <View style={themed($valueGrid)}>
-            <View style={themed($playerValue)}>
-              <ValueField
-                testID="player-count"
-                label={
-                  connectedMode
-                    ? translate("play:newGame.seats")
-                    : translate("play:newGame.players")
-                }
-                value={playerCount}
-                min={treachery ? TREACHERY_MIN_SEATS : PLAYER_COUNTS[0]}
-                max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
-                onChange={choosePlayerCount}
-              />
-            </View>
-            <View style={themed($counterValue)}>
-              <ValueField
-                testID="starting-counter"
-                label={counterHeading(system)}
-                value={startingLife}
-                min={1}
-                max={counter.maxStartingValue}
-                longStep={counter.longPressStep}
-                step={lifeStep}
-                onChange={setStartingLife}
-              />
-            </View>
-          </View>
-
-          {connectedMode ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="deck-requirement"
-                accessibilityLabel={translate("play:newGame.deckRequirement")}
-                segments={[
-                  { id: "optional", label: translate("play:newGame.optional") },
-                  { id: "required", label: translate("play:newGame.required") },
-                ]}
-                selectedId={deckRequired ? "required" : "optional"}
-                onSelect={(value) => setDeckRequired(value === "required")}
-              />
-            </View>
-          ) : null}
-
-          {!connectedMode && !localGame ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="match-mode"
-                accessibilityLabel={translate("play:newGame.match")}
-                segments={[
-                  { id: "off", label: translate("play:newGame.singleGame") },
-                  { id: "on", label: translate("play:newGame.bestOf") },
-                ]}
-                selectedId={matchBestOf ? "on" : "off"}
-                onSelect={(value) => toggleMatch(value === "on")}
-              />
-              {matchBestOf ? (
-                <SegmentedControl
-                  testID="match-best-of"
-                  accessibilityLabel={translate("play:newGame.bestOf")}
-                  segments={MATCH_BEST_OF.map((bestOf) => ({
-                    id: String(bestOf),
-                    label: translate("play:newGame.bestOfCount", { bestOf }),
-                  }))}
-                  selectedId={String(matchBestOf)}
-                  onSelect={(value) =>
-                    setChosenBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
-                  }
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          {!connectedMode && !localGame ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.clock" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="clock-mode"
-                accessibilityLabel={translate("play:newGame.clock")}
-                segments={CLOCK_MODES.map(({ id, labelTx }) => ({
-                  id,
-                  label: translate(labelTx),
-                }))}
-                selectedId={clockMode}
-                onSelect={(value) => {
-                  const mode = CLOCK_MODES.find(({ id }) => id === value)?.id
-                  if (mode) setClockMode(mode)
-                }}
-              />
-              {clockMode === "countdown" ? (
-                <ValueField
-                  testID="clock-minutes"
-                  label={translate("play:newGame.minutesLeft")}
-                  value={clockMinutes}
-                  min={ROUND_CLOCK_MINUTES.min}
-                  max={ROUND_CLOCK_MINUTES.max}
-                  longStep={ROUND_CLOCK_MINUTES.step}
-                  onChange={setChosenClockMinutes}
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          <Button
-            testID="setup-options"
-            tx={showOptions ? "play:newGame.hideOptions" : "play:newGame.showOptions"}
-            accessibilityState={{ expanded: showOptions }}
-            onPress={() => setShowOptions((value) => !value)}
-          />
-          {showOptions ? (
-            <View style={themed($statusDetails)}>
-              <View style={themed($section)}>
-                <SelectField
-                  testID="life-step"
-                  label={translate("play:newGame.changeBy")}
-                  field="changeBy"
-                  value={String(lifeStep)}
-                  options={LIFE_STEP_OPTIONS.map((step) => ({
-                    id: String(step),
-                    label: String(step),
-                  }))}
-                  onSelect={(value) => {
-                    const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
-                    if (next) setLifeStep(next)
-                  }}
-                />
-              </View>
-
-              <View style={themed($section)}>
-                <Text tx="play:newGame.layout" preset="subheading" accessibilityRole="header" />
-                <PlayerLayoutPicker playerCount={playerCount} value={layout} onChange={setLayout} />
-              </View>
-            </View>
-          ) : null}
 
           {!connectedMode ? (
             <View style={themed($section)}>
@@ -1007,6 +912,151 @@ export function NewGameScreen({
         </View>
       </>
       <DialogCard
+        visible={optionsOpen}
+        onClose={() => setOptionsOpen(false)}
+        placement="bottom"
+        wide
+        backdropTestID="setup-options-backdrop"
+        backdropAccessibilityLabel={translate("play:newGame.closeOptions")}
+        dialogTestID="setup-options-dialog"
+        accessibilityViewIsModal
+      >
+        <ScrollView contentContainerStyle={themed($statusDetails)}>
+          <View style={themed($valueGrid)}>
+            <View style={themed($playerValue)}>
+              <ValueField
+                testID="player-count"
+                label={
+                  connectedMode
+                    ? translate("play:newGame.seats")
+                    : translate("play:newGame.players")
+                }
+                value={playerCount}
+                min={treachery ? TREACHERY_MIN_SEATS : PLAYER_COUNTS[0]}
+                max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
+                onChange={choosePlayerCount}
+              />
+            </View>
+            <View style={themed($counterValue)}>
+              <ValueField
+                testID="starting-counter"
+                label={counterHeading(system)}
+                value={startingLife}
+                min={1}
+                max={counter.maxStartingValue}
+                longStep={counter.longPressStep}
+                step={lifeStep}
+                onChange={setStartingLife}
+              />
+            </View>
+          </View>
+
+          {connectedMode ? (
+            <View style={themed($section)}>
+              <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
+              <SegmentedControl
+                testID="deck-requirement"
+                accessibilityLabel={translate("play:newGame.deckRequirement")}
+                segments={[
+                  { id: "optional", label: translate("play:newGame.optional") },
+                  { id: "required", label: translate("play:newGame.required") },
+                ]}
+                selectedId={deckRequired ? "required" : "optional"}
+                onSelect={(value) => setDeckRequired(value === "required")}
+              />
+            </View>
+          ) : null}
+
+          {!connectedMode && !localGame ? (
+            <View style={themed($section)}>
+              <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
+              <SegmentedControl
+                testID="match-mode"
+                accessibilityLabel={translate("play:newGame.match")}
+                segments={[
+                  { id: "off", label: translate("play:newGame.singleGame") },
+                  { id: "on", label: translate("play:newGame.bestOf") },
+                ]}
+                selectedId={matchBestOf ? "on" : "off"}
+                onSelect={(value) => toggleMatch(value === "on")}
+              />
+              {matchBestOf ? (
+                <SegmentedControl
+                  testID="match-best-of"
+                  accessibilityLabel={translate("play:newGame.bestOf")}
+                  segments={MATCH_BEST_OF.map((bestOf) => ({
+                    id: String(bestOf),
+                    label: translate("play:newGame.bestOfCount", { bestOf }),
+                  }))}
+                  selectedId={String(matchBestOf)}
+                  onSelect={(value) =>
+                    setChosenBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
+                  }
+                />
+              ) : null}
+            </View>
+          ) : null}
+
+          {!connectedMode && !localGame ? (
+            <View style={themed($section)}>
+              <Text tx="play:newGame.clock" preset="subheading" accessibilityRole="header" />
+              <SegmentedControl
+                testID="clock-mode"
+                accessibilityLabel={translate("play:newGame.clock")}
+                segments={CLOCK_MODES.map(({ id, labelTx }) => ({
+                  id,
+                  label: translate(labelTx),
+                }))}
+                selectedId={clockMode}
+                onSelect={(value) => {
+                  const mode = CLOCK_MODES.find(({ id }) => id === value)?.id
+                  if (mode) setClockMode(mode)
+                }}
+              />
+              {clockMode === "countdown" ? (
+                <ValueField
+                  testID="clock-minutes"
+                  label={translate("play:newGame.minutesLeft")}
+                  value={clockMinutes}
+                  min={ROUND_CLOCK_MINUTES.min}
+                  max={ROUND_CLOCK_MINUTES.max}
+                  longStep={ROUND_CLOCK_MINUTES.step}
+                  onChange={setChosenClockMinutes}
+                />
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={themed($section)}>
+            <SelectField
+              testID="life-step"
+              label={translate("play:newGame.changeBy")}
+              field="changeBy"
+              value={String(lifeStep)}
+              options={LIFE_STEP_OPTIONS.map((step) => ({
+                id: String(step),
+                label: String(step),
+              }))}
+              onSelect={(value) => {
+                const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
+                if (next) setLifeStep(next)
+              }}
+            />
+          </View>
+
+          <View style={themed($section)}>
+            <Text tx="play:newGame.layout" preset="subheading" accessibilityRole="header" />
+            <PlayerLayoutPicker playerCount={playerCount} value={layout} onChange={setLayout} />
+          </View>
+        </ScrollView>
+        <Button
+          testID="setup-options-done"
+          tx="common:done"
+          preset="reversed"
+          onPress={() => setOptionsOpen(false)}
+        />
+      </DialogCard>
+      <DialogCard
         visible={showStatus}
         onClose={() => setShowStatus(false)}
         dialogTestID="setup-status-dialog"
@@ -1238,6 +1288,17 @@ const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.surface,
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $gameTypes: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+})
+const $summaryText: ThemedStyle<TextStyle> = ({ colors }) => ({ flex: 1, color: colors.textDim })
+const $changeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 40,
+  paddingVertical: spacing.xxs,
+})
 const $valueGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xs,
