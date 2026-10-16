@@ -115,7 +115,6 @@ export class LanSession {
   private connection?: LanConnection<LanGuestMessage>
   private pass?: LanSeatPass
   private claimedRound?: string
-  // why: the round belongs to the account that started it, even if the host signs out or switches before the finish.
   private roundOwner?: string
   private finishedRound?: string
   private pendingWrites = new Map<string, PendingWrite>()
@@ -416,7 +415,6 @@ export class LanSession {
     this.set({ lobby: message.lobby, projection: message.projection, status: "connected" })
     const round = lanRoundId(message.lobby)
     const { status } = message.lobby
-    // why: a guest that drops before the finish may never see it, so the claim is kept from the start and stays pending until the host uploads.
     if (
       (status === "active" || status === "finished") &&
       this.pass &&

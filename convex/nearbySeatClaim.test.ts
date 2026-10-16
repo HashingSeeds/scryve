@@ -153,6 +153,9 @@ describe("claimNearbySeat", () => {
       host.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: GUEST_TOKEN }),
     ).rejects.toThrow("already hold a seat")
     expect((await historyOf(host)).page).toHaveLength(1)
+    await expect(
+      host.query(api.games.connectedSummary, { publicId: PUBLIC_ID }),
+    ).resolves.toMatchObject({ publicId: PUBLIC_ID })
   })
 
   it("rejects a pass hash on the host's own seat, a malformed hash, and a repeated hash", async () => {

@@ -29,7 +29,6 @@ function isPermanentRejection(cause: unknown) {
   return cause instanceof Error && cause.message.includes("Server Error")
 }
 
-// why: a guest's claim usually reaches Convex before the host's upload does, so a pending claim retries soon instead of waiting for the next launch.
 const CLAIM_RETRY_DELAYS_MS = [5_000, 30_000, 300_000]
 
 function isDeckRejection(cause: unknown) {

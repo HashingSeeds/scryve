@@ -1436,7 +1436,6 @@ export const publishFinishedLocalGame = mutation({
 const seatPassInvalid = () =>
   new ConvexError({ code: "seat_pass_invalid", message: "That seat pass is not for this game" })
 
-// why: `pending` means the host has not uploaded yet; a guest that dropped its claim then would never see the game.
 export const claimNearbySeat = mutation({
   args: { publicId: v.string(), token: v.string() },
   handler: async (ctx, args) => {
@@ -3226,7 +3225,6 @@ export const activeConnectedGames = query({
 })
 
 // why: a published local game with no seat of the owner's has no membership row, only a host.
-// why: a local game's host may hold no seat, and a nearby guest who claimed a seat holds one.
 async function requireSummaryAccess(ctx: QueryCtx, game: Doc<"games">) {
   const user = await requireUser(ctx)
   if (game.mode === "local" && game.hostUserId === user._id) return
