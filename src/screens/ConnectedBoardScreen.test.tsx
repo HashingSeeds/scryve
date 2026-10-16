@@ -817,7 +817,7 @@ describe("ConnectedBoardScreen", () => {
     expect(
       screen.getByTestId("cancel-connected-finish-button").props.accessibilityState.disabled,
     ).toBe(true)
-    expect(screen.getByText(/game:ending/)).toBeTruthy()
+    expect(screen.getByText("Ending…")).toBeTruthy()
   })
 
   it("offers to abandon until a result is chosen, then to finish", () => {
@@ -828,12 +828,12 @@ describe("ConnectedBoardScreen", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedFinish()
 
-    expect(screen.getByText(/game:abandon/)).toBeTruthy()
+    expect(screen.getByText("Abandon")).toBeTruthy()
 
     fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
 
-    expect(screen.getByText(/game:finish/)).toBeTruthy()
-    expect(screen.queryByText(/game:abandon/)).toBeNull()
+    expect(screen.getByText("Finish")).toBeTruthy()
+    expect(screen.queryByText("Abandon")).toBeNull()
   })
 
   it("keeps finish confirmation open and shows a mutation error there", async () => {

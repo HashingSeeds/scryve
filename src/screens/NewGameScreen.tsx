@@ -747,7 +747,7 @@ export function NewGameScreen({
 
             {!connectedMode ? (
               <View style={themed($section)}>
-                <Text tx="game:playerNames" preset="subheading" accessibilityRole="header" />
+                <Text tx="play:playerNames" preset="subheading" accessibilityRole="header" />
                 <View style={themed($nameList)}>
                   {players.map((player, index) => (
                     <View key={index} style={themed($nameRow)}>
@@ -854,7 +854,7 @@ export function NewGameScreen({
                         ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
                         : undefined
                   }
-                  tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
+                  tx={connectedMode || gameBlocksStart ? undefined : "play:startGame"}
                   preset="reversed"
                   TextProps={$footerButtonText}
                   style={[

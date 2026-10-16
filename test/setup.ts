@@ -73,16 +73,6 @@ jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }))
 
-jest.mock("i18next", () => ({
-  currentLocale: "en",
-  t: (key: string, params: Record<string, string>) => {
-    return `${key} ${JSON.stringify(params)}`
-  },
-  translate: (key: string, params: Record<string, string>) => {
-    return `${key} ${JSON.stringify(params)}`
-  },
-}))
-
 jest.mock("expo-localization", () => ({
   ...jest.requireActual("expo-localization"),
   getLocales: () => [{ languageTag: "en-US", textDirection: "ltr" }],
@@ -118,17 +108,6 @@ jest.mock("expo-network", () => ({
   NetworkStateType: jest.requireActual("expo-network/build/Network.types").NetworkStateType,
   addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
   useNetworkState: jest.fn(() => ({})),
-}))
-
-jest.mock("../src/i18n/index.ts", () => ({
-  i18n: {
-    isInitialized: true,
-    language: "en",
-    t: (key: string, params: Record<string, string>) => {
-      return `${key} ${JSON.stringify(params)}`
-    },
-    numberToCurrency: jest.fn(),
-  },
 }))
 
 declare global {

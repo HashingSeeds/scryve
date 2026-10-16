@@ -463,7 +463,7 @@ export function CurrentGameScreen({
               closePanel()
             }}
           />
-          <Button tx="game:cancel" style={themed($menuItem)} onPress={closePanel} />
+          <Button tx="common:cancel" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
       ) : null}
 

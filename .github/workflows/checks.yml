@@ -141,6 +141,9 @@ jobs:
       - name: Run script tests
         run: pnpm test:scripts
 
+      - name: Check translations
+        run: pnpm i18n:check
+
       - name: Restore Jest cache
         uses: actions/cache@v4
         with:

@@ -2,7 +2,6 @@ import { useFonts } from "expo-font"
 import { SplashScreen } from "expo-router"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
-import { initI18n } from "@/i18n"
 import { reportCrash } from "@/utils/crashReporting"
 
 import {
@@ -15,38 +14,23 @@ jest.mock("expo-router", () => ({
   SplashScreen: { hideAsync: jest.fn(() => Promise.resolve()) },
 }))
 jest.mock("expo-font", () => ({ useFonts: jest.fn() }))
-jest.mock("@/i18n", () => ({ initI18n: jest.fn() }))
 jest.mock("@/utils/crashReporting", () => ({ reportCrash: jest.fn() }))
 
 const useFontsMock = jest.mocked(useFonts)
-const initI18nMock = jest.mocked(initI18n)
 const reportCrashMock = jest.mocked(reportCrash)
 const hideSplashMock = jest.mocked(SplashScreen.hideAsync)
-
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason: unknown) => void
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
-  })
-  return { promise, reject, resolve }
-}
 
 describe("useLaunchReadiness", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     useFontsMock.mockReturnValue([false, null])
-    initI18nMock.mockResolvedValue(undefined as never)
   })
 
   afterEach(() => {
     jest.useRealTimers()
   })
 
-  it("hands a normal fast launch straight from the native splash to the app", async () => {
-    const i18n = deferred<never>()
-    initI18nMock.mockReturnValue(i18n.promise)
+  it("hands a normal fast launch straight from the native splash to the app", () => {
     let fontsLoaded = false
     useFontsMock.mockImplementation(() => [fontsLoaded, null])
 
@@ -60,9 +44,6 @@ describe("useLaunchReadiness", () => {
 
     fontsLoaded = true
     hook.rerender({ consentResolved: false })
-    expect(hook.result.current).toBe(false)
-
-    await act(async () => i18n.resolve(undefined as never))
     expect(hook.result.current).toBe(true)
     expect(hideSplashMock).not.toHaveBeenCalled()
 
@@ -83,7 +64,6 @@ describe("useLaunchReadiness", () => {
   it("reveals the React launch fallback when startup takes longer than 700ms", () => {
     jest.useFakeTimers()
     useFontsMock.mockReturnValue([false, null])
-    initI18nMock.mockReturnValue(new Promise<never>(() => undefined))
 
     const hook = renderHook(() => useLaunchReadiness(false))
 
@@ -98,8 +78,7 @@ describe("useLaunchReadiness", () => {
 
   it("enters the degraded path at the existing 8000ms deadline", () => {
     jest.useFakeTimers()
-    useFontsMock.mockReturnValue([true, null])
-    initI18nMock.mockReturnValue(new Promise<never>(() => undefined))
+    useFontsMock.mockReturnValue([false, null])
 
     const hook = renderHook(() => useLaunchReadiness(true))
 
@@ -114,20 +93,7 @@ describe("useLaunchReadiness", () => {
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
   })
 
-  it("reports rejected i18n initialization and still becomes ready", async () => {
-    const i18nError = new Error("i18n unavailable")
-    useFontsMock.mockReturnValue([true, null])
-    initI18nMock.mockRejectedValue(i18nError)
-
-    const hook = renderHook(() => useLaunchReadiness(false))
-
-    await waitFor(() => expect(hook.result.current).toBe(true))
-    expect(reportCrashMock).toHaveBeenCalledWith(i18nError)
-  })
-
-  it("never hides the splash until readiness and consent both hold", async () => {
-    const i18n = deferred<never>()
-    initI18nMock.mockReturnValue(i18n.promise)
+  it("never hides the splash until readiness and consent both hold", () => {
     let fontsLoaded = false
     useFontsMock.mockImplementation(() => [fontsLoaded, null])
 
@@ -141,9 +107,6 @@ describe("useLaunchReadiness", () => {
 
     fontsLoaded = true
     hook.rerender({ consentResolved: true })
-    expect(hideSplashMock).not.toHaveBeenCalled()
-
-    await act(async () => i18n.resolve(undefined as never))
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
 
     hook.rerender({ consentResolved: true })

@@ -558,7 +558,7 @@ describe("SettingsScreen", () => {
     })
     expect(view.getAllByText("Settings")).toHaveLength(2)
 
-    fireEvent.press(view.getByText(/^(Back|common:back)$/))
+    fireEvent.press(view.getByText("Back"))
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
