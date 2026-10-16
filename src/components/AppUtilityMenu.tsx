@@ -8,6 +8,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { lanPlayAvailable } from "@/features/lan/lanAvailability"
+import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -40,6 +42,10 @@ export function AppUtilityMenu({
   const reducedMotion = useReducedMotion()
   const [open, setOpen] = useState(false)
   const updateReady = useAppUpdate().status === "ready"
+  const nearbyOnly = useNearbyOnly()
+  const testsNearby = lanPlayAvailable()
+  const itemCount = testsNearby ? 3 : 2
+  const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
   useEffect(() => {
@@ -56,8 +62,8 @@ export function AppUtilityMenu({
   }, [open, progress, reducedMotion])
 
   const containerStyle = useAnimatedStyle(() => ({
-    width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, compact ? 148 : 188]),
-    height: interpolate(progress.value, [0, 1], [44, 108]),
+    width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, openWidth]),
+    height: interpolate(progress.value, [0, 1], [44, ITEM_HEIGHT * itemCount]),
     borderRadius: compact ? interpolate(progress.value, [0, 1], [22, 16]) : 0,
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
@@ -76,7 +82,7 @@ export function AppUtilityMenu({
     close()
     action()
   }
-  const slotStyle = open ? (compact ? $expandedCompactSlot : $expandedSlot) : undefined
+  const slotStyle = open ? { width: openWidth, height: ITEM_HEIGHT * itemCount } : undefined
 
   return (
     <Animated.View
@@ -173,6 +179,22 @@ export function AppUtilityMenu({
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
             />
           </Pressable>
+          {testsNearby ? (
+            <Pressable
+              testID="utility-nearby-only-button"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: nearbyOnly }}
+              style={themed($item)}
+              onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
+            >
+              <Text
+                text={`Nearby only: ${nearbyOnly ? "On" : "Off"}`}
+                weight="medium"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+              />
+            </Pressable>
+          ) : null}
         </Animated.View>
       </Animated.View>
     </Animated.View>
@@ -180,11 +202,10 @@ export function AppUtilityMenu({
 }
 
 const MENU_MAX_FONT_SCALE = 1.5
+const ITEM_HEIGHT = 54
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
-const $expandedSlot: ViewStyle = { width: 188, height: 108 }
-const $expandedCompactSlot: ViewStyle = { width: 148, height: 108 }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,

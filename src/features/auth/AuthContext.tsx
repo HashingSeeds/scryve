@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
@@ -18,6 +19,7 @@ import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
 import { reconnectConvexOnNetworkReturn } from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
+import { UNREACHABLE_CONVEX_URL, useNearbyOnly } from "@/features/lan/nearbyOnly"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
@@ -90,10 +92,17 @@ export function ConfiguredAuth({
     }),
     [isLoaded, isSignedIn, user?.id, sessionHint, visible],
   )
+  const nearbyOnly = useNearbyOnly()
+  const clientUrl = nearbyOnly ? UNREACHABLE_CONVEX_URL : convexUrl
   const client = useMemo(
-    () => new ConvexReactClient(convexUrl, { initialAuthTokenReuse: true }),
-    [convexUrl],
+    () => new ConvexReactClient(clientUrl, { initialAuthTokenReuse: true }),
+    [clientUrl],
   )
+  const previousClient = useRef(client)
+  useEffect(() => {
+    if (previousClient.current !== client) void previousClient.current.close()
+    previousClient.current = client
+  }, [client])
   useEffect(() => reconnectConvexOnNetworkReturn(client), [client])
   const convexUseAuth = useMemo(
     () => createConvexAuthHook(useAuth, convexAuthRetryKey),

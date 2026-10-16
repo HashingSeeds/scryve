@@ -1,11 +1,20 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { setNearbyOnly } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
 
 import { AppUtilityMenu } from "./AppUtilityMenu"
 import { GameMenuBackdrop } from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
+
+let mockNearbyPlay = false
+jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
+
+beforeEach(() => {
+  mockNearbyPlay = false
+  setNearbyOnly(false)
+})
 
 describe("AppUtilityMenu", () => {
   it("closes on Android Back before the game menu it opened from", () => {
@@ -93,6 +102,28 @@ describe("AppUtilityMenu", () => {
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
       width: 148,
       height: 108,
+    })
+  })
+
+  it("lets a nearby tester cut this device off from Convex, and remembers it", () => {
+    mockNearbyPlay = true
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu compact onSettings={jest.fn()} onAccount={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      width: 176,
+      height: 162,
+    })
+
+    fireEvent.press(view.getByText("Nearby only: Off"))
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+
+    expect(view.getByText("Nearby only: On")).toBeTruthy()
+    expect(view.getByTestId("utility-nearby-only-button").props.accessibilityState).toEqual({
+      checked: true,
     })
   })
 

@@ -1,8 +1,10 @@
 import { useEffect, type ReactNode } from "react"
 import { Pressable } from "react-native"
-import { fireEvent, render, screen } from "@testing-library/react-native"
+import { act, fireEvent, render, screen } from "@testing-library/react-native"
+import { ConvexReactClient } from "convex/react"
 
 import { Text } from "@/components/Text"
+import { setNearbyOnly, UNREACHABLE_CONVEX_URL } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
 
 import { CloudProviders, useAuthAccess } from "./AuthContext"
@@ -46,7 +48,10 @@ jest.mock("@clerk/expo/native", () => {
 })
 jest.mock("convex/react", () => ({
   ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
-  ConvexReactClient: jest.fn(() => ({ subscribeToConnectionState: () => () => undefined })),
+  ConvexReactClient: jest.fn(() => ({
+    subscribeToConnectionState: () => () => undefined,
+    close: jest.fn(async () => undefined),
+  })),
   useConvex: () => mockConvexClient,
   useMutation: () => jest.fn(),
   useConvexAuth: () => ({ isAuthenticated: false, isLoading: true }),
@@ -82,6 +87,27 @@ describe("native auth experience", () => {
     expect(mockUseAuth).toHaveBeenCalledWith({ treatPendingAsSignedOut: false })
     fireEvent.press(screen.getByTestId("open-auth"))
     expect(screen.getByTestId("auth-modal").props.visible).toBe(true)
+  })
+
+  it("points Convex at an unreachable address while nearby only is on, closing the live client", () => {
+    render(
+      <ThemeProvider initialContext="light">
+        <CloudProviders>
+          <Harness />
+        </CloudProviders>
+      </ThemeProvider>,
+    )
+    const live = jest.mocked(ConvexReactClient).mock.results.at(-1)?.value
+
+    act(() => setNearbyOnly(true))
+    expect(ConvexReactClient).toHaveBeenLastCalledWith(UNREACHABLE_CONVEX_URL, expect.anything())
+    expect(live.close).toHaveBeenCalledTimes(1)
+
+    act(() => setNearbyOnly(false))
+    expect(ConvexReactClient).toHaveBeenLastCalledWith(
+      "https://example.convex.cloud",
+      expect.anything(),
+    )
   })
 
   it("passes the native Clerk resource cache alongside the token cache", () => {
