@@ -84,7 +84,6 @@ jest.mock("@/features/connected/LocalGamePublishSource", () => {
   }
 })
 
-
 describe("new local game route", () => {
   beforeEach(() => {
     jest.clearAllMocks()
