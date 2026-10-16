@@ -368,7 +368,6 @@ function appearanceOf(player: Doc<"gamePlayers">): PlayerAppearance {
   }
 }
 
-/** why: a Pro mark is shown to the whole table, so the server, not the client, decides who may wear one and whether it is foil. */
 async function proMarkFor(ctx: MutationCtx, user: Doc<"users">, proShape: ProMarkShape) {
   if (!(await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit))) return null
   const foil = await hasFeature(ctx, user, PREMIUM_FEATURES.foil)
@@ -1705,7 +1704,7 @@ export const setMyAppearance = mutation({
     seat: v.number(),
     color: v.string(),
     shape: v.string(),
-    // why: installed clients omit it, which leaves the seat's Pro mark as it is; null clears it.
+    // why: installed clients omit it, which must leave the seat's Pro mark as it is.
     proShape: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {

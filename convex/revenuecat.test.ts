@@ -285,6 +285,32 @@ describe("RevenueCat entitlement sync", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
+  it("revokes foil from a transferred-away Foil subscription", async () => {
+    const t = makeConvexTest()
+    await createUser(t, "clerk_foil_source")
+    await createUser(t, "clerk_foil_destination")
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        subscriberResponse({ enabled: true, observedAt: 500, productIdentifier: "foil_yearly" }),
+      )
+    const foil = async (clerkUserId: string) =>
+      (await entitlements(t, clerkUserId)).find(({ feature }) => feature === "foil")?.enabled
+    await t.withIdentity({ subject: "clerk_foil_source" }).action(api.revenuecat.syncCurrent, {})
+    expect(await foil("clerk_foil_source")).toBe(true)
+
+    await sendWebhook(t, {
+      id: "event-foil-transfer",
+      type: "TRANSFER",
+      event_timestamp_ms: 500,
+      environment: "PRODUCTION",
+      transferred_from: ["clerk_foil_source"],
+      transferred_to: ["clerk_foil_destination"],
+    })
+    expect(await foil("clerk_foil_source")).toBe(false)
+    expect(await foil("clerk_foil_destination")).toBe(true)
+  })
+
   it.each(["scryve_pro_monthly", "foil_yearly"])(
     "maps %s subscription state to the same Pro access",
     async (productIdentifier) => {

@@ -102,7 +102,6 @@ export async function applyRevenueCatState(
         .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", feature))
         .unique()
       const value = {
-        // why: a transfer revokes `enabled` but keeps the fetched `foil`, so foil also needs Pro.
         enabled: state.enabled && (feature !== PREMIUM_FEATURES.foil || state.foil === true),
         source: REVENUECAT_SOURCE,
         updatedAt: state.observedAt,
