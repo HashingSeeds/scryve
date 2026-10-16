@@ -12,6 +12,8 @@ import type {
   LifeChangedEvent,
   LocalGame,
 } from "@/features/game/types"
+import { appLocale, type TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 
 import type { HistoryOutcome, HistorySource } from "./historyEntries"
 
@@ -137,11 +139,16 @@ export interface ConnectedSummaryDocument {
   }[]
 }
 
-const UNUSUAL_ENDING_COPY = new Map([
-  ["host_abandoned", "Abandoned by the host"],
-  ["stale_inactivity", "Ended after inactivity"],
-  ["account_deleted", "Ended when the host deleted their account"],
+const UNUSUAL_ENDING_TX = new Map<string, TxKeyPath>([
+  ["host_abandoned", "play:summary.endedHostAbandoned"],
+  ["stale_inactivity", "play:summary.endedInactivity"],
+  ["account_deleted", "play:summary.endedAccountDeleted"],
 ])
+
+function unusualEnding(reason: string | undefined) {
+  const key = UNUSUAL_ENDING_TX.get(reason ?? "")
+  return key ? translate(key) : undefined
+}
 
 export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSummaryModel {
   const system = storedPlaySystem(summary.system)
@@ -155,7 +162,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
       ? playFormatLabel(system, summary.format || summary.ruleset)
       : counterValueLabel(system, summary.startingLife),
     changeCount: summary.eventCount,
-    terminalReason: UNUSUAL_ENDING_COPY.get(summary.terminalReason ?? ""),
+    terminalReason: unusualEnding(summary.terminalReason),
     players: summary.players.map((player) => ({
       id: player.playerId,
       seat: player.seat,
@@ -164,7 +171,10 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
         player.usernameAtFinish === player.displayName ? undefined : player.usernameAtFinish,
       deckLabel: player.deckNameAtFinish
         ? player.deckVersionNumber
-          ? `${player.deckNameAtFinish} v${player.deckVersionNumber}`
+          ? translate("play:summary.deckVersion", {
+              name: player.deckNameAtFinish,
+              version: player.deckVersionNumber,
+            })
           : player.deckNameAtFinish
         : undefined,
       color: player.color,
@@ -207,26 +217,29 @@ export function anyResultRecorded(model: GameSummaryModel) {
 export function playedFor(model: GameSummaryModel) {
   if (!model.startedAt || !model.finishedAt) return undefined
   const minutes = Math.max(0, Math.round((model.finishedAt - model.startedAt) / 60_000))
-  if (minutes < 1) return "Under a minute"
-  if (minutes < 60) return `${minutes} min`
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+  if (minutes < 1) return translate("play:summary.underAMinute")
+  if (minutes < 60) return translate("play:summary.minutes", { minutes })
+  return translate("play:summary.hoursMinutes", {
+    hours: Math.floor(minutes / 60),
+    minutes: minutes % 60,
+  })
 }
 
 export function finishedOnLabel(finishedAt?: number) {
   if (!finishedAt) return undefined
   const date = new Date(finishedAt)
-  const day = date.toLocaleDateString(undefined, {
+  const day = date.toLocaleDateString(appLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",
   })
-  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  const time = date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
   return `${day} · ${time}`
 }
 
 export function metaLine(model: GameSummaryModel) {
   return [
-    `${model.players.length} player${model.players.length === 1 ? "" : "s"}`,
+    translate("play:summary.playerCount", { count: model.players.length }),
     model.format,
     playedFor(model),
     counterChangeLabel(model.system, model.changeCount),

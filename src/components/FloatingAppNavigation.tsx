@@ -3,11 +3,22 @@ import type { ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { AppUtilityMenu } from "./AppUtilityMenu"
+import { type AccountLabel, AppUtilityMenu } from "./AppUtilityMenu"
 import { Text } from "./Text"
+
+type DestinationLabel = "Decks" | "Return to game" | "Play" | "Back to lobby"
+
+const destinationLabelTx = {
+  "Decks": "common:appNavigation.decks",
+  "Return to game": "common:appNavigation.returnToGame",
+  "Play": "common:appNavigation.play",
+  "Back to lobby": "common:appNavigation.backToLobby",
+} as const satisfies Record<DestinationLabel, TxKeyPath>
 
 export function FloatingAppNavigation({
   destinationLabel,
@@ -16,11 +27,11 @@ export function FloatingAppNavigation({
   onAccount,
   accountLabel = "Account",
 }: {
-  destinationLabel: "Decks" | "Return to game" | "Play" | "Back to lobby"
+  destinationLabel: DestinationLabel
   onDestination: () => void
   onSettings: () => void
   onAccount: () => void
-  accountLabel?: "Account" | "Sign in"
+  accountLabel?: AccountLabel
 }) {
   const { themed, theme } = useAppTheme()
   const insets = useSafeAreaInsets()
@@ -49,12 +60,12 @@ export function FloatingAppNavigation({
       <Pressable
         testID="open-decks-button"
         accessibilityRole="button"
-        accessibilityLabel={destinationLabel}
+        accessibilityLabel={translate(destinationLabelTx[destinationLabel])}
         style={themed($destination)}
         onPress={onDestination}
       >
         <Text
-          text={destinationLabel}
+          tx={destinationLabelTx[destinationLabel]}
           weight="bold"
           size="xs"
           numberOfLines={1}

@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -35,7 +36,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmText,
-  cancelText = "Cancel",
+  cancelText = translate("common:cancel"),
   destructive = false,
   busy = false,
   confirmDisabled = false,
@@ -57,7 +58,10 @@ export function ConfirmDialog({
       closeDisabled={busy}
       origin={origin}
       backdropTestID={backdropTestID}
-      backdropAccessibilityLabel={backdropAccessibilityLabel ?? `Cancel ${title.toLowerCase()}`}
+      backdropAccessibilityLabel={
+        backdropAccessibilityLabel ??
+        translate("common:confirmDialog.cancelAction", { action: title.toLowerCase() })
+      }
       dialogTestID={dialogTestID}
       dialogAccessibilityRole="alert"
       accessibilityViewIsModal

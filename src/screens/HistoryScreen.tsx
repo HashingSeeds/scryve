@@ -12,6 +12,8 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistorySource"
 import type { LocalGameSummary } from "@/features/game/types"
+import { appLocale, type TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -25,7 +27,7 @@ import type {
 } from "./historyEntries"
 import {
   activeFilterCount,
-  DATE_RANGE_LABELS,
+  dateRangeLabel,
   daySections,
   entryDeckNames,
   entryPlayerNames,
@@ -37,10 +39,10 @@ import {
   groupMatchGames,
   localHistoryEntry,
   NO_FILTERS,
-  OUTCOME_LABELS,
+  outcomeLabel,
   podSizeLabel,
   sortedByRecency,
-  SOURCE_LABELS,
+  sourceLabel,
   systemLabel,
   tallyOutcomes,
   toggleSystem,
@@ -61,21 +63,30 @@ export interface HistoryScreenProps {
 const MAX_COLOR_DOTS = 4
 const DATE_RANGES: DateRange[] = ["any", "7d", "30d", "year"]
 const OUTCOMES: HistoryOutcome[] = ["win", "loss", "draw", "unrecorded"]
-const SOURCES: { value: HistoryFilters["source"]; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "local", label: SOURCE_LABELS.local },
-  { value: "connected", label: SOURCE_LABELS.connected },
-  { value: "manual", label: SOURCE_LABELS.manual },
-]
+const SOURCES = [
+  { value: "all", labelTx: "play:history.source.all" },
+  { value: "local", labelTx: "play:history.source.local" },
+  { value: "connected", labelTx: "play:history.source.connected" },
+  { value: "manual", labelTx: "play:history.source.manual" },
+] as const satisfies readonly { value: HistoryFilters["source"]; labelTx: TxKeyPath }[]
+
+const EXPANDED_CARET = "▾"
+const COLLAPSED_CARET = "▸"
 
 const OUTCOME_BADGES = {
-  win: { label: "W", accessibilityLabel: "Win" },
-  loss: { label: "L", accessibilityLabel: "Loss" },
-  draw: { label: "D", accessibilityLabel: "Draw" },
-  unrecorded: { label: "–", accessibilityLabel: "Result not recorded" },
-  abandoned: { label: "A", accessibilityLabel: "Abandoned" },
-  inProgress: { label: "–", accessibilityLabel: "In progress" },
-} as const
+  win: { labelTx: "play:summary.badge.win", accessibilityTx: "play:history.outcome.win" },
+  loss: { labelTx: "play:summary.badge.loss", accessibilityTx: "play:summary.outcome.loss" },
+  draw: { labelTx: "play:summary.badge.draw", accessibilityTx: "play:summary.outcome.draw" },
+  unrecorded: {
+    labelTx: "play:summary.badge.unrecorded",
+    accessibilityTx: "play:summary.outcome.unrecorded",
+  },
+  abandoned: { labelTx: "play:history.badgeAbandoned", accessibilityTx: "play:summary.abandoned" },
+  inProgress: {
+    labelTx: "play:summary.badge.unrecorded",
+    accessibilityTx: "play:history.inProgress",
+  },
+} as const satisfies Record<string, { labelTx: TxKeyPath; accessibilityTx: TxKeyPath }>
 
 function badgeFor(entry: HistoryEntry) {
   if (entry.outcome !== "unrecorded") return OUTCOME_BADGES[entry.outcome]
@@ -84,25 +95,33 @@ function badgeFor(entry: HistoryEntry) {
 }
 
 function timeLabel(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  return new Date(timestamp).toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
 }
 
 function titleFor(entry: HistoryEntry) {
-  if (entry.match?.opponents) return `vs ${entry.match.opponents.join(" · ")}`
+  if (entry.match?.opponents)
+    return translate("play:history.versus", { opponents: entry.match.opponents.join(" · ") })
   const names = entryPlayerNames(entry)
   if (names.length > 0) return names.join(" · ")
-  return `${entry.players.length} player${entry.players.length === 1 ? "" : "s"}`
+  return translate("play:summary.playerCount", { count: entry.players.length })
 }
 
 function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
   const games = match.games?.length
   const decks = [...new Set(entryDeckNames(entry))]
   return [
-    SOURCE_LABELS[entry.source],
-    [`Bo${match.bestOf}`, match.score].filter(Boolean).join(" "),
-    match.inProgress ? "In progress" : undefined,
-    games === undefined ? undefined : `${games} game${games === 1 ? "" : "s"}`,
-    [match.eventName, match.roundNumber === undefined ? undefined : `R${match.roundNumber}`]
+    sourceLabel(entry.source),
+    [translate("play:history.bestOfShort", { bestOf: match.bestOf }), match.score]
+      .filter(Boolean)
+      .join(" "),
+    match.inProgress ? translate("play:history.inProgress") : undefined,
+    games === undefined ? undefined : translate("play:history.gameCount", { count: games }),
+    [
+      match.eventName,
+      match.roundNumber === undefined
+        ? undefined
+        : translate("play:history.roundShort", { round: match.roundNumber }),
+    ]
       .filter(Boolean)
       .join(" "),
     match.deckName ?? (games === undefined || decks.length === 0 ? undefined : decks.join(", ")),
@@ -116,9 +135,13 @@ function subtitleFor(entry: HistoryEntry) {
   const decks = [...new Set(entryDeckNames(entry))]
   const gameNumber = entry.scryveMatch?.gameNumber
   return [
-    gameNumber === undefined ? SOURCE_LABELS[entry.source] : `Game ${gameNumber}`,
+    gameNumber === undefined
+      ? sourceLabel(entry.source)
+      : translate("play:history.gameNumber", { number: gameNumber }),
     timeLabel(entry.finishedAt),
-    entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : undefined,
+    entry.winnerNames?.length
+      ? translate("play:history.wonBy", { names: entry.winnerNames.join(" & ") })
+      : undefined,
     decks.length > 0 ? decks.join(", ") : undefined,
   ]
     .filter(Boolean)
@@ -155,23 +178,26 @@ function HistoryRow({
   const extraPlayers = entry.players.length - MAX_COLOR_DOTS
   const group = entry.match?.games !== undefined
   const nested = entry.scryveMatch?.gameNumber !== undefined
+  const title = titleFor(entry)
+  const subtitle = subtitleFor(entry)
+  const rowLabel = [translate(badge.accessibilityTx), title, subtitle].join(" · ")
 
   return (
     <TouchableOpacity
       testID={rowTestId(entry)}
       accessibilityRole="button"
-      accessibilityLabel={`${badge.accessibilityLabel} · ${titleFor(entry)} · ${subtitleFor(entry)}`}
+      accessibilityLabel={rowLabel}
       {...(group ? { accessibilityState: { expanded: Boolean(expanded) } } : {})}
       activeOpacity={0.8}
       style={[themed($row), nested ? themed($nestedRow) : undefined]}
       onPress={onPress}
     >
       <View style={[themed($badge), { borderColor: badgeTone }]}>
-        <Text weight="bold" size="sm" text={badge.label} style={{ color: badgeTone }} />
+        <Text weight="bold" size="sm" tx={badge.labelTx} style={{ color: badgeTone }} />
       </View>
       <View style={$styles.flex1}>
-        <Text size="sm" weight="medium" numberOfLines={2} text={titleFor(entry)} />
-        <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={subtitleFor(entry)} />
+        <Text size="sm" weight="medium" numberOfLines={2} text={title} />
+        <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={subtitle} />
       </View>
       {entry.match && !group ? null : (
         <View style={themed($dots)}>
@@ -186,7 +212,13 @@ function HistoryRow({
           ) : null}
         </View>
       )}
-      {group ? <Text size="xs" style={themed($dimmedText)} text={expanded ? "▾" : "▸"} /> : null}
+      {group ? (
+        <Text
+          size="xs"
+          style={themed($dimmedText)}
+          text={expanded ? EXPANDED_CARET : COLLAPSED_CARET}
+        />
+      ) : null}
     </TouchableOpacity>
   )
 }
@@ -207,7 +239,10 @@ function HistoryRowSkeleton({ testID = "history-skeleton-row" }: { testID?: stri
 
 function HistoryRowsSkeleton() {
   return (
-    <View accessibilityRole="progressbar" accessibilityLabel="Loading connected history">
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={translate("play:history.loadingConnectedLabel")}
+    >
       {Array.from({ length: 3 }).map((_, index) => (
         <HistoryRowSkeleton key={index} />
       ))}
@@ -228,21 +263,21 @@ function ConnectedHistoryStatus({
       <View
         testID="history-connected-progress"
         accessibilityRole="progressbar"
-        accessibilityLabel="Loading connected history"
+        accessibilityLabel={translate("play:history.loadingConnectedLabel")}
         style={themed($row)}
       >
         <View style={themed($skeletonBadge)} />
-        <Text size="xs" style={themed($dimmedText)} text="Loading connected history…" />
+        <Text size="xs" style={themed($dimmedText)} tx="play:history.loadingConnected" />
       </View>
     )
 
   return (
     <View testID="history-connected-unavailable" accessibilityRole="alert" style={themed($status)}>
-      <Text size="xs" text="Connected history is unavailable." />
+      <Text size="xs" tx="play:history.connectedUnavailableMessage" />
       <Button
         testID="history-retry-connected"
         style={themed($statusButton)}
-        text="Try again"
+        tx="common:tryAgain"
         onPress={onRetry}
       />
     </View>
@@ -311,18 +346,22 @@ export function HistoryScreen({
     connectedPage?.status === "ready" &&
     connectedPage.nextPage.status === "loading"
   const localVisibleCount = visible.filter((entry) => entry.source === "local").length
-  const recordLabel = `${visible.length} game${visible.length === 1 ? "" : "s"} · ${record.wins}W · ${record.losses}L · ${record.draws}D`
   const countLabel = loadingFirstPage
     ? localVisibleCount > 0
-      ? `${localVisibleCount} local game${localVisibleCount === 1 ? "" : "s"} · Connected history loading`
-      : "Loading connected history…"
+      ? translate("play:history.count.localLoading", { count: localVisibleCount })
+      : translate("play:history.loadingConnected")
     : connectedUnavailable
       ? localVisibleCount > 0
-        ? `${localVisibleCount} local game${localVisibleCount === 1 ? "" : "s"} · Connected history unavailable`
-        : "Connected history unavailable"
+        ? translate("play:history.count.localUnavailable", { count: localVisibleCount })
+        : translate("play:history.connectedUnavailable")
       : loadingMore
-        ? `${visible.length} loaded game${visible.length === 1 ? "" : "s"} · Loading more connected history`
-        : recordLabel
+        ? translate("play:history.count.loadingMore", { count: visible.length })
+        : translate("play:history.count.record", {
+            count: visible.length,
+            wins: record.wins,
+            losses: record.losses,
+            draws: record.draws,
+          })
 
   function patch(change: Partial<HistoryFilters>) {
     setFilters((current) => ({ ...current, ...change }))
@@ -334,7 +373,7 @@ export function HistoryScreen({
       : [
           {
             key: "date",
-            label: DATE_RANGE_LABELS[filters.dateRange],
+            label: dateRangeLabel(filters.dateRange),
             clear: () => patch({ dateRange: "any" as DateRange }),
           },
         ]),
@@ -350,7 +389,7 @@ export function HistoryScreen({
     })),
     ...filters.outcomes.map((outcome) => ({
       key: `outcome:${outcome}`,
-      label: OUTCOME_LABELS[outcome],
+      label: outcomeLabel(outcome),
       clear: () => patch({ outcomes: filters.outcomes.filter((value) => value !== outcome) }),
     })),
     ...filters.podSizes.map((size) => ({
@@ -373,10 +412,11 @@ export function HistoryScreen({
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header
-        title={titleVisible ? "History" : ""}
+        title={titleVisible ? translate("play:history.title") : ""}
         leftTx="common:back"
         onLeftPress={onBack}
-        {...(onAddMatch ? { rightText: "Add result", onRightPress: onAddMatch } : {})}
+        rightTx={onAddMatch ? "play:history.addResult" : undefined}
+        onRightPress={onAddMatch}
       />
       <SectionList
         testID="history-list"
@@ -389,7 +429,7 @@ export function HistoryScreen({
         scrollEventThrottle={16}
         ListHeaderComponent={
           <View style={themed($headerBlock)}>
-            <Text preset="heading" text="History" />
+            <Text preset="heading" tx="play:history.title" />
             <Text size="xs" style={themed($dimmedText)} text={countLabel} />
             <View style={$chipRow}>
               <ScrollView
@@ -402,7 +442,7 @@ export function HistoryScreen({
                   <FilterPill
                     key={source.value}
                     testID={`history-source-${source.value}`}
-                    label={source.label}
+                    label={translate(source.labelTx)}
                     selected={filters.source === source.value}
                     onPress={() => patch({ source: source.value })}
                   />
@@ -452,17 +492,17 @@ export function HistoryScreen({
             <HistoryRowsSkeleton />
           ) : connectedUnavailable ? null : canLoadOlderMatches ? (
             <EmptyState
-              heading="No matches in loaded games"
-              content="Load older games to search further back."
-              button="Load older games"
+              headingTx="play:history.noLoadedMatchesHeading"
+              contentTx="play:history.noLoadedMatchesContent"
+              buttonTx="play:history.loadOlderGames"
               buttonOnPress={loadOlderMatches}
               ButtonProps={{ disabled: loadingOlderMatches }}
             />
           ) : anyFilters ? (
             <EmptyState
-              heading="No games match these filters"
-              content="Clear a filter to widen the search."
-              button="Clear filters"
+              headingTx="play:history.noFilterMatchesHeading"
+              contentTx="play:history.noFilterMatchesContent"
+              buttonTx="play:history.clearFilters"
               buttonOnPress={() => setFilters(NO_FILTERS)}
             />
           ) : (
@@ -483,11 +523,11 @@ export function HistoryScreen({
                 accessibilityRole="alert"
                 style={themed($status)}
               >
-                <Text size="xs" text="Some older connected games could not be added." />
+                <Text size="xs" tx="play:history.migrationFailed" />
                 <Button
                   testID="history-retry-migration"
                   style={themed($statusButton)}
-                  text="Retry import"
+                  tx="play:history.retryImport"
                   onPress={connected.migration.retry}
                 />
               </View>
@@ -498,10 +538,10 @@ export function HistoryScreen({
               <>
                 <Button
                   testID="history-load-more"
-                  text={
+                  tx={
                     connectedPage.nextPage.status === "loading"
-                      ? "Loading more connected games…"
-                      : "Load more connected games"
+                      ? "play:history.loadingMoreConnected"
+                      : "play:history.loadMoreConnected"
                   }
                   disabled={connectedPage.nextPage.status === "loading"}
                   onPress={
@@ -514,7 +554,7 @@ export function HistoryScreen({
                   <Text
                     size="xxs"
                     style={themed($dimmedText)}
-                    text="Filters apply to loaded games. Load more to search further back."
+                    tx="play:history.filtersLoadedNote"
                   />
                 ) : null}
               </>
@@ -527,23 +567,23 @@ export function HistoryScreen({
         onClose={() => setFiltersOpen(false)}
         dialogTestID="history-filters-dialog"
         dialogAccessibilityRole="alert"
-        backdropAccessibilityLabel="Dismiss filters"
+        backdropAccessibilityLabel={translate("play:history.dismissFilters")}
       >
-        <Text preset="subheading" text="Filters" />
+        <Text preset="subheading" tx="play:history.filters" />
         <ScrollView contentContainerStyle={themed($dialogBody)}>
-          <FilterGroup heading="Date">
+          <FilterGroup heading={translate("play:history.filterDate")}>
             {DATE_RANGES.map((range) => (
               <FilterPill
                 key={range}
                 testID={`history-date-${range}`}
-                label={DATE_RANGE_LABELS[range]}
+                label={dateRangeLabel(range)}
                 selected={filters.dateRange === range}
                 onPress={() => patch({ dateRange: range })}
               />
             ))}
           </FilterGroup>
           {options.players.length > 0 ? (
-            <FilterGroup heading="Players">
+            <FilterGroup heading={translate("play:history.filterPlayers")}>
               {options.players.map((name) => (
                 <FilterPill
                   key={name}
@@ -556,7 +596,7 @@ export function HistoryScreen({
             </FilterGroup>
           ) : null}
           {options.decks.length > 0 ? (
-            <FilterGroup heading="Decks">
+            <FilterGroup heading={translate("play:history.filterDecks")}>
               {options.decks.map((deck) => (
                 <FilterPill
                   key={deck}
@@ -568,19 +608,19 @@ export function HistoryScreen({
               ))}
             </FilterGroup>
           ) : null}
-          <FilterGroup heading="Result">
+          <FilterGroup heading={translate("play:history.filterResult")}>
             {OUTCOMES.map((outcome) => (
               <FilterPill
                 key={outcome}
                 testID={`history-outcome-${outcome}`}
-                label={OUTCOME_LABELS[outcome]}
+                label={outcomeLabel(outcome)}
                 selected={filters.outcomes.includes(outcome)}
                 onPress={() => patch({ outcomes: toggled(filters.outcomes, outcome) })}
               />
             ))}
           </FilterGroup>
           {options.podSizes.length > 0 ? (
-            <FilterGroup heading="Pod size">
+            <FilterGroup heading={translate("play:history.filterPodSize")}>
               {options.podSizes.map((size) => (
                 <FilterPill
                   key={size}
@@ -593,7 +633,7 @@ export function HistoryScreen({
             </FilterGroup>
           ) : null}
           {options.systems.length > 0 ? (
-            <FilterGroup heading="Game system">
+            <FilterGroup heading={translate("play:history.filterGameSystem")}>
               {options.systems.map((system) => (
                 <FilterPill
                   key={system}
@@ -606,7 +646,7 @@ export function HistoryScreen({
             </FilterGroup>
           ) : null}
           {formats.length > 0 ? (
-            <FilterGroup heading="Format">
+            <FilterGroup heading={translate("play:history.filterFormat")}>
               {formats.map((format) => (
                 <FilterPill
                   key={format.key}
@@ -622,14 +662,18 @@ export function HistoryScreen({
         <View style={themed($dialogActions)}>
           <Button
             style={themed($dialogButton)}
-            text="Clear all"
+            tx="play:history.clearAll"
             disabled={!anyFilters}
             onPress={() => setFilters(NO_FILTERS)}
           />
           <Button
             style={themed($dialogButton)}
             preset="reversed"
-            text={loadingFirstPage || loadingMore ? "Show loaded games" : `Show ${visible.length}`}
+            text={
+              loadingFirstPage || loadingMore
+                ? translate("play:history.showLoaded")
+                : translate("play:history.showCount", { total: visible.length })
+            }
             onPress={() => setFiltersOpen(false)}
           />
         </View>

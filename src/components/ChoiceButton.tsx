@@ -83,6 +83,8 @@ export function ChoiceButton(props: ChoiceButtonProps) {
   )
 }
 
+const CHECK_MARK = "✓"
+
 function CheckBadge({ selected, color }: { selected: boolean; color: string }) {
   const { themed } = useAppTheme()
   return (
@@ -90,7 +92,7 @@ function CheckBadge({ selected, color }: { selected: boolean; color: string }) {
       testID={selected ? "choice-check-on" : "choice-check-off"}
       style={[themed($badge), selected && { borderColor: color }]}
     >
-      {selected ? <Text size="xxs" text="✓" style={[themed($check), { color }]} /> : null}
+      {selected ? <Text size="xxs" text={CHECK_MARK} style={[themed($check), { color }]} /> : null}
     </View>
   )
 }

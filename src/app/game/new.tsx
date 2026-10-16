@@ -19,6 +19,7 @@ import {
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { LocalGame, LocalGameResult, MatchSeatOutcome } from "@/features/game/types"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
+import { translate } from "@/i18n/translate"
 import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 import {
   NewGameScreen,
@@ -100,7 +101,7 @@ export default function NewLocalGameRoute() {
     const current = localGameRepository.loadActiveGame()
     if (!current || current.id !== activeGame?.id) {
       setActiveGame(current)
-      throw new Error("The current game changed. Check it before ending it.")
+      throw new Error(translate("play:newGame.gameChanged"))
     }
     if (result) {
       const ended = applyGameCommand(
