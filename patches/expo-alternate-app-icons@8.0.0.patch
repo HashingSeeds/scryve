@@ -1,0 +1,95 @@
+diff --git a/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt b/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
+index 9c3ba02686d8d2d41e900f5483b4d06df4c1d22e..92be2db1ec6283953c34b93a0c798ac470fe5809 100644
+--- a/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
++++ b/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
+@@ -10,6 +10,9 @@ import kotlinx.coroutines.withContext
+ 
+ const val MAIN_ACTIVITY_NAME = "MainActivity"
+ 
++// Scryve patch: the running activity keeps the component it launched with, so reading the current
++// icon from it enabled every alias picked in one session and made a reset to the default a no-op.
++// Icons are now read from, and switched by, the launcher components' enabled state.
+ class ExpoAlternateAppIconsModule : Module() {
+   override fun definition() = ModuleDefinition {
+     Name("ExpoAlternateAppIcons")
+@@ -23,50 +26,51 @@ class ExpoAlternateAppIconsModule : Module() {
+   }
+ 
+   private fun getAppIconName(): String? {
+-    val currentActivityComponent = appContext.activityProvider?.currentActivity?.componentName ?: return null
+-
+-    return try {
+-      retrieveIconNameFromComponent(currentActivityComponent)
+-    } catch (error: PackageManager.NameNotFoundException) {
+-      null
+-    }
++    val packageManager = appContext.reactContext?.packageManager ?: return null
++    return launcherComponents()
++      .firstOrNull {
++        getSimpleName(it) != MAIN_ACTIVITY_NAME &&
++          packageManager.getComponentEnabledSetting(it) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
++      }
++      ?.let(::retrieveIconNameFromComponent)
+   }
+ 
+   private suspend fun setAlternateAppIcon(icon: String?): String? = withContext(Dispatchers.Main) {
+-    val currentActivityComponent = appContext.activityProvider!!.currentActivity!!.componentName
+-
+-    val currentIconName = retrieveIconNameFromComponent(currentActivityComponent)
+-
+-    if (currentIconName == icon) return@withContext icon
+-
+-    val newActivityComponent = replaceMainActivitySimpleName(currentActivityComponent, icon)
+-
+-    appContext.reactContext?.packageManager?.run {
+-      setComponentEnabledSetting(newActivityComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+-      setComponentEnabledSetting(currentActivityComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
++    val packageManager = appContext.reactContext!!.packageManager
++    val components = launcherComponents()
++    val target = components.firstOrNull { retrieveIconNameFromComponent(it) == icon }
++      ?: throw IllegalArgumentException("Unknown app icon: $icon")
++
++    packageManager.setComponentEnabledSetting(target, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
++    for (component in components) {
++      if (component != target) {
++        packageManager.setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
++      }
+     }
+ 
+     return@withContext icon
+   }
+ 
++  @Suppress("DEPRECATION")
++  private fun launcherComponents(): List<ComponentName> {
++    val context = appContext.reactContext ?: return emptyList()
++    val packageInfo = context.packageManager.getPackageInfo(
++      context.packageName,
++      PackageManager.GET_ACTIVITIES or PackageManager.MATCH_DISABLED_COMPONENTS
++    )
++    return packageInfo.activities.orEmpty()
++      .map { ComponentName(context.packageName, it.name) }
++      .filter { getSimpleName(it).startsWith(MAIN_ACTIVITY_NAME) }
++  }
++
+   private fun getSimpleName(component: ComponentName): String = component.className.split('.').last()
+ 
+   private fun retrieveIconNameFromComponent(component: ComponentName): String? =
+     with(getSimpleName(component)) {
+-      when  {
++      when {
+         equals(MAIN_ACTIVITY_NAME) -> null
+         startsWith(MAIN_ACTIVITY_NAME) -> substring(MAIN_ACTIVITY_NAME.length)
+         else -> null
+       }
+     }
+-
+-  private fun replaceMainActivitySimpleName(component: ComponentName, suffix: String?): ComponentName {
+-    val newActivitySimpleName = "$MAIN_ACTIVITY_NAME${suffix ?: ""}"
+-    val identifiers = component.className.split('.').toMutableList()
+-    identifiers[identifiers.size - 1] = newActivitySimpleName
+-    val packageName = component.packageName
+-    val newActivityName = identifiers.joinToString(".")
+-    return ComponentName(packageName, newActivityName)
+-  }
+-
+ }
