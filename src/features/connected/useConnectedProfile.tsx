@@ -11,6 +11,7 @@ import { useUser } from "@clerk/expo"
 import { useConvexAuth, useMutation } from "convex/react"
 
 import { translate } from "@/i18n/translate"
+import { convexErrorMessage } from "@/utils/convexError"
 
 import { useConvexOnline } from "./useConvexOnline"
 import { api } from "../../../convex/_generated/api"
@@ -151,8 +152,10 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
         setReadyUserId((ready) => (ready === profile.userId ? undefined : ready))
         setFailure({
           userId: profile.userId,
-          message:
+          message: convexErrorMessage(
+            cause,
             cause instanceof Error ? cause.message : translate("connected:profile.prepareFailed"),
+          ),
         })
       })
     return () => {

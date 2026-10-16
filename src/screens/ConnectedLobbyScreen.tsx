@@ -266,7 +266,10 @@ function ConnectedLobbyContent({
       await start({ publicId })
     } catch (cause) {
       setActionError(
-        cause instanceof Error ? cause.message : translate("connected:lobby.errors.start"),
+        convexErrorMessage(
+          cause,
+          cause instanceof Error ? cause.message : translate("connected:lobby.errors.start"),
+        ),
       )
     } finally {
       startInFlight.current = false
@@ -353,7 +356,10 @@ function ConnectedLobbyContent({
       onLeft?.()
     } catch (cause) {
       setActionError(
-        cause instanceof Error ? cause.message : translate("connected:lobby.errors.leave"),
+        convexErrorMessage(
+          cause,
+          cause instanceof Error ? cause.message : translate("connected:lobby.errors.leave"),
+        ),
       )
     } finally {
       setLeaving(false)

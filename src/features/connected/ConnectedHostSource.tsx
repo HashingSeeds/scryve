@@ -217,7 +217,12 @@ function ConnectedHostQuerySource({
       resumeRepository.removeResumeEntry(game.publicId)
       return true
     } catch (cause) {
-      setExitError(cause instanceof Error ? cause.message : translate("connected:host.exitFailed"))
+      setExitError(
+        convexErrorMessage(
+          cause,
+          cause instanceof Error ? cause.message : translate("connected:host.exitFailed"),
+        ),
+      )
       return false
     } finally {
       setBusy(false)
