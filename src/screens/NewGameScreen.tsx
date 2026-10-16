@@ -658,6 +658,7 @@ export function NewGameScreen({
             <Button
               testID="setup-change-button"
               tx="play:newGame.change"
+              accessibilityLabel={`${translate("play:newGame.change")}, ${setupSummary}`}
               style={themed($changeButton)}
               onPress={() => setOptionsOpen(true)}
             />

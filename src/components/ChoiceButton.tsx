@@ -73,7 +73,12 @@ export function ChoiceButton(props: ChoiceButtonProps) {
           : () => (
               <View style={themed($trailing)}>
                 {detail ? (
-                  <Text size="xs" text={detail} style={[themed($detail), { color: foreground }]} />
+                  <Text
+                    size="xs"
+                    text={detail}
+                    numberOfLines={1}
+                    style={[themed($detail), { color: foreground }]}
+                  />
                 ) : null}
                 <CheckBadge selected={selected} color={foreground} />
               </View>
@@ -126,6 +131,7 @@ const $leading: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginEnd: spacing.
 const $trailing: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
+  flexShrink: 1,
   gap: spacing.sm,
   marginStart: spacing.sm,
 })
@@ -139,4 +145,4 @@ const $badge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   justifyContent: "center",
 })
 const $check: ThemedStyle<TextStyle> = () => ({ lineHeight: 18 })
-const $detail: ThemedStyle<TextStyle> = () => ({ opacity: 0.75 })
+const $detail: ThemedStyle<TextStyle> = () => ({ opacity: 0.75, flexShrink: 1 })
