@@ -188,7 +188,7 @@ export function AppUtilityMenu({
               onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
             >
               <Text
-                text={`Nearby only: ${nearbyOnly ? "On" : "Off"}`}
+                tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
                 weight="medium"
                 numberOfLines={1}
                 maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}

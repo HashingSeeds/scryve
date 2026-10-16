@@ -25,6 +25,8 @@ export default {
     account: "Compte",
     signIn: "Se connecter",
     closeMenu: "Fermer le menu",
+    nearbyOnlyOn: "À proximité uniquement : activé",
+    nearbyOnlyOff: "À proximité uniquement : désactivé",
   },
   appNavigation: {
     decks: "Decks",

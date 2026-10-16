@@ -19,6 +19,8 @@
   "appMenu.account": "85fa5afe6bcb",
   "appMenu.signIn": "0bf309f8b036",
   "appMenu.closeMenu": "d7adb216e365",
+  "appMenu.nearbyOnlyOn": "c86bfde4f74e",
+  "appMenu.nearbyOnlyOff": "3c9e652b6d93",
   "appNavigation.decks": "02d3c84ba65c",
   "appNavigation.returnToGame": "f65f3bdbde33",
   "appNavigation.play": "6e87bc983040",

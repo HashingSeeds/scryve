@@ -25,6 +25,8 @@ export default {
     account: "계정",
     signIn: "로그인",
     closeMenu: "유틸리티 메뉴 닫기",
+    nearbyOnlyOn: "근처 전용: 켜짐",
+    nearbyOnlyOff: "근처 전용: 꺼짐",
   },
   appNavigation: {
     decks: "덱",
