@@ -56,9 +56,9 @@ const SAMPLE_DECKS: readonly (readonly PokemonCard[])[] = [
   [card("Dragonite ex", 330), card("Dratini", 70), card("Dragonair", 90), card("Snorlax", 150)],
 ]
 // Damage on each seat's Active (its deck's first card), then on its bench, in deck order.
-// Maya's Active is one hit from a knockout for the tour's demo.
+// Maya's first bench Pokémon is two hits from a knockout for the tour's demo.
 const SAMPLE_DAMAGE: readonly (readonly number[])[] = [
-  [310, 0, 30],
+  [120, 50, 30],
   [60, 20, 0],
   [0, 0, 40],
   [90, 0],
@@ -446,18 +446,15 @@ const inSeat = (seat: number, selector: string) => `.seat[data-player="${seat}"]
 const damageIn = (seat: number) => inSeat(seat, '[data-pk="damage"][data-dir="-1"]')
 const firstBench = (seat: number) => inSeat(seat, '[data-pk="bench"]')
 
-// The tour's Pokémon turn, on whatever seats the visitor's table has. Devon damages his Active
-// and then a bench Pokémon with one tap on its chip. Maya's Active takes the knockout; with more
-// than one opponent she picks Devon to take the prizes. Devon's prizes drop, and Maya taps her
-// bench to send in a new Active. Each tap clicks the real control, and a tap whose control isn't
-// there (the visitor's own board may differ) does nothing.
+// The tour's Pokémon turn, on whatever seats the visitor's table has. It plays on Maya, the seat
+// facing a phone on its side: she damages her Active, then taps a bench Pokémon and knocks it
+// out. With more than one opponent she picks Devon to take the prize. Each tap clicks the real
+// control, and a tap whose control isn't there (the visitor's own board may differ) does nothing.
 const POKEMON_DEMO_SCRIPT = [
-  { tap: damageIn(1), hint: inSeat(1, '[data-glyph="1:-1"]'), presses: 3 },
-  { tap: firstBench(1), presses: 1 },
-  { tap: damageIn(1), hint: inSeat(1, '[data-glyph="1:-1"]'), presses: 2 },
+  { tap: damageIn(0), hint: inSeat(0, '[data-glyph="0:-1"]'), presses: 3 },
+  { tap: firstBench(0), presses: 1 },
   { tap: damageIn(0), hint: inSeat(0, '[data-glyph="0:-1"]'), presses: 2 },
   { tap: inSeat(0, '[data-pk="taker"][data-value="1"]'), presses: 1 },
-  { tap: firstBench(0), presses: 1 },
 ] as const
 
 export interface PokemonDemoOptions {

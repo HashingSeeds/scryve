@@ -5,9 +5,9 @@
 export const HINT_PRESS_MS = 550
 // From the last press to when the hand has gone.
 const HINT_LEAVE_MS = 450
-// The hand reaches up and in on screen at this angle, whichever way its seat faces. Too close
-// to the bottom of the screen for the hand, it reaches down from above instead.
-const HINT_ANGLE = { up: 45, down: 135 }
+// The hand reaches up and in on screen at this angle, whichever way its seat faces. Near the
+// bottom of the screen its wrist runs off the edge, like a hand reaching in from below.
+const HINT_ANGLE = 45
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"
 const INTO_PRESS = "cubic-bezier(0.55, 0, 1, 0.45)"
 
@@ -141,11 +141,7 @@ export function showTapHint(target: Element, { presses = 1, every = 300 } = {}) 
   hint.style.setProperty("--tip-x", String(x))
   hint.style.setProperty("--tip-y", String(y))
   board.append(hint)
-  // How far the hand hangs below the fingertip when it leans the usual way.
-  const drop = hint.offsetHeight * scale * Math.cos((HINT_ANGLE.up * Math.PI) / 180)
-  const lean =
-    screen.getBoundingClientRect().bottom - spot.y < drop ? HINT_ANGLE.down : HINT_ANGLE.up
-  hint.style.rotate = `${(mirror ? -lean : lean) - axis}deg`
+  hint.style.rotate = `${(mirror ? -HINT_ANGLE : HINT_ANGLE) - axis}deg`
   if (mirror) hint.style.scale = "-1 1"
   const total = HINT_PRESS_MS + (presses - 1) * every + HINT_LEAVE_MS
   hint.animate(handFrames(presses, every, total), total).finished.then(
