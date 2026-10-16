@@ -472,6 +472,8 @@ export default {
       seatTaken: "Ese asiento pertenece a otro dispositivo.",
       started: "Esta partida ya ha empezado.",
       full: "Esta partida está llena.",
+      update: "Actualiza Scryve para unirte a esta partida.",
+      hostOutdated: "El anfitrión tiene que actualizar Scryve primero.",
     },
   },
 } satisfies LocaleNamespace

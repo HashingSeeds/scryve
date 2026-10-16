@@ -479,6 +479,8 @@ export default {
       seatTaken: "Cette place appartient à un autre appareil.",
       started: "Cette partie a déjà commencé.",
       full: "Cette partie est complète.",
+      update: "Mettez à jour Scryve pour rejoindre cette partie.",
+      hostOutdated: "L’hôte doit d’abord mettre à jour Scryve.",
     },
   },
 } satisfies LocaleNamespace

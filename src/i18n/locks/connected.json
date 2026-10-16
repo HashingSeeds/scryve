@@ -323,5 +323,7 @@
   "nearby.errors.lostHost": "d672cabb4f50",
   "nearby.rejected.seatTaken": "e1e32098e2a3",
   "nearby.rejected.started": "163d003325ae",
-  "nearby.rejected.full": "3ac308af14dc"
+  "nearby.rejected.full": "3ac308af14dc",
+  "nearby.rejected.update": "906c763e2aaa",
+  "nearby.rejected.hostOutdated": "0b436e34747d"
 }

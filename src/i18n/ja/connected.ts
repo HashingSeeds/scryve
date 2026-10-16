@@ -447,6 +447,8 @@ export default {
       seatTaken: "その席は別のデバイスが使用中です。",
       started: "このゲームはすでに開始されています。",
       full: "このゲームは満員です。",
+      update: "このゲームに参加するにはScryveをアップデートしてください。",
+      hostOutdated: "ホストが先にScryveをアップデートする必要があります。",
     },
   },
 } satisfies LocaleNamespace

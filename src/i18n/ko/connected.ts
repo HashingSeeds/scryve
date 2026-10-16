@@ -440,6 +440,8 @@ export default {
       seatTaken: "해당 자리는 다른 기기에서 사용 중입니다.",
       started: "이미 시작된 게임입니다.",
       full: "게임이 가득 찼습니다.",
+      update: "이 게임에 참여하려면 Scryve를 업데이트하세요.",
+      hostOutdated: "호스트가 먼저 Scryve를 업데이트해야 합니다.",
     },
   },
 } satisfies LocaleNamespace

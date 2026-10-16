@@ -457,6 +457,8 @@ export default {
       seatTaken: "यह सीट किसी दूसरे डिवाइस की है।",
       started: "यह गेम पहले ही शुरू हो चुका है।",
       full: "यह गेम भर चुका है।",
+      update: "इस गेम में शामिल होने के लिए Scryve अपडेट करें।",
+      hostOutdated: "होस्ट को पहले Scryve अपडेट करना होगा।",
     },
   },
 } satisfies LocaleNamespace
