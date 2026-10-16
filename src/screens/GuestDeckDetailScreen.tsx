@@ -28,6 +28,7 @@ import {
   type GuestDeckPayload,
 } from "@/features/decks/guestDeck"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -118,14 +119,14 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
         contentContainerStyle={themed($screen)}
       >
         <Header
-          title="Guest deck"
+          titleTx="decks:deckView.guestTitle"
           leftTx="common:back"
           onLeftPress={() => (sameDraft(draft, baseRef.current) ? onBack() : setDiscarding(true))}
         />
         <View style={themed($empty)}>
-          <Text preset="subheading" text="Guest deck unavailable" />
-          <Text text="This deck was deleted or has not been saved yet." />
-          <Button text="Back" onPress={onBack} />
+          <Text preset="subheading" tx="decks:guestDetail.unavailable" />
+          <Text tx="decks:guestDetail.unavailableDetail" />
+          <Button tx="common:back" onPress={onBack} />
         </View>
       </Screen>
     )
@@ -182,7 +183,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
     setError(undefined)
     setConflict(false)
     if (!current.name.trim()) {
-      setError("Enter a deck name.")
+      setError(translate("decks:guestDetail.nameRequired"))
       return
     }
     const latest = loadGuestDeck(localId)
@@ -193,7 +194,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       latest.localId !== revision.localId ||
       latest.updatedAt !== revision.updatedAt
     ) {
-      setError("This deck changed elsewhere. Reload it before saving.")
+      setError(translate("decks:guestDetail.changedBeforeSave"))
       setConflict(true)
       return
     }
@@ -208,7 +209,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       baseRef.current = saved.deck
       revisionRef.current = { localId: saved.localId, updatedAt: saved.updatedAt }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save guest deck.")
+      setError(cause instanceof Error ? cause.message : translate("decks:guestStorage.saveFailed"))
     }
   }
 
@@ -289,7 +290,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
             {conflict ? (
               <Button
                 testID="guest-deck-reload"
-                text="Reload saved deck"
+                tx="decks:guestDetail.reload"
                 onPress={() => {
                   const latest = loadGuestDeck(localId)
                   if (!latest) return
@@ -347,7 +348,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
               )
               if ("error" in result) return result.error
               if (result.cards.length > MAX_DECK_CARDS)
-                return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+                return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
               update({ cards: result.cards })
               setCommanderSelected(true)
               if (choosingCommander) setAdding(false)
@@ -358,11 +359,11 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
             )
             if (index >= 0) {
               const entry = current.cards[index]
-              if (entry.quantity >= 999) return "A card can have at most 999 copies."
+              if (entry.quantity >= 999) return translate("decks:draft.copyLimit", { limit: 999 })
               updateCard(index, { ...entry, quantity: entry.quantity + 1 })
             } else {
               if (current.cards.length >= MAX_DECK_CARDS)
-                return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+                return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
               update({ cards: [...current.cards, card] })
             }
             return undefined
@@ -419,10 +420,10 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       ) : null}
       <ConfirmDialog
         visible={discarding}
-        title="Discard changes?"
-        message="Your edits will be lost."
-        confirmText="Discard"
-        cancelText="Keep editing"
+        title={translate("decks:detail.discardTitle")}
+        message={translate("decks:detail.discardBody")}
+        confirmText={translate("decks:detail.discard")}
+        cancelText={translate("decks:detail.keepEditing")}
         destructive
         confirmTestID="guest-deck-discard-confirm"
         onClose={() => {
@@ -443,9 +444,9 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
       />
       <ConfirmDialog
         visible={deleting}
-        title="Delete guest deck?"
-        message="This removes the deck from this device."
-        confirmText="Delete"
+        title={translate("decks:guestDetail.deleteTitle")}
+        message={translate("decks:guestDetail.deleteBody")}
+        confirmText={translate("common:delete")}
         destructive
         cancelTestID="confirm-dialog-cancel"
         confirmTestID="guest-deck-confirm-delete"
@@ -459,7 +460,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
               latest.localId !== deleteRevision.localId ||
               latest.updatedAt !== deleteRevision.updatedAt
             ) {
-              setError("This deck changed elsewhere. Reload it before deleting.")
+              setError(translate("decks:guestDetail.changedBeforeDelete"))
               setConflict(true)
               setDeleting(false)
               return
@@ -467,7 +468,9 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
             deleteGuestDeck(localId)
             setLeaving(true)
           } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Unable to delete guest deck.")
+            setError(
+              cause instanceof Error ? cause.message : translate("decks:guestStorage.deleteFailed"),
+            )
             setDeleting(false)
           }
         }}

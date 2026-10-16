@@ -1,5 +1,7 @@
 import type { FunctionReturnType } from "convex/server"
 
+import { translate } from "@/i18n/translate"
+
 import { getCommanderWarnings, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardDetailsKey, printingKey, type DeckCard } from "./deckCards"
 import { canChooseCommander, draftChanges, type DeckDraft } from "./deckDraft"
@@ -10,6 +12,7 @@ import {
   DECK_CONFLICT_REASON,
   DECK_VERSION_CONFLICT_REASON,
   DECK_VERSION_QUEUE_CONFLICT_REASON,
+  syncReasonMessage,
 } from "./deckSyncReasons"
 import type { DeckVersionCacheSnapshot, StoredVersion } from "./deckVersionsCache"
 import type { api } from "../../../convex/_generated/api"
@@ -190,34 +193,41 @@ export function resolveDeckView(input: DeckViewInput) {
   const comparedFields =
     failedEdit && accountMetadata
       ? [
-          { label: "Name", local: failedEdit.action.name, account: accountMetadata.name },
           {
-            label: "Format",
+            label: translate("decks:conflict.name"),
+            local: failedEdit.action.name,
+            account: accountMetadata.name,
+          },
+          {
+            label: translate("decks:conflict.format"),
             local: deckFormatLabel(failedEdit.action.game, failedEdit.action.format),
             account: deckFormatLabel(accountMetadata.game, accountMetadata.format),
           },
           {
-            label: "Notes",
+            label: translate("decks:conflict.notes"),
             local: failedEdit.action.note ?? "",
             account: accountMetadata.note ?? "",
           },
         ].filter((field) => field.local !== field.account)
       : []
-  const failureMessage =
-    (failedCardEdit && !UNSAFE_FAILURE_REASON.test(failedCardEdit.reason)
+  const failureReason =
+    failedCardEdit && !UNSAFE_FAILURE_REASON.test(failedCardEdit.reason)
       ? failedCardEdit.reason
       : failedEdit && !UNSAFE_FAILURE_REASON.test(failedEdit.reason)
         ? failedEdit.reason
-        : undefined) ?? "This edit could not be synced. Try again or discard it."
+        : undefined
+  const failureMessage = failureReason
+    ? syncReasonMessage(failureReason)
+    : translate("decks:conflict.syncFailed")
   const saveStatus =
     sync.enabled && sync.ownerId
       ? failedEdit || failedCardEdit
-        ? "Local edit not synced"
+        ? translate("decks:saveStatus.notSynced")
         : metadataWrites.capacityBlocked || versionWrites.capacityBlocked
-          ? "Sync paused. Resolve a saved local edit to continue."
+          ? translate("decks:saveStatus.paused")
           : pendingMetadata.length || pendingCards.length
-            ? "Saved locally · Pending sync"
-            : "Synced"
+            ? translate("decks:saveStatus.pending")
+            : translate("decks:saveStatus.synced")
       : undefined
 
   return {

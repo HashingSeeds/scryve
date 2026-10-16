@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useMutation } from "convex/react"
 
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { translate } from "@/i18n/translate"
 import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 
 import {
@@ -69,15 +70,11 @@ export function useGuestDeckImport(access?: CloudAccess) {
           summary.imported += 1
           const removed = acknowledgeGuestDeckImport(deck.localId, response.localUpdatedAt)
           if (!removed && loadGuestDeck(deck.localId))
-            failure = "A local deck has newer edits. It is still saved on this device."
+            failure = translate("decks:guestImport.newerEdits")
         } catch (cause) {
           if (!stillOwner()) return
           if (convexErrorCode(cause) === "deck_limit_reached") summary.limitReached += 1
-          else
-            failure = convexErrorMessage(
-              cause,
-              "Could not sync a deck. It is saved on this device.",
-            )
+          else failure = convexErrorMessage(cause, translate("decks:guestImport.syncFailed"))
         }
       }
       setResult(summary)

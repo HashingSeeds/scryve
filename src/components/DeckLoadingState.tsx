@@ -2,6 +2,7 @@ import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -14,7 +15,9 @@ export function DeckListSkeleton({
 }) {
   const { themed } = useAppTheme()
   const visibleSections =
-    sections.length > 0 ? sections.slice(0, 2) : [{ id: "cards", label: "Cards" }]
+    sections.length > 0
+      ? sections.slice(0, 2)
+      : [{ id: "cards", label: translate("decks:loading.cards") }]
   const rowStyle = density === "comfortable" ? $comfortableRow : $compactRow
   const thumbnailStyle = density === "comfortable" ? $comfortableThumbnail : $compactThumbnail
 

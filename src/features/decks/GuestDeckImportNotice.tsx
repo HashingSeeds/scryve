@@ -4,13 +4,10 @@ import { View } from "react-native"
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { translate } from "@/i18n/translate"
 
 import { DeckLimitDialog } from "./DeckLimit"
 import { useGuestDeckImport } from "./useGuestDeckImport"
-
-function deckCount(count: number) {
-  return `${count} ${count === 1 ? "deck" : "decks"}`
-}
 
 export function GuestDeckImportNotice({
   access,
@@ -23,23 +20,26 @@ export function GuestDeckImportNotice({
   if (!transfer.guestDecks.length || !access?.ready) return null
   const kept = transfer.result?.limitReached ?? 0
   const imported = transfer.result?.imported ?? 0
+  const keptSummary = [
+    imported > 0 ? translate("decks:guestImport.synced", { count: imported }) : undefined,
+    translate("decks:guestImport.didNotFit", { count: kept }),
+  ]
+    .filter(Boolean)
+    .join(" ")
   return (
     <View>
       {transfer.importing ? (
         <Text
           accessibilityLiveRegion="polite"
-          text={
-            transfer.guestDecks.length > 1
-              ? "Syncing your saved decks…"
-              : "Syncing your saved deck…"
-          }
+          tx="decks:guestImport.syncing"
+          txOptions={{ count: transfer.guestDecks.length }}
         />
       ) : null}
       {transfer.error ? (
         <View>
           <Text accessibilityRole="alert" text={transfer.error} />
           <Button
-            text="Retry sync"
+            tx="decks:guestImport.retrySync"
             disabled={transfer.importing}
             onPress={() => void transfer.retry()}
           />
@@ -47,16 +47,8 @@ export function GuestDeckImportNotice({
       ) : null}
       {kept > 0 ? (
         <>
-          <Text
-            size="sm"
-            text={[
-              imported > 0 ? `Synced ${deckCount(imported)}.` : undefined,
-              `${deckCount(kept)} did not fit and ${kept > 1 ? "are" : "is"} still saved on this device.`,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          />
-          <Button text="Make room" onPress={() => setMakingRoom(true)} />
+          <Text size="sm" text={keptSummary} />
+          <Button tx="decks:guestImport.makeRoom" onPress={() => setMakingRoom(true)} />
           {makingRoom ? (
             <DeckLimitDialog
               access={access}

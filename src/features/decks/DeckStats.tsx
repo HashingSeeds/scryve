@@ -8,7 +8,9 @@ import type { ThemedStyle } from "@/theme/types"
 
 import {
   deckStatLines,
+  statLineLabel,
   STATS_SOURCES,
+  statsSourceLabel,
   type DeckStatsRecord,
   type StatsSource,
 } from "./deckStatLines"
@@ -28,7 +30,7 @@ export function DeckStats({
     <View testID="deck-stats" style={themed($stats)}>
       <View style={themed($lines)}>
         {lines.length === 0 ? (
-          <Text size="xs" style={themed($dim)} text="No results yet" />
+          <Text size="xs" style={themed($dim)} tx="decks:stats.noResults" />
         ) : (
           lines.map((line) => (
             <View
@@ -36,7 +38,7 @@ export function DeckStats({
               testID={`deck-stats-line-${line.label.toLowerCase()}`}
               style={themed($line)}
             >
-              <Text size="xs" style={themed($dim)} text={line.label} />
+              <Text size="xs" style={themed($dim)} text={statLineLabel(line)} />
               <Text size="sm" weight="medium" style={$tabularNumbers} text={line.text} />
             </View>
           ))
@@ -45,11 +47,11 @@ export function DeckStats({
       <View style={themed($pills)}>
         {STATS_SOURCES.map((option) => (
           <FilterPill
-            key={option.value}
-            testID={`deck-stats-source-${option.value}`}
-            label={option.label}
-            selected={source === option.value}
-            onPress={() => onSourceChange(option.value)}
+            key={option}
+            testID={`deck-stats-source-${option}`}
+            label={statsSourceLabel(option)}
+            selected={source === option}
+            onPress={() => onSourceChange(option)}
           />
         ))}
       </View>

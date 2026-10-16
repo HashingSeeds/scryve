@@ -42,7 +42,7 @@ import {
 } from "@/features/decks/deckDraft"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
-import { deckStatLines, type StatsSource } from "@/features/decks/deckStatLines"
+import { deckStatLines, statLineSummary, type StatsSource } from "@/features/decks/deckStatLines"
 import { useDeckVersionWrites } from "@/features/decks/decksVersionWrites"
 import {
   cachedCardIdentity,
@@ -56,6 +56,7 @@ import {
   resolveDeckView,
 } from "@/features/decks/resolveDeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -77,7 +78,7 @@ type DeckDialog =
   | "discard"
   | "syncConflict"
 
-const OFFLINE_CARD_MESSAGE = "You’re offline. Cards already in your decks can be added."
+const DECK_TABS = ["cards", "notes"] as const
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -122,7 +123,10 @@ function DeckDetailPlaceholder({
         .join(" · ")
     : null
   const loadingSections = summary ? deckSections(summary.game, summary.format) : []
-  const statusText = failure?.kind === "missing" ? "Deck not found" : "Deck unavailable"
+  const statusText =
+    failure?.kind === "missing"
+      ? translate("decks:detail.notFound")
+      : translate("decks:detail.unavailable")
 
   return (
     <Screen
@@ -149,18 +153,22 @@ function DeckDetailPlaceholder({
       >
         <View style={themed($headerBlock)}>
           <View style={themed($titleBlock)}>
-            <Text preset="heading" size="xl" text={summary?.name ?? "Deck"} />
+            <Text
+              preset="heading"
+              size="xl"
+              text={summary?.name ?? translate("decks:deckView.title")}
+            />
             {loadingMetadata ? (
               <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
             ) : null}
             <LoadingProgress
               testID="deck-loading-progress"
               state={failure || access?.message ? "unavailable" : "loading"}
-              accessibilityText={failure ? statusText : "Loading deck"}
+              accessibilityText={failure ? statusText : translate("decks:detail.loading")}
             />
           </View>
           <View style={themed($tabs)} accessibilityRole="tablist">
-            {(["cards", "notes"] as const).map((tab) => (
+            {DECK_TABS.map((tab) => (
               <TouchableOpacity
                 key={tab}
                 testID={`deck-tab-${tab}`}
@@ -172,7 +180,7 @@ function DeckDetailPlaceholder({
                 <Text
                   size="sm"
                   weight={tab === "cards" ? "bold" : "normal"}
-                  text={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  tx={tab === "cards" ? "decks:deckView.cardsTab" : "decks:deckView.notesTab"}
                 />
               </TouchableOpacity>
             ))}
@@ -182,8 +190,8 @@ function DeckDetailPlaceholder({
             style={themed($currentVersion)}
             disabled
           >
-            <Text size="xs" style={themed($dimmedText)} text="Current version" />
-            <Text weight="medium" text="Current ›" />
+            <Text size="xs" style={themed($dimmedText)} tx="decks:detail.currentVersion" />
+            <Text weight="medium" tx="decks:detail.current" />
           </TouchableOpacity>
           {access?.message ? (
             <Button text={access.actionLabel ?? access.message} onPress={access.request} />
@@ -194,14 +202,14 @@ function DeckDetailPlaceholder({
               <Text
                 size="sm"
                 style={themed($dimmedText)}
-                text={
+                tx={
                   failure.kind === "missing"
-                    ? "This deck may have been deleted."
-                    : "Could not load this deck."
+                    ? "decks:detail.maybeDeleted"
+                    : "decks:detail.loadFailed"
                 }
               />
               {failure.kind === "unavailable" ? (
-                <Button testID="retry-deck-detail" text="Retry" onPress={failure.retry} />
+                <Button testID="retry-deck-detail" tx="common:retry" onPress={failure.retry} />
               ) : null}
             </View>
           ) : null}
@@ -212,7 +220,7 @@ function DeckDetailPlaceholder({
         <View style={themed($actionRow)}>
           <Button
             testID="edit-deck-button"
-            text="Edit list"
+            tx="decks:detail.editList"
             preset="primary"
             style={$primaryActionButton}
             disabled
@@ -482,7 +490,7 @@ function DeckDetailContent({
     if (!alreadyInDraft && offline) {
       const entry = offlineCardEntry(card)
       if (!entry) {
-        setError(OFFLINE_CARD_MESSAGE)
+        setError(translate("decks:detail.offlineCard"))
         return
       }
       // The cached card carries the full server identity; the candidate may not.
@@ -543,7 +551,7 @@ function DeckDetailContent({
     metadataSaveStarted.current = true
     if (knownDeleted) {
       metadataSaveStarted.current = false
-      fail(new Error("This deck was deleted."), "Could not save deck")
+      fail(new Error("This deck was deleted."), translate("decks:detail.saveFailed"))
       return
     }
     const cardTarget = pinnedVersionTarget.current ?? versionTarget
@@ -574,7 +582,7 @@ function DeckDetailContent({
         finish()
       } catch (cause) {
         metadataSaveStarted.current = false
-        fail(cause, "Could not save deck")
+        fail(cause, translate("decks:detail.saveFailed"))
       }
       return
     }
@@ -591,7 +599,7 @@ function DeckDetailContent({
       else if (plan.note === "mutation")
         await updateDeck({ deckId: deckId as Id<"decks">, note: draft.note })
       finish()
-    }, "Could not save deck")
+    }, translate("decks:detail.saveFailed"))
     if (!saved) metadataSaveStarted.current = false
   }
 
@@ -603,9 +611,7 @@ function DeckDetailContent({
     setError(undefined)
     if (!view.canAddVersion) {
       const limit = view.versionLimit
-      setError(
-        `This deck holds up to ${limit} version${limit === 1 ? "" : "s"}. Delete one to add another.`,
-      )
+      setError(translate("decks:detail.versionLimit", { count: limit }))
       return
     }
     setDialog("newVersion")
@@ -617,7 +623,7 @@ function DeckDetailContent({
       // a server snapshot fromVersionId would silently miss pending offline cards.
       const captured = copyCards ? view.versionCapture : undefined
       if (copyCards && captured === undefined) {
-        setError("Saved cards are not available. Reconnect or create an empty version.")
+        setError(translate("decks:detail.cardsNotSaved"))
         return
       }
       try {
@@ -630,12 +636,12 @@ function DeckDetailContent({
         setSelectedVersionId(provisionalId as Id<"deckVersions">)
         setDialog("none")
       } catch (cause) {
-        fail(cause, "Could not create version")
+        fail(cause, translate("decks:detail.createVersionFailed"))
       }
       return
     }
     if (!detail) {
-      setError("Reconnect to create versions.")
+      setError(translate("decks:detail.reconnectForVersions"))
       return
     }
     await run(async () => {
@@ -647,7 +653,7 @@ function DeckDetailContent({
       })
       setSelectedVersionId(versionId)
       setDialog("none")
-    }, "Could not create version")
+    }, translate("decks:detail.createVersionFailed"))
   }
 
   async function submitRenameVersion({ name, note }: DeckVersionDraft) {
@@ -661,7 +667,7 @@ function DeckDetailContent({
         )
         setDialog("none")
       } catch (cause) {
-        fail(cause, "Could not update version")
+        fail(cause, translate("decks:detail.updateVersionFailed"))
       }
       return
     }
@@ -669,7 +675,7 @@ function DeckDetailContent({
     await run(async () => {
       await updateVersion({ versionId: version._id, name, note })
       setDialog("none")
-    }, "Could not update version")
+    }, translate("decks:detail.updateVersionFailed"))
   }
 
   function startDeleteVersion() {
@@ -689,7 +695,7 @@ function DeckDetailContent({
         setSelectedVersionId(undefined)
         setDialog("none")
       } catch (cause) {
-        fail(cause, "Could not delete version")
+        fail(cause, translate("decks:detail.deleteVersionFailed"))
       }
       return
     }
@@ -698,13 +704,13 @@ function DeckDetailContent({
       await deleteVersion({ versionId: version._id })
       setSelectedVersionId(undefined)
       setDialog("none")
-    }, "Could not delete version")
+    }, translate("decks:detail.deleteVersionFailed"))
   }
 
   async function submitSettings({ name, format }: { name: string; format: string }) {
     if (knownDeleted) {
       settingsSaveStarted.current = false
-      fail(new Error("This deck was deleted."), "Could not update deck")
+      fail(new Error("This deck was deleted."), translate("decks:detail.updateFailed"))
       return
     }
     if (view.canQueueMetadata && settingsMetadataRevision !== undefined) {
@@ -716,14 +722,14 @@ function DeckDetailContent({
         setDialog("none")
       } catch (cause) {
         settingsSaveStarted.current = false
-        fail(cause, "Could not update deck")
+        fail(cause, translate("decks:detail.updateFailed"))
       }
       return
     }
     await run(async () => {
       await updateDeck({ deckId: deckId as Id<"decks">, name, format })
       setDialog("none")
-    }, "Could not update deck")
+    }, translate("decks:detail.updateFailed"))
   }
 
   async function deleteDeck() {
@@ -731,7 +737,7 @@ function DeckDetailContent({
       await archiveDeck({ deckId: deckId as Id<"decks"> })
       setDialog("none")
       onBack()
-    }, "Could not delete deck")
+    }, translate("decks:detail.deleteFailed"))
   }
 
   if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
@@ -741,7 +747,7 @@ function DeckDetailContent({
   const copyFromVersion = activeVersionSummary ?? version
   const syncError =
     failedEdit || failedCardEdit ? (
-      <Button text="Review changes" onPress={() => setDialog("syncConflict")} />
+      <Button tx="decks:detail.reviewChanges" onPress={() => setDialog("syncConflict")} />
     ) : undefined
 
   return (
@@ -767,7 +773,7 @@ function DeckDetailContent({
         canAddOffline={offlineCandidates.length > 0}
         addOfflineNote={
           offline && cardsCached && offlineCandidates.length === 0
-            ? "No offline cards yet. Open cards online and they'll be available here."
+            ? translate("decks:detail.noOfflineCards")
             : undefined
         }
         editingDisabled={knownDeleted}
@@ -833,28 +839,37 @@ function DeckDetailContent({
           wide
           onClose={() => setDialog("none")}
           dialogTestID="version-sync-conflict"
-          backdropAccessibilityLabel="Later"
+          backdropAccessibilityLabel={translate("decks:conflict.later")}
           accessibilityViewIsModal
         >
           <ScrollView contentContainerStyle={themed($syncFailure)}>
             <Text
               preset="subheading"
-              text={versionCardConflict ? "Keep which card list?" : "Review saved card edits"}
+              tx={
+                versionCardConflict ? "decks:conflict.keepWhichCards" : "decks:conflict.reviewCards"
+              }
             />
             <Text
               size="sm"
               text={
                 knownDeleted
-                  ? "Deck deleted. Your card edits are saved on this device."
+                  ? translate("decks:conflict.deletedCards")
                   : versionCardConflict
-                    ? "The card list changed on another device after you saved. Your edits are still saved on this device."
+                    ? translate("decks:conflict.changedCards")
                     : failureMessage
               }
             />
             <View style={themed($conflictVersion)}>
               <Text
                 size="sm"
-                text={`${failedCardEdit.action.cards.reduce((total, card) => total + card.quantity, 0)} cards · ${failedCardEdit.action.cards.length} entries`}
+                tx="decks:conflict.cardsSummary"
+                txOptions={{
+                  cards: failedCardEdit.action.cards.reduce(
+                    (total, card) => total + card.quantity,
+                    0,
+                  ),
+                  entries: failedCardEdit.action.cards.length,
+                }}
               />
               <Text
                 size="sm"
@@ -862,44 +877,51 @@ function DeckDetailContent({
                   failedCardEdit.action.cards
                     .slice(0, 3)
                     .map((card) => card.name)
-                    .join(", ") || "No cards"
+                    .join(", ") || translate("decks:conflict.noCards")
                 }
                 numberOfLines={2}
               />
               {view.failedVersionSnapshot ? (
                 <Text
                   size="sm"
-                  text={`Account copy: ${view.failedVersionSnapshot.cardQuantity} cards · ${view.failedVersionSnapshot.cardCount} entries · revision ${view.failedVersionSnapshot.revision}`}
+                  tx="decks:conflict.accountCopy"
+                  txOptions={{
+                    cards: view.failedVersionSnapshot.cardQuantity,
+                    entries: view.failedVersionSnapshot.cardCount,
+                    revision: view.failedVersionSnapshot.revision,
+                  }}
                 />
               ) : null}
             </View>
             {error ? <AlertNote text={error} /> : null}
             <Button
               testID="reapply-version-cards"
-              text={versionCardConflict ? "Keep mine" : "Retry sync"}
+              tx={versionCardConflict ? "decks:conflict.keepMine" : "decks:conflict.retrySync"}
               preset="primary"
               onPress={() => {
                 try {
                   versionWrites.reapplyFailure(failedCardEdit.action.operationId)
                   setDialog("none")
                 } catch (cause) {
-                  fail(cause, "Could not save your card changes")
+                  fail(cause, translate("decks:conflict.saveCardsFailed"))
                 }
               }}
             />
             <Button
               testID="discard-version-cards"
-              text={versionCardConflict ? "Keep account" : "Discard local edit"}
+              tx={
+                versionCardConflict ? "decks:conflict.keepAccount" : "decks:conflict.discardLocal"
+              }
               onPress={() => {
                 try {
                   versionWrites.discardFailure(failedCardEdit.action.operationId)
                   setDialog("none")
                 } catch (cause) {
-                  fail(cause, "Could not discard local card edits")
+                  fail(cause, translate("decks:conflict.discardCardsFailed"))
                 }
               }}
             />
-            <Button text="Later" onPress={() => setDialog("none")} />
+            <Button tx="decks:conflict.later" onPress={() => setDialog("none")} />
           </ScrollView>
         </DialogCard>
       ) : null}
@@ -910,19 +932,31 @@ function DeckDetailContent({
           wide
           onClose={() => setDialog("none")}
           dialogTestID="deck-sync-conflict"
-          backdropAccessibilityLabel="Later"
+          backdropAccessibilityLabel={translate("decks:conflict.later")}
           accessibilityViewIsModal
         >
           <ScrollView contentContainerStyle={themed($syncFailure)}>
             <Text
               preset="subheading"
-              text={versionConflict ? "Keep which version?" : "Review local edit"}
+              tx={
+                versionConflict ? "decks:conflict.keepWhichVersion" : "decks:conflict.reviewLocal"
+              }
             />
             {versionConflict && !knownDeleted && accountMetadata ? (
               <>
                 <View style={themed($comparisonRow)}>
-                  <Text weight="bold" size="sm" text="This device" style={$comparisonCell} />
-                  <Text weight="bold" size="sm" text="Account" style={$comparisonCell} />
+                  <Text
+                    weight="bold"
+                    size="sm"
+                    tx="decks:conflict.thisDevice"
+                    style={$comparisonCell}
+                  />
+                  <Text
+                    weight="bold"
+                    size="sm"
+                    tx="decks:conflict.account"
+                    style={$comparisonCell}
+                  />
                 </View>
                 {view.comparedFields.map((field) => (
                   <View key={field.label} style={themed($conflictVersion)}>
@@ -930,47 +964,62 @@ function DeckDetailContent({
                     <View style={themed($comparisonRow)}>
                       <Text
                         size="sm"
-                        text={field.local || "Empty"}
-                        accessibilityLabel={`${field.label}, this device: ${field.local || "Empty"}`}
+                        text={field.local || translate("decks:conflict.empty")}
+                        accessibilityLabel={translate("decks:conflict.localValue", {
+                          field: field.label,
+                          value: field.local || translate("decks:conflict.empty"),
+                        })}
                         style={$comparisonCell}
                       />
                       <Text
                         size="sm"
-                        text={field.account || "Empty"}
-                        accessibilityLabel={`${field.label}, account: ${field.account || "Empty"}`}
+                        text={field.account || translate("decks:conflict.empty")}
+                        accessibilityLabel={translate("decks:conflict.accountValue", {
+                          field: field.label,
+                          value: field.account || translate("decks:conflict.empty"),
+                        })}
                         style={$comparisonCell}
                       />
                     </View>
                   </View>
                 ))}
                 {view.comparedFields.length === 0 ? (
-                  <Text size="sm" text="Both versions match." />
+                  <Text size="sm" tx="decks:conflict.bothMatch" />
                 ) : null}
               </>
             ) : (
               <>
                 <Text
                   size="sm"
-                  text={
-                    knownDeleted
-                      ? "Deck deleted. Your edit is saved on this device."
-                      : failureMessage
-                  }
+                  text={knownDeleted ? translate("decks:conflict.deletedEdit") : failureMessage}
                 />
                 <View style={themed($conflictVersion)}>
-                  <Text size="sm" text={`Name: ${failedEdit.action.name}`} />
                   <Text
                     size="sm"
-                    text={`Format: ${deckFormatLabel(failedEdit.action.game, failedEdit.action.format)}`}
+                    tx="decks:conflict.nameLine"
+                    txOptions={{ name: failedEdit.action.name }}
                   />
-                  <Text size="sm" text={`Note: ${failedEdit.action.note || "No note"}`} />
+                  <Text
+                    size="sm"
+                    tx="decks:conflict.formatLine"
+                    txOptions={{
+                      format: deckFormatLabel(failedEdit.action.game, failedEdit.action.format),
+                    }}
+                  />
+                  <Text
+                    size="sm"
+                    tx="decks:conflict.noteLine"
+                    txOptions={{
+                      note: failedEdit.action.note || translate("decks:conflict.noNote"),
+                    }}
+                  />
                 </View>
               </>
             )}
             {error ? <AlertNote text={error} /> : null}
             <Button
               testID="reapply-deck-metadata"
-              text={versionConflict ? "Keep mine" : "Retry sync"}
+              tx={versionConflict ? "decks:conflict.keepMine" : "decks:conflict.retrySync"}
               preset="primary"
               disabled={knownDeleted || !accountMetadata}
               onPress={() => {
@@ -978,23 +1027,27 @@ function DeckDetailContent({
                   metadataWrites.reapplyFailure(failedEdit.action.operationId)
                   setDialog("none")
                 } catch (cause) {
-                  fail(cause, "Could not save your changes")
+                  fail(cause, translate("decks:conflict.saveFailed"))
                 }
               }}
             />
             <Button
               testID="discard-deck-metadata"
-              text={versionConflict && !knownDeleted ? "Keep account" : "Discard local edit"}
+              tx={
+                versionConflict && !knownDeleted
+                  ? "decks:conflict.keepAccount"
+                  : "decks:conflict.discardLocal"
+              }
               onPress={() => {
                 try {
                   metadataWrites.discardFailure(failedEdit.action.operationId)
                   setDialog("none")
                 } catch (cause) {
-                  fail(cause, "Could not discard local edit")
+                  fail(cause, translate("decks:conflict.discardFailed"))
                 }
               }}
             />
-            <Button text="Later" onPress={() => setDialog("none")} />
+            <Button tx="decks:conflict.later" onPress={() => setDialog("none")} />
           </ScrollView>
         </DialogCard>
       ) : null}
@@ -1071,8 +1124,8 @@ function DeckDetailContent({
 
       {dialog === "newVersion" && (detail || view.canQueueVersions) ? (
         <DeckVersionDialog
-          title="New version"
-          submitLabel="Create version"
+          title={translate("decks:detail.newVersion")}
+          submitLabel={translate("decks:detail.createVersion")}
           copyFromLabel={copyFromVersion ? versionLabel(copyFromVersion) : undefined}
           busy={busy}
           error={error}
@@ -1083,8 +1136,8 @@ function DeckDetailContent({
 
       {dialog === "renameVersion" && activeVersionSummary ? (
         <DeckVersionDialog
-          title="Version details"
-          submitLabel="Save"
+          title={translate("decks:detail.versionDetails")}
+          submitLabel={translate("common:save")}
           initialName={versionLabel(activeVersionSummary)}
           initialNote={activeVersionSummary.note ?? ""}
           notesLocked={!view.premium}
@@ -1112,16 +1165,21 @@ function DeckDetailContent({
           {view.hasVersionRows ? (
             <View style={themed($versions)}>
               <View style={themed($versionHeading)}>
-                <Text weight="bold" size="sm" text="Versions" />
+                <Text weight="bold" size="sm" tx="decks:detail.versions" />
                 {detail || view.canQueueVersions ? (
                   <TouchableOpacity
                     testID="version-picker-__new__"
                     accessibilityRole="button"
-                    accessibilityLabel="New version"
+                    accessibilityLabel={translate("decks:detail.newVersion")}
                     disabled={draft.editing}
                     onPress={startNewVersion}
                   >
-                    <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
+                    <Text
+                      weight="bold"
+                      size="sm"
+                      style={themed($textAction)}
+                      tx="decks:detail.newVersion"
+                    />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -1132,9 +1190,9 @@ function DeckDetailContent({
                   ? deckStatLines(candidate.record, statsSource)
                   : []
                 const candidateRecord = recordLines.length
-                  ? recordLines.map((line) => `${line.label} ${line.text}`)
+                  ? recordLines.map(statLineSummary)
                   : detail
-                    ? ["Unplayed"]
+                    ? [translate("decks:detail.unplayed")]
                     : []
                 return (
                   <TouchableOpacity
@@ -1200,27 +1258,27 @@ function DeckDetailContent({
           onClose={() => setDialog("none")}
           closeDisabled={busy}
           backdropTestID="delete-version-backdrop"
-          backdropAccessibilityLabel="Keep this version"
+          backdropAccessibilityLabel={translate("decks:detail.keepVersion")}
           dialogTestID="delete-version-dialog"
           dialogAccessibilityRole="alert"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Delete this version?" style={themed($dialogText)} />
           <Text
-            size="sm"
-            text="Games already played with it keep their record, but the list will no longer be editable or selectable."
+            preset="subheading"
+            tx="decks:detail.deleteVersionTitle"
             style={themed($dialogText)}
           />
+          <Text size="sm" tx="decks:detail.deleteVersionBody" style={themed($dialogText)} />
           {error ? <AlertNote text={error} /> : null}
           <View style={themed($dialogActions)}>
             <Button
-              text="Cancel"
+              tx="common:cancel"
               style={themed($dialogButton)}
               disabled={busy}
               onPress={() => setDialog("none")}
             />
             <Button
-              text="Delete"
+              tx="common:delete"
               testID="delete-version-confirm"
               style={[themed($dialogButton), themed($destructiveButton)]}
               textStyle={themed($destructiveText)}
@@ -1237,26 +1295,22 @@ function DeckDetailContent({
           onClose={() => setDialog("none")}
           closeDisabled={busy}
           backdropTestID="delete-deck-backdrop"
-          backdropAccessibilityLabel="Keep this deck"
+          backdropAccessibilityLabel={translate("decks:detail.keepDeck")}
           dialogTestID="delete-deck-dialog"
           dialogAccessibilityRole="alert"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Delete this deck?" style={themed($dialogText)} />
-          <Text
-            size="sm"
-            text="Past games keep their record of this deck, but it will no longer be available to pick or edit."
-            style={themed($dialogText)}
-          />
+          <Text preset="subheading" tx="decks:detail.deleteDeckTitle" style={themed($dialogText)} />
+          <Text size="sm" tx="decks:deleteDeck.body" style={themed($dialogText)} />
           <View style={themed($dialogActions)}>
             <Button
-              text="Cancel"
+              tx="common:cancel"
               style={themed($dialogButton)}
               disabled={busy}
               onPress={() => setDialog("none")}
             />
             <Button
-              text="Delete"
+              tx="common:delete"
               testID="delete-deck-confirm"
               style={[themed($dialogButton), themed($destructiveButton)]}
               textStyle={themed($destructiveText)}
@@ -1276,16 +1330,16 @@ function DeckDetailContent({
           }}
           closeDisabled={busy}
           backdropTestID="discard-edits-backdrop"
-          backdropAccessibilityLabel="Keep editing"
+          backdropAccessibilityLabel={translate("decks:detail.keepEditing")}
           dialogTestID="discard-edits-dialog"
           dialogAccessibilityRole="alert"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Discard changes?" style={themed($dialogText)} />
-          <Text size="sm" text="Your edits will be lost." style={themed($dialogText)} />
+          <Text preset="subheading" tx="decks:detail.discardTitle" style={themed($dialogText)} />
+          <Text size="sm" tx="decks:detail.discardBody" style={themed($dialogText)} />
           <View style={themed($dialogActions)}>
             <Button
-              text="Keep editing"
+              tx="decks:detail.keepEditing"
               style={themed($dialogButton)}
               disabled={busy}
               onPress={() => {
@@ -1294,7 +1348,7 @@ function DeckDetailContent({
               }}
             />
             <Button
-              text="Discard"
+              tx="decks:detail.discard"
               testID="discard-edits-confirm"
               style={[themed($dialogButton), themed($destructiveButton)]}
               textStyle={themed($destructiveText)}

@@ -1,3 +1,5 @@
+import { translate } from "@/i18n/translate"
+
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
@@ -116,9 +118,9 @@ export function restoreDraftUndo(draft: DeckDraft): DeckDraft {
 export function cardLimitError(cards: readonly DeckCard[], card: DeckCard) {
   const existing = cards.find((entry) => printingKey(entry) === printingKey(card))
   if (existing && existing.quantity >= MAX_CARD_COPIES)
-    return `A card can have at most ${MAX_CARD_COPIES} copies.`
+    return translate("decks:draft.copyLimit", { limit: MAX_CARD_COPIES })
   if (!existing && cards.length >= MAX_DECK_CARDS)
-    return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+    return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
   return undefined
 }
 
@@ -148,7 +150,7 @@ export function addCommanderCard<T extends DeckCard>(
   const result = addCommander(cards, card, detailsFor, card.commanderColor)
   if ("error" in result) return result
   if (result.cards.length > MAX_DECK_CARDS)
-    return { error: `A deck can have at most ${MAX_DECK_CARDS} entries.` }
+    return { error: translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS }) }
   return { cards: result.cards }
 }
 

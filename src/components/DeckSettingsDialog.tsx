@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react"
 import { ScrollView } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -47,17 +48,17 @@ export function DeckSettingsDialog({
       onClose={onClose}
       closeDisabled={busy}
       backdropTestID="deck-settings-backdrop"
-      backdropAccessibilityLabel="Close deck settings"
+      backdropAccessibilityLabel={translate("decks:settings.close")}
       dialogTestID="deck-settings-dialog"
       accessibilityViewIsModal
       placement="bottom"
       wide
     >
       <ScrollView contentContainerStyle={themed($content)} keyboardShouldPersistTaps="handled">
-        <Text preset="subheading" text="Deck details" />
+        <Text preset="subheading" tx="decks:settings.title" />
         <TextField
           testID="deck-name-input"
-          label="Deck name"
+          labelTx="decks:settings.name"
           value={name}
           maxLength={80}
           helper={deckNameWarning(name)}
@@ -65,7 +66,7 @@ export function DeckSettingsDialog({
         />
         <SelectField
           testID="deck-format-picker"
-          label="Format"
+          label={translate("decks:settings.format")}
           value={format}
           options={deckFormats(game).map((candidate) => ({
             id: candidate.id,
@@ -79,14 +80,14 @@ export function DeckSettingsDialog({
         {error ? <AlertNote text={error} /> : null}
         <Button
           testID="deck-settings-save"
-          text={busy ? "Saving…" : "Save changes"}
+          tx={busy ? "decks:saving" : "decks:settings.save"}
           preset="primary"
           disabled={busy || !name.trim()}
           onPress={() => onSubmit({ name, format })}
         />
         <Button
           testID="delete-deck-button"
-          text="Delete deck"
+          tx="decks:settings.delete"
           style={themed($destructiveButton)}
           textStyle={themed($destructiveText)}
           disabled={busy}

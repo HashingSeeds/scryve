@@ -7,11 +7,13 @@ import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
+import { cardCountLabel } from "./deckCopy"
 import type { DeckStatsRecord, StatsSource } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame, deckSections } from "../../../convex/lib/deckGames"
@@ -97,10 +99,15 @@ export function DeckView({
   return (
     <>
       <Header
-        title={editing ? "Edit deck" : guest ? "Guest deck" : "Deck"}
+        titleTx={
+          editing
+            ? "decks:deckView.editTitle"
+            : guest
+              ? "decks:deckView.guestTitle"
+              : "decks:deckView.title"
+        }
         backgroundColor={theme.colors.surface}
-        leftTx={editing ? undefined : "common:back"}
-        leftText={editing ? "Cancel" : undefined}
+        leftTx={editing ? "common:cancel" : "common:back"}
         onLeftPress={editing ? onCancel : onBack}
         RightActionComponent={
           <View style={$row}>
@@ -112,7 +119,7 @@ export function DeckView({
               onPress={editing ? onSave : onEdit}
             >
               <Text
-                text={editing ? (busy ? "Saving…" : "Save") : "Edit"}
+                tx={editing ? (busy ? "decks:saving" : "common:save") : "common:edit"}
                 style={[
                   themed($action),
                   (busy || editingDisabled || (editing && !dirty)) && $disabled,
@@ -121,7 +128,7 @@ export function DeckView({
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Deck details"
+              accessibilityLabel={translate("decks:deckView.details")}
               testID="deck-settings-button"
               style={$touch}
               disabled={busy || editing || editingDisabled}
@@ -150,9 +157,7 @@ export function DeckView({
                 text={[
                   deckGame(game)?.shortLabel ?? game,
                   deckFormatLabel(game, format),
-                  cardsUnavailable
-                    ? undefined
-                    : `${totalQuantity(cards)} ${totalQuantity(cards) === 1 ? "card" : "cards"}`,
+                  cardsUnavailable ? undefined : cardCountLabel(totalQuantity(cards)),
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -168,7 +173,7 @@ export function DeckView({
                 >
                   <Text
                     size="sm"
-                    text="Add match result"
+                    tx="decks:deckView.addMatch"
                     style={[themed($action), (editing || busy) && $disabled]}
                   />
                 </TouchableOpacity>
@@ -186,7 +191,7 @@ export function DeckView({
                 >
                   <Text
                     size="sm"
-                    text={value === "cards" ? "Cards" : "Notes"}
+                    tx={value === "cards" ? "decks:deckView.cardsTab" : "decks:deckView.notesTab"}
                     style={tab === value ? undefined : themed($dim)}
                   />
                 </TouchableOpacity>
@@ -197,17 +202,17 @@ export function DeckView({
                 {editing ? (
                   <TextField
                     testID="deck-note-input"
-                    accessibilityLabel="Deck notes"
+                    accessibilityLabel={translate("decks:deckView.notesLabel")}
                     value={note}
                     onChangeText={onNoteChange}
-                    placeholder="Add a note"
+                    placeholderTx="decks:deckView.notePlaceholder"
                     multiline
                     maxLength={1000}
                     style={$noteInput}
                   />
                 ) : (
                   <>
-                    <Text text={note || "No notes yet."} size="sm" />
+                    <Text text={note || translate("decks:deckView.noNotes")} size="sm" />
                     <TouchableOpacity
                       testID="edit-deck-notes"
                       style={$noteAction}
@@ -216,7 +221,7 @@ export function DeckView({
                       onPress={onEdit}
                     >
                       <Text
-                        text="Edit notes"
+                        tx="decks:deckView.editNotes"
                         style={[themed($action), editingDisabled && $disabled]}
                       />
                     </TouchableOpacity>
@@ -224,11 +229,11 @@ export function DeckView({
                 )}
               </View>
             ) : cardsUnavailable ? (
-              <Text style={themed($notes)} text="Card list unavailable offline." />
+              <Text style={themed($notes)} tx="decks:deckView.cardsUnavailable" />
             ) : cards.length === 0 ? (
               <Text
                 style={themed($notes)}
-                text={addOfflineNote ?? "No cards yet. Add your first card below."}
+                text={addOfflineNote ?? translate("decks:deckView.noCards")}
               />
             ) : null}
             {addOfflineNote && tab === "cards" && cards.length > 0 ? (
@@ -264,9 +269,14 @@ export function DeckView({
         ))}
         {undo ? (
           <View style={$row}>
-            <Text size="xs" style={$flex} text={`Removed ${undo.name}`} />
+            <Text
+              size="xs"
+              style={$flex}
+              tx="decks:deckView.removed"
+              txOptions={{ card: undo.name }}
+            />
             <TouchableOpacity style={$touch} accessibilityRole="button" onPress={undo.restore}>
-              <Text text="Undo" style={themed($action)} />
+              <Text tx="common:undo" style={themed($action)} />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -274,11 +284,18 @@ export function DeckView({
           <Text
             size="xxs"
             style={[themed($dim), $flex]}
-            text={dirty ? "Unsaved changes" : (saveStatus ?? (guest ? "Saved on device" : "Saved"))}
+            text={
+              dirty
+                ? translate("decks:deckView.unsaved")
+                : (saveStatus ??
+                  (guest
+                    ? translate("decks:deckView.savedOnDevice")
+                    : translate("decks:deckView.saved")))
+            }
           />
           <Button
             testID="deck-add-cards"
-            text="+ Add cards"
+            tx="decks:deckView.addCards"
             onPress={onAdd}
             disabled={
               busy || cardsUnavailable || editingDisabled || (cardsCached && !canAddOffline)

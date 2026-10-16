@@ -45,6 +45,8 @@ import {
 import { GuestDeckImportNotice } from "@/features/decks/GuestDeckImportNotice"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
+import { appLocale, type TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -70,21 +72,26 @@ type DeckCapacity = FunctionReturnType<typeof api.decks.capacity>
 
 type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckCapacity }
 
-const MODES: Array<{ id: CreationMode; label: string }> = [
-  { id: "precon", label: "Browse" },
-  { id: "paste", label: "Import" },
-  { id: "blank", label: "Build" },
-]
+const MODES = [
+  { id: "precon", labelTx: "decks:addDeck.modeBrowse" },
+  { id: "paste", labelTx: "decks:addDeck.modeImport" },
+  { id: "blank", labelTx: "decks:addDeck.modeBuild" },
+] as const satisfies ReadonlyArray<{ id: CreationMode; labelTx: TxKeyPath }>
 
 const SEARCH_DEBOUNCE_MS = 350
 
-const DECK_LINK_SOURCES = new Map([
+const IMPORT_KINDS = ["text", "link"] as const
+
+const DECK_LINK_SOURCES = new Map<
+  string,
+  { name: string; placeholder: string; helperTx: TxKeyPath }
+>([
   [
     "mtg",
     {
       name: "Archidekt",
       placeholder: "https://archidekt.com/decks/12345",
-      helper: "HTTPS links to public Magic decks. For other sites, paste a text export.",
+      helperTx: "decks:addDeck.linkHelperMtg",
     },
   ],
   [
@@ -92,7 +99,7 @@ const DECK_LINK_SOURCES = new Map([
     {
       name: "YGOPRODeck",
       placeholder: "https://ygoprodeck.com/deck/12345",
-      helper: "Links to public YGOPRODeck decks. For other sites, paste a YDK or YDKe export.",
+      helperTx: "decks:addDeck.linkHelperYgo",
     },
   ],
   [
@@ -100,7 +107,7 @@ const DECK_LINK_SOURCES = new Map([
     {
       name: "Limitless",
       placeholder: "https://play.limitlesstcg.com/tournament/…/player/…",
-      helper: "Limitless tournament decklists. For decks you built, paste a Pokémon TCG Live list.",
+      helperTx: "decks:addDeck.linkHelperPokemon",
     },
   ],
 ])
@@ -226,7 +233,9 @@ function CapacityQuery({ onReady }: { onReady: (capacity: DeckCapacity) => void 
     if (capacity) onReady(capacity)
   }, [capacity, onReady])
 
-  return capacity ? null : <Text size="xs" style={themed($label)} text="Checking deck limit…" />
+  return capacity ? null : (
+    <Text size="xs" style={themed($label)} tx="decks:addDeck.checkingLimit" />
+  )
 }
 
 function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
@@ -236,8 +245,8 @@ function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => 
       <ConvexQueryBoundary
         fallback={({ retry }) => (
           <View style={themed($inlineStatus)}>
-            <Text size="xs" style={themed($label)} text="Deck limit unavailable." />
-            <Button testID="retry-deck-capacity" text="Retry" onPress={retry} />
+            <Text size="xs" style={themed($label)} tx="decks:addDeck.limitUnavailable" />
+            <Button testID="retry-deck-capacity" tx="common:retry" onPress={retry} />
           </View>
         )}
       >
@@ -300,14 +309,14 @@ function catalogSourceLabel(deck: CatalogDeck) {
       ? "Konami"
       : "Pokémon"
     : deck.source === "mtgo-examples"
-      ? "MTGO example"
+      ? translate("decks:addDeck.sourceMtgoExample")
       : deck.source === "limitless"
         ? "Limitless"
         : deck.source === "ygoprodeck-decks"
           ? "YGOPRODeck"
           : deck.kind === "tournament"
-            ? "Tournament deck"
-            : "Example deck"
+            ? translate("decks:addDeck.sourceTournament")
+            : translate("decks:addDeck.sourceExample")
 }
 
 function catalogDeckDetail(deck: CatalogDeck) {
@@ -315,7 +324,7 @@ function catalogDeckDetail(deck: CatalogDeck) {
     catalogSourceLabel(deck),
     deck.publishedAt === undefined
       ? undefined
-      : new Date(deck.publishedAt).toLocaleDateString(undefined, {
+      : new Date(deck.publishedAt).toLocaleDateString(appLocale, {
           year: "numeric",
           month: "short",
           day: "numeric",
@@ -342,7 +351,7 @@ export function catalogPreviewSections<Entry extends { section: string }>(
       entries: entries.filter((entry) => entry.section === section.id),
     })),
     ...(unknownEntries.length > 0
-      ? [{ id: "other", label: "Other", entries: unknownEntries }]
+      ? [{ id: "other", label: translate("decks:addDeck.otherSection"), entries: unknownEntries }]
       : []),
   ].filter((section) => section.entries.length > 0)
 }
@@ -538,7 +547,7 @@ export function AddDeckScreen({
         setError(undefined)
         return
       }
-      fail(cause, "Could not save deck locally")
+      fail(cause, translate("decks:addDeck.saveLocalFailed"))
     }
   }
 
@@ -551,7 +560,7 @@ export function AddDeckScreen({
           : pendingGuestPayload
       onCreated(guestDeckRouteId(replaceGuestDeck(payload, guestReplacementLocalId).localId))
     } catch (cause) {
-      fail(cause, "Could not replace local deck")
+      fail(cause, translate("decks:addDeck.replaceLocalFailed"))
     }
   }
 
@@ -620,7 +629,9 @@ export function AddDeckScreen({
         if (failures.length)
           setSearchError(
             failures
-              .map((result) => convexErrorMessage(result.reason, "Could not load decks"))
+              .map((result) =>
+                convexErrorMessage(result.reason, translate("decks:addDeck.loadDecksFailed")),
+              )
               .join("\n"),
           )
         if (catalogResult.status === "fulfilled") {
@@ -639,7 +650,7 @@ export function AddDeckScreen({
         }
       } catch (cause) {
         if (searchToken.current === token)
-          setSearchError(convexErrorMessage(cause, "Could not load decks"))
+          setSearchError(convexErrorMessage(cause, translate("decks:addDeck.loadDecksFailed")))
       } finally {
         if (searchToken.current === token) setSearching(false)
       }
@@ -691,7 +702,7 @@ export function AddDeckScreen({
       setNote("")
       onCreated(deckId)
     } catch (cause) {
-      fail(cause, "Could not create deck")
+      fail(cause, translate("decks:addDeck.createFailed"))
     } finally {
       setBusy(false)
     }
@@ -716,7 +727,7 @@ export function AddDeckScreen({
         if (previewToken.current === token) setResolvedPrecon(resolved)
       } catch (cause) {
         if (previewToken.current === token) {
-          setPreviewError(convexErrorMessage(cause, "Could not load this deck"))
+          setPreviewError(convexErrorMessage(cause, translate("decks:addDeck.previewFailed")))
           setPreviewRetryAfterMs(convexRetryAfterMs(cause))
         }
       } finally {
@@ -818,7 +829,7 @@ export function AddDeckScreen({
       })
       onCreated(deckId)
     } catch (cause) {
-      fail(cause, "Could not import official deck")
+      fail(cause, translate("decks:addDeck.importOfficialFailed"))
     } finally {
       setBusy(false)
     }
@@ -850,7 +861,7 @@ export function AddDeckScreen({
       const deckId = await importCatalog({ catalogDeckId: selectedCatalogDeck._id })
       onCreated(deckId)
     } catch (cause) {
-      fail(cause, "Could not import Top Deck")
+      fail(cause, translate("decks:addDeck.importTopDeckFailed"))
     } finally {
       setBusy(false)
     }
@@ -883,9 +894,7 @@ export function AddDeckScreen({
           : format
       const normalized = normalizeImportedCards(importCards(resolved.cards), game, suggestedFormat)
       if ("overflow" in normalized) {
-        setError(
-          `${normalized.overflow} has more than 999 copies after matching. Correct the source before reviewing.`,
-        )
+        setError(translate("decks:addDeck.overflowAfterMatch", { card: normalized.overflow }))
         return
       }
       if (result.kind === "link") {
@@ -920,8 +929,8 @@ export function AddDeckScreen({
         fail(
           cause,
           importKind === "link"
-            ? "Could not load this deck. Try again or paste its text export."
-            : "Could not resolve deck list. Try again.",
+            ? translate("decks:addDeck.linkFailed")
+            : translate("decks:addDeck.resolveFailed"),
         )
     } finally {
       if (pastedToken.current === token) setResolvingPasted(false)
@@ -970,9 +979,7 @@ export function AddDeckScreen({
     if (!next || !pastedDraft || busy) return
     const normalized = normalizeImportedCards(pastedDraft.cards, game, next)
     if ("overflow" in normalized) {
-      setError(
-        `${normalized.overflow} would exceed 999 copies. Reduce its quantity before changing format.`,
-      )
+      setError(translate("decks:addDeck.overflowOnFormat", { card: normalized.overflow }))
       return
     }
     setDeckFormat(next)
@@ -984,9 +991,9 @@ export function AddDeckScreen({
   }
 
   function addImportCard(card: GuestDeckPayload["cards"][number]) {
-    if (busy) return "Wait for the deck to finish saving."
+    if (busy) return translate("decks:addDeck.waitForSave")
     const draft = latestPastedDraft.current
-    if (!draft) return "Review the import before adding cards."
+    if (!draft) return translate("decks:addDeck.reviewFirst")
     const cards = importableCards(draft)
     if (game === "mtg" && format === "commander" && cardSection(card) === "commander") {
       const cached = loadCardDetails()
@@ -1039,7 +1046,7 @@ export function AddDeckScreen({
       const deckId = await createImportedDeck(payload)
       onCreated(deckId)
     } catch (cause) {
-      fail(cause, "Could not import deck list")
+      fail(cause, translate("decks:addDeck.importListFailed"))
     } finally {
       setBusy(false)
     }
@@ -1048,8 +1055,8 @@ export function AddDeckScreen({
   const noteField = (
     <TextField
       testID="deck-note-input"
-      label="Notes"
-      placeholder="Optional"
+      labelTx="decks:addDeck.notes"
+      placeholderTx="decks:addDeck.optional"
       value={note}
       multiline
       numberOfLines={3}
@@ -1101,12 +1108,12 @@ export function AddDeckScreen({
   const guestRecovery = guestBlocked ? (
     <>
       <View style={themed($stack)}>
-        <Text weight="bold" text={`${FREE_DECK_LIMIT} decks saved on this device`} />
+        <Text weight="bold" tx="decks:addDeck.guestFull" txOptions={{ limit: FREE_DECK_LIMIT }} />
         {guestDecks.map((deck) => (
           <Button
             key={deck.localId}
             preset="reversed"
-            text={`Replace ${deck.deck.name}…`}
+            text={translate("decks:addDeck.replaceDeck", { name: deck.deck.name })}
             style={themed($previewImportButton)}
             textStyle={themed($previewImportButtonText)}
             onPress={() => {
@@ -1121,20 +1128,25 @@ export function AddDeckScreen({
             style={themed($plainAction)}
             onPress={access.request}
           >
-            <Text text="Sign in, then upgrade to Pro" style={themed($textAction)} />
+            <Text tx="decks:addDeck.signInUpgrade" style={themed($textAction)} />
           </TouchableOpacity>
         ) : null}
         <Text
           size="xs"
           style={themed($label)}
-          text={`Pro is a subscription on your account · ${MAX_PREMIUM_DECKS} decks`}
+          tx="decks:addDeck.proSubscription"
+          txOptions={{ limit: MAX_PREMIUM_DECKS }}
         />
       </View>
       <ConfirmDialog
         visible={confirmGuestReplace}
-        title="Replace local deck?"
-        message={`${guestReplacement?.deck.name ?? "The selected deck"} will be replaced.`}
-        confirmText="Replace"
+        title={translate("decks:addDeck.replaceTitle")}
+        message={
+          guestReplacement
+            ? translate("decks:addDeck.replaceBody", { name: guestReplacement.deck.name })
+            : translate("decks:addDeck.replaceSelectedBody")
+        }
+        confirmText={translate("decks:addDeck.replace")}
         dialogTestID="confirm-guest-replace"
         confirmTestID="confirm-guest-replace-action"
         cancelTestID="cancel-guest-replace"
@@ -1159,17 +1171,20 @@ export function AddDeckScreen({
 
   const emptyCatalog = (
     <View style={themed($stack)}>
-      <Text weight="bold" text={preconQuery.trim() ? "No matching decks" : "No decks here yet"} />
+      <Text
+        weight="bold"
+        tx={preconQuery.trim() ? "decks:addDeck.noMatches" : "decks:addDeck.noDecksHere"}
+      />
       <Text
         size="sm"
         text={
           preconQuery.trim()
-            ? "Try another search, paste a list, or start an empty deck."
-            : `We don’t have ${deckFormatLabel(game, format)} lists yet. Paste a list or start an empty deck.`
+            ? translate("decks:addDeck.noMatchesDetail")
+            : translate("decks:addDeck.noListsYet", { format: deckFormatLabel(game, format) })
         }
       />
       <Button
-        text="Paste a list"
+        tx="decks:addDeck.pasteList"
         preset="reversed"
         style={themed($previewImportButton)}
         textStyle={themed($previewImportButtonText)}
@@ -1180,7 +1195,7 @@ export function AddDeckScreen({
         style={themed($plainAction)}
         onPress={() => setMode("blank")}
       >
-        <Text text="Start empty" style={themed($textAction)} />
+        <Text tx="decks:versionDialog.empty" style={themed($textAction)} />
       </TouchableOpacity>
     </View>
   )
@@ -1222,10 +1237,10 @@ export function AddDeckScreen({
         contentContainerStyle={themed($previewScreen)}
       >
         <Header
-          title={editingPasted ? "Edit deck" : "Review deck"}
+          titleTx={editingPasted ? "decks:deckView.editTitle" : "decks:addDeck.reviewTitle"}
           leftTx="common:back"
           onLeftPress={busy ? undefined : changeImportSource}
-          rightText={editingPasted ? "Done" : "Edit"}
+          rightTx={editingPasted ? "common:done" : "common:edit"}
           onRightPress={busy ? undefined : editImport}
         />
         <ScrollView
@@ -1239,8 +1254,8 @@ export function AddDeckScreen({
               <View style={themed($importFields)}>
                 <TextField
                   testID="deck-name-input"
-                  accessibilityLabel="Deck name"
-                  placeholder="Deck name"
+                  accessibilityLabel={translate("decks:settings.name")}
+                  placeholderTx="decks:settings.name"
                   value={name}
                   maxLength={80}
                   helper={deckNameWarning(name)}
@@ -1254,7 +1269,7 @@ export function AddDeckScreen({
                 />
                 <SelectField
                   testID="format-picker-options"
-                  label="Format"
+                  label={translate("decks:settings.format")}
                   value={format}
                   disabled={busy}
                   options={deckFormats(game)}
@@ -1262,7 +1277,10 @@ export function AddDeckScreen({
                 />
               </View>
             ) : (
-              <Text preset="subheading" text={name.trim() || "Imported deck"} />
+              <Text
+                preset="subheading"
+                text={name.trim() || translate("decks:addDeck.importedDeck")}
+              />
             )}
             <View style={themed($importSummaryRow)}>
               <Text
@@ -1273,11 +1291,24 @@ export function AddDeckScreen({
               {pastedDraft.attribution ? (
                 <TouchableOpacity
                   accessibilityRole="link"
-                  accessibilityLabel={`View on ${attributionLabel(pastedDraft.attribution, " by ")}`}
+                  accessibilityLabel={
+                    pastedDraft.attribution.author
+                      ? translate("decks:addDeck.viewOnBy", {
+                          source: pastedDraft.attribution.sourceName,
+                          author: pastedDraft.attribution.author,
+                        })
+                      : translate("decks:addDeck.viewOn", {
+                          source: pastedDraft.attribution.sourceName,
+                        })
+                  }
                   style={$importAttribution}
                   onPress={() =>
                     void Linking.openURL(pastedDraft.attribution!.sourceUrl).catch(() =>
-                      setError(`Could not open ${pastedDraft.attribution!.sourceName}.`),
+                      setError(
+                        translate("decks:addDeck.openFailed", {
+                          source: pastedDraft.attribution!.sourceName,
+                        }),
+                      ),
                     )
                   }
                 >
@@ -1291,20 +1322,28 @@ export function AddDeckScreen({
             </View>
           </View>
           {error ? <AlertNote text={error} /> : null}
-          {!name.trim() ? <AlertNote text="Add a deck name." /> : null}
+          {!name.trim() ? <AlertNote text={translate("decks:addDeck.nameRequired")} /> : null}
           {pastedProblems.length > 0 && !pastedDraft.omitted ? (
             <View style={themed($stack)}>
-              <Text weight="bold" text="Fix or remove these lines" />
+              <Text weight="bold" tx="decks:addDeck.fixLines" />
               {pastedDraft.resolved.unresolved.map((line, index) => (
-                <Text key={`unmatched:${index}`} text={`Unmatched: ${line}`} />
+                <Text
+                  key={`unmatched:${index}`}
+                  tx="decks:addDeck.unmatchedLine"
+                  txOptions={{ line }}
+                />
               ))}
               {pastedDraft.resolved.invalidLines.map((line, index) => (
-                <Text key={`invalid:${index}`} text={`Not understood: ${line}`} />
+                <Text
+                  key={`invalid:${index}`}
+                  tx="decks:addDeck.invalidLine"
+                  txOptions={{ line }}
+                />
               ))}
-              <Text text="Change source to correct these lines, then review again." />
+              <Text tx="decks:addDeck.changeSource" />
               <Button
                 testID="omit-import-problems"
-                text="Remove unmatched and invalid lines"
+                tx="decks:addDeck.removeProblems"
                 disabled={!pastedDraftCurrent || busy || resolvingPasted}
                 onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
               />
@@ -1312,7 +1351,7 @@ export function AddDeckScreen({
           ) : null}
           {pastedDraft.omitted ? (
             <AlertNote
-              text={`${pastedProblems.length} unmatched or invalid line${pastedProblems.length === 1 ? "" : "s"} removed from this import. Original text kept in the import form.`}
+              text={translate("decks:addDeck.problemsRemoved", { count: pastedProblems.length })}
             />
           ) : null}
           {sections.map((section) => (
@@ -1371,7 +1410,7 @@ export function AddDeckScreen({
             {editingPasted ? (
               <Button
                 testID="import-add-cards"
-                text="+ Add cards"
+                tx="decks:deckView.addCards"
                 onPress={() => {
                   if (busy) return
                   setChoosingPastedCommander(false)
@@ -1383,7 +1422,13 @@ export function AddDeckScreen({
             ) : null}
             <Button
               testID="save-import-button"
-              text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
+              tx={
+                busy
+                  ? "decks:saving"
+                  : guestMode
+                    ? "decks:addDeck.saveOnDevice"
+                    : "decks:addDeck.saveDeck"
+              }
               preset="reversed"
               style={$flex1}
               disabled={
@@ -1436,7 +1481,7 @@ export function AddDeckScreen({
         contentContainerStyle={themed($previewScreen)}
       >
         <Header
-          title="Deck preview"
+          titleTx="decks:addDeck.previewTitle"
           leftTx="common:back"
           onLeftPress={() => {
             setSelectedCatalogDeck(undefined)
@@ -1457,7 +1502,7 @@ export function AddDeckScreen({
             />
             <Text size="xs" style={themed($label)} text={catalogDeckDetail(selectedCatalogDeck)} />
             {selectedCatalogDeck.kind === "example" ? (
-              <Text size="xs" text="Dated example. Cards may no longer be legal in this format." />
+              <Text size="xs" tx="decks:addDeck.datedExample" />
             ) : null}
             {selectedCatalogDeck.sourceUrl ? (
               <TouchableOpacity
@@ -1465,16 +1510,20 @@ export function AddDeckScreen({
                 style={themed($plainAction)}
                 onPress={() =>
                   void Linking.openURL(selectedCatalogDeck.sourceUrl!).catch(() =>
-                    setError("Could not open the deck source."),
+                    setError(translate("decks:addDeck.openSourceFailed")),
                   )
                 }
               >
-                <Text text="View source deck" style={themed($textAction)} />
+                <Text tx="decks:addDeck.viewSource" style={themed($textAction)} />
               </TouchableOpacity>
             ) : null}
             <LoadingProgress
               state={catalogDetail ? "complete" : "loading"}
-              accessibilityText={catalogDetail ? "Preview ready" : "Loading Top Deck"}
+              accessibilityText={
+                catalogDetail
+                  ? translate("decks:addDeck.previewReady")
+                  : translate("decks:addDeck.loadingTopDeck")
+              }
             />
           </View>
           {catalogPreviewSections(
@@ -1499,7 +1548,9 @@ export function AddDeckScreen({
                   <TouchableOpacity
                     key={entry._id}
                     accessibilityRole="button"
-                    accessibilityLabel={`Preview ${entry.name}`}
+                    accessibilityLabel={translate("decks:addDeck.previewCard", {
+                      card: entry.name,
+                    })}
                     activeOpacity={0.75}
                     style={themed($previewCardRow)}
                     onPress={() => focusCatalogCard(entry, section.label)}
@@ -1542,7 +1593,13 @@ export function AddDeckScreen({
           {!guestBlocked ? (
             <Button
               testID="import-catalog-deck"
-              text={busy ? "Importing…" : guestMode ? "Save deck on this device" : "Import deck"}
+              tx={
+                busy
+                  ? "decks:addDeck.importing"
+                  : guestMode
+                    ? "decks:addDeck.saveDeckOnDevice"
+                    : "decks:addDeck.importDeck"
+              }
               preset="reversed"
               disabled={
                 busy ||
@@ -1589,7 +1646,11 @@ export function AddDeckScreen({
         safeAreaEdges={["bottom"]}
         contentContainerStyle={themed($previewScreen)}
       >
-        <Header title="Deck preview" leftTx="common:back" onLeftPress={closePreview} />
+        <Header
+          titleTx="decks:addDeck.previewTitle"
+          leftTx="common:back"
+          onLeftPress={closePreview}
+        />
         <ScrollView
           testID="precon-preview"
           contentContainerStyle={themed($previewContent)}
@@ -1615,10 +1676,7 @@ export function AddDeckScreen({
               <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
             ) : null}
             {["standard", "pioneer", "modern"].includes(previewFormat) ? (
-              <Text
-                size="xs"
-                text="Original precon list. Cards may no longer be legal in this format."
-              />
+              <Text size="xs" tx="decks:addDeck.originalPrecon" />
             ) : null}
             <LoadingProgress
               testID="precon-loading-progress"
@@ -1626,11 +1684,11 @@ export function AddDeckScreen({
               accessibilityText={
                 previewLoading
                   ? preconOutline
-                    ? "Loading card images"
-                    : "Loading official card list"
+                    ? translate("decks:addDeck.loadingImages")
+                    : translate("decks:addDeck.loadingOfficial")
                   : resolvedPrecon
-                    ? "Preview ready"
-                    : "Preview unavailable"
+                    ? translate("decks:addDeck.previewReady")
+                    : translate("decks:addDeck.previewUnavailable")
               }
             />
           </View>
@@ -1648,9 +1706,7 @@ export function AddDeckScreen({
           ) : null}
           {error ? <AlertNote text={error} /> : null}
           {unresolved > 0 ? (
-            <AlertNote
-              text={`This deck has ${unresolved} card${unresolved === 1 ? "" : "s"} we could not match, so it cannot be imported yet.`}
-            />
+            <AlertNote text={translate("decks:addDeck.unresolvedCards", { count: unresolved })} />
           ) : null}
 
           {cards.length === 0 && previewLoading ? (
@@ -1666,7 +1722,7 @@ export function AddDeckScreen({
                   <TouchableOpacity
                     key={`${card.board}:${card.scryfallId ?? card.name}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`Preview ${card.name}`}
+                    accessibilityLabel={translate("decks:addDeck.previewCard", { card: card.name })}
                     activeOpacity={0.75}
                     style={themed($previewCardRow)}
                     onPress={() => focusPreviewCard(card, section.label)}
@@ -1711,7 +1767,13 @@ export function AddDeckScreen({
               <Text
                 weight="bold"
                 style={themed($previewImportButtonText)}
-                text={busy ? "Importing…" : guestMode ? "Save deck on this device" : "Import deck"}
+                tx={
+                  busy
+                    ? "decks:addDeck.importing"
+                    : guestMode
+                      ? "decks:addDeck.saveDeckOnDevice"
+                      : "decks:addDeck.importDeck"
+                }
               />
             </TouchableOpacity>
           ) : null}
@@ -1723,15 +1785,15 @@ export function AddDeckScreen({
 
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
-      <Header title="Add deck" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="decks:shelf.addDeck" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($stack)}>
         {saveRecovery}
-        <Text preset="subheading" text="Deck details" accessibilityRole="header" />
+        <Text preset="subheading" tx="decks:settings.title" accessibilityRole="header" />
         <View style={themed($configRow)}>
           <View style={$flex1}>
             <SelectField
               testID="game-picker-options"
-              label="System"
+              label={translate("decks:shelf.system")}
               value={game}
               options={DECK_GAME_LIST.map((candidate) => ({
                 id: candidate.id,
@@ -1745,7 +1807,7 @@ export function AddDeckScreen({
           <View style={$flex1}>
             <SelectField
               testID="format-picker-options"
-              label="Format"
+              label={translate("decks:settings.format")}
               value={format}
               options={deckFormats(game).map((candidate) => ({
                 id: candidate.id,
@@ -1760,7 +1822,7 @@ export function AddDeckScreen({
         <View
           testID="mode-picker-options"
           accessibilityRole="tablist"
-          accessibilityLabel="Starting point"
+          accessibilityLabel={translate("decks:addDeck.startingPoint")}
           style={themed($tabs)}
         >
           {MODES.map((candidate) => (
@@ -1775,7 +1837,7 @@ export function AddDeckScreen({
                 setMode(candidate.id)
               }}
             >
-              <Text text={candidate.label} weight={mode === candidate.id ? "bold" : "normal"} />
+              <Text tx={candidate.labelTx} weight={mode === candidate.id ? "bold" : "normal"} />
             </TouchableOpacity>
           ))}
         </View>
@@ -1783,7 +1845,7 @@ export function AddDeckScreen({
           <View style={themed($stack)}>
             <TextField
               testID="precon-search-input"
-              placeholder="Search decks"
+              placeholderTx="decks:shelf.search"
               value={preconQuery}
               maxLength={120}
               autoCorrect={false}
@@ -1791,9 +1853,9 @@ export function AddDeckScreen({
               onChangeText={setPreconQuery}
             />
             {browseOffline ? (
-              <AlertNote tone="info" text="You're offline. Decks will load when you reconnect." />
+              <AlertNote tone="info" text={translate("decks:addDeck.browseOffline")} />
             ) : searching ? (
-              <Text size="xs" style={themed($label)} text="Loading decks…" />
+              <Text size="xs" style={themed($label)} tx="decks:deckLimit.loading" />
             ) : searchError ? (
               <View style={themed($inlineStatus)}>
                 <AlertNote text={searchError} />
@@ -1802,7 +1864,7 @@ export function AddDeckScreen({
                   style={themed($plainAction)}
                   onPress={() => void runCatalogSearch(preconQuery, searchCursor.current)}
                 >
-                  <Text text="Retry" style={themed($textAction)} />
+                  <Text tx="common:retry" style={themed($textAction)} />
                 </TouchableOpacity>
               </View>
             ) : catalogDecks.length === 0 &&
@@ -1818,10 +1880,12 @@ export function AddDeckScreen({
                   size="sm"
                   text={
                     catalogStatus === "rate_limited"
-                      ? `Refresh available in ${Math.ceil((retryAfterMs ?? 30_000) / 1000)} seconds. Saved results remain available.`
+                      ? translate("decks:addDeck.rateLimited", {
+                          count: Math.ceil((retryAfterMs ?? 30_000) / 1000),
+                        })
                       : catalogStatus === "refreshing"
-                        ? "Refreshing decks. Saved results remain available."
-                        : "Could not refresh decks. Saved results remain available."
+                        ? translate("decks:addDeck.refreshing")
+                        : translate("decks:addDeck.refreshFailed")
                   }
                 />
                 <TouchableOpacity
@@ -1830,7 +1894,7 @@ export function AddDeckScreen({
                   style={[themed($plainAction), searching && themed($previewImportButtonDisabled)]}
                   onPress={() => void runCatalogSearch(preconQuery)}
                 >
-                  <Text text="Check again" style={themed($textAction)} />
+                  <Text tx="decks:addDeck.checkAgain" style={themed($textAction)} />
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -1839,7 +1903,7 @@ export function AddDeckScreen({
                 key={deck.fileName}
                 testID={`precon-result-${deck.fileName}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Preview ${deck.name}`}
+                accessibilityLabel={translate("decks:addDeck.previewCard", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
                 disabled={previewLoading}
@@ -1851,14 +1915,14 @@ export function AddDeckScreen({
                     <Text size="xs" style={themed($label)} text={preconDetail(deck)} />
                   ) : null}
                 </View>
-                <Text weight="medium" style={themed($textAction)} text="Preview" />
+                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
               </TouchableOpacity>
             ))}
             {catalogDecks.map((deck) => (
               <TouchableOpacity
                 key={deck._id}
                 accessibilityRole="button"
-                accessibilityLabel={`Preview ${deck.name}`}
+                accessibilityLabel={translate("decks:addDeck.previewCard", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
                 onPress={() => setSelectedCatalogDeck(deck)}
@@ -1867,12 +1931,12 @@ export function AddDeckScreen({
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
                   <Text size="xs" style={themed($label)} text={catalogDeckDetail(deck)} />
                 </View>
-                <Text weight="medium" style={themed($textAction)} text="Preview" />
+                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
               </TouchableOpacity>
             ))}
             {catalogCursor ? (
               <Button
-                text="Load more"
+                tx="decks:addDeck.loadMore"
                 disabled={searching}
                 onPress={() => void runCatalogSearch(preconQuery, catalogCursor)}
               />
@@ -1885,10 +1949,10 @@ export function AddDeckScreen({
             {linkSource ? (
               <View
                 accessibilityRole="tablist"
-                accessibilityLabel="Import source"
+                accessibilityLabel={translate("decks:addDeck.importSource")}
                 style={themed($tabs)}
               >
-                {(["text", "link"] as const).map((kind) => (
+                {IMPORT_KINDS.map((kind) => (
                   <TouchableOpacity
                     key={kind}
                     testID={`import-source-${kind}`}
@@ -1900,14 +1964,20 @@ export function AddDeckScreen({
                       setImportKind(kind)
                     }}
                   >
-                    <Text text={kind === "text" ? "Paste text" : `${linkSource.name} link`} />
+                    <Text
+                      text={
+                        kind === "text"
+                          ? translate("decks:addDeck.pasteText")
+                          : translate("decks:addDeck.sourceLink", { source: linkSource.name })
+                      }
+                    />
                   </TouchableOpacity>
                 ))}
               </View>
             ) : null}
             <TextField
               testID="deck-name-input"
-              label="Deck name"
+              labelTx="decks:settings.name"
               value={name}
               maxLength={80}
               helper={deckNameWarning(name)}
@@ -1917,9 +1987,9 @@ export function AddDeckScreen({
               <>
                 <TextField
                   testID="deck-link-input"
-                  label={`${linkSource.name} link`}
+                  label={translate("decks:addDeck.sourceLink", { source: linkSource.name })}
                   placeholder={linkSource.placeholder}
-                  helper={linkSource.helper}
+                  helperTx={linkSource.helperTx}
                   value={deckLink}
                   maxLength={2048}
                   keyboardType="url"
@@ -1931,7 +2001,7 @@ export function AddDeckScreen({
                   }}
                 />
                 <Button
-                  text="Paste text instead"
+                  tx="decks:addDeck.pasteInstead"
                   onPress={() => {
                     invalidatePasted()
                     setImportKind("text")
@@ -1940,14 +2010,14 @@ export function AddDeckScreen({
               </>
             ) : (
               <TextField
-                label="Deck list"
-                accessibilityLabel="Deck list"
-                helper={
+                labelTx="decks:addDeck.deckList"
+                accessibilityLabel={translate("decks:addDeck.deckList")}
+                helperTx={
                   game === "ygo"
-                    ? "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported."
+                    ? "decks:addDeck.listHelperYgo"
                     : game === "pokemon"
-                      ? "Paste a Pokémon TCG Live list with quantities, names, set codes, and card numbers."
-                      : 'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.'
+                      ? "decks:addDeck.listHelperPokemon"
+                      : "decks:addDeck.listHelperMtg"
                 }
                 value={deckList}
                 multiline
@@ -1963,7 +2033,7 @@ export function AddDeckScreen({
             {pastedDraftCurrent ? (
               <Button
                 testID="return-import-review-button"
-                text="Return to review"
+                tx="decks:addDeck.returnToReview"
                 disabled={resolvingPasted || busy}
                 onPress={() => {
                   if (resolvingPasted || busy) return
@@ -1976,14 +2046,14 @@ export function AddDeckScreen({
               testID="review-import-button"
               text={
                 resolvingPasted
-                  ? "Loading deck…"
+                  ? translate("decks:addDeck.loadingDeck")
                   : pastedDraftCurrent
-                    ? "Reload source"
+                    ? translate("decks:addDeck.reloadSource")
                     : pastedDraft
-                      ? "Review changes"
+                      ? translate("decks:detail.reviewChanges")
                       : importKind === "link" && linkSource
-                        ? `Review ${linkSource.name} deck`
-                        : "Review deck list"
+                        ? translate("decks:addDeck.reviewSourceDeck", { source: linkSource.name })
+                        : translate("decks:addDeck.reviewList")
               }
               preset="reversed"
               disabled={busy || resolvingPasted || !importSource.trim()}
@@ -1996,7 +2066,7 @@ export function AddDeckScreen({
           <View style={themed($stack)}>
             <TextField
               testID="deck-name-input"
-              label="Deck name"
+              labelTx="decks:settings.name"
               value={name}
               maxLength={80}
               helper={deckNameWarning(name)}
@@ -2004,7 +2074,7 @@ export function AddDeckScreen({
             />
             {noteField}
             <Button
-              text={busy ? "Creating…" : "Create deck"}
+              tx={busy ? "decks:addDeck.creating" : "decks:addDeck.createDeck"}
               preset="reversed"
               disabled={
                 busy ||

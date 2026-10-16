@@ -16,11 +16,17 @@ import {
   type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
+import { translate } from "@/i18n/translate"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import { scopedOwnerId } from "./decksSync"
-import { DECK_VERSION_CONFLICT_REASON, DECK_VERSION_QUEUE_CONFLICT_REASON } from "./deckSyncReasons"
+import {
+  DECK_VERSION_CONFLICT_REASON,
+  DECK_VERSION_DRAFT_UNSYNCED_REASON,
+  DECK_VERSION_QUEUE_CONFLICT_REASON,
+  DECK_VERSION_REJECTED_REASON,
+} from "./deckSyncReasons"
 import { DeckVersionCacheRepository, type CachedVersion } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import { MAX_DECK_NOTE_LENGTH, assertVersionName } from "../../../convex/lib/policy"
@@ -60,12 +66,13 @@ const SCOPE = "versionCards"
 const RETRY_DELAY_MS = 2_000
 // why: each card write is a full list; a 300-entry deck is ~190 KB, past the default budget.
 const VERSION_OUTBOX_LIMITS = { maxPendingBytes: 512 * 1024, maxFailedBytes: 512 * 1024 }
-export { DECK_VERSION_CONFLICT_REASON, DECK_VERSION_QUEUE_CONFLICT_REASON }
-export const DECK_VERSION_DRAFT_UNSYNCED_REASON =
-  "This offline draft was never synced. Discard it and create the version again."
+export {
+  DECK_VERSION_CONFLICT_REASON,
+  DECK_VERSION_DRAFT_UNSYNCED_REASON,
+  DECK_VERSION_QUEUE_CONFLICT_REASON,
+  DECK_VERSION_REJECTED_REASON,
+}
 export const DECK_VERSION_LAST_REASON = "A deck must keep at least one version."
-export const DECK_VERSION_REJECTED_REASON =
-  "The server can't accept these changes. Discard them and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -638,7 +645,7 @@ export class DeckVersionWriteController {
         return code && permanentErrors.has(code)
           ? {
               kind: "reject" as const,
-              reason: convexErrorMessage(cause, "Could not sync these card changes"),
+              reason: convexErrorMessage(cause, translate("decks:sync.cardChangesFailed")),
             }
           : { kind: "retry" as const }
       },

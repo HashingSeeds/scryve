@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router"
 
 import { CloudScreen } from "@/features/auth/CloudScreen"
+import { translate } from "@/i18n/translate"
 import { RecordMatchScreen } from "@/screens/RecordMatchScreen"
 
 import type { Id } from "../../../../convex/_generated/dataModel"
@@ -25,7 +26,10 @@ export default function RecordMatchRoute() {
           access={access}
           deck={
             deckId && versionId
-              ? { versionId: versionId as Id<"deckVersions">, name: deckName ?? "Deck" }
+              ? {
+                  versionId: versionId as Id<"deckVersions">,
+                  name: deckName ?? translate("decks:deckView.title"),
+                }
               : undefined
           }
           onBack={leave}

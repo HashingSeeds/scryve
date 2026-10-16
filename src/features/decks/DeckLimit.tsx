@@ -10,6 +10,7 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -44,8 +45,11 @@ function DeckCountLabel({ access }: { access?: CloudAccess }) {
     <TouchableOpacity
       testID="deck-count"
       accessibilityRole={upgradable ? "button" : "text"}
-      accessibilityLabel={`${capacity.used} of ${capacity.limit} ${capacity.premium ? "" : "free "}decks used`}
-      accessibilityHint={upgradable ? "Opens Scryve Pro" : undefined}
+      accessibilityLabel={translate(
+        capacity.premium ? "decks:deckLimit.countLabel" : "decks:deckLimit.countLabelFree",
+        { used: capacity.used, limit: capacity.limit },
+      )}
+      accessibilityHint={upgradable ? translate("decks:deckLimit.opensPro") : undefined}
       disabled={!upgradable || billing.isLoading}
       hitSlop={12}
       onPress={() => void billing.presentPaywall()}
@@ -94,7 +98,7 @@ export function DeckLimitDialog(props: DeckLimitDialogProps) {
       onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
       onClose={props.onClose}
       closeDisabled={busy}
-      backdropAccessibilityLabel="Close deck limit"
+      backdropAccessibilityLabel={translate("decks:deckLimit.close")}
       dialogTestID="deck-limit-dialog"
       dialogAccessibilityRole="alert"
       accessibilityViewIsModal
@@ -103,10 +107,10 @@ export function DeckLimitDialog(props: DeckLimitDialogProps) {
       <ConvexQueryBoundary
         fallback={({ retry }) => (
           <>
-            <Text size="sm" text="Deck slots unavailable. Your draft is kept." />
+            <Text size="sm" tx="decks:deckLimit.unavailable" />
             <View style={themed($row)}>
-              <Button text="Close" style={$flex1} onPress={props.onClose} />
-              <Button text="Retry" style={$flex1} onPress={retry} />
+              <Button tx="common:close" style={$flex1} onPress={props.onClose} />
+              <Button tx="common:retry" style={$flex1} onPress={retry} />
             </View>
           </>
         )}
@@ -149,7 +153,7 @@ function DeckLimitOptions({
       await deleteDeck({ deckId })
       setStep({ kind: "options" })
     } catch (cause) {
-      setError(convexErrorMessage(cause, "Could not delete this deck."))
+      setError(convexErrorMessage(cause, translate("decks:deckLimit.deleteFailed")))
     } finally {
       setBusy(false)
     }
@@ -162,22 +166,19 @@ function DeckLimitOptions({
       {step.kind === "options" ? (
         <>
           <View style={themed($copy)}>
-            <Text preset="subheading" accessibilityLiveRegion="polite" text="Deck limit reached" />
+            <Text preset="subheading" accessibilityLiveRegion="polite" tx="decks:deckLimit.title" />
             <Text
               size="sm"
               style={themed($dim)}
-              text={
-                premium
-                  ? `Pro accounts hold ${limit} decks. Delete a deck to make room.`
-                  : `Free accounts hold ${limit} decks. Get Pro for ${MAX_PREMIUM_DECKS}, or delete a deck to make room.`
-              }
+              tx={premium ? "decks:deckLimit.proBody" : "decks:deckLimit.freeBody"}
+              txOptions={{ limit, premiumLimit: MAX_PREMIUM_DECKS }}
             />
           </View>
           <View style={themed($stack)}>
             {premium ? null : (
               <Button
                 testID="deck-limit-upgrade"
-                text="Upgrade to Pro"
+                tx="decks:deckLimit.upgrade"
                 preset="reversed"
                 disabled={!billing.configured || billing.isLoading}
                 onPress={onUpgrade}
@@ -185,29 +186,29 @@ function DeckLimitOptions({
             )}
             <Button
               testID="deck-limit-delete"
-              text="Delete a deck"
+              tx="decks:deckLimit.deleteADeck"
               disabled={!capacity}
               onPress={() => setStep({ kind: "choose" })}
             />
-            <Button testID="deck-limit-close" text="Not now" onPress={onClose} />
+            <Button testID="deck-limit-close" tx="decks:deckLimit.notNow" onPress={onClose} />
           </View>
           {!premium && !billing.configured ? (
             <Text
               size="xs"
               style={themed($dim)}
-              text={billing.configurationMessage || "Pro purchases are unavailable in this build."}
+              text={billing.configurationMessage || translate("decks:deckLimit.proUnavailable")}
             />
           ) : null}
         </>
       ) : null}
       {step.kind === "choose" ? (
         <>
-          <Text preset="subheading" text="Delete a deck" />
+          <Text preset="subheading" tx="decks:deckLimit.deleteADeck" />
           <ConvexQueryBoundary
             fallback={({ retry }) => (
               <View style={themed($stack)}>
-                <Text size="sm" text="Your decks could not load." />
-                <Button text="Retry" onPress={retry} />
+                <Text size="sm" tx="decks:deckLimit.decksFailed" />
+                <Button tx="common:retry" onPress={retry} />
               </View>
             )}
           >
@@ -216,30 +217,30 @@ function DeckLimitOptions({
               onChoose={(id, name) => setStep({ kind: "confirm", id, name })}
             />
           </ConvexQueryBoundary>
-          <Button text="Back" onPress={() => setStep({ kind: "options" })} />
+          <Button tx="common:back" onPress={() => setStep({ kind: "options" })} />
         </>
       ) : null}
       {step.kind === "confirm" ? (
         <>
           <View style={themed($copy)}>
-            <Text preset="subheading" text={`Delete ${step.name}?`} />
             <Text
-              size="sm"
-              style={themed($dim)}
-              text="Past games keep their record of this deck, but it will no longer be available to pick or edit."
+              preset="subheading"
+              tx="decks:deckLimit.confirmTitle"
+              txOptions={{ name: step.name }}
             />
+            <Text size="sm" style={themed($dim)} tx="decks:deleteDeck.body" />
           </View>
           <View style={themed($row)}>
             <Button
               testID="deck-limit-cancel-delete"
-              text="Back"
+              tx="common:back"
               style={$flex1}
               disabled={busy}
               onPress={() => setStep({ kind: "choose" })}
             />
             <Button
               testID="deck-limit-confirm-delete"
-              text={busy ? "Deleting…" : "Delete"}
+              tx={busy ? "decks:deleting" : "common:delete"}
               style={[$flex1, themed($destructive)]}
               textStyle={themed($destructiveText)}
               disabled={busy}
@@ -264,14 +265,14 @@ function DeckChoices({
 }) {
   const { themed } = useAppTheme()
   const mine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
-  if (!mine) return <Text size="sm" style={themed($dim)} text="Loading decks…" />
+  if (!mine) return <Text size="sm" style={themed($dim)} tx="decks:deckLimit.loading" />
   return (
     <ScrollView style={$choices} testID="deck-limit-choices">
       {mine.decks.map((deck) => (
         <TouchableOpacity
           key={deck._id}
           accessibilityRole="button"
-          accessibilityLabel={`Delete ${deck.name}`}
+          accessibilityLabel={translate("decks:deckLimit.deleteNamed", { name: deck.name })}
           style={themed($choice)}
           onPress={() => onChoose(deck._id, deck.name)}
         >

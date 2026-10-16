@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react"
 import { randomUUID } from "expo-crypto"
 import type { FunctionArgs } from "convex/server"
 
+import { translate } from "@/i18n/translate"
 import { saveString, storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
@@ -112,7 +113,7 @@ function readRaw(key: string): string | null {
   try {
     return storage.getString(key) ?? null
   } catch {
-    throw new GuestDeckStorageError("Unable to read guest decks.")
+    throw new GuestDeckStorageError(translate("decks:guestStorage.readFailed"))
   }
 }
 
@@ -121,10 +122,9 @@ function parseStored<T>(raw: string, valid: (value: unknown) => value is T): T {
   try {
     value = JSON.parse(raw)
   } catch {
-    throw new GuestDeckStorageError("Stored guest deck is malformed; delete it explicitly first.")
+    throw new GuestDeckStorageError(translate("decks:guestStorage.malformed"))
   }
-  if (!valid(value))
-    throw new GuestDeckStorageError("Stored guest deck is unsupported; delete it explicitly first.")
+  if (!valid(value)) throw new GuestDeckStorageError(translate("decks:guestStorage.unsupported"))
   return value
 }
 
@@ -171,7 +171,7 @@ function notify() {
 function writableDecks() {
   const store = readStore()
   if (store.legacy && !migrateLegacyDeck(store.decks))
-    throw new GuestDeckStorageError("Unable to save guest deck.")
+    throw new GuestDeckStorageError(translate("decks:guestStorage.saveFailed"))
   return store.decks
 }
 
@@ -194,7 +194,7 @@ export function saveGuestDeck(
   deck: GuestDeckPayload,
   options: { localId?: string; now?: number } = {},
 ): GuestDeck {
-  if (!isPayload(deck)) throw new GuestDeckStorageError("Guest deck payload is invalid.")
+  if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const decks = writableDecks()
   const previous = options.localId
     ? decks.find((candidate) => candidate.localId === options.localId)
@@ -203,7 +203,7 @@ export function saveGuestDeck(
     throw new GuestDeckStorageError("Guest deck localId does not match a saved deck.")
   if (!previous && decks.length >= FREE_DECK_LIMIT)
     throw new GuestDeckStorageError(
-      `Only ${FREE_DECK_LIMIT} decks can be saved on this device. Replace one to continue.`,
+      translate("decks:guestStorage.limit", { limit: FREE_DECK_LIMIT }),
     )
   const updatedAt = Math.max(options.now ?? Date.now(), (previous?.updatedAt ?? 0) + 1)
   if (!Number.isSafeInteger(updatedAt) || updatedAt < 0)
@@ -219,7 +219,7 @@ export function saveGuestDeck(
     previous
       ? decks.map((candidate) => (candidate.localId === previous.localId ? next : candidate))
       : [...decks, next],
-    "Unable to save guest deck.",
+    translate("decks:guestStorage.saveFailed"),
   )
   return next
 }
@@ -228,7 +228,7 @@ export function deleteGuestDeck(localId: string) {
   const decks = writableDecks()
   commit(
     decks.filter((deck) => deck.localId !== localId),
-    "Unable to delete guest deck.",
+    translate("decks:guestStorage.deleteFailed"),
   )
 }
 
@@ -237,7 +237,7 @@ export function clearGuestDecks() {
     storage.delete(GUEST_DECKS_KEY)
     storage.delete(LEGACY_GUEST_DECK_KEY)
   } catch {
-    throw new GuestDeckStorageError("Unable to delete guest decks.")
+    throw new GuestDeckStorageError(translate("decks:guestStorage.deleteAllFailed"))
   }
   snapshot = []
   notify()
@@ -246,8 +246,8 @@ export function clearGuestDecks() {
 export function replaceGuestDeck(deck: GuestDeckPayload, expectedLocalId: string): GuestDeck {
   const decks = writableDecks()
   if (!decks.some((candidate) => candidate.localId === expectedLocalId))
-    throw new GuestDeckStorageError("The saved deck changed. Review it before replacing it.")
-  if (!isPayload(deck)) throw new GuestDeckStorageError("Guest deck payload is invalid.")
+    throw new GuestDeckStorageError(translate("decks:guestStorage.changed"))
+  if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const now = Date.now()
   const next: GuestDeck = {
     schemaVersion: 1,
@@ -258,7 +258,7 @@ export function replaceGuestDeck(deck: GuestDeckPayload, expectedLocalId: string
   }
   commit(
     decks.map((candidate) => (candidate.localId === expectedLocalId ? next : candidate)),
-    "Unable to save guest deck.",
+    translate("decks:guestStorage.saveFailed"),
   )
   return next
 }

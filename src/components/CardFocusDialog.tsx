@@ -13,6 +13,7 @@ import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { readCardFaces } from "@/features/decks/cardFaces"
 import type { CommanderColor } from "@/features/decks/deckCards"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -57,26 +58,35 @@ export interface CardFocusDialogProps {
 
 const CARD_ASPECT_RATIO = 488 / 680
 
-export const COMMANDER_COLORS = [
-  { id: "W", label: "White" },
-  { id: "U", label: "Blue" },
-  { id: "B", label: "Black" },
-  { id: "R", label: "Red" },
-  { id: "G", label: "Green" },
-] as const
+export const COMMANDER_COLORS = ["W", "U", "B", "R", "G"] as const
+
+const COLOR_LABEL_KEYS = {
+  W: "decks:colors.white",
+  U: "decks:colors.blue",
+  B: "decks:colors.black",
+  R: "decks:colors.red",
+  G: "decks:colors.green",
+  C: "decks:colors.colorless",
+} as const
+
+export function colorLabel(id: keyof typeof COLOR_LABEL_KEYS) {
+  return translate(COLOR_LABEL_KEYS[id])
+}
 
 export function cardColorIdentityLabel(details: FocusedCardDetails | undefined, name: string) {
   if (details?.colorIdentity === undefined) return undefined
-  const colors = COMMANDER_COLORS.filter((color) => details.colorIdentity?.includes(color.id))
-    .map((color) => color.label)
+  const colors = COMMANDER_COLORS.filter((color) => details.colorIdentity?.includes(color))
+    .map(colorLabel)
     .join(", ")
   const identity =
     details.commanderEligibility === "color-choice"
       ? colors
-        ? `${colors} + chosen color`
-        : "Choose a color"
-      : colors || "Colorless"
-  return `Color identity: ${identity}${name.includes(" // ") ? " · Both faces" : ""}`
+        ? translate("decks:colors.withChosen", { colors })
+        : translate("decks:colors.chooseColor")
+      : colors || colorLabel("C")
+  return name.includes(" // ")
+    ? translate("decks:colors.identityBothFaces", { identity })
+    : translate("decks:colors.identity", { identity })
 }
 
 function capitalized(value: string) {
@@ -115,11 +125,11 @@ export function CardFocusDialog({
   const needsColor = details?.commanderEligibility === "color-choice"
   const commanderProblem =
     !details?.commanderEligibility || !details?.commanderLegality
-      ? "Commander eligibility not yet verified."
+      ? translate("decks:cardFocus.eligibilityUnverified")
       : details.commanderEligibility === "ineligible"
-        ? "This card cannot be a commander on its own."
+        ? translate("decks:cardFocus.ineligible")
         : details.commanderLegality !== "legal"
-          ? "This card is not legal in Commander."
+          ? translate("decks:cardFocus.notLegal")
           : undefined
   const printing = details ? printingLine(details) : ""
   const colorIdentity = cardColorIdentityLabel(details, card.name)
@@ -135,6 +145,7 @@ export function CardFocusDialog({
   ]
     .filter(Boolean)
     .join(". ")
+  const closeLabel = translate("decks:cardFocus.close")
 
   return (
     <DialogCard
@@ -144,7 +155,7 @@ export function CardFocusDialog({
       style={$sheet}
       onClose={onClose}
       backdropTestID="card-focus-backdrop"
-      backdropAccessibilityLabel="Close card details"
+      backdropAccessibilityLabel={closeLabel}
       dialogTestID="card-focus-dialog"
       accessibilityViewIsModal
     >
@@ -152,11 +163,11 @@ export function CardFocusDialog({
         <Text preset="subheading" style={themed($name)} text={visibleName} />
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="Close card details"
+          accessibilityLabel={closeLabel}
           style={themed($closeButton)}
           onPress={onClose}
         >
-          <Text text="Close" weight="bold" style={themed($closeText)} />
+          <Text tx="common:close" weight="bold" style={themed($closeText)} />
         </TouchableOpacity>
       </View>
       {faces.length === 2 ? (
@@ -165,7 +176,9 @@ export function CardFocusDialog({
             <FilterPill
               key={entry.name}
               testID={`card-face-${index}`}
-              label={index === 0 ? "Front" : "Back"}
+              label={
+                index === 0 ? translate("decks:cardFocus.front") : translate("decks:cardFocus.back")
+              }
               selected={faceIndex === index}
               onPress={() => setFaceIndex(index)}
             />
@@ -197,7 +210,7 @@ export function CardFocusDialog({
           {visibleDetails?.oracleText ? <Text selectable text={visibleDetails.oracleText} /> : null}
           {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
           {!details && !detailsError ? (
-            <Text size="sm" style={themed($dimText)} text="Loading details…" />
+            <Text size="sm" style={themed($dimText)} tx="decks:cardFocus.loadingDetails" />
           ) : null}
           {detailsError ? (
             onRetryDetails ? (
@@ -218,18 +231,16 @@ export function CardFocusDialog({
           {needsColor ? (
             <SelectField
               testID="commander-color"
-              label="Commander color"
-              options={COMMANDER_COLORS}
+              label={translate("decks:cardFocus.commanderColor")}
+              options={COMMANDER_COLORS.map((id) => ({ id, label: colorLabel(id) }))}
               value={commanderColor}
-              onSelect={(color) =>
-                setCommanderColor(COMMANDER_COLORS.find((option) => option.id === color)?.id)
-              }
+              onSelect={(color) => setCommanderColor(COMMANDER_COLORS.find((id) => id === color))}
             />
           ) : null}
           {commanderProblem ? <Text size="xs" text={commanderProblem} /> : null}
           <Button
             testID="set-commander"
-            text="Set as commander"
+            tx="decks:cardFocus.setCommander"
             disabled={Boolean(commanderProblem) || (needsColor && !commanderColor)}
             onPress={() => onSetCommander(needsColor ? commanderColor : undefined)}
           />
@@ -240,7 +251,10 @@ export function CardFocusDialog({
           <Text
             size="sm"
             style={themed($quantityLabel)}
-            text={`${card.quantity}× in ${card.boardLabel}`}
+            text={translate("decks:cardFocus.quantityIn", {
+              quantity: card.quantity,
+              section: card.boardLabel,
+            })}
           />
           {onDecrement ? (
             <Button
