@@ -196,6 +196,10 @@ export default {
     plus: "plus",
     shield: "bouclier",
     circle: "cercle",
+    crown: "couronne",
+    flame: "flamme",
+    bolt: "éclair",
+    eye: "œil",
   },
   savedToast: {
     gameSaved: "Partie enregistrée",

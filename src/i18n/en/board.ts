@@ -169,6 +169,10 @@ const board = {
     plus: "plus",
     shield: "shield",
     circle: "circle",
+    crown: "crown",
+    flame: "flame",
+    bolt: "bolt",
+    eye: "eye",
   },
   savedToast: {
     gameSaved: "Game saved",

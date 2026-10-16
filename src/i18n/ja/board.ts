@@ -190,6 +190,10 @@ export default {
     plus: "プラス",
     shield: "盾",
     circle: "丸",
+    crown: "王冠",
+    flame: "炎",
+    bolt: "稲妻",
+    eye: "目",
   },
   savedToast: {
     gameSaved: "ゲームを保存しました",

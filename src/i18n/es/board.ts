@@ -196,6 +196,10 @@ export default {
     plus: "más",
     shield: "escudo",
     circle: "círculo",
+    crown: "corona",
+    flame: "llama",
+    bolt: "rayo",
+    eye: "ojo",
   },
   savedToast: {
     gameSaved: "Partida guardada",

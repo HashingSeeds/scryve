@@ -189,6 +189,10 @@ export default {
     plus: "플러스",
     shield: "방패",
     circle: "원",
+    crown: "왕관",
+    flame: "불꽃",
+    bolt: "번개",
+    eye: "눈",
   },
   savedToast: {
     gameSaved: "게임 저장됨",

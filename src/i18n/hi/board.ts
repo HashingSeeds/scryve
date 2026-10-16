@@ -192,6 +192,10 @@ export default {
     plus: "जमा",
     shield: "ढाल",
     circle: "वृत्त",
+    crown: "मुकुट",
+    flame: "लौ",
+    bolt: "बिजली",
+    eye: "आँख",
   },
   savedToast: {
     gameSaved: "गेम सहेजा गया",
