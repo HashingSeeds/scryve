@@ -61,7 +61,14 @@ function parseLocalSetup(value: unknown): LocalSetup | undefined {
     ...(isRecord(value.match) && isMatchBestOf(value.match.bestOf)
       ? { match: { bestOf: value.match.bestOf } }
       : {}),
-    ...(isRoundClockSetup(value.clock) ? { clock: value.clock } : {}),
+    ...(isRoundClockSetup(value.clock)
+      ? {
+          clock:
+            value.clock.mode === "countdown"
+              ? { mode: "countdown" as const, minutes: value.clock.minutes }
+              : { mode: "stopwatch" as const },
+        }
+      : {}),
   }
   try {
     createLocalGame(setup)
@@ -101,7 +108,7 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     playerCount: value.playerCount,
     startingLife: value.startingLife,
     ruleset: value.ruleset,
-    ...(system ? { system, format: value.format as string } : {}),
+    ...(system && typeof value.format === "string" ? { system, format: value.format } : {}),
     ...(value.variant === "treachery" ? { variant: value.variant } : {}),
     deckRequired: value.deckRequired,
     layout: playerGridLayoutForCount(value.playerCount, value.layout),

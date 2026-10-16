@@ -4,7 +4,7 @@ import { hasLocalGameStarted, isMatchInProgress } from "./domain"
 import { localGameRepository, type LocalGameAccountInput } from "./localPersistence"
 import type { LocalSetup } from "./recentSetups"
 
-function activeGameBlocksSetup() {
+export function activeGameBlocksSetup() {
   const game = localGameRepository.loadActiveGame()
   return game !== null && (hasLocalGameStarted(game) || isMatchInProgress(game))
 }

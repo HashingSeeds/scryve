@@ -141,6 +141,28 @@ describe("Recent setups", () => {
     expect(router.dismissTo).not.toHaveBeenCalled()
   })
 
+  it("holds every replay while a local game is running", () => {
+    localGameRepository.rememberSetup(connectedSetup)
+    const view = renderRoute()
+    const running = createLocalGame(game)
+    localGameRepository.saveActiveGame(
+      applyGameCommand(
+        running,
+        { type: "life.change", playerId: running.players[0].id, delta: -1 },
+        defaultCommandContext(localGameRepository.getDeviceId()),
+      ),
+    )
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <StartGameRoute />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("End the current game in Setup first.")).toBeTruthy()
+    fireEvent.press(view.getByTestId("recent-setup-0"))
+    expect(mockHost).not.toHaveBeenCalled()
+  })
+
   it("leads to a new setup and to Join", () => {
     localGameRepository.rememberSetup(localSetup)
     const view = renderRoute()

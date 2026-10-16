@@ -2,6 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
+import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -18,6 +19,7 @@ export interface StartGameScreenProps {
   now: number
   blockedReason: (setup: RecentSetup) => string | undefined
   error?: string
+  onRetry?: () => void
   onReplay: (setup: RecentSetup) => void
   onNewSetup: () => void
   onJoin: () => void
@@ -44,6 +46,7 @@ export function StartGameScreen({
   now,
   blockedReason,
   error,
+  onRetry,
   onReplay,
   onNewSetup,
   onJoin,
@@ -107,6 +110,9 @@ export function StartGameScreen({
         </TouchableOpacity>
       </View>
       {error ? <AlertNote testID="start-game-error" text={error} /> : null}
+      {error && onRetry ? (
+        <Button testID="retry-start-game-button" text="Try again" onPress={onRetry} />
+      ) : null}
     </Screen>
   )
 }
