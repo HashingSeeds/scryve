@@ -28,6 +28,13 @@ import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
 const commanderSeats = commanderBoardSeats([[0], [1]], commanderIds)
+const commanderPlayers = commanderIds.map((id, seat) => ({
+  id,
+  seat,
+  name: `Player ${seat + 1}`,
+  life: 40,
+  color: "#41476E",
+}))
 
 function card(life: number) {
   return (
@@ -566,7 +573,8 @@ describe("LifeCard", () => {
             seats: commanderSeats.seats,
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
-            incoming: {},
+            players: commanderPlayers,
+            incoming: { [commanderIds[1]]: 3 },
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword,
           }}
@@ -639,7 +647,8 @@ describe("LifeCard", () => {
             seats: commanderSeats.seats,
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
-            incoming: {},
+            players: commanderPlayers,
+            incoming: { [commanderIds[1]]: 3 },
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword: jest.fn(),
           }}

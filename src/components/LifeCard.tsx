@@ -32,7 +32,7 @@ import {
   type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
-import { CommanderStrip } from "./CommanderStrip"
+import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
 import { CounterChips, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
@@ -343,7 +343,15 @@ export const LifeCard = memo(function LifeCard({
   const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
   const commanderStripShown =
-    !!commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers
+    !!commanderDamage?.inspection &&
+    !commanderCardMode &&
+    !tableSheetOpen &&
+    !diceCovers &&
+    commanderDamageDealers(
+      commanderDamage.players ?? [],
+      commanderDamage.ownerPlayerId,
+      commanderDamage.incoming,
+    ).length > 0
   const identityMetrics = seatIdentityMetrics(compact)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
@@ -592,7 +600,7 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage?.inspection && commanderStripShown ? (
+      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
