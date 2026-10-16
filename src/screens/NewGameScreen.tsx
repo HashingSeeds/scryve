@@ -218,7 +218,8 @@ export function NewGameScreen({
   const auth = useAuthAccess()
   const billing = useRevenueCat()
   // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade.
-  const confirmedFree = billing.customerInfo !== null && !billing.isCountPro
+  const confirmedFree =
+    (auth.isLoaded && !auth.isSignedIn) || (billing.customerInfo !== null && !billing.isCountPro)
   const seatAppearances = useMemo(
     () => (confirmedFree ? withoutProMarks(appearances) : appearances),
     [appearances, confirmedFree],
@@ -483,7 +484,7 @@ export function NewGameScreen({
   function choosePlayerCount(value: number) {
     if (value > playerCount)
       setAppearances((current) => {
-        const next = [...current]
+        const next = confirmedFree ? withoutProMarks(current) : [...current]
         for (let index = playerCount; index < value; index += 1)
           next[index] = resolveAppearance({
             preferred: current[index],
