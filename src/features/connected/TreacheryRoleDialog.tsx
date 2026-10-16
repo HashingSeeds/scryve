@@ -6,6 +6,7 @@ import { useMutation } from "convex/react"
 import { Button } from "@/components/Button"
 import { DialogCard, type DialogOrigin } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -45,6 +46,7 @@ export function TreacheryRoleDialog({
 }) {
   const { themed } = useAppTheme()
   const reveal = useMutation(api.games.revealMyRole)
+  const online = useConvexOnline()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -70,7 +72,6 @@ export function TreacheryRoleDialog({
     <DialogCard
       visible
       onClose={onClose}
-      closeDisabled={busy}
       origin={origin}
       backdropTestID="treachery-role-backdrop"
       backdropAccessibilityLabel="Hide your role"
@@ -82,17 +83,23 @@ export function TreacheryRoleDialog({
       <Text
         size="xs"
         style={themed($muted)}
-        text={revealed ? "Face up for the table." : "Hidden from the table."}
+        text={
+          revealed
+            ? "Face up for the table."
+            : canReveal && !online
+              ? "Hidden from the table. Reconnect to reveal it."
+              : "Hidden from the table."
+        }
       />
       {error ? <Text testID="treachery-role-error" accessibilityRole="alert" text={error} /> : null}
       <View style={themed($actions)}>
-        <Button text="Hide" disabled={busy} style={themed($action)} onPress={onClose} />
+        <Button text="Hide" style={themed($action)} onPress={onClose} />
         {canReveal && !revealed ? (
           <Button
             testID="reveal-role-button"
             text={busy ? "Revealing…" : confirming ? "Reveal to all?" : "Reveal"}
             preset={confirming ? "reversed" : "default"}
-            disabled={busy}
+            disabled={busy || !online}
             style={themed($action)}
             onPress={() => void revealRole()}
           />
