@@ -31,3 +31,10 @@ it("drops the live socket when switched on, and dials Convex again once switched
   nearbyOnly.setNearbyOnly(false)
   expect(open().url).toBe("wss://real.convex.cloud/api/sync")
 })
+
+it("still switches when the setting can't be saved", () => {
+  jest.spyOn(require("@/utils/storage"), "save").mockReturnValueOnce(false)
+  nearbyOnly.setNearbyOnly(true)
+  expect(open().url).toBe("wss://convex.offline.invalid/api/sync")
+  nearbyOnly.setNearbyOnly(false)
+})

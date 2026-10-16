@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from "react"
+import { Platform } from "react-native"
 import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
@@ -18,7 +19,6 @@ import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
 import { reconnectConvexOnNetworkReturn, reconnectNow } from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
-import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { NearbyOnlyWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
@@ -96,7 +96,7 @@ export function ConfiguredAuth({
     () =>
       new ConvexReactClient(convexUrl, {
         initialAuthTokenReuse: true,
-        ...(lanPlayAvailable() ? { webSocketConstructor: NearbyOnlyWebSocket } : {}),
+        ...(Platform.OS === "web" ? {} : { webSocketConstructor: NearbyOnlyWebSocket }),
       }),
     [convexUrl],
   )

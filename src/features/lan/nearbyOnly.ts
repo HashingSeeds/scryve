@@ -26,7 +26,7 @@ export class NearbyOnlyWebSocket extends WebSocket {
 }
 
 export function setNearbyOnly(on: boolean) {
-  if (!save(NEARBY_ONLY_KEY, on)) return
+  save(NEARBY_ONLY_KEY, on)
   nearbyOnly = on
   if (on) for (const socket of liveSockets) socket.close()
   for (const listener of listeners) listener()

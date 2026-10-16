@@ -47,7 +47,6 @@ jest.mock("@clerk/expo/native", () => {
   const NativeText = jest.requireActual("react-native").Text
   return { AuthView: () => <NativeText testID="native-auth-view">Auth</NativeText> }
 })
-jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => true }))
 jest.mock("@/features/lan/nearbyOnly", () => ({
   ...jest.requireActual("@/features/lan/nearbyOnly"),
   NearbyOnlyWebSocket: class {},
