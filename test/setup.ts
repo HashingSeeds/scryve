@@ -108,6 +108,12 @@ jest.mock("expo-keep-awake", () => ({
   useKeepAwake: jest.fn(),
 }))
 
+jest.mock("expo-alternate-app-icons", () => ({
+  supportsAlternateIcons: false,
+  getAppIconName: () => null,
+  setAlternateAppIcon: jest.fn(async (name: string | null) => name),
+}))
+
 jest.mock("expo-network", () => ({
   NetworkStateType: jest.requireActual("expo-network/build/Network.types").NetworkStateType,
   addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
