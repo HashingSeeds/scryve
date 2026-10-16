@@ -11,7 +11,7 @@ import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
 
-import { archiveLanGame } from "./lanArchive"
+import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
 import { loadLanName } from "./lanAvailability"
 import {
   admitLanGuest,
@@ -106,6 +106,7 @@ export class LanSession {
   private server?: LanHost
   private serverClosed = false
   private tokens = new Map<string, string>()
+  private passHashes = new Map<string, string>()
   private peers = new Map<string, LanConnection<LanHostMessage>>()
   // why: a socket that hasn't sent its join yet isn't in peers, but still has to close when the host leaves.
   private accepted = new Set<LanConnection<LanHostMessage>>()
@@ -165,6 +166,7 @@ export class LanSession {
   async host(setup: LanSetup) {
     this.session += 1
     this.tokens.clear()
+    this.passHashes.clear()
     const name = playerName()
     const seatKey = createClientId("seat")
     const game = createLanGame(createClientId("lan"), seatKey, name, setup, Date.now())
@@ -232,6 +234,7 @@ export class LanSession {
             return peer.sendAndClose({ type: "rejected", reason: admitted.rejected })
           seatKey = admitted.pass.key
           this.tokens.set(admitted.pass.key, admitted.pass.token)
+          this.hashPass(admitted.pass)
           const previous = this.peers.get(seatKey)
           this.peers.set(seatKey, peer)
           previous?.close()
@@ -272,7 +275,10 @@ export class LanSession {
         if (!seatKey || this.peers.get(seatKey) !== peer || !game) return
         this.peers.delete(seatKey)
         this.replies.delete(seatKey)
-        if (game.status === "lobby") this.tokens.delete(seatKey)
+        if (game.status === "lobby") {
+          this.tokens.delete(seatKey)
+          this.passHashes.delete(seatKey)
+        }
         this.publish(releaseLanSeat(game, seatKey))
       },
     }
@@ -412,11 +418,10 @@ export class LanSession {
     if (
       (status === "active" || status === "finished") &&
       this.pass &&
-      this.claimedRound !== round
-    ) {
-      this.claimedRound = round
+      this.claimedRound !== round &&
       rememberSeatClaim({ publicId: round, token: this.pass.token, savedAt: Date.now() })
-    }
+    )
+      this.claimedRound = round
     if (status === "finished" && this.finishedRound !== round) {
       this.finishedRound = round
       retrySeatClaims()
@@ -452,12 +457,19 @@ export class LanSession {
       this.publish(startLanRound(game, Date.now()))
   }
 
+  // why: hashing is async, so it runs at join; finishing then saves the round before ending it, and a failed save leaves the round open to finish again.
+  private hashPass({ key, token }: LanSeatPass) {
+    void hashSeatPassToken(token).then((hash) => {
+      if (this.tokens.get(key) === token) this.passHashes.set(key, hash)
+    })
+  }
+
   finish(result?: ConnectedGameResult) {
     const game = this.game
     if (this.state.role !== "host" || game?.status !== "active") return
-    const ended = endLanRound(game, "finished", Date.now())
-    this.publish(ended)
-    void archiveLanGame(ended, result, new Map(this.tokens))
+    const now = Date.now()
+    archiveLanGame({ ...game, updatedAt: now }, result, this.passHashes)
+    this.publish(endLanRound(game, "finished", now))
   }
 
   leave({ keepGame = false }: { keepGame?: boolean } = {}) {
@@ -486,6 +498,7 @@ export class LanSession {
     this.peers.clear()
     this.accepted.clear()
     this.tokens.clear()
+    this.passHashes.clear()
     this.replies.clear()
     for (const settle of this.hostAcks.splice(0)) settle()
     this.rejectPendingWrites("Left the game")

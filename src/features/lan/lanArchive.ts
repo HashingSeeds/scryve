@@ -3,7 +3,7 @@ import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
-import type { LifeChangedEvent, LocalGame, SeatPassHashes } from "@/features/game/types"
+import type { GameEvent, LocalGame, SeatPassHashes } from "@/features/game/types"
 
 import { lanProjection, lanRoundId, lanSeatAppearance, type LanGame } from "./lanGame"
 import { nearbyOwner } from "./nearbyAccount"
@@ -23,22 +23,30 @@ export function lanLocalGame(
 ): LocalGame {
   const { setup, memory } = game
   const id = asGameId(lanRoundId(game))
-  const events = [...(memory?.events.values() ?? [])].flatMap((event): LifeChangedEvent[] =>
-    event.kind === "life.changed" && event.delta !== undefined
-      ? [
-          {
-            type: "life.changed",
-            operationId: asOperationId(event.operationId),
-            gameId: id,
-            actorId: asActorId(event.actorUserId ?? event.playerId),
-            deviceId: asDeviceId(event.deviceId ?? event.playerId),
-            clientCreatedAt: event.clientCreatedAt,
-            playerId: asPlayerId(event.playerId),
-            delta: event.delta,
-          },
-        ]
-      : [],
-  )
+  const events = [...(memory?.events.values() ?? [])].flatMap((event): GameEvent[] => {
+    const { delta, fromPlayerId, toPlayerId } = event
+    if (delta === undefined) return []
+    const base = {
+      operationId: asOperationId(event.operationId),
+      gameId: id,
+      actorId: asActorId(event.actorUserId ?? event.playerId),
+      deviceId: asDeviceId(event.deviceId ?? event.playerId),
+      clientCreatedAt: event.clientCreatedAt,
+    }
+    if (event.kind === "life.changed")
+      return [{ type: "life.changed", ...base, playerId: asPlayerId(event.playerId), delta }]
+    if (event.kind === "commanderDamage.confirmed" && fromPlayerId && toPlayerId)
+      return [
+        {
+          type: "commanderDamage.assigned",
+          ...base,
+          fromPlayerId: asPlayerId(fromPlayerId),
+          toPlayerId: asPlayerId(toPlayerId),
+          delta,
+        },
+      ]
+    return []
+  })
   const commanderDamage = Object.fromEntries(
     (memory ? commanderTotals(memory) : [])
       .filter(({ total }) => total > 0)
@@ -76,17 +84,17 @@ export function lanLocalGame(
   }
 }
 
-export async function archiveLanGame(
+export function archiveLanGame(
   game: LanGame,
   result: ConnectedGameResult | undefined,
-  tokens: ReadonlyMap<string, string>,
+  passHashes: ReadonlyMap<string, string>,
 ) {
-  const ownerId = nearbyOwner()
   const seatPassHashes: SeatPassHashes = {}
   for (const { key } of game.seats) {
-    const token = tokens.get(key)
-    if (token && key !== game.hostKey)
-      seatPassHashes[asPlayerId(key)] = await hashSeatPassToken(token)
+    const hash = passHashes.get(key)
+    if (hash && key !== game.hostKey) seatPassHashes[asPlayerId(key)] = hash
   }
-  return localGameRepository.archiveGame(lanLocalGame(game, { result, ownerId, seatPassHashes }))
+  return localGameRepository.archiveGame(
+    lanLocalGame(game, { result, ownerId: nearbyOwner(), seatPassHashes }),
+  )
 }

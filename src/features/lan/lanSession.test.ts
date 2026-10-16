@@ -20,7 +20,10 @@ jest.mock("./lanTransport", () => ({
   connectLan: jest.fn(),
   resolveLanService: jest.fn(),
 }))
-jest.mock("./lanArchive", () => ({ archiveLanGame: jest.fn(async () => null) }))
+jest.mock("./lanArchive", () => ({
+  archiveLanGame: jest.fn(() => null),
+  hashSeatPassToken: jest.fn(async (token: string) => `hash-${token}`),
+}))
 
 type Accept = (peer: LanConnection<LanHostMessage>) => LanPeerHandlers<LanGuestMessage>
 
@@ -140,15 +143,30 @@ describe("nearby host", () => {
     await session.writes.finish(result)
 
     expect(archiveLanGame).toHaveBeenCalledTimes(1)
-    const [game, archivedResult, tokens] = jest.mocked(archiveLanGame).mock.calls[0]
-    expect(game.status).toBe("finished")
+    const [game, archivedResult, hashes] = jest.mocked(archiveLanGame).mock.calls[0]
+    expect(game.status).toBe("active")
     expect(archivedResult).toEqual(result)
-    expect(tokens).toEqual(
+    expect(hashes).toEqual(
       new Map([
-        [alice.pass().key, alice.pass().token],
-        [bob.pass().key, bob.pass().token],
+        [alice.pass().key, `hash-${alice.pass().token}`],
+        [bob.pass().key, `hash-${bob.pass().token}`],
       ]),
     )
+  })
+
+  it("keeps the round open when saving it fails, so the host can finish again", async () => {
+    const { session } = await startedGame()
+    jest.mocked(archiveLanGame).mockImplementationOnce(() => {
+      throw new Error("Storage is full")
+    })
+
+    await expect(session.writes.finish()).rejects.toThrow("Storage is full")
+    jest.advanceTimersByTime(50)
+    expect(session.getState().projection?.status).toBe("active")
+
+    await session.writes.finish()
+    jest.advanceTimersByTime(50)
+    expect(session.getState().projection?.status).toBe("finished")
   })
 
   it("turns away a socket that names another guest's seat or the host's", async () => {

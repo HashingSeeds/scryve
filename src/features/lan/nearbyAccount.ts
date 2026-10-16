@@ -40,10 +40,10 @@ function loadClaims(now: number) {
 }
 
 export function rememberSeatClaim(claim: Omit<SeatClaim, "ownerId">) {
-  if (!owner) return
+  if (!owner) return false
   const claims = loadClaims(claim.savedAt)
-  if (claims.some(({ publicId }) => publicId === claim.publicId)) return
-  save(CLAIMS_KEY, [...claims, { ...claim, ownerId: owner }].slice(-MAX_CLAIMS))
+  if (claims.some(({ publicId }) => publicId === claim.publicId)) return true
+  return save(CLAIMS_KEY, [...claims, { ...claim, ownerId: owner }].slice(-MAX_CLAIMS))
 }
 
 export function retrySeatClaims() {

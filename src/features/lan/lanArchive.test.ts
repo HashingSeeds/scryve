@@ -52,20 +52,42 @@ function finishedRound() {
   )
   if ("rejected" in admitted) throw new Error(admitted.rejected)
   const started = startLanRound(admitted.game, NOW + 1)
-  const { game } = applyLanWrite(
+  const sent = { gameId: lanRoundId(started), deviceId: "device-0001", clientCreatedAt: NOW + 2 }
+  const writes: [string, Record<string, unknown>][] = [
+    [
+      "guest",
+      { type: "life.changed", operationId: "life-operation-0001", playerId: "guest", delta: -7 },
+    ],
+    [
+      "host",
+      {
+        type: "commanderDamage.submitted",
+        operationId: "claim-operation-0001",
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta: 5,
+      },
+    ],
+    [
+      "guest",
+      {
+        type: "commanderDamage.resolved",
+        operationId: "resolve-operation-0001",
+        claimOperationId: "claim-operation-0001",
+        toPlayerId: "guest",
+        accepted: true,
+      },
+    ],
+  ]
+  const game = writes.reduce(
+    (current, [sender, event]) =>
+      applyLanWrite(
+        current,
+        sender,
+        { ...sent, actorId: sender, ...event } as Parameters<typeof applyLanWrite>[2],
+        NOW + 2,
+      ).game,
     started,
-    "guest",
-    {
-      type: "life.changed",
-      operationId: "life-operation-0001",
-      gameId: lanRoundId(started),
-      actorId: "guest",
-      deviceId: "device-guest",
-      clientCreatedAt: NOW + 2,
-      playerId: "guest",
-      delta: -7,
-    } as Parameters<typeof applyLanWrite>[2],
-    NOW + 2,
   )
   return endLanRound(game, "finished", NOW + 3)
 }
@@ -90,11 +112,18 @@ describe("lanLocalGame", () => {
     })
     expect(game.players.map(({ id, life, seat }) => ({ id, life, seat }))).toEqual([
       { id: "host", life: 40, seat: 0 },
-      { id: "guest", life: 33, seat: 1 },
+      { id: "guest", life: 28, seat: 1 },
     ])
     expect(game.events).toEqual([
       expect.objectContaining({ type: "life.changed", playerId: "guest", delta: -7 }),
+      expect.objectContaining({
+        type: "commanderDamage.assigned",
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta: 5,
+      }),
     ])
+    expect(game.commanderDamage).toEqual({ "host>guest": 5 })
 
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(game)
