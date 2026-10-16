@@ -64,6 +64,8 @@ function wrapSocket<In, Out>(
   parse: (line: string) => In | null,
   handlers: LanPeerHandlers<In>,
 ): LanConnection<Out> {
+  // why: each tap is one small line, and Nagle holds it back until the last one is acknowledged, adding tens of milliseconds.
+  socket.setNoDelay(true)
   let lastHeard = Date.now()
   let closed = false
   // why: tcp-socket throws on writes after destroy, and its close event can arrive well after, so shut down at once.

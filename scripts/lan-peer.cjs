@@ -23,6 +23,7 @@ const send = (message) => socket.write(`${JSON.stringify(message)}\n`)
 
 let buffer = ""
 socket.setEncoding("utf8")
+socket.setNoDelay(true)
 socket.on("data", (chunk) => {
   buffer += chunk
   let newline

@@ -88,6 +88,7 @@ export class LanSession {
   private reconnectingSince?: number
   private unreachableAt = new Map<string, number>()
   private flushTimer?: ReturnType<typeof setTimeout>
+  private flushedAt = 0
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
   private session = 0
 
@@ -207,14 +208,16 @@ export class LanSession {
     }
   }
 
-  // why: guests only ever need the latest snapshot, so one flush covers every change since the last.
+  // why: guests only ever need the latest snapshot, so one flush covers every change since the last; an idle host sends at once instead of waiting out a window.
   private publish(game: LanGame) {
     this.state = { ...this.state, game }
-    this.flushTimer ??= setTimeout(() => this.flush(), FLUSH_INTERVAL_MS)
+    const wait = Math.max(0, this.flushedAt + FLUSH_INTERVAL_MS - Date.now())
+    this.flushTimer ??= setTimeout(() => this.flush(), wait)
   }
 
   private flush() {
     this.flushTimer = undefined
+    this.flushedAt = Date.now()
     this.notify()
     const { game } = this.state
     if (!game) return
