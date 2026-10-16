@@ -3,8 +3,13 @@ import { ConvexError } from "convex/values"
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import type { EngineError } from "./lib/gameEngine"
-import { writeMemoryGame, type MemoryGame, type MemoryWrite } from "./lib/gameEngineMemory"
+import { engineGameOf, type EngineError } from "./lib/gameEngine"
+import {
+  writeMemoryGame,
+  type MemoryAck,
+  type MemoryGame,
+  type MemoryWrite,
+} from "./lib/gameEngineMemory"
 import type { TableAction } from "./lib/table"
 
 const token = "t".repeat(43)
@@ -13,7 +18,7 @@ const JOINER_DEVICE = "device-joiner-0002"
 const CREATED_AT = 1_700_000_000_000
 
 type Seat = "host" | "joiner"
-type Outcome = { ok: true; deduplicated: boolean } | { ok: false; error: EngineError }
+type Outcome = { ok: true; ack: MemoryAck } | { ok: false; error: EngineError }
 
 async function parityGame(
   t: ConvexTestHarness,
@@ -57,10 +62,7 @@ async function parityGame(
   })
   const [hostRow, joinerRow] = players
   const memory: MemoryGame = {
-    status: game.status,
-    system: game.system ?? game.game,
-    format: game.format ?? game.ruleset,
-    designations: game.designations ?? {},
+    ...engineGameOf(game),
     seats: new Map(
       players.map((row) => [
         row._id,
@@ -120,13 +122,25 @@ async function parityGame(
                       : {}),
                   },
                 )
-      return { ok: true, deduplicated: result.deduplicated }
+      const { operationId, deduplicated } = result
+      return {
+        ok: true,
+        ack: {
+          operationId,
+          deduplicated,
+          ...("status" in result ? { status: result.status } : {}),
+          ...("currentLife" in result && typeof result.currentLife === "number"
+            ? { currentLife: result.currentLife }
+            : {}),
+          ...("total" in result && typeof result.total === "number" ? { total: result.total } : {}),
+        },
+      }
     } catch (cause) {
       if (cause instanceof ConvexError) {
         const data = cause.data as { code: EngineError["code"]; message: string }
-        return { ok: false, error: { code: data.code, message: data.message } }
+        return { ok: false, error: { kind: "rejected", code: data.code, message: data.message } }
       }
-      return { ok: false, error: { message: (cause as Error).message } }
+      return { ok: false, error: { kind: "rejected", message: (cause as Error).message } }
     }
   }
 
@@ -248,13 +262,13 @@ describe("engine parity: changeLife", () => {
     const life = (operationId: string, delta: number, playerId = game.hostSeat) =>
       ({ kind: "life", playerId, delta, ...sent(operationId) }) as const
 
-    expect(await game.write("host", life("life-operation-0001", -3))).toEqual({
+    expect(await game.write("host", life("life-operation-0001", -3))).toMatchObject({
       ok: true,
-      deduplicated: false,
+      ack: { deduplicated: false },
     })
-    expect(await game.write("host", life("life-operation-0001", -3))).toEqual({
+    expect(await game.write("host", life("life-operation-0001", -3))).toMatchObject({
       ok: true,
-      deduplicated: true,
+      ack: { deduplicated: true },
     })
     await game.write("host", life("life-operation-0001", -4))
     await game.write("host", life("life-operation-0002", -1, game.joinerSeat))
@@ -290,9 +304,9 @@ describe("engine parity: changeLife", () => {
     await game.write("host", life("life-before-end-001"))
     await game.end()
 
-    expect(await game.write("host", life("life-before-end-001"))).toEqual({
+    expect(await game.write("host", life("life-before-end-001"))).toMatchObject({
       ok: true,
-      deduplicated: true,
+      ack: { deduplicated: true },
     })
     expect(await game.write("host", life("life-after-end-0001"))).toMatchObject({
       ok: false,
@@ -409,9 +423,9 @@ describe("engine parity: tableAction", () => {
     await game.write("host", table("table-before-end-01", poison))
     await game.end()
 
-    expect(await game.write("host", table("table-before-end-01", poison))).toEqual({
+    expect(await game.write("host", table("table-before-end-01", poison))).toMatchObject({
       ok: true,
-      deduplicated: true,
+      ack: { deduplicated: true },
     })
     await game.write("host", table("table-after-end-001", poison))
     await game.expectSameState()
@@ -435,9 +449,9 @@ describe("engine parity: submitCommanderDamage", () => {
         ...sent(operationId),
       }) as const
 
-    expect(await game.write("host", claim("claim-operation-001", 7))).toEqual({
+    expect(await game.write("host", claim("claim-operation-001", 7))).toMatchObject({
       ok: true,
-      deduplicated: false,
+      ack: { deduplicated: false },
     })
     await game.write("host", claim("claim-operation-001", 7))
     await game.write("host", claim("claim-operation-001", 8))
@@ -526,7 +540,7 @@ describe("engine parity: confirm and decline commander damage", () => {
     await game.write("joiner", resolve("confirmed", "claim-confirm-0001", "resolve-confirm-01"))
     expect(
       await game.write("joiner", resolve("confirmed", "claim-confirm-0001", "resolve-confirm-01")),
-    ).toEqual({ ok: true, deduplicated: true })
+    ).toMatchObject({ ok: true, ack: { deduplicated: true } })
     await game.write("joiner", resolve("declined", "claim-confirm-0001", "resolve-confirm-01"))
     await game.write("joiner", resolve("confirmed", "claim-confirm-0001", "resolve-confirm-02"))
     await game.write("joiner", resolve("confirmed", "claim-missing-00001"))
@@ -573,7 +587,7 @@ describe("engine parity: confirm and decline commander damage", () => {
 
     expect(
       await game.write("joiner", resolve("confirmed", "claim-ended-000001", "resolve-ended-0001")),
-    ).toEqual({ ok: true, deduplicated: true })
+    ).toMatchObject({ ok: true, ack: { deduplicated: true } })
     await game.write("host", {
       ...resolve("confirmed", "claim-ended-000002"),
       deviceId: HOST_DEVICE,

@@ -13,6 +13,7 @@ import {
   matchLifeRetry,
   matchResolutionRetry,
   matchTableRetry,
+  rejected,
   resolutionEventIds,
   resolveClaim,
   submitClaim,
@@ -22,6 +23,7 @@ import {
   validateResolution,
   validateTableAction,
   type ClaimDecision,
+  type ClaimStatus,
   type CommanderClaimRecord,
   type EngineError,
   type EngineGame,
@@ -55,8 +57,15 @@ export type MemoryWrite =
       resolutionOperationId?: string
     })
 
-export type MemoryWriteResult =
-  { ok: true; deduplicated: boolean } | { ok: false; error: EngineError }
+export interface MemoryAck {
+  operationId: string
+  deduplicated: boolean
+  status?: ClaimStatus
+  currentLife?: number
+  total?: number
+}
+
+export type MemoryWriteResult = { ok: true; ack: MemoryAck } | { ok: false; error: EngineError }
 
 const pairKey = (fromPlayerId: string, toPlayerId: string) => `${fromPlayerId}\u0000${toPlayerId}`
 
@@ -88,13 +97,16 @@ export function applyGameChanges(game: MemoryGame, changes: readonly GameChange[
 
 const failed = (error: EngineError): MemoryWriteResult => ({ ok: false, error })
 
-function commit(
+const acknowledged = (ack: MemoryAck): MemoryWriteResult => ({ ok: true, ack })
+
+function commit<Outcome extends { changes: GameChange[] }>(
   game: MemoryGame,
-  outcome: { changes: GameChange[] } | EngineError,
+  outcome: Outcome | EngineError,
+  ack: (outcome: Outcome) => MemoryAck,
 ): MemoryWriteResult {
   if (isEngineError(outcome)) return failed(outcome)
   applyGameChanges(game, outcome.changes)
-  return { ok: true, deduplicated: false }
+  return acknowledged(ack(outcome))
 }
 
 export function writeMemoryGame(
@@ -109,16 +121,22 @@ export function writeMemoryGame(
     const request = { ...write, actorUserId }
     const seat = game.seats.get(write.playerId)
     const invalid = validateLifeChange(write) ?? authorizeSeat(seat, actor)
-    if (invalid || !seat) return failed(invalid ?? { message: "Seat not found" })
+    if (invalid || !seat) return failed(invalid ?? rejected("Seat not found"))
     const retry = matchLifeRetry(game.events.get(write.operationId), {
       ...request,
       playerId: seat.id,
     })
-    if (retry === "duplicate") return { ok: true, deduplicated: true }
+    const { operationId } = write
+    if (retry === "duplicate")
+      return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
     if (retry !== "new") return failed(retry)
     const inactive = checkActive(game)
     if (inactive) return failed(inactive)
-    return commit(game, changeLife(game, seat, { ...request, playerId: seat.id }, now))
+    return commit(
+      game,
+      changeLife(game, seat, { ...request, playerId: seat.id }, now),
+      ({ currentLife }) => ({ operationId, deduplicated: false, currentLife }),
+    )
   }
 
   if (write.kind === "table") {
@@ -127,7 +145,7 @@ export function writeMemoryGame(
     const action = gatedTableAction(write.action)
     const seat = game.seats.get(action.playerId)
     const unauthorized = authorizeSeat(seat, actor)
-    if (unauthorized || !seat) return failed(unauthorized ?? { message: "Seat not found" })
+    if (unauthorized || !seat) return failed(unauthorized ?? rejected("Seat not found"))
     const request = {
       ...write,
       action,
@@ -135,12 +153,16 @@ export function writeMemoryGame(
       actionIdentity: tableActionIdentity(write.action),
     }
     const retry = matchTableRetry(game.events.get(write.operationId), seat, request)
-    if (retry === "duplicate") return { ok: true, deduplicated: true }
+    const { operationId } = write
+    if (retry === "duplicate") return acknowledged({ operationId, deduplicated: true })
     if (retry !== "new") return failed(retry)
     const inactive = checkActive(game)
     if (inactive) return failed(inactive)
     const related = game.seats.get(tableRelatedSeatId(action, seat) ?? "")
-    return commit(game, changeTable(game, seat, related, request, now))
+    return commit(game, changeTable(game, seat, related, request, now), () => ({
+      operationId,
+      deduplicated: false,
+    }))
   }
 
   if (write.kind === "commander.claim") {
@@ -153,14 +175,12 @@ export function writeMemoryGame(
       checkActive(game) ??
       authorizeSeat(source, actor, "Seat-owner permission required for the attacking seat") ??
       checkClaimTarget(target)
-    if (invalid || !target) return failed(invalid ?? { message: "Seat not found" })
-    const retry = matchClaimRetry(
-      game.claims.get(write.operationId),
-      game.events.get(write.operationId),
-      request,
-    )
-    if (retry === "duplicate") return { ok: true, deduplicated: true }
-    if (retry !== "new") return failed(retry)
+    if (invalid || !target) return failed(invalid ?? rejected("Seat not found"))
+    const { operationId } = write
+    const existing = game.claims.get(operationId)
+    const retry = matchClaimRetry(existing, game.events.get(operationId), request)
+    if (isEngineError(retry)) return failed(retry)
+    if (existing) return acknowledged({ operationId, deduplicated: true, status: existing.status })
     const pending = [...game.claims.values()].filter((claim) => claim.status === "pending")
     return commit(
       game,
@@ -174,6 +194,7 @@ export function writeMemoryGame(
         request,
         now,
       ),
+      ({ status }) => ({ operationId, deduplicated: false, status }),
     )
   }
 
@@ -183,14 +204,14 @@ export function writeMemoryGame(
     validateResolution(request) ??
     checkCommanderGame(game) ??
     checkResolutionBinding(claim, request)
-  if (invalid || !claim) return failed(invalid ?? { message: "Commander damage claim not found" })
+  if (invalid || !claim) return failed(invalid ?? rejected("Commander damage claim not found"))
   const target = game.seats.get(claim.toPlayerId)
   const unauthorized = authorizeSeat(
     target,
     actor,
     "Seat-owner permission required for the defending seat",
   )
-  if (unauthorized || !target) return failed(unauthorized ?? { message: "Seat not found" })
+  if (unauthorized || !target) return failed(unauthorized ?? rejected("Seat not found"))
   const recordedId = resolutionEventIds(claim).find((operationId) => game.events.has(operationId))
   const retry = matchResolutionRetry(
     claim,
@@ -204,21 +225,29 @@ export function writeMemoryGame(
     request,
   )
   if (isEngineError(retry)) return failed(retry)
+  const operationId = write.resolutionOperationId ?? claim.operationId
+  const pairTotal = game.pairs.get(pairKey(claim.fromPlayerId, claim.toPlayerId))?.total ?? 0
   if (retry !== "new") {
     applyGameChanges(game, retry.changes)
-    return { ok: true, deduplicated: true }
+    return acknowledged({
+      operationId,
+      deduplicated: true,
+      status: claim.status,
+      ...(write.decision === "confirmed" && claim.status === "confirmed"
+        ? { total: pairTotal, currentLife: target.currentLife }
+        : {}),
+    })
   }
   const inactive = checkActive(game)
   if (inactive) return failed(inactive)
   return commit(
     game,
-    resolveClaim(
-      claim,
-      write.decision,
-      game.pairs.get(pairKey(claim.fromPlayerId, claim.toPlayerId))?.total ?? 0,
-      target,
-      request,
-      now,
-    ),
+    resolveClaim(claim, write.decision, pairTotal, target, request, now),
+    ({ total, currentLife }) => ({
+      operationId,
+      deduplicated: false,
+      status: write.decision,
+      ...(total === undefined ? {} : { total, currentLife }),
+    }),
   )
 }

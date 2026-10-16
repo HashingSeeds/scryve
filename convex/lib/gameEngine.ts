@@ -1,3 +1,4 @@
+import { DEFAULT_DECK_GAME } from "./deckGames"
 import {
   applyLifeChange,
   commanderClaimOutcome,
@@ -25,21 +26,38 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
+  readonly kind: "rejected"
   readonly code?: GameWriteErrorCode
   readonly message: string
 }
 
 export const isEngineError = (value: unknown): value is EngineError =>
-  typeof value === "object" && value !== null && "message" in value
+  typeof value === "object" && value !== null && "kind" in value && value.kind === "rejected"
 
-const writeError = (code: GameWriteErrorCode, message: string): EngineError => ({ code, message })
+export const rejected = (message: string): EngineError => ({ kind: "rejected", message })
+
+const writeError = (code: GameWriteErrorCode, message: string): EngineError => ({
+  kind: "rejected",
+  code,
+  message,
+})
 
 const MISMATCH = writeError(
   "sync_operation_mismatch",
   "Operation identifier was reused with different data",
 )
+
+export const engineGameOf = (
+  game: Pick<Doc<"games">, "status" | "system" | "game" | "format" | "ruleset" | "designations">,
+): EngineGame => ({
+  status: game.status,
+  system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
+  format: game.format ?? game.ruleset,
+  designations: game.designations ?? {},
+})
 
 export interface EngineGame {
   status: string
@@ -349,21 +367,21 @@ export function changeTable(
 export const checkCommanderGame = (game: Pick<EngineGame, "system" | "format">) =>
   isCommanderFormat(game.system, game.format)
     ? null
-    : { message: "Commander damage is only available in Commander games" }
+    : rejected("Commander damage is only available in Commander games")
 
 export const validateCommanderClaim = (
   request: WriteRequest & { delta: number; fromPlayerId: string; toPlayerId: string },
 ) =>
   (isCommanderDamageDelta(request.delta)
     ? null
-    : { message: "Commander damage delta must be a non-zero whole number from -99 to 99" }) ??
+    : rejected("Commander damage delta must be a non-zero whole number from -99 to 99")) ??
   checkWrite(request) ??
   (request.fromPlayerId === request.toPlayerId
-    ? { message: "A commander cannot damage itself" }
+    ? rejected("A commander cannot damage itself")
     : null)
 
 export const checkClaimTarget = (target: EngineSeat | undefined) =>
-  target ? null : { message: "Commander damage target must belong to this game" }
+  target ? null : rejected("Commander damage target must belong to this game")
 
 export function matchClaimRetry(
   existing: CommanderClaimRecord | undefined,
@@ -469,7 +487,7 @@ export function checkResolutionBinding(
   claim: CommanderClaimRecord | undefined,
   request: ResolutionRequest,
 ): EngineError | null {
-  if (!claim) return { message: "Commander damage claim not found" }
+  if (!claim) return rejected("Commander damage claim not found")
   return request.resolutionOperationId &&
     claim.resolutionOperationId &&
     claim.resolutionOperationId !== request.resolutionOperationId
@@ -574,7 +592,7 @@ export function resolveClaim(
     life: target.currentLife,
     delta: claim.delta,
   })
-  if (!confirmed) return { message: "Commander damage total must remain between 0 and 99" }
+  if (!confirmed) return rejected("Commander damage total must remain between 0 and 99")
   const { total, currentLife } = confirmed
   return {
     total,
