@@ -63,6 +63,7 @@ import type {
   NewPlayerInput,
   PlayerId,
 } from "@/features/game/types"
+import type { LanSetup } from "@/features/lan/lanGame"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -144,7 +145,7 @@ export interface NewGameScreenProps {
   onSavePlayers?: (players: NewPlayerInput[], account?: LocalGameAccountInput) => void
   joinContent?: ReactNode
   onResumeConnected?: (game: ResumableGame) => void
-  onNearby?: () => void
+  onNearby?: (setup: LanSetup) => void
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
   localConnect?: LocalConnectFeed
   localMatchEnd?: { game: LocalGame; onEnd: (outcomes: MatchSeatOutcome[]) => void }
@@ -871,7 +872,15 @@ export function NewGameScreen({
                     TextProps={$footerButtonText}
                     style={footerRow ? themed($footerAction) : undefined}
                     accessibilityHint="Plays with phones on this Wi-Fi, without accounts or the cloud"
-                    onPress={onNearby}
+                    onPress={() =>
+                      onNearby?.({
+                        playerCount,
+                        startingLife,
+                        lifeStep,
+                        ruleset: format ?? NO_PLAY_SYSTEM,
+                        ...(system && format ? { system, format } : {}),
+                      })
+                    }
                   />
                 ) : null}
                 {localMatchEnd ? (

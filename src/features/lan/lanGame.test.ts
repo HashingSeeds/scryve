@@ -1,121 +1,243 @@
 import {
   admitLanGuest,
+  applyLanWrite,
   createLanGame,
-  LAN_MAX_SEATS,
+  endLanRound,
+  LAN_PROTOCOL,
   lanProjection,
-  MAX_LAN_VERSION_STEP,
-  mergeHostGame,
+  lanSeatsReady,
   parseGuestMessage,
+  parseHostMessage,
   releaseLanSeat,
-  setLanLife,
-  startLanGame,
+  setLanConnected,
+  startLanRound,
   type LanGame,
   type LanSeatPass,
+  type LanSetup,
 } from "./lanGame"
+import type { ConnectedActionEvent } from "../connected/model"
 
-const lobby = () => createLanGame("game", "host", "Host")
+const NOW = 1_700_000_000_000
+const commander: LanSetup = {
+  playerCount: 2,
+  startingLife: 40,
+  lifeStep: 1,
+  ruleset: "commander",
+  system: "mtg",
+  format: "commander",
+}
 const tokens = new Map<string, string>()
-const late = { type: "join", name: "late" } as const
+const join = (name: string, pass?: LanSeatPass) =>
+  ({ type: "join", protocol: LAN_PROTOCOL, name, ...(pass ? { pass } : {}) }) as const
 const unused = { key: "unused", token: "unused" }
+
+const lobby = (setup: LanSetup = commander) => createLanGame("game", "host", "Host", setup, NOW)
 
 function seatGuest(game: LanGame, key: string) {
   const pass = { key, token: `token-${key}` }
-  const admitted = admitLanGuest(game, tokens, { type: "join", name: key }, pass)
+  const admitted = admitLanGuest(game, tokens, join(key), pass)
   if ("rejected" in admitted) throw new Error(admitted.rejected)
   tokens.set(key, pass.token)
   return admitted.game
 }
 
-const rejoin = (game: LanGame, pass: LanSeatPass) =>
-  admitLanGuest(game, tokens, { type: "join", name: "x", pass }, unused)
+const started = (setup: LanSetup = commander) =>
+  startLanRound(seatGuest(lobby(setup), "guest"), NOW)
 
-const lifeOf = (game: LanGame, key: string) => game.seats.find((seat) => seat.key === key)?.life
+function op(event: Record<string, unknown>): ConnectedActionEvent {
+  const message = parseGuestMessage(
+    JSON.stringify({
+      type: "op",
+      event: {
+        gameId: "game-1",
+        actorId: "actor",
+        deviceId: "device-0001",
+        clientCreatedAt: NOW,
+        ...event,
+      },
+    }),
+  )
+  if (message?.type !== "op") throw new Error("not an op")
+  return message.event
+}
 
-describe("LAN game", () => {
-  it("seats new guests only in the lobby and only up to the board's player limit", () => {
-    let full = lobby()
-    for (let index = 1; index < LAN_MAX_SEATS; index += 1) full = seatGuest(full, `guest-${index}`)
-    const started = startLanGame(seatGuest(lobby(), "guest"), 20)
+const life = (operationId: string, playerId: string, delta: number) =>
+  op({ type: "life.changed", operationId, playerId, delta })
 
-    expect(admitLanGuest(full, tokens, late, unused)).toEqual({ rejected: "This game is full." })
-    expect(admitLanGuest(started, tokens, late, unused)).toEqual({
+const lifeOf = (game: LanGame, viewer: string, key: string) =>
+  lanProjection(game, viewer).players.find((player) => player.playerId === key)?.currentLife
+
+function write(game: LanGame, sender: string, event: ConnectedActionEvent) {
+  const { game: next, result } = applyLanWrite(game, sender, event, NOW)
+  return { next, result }
+}
+
+describe("nearby lobby", () => {
+  it("seats guests up to the chosen player count, only in the lobby and on this protocol", () => {
+    const full = seatGuest(lobby(), "guest")
+
+    expect(admitLanGuest(full, tokens, join("late"), unused)).toEqual({
+      rejected: "This game is full.",
+    })
+    expect(
+      admitLanGuest(lobby(), tokens, { type: "join", protocol: 1, name: "old" }, unused),
+    ).toEqual({ rejected: "Update Scryve to join this game." })
+    expect(admitLanGuest(startLanRound(full, NOW), tokens, join("late"), unused)).toEqual({
       rejected: "This game has already started.",
     })
   })
 
   it("returns a seat only to the pass it was issued with, and never hands out the host's", () => {
-    const game = startLanGame(seatGuest(lobby(), "guest"), 20)
+    const game = startLanRound(seatGuest(lobby(), "guest"), NOW)
 
-    expect(rejoin(game, { key: "guest", token: "token-guest" })).not.toHaveProperty("rejected")
-    expect(rejoin(game, { key: "guest", token: "guessed" })).toEqual({
+    expect(
+      admitLanGuest(game, tokens, join("x", { key: "guest", token: "token-guest" }), unused),
+    ).not.toHaveProperty("rejected")
+    expect(
+      admitLanGuest(game, tokens, join("x", { key: "guest", token: "guess" }), unused),
+    ).toEqual({
       rejected: "That seat belongs to another device.",
     })
-    expect(rejoin(game, { key: "host", token: "anything" })).toHaveProperty("rejected")
-  })
-
-  it("gives a guest whose lobby seat was freed a new seat instead of turning it away", () => {
-    const freed = releaseLanSeat(seatGuest(lobby(), "left"), "left")
-    const back = admitLanGuest(
-      freed,
-      tokens,
-      { type: "join", name: "back", pass: { key: "left", token: "token-left" } },
-      { key: "fresh", token: "fresh-token" },
-    )
-
-    expect(back).toMatchObject({ pass: { key: "fresh" } })
     expect(
-      admitLanGuest(
-        startLanGame(freed, 20),
-        tokens,
-        { type: "join", name: "x", pass: { key: "left", token: "token-left" } },
-        unused,
+      admitLanGuest(game, tokens, join("x", { key: "host", token: "" }), unused),
+    ).toHaveProperty("rejected")
+  })
+
+  it("is ready to start only when every chosen seat is filled and present", () => {
+    const full = seatGuest(lobby(), "guest")
+
+    expect(lanSeatsReady(lobby())).toBe(false)
+    expect(lanSeatsReady(full)).toBe(true)
+    expect(lanSeatsReady(setLanConnected(full, "guest", false))).toBe(false)
+    expect(releaseLanSeat(full, "guest").seats.map((seat) => seat.key)).toEqual(["host"])
+  })
+})
+
+describe("nearby rounds on the shared engine", () => {
+  it("applies a write as the sender's own seat, once, and lists it for the overlay", () => {
+    const game = started()
+    const { next, result } = write(game, "guest", life("life-operation-0001", "guest", -3))
+    const replay = write(next, "guest", life("life-operation-0001", "guest", -3))
+
+    expect(result).toMatchObject({ ok: true, ack: { deduplicated: false, currentLife: 37 } })
+    expect(replay.result).toMatchObject({ ok: true, ack: { deduplicated: true } })
+    expect(lifeOf(replay.next, "host", "guest")).toBe(37)
+    expect(lanProjection(next, "guest").recentOperationIds).toEqual(["life-operation-0001"])
+    expect(write(game, "guest", life("life-operation-0002", "host", -1)).result).toMatchObject({
+      ok: false,
+      error: { code: "seat_owner_required" },
+    })
+  })
+
+  it("shows a commander claim only to its defender and applies the defender's confirm", () => {
+    const claimed = write(
+      started(),
+      "host",
+      op({
+        type: "commanderDamage.submitted",
+        operationId: "claim-operation-001",
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta: 7,
+      }),
+    ).next
+
+    expect(lanProjection(claimed, "guest").commanderDamage?.pendingClaims).toHaveLength(1)
+    expect(lanProjection(claimed, "host").commanderDamage?.pendingClaims).toEqual([])
+
+    const confirmed = write(
+      claimed,
+      "guest",
+      op({
+        type: "commanderDamage.resolved",
+        operationId: "resolve-operation-1",
+        claimOperationId: "claim-operation-001",
+        toPlayerId: "guest",
+        accepted: true,
+      }),
+    ).next
+
+    expect(lifeOf(confirmed, "host", "guest")).toBe(33)
+    expect(lanProjection(confirmed, "host").commanderDamage?.totals).toEqual([
+      { fromPlayerId: "host", toPlayerId: "guest", total: 7 },
+    ])
+  })
+
+  it("moves Pokémon prizes to the taker when the owner records a knockout", () => {
+    const pokemon = {
+      ...commander,
+      startingLife: 6,
+      ruleset: "standard",
+      system: "pokemon" as const,
+      format: "standard",
+    }
+    const placed = write(
+      started(pokemon),
+      "host",
+      op({
+        type: "table.action",
+        operationId: "table-operation-01",
+        action: {
+          kind: "pokemon.placed",
+          playerId: "host",
+          pokemonId: "charizard-001",
+          slot: "active",
+          card: { cardId: "sv03.5-006", name: "Charizard ex", hp: 330, prizes: 2 },
+        },
+      }),
+    ).next
+    const knockedOut = write(
+      placed,
+      "host",
+      op({
+        type: "table.action",
+        operationId: "table-operation-02",
+        action: {
+          kind: "pokemon.knockedOut",
+          playerId: "host",
+          pokemonId: "charizard-001",
+          takerPlayerId: "guest",
+        },
+      }),
+    ).next
+
+    expect(lifeOf(knockedOut, "guest", "guest")).toBe(4)
+    expect(lanProjection(knockedOut, "guest").table?.players.host.pokemon?.active).toBeUndefined()
+  })
+
+  it("refuses writes before a round starts and after it ends", () => {
+    const write1 = life("life-operation-0003", "guest", -1)
+
+    expect(write(seatGuest(lobby(), "guest"), "guest", write1).result).toMatchObject({
+      error: { code: "game_not_active" },
+    })
+    expect(write(endLanRound(started(), "finished", NOW), "guest", write1).result).toMatchObject({
+      error: { code: "game_not_active" },
+    })
+  })
+
+  it("gives every round a new id and a fresh table", () => {
+    const first = write(started(), "guest", life("life-operation-0004", "guest", -5)).next
+    const again = startLanRound(endLanRound(first, "finished", NOW), NOW)
+
+    expect(lanProjection(again, "host").publicId).not.toBe(lanProjection(first, "host").publicId)
+    expect(lifeOf(again, "host", "guest")).toBe(40)
+    expect(lanProjection(again, "host").recentOperationIds).toEqual([])
+  })
+})
+
+describe("nearby messages", () => {
+  it("drops malformed writes and tells an older host apart", () => {
+    expect(
+      parseGuestMessage(
+        JSON.stringify({ type: "op", event: { type: "table.action", action: { kind: "nope" } } }),
       ),
-    ).toEqual({
-      rejected: "This game has already started.",
+    ).toBeNull()
+    expect(parseGuestMessage(JSON.stringify({ type: "join", name: "old" }))).toMatchObject({
+      protocol: 1,
     })
-  })
-
-  it("ignores a replayed older life total and a version jump that would lock the seat", () => {
-    const game = setLanLife(startLanGame(seatGuest(lobby(), "guest"), 20), "guest", {
-      life: 12,
-      version: 4,
-      round: 1,
+    expect(parseHostMessage(JSON.stringify({ type: "game", game: {} }))).toEqual({
+      type: "outdated",
     })
-    const jump = { life: 1, version: 4 + MAX_LAN_VERSION_STEP + 1, round: 1 }
-
-    expect(lifeOf(setLanLife(game, "guest", { life: 18, version: 3, round: 1 }), "guest")).toBe(12)
-    expect(lifeOf(setLanLife(game, "guest", jump), "guest")).toBe(12)
-    expect(parseGuestMessage('{"type":"life","life":1,"version":1e308,"round":1}')).toBeNull()
-  })
-
-  it("keeps a guest's own newer life when the host has not caught up", () => {
-    const host = startLanGame(seatGuest(lobby(), "guest"), 20)
-    const merged = mergeHostGame(host, "guest", { life: 9, version: 7, round: 1 })
-
-    expect(lifeOf(merged, "guest")).toBe(9)
-    expect(lanProjection(merged, "guest").players.map((player) => player.controlledByMe)).toEqual([
-      false,
-      true,
-    ])
-  })
-
-  it("keeps a restart's starting life over a total from the previous game", () => {
-    const first = startLanGame(seatGuest(lobby(), "guest"), 20)
-    const restarted = startLanGame(first, 40)
-    const stale = { life: 3, version: 9, round: first.round }
-
-    expect(lifeOf(setLanLife(restarted, "guest", stale), "guest")).toBe(40)
-    expect(lifeOf(mergeHostGame(restarted, "guest", stale), "guest")).toBe(40)
-  })
-
-  it("frees a lobby seat but holds a started game's seat for its owner to rejoin", () => {
-    const lobbyGame = seatGuest(seatGuest(lobby(), "left"), "stays")
-    const away = releaseLanSeat(startLanGame(lobbyGame, 20), "left")
-
-    expect(releaseLanSeat(lobbyGame, "left").seats.map(({ key, seat }) => [key, seat])).toEqual([
-      ["host", 1],
-      ["stays", 2],
-    ])
-    expect(startLanGame(away, 20).seats.map((seat) => seat.key)).toEqual(["host", "left", "stays"])
   })
 })

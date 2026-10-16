@@ -1,82 +1,132 @@
 import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
-import { EMPTY_TABLE } from "../../../convex/lib/table"
-import type { ConnectedDisplayProjection } from "../connected/model"
-import { MAX_PLAYER_NAME_LENGTH, MAX_PLAYERS } from "../game/domain"
+import {
+  commanderTotals,
+  writeMemoryGame,
+  type MemoryGame,
+  type MemoryWrite,
+  type MemoryWriteResult,
+} from "../../../convex/lib/gameEngineMemory"
+import { isCommanderFormat, isCommanderLethal } from "../../../convex/lib/gameRules"
+import { tableRules } from "../../../convex/lib/systems"
+import {
+  matchesValidator,
+  TABLE_VERSION,
+  tableActionValidator,
+  tableForVersion,
+  type PlayerTable,
+} from "../../../convex/lib/table"
+import {
+  CONNECTED_RECENT_OPERATION_LIMIT,
+  toConnectedProjection,
+  type ConnectedActionEvent,
+  type ConnectedProjection,
+} from "../connected/model"
+import {
+  asActorId,
+  asDeviceId,
+  asGameId,
+  asOperationId,
+  asPlayerId,
+  MAX_PLAYER_NAME_LENGTH,
+  MAX_PLAYERS,
+} from "../game/domain"
+import { isPlaySystemId, playSystemFormats, type PlaySystemId } from "../game/playSystems"
 
+// why: guests and hosts from before the shared game engine speak a different protocol, so each side turns the other away with a clear reason.
+export const LAN_PROTOCOL = 2
 export const LAN_MAX_SEATS = MAX_PLAYERS
 export const LAN_MIN_PLAYERS = 2
-// why: the same bound Convex puts on a life delta; a total outside it can only come from a broken or hostile peer.
-export const MAX_LAN_LIFE = 999_999
-// why: a guest offline for a long game still catches up, but one message can't jump a version so far the seat locks.
-export const MAX_LAN_VERSION_STEP = 10_000
 
-export const connectedSeatCount = (game: LanGame) =>
-  game.seats.filter((seat) => seat.connected).length
+export interface LanSetup {
+  playerCount: number
+  startingLife: number
+  lifeStep: number
+  ruleset: string
+  system?: PlaySystemId
+  format?: string
+}
 
 export interface LanSeat {
   key: string
   seat: number
   name: string
-  life: number
-  // why: replays and reconnects resend old totals; the higher version always wins.
-  version: number
   connected: boolean
 }
 
-export interface LanGame {
+export type LanStatus = "lobby" | "active" | "finished" | "abandoned"
+
+export interface LanLobby {
   id: string
-  hostKey: string
-  status: "lobby" | "active" | "finished" | "abandoned"
-  // why: each start resets every life, so a total from an earlier round must never win against it.
+  status: LanStatus
   round: number
-  startingLife: number
+  setup: LanSetup
   seats: LanSeat[]
 }
 
-export interface LanLife {
-  life: number
-  version: number
-  round: number
+export interface LanGame extends LanLobby {
+  hostKey: string
+  memory?: MemoryGame
+  recentOperationIds: string[]
+  updatedAt: number
 }
 
-// why: seat keys are public in every snapshot, so reclaiming a seat also needs the token only its device was sent.
+// why: seat keys are public in every projection, so reclaiming a seat also needs the token only its device was sent.
 export interface LanSeatPass {
   key: string
   token: string
 }
 
 export type LanGuestMessage =
-  { type: "join"; name: string; pass?: LanSeatPass; life?: LanLife } | ({ type: "life" } & LanLife)
+  | { type: "join"; protocol: number; name: string; pass?: LanSeatPass }
+  | { type: "op"; event: ConnectedActionEvent }
 
 export type LanHostMessage =
-  | { type: "game"; game: LanGame }
   | { type: "welcome"; pass: LanSeatPass }
   | { type: "rejected"; reason: string }
+  | { type: "outdated" }
+  | { type: "state"; lobby: LanLobby; projection: ConnectedProjection }
+  | { type: "ack"; operationId: string }
+  | { type: "nack"; operationId: string; code?: string; message: string }
 
-export function createLanGame(id: string, hostKey: string, name: string): LanGame {
-  const startingLife = 20
+export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
+
+export const connectedSeatCount = (game: Pick<LanLobby, "seats">) =>
+  game.seats.filter((seat) => seat.connected).length
+
+export const lanSeatsReady = (game: Pick<LanLobby, "seats" | "setup">) =>
+  game.seats.length === game.setup.playerCount && connectedSeatCount(game) === game.seats.length
+
+export function createLanGame(
+  id: string,
+  hostKey: string,
+  name: string,
+  setup: LanSetup,
+  now: number,
+): LanGame {
   return {
     id,
     hostKey,
     status: "lobby",
     round: 0,
-    startingLife,
-    seats: [{ key: hostKey, seat: 1, name, life: startingLife, version: 0, connected: true }],
+    setup,
+    seats: [{ key: hostKey, seat: 1, name, connected: true }],
+    recentOperationIds: [],
+    updatedAt: now,
   }
 }
 
-const withSeat = (game: LanGame, key: string, update: (seat: LanSeat) => LanSeat) => ({
+export const lanLobbyOf = ({ id, status, round, setup, seats }: LanGame): LanLobby => ({
+  id,
+  status,
+  round,
+  setup,
+  seats,
+})
+
+const withSeat = (game: LanGame, key: string, update: (seat: LanSeat) => LanSeat): LanGame => ({
   ...game,
   seats: game.seats.map((seat) => (seat.key === key ? update(seat) : seat)),
 })
-
-const applyLife = (game: LanGame, seat: LanSeat, life: LanLife | undefined): LanSeat =>
-  life &&
-  life.round === game.round &&
-  life.version > seat.version &&
-  life.version - seat.version <= MAX_LAN_VERSION_STEP
-    ? { ...seat, life: life.life, version: life.version }
-    : seat
 
 // why: the host's seat has no token anywhere, so no pass can ever claim it; a pass for a seat the lobby already freed just gets a new one.
 export function admitLanGuest(
@@ -85,32 +135,26 @@ export function admitLanGuest(
   join: Extract<LanGuestMessage, { type: "join" }>,
   fresh: LanSeatPass,
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
+  if (join.protocol !== LAN_PROTOCOL) return { rejected: "Update Scryve to join this game." }
   const { pass } = join
   const owned = pass && game.seats.some((seat) => seat.key === pass.key)
   if (pass && (pass.key === game.hostKey || (owned && tokens.get(pass.key) !== pass.token)))
     return { rejected: "That seat belongs to another device." }
   if (pass && owned)
     return {
-      game: withSeat(game, pass.key, (seat) =>
-        applyLife(game, { ...seat, name: join.name, connected: true }, join.life),
-      ),
+      game: withSeat(game, pass.key, (seat) => ({ ...seat, name: join.name, connected: true })),
       pass,
     }
   if (game.status !== "lobby") return { rejected: "This game has already started." }
-  if (game.seats.length >= LAN_MAX_SEATS) return { rejected: "This game is full." }
+  if (game.seats.length >= game.setup.playerCount) return { rejected: "This game is full." }
   const seat: LanSeat = {
     key: fresh.key,
     seat: game.seats.length + 1,
     name: join.name,
-    life: game.startingLife,
-    version: 0,
     connected: true,
   }
   return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
 }
-
-export const setLanLife = (game: LanGame, key: string, life: LanLife) =>
-  withSeat(game, key, (seat) => applyLife(game, seat, life))
 
 export const setLanConnected = (game: LanGame, key: string, connected: boolean) =>
   withSeat(game, key, (seat) => ({ ...seat, connected }))
@@ -126,45 +170,174 @@ export function releaseLanSeat(game: LanGame, key: string): LanGame {
   }
 }
 
-export function startLanGame(game: LanGame, startingLife: number): LanGame {
+// why: every round is a fresh game for the shared engine, with its own id, so a change queued for the last round can never land in this one.
+export function startLanRound(game: LanGame, now: number): LanGame {
+  const { setup } = game
   return {
     ...game,
     status: "active",
     round: game.round + 1,
-    startingLife,
-    seats: game.seats.map((seat) => ({ ...seat, life: startingLife, version: 0 })),
+    recentOperationIds: [],
+    updatedAt: now,
+    memory: {
+      status: "active",
+      system: setup.system,
+      format: setup.format,
+      designations: {},
+      seats: new Map(
+        game.seats.map((seat) => [
+          seat.key,
+          { id: seat.key, userId: seat.key, currentLife: setup.startingLife, eventCount: 0 },
+        ]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    },
   }
 }
 
-// why: a host snapshot sent before the guest's latest change arrived would otherwise roll its life back.
-export function mergeHostGame(hostGame: LanGame, key: string, own: LanLife | undefined) {
-  return own ? setLanLife(hostGame, key, own) : hostGame
+export function endLanRound(game: LanGame, status: "finished" | "abandoned", now: number): LanGame {
+  if (game.memory) game.memory.status = status
+  return { ...game, status, updatedAt: now }
 }
 
-export function lanProjection(game: LanGame, seatKey: string): ConnectedDisplayProjection {
+function memoryWriteOf(event: ConnectedActionEvent): MemoryWrite {
+  const sent = {
+    operationId: event.operationId,
+    deviceId: event.deviceId,
+    clientCreatedAt: event.clientCreatedAt,
+  }
+  if (event.type === "life.changed")
+    return { kind: "life", playerId: event.playerId, delta: event.delta, ...sent }
+  if (event.type === "table.action") return { kind: "table", action: event.action, ...sent }
+  if (event.type === "commanderDamage.submitted")
+    return {
+      kind: "commander.claim",
+      fromPlayerId: event.fromPlayerId,
+      toPlayerId: event.toPlayerId,
+      delta: event.delta,
+      ...sent,
+    }
+  return {
+    kind: "commander.resolve",
+    decision: event.accepted ? "confirmed" : "declined",
+    operationId: event.claimOperationId,
+    resolutionOperationId: event.operationId,
+    deviceId: event.deviceId,
+    clientCreatedAt: event.clientCreatedAt,
+  }
+}
+
+const NOT_STARTED: MemoryWriteResult = {
+  ok: false,
+  error: { kind: "rejected", code: "game_not_active", message: "Game is not active" },
+}
+
+// why: the sender's seat comes from the pass the host verified, never from the message, so a guest can only act as itself.
+export function applyLanWrite(
+  game: LanGame,
+  senderKey: string,
+  event: ConnectedActionEvent,
+  now: number,
+): { game: LanGame; result: MemoryWriteResult } {
+  if (!game.memory) return { game, result: NOT_STARTED }
+  const result = writeMemoryGame(
+    game.memory,
+    { userId: senderKey, isHost: senderKey === game.hostKey },
+    memoryWriteOf(event),
+    now,
+  )
+  if (!result.ok || result.ack.deduplicated) return { game, result }
+  return {
+    game: {
+      ...game,
+      updatedAt: now,
+      recentOperationIds: [...game.recentOperationIds, event.operationId].slice(
+        -CONNECTED_RECENT_OPERATION_LIMIT,
+      ),
+    },
+    result,
+  }
+}
+
+const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
+  rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
+
+const playerTableOf = (seat: PlayerTable): PlayerTable => ({
+  ...(seat.counters ? { counters: seat.counters } : {}),
+  ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
+})
+
+function commanderProjection(memory: MemoryGame, viewerKey: string) {
+  const totals = commanderTotals(memory)
+  return {
+    totals,
+    pendingClaims: [...memory.claims.values()]
+      .filter((claim) => claim.status === "pending" && claim.toPlayerId === viewerKey)
+      .map((claim) => ({
+        claimId: claim.operationId,
+        operationId: claim.operationId,
+        fromPlayerId: claim.fromPlayerId,
+        toPlayerId: claim.toPlayerId,
+        delta: claim.delta,
+        clientCreatedAt: claim.clientCreatedAt,
+        createdAt: claim.createdAt,
+      })),
+    eliminatedPlayerIds: [
+      ...new Set(
+        totals.filter((total) => isCommanderLethal(total.total)).map((total) => total.toPlayerId),
+      ),
+    ],
+  }
+}
+
+// why: shaped like Convex's lobbyProjection, so a nearby guest's board reads the same game state a cloud guest's does.
+export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjection {
+  const { setup, memory } = game
+  const rules = tableRules(setup.system, setup.format)
+  const commander =
+    memory && isCommanderFormat(setup.system, setup.format)
+      ? commanderProjection(memory, viewerKey)
+      : undefined
+  const eliminated = new Set(commander?.eliminatedPlayerIds)
+  const seatsOf = memory ? [...memory.seats.values()] : []
   return {
     schemaVersion: 1,
-    publicId: game.id,
+    publicId: lanRoundId(game),
     status: game.status,
-    playerCount: game.seats.length,
-    system: "mtg",
-    startingLife: game.startingLife,
-    ruleset: "lan",
-    isHost: game.hostKey === seatKey,
-    eventSequence: 0,
-    serverUpdatedAt: 0,
-    recentOperationIds: [],
-    table: EMPTY_TABLE,
+    playerCount: setup.playerCount,
+    ...(setup.system ? { system: setup.system } : {}),
+    ...(setup.format ? { format: setup.format } : {}),
+    startingLife: setup.startingLife,
+    lifeStep: setup.lifeStep,
+    ruleset: setup.ruleset,
+    isHost: viewerKey === game.hostKey,
+    eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
+    serverUpdatedAt: game.updatedAt,
+    recentOperationIds: game.recentOperationIds,
     players: game.seats.map((seat) => ({
       playerId: seat.key,
       seat: seat.seat,
       displayName: seat.name,
       color: PLAYER_COLOR_CHOICES[(seat.seat - 1) % PLAYER_COLOR_CHOICES.length],
       shape: shapeForSeat(seat.seat),
-      currentLife: seat.life,
-      controlledByMe: seat.key === seatKey,
-      pendingDelta: 0,
+      currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
+      ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
+      controlledByMe: seat.key === viewerKey,
     })),
+    ...(commander ? { commanderDamage: commander } : {}),
+    ...(memory && tableRulesApply(rules)
+      ? {
+          table: tableForVersion(
+            {
+              designations: memory.designations,
+              players: Object.fromEntries(seatsOf.map((seat) => [seat.id, playerTableOf(seat)])),
+            },
+            TABLE_VERSION,
+          ),
+        }
+      : {}),
   }
 }
 
@@ -172,14 +345,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-const isLifeTotal = (value: unknown): value is number =>
-  typeof value === "number" && Number.isInteger(value) && Math.abs(value) <= MAX_LAN_LIFE
+const isId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 128
 
 const isCount = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0
 
-const isLife = (value: unknown): value is LanLife =>
-  isRecord(value) && isLifeTotal(value.life) && isCount(value.version) && isCount(value.round)
+const isWhole = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value)
 
 const isPass = (value: unknown): value is LanSeatPass =>
   isRecord(value) &&
@@ -188,49 +361,129 @@ const isPass = (value: unknown): value is LanSeatPass =>
   typeof value.token === "string" &&
   value.token.length <= 128
 
+export function parseLanSetup(value: unknown): LanSetup | null {
+  if (!isRecord(value)) return null
+  const { playerCount, startingLife, lifeStep, ruleset, system, format } = value
+  if (
+    !Number.isInteger(playerCount) ||
+    (playerCount as number) < LAN_MIN_PLAYERS ||
+    (playerCount as number) > LAN_MAX_SEATS ||
+    !isWhole(startingLife) ||
+    !isCount(lifeStep) ||
+    lifeStep < 1 ||
+    typeof ruleset !== "string" ||
+    ruleset.length > 64
+  )
+    return null
+  if (system === undefined)
+    return { playerCount: playerCount as number, startingLife, lifeStep, ruleset }
+  if (
+    !isPlaySystemId(system) ||
+    typeof format !== "string" ||
+    !playSystemFormats(system).some(({ id }) => id === format)
+  )
+    return null
+  return { playerCount: playerCount as number, startingLife, lifeStep, ruleset, system, format }
+}
+
+function parseEvent(value: unknown): ConnectedActionEvent | null {
+  if (!isRecord(value)) return null
+  const { operationId, gameId, actorId, deviceId, clientCreatedAt } = value
+  if (!isId(operationId) || !isId(gameId) || !isId(actorId) || !isId(deviceId)) return null
+  if (!isCount(clientCreatedAt)) return null
+  const base = {
+    operationId: asOperationId(operationId),
+    gameId: asGameId(gameId),
+    actorId: asActorId(actorId),
+    deviceId: asDeviceId(deviceId),
+    clientCreatedAt,
+  }
+  if (value.type === "life.changed" && isId(value.playerId) && isWhole(value.delta))
+    return {
+      type: "life.changed",
+      ...base,
+      playerId: asPlayerId(value.playerId),
+      delta: value.delta,
+    }
+  if (value.type === "table.action" && matchesValidator(tableActionValidator, value.action))
+    return { type: "table.action", ...base, action: value.action }
+  if (
+    value.type === "commanderDamage.submitted" &&
+    isId(value.fromPlayerId) &&
+    isId(value.toPlayerId) &&
+    isWhole(value.delta)
+  )
+    return {
+      type: "commanderDamage.submitted",
+      ...base,
+      fromPlayerId: asPlayerId(value.fromPlayerId),
+      toPlayerId: asPlayerId(value.toPlayerId),
+      delta: value.delta,
+    }
+  if (
+    value.type === "commanderDamage.resolved" &&
+    isId(value.claimOperationId) &&
+    isId(value.toPlayerId) &&
+    typeof value.accepted === "boolean"
+  )
+    return {
+      type: "commanderDamage.resolved",
+      ...base,
+      claimOperationId: asOperationId(value.claimOperationId),
+      toPlayerId: asPlayerId(value.toPlayerId),
+      accepted: value.accepted,
+    }
+  return null
+}
+
 export function parseGuestMessage(line: string): LanGuestMessage | null {
   const value: unknown = JSON.parse(line)
   if (!isRecord(value)) return null
   if (
     value.type === "join" &&
     typeof value.name === "string" &&
-    (value.pass === undefined || isPass(value.pass)) &&
-    (value.life === undefined || isLife(value.life))
+    (value.pass === undefined || isPass(value.pass))
   )
     return {
       type: "join",
+      protocol: typeof value.protocol === "number" ? value.protocol : 1,
       name: value.name.slice(0, MAX_PLAYER_NAME_LENGTH),
       ...(value.pass ? { pass: { key: value.pass.key, token: value.pass.token } } : {}),
-      ...(value.life
-        ? { life: { life: value.life.life, version: value.life.version, round: value.life.round } }
-        : {}),
     }
-  if (value.type === "life" && isLife(value))
-    return { type: "life", life: value.life, version: value.version, round: value.round }
+  if (value.type === "op") {
+    const event = parseEvent(value.event)
+    return event ? { type: "op", event } : null
+  }
   return null
 }
 
-const LAN_STATUSES: readonly LanGame["status"][] = ["lobby", "active", "finished", "abandoned"]
+const LAN_STATUSES: readonly LanStatus[] = ["lobby", "active", "finished", "abandoned"]
 
-const isSeat = (value: unknown): value is LanSeat =>
-  isRecord(value) &&
-  typeof value.key === "string" &&
-  Number.isInteger(value.seat) &&
-  typeof value.name === "string" &&
-  isLifeTotal(value.life) &&
-  isCount(value.version) &&
-  typeof value.connected === "boolean"
-
-const isGame = (value: unknown): value is LanGame =>
-  isRecord(value) &&
-  typeof value.id === "string" &&
-  typeof value.hostKey === "string" &&
-  LAN_STATUSES.some((status) => status === value.status) &&
-  isCount(value.round) &&
-  Number.isInteger(value.startingLife) &&
-  Array.isArray(value.seats) &&
-  value.seats.length <= LAN_MAX_SEATS &&
-  value.seats.every(isSeat)
+function parseLobby(value: unknown): LanLobby | null {
+  if (!isRecord(value) || !isId(value.id) || !isCount(value.round)) return null
+  const status = LAN_STATUSES.find((candidate) => candidate === value.status)
+  const setup = parseLanSetup(value.setup)
+  if (!status || !setup || !Array.isArray(value.seats) || value.seats.length > LAN_MAX_SEATS)
+    return null
+  const seats: LanSeat[] = []
+  for (const seat of value.seats) {
+    if (
+      !isRecord(seat) ||
+      !isId(seat.key) ||
+      !Number.isInteger(seat.seat) ||
+      typeof seat.name !== "string" ||
+      typeof seat.connected !== "boolean"
+    )
+      return null
+    seats.push({
+      key: seat.key,
+      seat: seat.seat as number,
+      name: seat.name.slice(0, MAX_PLAYER_NAME_LENGTH),
+      connected: seat.connected,
+    })
+  }
+  return { id: value.id, status, round: value.round, setup, seats }
+}
 
 export function parseHostMessage(line: string): LanHostMessage | null {
   const value: unknown = JSON.parse(line)
@@ -239,6 +492,20 @@ export function parseHostMessage(line: string): LanHostMessage | null {
     return { type: "rejected", reason: value.reason }
   if (value.type === "welcome" && isPass(value.pass))
     return { type: "welcome", pass: { key: value.pass.key, token: value.pass.token } }
-  if (value.type === "game" && isGame(value.game)) return { type: "game", game: value.game }
+  if (value.type === "game") return { type: "outdated" }
+  if (value.type === "state") {
+    const lobby = parseLobby(value.lobby)
+    const projection = toConnectedProjection(value.projection)
+    return lobby && projection ? { type: "state", lobby, projection } : null
+  }
+  if (value.type === "ack" && isId(value.operationId))
+    return { type: "ack", operationId: value.operationId }
+  if (value.type === "nack" && isId(value.operationId) && typeof value.message === "string")
+    return {
+      type: "nack",
+      operationId: value.operationId,
+      ...(typeof value.code === "string" ? { code: value.code } : {}),
+      message: value.message,
+    }
   return null
 }

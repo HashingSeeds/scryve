@@ -69,6 +69,12 @@ export type MemoryWriteResult = { ok: true; ack: MemoryAck } | { ok: false; erro
 
 const pairKey = (fromPlayerId: string, toPlayerId: string) => `${fromPlayerId}\u0000${toPlayerId}`
 
+export const commanderTotals = (game: MemoryGame) =>
+  [...game.pairs].map(([key, { total }]) => {
+    const [fromPlayerId, toPlayerId] = key.split("\u0000")
+    return { fromPlayerId, toPlayerId, total }
+  })
+
 export function applyGameChanges(game: MemoryGame, changes: readonly GameChange[]) {
   for (const change of changes) {
     if (change.kind === "seat.patch") {

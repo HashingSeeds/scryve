@@ -9,8 +9,9 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { playSystemFormats } from "@/features/game/playSystems"
 import { LAN_NAME_MAX_LENGTH, loadLanName, saveLanName } from "@/features/lan/lanAvailability"
-import { connectedSeatCount, LAN_MIN_PLAYERS, lanProjection } from "@/features/lan/lanGame"
+import { lanSeatsReady, type LanSetup } from "@/features/lan/lanGame"
 import { lanSession, useLanSession } from "@/features/lan/lanSession"
 import {
   checkLocalNetworkAccess,
@@ -21,27 +22,35 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
-const STARTING_LIVES = [20, 30, 40] as const
-
 export interface LanLobbyAutomation {
   host?: boolean
   join?: string
-  start?: number
-  players?: number
+  start?: boolean
+}
+
+const summaryOf = (setup: LanSetup) => {
+  const format = setup.system
+    ? (playSystemFormats(setup.system).find(({ id }) => id === setup.format)?.label ?? setup.format)
+    : undefined
+  return [`${setup.startingLife} life`, format, `${setup.playerCount} players`]
+    .filter(Boolean)
+    .join(" · ")
 }
 
 export function LanLobbyScreen({
   onBack,
   onPlay,
+  setup,
   automation = {},
 }: {
   onBack: () => void
   onPlay: () => void
+  setup?: LanSetup
   automation?: LanLobbyAutomation
 }) {
   const { themed } = useAppTheme()
   const session = useLanSession()
-  const { game, role, status, error, serviceName } = session
+  const { lobby, projection, role, status, error, serviceName } = session
   const inGame = Boolean(role)
   // why: Android 17 refuses to browse or publish until the app itself requests ACCESS_LOCAL_NETWORK.
   const [access, setAccess] = useState<Awaited<ReturnType<typeof checkLocalNetworkAccess>>>()
@@ -57,25 +66,25 @@ export function LanLobbyScreen({
   const nearby = services.filter(
     (service) => isLanGameService(service) && lanSession.isReachable(service.name),
   )
-  const [startingLife, setStartingLife] = useState<number>(automation.start ?? 20)
   const [name, setName] = useState(loadLanName)
-  const projection = game && session.seatKey ? lanProjection(game, session.seatKey) : undefined
   const players = projection?.players ?? []
-  const readyPlayers = game ? connectedSeatCount(game) : 0
+  const seatsReady = lobby ? lanSeatsReady(lobby) : false
+  const openSeats = lobby ? Math.max(0, lobby.setup.playerCount - lobby.seats.length) : 0
 
-  const previousStatus = useRef(game?.status)
+  const startedRound = useRef(lobby?.status === "active" ? lobby.round : undefined)
   useEffect(() => {
-    if (game?.status === "active" && previousStatus.current !== "active") onPlay()
-    previousStatus.current = game?.status
-  }, [game?.status, onPlay])
+    if (lobby?.status !== "active" || startedRound.current === lobby.round) return
+    startedRound.current = lobby.round
+    onPlay()
+  }, [lobby?.status, lobby?.round, onPlay])
 
   // why: lets an agent drive devices it can deep link into but cannot tap.
   const automated = useRef(false)
   useEffect(() => {
     if (automated.current || inGame || !ready) return
-    if (automation.host) {
+    if (automation.host && setup) {
       automated.current = true
-      void lanSession.host()
+      void lanSession.host(setup)
     }
     const target =
       automation.join && nearby.find((service) => service.name.startsWith(automation.join ?? ""))
@@ -85,14 +94,9 @@ export function LanLobbyScreen({
     }
   })
   useEffect(() => {
-    if (
-      automation.start &&
-      role === "host" &&
-      game?.status === "lobby" &&
-      readyPlayers >= (automation.players ?? LAN_MIN_PLAYERS)
-    )
-      lanSession.start(automation.start)
-  }, [automation.start, automation.players, role, game?.status, readyPlayers])
+    if (automation.start && role === "host" && lobby?.status === "lobby" && seatsReady)
+      lanSession.start()
+  }, [automation.start, role, lobby?.status, seatsReady])
 
   const heading = !inGame
     ? "Nearby games"
@@ -139,18 +143,26 @@ export function LanLobbyScreen({
                 onPress={() => void lanSession.join(service)}
               />
             ))}
-            <Button
-              preset="primary"
-              text="Host a game"
-              disabled={!ready}
-              onPress={() => void lanSession.host()}
-            />
+            {setup ? (
+              <>
+                <Text style={themed($dimmed)} text={summaryOf(setup)} />
+                <Button
+                  preset="primary"
+                  text="Host this game"
+                  disabled={!ready}
+                  onPress={() => void lanSession.host(setup)}
+                />
+              </>
+            ) : (
+              <Text style={themed($dimmed)} text="To host, set up a game and choose Nearby." />
+            )}
           </View>
         ) : (
           <>
             <View style={themed($section)}>
+              {lobby ? <Text style={themed($dimmed)} text={summaryOf(lobby.setup)} /> : null}
               {players.map((player) => {
-                const seat = game?.seats.find((candidate) => candidate.key === player.playerId)
+                const seat = lobby?.seats.find((candidate) => candidate.key === player.playerId)
                 return (
                   <View key={player.playerId} style={themed($seatRow)}>
                     <View style={[themed($swatch), { backgroundColor: player.color }]} />
@@ -167,33 +179,26 @@ export function LanLobbyScreen({
                   </View>
                 )
               })}
+              {Array.from({ length: openSeats }, (_, index) => (
+                <View key={`open-${index}`} style={themed($seatRow)}>
+                  <View style={[themed($swatch), themed($openSwatch)]} />
+                  <Text style={[$styles.flex1, themed($dimmed)]} text="Open seat" />
+                </View>
+              ))}
             </View>
 
-            {role === "host" && game?.status !== "active" ? (
-              <View style={themed($section)}>
-                <View style={themed($row)}>
-                  {STARTING_LIVES.map((life) => (
-                    <Button
-                      key={life}
-                      style={$styles.flex1}
-                      preset={startingLife === life ? "primary" : "default"}
-                      text={String(life)}
-                      onPress={() => setStartingLife(life)}
-                    />
-                  ))}
-                </View>
-                <Button
-                  preset="primary"
-                  disabled={readyPlayers < LAN_MIN_PLAYERS}
-                  text={game?.status === "lobby" ? "Start game" : "Start again"}
-                  onPress={() => lanSession.start(startingLife)}
-                />
-              </View>
+            {role === "host" && lobby?.status !== "active" ? (
+              <Button
+                preset="primary"
+                disabled={!seatsReady}
+                text={lobby?.status === "lobby" ? "Start game" : "Start again"}
+                onPress={() => lanSession.start()}
+              />
             ) : null}
-            {role === "guest" && game?.status !== "active" ? (
+            {role === "guest" && lobby?.status !== "active" ? (
               <Text style={themed($dimmed)} text="Waiting for the host to start." />
             ) : null}
-            {game?.status === "active" ? <Button text="Back to game" onPress={onPlay} /> : null}
+            {lobby?.status === "active" ? <Button text="Back to game" onPress={onPlay} /> : null}
             <Button
               text={role === "host" ? "End game" : "Leave"}
               onPress={() => lanSession.leave()}
@@ -210,7 +215,6 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.lg,
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flexDirection: "row", gap: spacing.xs })
 const $seatRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
@@ -218,4 +222,8 @@ const $seatRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 36,
 })
 const $swatch: ThemedStyle<ViewStyle> = () => ({ width: 14, height: 14, borderRadius: 7 })
+const $openSwatch: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  borderWidth: 1,
+  borderColor: colors.textDim,
+})
 const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
