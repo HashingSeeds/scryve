@@ -93,6 +93,7 @@ type ConnectedBoardScreenProps = {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -247,6 +248,7 @@ type ConnectedBoardReadyProps = {
   initialInviteOpen?: boolean
   onBack?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -324,6 +326,7 @@ interface ConnectedBoardRuntimeProps {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -346,6 +349,7 @@ export function ConnectedBoardWithRuntime({
   onGameAbandoned,
   onBack,
   onHistory,
+  onRules,
   onDecks,
   onSettings,
   onAccount,
@@ -495,6 +499,7 @@ export function ConnectedBoardWithRuntime({
               initialInviteOpen={initialInviteOpen}
               onBack={onBack}
               onHistory={onHistory}
+              onRules={onRules}
               onDecks={onDecks}
               onSettings={onSettings}
               onAccount={onAccount}
@@ -519,6 +524,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   initialInviteOpen,
   onBack,
   onHistory,
+  onRules,
   onDecks,
   onSettings,
   onAccount,
@@ -793,15 +799,25 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             } satisfies RadialMenuAction,
           ]
         : []),
-      {
-        kind: "history",
-        label: translate("connected:board.menu.history"),
-        disabled: !onHistory,
-        onPress: () => {
-          setMenuOpen(false)
-          onHistory?.()
-        },
-      },
+      system === "mtg"
+        ? {
+            kind: "rules",
+            label: translate("connected:board.menu.rules"),
+            disabled: !onRules,
+            onPress: () => {
+              setMenuOpen(false)
+              onRules?.()
+            },
+          }
+        : {
+            kind: "history",
+            label: translate("connected:board.menu.history"),
+            disabled: !onHistory,
+            onPress: () => {
+              setMenuOpen(false)
+              onHistory?.()
+            },
+          },
       {
         kind: "end-game",
         label: translate("connected:board.menu.end"),
@@ -836,6 +852,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       layoutOptions.length,
       cloud,
       onHistory,
+      onRules,
+      system,
     ],
   )
   const seatColors = useSeatColors(players)

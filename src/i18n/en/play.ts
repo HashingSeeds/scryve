@@ -350,6 +350,19 @@ const play = {
       scoreIsDraw: "A {{wins}}-{{losses}} score is a draw",
     },
   },
+  rules: {
+    title: "Rules",
+    search: "Search rules",
+    glossary: "Glossary",
+    effective: "Comprehensive Rules, effective {{date}}",
+    official: "Official rules",
+    downloading: "Downloading the Comprehensive Rules from Wizards of the Coast.",
+    failed: "Couldn't download the rules.",
+    webOnly: "The Comprehensive Rules are on the Wizards of the Coast site.",
+    allOf: "All of {{section}}",
+    noResults: "No rules match.",
+    notFound: "This rule isn't in this version of the rules.",
+  },
 }
 
 export default play

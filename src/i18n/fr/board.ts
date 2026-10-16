@@ -461,6 +461,7 @@ export default {
     dice: "Dés",
     game: "Partie",
     history: "Historique",
+    rules: "Règles",
     connect: "Connexion",
     end: "Fin",
     closeDice: "Fermer les dés",

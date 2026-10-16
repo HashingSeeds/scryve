@@ -283,6 +283,7 @@ export default {
       dice: "주사위",
       players: "플레이어",
       history: "기록",
+      rules: "규칙",
       end: "종료",
       closeDice: "주사위 닫기",
       exitCommanderDamage: "커맨더 피해 나가기",

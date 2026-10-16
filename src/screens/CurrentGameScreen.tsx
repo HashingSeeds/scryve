@@ -62,6 +62,7 @@ export interface CurrentGameScreenProps {
   initialEndOpen?: boolean
   onDecks?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onSetup?: () => void
   onConnect?: () => void
   onSettings?: () => void
@@ -79,6 +80,7 @@ export function CurrentGameScreen({
   initialEndOpen = false,
   onDecks,
   onHistory,
+  onRules,
   onSetup,
   onConnect,
   onSettings,
@@ -313,15 +315,25 @@ export function CurrentGameScreen({
           onSetup?.()
         },
       },
-      {
-        kind: "history",
-        label: translate("board:menu.history"),
-        disabled: !onHistory,
-        onPress: () => {
-          closeMenu()
-          onHistory?.()
-        },
-      },
+      system === "mtg"
+        ? {
+            kind: "rules",
+            label: translate("board:menu.rules"),
+            disabled: !onRules,
+            onPress: () => {
+              closeMenu()
+              onRules?.()
+            },
+          }
+        : {
+            kind: "history",
+            label: translate("board:menu.history"),
+            disabled: !onHistory,
+            onPress: () => {
+              closeMenu()
+              onHistory?.()
+            },
+          },
       isFresh
         ? {
             kind: "connect",
@@ -349,8 +361,10 @@ export function CurrentGameScreen({
       layoutOptions.length,
       onConnect,
       onHistory,
+      onRules,
       onSetup,
       showEndConfirmation,
+      system,
     ],
   )
 

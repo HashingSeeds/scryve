@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-09-30",
-  effectiveDate: "September 30, 2026",
+  version: "2026-10-16",
+  effectiveDate: "October 16, 2026",
   sections: [
     {
       blocks: [
@@ -18,7 +18,7 @@ export const gameContentNotices = {
         },
         {
           type: "paragraph",
-          text: "Access to supported card catalogs and card images is free. Paid Scryve features cover Scryve services such as additional saved decks, deck versions, synchronization, and statistics, not the sale of third-party game content.",
+          text: "Access to supported card catalogs, card images, and rules references is free. Paid Scryve features cover Scryve services such as additional saved decks, deck versions, synchronization, and statistics, not the sale of third-party game content.",
         },
       ],
     },
@@ -32,6 +32,10 @@ export const gameContentNotices = {
         {
           type: "paragraph",
           text: "Magic: The Gathering card data and images are provided through Scryfall. Scryve is not affiliated with Wizards of the Coast or Scryfall.",
+        },
+        {
+          type: "paragraph",
+          text: "The Magic: The Gathering Comprehensive Rules are downloaded from Wizards of the Coast when you open Rules, and shown with their original notices. Scryve does not host or distribute them. The official rules are at https://magic.wizards.com/en/rules.",
         },
       ],
     },

@@ -462,6 +462,7 @@ export default {
     dice: "Dados",
     game: "Partida",
     history: "Historial",
+    rules: "Reglas",
     connect: "Conectar",
     end: "Terminar",
     closeDice: "Cerrar dados",

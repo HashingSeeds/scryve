@@ -161,6 +161,37 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
+  it("gives Magic games a Rules action where History sits, keeping History in More", () => {
+    const onRules = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={createLocalGame({
+            players: [
+              { name: "Ada", color: "#41476E" },
+              { name: "Grace", color: "#39755C" },
+            ],
+            startingLife: 20,
+            system: "mtg",
+            now: 1,
+          })}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onDecks={jest.fn()}
+          onHistory={jest.fn()}
+          onRules={onRules}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.queryByTestId("history-button")).toBeNull()
+    fireEvent.press(view.getByTestId("rules-button"))
+    expect(onRules).toHaveBeenCalledTimes(1)
+  })
+
   it("enters dice mode from a pea in the menu and closes it from the pentagon", () => {
     const view = renderGame()
     fireEvent.press(view.getByTestId("game-menu-button"))

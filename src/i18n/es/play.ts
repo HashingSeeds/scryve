@@ -373,4 +373,17 @@ export default {
       scoreIsDraw: "Un marcador {{wins}}-{{losses}} es un empate",
     },
   },
+  rules: {
+    title: "Reglas",
+    search: "Buscar reglas",
+    glossary: "Glosario",
+    effective: "Reglas completas, en vigor desde el {{date}}",
+    official: "Reglas oficiales",
+    downloading: "Descargando las Reglas completas de Wizards of the Coast.",
+    failed: "No se pudieron descargar las reglas.",
+    webOnly: "Las Reglas completas están en el sitio de Wizards of the Coast.",
+    allOf: "Todo {{section}}",
+    noResults: "Ninguna regla coincide.",
+    notFound: "Esta regla no está en esta versión de las reglas.",
+  },
 } satisfies LocaleNamespace

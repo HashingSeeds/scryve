@@ -309,6 +309,7 @@ export default {
       dice: "Dados",
       players: "Jugadores",
       history: "Historial",
+      rules: "Reglas",
       end: "Terminar",
       closeDice: "Cerrar dados",
       exitCommanderDamage: "Salir del daño de comandante",
