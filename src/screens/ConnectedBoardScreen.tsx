@@ -75,6 +75,8 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { isGameUnavailableError } from "@/utils/convexError"
@@ -152,7 +154,7 @@ function ConnectedBoardShell({
             {unavailable && state.retry ? (
               <Button
                 testID="retry-connected-board-button"
-                text="Try again"
+                tx="common:tryAgain"
                 preset="reversed"
                 style={themed($statusAction)}
                 textStyle={themed($statusActionText)}
@@ -162,8 +164,8 @@ function ConnectedBoardShell({
             {onBack ? (
               <Button
                 testID="back-from-connected-board-button"
-                accessibilityLabel="Back to local play"
-                text="Back"
+                accessibilityLabel={translate("connected:gate.backToLocalPlay")}
+                tx="common:back"
                 style={themed($statusAction)}
                 textStyle={themed($statusActionText)}
                 onPress={onBack}
@@ -187,7 +189,7 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   if (!isLoaded && !hintedUserId)
     return (
       <ConnectedBoardShell
-        state={{ status: "loading", message: "Checking connected session…" }}
+        state={{ status: "loading", message: translate("connected:board.checkingSession") }}
         onBack={props.onBack}
       />
     )
@@ -195,7 +197,10 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   if (!ownerId)
     return (
       <ConnectedBoardShell
-        state={{ status: "unavailable", message: "Connected session unavailable" }}
+        state={{
+          status: "unavailable",
+          message: translate("connected:board.sessionUnavailable"),
+        }}
         onBack={props.onBack}
       />
     )
@@ -209,8 +214,12 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
           <ConnectedBoardShell
             state={
               gone
-                ? { status: "unavailable", message: "This game no longer exists." }
-                : { status: "unavailable", message: "Connected board unavailable", retry }
+                ? { status: "unavailable", message: translate("connected:gameGone") }
+                : {
+                    status: "unavailable",
+                    message: translate("connected:board.unavailable"),
+                    retry,
+                  }
             }
             onBack={
               props.onBack
@@ -466,7 +475,7 @@ export function ConnectedBoardWithRuntime({
   if (runtime.status === "loading")
     return (
       <ConnectedBoardShell
-        state={{ status: "loading", message: "Loading connected board…" }}
+        state={{ status: "loading", message: translate("connected:board.loading") }}
         onBack={onBack}
       />
     )
@@ -645,14 +654,24 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const commanderTotals = game.commanderDamage?.totals ?? []
   const failedActionLabel = (event: PendingLifeAction["event"]) => {
     if (event.type === "life.changed")
-      return `A ${event.delta > 0 ? "+" : ""}${event.delta} ${counter.label} change could not sync`
+      return translate("connected:board.failedAction.life", {
+        delta: `${event.delta > 0 ? "+" : ""}${event.delta}`,
+        counter: counter.label,
+      })
     if (event.type === "commanderDamage.submitted")
-      return `A ${event.delta > 0 ? "+" : ""}${event.delta} commander damage assignment could not sync`
-    if (event.type === "table.action") return "A table change could not sync"
-    return `${event.accepted ? "Confirming" : "Declining"} commander damage could not sync`
+      return translate("connected:board.failedAction.commanderDamage", {
+        delta: `${event.delta > 0 ? "+" : ""}${event.delta}`,
+      })
+    if (event.type === "table.action") return translate("connected:board.failedAction.table")
+    return translate(
+      event.accepted
+        ? "connected:board.failedAction.confirmCommanderDamage"
+        : "connected:board.failedAction.declineCommanderDamage",
+    )
   }
   const displayNameOf = (playerId: string) =>
-    game.players.find((candidate) => candidate.playerId === playerId)?.displayName ?? "Another seat"
+    game.players.find((candidate) => candidate.playerId === playerId)?.displayName ??
+    translate("connected:board.anotherSeat")
   const incomingCommanderDamage = (player: BoardSeat): Record<PlayerId, number> =>
     Object.fromEntries(
       players
@@ -727,10 +746,18 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     try {
       setInviteError(undefined)
       if (inviteUrl)
-        await Share.share({ message: `Join my Scryve game: ${inviteUrl}`, url: inviteUrl })
-      else await Share.share({ message: `Join my Scryve game with code ${invitation.manualCode}` })
+        await Share.share({
+          message: translate("connected:invite.shareMessage", { url: inviteUrl }),
+          url: inviteUrl,
+        })
+      else
+        await Share.share({
+          message: translate("connected:invite.shareMessageCode", { code: invitation.manualCode }),
+        })
     } catch (cause) {
-      setInviteError(cause instanceof Error ? cause.message : "Could not open sharing")
+      setInviteError(
+        cause instanceof Error ? cause.message : translate("connected:invite.shareFailed"),
+      )
     }
   }
 
@@ -748,7 +775,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     () => [
       {
         kind: "layout",
-        label: "Layout",
+        label: translate("connected:board.menu.layout"),
         disabled: layoutOptions.length < 2,
         onPress: (event) => {
           captureMenuDialogOrigin(event)
@@ -756,12 +783,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           setLayoutPickerOpen(true)
         },
       },
-      { kind: "dice", label: "Dice", tools: diceTools },
+      { kind: "dice", label: translate("connected:board.menu.dice"), tools: diceTools },
       ...(cloud
         ? [
             {
               kind: "players",
-              label: "Players",
+              label: translate("connected:board.menu.players"),
               onPress: (event?: GestureResponderEvent) => {
                 captureMenuDialogOrigin(event)
                 setMenuOpen(false)
@@ -772,7 +799,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         : []),
       {
         kind: "history",
-        label: "History",
+        label: translate("connected:board.menu.history"),
         disabled: !onHistory,
         onPress: () => {
           setMenuOpen(false)
@@ -781,8 +808,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       },
       {
         kind: "end-game",
-        label: "End",
-        detail: canEnd ? finishBlocker?.petal : undefined,
+        label: translate("connected:board.menu.end"),
+        detail: canEnd && finishBlocker ? translate(finishBlocker.petal) : undefined,
         blocked: canEnd && Boolean(finishBlocker),
         disabled: !canEnd,
         onPress: (event) => {
@@ -821,9 +848,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const exitAction = useMemo(
     () =>
       diceOpen
-        ? { label: "Close dice", onPress: closeDice }
+        ? { label: translate("connected:board.menu.closeDice"), onPress: closeDice }
         : armedCommander || inspectedPlayerId
-          ? { label: "Exit commander damage", onPress: exitCommanderDamage }
+          ? {
+              label: translate("connected:board.menu.exitCommanderDamage"),
+              onPress: exitCommanderDamage,
+            }
           : undefined,
     [armedCommander, closeDice, diceOpen, inspectedPlayerId, exitCommanderDamage],
   )
@@ -957,18 +987,18 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           origin={menuDialogOrigin}
           onClose={() => setInviteOpen(false)}
           backdropTestID="invite-backdrop"
-          backdropAccessibilityLabel="Close invite"
+          backdropAccessibilityLabel={translate("connected:invite.close")}
           dialogTestID="invite-dialog"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Invite players" style={themed($dialogText)} />
+          <Text preset="subheading" tx="connected:invite.title" style={themed($dialogText)} />
           <InviteCard
             qrPayload={buildInviteQrPayload(invitation.token, invitation.manualCode)}
             manualCode={invitation.manualCode}
             onShare={() => void shareInvite()}
           />
           {inviteError ? <AlertNote text={inviteError} /> : null}
-          <Button text="Close" onPress={() => setInviteOpen(false)} />
+          <Button tx="common:close" onPress={() => setInviteOpen(false)} />
         </DialogCard>
       ) : null}
 
@@ -978,13 +1008,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onClose={() => setLayoutPickerOpen(false)}
           origin={menuDialogOrigin}
           backdropTestID="connected-layout-backdrop"
-          backdropAccessibilityLabel="Close layout chooser"
+          backdropAccessibilityLabel={translate("connected:board.closeLayout")}
           dialogTestID="connected-layout-dialog"
           accessibilityViewIsModal
           wide
           style={themed($boardDialog)}
         >
-          <Text text="Layout" preset="subheading" style={themed($dialogText)} />
+          <Text tx="connected:board.menu.layout" preset="subheading" style={themed($dialogText)} />
           <PlayerLayoutPicker
             playerCount={players.length}
             value={layoutVariant}
@@ -994,7 +1024,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               setLayoutPickerOpen(false)
             }}
           />
-          <Button text="Cancel" onPress={() => setLayoutPickerOpen(false)} />
+          <Button tx="common:cancel" onPress={() => setLayoutPickerOpen(false)} />
         </DialogCard>
       ) : null}
 
@@ -1004,7 +1034,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onClose={() => setStatusOpen(false)}
           origin={menuDialogOrigin}
           backdropTestID="connected-status-backdrop"
-          backdropAccessibilityLabel="Close connected-game status"
+          backdropAccessibilityLabel={translate("connected:board.status.close")}
           dialogTestID="connected-status-dialog"
           accessibilityViewIsModal
           wide
@@ -1014,16 +1044,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             since={finished ? undefined : offlineSince}
             text={(elapsed) =>
               finished
-                ? "Connected summary"
+                ? translate("connected:board.status.summary")
                 : elapsed !== undefined
-                  ? `Offline for ${elapsed}`
+                  ? translate("connected:board.status.offlineFor", { elapsed })
                   : syncSignal.kind === "slow"
-                    ? "Slow connection"
+                    ? translate("connected:board.status.slow")
                     : syncSignal.kind === "catchingUp"
-                      ? "Back online"
+                      ? translate("connected:board.status.backOnline")
                       : syncSignal.kind === "attention"
-                        ? (syncStatusText ?? "Connected game")
-                        : "Connected"
+                        ? (syncStatusText ?? translate("connected:board.status.connectedGame"))
+                        : translate("connected:board.status.connected")
             }
             preset="subheading"
             style={themed($dialogText)}
@@ -1031,8 +1061,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           <Text
             text={
               finished
-                ? `${counterChangeLabel(system, game.finalEventSequence ?? 0)} accepted · final`
-                : `${playFormatLabel(system, game.format || game.ruleset)} · starts with ${counterValueLabel(system, game.startingLife)}`
+                ? translate("connected:board.status.finalChanges", {
+                    changes: counterChangeLabel(system, game.finalEventSequence ?? 0),
+                  })
+                : translate("connected:board.status.startsWith", {
+                    format: playFormatLabel(system, game.format || game.ruleset),
+                    value: counterValueLabel(system, game.startingLife),
+                  })
             }
             size="xs"
             style={themed($muted)}
@@ -1041,14 +1076,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             <View testID="connected-sync-details" style={themed($syncRows)}>
               <UnsentChangesRow offline={syncSignal.kind === "offline"} />
               <SyncRow
-                label="Other players"
+                label={translate("connected:board.status.otherPlayers")}
                 since={offlineSince}
                 value={(elapsed) =>
                   elapsed !== undefined
-                    ? `Updated ${elapsed} ago`
+                    ? translate("connected:board.status.updatedAgo", { elapsed })
                     : syncSignal.kind === "slow"
-                      ? "May arrive late"
-                      : "Live"
+                      ? translate("connected:board.status.mayArriveLate")
+                      : translate("connected:board.status.live")
                 }
               />
               <FinishAvailabilityRow blocker={finishBlocker} />
@@ -1064,7 +1099,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               >
                 <Text text={`${failedActionLabel(failure.action.event)}: ${failure.reason}`} />
                 <Button
-                  text="Dismiss after reviewing"
+                  tx="connected:board.status.dismissFailure"
                   onPress={() => controls.dismissFailed(failure.action.event.operationId)}
                 />
               </View>
@@ -1086,11 +1121,15 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {!active && !finished ? (
               <Text
                 accessibilityRole="alert"
-                text={`This game is ${game.status} and is read-only on the board.`}
+                tx={
+                  game.status === "lobby"
+                    ? "connected:board.status.readOnlyLobby"
+                    : "connected:board.status.readOnlyAbandoned"
+                }
               />
             ) : null}
           </ScrollView>
-          <Button text="Close" onPress={() => setStatusOpen(false)} />
+          <Button tx="common:close" onPress={() => setStatusOpen(false)} />
         </DialogCard>
       ) : null}
 
@@ -1136,19 +1175,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onClose={() => setAbandonedOpen(false)}
           origin={menuDialogOrigin}
           backdropTestID="abandoned-game-backdrop"
-          backdropAccessibilityLabel="Dismiss game ended notice"
+          backdropAccessibilityLabel={translate("connected:board.abandoned.dismiss")}
           dialogTestID="abandoned-game-dialog"
           dialogAccessibilityRole="alert"
           wide
           style={themed($boardDialog)}
         >
-          <Text text="Game ended" preset="subheading" style={themed($dialogText)} />
           <Text
-            size="xs"
-            text="The host ended this game. Its board stays read-only."
-            style={themed($muted)}
+            tx="connected:board.abandoned.title"
+            preset="subheading"
+            style={themed($dialogText)}
           />
-          <Button text="Leave" onPress={leaveAbandonedGame} />
+          <Text size="xs" tx="connected:board.abandoned.message" style={themed($muted)} />
+          <Button tx="connected:board.abandoned.leave" onPress={leaveAbandonedGame} />
         </DialogCard>
       ) : null}
 
@@ -1159,18 +1198,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           closeDisabled={view.finishing}
           origin={menuDialogOrigin}
           backdropTestID="connected-finish-backdrop"
-          backdropAccessibilityLabel="Cancel ending the connected game"
+          backdropAccessibilityLabel={translate("connected:board.finish.cancel")}
           dialogTestID="connected-finish-confirmation"
           dialogAccessibilityRole="alert"
           style={themed($boardDialog)}
         >
           <View style={themed($dialogHeader)}>
-            <Text text="Who won?" preset="subheading" />
-            <Text
-              size="xs"
-              text="Skip to end without recording a result. The summary is final for everyone."
-              style={themed($dialogSubtitle)}
-            />
+            <Text tx="connected:board.finish.title" preset="subheading" />
+            <Text size="xs" tx="connected:board.finish.subtitle" style={themed($dialogSubtitle)} />
           </View>
           <View style={themed($resultChoices)}>
             {game.players.map((player) => (
@@ -1183,7 +1218,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               />
             ))}
             <ChoiceButton
-              text="Draw"
+              tx="connected:board.finish.draw"
               accentColor={colors.palette.neutral400}
               Leading={({ color }) => <DrawMark color={color} />}
               selected={drawSelected}
@@ -1319,10 +1354,19 @@ const $dialogAction: ThemedStyle<ViewStyle> = () => ({
   borderRadius: CHOICE_RADIUS,
 })
 const FINISH_BLOCKERS = {
-  offline: { petal: "needs connection", detail: "Needs a connection" },
-  sending: { petal: "sending changes", detail: "After your changes send" },
-  rejected: { petal: "review first", detail: "Review the changes below first" },
-} as const
+  offline: {
+    petal: "connected:board.finishBlocker.offline.petal",
+    detail: "connected:board.finishBlocker.offline.detail",
+  },
+  sending: {
+    petal: "connected:board.finishBlocker.sending.petal",
+    detail: "connected:board.finishBlocker.sending.detail",
+  },
+  rejected: {
+    petal: "connected:board.finishBlocker.rejected.petal",
+    detail: "connected:board.finishBlocker.rejected.detail",
+  },
+} as const satisfies Record<string, { petal: TxKeyPath; detail: TxKeyPath }>
 
 function ConnectedLifeGrid({
   seats,
@@ -1363,7 +1407,10 @@ function WinnerChoice({
           size={28}
         />
       )}
-      accessibilityLabel={`${player.displayName}, ${life}${selected ? ", winner" : ""}`}
+      accessibilityLabel={translate(
+        selected ? "connected:board.finish.winnerOption" : "connected:board.finish.playerOption",
+        { name: player.displayName, life },
+      )}
       selected={selected}
       onPress={onPress}
     />
@@ -1374,13 +1421,13 @@ function UnsentChangesRow({ offline }: { offline: boolean }) {
   const unsent = useContext(ConnectedUnsentContext)
   return (
     <SyncRow
-      label="Your changes"
+      label={translate("connected:board.status.yourChanges")}
       value={() =>
         unsent === 0
-          ? "All sent"
+          ? translate("connected:board.status.allSent")
           : offline
-            ? `${unsent} saved on this device. They send when you reconnect.`
-            : `Sending ${unsent}`
+            ? translate("connected:board.status.savedOffline", { unsent })
+            : translate("connected:board.status.sending", { unsent })
       }
     />
   )
@@ -1390,7 +1437,14 @@ function UnsentChangesRow({ offline }: { offline: boolean }) {
 function FinishAvailabilityRow({ blocker }: { blocker?: FinishBlocker }) {
   const unsent = useContext(ConnectedUnsentContext)
   const shown = blocker ?? (unsent > 0 ? FINISH_BLOCKERS.sending : undefined)
-  return <SyncRow label="Finish game" value={() => shown?.detail ?? "Available"} />
+  return (
+    <SyncRow
+      label={translate("connected:board.status.finishGame")}
+      value={() =>
+        shown ? translate(shown.detail) : translate("connected:board.status.finishAvailable")
+      }
+    />
+  )
 }
 
 function ElapsedText({

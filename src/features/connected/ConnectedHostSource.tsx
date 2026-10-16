@@ -14,6 +14,7 @@ import {
 import { useResumeGames } from "@/features/connected/useResumeGames"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
+import { translate } from "@/i18n/translate"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -42,7 +43,7 @@ export function ConnectedHostSource({
         children({
           ready: false,
           busy: false,
-          error: "Could not check for an existing hosted game.",
+          error: translate("connected:host.checkFailed"),
           retry,
           host: () => undefined,
           exitGame: async () => false,
@@ -102,9 +103,9 @@ function ConnectedHostQuerySource({
     activeGamesState.status === "ready" && activeGamesState.items.some((game) => game.isHost)
   const preparationStatus =
     connectedProfile.status === "loading"
-      ? "Connecting… You can keep editing."
+      ? translate("connected:setup.connecting")
       : ready && activeGamesState.status === "loading"
-        ? "Checking your games…"
+        ? translate("connected:host.checkingGames")
         : undefined
   const hostReady = ready && activeGamesState.status === "ready"
 
@@ -146,7 +147,7 @@ function ConnectedHostQuerySource({
         stage: "failed",
         reason: "offline",
       })
-      setHostError("Reconnect before hosting; lobby creation is not queued.")
+      setHostError(translate("connected:host.reconnectToHost"))
       return
     }
     if (connectedProfile.status !== "ready" || !hostReady) {
@@ -158,7 +159,7 @@ function ConnectedHostQuerySource({
       setHostError(
         connectedProfile.status === "error"
           ? connectedProfile.message
-          : (preparationStatus ?? "Connected profile is not ready yet."),
+          : (preparationStatus ?? translate("connected:host.profileNotReady")),
       )
       return
     }
@@ -190,7 +191,7 @@ function ConnectedHostQuerySource({
       setHostError(
         convexErrorMessage(
           cause,
-          cause instanceof Error ? cause.message : "Could not create lobby",
+          cause instanceof Error ? cause.message : translate("connected:host.createFailed"),
         ),
       )
     } finally {
@@ -201,11 +202,11 @@ function ConnectedHostQuerySource({
   async function exitGame(game: ResumableGame) {
     if (busy) return false
     if (connectedProfile.status === "offline") {
-      setExitError("Reconnect before leaving or ending a game.")
+      setExitError(translate("connected:host.reconnectToExit"))
       return false
     }
     if (!hostReady) {
-      setExitError(preparationStatus ?? "Connected profile is not ready yet.")
+      setExitError(preparationStatus ?? translate("connected:host.profileNotReady"))
       return false
     }
     try {
@@ -216,7 +217,7 @@ function ConnectedHostQuerySource({
       resumeRepository.removeResumeEntry(game.publicId)
       return true
     } catch (cause) {
-      setExitError(cause instanceof Error ? cause.message : "Could not update this game.")
+      setExitError(cause instanceof Error ? cause.message : translate("connected:host.exitFailed"))
       return false
     } finally {
       setBusy(false)
@@ -229,9 +230,9 @@ function ConnectedHostQuerySource({
     status: preparationStatus,
     blockedReason:
       connectedProfile.status === "offline"
-        ? "You’re offline. Your setup is kept."
+        ? translate("connected:host.offline")
         : hasHostedGame
-          ? "End your hosted game before hosting another."
+          ? translate("connected:host.alreadyHosting")
           : undefined,
     error:
       hostError ?? (connectedProfile.status === "error" ? connectedProfile.message : undefined),

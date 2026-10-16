@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useReducer, useRef } from "react"
 import { AccessibilityInfo } from "react-native"
 
 import type { GameMenuSignal } from "@/components/GameRadialMenu"
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 
 import type { ConnectionStatus } from "./model"
 
@@ -90,20 +92,20 @@ export function nextBoardSyncSignal(
   }
 }
 
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`
-
 export function boardSyncStatusText(signal: BoardSyncSignal): string | undefined {
   switch (signal.kind) {
     case "slow":
-      return `Slow connection · sending ${signal.unsent}`
+      return translate("connected:sync.status.slow", { unsent: signal.unsent })
     case "offline":
-      return signal.unsent > 0 ? `Offline · ${plural(signal.unsent, "change")} saved` : "Offline"
+      return signal.unsent > 0
+        ? translate("connected:sync.status.offlineSaved", { count: signal.unsent })
+        : translate("connected:sync.offline")
     case "catchingUp":
-      return `Back online · sending ${signal.unsent}`
+      return translate("connected:sync.status.catchingUp", { unsent: signal.unsent })
     case "attention":
       return signal.rejected > 0
-        ? `${plural(signal.rejected, "change")} not accepted`
-        : "Changes need attention"
+        ? translate("connected:sync.status.notAccepted", { count: signal.rejected })
+        : translate("connected:sync.status.needsAttention")
     default:
       return undefined
   }
@@ -112,13 +114,13 @@ export function boardSyncStatusText(signal: BoardSyncSignal): string | undefined
 export function boardSyncAccessibilityText(signal: BoardSyncSignal): string | undefined {
   switch (signal.kind) {
     case "slow":
-      return `Slow connection, ${plural(signal.unsent, "change")} sending`
+      return translate("connected:sync.accessibility.slow", { count: signal.unsent })
     case "offline":
       return signal.unsent > 0
-        ? `Offline, ${plural(signal.unsent, "change")} saved on this device`
-        : "Offline"
+        ? translate("connected:sync.accessibility.offlineSaved", { count: signal.unsent })
+        : translate("connected:sync.offline")
     case "catchingUp":
-      return `Back online, sending ${plural(signal.unsent, "change")}`
+      return translate("connected:sync.accessibility.catchingUp", { count: signal.unsent })
     default:
       return boardSyncStatusText(signal)
   }
@@ -135,9 +137,9 @@ export function boardSyncMenuSignal(signal: BoardSyncSignal): GameMenuSignal | u
   return { tone: signal.kind, badge, accessibilityText: boardSyncAccessibilityText(signal) }
 }
 
-const ANNOUNCEMENTS: Partial<Record<BoardSyncSignal["kind"], string>> = {
-  offline: "Offline. Changes are saved on this device.",
-  attention: "A change needs attention.",
+const ANNOUNCEMENTS: Partial<Record<BoardSyncSignal["kind"], TxKeyPath>> = {
+  offline: "connected:sync.announcement.offline",
+  attention: "connected:sync.announcement.attention",
 }
 
 export function useBoardSyncSignal(input: BoardSyncInput): {
@@ -158,7 +160,8 @@ export function useBoardSyncSignal(input: BoardSyncInput): {
     return () => clearTimeout(timer)
   }, [result.wakeAt, wakeCount])
 
-  const announcement = ANNOUNCEMENTS[result.signal.kind]
+  const announcementKey = ANNOUNCEMENTS[result.signal.kind]
+  const announcement = announcementKey && translate(announcementKey)
   useEffect(() => {
     if (announcement) AccessibilityInfo.announceForAccessibility(announcement)
   }, [announcement])

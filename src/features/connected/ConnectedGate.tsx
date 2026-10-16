@@ -17,6 +17,7 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedErrorBoundary } from "@/features/connected/ConnectedErrorBoundary"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -150,29 +151,26 @@ export function BackendGate({
   if (!clerkLoaded)
     return (
       <GateScreen busy>
-        <Text text="Checking your session… Local play remains available." />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        <Text tx="connected:gate.checkingSession" />
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   if (!clerkSignedIn)
     return (
       <GateScreen>
-        <Text
-          accessibilityRole="alert"
-          text="Sign in to play across devices. Local games remain available."
-        />
-        <Button text="Sign in" preset="reversed" onPress={onReauthenticate} />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        <Text accessibilityRole="alert" tx="connected:gate.signInPrompt" />
+        <Button tx="connected:gate.signIn" preset="reversed" onPress={onReauthenticate} />
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   if (isAuthenticated && isUserLoaded && user?.id && user.username === null)
     return (
       <GateScreen>
-        <Text preset="heading" text="Choose your player username" />
-        <Text text="Your unique @username identifies you in connected game history." />
+        <Text preset="heading" tx="connected:gate.username.title" />
+        <Text tx="connected:gate.username.description" />
         <TextField
-          label="Username"
-          accessibilityLabel="Username"
+          labelTx="connected:gate.username.label"
+          accessibilityLabel={translate("connected:gate.username.label")}
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
@@ -183,7 +181,7 @@ export function BackendGate({
         />
         <UsernameChecklist username={username} />
         <Button
-          text="Suggest a username"
+          tx="connected:gate.username.suggest"
           onPress={() => {
             setUsername(suggestUsername())
             setUsernameError(undefined)
@@ -191,7 +189,7 @@ export function BackendGate({
         />
         {usernameError ? <Text accessibilityRole="alert" text={usernameError} /> : null}
         <Button
-          text={savingUsername ? "Saving…" : "Save username"}
+          tx={savingUsername ? "connected:saving" : "connected:gate.username.save"}
           preset="reversed"
           disabled={savingUsername || !isUsernameValid(username)}
           onPress={async () => {
@@ -202,9 +200,7 @@ export function BackendGate({
                 username: username.trim(),
               })
               if (!acceptable) {
-                setUsernameError(
-                  "That username is not allowed. Other players will see this name, so please choose another.",
-                )
+                setUsernameError(translate("connected:gate.username.notAllowed"))
                 return
               }
               await user.update({ username: username.trim() })
@@ -215,7 +211,7 @@ export function BackendGate({
             }
           }}
         />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   if (allowPendingProfile && clerkSignedIn && isUserLoaded && user?.id && user.username !== null)
@@ -231,11 +227,8 @@ export function BackendGate({
   if (connectedProfile.status === "offline")
     return (
       <GateScreen>
-        <Text
-          accessibilityRole="alert"
-          text="Connected play is offline. Local play remains available."
-        />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        <Text accessibilityRole="alert" tx="connected:gate.offline" />
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   if (
@@ -244,8 +237,8 @@ export function BackendGate({
   )
     return (
       <GateScreen busy>
-        <Text text="Connecting… Local play remains available." />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        <Text tx="connected:gate.connecting" />
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   if (
@@ -254,27 +247,24 @@ export function BackendGate({
   )
     return (
       <GateScreen>
-        <Text
-          accessibilityRole="alert"
-          text="We couldn’t connect your account. Try signing in again."
-        />
-        <Button text="Sign in again" preset="reversed" onPress={onReauthenticate} />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        <Text accessibilityRole="alert" tx="connected:gate.authFailed" />
+        <Button tx="connected:gate.signInAgain" preset="reversed" onPress={onReauthenticate} />
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   if (connectedProfile.status === "error" && connectedProfile.reason === "sync")
     return (
       <GateScreen>
         <Text accessibilityRole="alert" text={connectedProfile.message} />
-        <Button text="Retry connected setup" preset="reversed" onPress={connectedProfile.retry} />
-        <Button text="Sign in again" onPress={onReauthenticate} />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        <Button tx="connected:gate.retrySetup" preset="reversed" onPress={connectedProfile.retry} />
+        <Button tx="connected:gate.signInAgain" onPress={onReauthenticate} />
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   return (
     <GateScreen busy>
-      <Text text="Preparing your game profile…" />
-      {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+      <Text tx="connected:gate.preparingProfile" />
+      {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
     </GateScreen>
   )
 }
@@ -297,7 +287,7 @@ export function ConnectedGate({
     return (
       <GateScreen>
         <Text accessibilityRole="alert" text={auth.configurationMessage} />
-        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+        {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
   return (

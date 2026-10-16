@@ -7,6 +7,7 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import type { RemoteValue } from "@/features/async/remoteState"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -75,7 +76,7 @@ export function LobbySeatList({
           seats.find((candidate) => candidate.seat === seat) ?? {
             seat,
             open: true,
-            displayName: "Open seat",
+            displayName: translate("connected:seats.openSeat"),
             color: "",
             controlledByMe: false,
           }
@@ -86,7 +87,7 @@ export function LobbySeatList({
         ...Array.from({ length: openSeats }, (_, index) => ({
           seat: seats.length + index + 1,
           open: true,
-          displayName: "Open seat",
+          displayName: translate("connected:seats.openSeat"),
           color: "",
           controlledByMe: false,
         })),
@@ -98,8 +99,8 @@ export function LobbySeatList({
           return (
             <View key={`open-${seat.seat}`} testID="lobby-open-seat" style={themed($openSeat)}>
               <View style={themed($openMark)} />
-              <Text size="xs" style={themed($seatPending)} text="Open seat" />
-              <Text size="xxs" style={themed($seatPending)} text="Waiting" />
+              <Text size="xs" style={themed($seatPending)} tx="connected:seats.openSeat" />
+              <Text size="xxs" style={themed($seatPending)} tx="connected:seats.waiting" />
             </View>
           )
         const decks = deckState.status === "ready" ? deckState.value : undefined
@@ -136,7 +137,7 @@ export function LobbySeatList({
                 <TouchableOpacity
                   testID={`edit-appearance-seat-${seat.seat}`}
                   accessibilityRole="button"
-                  accessibilityLabel="Change your color and mark"
+                  accessibilityLabel={translate("connected:seats.changeAppearance")}
                   activeOpacity={0.75}
                   style={themed($markButton)}
                   onPress={(event) => onEditAppearance(seat, event)}
@@ -169,12 +170,15 @@ export function LobbySeatList({
                     style={themed(deckReady ? $seatDetail : $seatPending)}
                     text={
                       [
-                        seat.controlledByMe ? "You" : undefined,
+                        seat.controlledByMe ? translate("connected:seats.you") : undefined,
                         chosenDeck?.name,
                         chosenVersion ? versionLabel(chosenVersion) : undefined,
                       ]
                         .filter(Boolean)
-                        .join(" · ") || (deckReady ? "Deck selected" : "No deck")
+                        .join(" · ") ||
+                      translate(
+                        deckReady ? "connected:seats.deckSelected" : "connected:seats.noDeck",
+                      )
                     }
                   />
                 ) : null}
@@ -183,15 +187,23 @@ export function LobbySeatList({
                   size="xxs"
                   weight="medium"
                   style={themed(ready ? $seatReady : $seatPending)}
-                  text={
-                    ready ? "✓ Ready" : seat.controlledByMe ? "○ Choose a deck" : "○ Needs a deck"
+                  tx={
+                    ready
+                      ? "connected:seats.ready"
+                      : seat.controlledByMe
+                        ? "connected:seats.chooseDeck"
+                        : "connected:seats.needsDeck"
                   }
                 />
               </View>
               {showManageDecks ? (
                 <Button
                   testID={`manage-seat-${seat.seat}-decks`}
-                  text={usableDecks.length === 0 ? "Add a deck" : "Manage decks"}
+                  tx={
+                    usableDecks.length === 0
+                      ? "connected:seats.addDeck"
+                      : "connected:seats.manageDecks"
+                  }
                   style={themed($rowAction)}
                   textStyle={themed($rowActionText)}
                   onPress={onManageDecks}
@@ -200,7 +212,9 @@ export function LobbySeatList({
               {!seat.controlledByMe && seat.playerId ? (
                 <Button
                   testID={`lobby-report-player-seat-${seat.seat}`}
-                  accessibilityLabel={`Report ${seat.displayName}`}
+                  accessibilityLabel={translate("connected:playerActions.reportPlayer", {
+                    name: seat.displayName,
+                  })}
                   text="•••"
                   style={themed($report)}
                   textStyle={themed($reportText)}
@@ -211,19 +225,19 @@ export function LobbySeatList({
             {seat.controlledByMe && !onlyAddDeckAction ? (
               <View style={themed($deckChoices)}>
                 {system === NO_PLAY_SYSTEM ? (
-                  <Text
-                    size="xxs"
-                    style={themed($seatPending)}
-                    text="Decks are not used for this game."
-                  />
+                  <Text size="xxs" style={themed($seatPending)} tx="connected:seats.decksNotUsed" />
                 ) : deckState.status === "loading" ? (
                   <View
                     testID={`seat-${seat.seat}-deck-loading`}
                     accessibilityRole="progressbar"
-                    accessibilityLabel="Loading decks"
+                    accessibilityLabel={translate("connected:seats.loadingDecksLabel")}
                     style={themed($deckLoading)}
                   >
-                    <Text size="xxs" style={themed($seatPending)} text="Loading decks…" />
+                    <Text
+                      size="xxs"
+                      style={themed($seatPending)}
+                      tx="connected:seats.loadingDecks"
+                    />
                     <View style={themed($deckPlaceholderRow)}>
                       <View style={themed($deckPlaceholderWide)} />
                       <View style={themed($deckPlaceholderNarrow)} />
@@ -235,15 +249,15 @@ export function LobbySeatList({
                       accessibilityRole="alert"
                       size="xxs"
                       style={themed($seatPending)}
-                      text={
+                      tx={
                         deckRequired
-                          ? "Decks unavailable. A deck is required to start."
-                          : "Decks unavailable. You can play without one."
+                          ? "connected:seats.decksUnavailableRequired"
+                          : "connected:seats.decksUnavailableOptional"
                       }
                     />
                     <Button
                       testID={`retry-seat-${seat.seat}-decks`}
-                      text="Try again"
+                      tx="common:tryAgain"
                       style={themed($deckRetry)}
                       textStyle={themed($deckRetryText)}
                       onPress={deckState.retry}
@@ -255,7 +269,11 @@ export function LobbySeatList({
                       <Text
                         size="xxs"
                         style={themed($seatPending)}
-                        text={deckRequired ? "Add a deck to join." : "No decks yet."}
+                        tx={
+                          deckRequired
+                            ? "connected:seats.addDeckToJoin"
+                            : "connected:seats.noDecksYet"
+                        }
                       />
                     </View>
                   )
@@ -263,11 +281,17 @@ export function LobbySeatList({
                   <>
                     <FilterChips
                       testID={`seat-${seat.seat}-deck`}
-                      accessibilityLabel="Deck"
+                      accessibilityLabel={translate("connected:seats.deck")}
                       chips={[
                         ...(deckRequired
                           ? []
-                          : [{ id: NO_DECK_ID, label: "No deck", disabled: selectingDeck }]),
+                          : [
+                              {
+                                id: NO_DECK_ID,
+                                label: translate("connected:seats.noDeck"),
+                                disabled: selectingDeck,
+                              },
+                            ]),
                         ...usableDecks.map((deck) => ({
                           id: deck._id,
                           label: deck.name,
@@ -288,7 +312,7 @@ export function LobbySeatList({
                     {chosenDeck && chosenDeck.versions.length > 1 ? (
                       <FilterChips
                         testID={`seat-${seat.seat}-version`}
-                        accessibilityLabel="Deck version"
+                        accessibilityLabel={translate("connected:seats.deckVersion")}
                         chips={chosenDeck.versions.map((version) => ({
                           id: version._id,
                           label: versionLabel(version),
@@ -302,7 +326,7 @@ export function LobbySeatList({
                 )}
                 {!deckRequired && seat.deckVersionId && usableDecks.length === 0 ? (
                   <Button
-                    text="No deck"
+                    tx="connected:seats.noDeck"
                     disabled={selectingDeck}
                     onPress={() => onSelectVersion(seat.seat)}
                   />
@@ -314,7 +338,7 @@ export function LobbySeatList({
                     accessibilityLiveRegion="polite"
                     size="xxs"
                     style={themed($seatPending)}
-                    text="Selecting deck…"
+                    tx="connected:seats.selectingDeck"
                   />
                 ) : null}
               </View>

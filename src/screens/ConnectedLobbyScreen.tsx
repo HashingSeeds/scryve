@@ -43,6 +43,7 @@ import {
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -63,14 +64,12 @@ import {
 import { versionLabel } from "../../convex/lib/deckVersions"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
-const LOBBY_TITLE = "Lobby"
-
 function LobbySkeleton() {
   const { themed } = useAppTheme()
   return (
     <View
       accessibilityRole="progressbar"
-      accessibilityLabel="Loading lobby"
+      accessibilityLabel={translate("connected:lobby.loadingLabel")}
       style={themed($skeleton)}
     >
       <View style={themed($skeletonInvite)} />
@@ -101,7 +100,7 @@ export function ConnectedLobbyScreen({
         const gone = isGameUnavailableError(error)
         return (
           <LobbyStatusScreen
-            message={gone ? "This game no longer exists." : "This lobby is unavailable."}
+            message={translate(gone ? "connected:gameGone" : "connected:lobby.unavailable")}
             error
             {...(gone ? {} : { retry })}
             onBack={
@@ -231,7 +230,7 @@ function ConnectedLobbyContent({
       })
       if (deckVersionId) captureAnalytics("deck_used", { feature: "assigned" })
     } catch (cause) {
-      setActionError(convexErrorMessage(cause, "Could not select deck"))
+      setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.selectDeck")))
     } finally {
       selectingDeckSeatsInFlight.current.delete(seat)
       setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
@@ -246,7 +245,7 @@ function ConnectedLobbyContent({
       setActionError(undefined)
       await updateSettings({ publicId, ...settings })
     } catch (cause) {
-      setActionError(convexErrorMessage(cause, "Could not update lobby settings"))
+      setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.updateSettings")))
     } finally {
       settingsInFlight.current = false
       setSavingSettings(false)
@@ -266,7 +265,9 @@ function ConnectedLobbyContent({
       setActionError(undefined)
       await start({ publicId })
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Could not start the game")
+      setActionError(
+        cause instanceof Error ? cause.message : translate("connected:lobby.errors.start"),
+      )
     } finally {
       startInFlight.current = false
       setStarting(false)
@@ -277,12 +278,19 @@ function ConnectedLobbyContent({
     try {
       setActionError(undefined)
       if (inviteUrl) {
-        await Share.share({ message: `Join my Scryve game: ${inviteUrl}`, url: inviteUrl })
+        await Share.share({
+          message: translate("connected:invite.shareMessage", { url: inviteUrl }),
+          url: inviteUrl,
+        })
       } else if (manualCode) {
-        await Share.share({ message: `Join my Scryve game with code ${manualCode}` })
+        await Share.share({
+          message: translate("connected:invite.shareMessageCode", { code: manualCode }),
+        })
       }
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Could not open sharing")
+      setActionError(
+        cause instanceof Error ? cause.message : translate("connected:invite.shareFailed"),
+      )
     }
   }
 
@@ -306,7 +314,7 @@ function ConnectedLobbyContent({
       })
       setAppearanceSeat(undefined)
     } catch (cause) {
-      setActionError(convexErrorMessage(cause, "Could not update your color and mark"))
+      setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.appearance")))
     } finally {
       setSavingAppearance(false)
     }
@@ -344,13 +352,18 @@ function ConnectedLobbyContent({
       setLeaveAction(undefined)
       onLeft?.()
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Could not leave lobby")
+      setActionError(
+        cause instanceof Error ? cause.message : translate("connected:lobby.errors.leave"),
+      )
     } finally {
       setLeaving(false)
     }
   }
 
-  if (lobby === undefined) return <LobbyStatusScreen message="Loading lobby…" onBack={onBack} />
+  const startOfflineNotice = onlineOnlyNotice("start")
+
+  if (lobby === undefined)
+    return <LobbyStatusScreen message={translate("connected:lobby.loading")} onBack={onBack} />
 
   if (lobby.status === "abandoned" || lobby.status === "finished") {
     const close = onLeft ?? onBack ?? (() => undefined)
@@ -359,19 +372,19 @@ function ConnectedLobbyContent({
         <DialogCard
           visible
           onClose={close}
-          backdropAccessibilityLabel="Close lobby"
+          backdropAccessibilityLabel={translate("connected:lobby.closed.close")}
           dialogAccessibilityRole="alert"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Lobby closed" />
+          <Text preset="subheading" tx="connected:lobby.closed.title" />
           <Text
-            text={
+            tx={
               lobby.status === "abandoned"
-                ? "This game was abandoned. You can start or join another game."
-                : "This game has ended. You can start or join another game."
+                ? "connected:lobby.closed.abandoned"
+                : "connected:lobby.closed.ended"
             }
           />
-          <Button text="OK" onPress={close} />
+          <Button tx="connected:lobby.closed.ok" onPress={close} />
         </DialogCard>
       </Screen>
     )
@@ -408,7 +421,7 @@ function ConnectedLobbyContent({
       contentContainerStyle={themed($screen)}
     >
       <Header
-        title={titleVisible ? LOBBY_TITLE : ""}
+        title={titleVisible ? translate("connected:lobby.title") : ""}
         leftTx={onBack ? "common:back" : undefined}
         backgroundColor={colors.surface}
         onLeftPress={onBack}
@@ -422,13 +435,13 @@ function ConnectedLobbyContent({
         <View style={themed($hero)}>
           <View style={themed($inviteSummary)}>
             <View style={$styles.flex1}>
-              <Text preset="heading" text={manualCode ?? LOBBY_TITLE} />
+              <Text preset="heading" text={manualCode ?? translate("connected:lobby.title")} />
               <Text
                 size="sm"
                 style={themed($dimmed)}
                 text={
                   manualCode
-                    ? "Invite code"
+                    ? translate("connected:invite.code")
                     : lobbyDetail(
                         lobby.startingLife,
                         lobby.ruleset,
@@ -442,7 +455,7 @@ function ConnectedLobbyContent({
             {inviteQrPayload || manualCode ? (
               <Button
                 testID="open-invite-button"
-                text="Invite"
+                tx="connected:invite.label"
                 style={themed($inviteButton)}
                 onPress={(event) => {
                   setInviteOrigin(
@@ -471,10 +484,10 @@ function ConnectedLobbyContent({
         </View>
         {lobby.isHost ? (
           <View style={themed($section)}>
-            <Text preset="subheading" accessibilityRole="header" text="Players" />
+            <Text preset="subheading" accessibilityRole="header" tx="connected:lobby.players" />
             <FilterChips
               testID="lobby-player-count"
-              accessibilityLabel="Number of players"
+              accessibilityLabel={translate("connected:lobby.playerCount")}
               selectedId={String(lobby.playerCount)}
               chips={[2, 3, 4, 5, 6].map((count) => ({
                 id: String(count),
@@ -491,7 +504,7 @@ function ConnectedLobbyContent({
             {lobby.system !== NO_PLAY_SYSTEM || lobby.deckRequired ? (
               <Switch
                 testID="lobby-require-decks"
-                label="Decks required"
+                labelTx="connected:decksRequired"
                 value={Boolean(lobby.deckRequired)}
                 disabled={!isWebSocketConnected || savingSettings || starting}
                 onValueChange={(deckRequired) => void changeSettings({ deckRequired })}
@@ -501,11 +514,12 @@ function ConnectedLobbyContent({
         ) : null}
         <View style={themed($section)}>
           <View style={themed($readinessHeading)}>
-            <Text preset="subheading" accessibilityRole="header" text="Lobby" />
+            <Text preset="subheading" accessibilityRole="header" tx="connected:lobby.title" />
             <Text
               size="xs"
               style={themed($dimmed)}
-              text={`${readyPlayers} of ${lobby.playerCount} ready`}
+              tx="connected:lobby.readyCount"
+              txOptions={{ ready: readyPlayers, total: lobby.playerCount }}
             />
           </View>
           <View style={themed($progressTrack)}>
@@ -574,13 +588,13 @@ function ConnectedLobbyContent({
           <AlertNote testID="connected-action-error" text={actionError} />
         ) : null}
         {lobby.isHost && !isWebSocketConnected ? (
-          <AlertNote testID="connected-start-offline" text={onlineOnlyNotice("start")} />
+          <AlertNote testID="connected-start-offline" text={startOfflineNotice} />
         ) : null}
         {lobby.isHost ? (
           <>
             <Button
               testID="start-connected-game-button"
-              text={starting ? "Starting\u2026" : "Start game"}
+              tx={starting ? "connected:lobby.starting" : "play:startGame"}
               preset="reversed"
               style={themed($primaryAction)}
               disabled={startBlocked}
@@ -594,11 +608,11 @@ function ConnectedLobbyContent({
               />
             ) : null}
             {missingDeck && isWebSocketConnected ? (
-              <Text size="xxs" style={themed($actionHint)} text="Waiting for decks" />
+              <Text size="xxs" style={themed($actionHint)} tx="connected:lobby.waitingForDecks" />
             ) : null}
           </>
         ) : (
-          <Text size="sm" style={themed($actionHint)} text="Waiting for the host to start." />
+          <Text size="sm" style={themed($actionHint)} tx="connected:waitingForHost" />
         )}
         <Button
           testID={`${exitAction}-connected-lobby-button`}
@@ -616,17 +630,17 @@ function ConnectedLobbyContent({
           origin={inviteOrigin}
           onClose={() => setInviteOpen(false)}
           backdropTestID="invite-backdrop"
-          backdropAccessibilityLabel="Close invite"
+          backdropAccessibilityLabel={translate("connected:invite.close")}
           dialogTestID="invite-dialog"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Invite players" />
+          <Text preset="subheading" tx="connected:invite.title" />
           <InviteCard
             qrPayload={inviteQrPayload}
             manualCode={manualCode}
             onShare={inviteUrl || manualCode ? shareInvite : undefined}
           />
-          <Button text="Close" onPress={() => setInviteOpen(false)} />
+          <Button tx="common:close" onPress={() => setInviteOpen(false)} />
         </DialogCard>
       ) : null}
       {leaveAction && openExitCopy ? (
@@ -643,7 +657,7 @@ function ConnectedLobbyContent({
           confirmTestID={`confirm-connected-lobby-${leaveAction}-button`}
           cancelTestID={`cancel-connected-lobby-${leaveAction}-button`}
           backdropTestID="connected-lobby-leave-backdrop"
-          backdropAccessibilityLabel="Keep this lobby open"
+          backdropAccessibilityLabel={translate("connected:lobby.keepOpen")}
           notice={
             actionError ? (
               <AlertNote testID="connected-action-error" text={actionError} />
@@ -663,11 +677,11 @@ function ConnectedLobbyContent({
           closeDisabled={savingAppearance}
           origin={appearanceOrigin}
           backdropTestID="lobby-appearance-backdrop"
-          backdropAccessibilityLabel="Close color and mark picker"
+          backdropAccessibilityLabel={translate("connected:lobby.appearance.close")}
           dialogTestID="lobby-appearance-dialog"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Your color and mark" />
+          <Text preset="subheading" tx="connected:lobby.appearance.title" />
           <AppearancePicker
             value={appearanceDraft}
             taken={takenAppearances}
@@ -681,14 +695,14 @@ function ConnectedLobbyContent({
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-appearance-button"
-              text="Cancel"
+              tx="common:cancel"
               style={themed($dialogButton)}
               disabled={savingAppearance}
               onPress={() => setAppearanceSeat(undefined)}
             />
             <Button
               testID="save-appearance-button"
-              text={savingAppearance ? "Saving…" : "Save"}
+              tx={savingAppearance ? "connected:saving" : "common:save"}
               preset="reversed"
               style={themed($dialogButton)}
               disabled={savingAppearance}
@@ -752,7 +766,7 @@ function LobbyStatusScreen({
         scrollEnabled={false}
       >
         <View style={themed($hero)}>
-          <Text preset="heading" text={LOBBY_TITLE} />
+          <Text preset="heading" tx="connected:lobby.title" />
           {error ? (
             <AlertNote text={message} />
           ) : (
@@ -767,11 +781,11 @@ function LobbyStatusScreen({
         </View>
         <LobbySkeleton />
         {error && retry ? (
-          <Button testID="retry-lobby-button" text="Try again" onPress={retry} />
+          <Button testID="retry-lobby-button" tx="common:tryAgain" onPress={retry} />
         ) : null}
       </ScrollView>
       <BottomActionBar style={themed($surface)}>
-        <Button text="Start game" preset="reversed" style={themed($primaryAction)} disabled />
+        <Button tx="play:startGame" preset="reversed" style={themed($primaryAction)} disabled />
       </BottomActionBar>
     </Screen>
   )

@@ -18,6 +18,7 @@ import {
   isLanGameService,
   LAN_SERVICE_TYPE,
 } from "@/features/lan/lanTransport"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -32,7 +33,11 @@ const summaryOf = (setup: LanSetup) => {
   const format = setup.system
     ? (playSystemFormats(setup.system).find(({ id }) => id === setup.format)?.label ?? setup.format)
     : undefined
-  return [`${setup.startingLife} life`, format, `${setup.playerCount} players`]
+  return [
+    translate("connected:nearby.summaryLife", { life: setup.startingLife }),
+    format,
+    translate("connected:nearby.summaryPlayers", { players: setup.playerCount }),
+  ]
     .filter(Boolean)
     .join(" · ")
 }
@@ -99,10 +104,10 @@ export function LanLobbyScreen({
   }, [automation.start, role, lobby?.status, seatsReady])
 
   const heading = !inGame
-    ? "Nearby games"
-    : role === "host"
-      ? `Hosting ${serviceName ?? ""}`
-      : `Joined ${serviceName ?? ""}`
+    ? translate("connected:nearby.title")
+    : translate(role === "host" ? "connected:nearby.hosting" : "connected:nearby.joined", {
+        name: serviceName ?? "",
+      })
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$styles.flex1}>
@@ -110,21 +115,25 @@ export function LanLobbyScreen({
       <ScrollView style={$styles.flex1} contentContainerStyle={themed($content)}>
         <Text preset="heading" accessibilityRole="header" text={heading} />
         {access === "denied" ? (
-          <AlertNote text="Allow nearby devices access in Settings to find and host games." />
+          <AlertNote text={translate("connected:nearby.accessDenied")} />
         ) : null}
         {error ? <AlertNote text={error} /> : null}
         {status === "connecting" || status === "reconnecting" ? (
           <Text
             style={themed($dimmed)}
-            text={status === "connecting" ? "Connecting…" : "Reconnecting…"}
+            tx={
+              status === "connecting"
+                ? "connected:nearby.connecting"
+                : "connected:nearby.reconnecting"
+            }
           />
         ) : null}
 
         {!inGame ? (
           <View style={themed($section)}>
             <TextField
-              label="Your name"
-              placeholder="Shown to the table"
+              labelTx="connected:nearby.nameLabel"
+              placeholderTx="connected:nearby.namePlaceholder"
               value={name}
               maxLength={LAN_NAME_MAX_LENGTH}
               autoCorrect={false}
@@ -134,12 +143,13 @@ export function LanLobbyScreen({
               }}
             />
             {nearby.length === 0 ? (
-              <Text style={themed($dimmed)} text="No games on this network yet." />
+              <Text style={themed($dimmed)} tx="connected:nearby.empty" />
             ) : null}
             {nearby.map((service) => (
               <Button
                 key={service.name}
-                text={`Join ${service.name}`}
+                tx="connected:nearby.join"
+                txOptions={{ name: service.name }}
                 onPress={() => void lanSession.join(service)}
               />
             ))}
@@ -148,13 +158,13 @@ export function LanLobbyScreen({
                 <Text style={themed($dimmed)} text={summaryOf(setup)} />
                 <Button
                   preset="primary"
-                  text="Host this game"
+                  tx="connected:nearby.host"
                   disabled={!ready}
                   onPress={() => void lanSession.host(setup)}
                 />
               </>
             ) : (
-              <Text style={themed($dimmed)} text="To host, set up a game and choose Nearby." />
+              <Text style={themed($dimmed)} tx="connected:nearby.hostHint" />
             )}
           </View>
         ) : (
@@ -170,11 +180,13 @@ export function LanLobbyScreen({
                       style={$styles.flex1}
                       weight={player.controlledByMe ? "semiBold" : "normal"}
                       text={
-                        player.controlledByMe ? `${player.displayName} (you)` : player.displayName
+                        player.controlledByMe
+                          ? translate("connected:nearby.you", { name: player.displayName })
+                          : player.displayName
                       }
                     />
                     {seat && !seat.connected ? (
-                      <Text size="xs" style={themed($dimmed)} text="Away" />
+                      <Text size="xs" style={themed($dimmed)} tx="connected:nearby.away" />
                     ) : null}
                   </View>
                 )
@@ -182,7 +194,7 @@ export function LanLobbyScreen({
               {Array.from({ length: openSeats }, (_, index) => (
                 <View key={`open-${index}`} style={themed($seatRow)}>
                   <View style={[themed($swatch), themed($openSwatch)]} />
-                  <Text style={[$styles.flex1, themed($dimmed)]} text="Open seat" />
+                  <Text style={[$styles.flex1, themed($dimmed)]} tx="connected:nearby.openSeat" />
                 </View>
               ))}
             </View>
@@ -191,16 +203,18 @@ export function LanLobbyScreen({
               <Button
                 preset="primary"
                 disabled={!seatsReady}
-                text={lobby?.status === "lobby" ? "Start game" : "Start again"}
+                tx={lobby?.status === "lobby" ? "play:startGame" : "connected:nearby.startAgain"}
                 onPress={() => lanSession.start()}
               />
             ) : null}
             {role === "guest" && lobby?.status !== "active" ? (
-              <Text style={themed($dimmed)} text="Waiting for the host to start." />
+              <Text style={themed($dimmed)} tx="connected:waitingForHost" />
             ) : null}
-            {lobby?.status === "active" ? <Button text="Back to game" onPress={onPlay} /> : null}
+            {lobby?.status === "active" ? (
+              <Button tx="connected:nearby.backToGame" onPress={onPlay} />
+            ) : null}
             <Button
-              text={role === "host" ? "End game" : "Leave"}
+              tx={role === "host" ? "connected:nearby.endGame" : "connected:nearby.leave"}
               onPress={() => lanSession.leave()}
             />
           </>

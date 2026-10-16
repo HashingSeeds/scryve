@@ -6,6 +6,7 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react"
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -44,9 +45,11 @@ function BlockedPlayersContent({
     <BlockedPlayersFrame>
       {isLoading ? (
         <View testID="blocked-players-loading" style={themed($stateRow)}>
-          <ActivityIndicator accessibilityLabel="Loading blocked players" />
+          <ActivityIndicator
+            accessibilityLabel={translate("connected:blockedPlayers.loadingLabel")}
+          />
           <Text
-            text="Loading blocked players…"
+            tx="connected:blockedPlayers.loading"
             size="xs"
             style={themed($muted)}
             accessibilityLiveRegion="polite"
@@ -54,11 +57,11 @@ function BlockedPlayersContent({
         </View>
       ) : !isAuthenticated ? (
         <View testID="blocked-players-signed-out" style={themed($stateRow)}>
-          <Text text="Sign in to manage blocked players." size="xs" style={themed($muted)} />
+          <Text tx="connected:blockedPlayers.signedOut" size="xs" style={themed($muted)} />
         </View>
       ) : blocks?.length === 0 ? (
         <View testID="blocked-players-empty" style={themed($stateRow)}>
-          <Text text="No blocked players." size="xs" style={themed($muted)} />
+          <Text tx="connected:blockedPlayers.empty" size="xs" style={themed($muted)} />
         </View>
       ) : (
         <View testID="blocked-players-list" style={themed($list)}>
@@ -72,8 +75,14 @@ function BlockedPlayersContent({
               <Text style={themed($name)} numberOfLines={1} text={block.username} />
               <Button
                 testID={`unblock-${block.blockedUserId}`}
-                text={busyId === block.blockedUserId ? "Unblocking…" : "Unblock"}
-                accessibilityLabel={`Unblock ${block.username}`}
+                tx={
+                  busyId === block.blockedUserId
+                    ? "connected:blockedPlayers.unblocking"
+                    : "connected:blockedPlayers.unblock"
+                }
+                accessibilityLabel={translate("connected:blockedPlayers.unblockPlayer", {
+                  username: block.username,
+                })}
                 accessibilityState={{
                   busy: busyId === block.blockedUserId,
                   disabled: busyId !== undefined,
@@ -86,7 +95,12 @@ function BlockedPlayersContent({
                     setError(undefined)
                     await unblock({ blockedUserId: block.blockedUserId as Id<"users"> })
                   } catch (cause) {
-                    setError(convexErrorMessage(cause, "Could not unblock that player"))
+                    setError(
+                      convexErrorMessage(
+                        cause,
+                        translate("connected:blockedPlayers.unblockFailed"),
+                      ),
+                    )
                   } finally {
                     setBusyId(undefined)
                   }
@@ -107,13 +121,13 @@ function BlockedPlayersFailure({ onRetry }: { onRetry: () => void }) {
       <View testID="blocked-players-error" style={themed($stateRow)}>
         <Text
           accessibilityRole="alert"
-          text="Couldn't load blocked players."
+          tx="connected:blockedPlayers.loadFailed"
           size="xs"
           style={themed([$name, $error])}
         />
         <Button
-          text="Retry"
-          accessibilityHint="Loads blocked players again"
+          tx="common:retry"
+          accessibilityHint={translate("connected:blockedPlayers.retryHint")}
           style={themed($retry)}
           onPress={onRetry}
         />
@@ -126,12 +140,8 @@ function BlockedPlayersFrame({ children }: { children: ReactNode }) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($section)}>
-      <Text text="Blocked players" preset="subheading" accessibilityRole="header" />
-      <Text
-        size="xs"
-        style={themed($muted)}
-        text="Blocked players cannot join the same connected game as you."
-      />
+      <Text tx="connected:blockedPlayers.title" preset="subheading" accessibilityRole="header" />
+      <Text size="xs" style={themed($muted)} tx="connected:blockedPlayers.description" />
       <View testID="blocked-players-state" style={themed($state)}>
         {children}
       </View>

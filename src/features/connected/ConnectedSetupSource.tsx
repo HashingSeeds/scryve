@@ -3,6 +3,7 @@ import { Modal } from "react-native"
 import { useUser } from "@clerk/expo"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { translate } from "@/i18n/translate"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 
 import { BackendGate } from "./ConnectedGate"
@@ -39,9 +40,12 @@ function SetupFeed({
   const checkingSession = !auth.isLoaded || !isLoaded
   const access =
     !checkingSession && !auth.isSignedIn
-      ? { label: "Sign in to host", request: auth.openAuth }
+      ? { label: translate("connected:setup.signInToHost"), request: auth.openAuth }
       : !checkingSession && user?.username === null
-        ? { label: "Choose username", request: () => setChoosingUsername(true) }
+        ? {
+            label: translate("connected:setup.chooseUsername"),
+            request: () => setChoosingUsername(true),
+          }
         : undefined
 
   return (
@@ -55,7 +59,7 @@ function SetupFeed({
               ready: feed.ready && !checkingSession && !access,
               access,
               status: checkingSession
-                ? "Connecting… You can keep editing."
+                ? translate("connected:setup.connecting")
                 : access
                   ? undefined
                   : feed.status,
@@ -97,7 +101,7 @@ export const ConnectedSetupSource = memo(function ConnectedSetupSource({
         feed={{
           ready: false,
           busy: false,
-          blockedReason: auth.configurationMessage ?? "Connected play is unavailable.",
+          blockedReason: auth.configurationMessage ?? translate("connected:setup.unavailable"),
           host: () => undefined,
           exitGame: async () => false,
         }}

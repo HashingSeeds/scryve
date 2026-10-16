@@ -10,6 +10,8 @@ import {
 import { useUser } from "@clerk/expo"
 import { useConvexAuth, useMutation } from "convex/react"
 
+import { translate } from "@/i18n/translate"
+
 import { useConvexOnline } from "./useConvexOnline"
 import { api } from "../../../convex/_generated/api"
 import { MAX_DISPLAY_NAME_LENGTH } from "../../../convex/lib/policy"
@@ -149,7 +151,8 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
         setReadyUserId((ready) => (ready === profile.userId ? undefined : ready))
         setFailure({
           userId: profile.userId,
-          message: cause instanceof Error ? cause.message : "Could not prepare connected play",
+          message:
+            cause instanceof Error ? cause.message : translate("connected:profile.prepareFailed"),
         })
       })
     return () => {
@@ -182,7 +185,7 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
     state = {
       status: "error",
       reason: "signedOut",
-      message: "You are signed out or your session expired.",
+      message: translate("connected:profile.signedOut"),
       retry,
     }
   } else if (isAuthenticationLoading || isAuthenticationRefreshing) {
@@ -193,7 +196,7 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
     state = {
       status: "error",
       reason: "authentication",
-      message: "Convex rejected this signed-in session.",
+      message: translate("connected:profile.sessionRejected"),
       profile,
       retry,
     }

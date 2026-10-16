@@ -5,6 +5,7 @@ import { createLobbyIdentifiers } from "@/features/connected/identifiers"
 import { buildLocalGameSnapshot } from "@/features/connected/localGameSnapshot"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LocalGame, PlayerId } from "@/features/game/types"
+import { translate } from "@/i18n/translate"
 import type { LocalConnectFeed } from "@/screens/NewGameScreen"
 
 import { api } from "../../../convex/_generated/api"
@@ -51,7 +52,7 @@ export function LocalGamePublishSource({
         )
         onPublished({ publicId: published.publicId, manualCode: published.manualCode })
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not connect this game.")
+        setError(cause instanceof Error ? cause.message : translate("connected:publish.failed"))
       } finally {
         inFlight.current = false
         setBusy(false)

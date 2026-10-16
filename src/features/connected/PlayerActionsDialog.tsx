@@ -9,6 +9,8 @@ import { DialogCard, type DialogOrigin } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import type { TxKeyPath } from "@/i18n"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -27,11 +29,11 @@ export interface ReportablePlayer {
 }
 
 const REPORT_REASONS = [
-  { id: "offensive_username", label: "Offensive username" },
-  { id: "harassment", label: "Harassment or abuse" },
-  { id: "impersonation", label: "Impersonation" },
-  { id: "other", label: "Something else" },
-] as const
+  { id: "offensive_username", labelTx: "connected:playerActions.reasons.offensiveUsername" },
+  { id: "harassment", labelTx: "connected:playerActions.reasons.harassment" },
+  { id: "impersonation", labelTx: "connected:playerActions.reasons.impersonation" },
+  { id: "other", labelTx: "connected:playerActions.reasons.other" },
+] as const satisfies readonly { id: string; labelTx: TxKeyPath }[]
 
 type ReportReason = (typeof REPORT_REASONS)[number]["id"]
 
@@ -75,7 +77,7 @@ export function PlayerActionsDialog({
       await action()
       setDone(confirmation)
     } catch (cause) {
-      setError(convexErrorMessage(cause, "Could not complete that request"))
+      setError(convexErrorMessage(cause, translate("connected:playerActions.requestFailed")))
     } finally {
       setBusy(false)
     }
@@ -88,15 +90,15 @@ export function PlayerActionsDialog({
       closeDisabled={busy}
       origin={origin}
       backdropTestID="player-actions-backdrop"
-      backdropAccessibilityLabel="Close player actions"
+      backdropAccessibilityLabel={translate("connected:playerActions.close")}
       dialogTestID="player-actions-dialog"
       style={themed($dialog)}
     >
       {done ? (
         <View style={themed($section)}>
-          <Text preset="subheading" text="Thanks — that's been recorded" />
+          <Text preset="subheading" tx="connected:playerActions.thanks" />
           <Text testID="player-actions-confirmation" accessibilityRole="alert" text={done} />
-          <Button text="Close" preset="reversed" onPress={onClose} />
+          <Button tx="common:close" preset="reversed" onPress={onClose} />
         </View>
       ) : selected ? (
         <ScrollView
@@ -105,24 +107,24 @@ export function PlayerActionsDialog({
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
         >
-          <Text preset="subheading" text={`Report ${selected.displayName}`} />
           <Text
-            size="xs"
-            style={themed($muted)}
-            text="Reporting also blocks this player for you immediately. You will stop seeing their username and will not be seated with them again. We review every report within 24 hours."
+            preset="subheading"
+            tx="connected:playerActions.reportPlayer"
+            txOptions={{ name: selected.displayName }}
           />
+          <Text size="xs" style={themed($muted)} tx="connected:playerActions.reportExplanation" />
           <View style={themed($choices)}>
             {REPORT_REASONS.map((option) => (
               <ChoiceButton
                 key={option.id}
-                text={option.label}
+                text={translate(option.labelTx)}
                 selected={reason === option.id}
                 onPress={() => setReason(option.id)}
               />
             ))}
           </View>
           <TextField
-            label="Anything else we should know? (optional)"
+            labelTx="connected:playerActions.noteLabel"
             multiline
             maxLength={NOTE_MAX_LENGTH}
             value={note}
@@ -133,7 +135,7 @@ export function PlayerActionsDialog({
           ) : null}
           <View style={themed($actions)}>
             <Button
-              text="Back"
+              tx="common:back"
               disabled={busy}
               style={themed($action)}
               onPress={() => {
@@ -143,7 +145,7 @@ export function PlayerActionsDialog({
             />
             <Button
               testID="submit-player-report-button"
-              text={busy ? "Sending…" : "Send report"}
+              tx={busy ? "connected:playerActions.sending" : "connected:playerActions.sendReport"}
               preset="reversed"
               disabled={busy}
               style={themed($action)}
@@ -156,7 +158,9 @@ export function PlayerActionsDialog({
                       reason,
                       ...(note.trim() ? { note: note.trim() } : {}),
                     }),
-                  `We received your report about ${selected.displayName} and blocked them for you. You will not be seated with them again.`,
+                  translate("connected:playerActions.reportConfirmation", {
+                    name: selected.displayName,
+                  }),
                 )
               }
             />
@@ -164,24 +168,28 @@ export function PlayerActionsDialog({
         </ScrollView>
       ) : (
         <View style={themed($section)}>
-          <Text preset="subheading" text="Players" />
-          <Text
-            size="xs"
-            style={themed($muted)}
-            text="Report a name you find offensive, or block a player to stop being seated with them."
-          />
+          <Text preset="subheading" tx="connected:playerActions.title" />
+          <Text size="xs" style={themed($muted)} tx="connected:playerActions.description" />
           {onRole ? (
-            <Button testID="role-from-players-button" text="Your role" onPress={onRole} />
+            <Button
+              testID="role-from-players-button"
+              tx="connected:playerActions.yourRole"
+              onPress={onRole}
+            />
           ) : null}
           {onInvite ? (
-            <Button testID="invite-from-players-button" text="Invite" onPress={onInvite} />
+            <Button
+              testID="invite-from-players-button"
+              tx="connected:invite.label"
+              onPress={onInvite}
+            />
           ) : null}
           {error ? (
             <Text testID="player-actions-error" accessibilityRole="alert" text={error} />
           ) : null}
           <ScrollView style={themed($list)}>
             {opponents.length === 0 ? (
-              <Text size="xs" style={themed($muted)} text="No other players in this game." />
+              <Text size="xs" style={themed($muted)} tx="connected:playerActions.noOtherPlayers" />
             ) : null}
             {opponents.map((player) => (
               <View key={player.playerId} style={themed($row)}>
@@ -193,12 +201,17 @@ export function PlayerActionsDialog({
                     size={28}
                   />
                   <Text numberOfLines={1} text={player.displayName} style={themed($identityName)} />
-                  <Text size="xxs" style={themed($muted)} text={`Seat ${player.seat}`} />
+                  <Text
+                    size="xxs"
+                    style={themed($muted)}
+                    tx="connected:seatNumber"
+                    txOptions={{ seat: player.seat }}
+                  />
                 </View>
                 <View style={themed($actions)}>
                   <Button
                     testID={`report-player-seat-${player.seat}`}
-                    text="Report"
+                    tx="connected:playerActions.report"
                     disabled={busy}
                     style={themed($action)}
                     onPress={() => {
@@ -208,13 +221,15 @@ export function PlayerActionsDialog({
                   />
                   <Button
                     testID={`block-player-seat-${player.seat}`}
-                    text="Block"
+                    tx="connected:playerActions.block"
                     disabled={busy}
                     style={themed($action)}
                     onPress={() =>
                       run(
                         () => block({ publicId, playerId: player.playerId as Id<"gamePlayers"> }),
-                        `${player.displayName} is blocked. You will not be seated with them again, and their name is hidden from you.`,
+                        translate("connected:playerActions.blockConfirmation", {
+                          name: player.displayName,
+                        }),
                       )
                     }
                   />
@@ -222,7 +237,7 @@ export function PlayerActionsDialog({
               </View>
             ))}
           </ScrollView>
-          <Button text="Close" onPress={onClose} />
+          <Button tx="common:close" onPress={onClose} />
         </View>
       )}
     </DialogCard>

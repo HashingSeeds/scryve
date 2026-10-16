@@ -3,6 +3,7 @@ import { TouchableOpacity, View } from "react-native"
 
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -45,15 +46,22 @@ export function AppearancePicker({
     const selected = shape === value.shape
     const unavailable = takenShapes.has(shape)
     const locked = pro && proLocked
+    const shapeName = translate(`connected:appearance.shapes.${shape}`)
     return (
       <View key={shape} style={$option}>
         <TouchableOpacity
           testID={`appearance-shape-${shape}`}
           accessibilityRole="radio"
           accessibilityLabel={
-            unavailable ? `${shape}, already taken` : locked ? `${shape}, Scryve Pro` : shape
+            unavailable
+              ? translate("connected:appearance.shapeTaken", { shape: shapeName })
+              : locked
+                ? translate("connected:appearance.shapePro", { shape: shapeName })
+                : shapeName
           }
-          accessibilityHint={locked && !unavailable ? "Opens Scryve Pro" : undefined}
+          accessibilityHint={
+            locked && !unavailable ? translate("connected:appearance.opensPro") : undefined
+          }
           accessibilityState={{ selected, disabled: unavailable }}
           disabled={unavailable}
           activeOpacity={0.75}
@@ -82,7 +90,7 @@ export function AppearancePicker({
   return (
     <View style={themed($picker)}>
       <View style={themed($group)}>
-        <Text size="xs" style={themed($label)} text="Color" />
+        <Text size="xs" style={themed($label)} tx="connected:appearance.color" />
         <View accessibilityRole="radiogroup" style={themed($row)}>
           {PLAYER_COLOR_CHOICES.map((color) => {
             const selected = color.toUpperCase() === value.color.toUpperCase()
@@ -92,7 +100,12 @@ export function AppearancePicker({
                 <TouchableOpacity
                   testID={`appearance-color-${colorSlug(color)}`}
                   accessibilityRole="radio"
-                  accessibilityLabel={`Color ${colorSlug(color)}${exhausted ? ", already taken" : ""}`}
+                  accessibilityLabel={translate(
+                    exhausted
+                      ? "connected:appearance.colorOptionTaken"
+                      : "connected:appearance.colorOption",
+                    { color: colorSlug(color) },
+                  )}
                   accessibilityState={{ selected, disabled: exhausted }}
                   disabled={exhausted}
                   activeOpacity={0.75}
@@ -111,14 +124,14 @@ export function AppearancePicker({
         </View>
       </View>
       <View style={themed($group)}>
-        <Text size="xs" style={themed($label)} text="Mark" />
+        <Text size="xs" style={themed($label)} tx="connected:appearance.mark" />
         <View accessibilityRole="radiogroup" style={themed($row)}>
           {shapes.map((shape, index) => shapeOption(shape, index, false))}
         </View>
       </View>
       {proShapes.length ? (
         <View style={themed($group)}>
-          <Text size="xs" style={themed($label)} text="Pro" />
+          <Text size="xs" style={themed($label)} tx="connected:appearance.pro" />
           <View accessibilityRole="radiogroup" style={themed($row)}>
             {proShapes.map((shape, index) => shapeOption(shape, index, true))}
           </View>

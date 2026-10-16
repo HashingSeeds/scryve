@@ -53,7 +53,7 @@ export function InviteCard({
       <View style={[themed($details), sideBySide && themed($sideBySideDetails)]}>
         {manualCode ? (
           <View style={[themed($codeBlock), sideBySide && themed($sideBySideCodeBlock)]}>
-            <Text size="xxs" style={themed($label)} text="Invite code" />
+            <Text size="xxs" style={themed($label)} tx="connected:invite.code" />
             <Text
               testID="manual-code"
               preset={sideBySide ? "subheading" : "heading"}
@@ -66,7 +66,8 @@ export function InviteCard({
               <Text
                 size="xs"
                 style={themed($hint)}
-                text={`Scan to join or enter code ${manualCode}.`}
+                tx="connected:invite.scanOrEnter"
+                txOptions={{ code: manualCode }}
               />
             )}
           </View>
@@ -74,7 +75,7 @@ export function InviteCard({
         {onShare ? (
           <Button
             testID="share-invite-button"
-            text="Share invite"
+            tx="connected:invite.share"
             style={themed($share)}
             onPress={onShare}
           />
