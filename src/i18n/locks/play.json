@@ -307,5 +307,6 @@
   "rules.webOnly": "c8d04c0cef47",
   "rules.allOf": "d86d52b22fa5",
   "rules.noResults": "3de638240022",
-  "rules.notFound": "28a6a3b84cc3"
+  "rules.notFound": "28a6a3b84cc3",
+  "rules.openFailed": "b3eeb9629749"
 }

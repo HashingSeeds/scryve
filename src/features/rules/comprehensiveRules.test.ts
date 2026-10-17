@@ -1,9 +1,5 @@
-import {
-  findRules,
-  parseComprehensiveRules,
-  ruleReferences,
-  searchRules,
-} from "./comprehensiveRules"
+import { findRules, ruleReferences, searchRules } from "./comprehensiveRules"
+import { parseMagicRules } from "./magicRules"
 
 const SOURCE = [
   "﻿Magic: The Gathering Comprehensive Rules",
@@ -45,8 +41,8 @@ const SOURCE = [
   "Published by Wizards of the Coast LLC.",
 ].join("\r\n")
 
-describe("parseComprehensiveRules", () => {
-  const rules = parseComprehensiveRules(SOURCE)
+describe("parseMagicRules", () => {
+  const rules = parseMagicRules(SOURCE)
 
   it("reads chapters, sections, rules, examples, glossary, and the closing notice", () => {
     expect(rules).toMatchObject({
@@ -71,7 +67,7 @@ describe("parseComprehensiveRules", () => {
   })
 
   it("rejects text that is not the Comprehensive Rules", () => {
-    expect(parseComprehensiveRules("<html>Not found</html>")).toBeUndefined()
+    expect(parseMagicRules("<html>Not found</html>")).toBeUndefined()
   })
 
   it("finds a rule with its lettered subrules, not its numeric neighbors", () => {

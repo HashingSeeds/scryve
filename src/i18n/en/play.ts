@@ -365,6 +365,7 @@ const play = {
     glossary: "Glossary",
     effective: "Comprehensive Rules, effective {{date}}",
     official: "Official rules",
+    openFailed: "Couldn't open the official rules",
     downloading: "Downloading the Comprehensive Rules from Wizards of the Coast.",
     failed: "Couldn't download the rules.",
     webOnly: "The Comprehensive Rules are on the Wizards of the Coast site.",

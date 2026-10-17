@@ -356,6 +356,7 @@ export default {
     glossary: "용어집",
     effective: "종합 규칙, {{date}} 시행",
     official: "공식 규칙",
+    openFailed: "공식 규칙을 열 수 없습니다",
     downloading: "Wizards of the Coast에서 종합 규칙을 다운로드하는 중입니다.",
     failed: "규칙을 다운로드하지 못했습니다.",
     webOnly: "종합 규칙은 Wizards of the Coast 사이트에서 볼 수 있습니다.",

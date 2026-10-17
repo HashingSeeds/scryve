@@ -1,8 +1,10 @@
 import { translate } from "@/i18n/translate"
 
 import type { GamePlayer, PlayerId } from "./types"
+import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
 
-export type Die = "d6" | "d20"
+export type DiceRules = Pick<FirstPlayerDefinition, "die" | "winnerChooses">
+export type Die = DiceRules["die"]
 export type DiceTool = Die | "coin"
 export type CoinFace = "Heads" | "Tails"
 export type DiceRoll = { tool: Die; value: number } | { tool: "coin"; value: CoinFace }
@@ -55,14 +57,14 @@ export function randomIndex(count: number, random = Math.random) {
   return Math.floor(random() * count)
 }
 
-export type DiceRules = { die: Die; winnerChooses: boolean }
+const DEFAULT_DICE: FirstPlayerDefinition = {
+  die: "d20",
+  winnerChooses: false,
+  twoPlayerCoinFlip: false,
+}
 
-const DEFAULT_DICE: DiceRules = { die: "d20", winnerChooses: false }
-// why: Yu-Gi-Oh! rules use a six-sided die, and the roll's winner picks whether to go first or second.
-const YGO_DICE: DiceRules = { die: "d6", winnerChooses: true }
-
-export function systemDice(system: unknown): DiceRules {
-  return system === "ygo" ? YGO_DICE : DEFAULT_DICE
+export function systemDice(system: unknown): FirstPlayerDefinition {
+  return systemDefinition(system)?.firstPlayer ?? DEFAULT_DICE
 }
 
 function rollDie(die: Die, random: () => number) {
