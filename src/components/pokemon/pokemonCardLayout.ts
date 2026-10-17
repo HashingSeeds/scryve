@@ -134,8 +134,8 @@ export type BenchChipMetrics = ReturnType<typeof benchChipMetrics>
 // why: the table requires HP that installed clients can read, and real damage never reaches max HP, so a Pokémon placed before its card is chosen stays in play.
 export const CARDLESS_POKEMON: PokemonCard = { hp: MAX_POKEMON_HP, prizes: 1 }
 
-export function isCardless(pokemon: Pick<PokemonInPlay, "hp">) {
-  return pokemon.hp === MAX_POKEMON_HP
+export function isCardless(pokemon: Pick<PokemonInPlay, "hp" | "cardId">) {
+  return pokemon.hp === MAX_POKEMON_HP && pokemon.cardId === undefined
 }
 
 export function pokemonReadout(pokemon: Pick<PokemonInPlay, "hp" | "damage">) {

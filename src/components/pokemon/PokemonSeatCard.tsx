@@ -355,7 +355,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     touchFocus(pokemon.id)
   }
 
-  // why: a seat with a deck wants its cards tracked, so a tap picks the card and a hold counts damage without one. Seats without a deck are the other way round.
   const tapPicksCard = deck !== undefined
   const holdCopy = tapPicksCard
     ? {
@@ -372,7 +371,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       }
 
   function placeOn(slot: PokemonSlot, from: string, picksCard: boolean) {
-    // why: when the table refuses a cardless Pokémon, the sheet says why instead of the tap doing nothing.
     if (picksCard || table.placePokemon(playerId, slot, CARDLESS_POKEMON) === null)
       openSheet({ kind: "place", slot }, from)
   }
@@ -591,7 +589,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
             onLongPress={() => placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)}
-            // why: once a bench exists, the empty Active is a promotion from it, not a new Pokémon.
             onPress={() =>
               board.bench.length
                 ? openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
@@ -905,7 +902,6 @@ function PokemonHero({
     { direction: -1, glyph: "−", align: "flex-start" as const },
     { direction: 1, glyph: "+", align: "flex-end" as const },
   ]
-  // why: the readout counts down HP once a card is set and counts damage up before, so + always moves the big number up.
   const recentReadout = cardless ? recentDelta : -recentDelta
   return (
     <View
@@ -997,7 +993,7 @@ function PokemonHero({
           />
           <Text
             testID={`pokemon-hp-seat-${seatNumber}`}
-            text={String(reveal?.hp ?? readout)}
+            text={String(reveal?.damage === pokemon.damage ? reveal.hp : readout)}
             accessible
             accessibilityLabel={
               cardless
@@ -1019,7 +1015,6 @@ function PokemonHero({
             numberOfLines={1}
             style={[themed($hp), { fontSize, lineHeight: getLifeLineHeight(fontSize), color: ink }]}
           />
-          {/* why: an unseen copy of the unit balances the row, so the number stays centered under the caption. */}
           <Text
             text={unit}
             weight="bold"
@@ -1148,7 +1143,6 @@ function useCardReveal(pokemon: PokemonInPlay) {
   const wasCardless = useRef(cardless)
   const reducedMotion = useReducedMotion()
   const [reveal, setReveal] = useState<{ hp: number; damage: number } | null>(null)
-  // why: a layout effect starts the reveal before paint, so HP left never flashes ahead of the printed HP.
   useLayoutEffect(() => {
     const was = wasCardless.current
     wasCardless.current = cardless
@@ -1157,8 +1151,6 @@ function useCardReveal(pokemon: PokemonInPlay) {
     const timer = setTimeout(() => setReveal(null), REVEAL_MS)
     return () => clearTimeout(timer)
   }, [cardless]) // eslint-disable-line react-hooks/exhaustive-deps
-  // why: a tap mid-reveal must show the real HP at once, not the printed HP until the timer ends.
-  useEffect(() => setReveal(null), [pokemon.damage])
   return reveal
 }
 
