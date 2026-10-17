@@ -2,6 +2,7 @@ import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import fabPrecons from "./lib/games/fabPrecons.json"
 import fabCube from "./lib/games/fixtures/fabCube.json"
+import fabPreconCards from "./lib/games/fixtures/fabPreconCards.json"
 
 async function syncedFab(dataset: unknown[] = fabCube) {
   jest.spyOn(global, "fetch").mockImplementation(async () => new Response(JSON.stringify(dataset)))
@@ -32,17 +33,19 @@ const FABRARY_LIST = [
   "See the full deck @ https://fabrary.net/decks/01ABC",
 ].join("\n")
 
+const pitches = new Map([
+  ["red", "1"],
+  ["yellow", "2"],
+  ["blue", "3"],
+])
+
+function printing(id: string) {
+  return [{ unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` }]
+}
+
 function blitzPrecon() {
   const deck = fabPrecons.find(({ format }) => format === "blitz")
   if (!deck) throw new Error("No Blitz precon")
-  const pitches = new Map([
-    ["red", "1"],
-    ["yellow", "2"],
-    ["blue", "3"],
-  ])
-  const printing = (id: string) => [
-    { unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` },
-  ]
   const dataset = [
     { unique_id: deck.heroId, name: deck.hero, printings: printing("hero") },
     ...deck.cards.map((card, index) => ({
@@ -53,6 +56,20 @@ function blitzPrecon() {
     })),
   ]
   return { deck, dataset }
+}
+
+function everyPreconCard() {
+  return [
+    ...Object.entries(fabPreconCards.heroes).map(([id, name]) => ({
+      unique_id: id,
+      name,
+      printings: printing(id),
+    })),
+    ...Object.entries(fabPreconCards.cards).map(([id, listed]) => {
+      const [, name = listed, pitch = ""] = /^(.*) \((red|yellow|blue)\)$/.exec(listed) ?? []
+      return { unique_id: id, name, pitch: pitches.get(pitch) ?? "", printings: printing(id) }
+    }),
+  ]
 }
 
 describe("Flesh and Blood", () => {
@@ -79,6 +96,30 @@ describe("Flesh and Blood", () => {
     ])
     expect(result.unresolved).toEqual([])
     expect(result.invalidLines).toEqual([])
+  })
+
+  it("imports a card by its exact name when search ranks other cards above it", async () => {
+    const decoys = Array.from({ length: 8 }, (_, index) => ({
+      unique_id: `decoy-${index}`,
+      name: `Snatch Decoy ${index}`,
+      pitch: "1",
+      printings: printing(`decoy-${index}`),
+    }))
+    const snatch = {
+      unique_id: "snatch",
+      name: "Snatch",
+      pitch: "1",
+      printings: printing("snatch"),
+    }
+    const actor = await player(await syncedFab([...decoys, snatch]), "fab-exact-name")
+
+    const result = await actor.action(api.deckImports.resolvePasted, {
+      game: "fab",
+      list: "3x Snatch (red)",
+    })
+
+    expect(result.unresolved).toEqual([])
+    expect(result.cards).toMatchObject([{ name: "Snatch (red)", cardId: "snatch", quantity: 3 }])
   })
 
   it("starts a connected seat at its hero's life, in the rematch, and in the summary", async () => {
@@ -242,6 +283,45 @@ describe("Flesh and Blood", () => {
           .take(10),
     )
     expect(listed.map(({ name }) => name)).toEqual([deck.name])
+  })
+
+  it("retries a partly synced precon refresh until every listed deck resolves", async () => {
+    const t = await syncedFab(everyPreconCard())
+    const deck = fabPrecons.find(({ format }) => format === "silverAge")
+    if (!deck) throw new Error("No Silver Age precon")
+    const hero = await t.run(async (ctx) => {
+      const card = await ctx.db
+        .query("gameCards")
+        .withIndex("by_game_and_identity_namespace_and_card_id", (q) =>
+          q.eq("game", "fab").eq("identityNamespace", "fab-cube-card").eq("cardId", deck.heroId),
+        )
+        .unique()
+      if (!card) throw new Error("The hero was not synced")
+      await ctx.db.delete(card._id)
+      return card
+    })
+    const listed = async () =>
+      (
+        await t.run(
+          async (ctx) =>
+            await ctx.db
+              .query("deckCatalogs")
+              .withIndex("by_game_and_format_and_fetched_at", (q) =>
+                q.eq("game", "fab").eq("format", "silverAge"),
+              )
+              .take(20),
+        )
+      ).map(({ name }) => name)
+
+    await t.action(internal.deckCatalogs.refresh, { game: "fab", format: "silverAge" })
+    expect(await listed()).not.toContain(deck.name)
+    await t.run(async (ctx) => {
+      const { _id, _creationTime, ...restored } = hero
+      await ctx.db.insert("gameCards", restored)
+    })
+    await t.action(internal.deckCatalogs.refresh, { game: "fab", format: "silverAge" })
+
+    expect(await listed()).toContain(deck.name)
   })
 
   it("serves image fallbacks from the catalog and has no deck links", async () => {

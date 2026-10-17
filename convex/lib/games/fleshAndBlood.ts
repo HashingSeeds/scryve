@@ -141,7 +141,7 @@ async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format:
   const decks = fabPrecons
     .filter((deck) => deck.format === format)
     .sort((a, b) => a.releasedAt.localeCompare(b.releasedAt))
-  let count = 0
+  const unresolved: string[] = []
   for (const deck of decks) {
     const entries = fabPreconEntries(deck)
     const cards = await ctx.runQuery(internal.cardCatalog.lookupManyCached, {
@@ -166,7 +166,10 @@ async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format:
         },
       ]
     })
-    if (resolved.length < entries.length) continue
+    if (resolved.length < entries.length) {
+      unresolved.push(deck.name)
+      continue
+    }
     await ctx.runMutation(internal.deckCatalogs.upsert, {
       game: "fab",
       source: FAB_PRECON_FEED.source,
@@ -178,7 +181,6 @@ async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format:
       publishedAt: Date.parse(deck.releasedAt),
       entries: resolved,
     })
-    count += 1
   }
   await ctx.runMutation(internal.deckCatalogs.removeStale, {
     game: "fab",
@@ -186,8 +188,11 @@ async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format:
     format,
     keep: decks.map((deck) => deck.sourceUrl),
   })
-  if (count === 0) throw new Error("Flesh and Blood cards are not synced yet")
-  return { count, status: 200 }
+  if (unresolved.length)
+    throw new Error(
+      `Cards not synced yet for ${unresolved.length} precons: ${unresolved.join(", ")}`,
+    )
+  return { count: decks.length, status: 200 }
 }
 
 export const FAB_PRECON_FEED = {

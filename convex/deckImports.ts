@@ -292,6 +292,14 @@ async function resolveGenericEntries(
     }
 
     const lookupPrinting = deckList.printingLookup?.(entry)
+    const named: CatalogCard | null =
+      catalog.bulk && !lookupPrinting
+        ? await ctx.runQuery(internal.cardCatalog.cachedByName, { game, name: entry.name })
+        : null
+    if (named) {
+      resolutions.set(key, { source: "cache", card: named })
+      continue
+    }
     const cached: CatalogCard[] = lookupPrinting
       ? []
       : await ctx.runQuery(internal.cardCatalog.searchCached, {
