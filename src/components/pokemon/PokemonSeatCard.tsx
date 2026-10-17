@@ -513,7 +513,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   delayLongPress={LONG_PRESS_MS}
                   onLongPress={() => placeOn("bench", ADD_TRIGGER, !tapPicksCard)}
                   onKeyDown={(event) => {
-                    if (HOLD_KEYS.has(event.key)) placeOn("bench", ADD_TRIGGER, !tapPicksCard)
+                    if (HOLD_KEYS.has(event.key) && !event.repeat)
+                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
                   }}
                   onPress={() => placeOn("bench", ADD_TRIGGER, tapPicksCard)}
                   style={({ pressed }) => [
@@ -597,7 +598,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             // why: React Native Web never fires long press from the keyboard, and Enter also presses, so keyboard players hold with + or the up arrow.
             onLongPress={() => placeActive(!tapPicksCard)}
             onKeyDown={(event) => {
-              if (HOLD_KEYS.has(event.key)) placeActive(!tapPicksCard)
+              if (HOLD_KEYS.has(event.key) && !event.repeat) placeActive(!tapPicksCard)
             }}
             onPress={() => placeActive(tapPicksCard)}
             style={({ pressed }) => [

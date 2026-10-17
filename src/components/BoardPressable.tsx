@@ -9,7 +9,7 @@ const WHOLE_SCREEN: Insets = { top: 10000, left: 10000, bottom: 10000, right: 10
 export function BoardPressable(
   props: ComponentProps<typeof Pressable> & {
     /** why: React Native's types omit it, but React Native Web forwards it; without it keyboard players can't reach long-press actions. */
-    onKeyDown?: (event: { key: string }) => void
+    onKeyDown?: (event: { key: string; repeat?: boolean }) => void
   },
 ) {
   const turned = useContext(TurnedBoardContext)
