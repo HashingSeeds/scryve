@@ -3283,14 +3283,24 @@ export const connectedSummary = query({
     if (!summary) return null
     const viewer = await requireUser(ctx)
     const blocked = await blockedUserIdsFor(ctx, viewer._id)
+    const system = summary.system ?? summary.game ?? DEFAULT_DECK_GAME
+    const format = summary.format ?? summary.ruleset
+    const players = maskSummaryPlayersForViewer(summary.players, viewer._id, blocked, {
+      localGame: game.mode === "local",
+    })
     return {
       ...summary,
       game: summary.game ?? DEFAULT_DECK_GAME,
-      system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
-      format: summary.format ?? summary.ruleset,
-      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked, {
-        localGame: game.mode === "local",
-      }),
+      system,
+      format,
+      players: await Promise.all(
+        players.map(async (player) => {
+          const startingLife =
+            player.deckVersionId &&
+            (await deckStartingValue(ctx, player.deckVersionId, system, format))
+          return { ...player, ...(startingLife ? { startingLife } : {}) }
+        }),
+      ),
       viewerPlayerIds: summary.players
         .filter((player) => player.userId === viewer._id)
         .map((player) => player.playerId),

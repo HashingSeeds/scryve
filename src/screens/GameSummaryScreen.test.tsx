@@ -270,6 +270,36 @@ describe("game summary", () => {
     expect(screen.getByText("2 players · Commander · 48 life changes")).toBeTruthy()
   })
 
+  it("measures a connected seat's change from its own starting life", () => {
+    const [hero, other] = connectedSummary().players
+    const render36 = (finalLife: number) =>
+      render(
+        themed(
+          <GameSummaryScreen
+            summary={{
+              status: "ready",
+              value: connectedSummaryModel(
+                connectedSummary({
+                  players: [
+                    { ...hero, startingLife: 36, finalLife },
+                    { ...other, finalLife: 40 },
+                  ],
+                }),
+              ),
+            }}
+            timeline={{ status: "ready", items: [], nextPage: { status: "exhausted" } }}
+            onBack={jest.fn()}
+          />,
+        ),
+      )
+
+    render36(36)
+    expect(screen.getAllByText("even")).toHaveLength(2)
+    screen.unmount()
+    render36(33)
+    expect(screen.getByText("-3 from start")).toBeTruthy()
+  })
+
   it.each([
     ["host_finished", undefined],
     ["host_abandoned", "Abandoned by the host"],

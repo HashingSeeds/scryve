@@ -137,6 +137,7 @@ export interface ConnectedSummaryDocument {
     outcome?: "win" | "loss" | "draw" | "unknown"
     color: string
     finalLife: number
+    startingLife?: number
     deletedAt?: number
   }[]
 }
@@ -181,6 +182,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
         : undefined,
       color: player.color,
       life: player.finalLife,
+      ...(player.startingLife === undefined ? {} : { startingLife: player.startingLife }),
       outcome:
         player.outcome === "win" || player.outcome === "loss" || player.outcome === "draw"
           ? player.outcome

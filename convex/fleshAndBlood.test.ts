@@ -57,7 +57,7 @@ describe("Flesh and Blood", () => {
     expect(result.invalidLines).toEqual([])
   })
 
-  it("starts a connected seat at its hero's life, here and in the rematch", async () => {
+  it("starts a connected seat at its hero's life, in the rematch, and in the summary", async () => {
     jest.useFakeTimers()
     try {
       const t = await syncedFab()
@@ -117,6 +117,11 @@ describe("Flesh and Blood", () => {
         manualCodeCandidates: ["FAB345"],
       }
       await host.mutation(api.games.finishGame, { publicId: created.publicId, rematch })
+      const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
+      expect(summary?.players.map(({ seat, startingLife }) => [seat, startingLife])).toEqual([
+        [1, 40],
+        [2, undefined],
+      ])
       expect(await lives(rematch.publicId)).toEqual([
         [1, 40],
         [2, 20],
