@@ -1,4 +1,4 @@
-import { Linking } from "react-native"
+import { Alert, Linking } from "react-native"
 
 import { GAME_RULES, gameRules, openRules } from "./gameRules"
 
@@ -19,4 +19,12 @@ it("openRules opens a link game's page and shows text rules in the app", () => {
   openRules(GAME_RULES.mtg, showText)
   expect(showText).toHaveBeenCalledTimes(1)
   expect(openURL).toHaveBeenCalledTimes(1)
+})
+
+it("openRules tells the player when the official page can't open", async () => {
+  jest.spyOn(Linking, "openURL").mockRejectedValue(new Error("no browser"))
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+  openRules(GAME_RULES.ygo)
+  await new Promise(process.nextTick)
+  expect(alert).toHaveBeenCalledWith(expect.any(String), GAME_RULES.ygo.pageUrl)
 })

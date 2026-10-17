@@ -389,6 +389,7 @@ export default {
     glossary: "Glosario",
     effective: "Reglas completas, en vigor desde el {{date}}",
     official: "Reglas oficiales",
+    openFailed: "No se pudieron abrir las reglas oficiales",
     downloading: "Descargando las Reglas completas de Wizards of the Coast.",
     failed: "No se pudieron descargar las reglas.",
     webOnly: "Las Reglas completas están en el sitio de Wizards of the Coast.",

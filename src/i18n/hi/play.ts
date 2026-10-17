@@ -368,6 +368,7 @@ export default {
     glossary: "शब्दावली",
     effective: "Comprehensive Rules, {{date}} से प्रभावी",
     official: "आधिकारिक नियम",
+    openFailed: "आधिकारिक नियम नहीं खुल सके",
     downloading: "Wizards of the Coast से Comprehensive Rules डाउनलोड हो रहे हैं।",
     failed: "नियम डाउनलोड नहीं हो सके।",
     webOnly: "Comprehensive Rules Wizards of the Coast की साइट पर उपलब्ध हैं।",

@@ -1,4 +1,6 @@
-import { Linking } from "react-native"
+import { Alert, Linking } from "react-native"
+
+import { translate } from "@/i18n/translate"
 
 import type { ComprehensiveRules } from "./comprehensiveRules"
 import { parseMagicRules } from "./magicRules"
@@ -31,5 +33,8 @@ export function gameRules(system: unknown): GameRules | undefined {
 
 export function openRules(rules: GameRules, showText?: () => void) {
   if (rules.kind === "text") showText?.()
-  else void Linking.openURL(rules.pageUrl).catch(() => undefined)
+  else
+    void Linking.openURL(rules.pageUrl).catch(() =>
+      Alert.alert(translate("play:rules.openFailed"), rules.pageUrl),
+    )
 }
