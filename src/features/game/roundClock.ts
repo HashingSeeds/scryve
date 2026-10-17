@@ -2,6 +2,7 @@ import { translate } from "@/i18n/translate"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import type { PlaySystemId } from "./playSystems"
+import { systemDefinition } from "../../../convex/lib/systems"
 
 /** why: a judge keeps the official time, so a countdown starts from the minutes left on the venue clock. */
 export type RoundClockSetup = { mode: "stopwatch" } | { mode: "countdown"; minutes: number }
@@ -28,14 +29,9 @@ export const ROUND_CLOCK_MINUTES = { min: 1, max: 180, step: 5 } as const
 
 const MINUTE_MS = 60_000
 
-/** why: MTR 2.5 and the Play! Pokémon handbook add turns after time; Yu-Gi-Oh! and unknown systems show only that time is up. */
-const END_OF_ROUND_TURNS: Record<PlaySystemId, number> = { mtg: 5, pokemon: 3, ygo: 0 }
-
-/** why: Play! Pokémon caps the end-of-round turns at 15 minutes for every table. */
-const OVERTIME_MS: Partial<Record<PlaySystemId, number>> = { pokemon: 15 * MINUTE_MS }
-
 export function defaultRoundClockMinutes(system: PlaySystemId | undefined, bestOf?: number) {
-  return system === "pokemon" && (bestOf ?? 1) === 1 ? 30 : 50
+  const rules = systemDefinition(system)?.roundClock
+  return ((bestOf ?? 1) === 1 ? rules?.bestOfOneMinutes : undefined) ?? rules?.minutes ?? 50
 }
 
 export function isRoundClockSetup(value: unknown): value is RoundClockSetup {
@@ -75,11 +71,13 @@ export function roundClockView(
   if (duration === undefined) return { kind: "elapsed", ms: elapsed }
   const calledAt = clock.calledAtMs ?? (elapsed >= duration ? duration : undefined)
   if (calledAt === undefined) return { kind: "remaining", ms: duration - elapsed }
-  const overtime = system ? OVERTIME_MS[system] : undefined
+  const rules = systemDefinition(system)?.roundClock
+  const overtime =
+    rules?.overtimeMinutes === undefined ? undefined : rules.overtimeMinutes * MINUTE_MS
   return {
     kind: "time",
     turn: clock.turn ?? 0,
-    turns: (system ? END_OF_ROUND_TURNS[system] : 0) + (clock.bonusTurns ?? 0),
+    turns: (rules?.endOfRoundTurns ?? 0) + (clock.bonusTurns ?? 0),
     ...(overtime === undefined ? {} : { overtimeMs: Math.max(0, overtime - (elapsed - calledAt)) }),
   }
 }

@@ -73,6 +73,7 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -618,9 +619,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [])
 
   const system = game.system
+  const rules = gameRules(system)
   useEffect(() => {
-    if (system === "mtg") prefetchRules()
-  }, [system])
+    if (rules?.kind === "text") prefetchRules(rules)
+  }, [rules])
   const active = game.status === "active"
   const finished = game.status === "finished"
 
@@ -803,14 +805,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             } satisfies RadialMenuAction,
           ]
         : []),
-      system === "mtg"
+      rules
         ? {
             kind: "rules",
             label: translate("connected:board.menu.rules"),
-            disabled: !onRules,
+            disabled: rules.kind === "text" && !onRules,
             onPress: () => {
               setMenuOpen(false)
-              onRules?.()
+              openRules(rules, onRules)
             },
           }
         : {
@@ -857,7 +859,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       cloud,
       onHistory,
       onRules,
-      system,
+      rules,
     ],
   )
   const seatColors = useSeatColors(players)

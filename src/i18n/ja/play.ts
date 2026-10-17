@@ -357,6 +357,7 @@ export default {
     glossary: "用語集",
     effective: "総合ルール、{{date}}施行",
     official: "公式ルール",
+    openFailed: "公式ルールを開けませんでした",
     downloading: "Wizards of the Coastから総合ルールをダウンロードしています。",
     failed: "ルールをダウンロードできませんでした。",
     webOnly: "総合ルールはWizards of the Coastのサイトにあります。",
