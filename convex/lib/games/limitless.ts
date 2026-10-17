@@ -310,7 +310,7 @@ async function refreshPokemonTopDecks(
   for (const deck of decks) {
     await ctx.runMutation(internal.deckCatalogs.upsert, {
       game: "pokemon",
-      source: "limitless",
+      source: LIMITLESS_FEED.source,
       externalId: deck.externalId,
       kind: "tournament",
       name: deck.name,
@@ -346,6 +346,7 @@ async function refreshPokemonTopDecks(
 }
 
 export const LIMITLESS_FEED = {
+  source: "limitless",
   formats: ["standard", "expanded"],
   operation: (format) => `deck-feed-refresh:${format}`,
   refresh: refreshPokemonTopDecks,

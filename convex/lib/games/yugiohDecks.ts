@@ -305,7 +305,7 @@ async function refreshYgoTopDecks(
   for (const deck of feed) {
     await ctx.runMutation(internal.deckCatalogs.upsert, {
       game,
-      source: "ygoprodeck-decks",
+      source: YGOPRODECK_FEED.source,
       externalId: deck.externalId,
       kind: deck.kind,
       name: deck.name,
@@ -345,6 +345,7 @@ async function refreshYgoTopDecks(
 }
 
 export const YGOPRODECK_FEED = {
+  source: "ygoprodeck-decks",
   formats: ["advanced"],
   operation: () => "deck-feed-refresh",
   refresh: refreshYgoTopDecks,
