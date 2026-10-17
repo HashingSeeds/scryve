@@ -7,6 +7,7 @@ import type { ConnectedProjection, PendingLifeAction } from "@/features/connecte
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
 import { createClientId, wellFormedPlayerName } from "@/features/game/domain"
+import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
@@ -382,6 +383,7 @@ export class LanSession {
       type: "join",
       protocol: LAN_PROTOCOL,
       name: playerName(),
+      systems: PLAY_SYSTEM_IDS,
       ...(this.pass ? { pass: this.pass } : {}),
     })
   }
