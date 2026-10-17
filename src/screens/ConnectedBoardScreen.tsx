@@ -73,6 +73,7 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { prefetchRules } from "@/features/rules/rulesSource"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -93,6 +94,7 @@ type ConnectedBoardScreenProps = {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -247,6 +249,7 @@ type ConnectedBoardReadyProps = {
   initialInviteOpen?: boolean
   onBack?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -324,6 +327,7 @@ interface ConnectedBoardRuntimeProps {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -346,6 +350,7 @@ export function ConnectedBoardWithRuntime({
   onGameAbandoned,
   onBack,
   onHistory,
+  onRules,
   onDecks,
   onSettings,
   onAccount,
@@ -495,6 +500,7 @@ export function ConnectedBoardWithRuntime({
               initialInviteOpen={initialInviteOpen}
               onBack={onBack}
               onHistory={onHistory}
+              onRules={onRules}
               onDecks={onDecks}
               onSettings={onSettings}
               onAccount={onAccount}
@@ -519,6 +525,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   initialInviteOpen,
   onBack,
   onHistory,
+  onRules,
   onDecks,
   onSettings,
   onAccount,
@@ -611,6 +618,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [])
 
   const system = game.system
+  useEffect(() => {
+    if (system === "mtg") prefetchRules()
+  }, [system])
   const active = game.status === "active"
   const finished = game.status === "finished"
 
@@ -793,15 +803,25 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             } satisfies RadialMenuAction,
           ]
         : []),
-      {
-        kind: "history",
-        label: translate("connected:board.menu.history"),
-        disabled: !onHistory,
-        onPress: () => {
-          setMenuOpen(false)
-          onHistory?.()
-        },
-      },
+      system === "mtg"
+        ? {
+            kind: "rules",
+            label: translate("connected:board.menu.rules"),
+            disabled: !onRules,
+            onPress: () => {
+              setMenuOpen(false)
+              onRules?.()
+            },
+          }
+        : {
+            kind: "history",
+            label: translate("connected:board.menu.history"),
+            disabled: !onHistory,
+            onPress: () => {
+              setMenuOpen(false)
+              onHistory?.()
+            },
+          },
       {
         kind: "end-game",
         label: translate("connected:board.menu.end"),
@@ -836,6 +856,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       layoutOptions.length,
       cloud,
       onHistory,
+      onRules,
+      system,
     ],
   )
   const seatColors = useSeatColors(players)

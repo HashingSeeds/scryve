@@ -285,6 +285,7 @@ export default {
       dice: "ダイス",
       players: "プレイヤー",
       history: "履歴",
+      rules: "ルール",
       end: "終了",
       closeDice: "ダイスを閉じる",
       exitCommanderDamage: "コマンダーダメージを終了",

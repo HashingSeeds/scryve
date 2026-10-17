@@ -291,5 +291,16 @@
   "recordMatch.error.tooManyGames": "d763b9b3635d",
   "recordMatch.error.scoreIsWin": "42991a7509c4",
   "recordMatch.error.scoreIsLoss": "da237ee1a666",
-  "recordMatch.error.scoreIsDraw": "faee2d5417ce"
+  "recordMatch.error.scoreIsDraw": "faee2d5417ce",
+  "rules.title": "942e6f8ead5e",
+  "rules.search": "e38875768f8d",
+  "rules.glossary": "7b29bd4ac595",
+  "rules.effective": "8cf64bba3255",
+  "rules.official": "0c5b540829b3",
+  "rules.downloading": "f18a5c718a44",
+  "rules.failed": "718da371fe10",
+  "rules.webOnly": "c8d04c0cef47",
+  "rules.allOf": "d86d52b22fa5",
+  "rules.noResults": "3de638240022",
+  "rules.notFound": "28a6a3b84cc3"
 }

@@ -343,4 +343,17 @@ export default {
       scoreIsDraw: "{{wins}}-{{losses}}のスコアは引き分けです",
     },
   },
+  rules: {
+    title: "ルール",
+    search: "ルールを検索",
+    glossary: "用語集",
+    effective: "総合ルール、{{date}}施行",
+    official: "公式ルール",
+    downloading: "Wizards of the Coastから総合ルールをダウンロードしています。",
+    failed: "ルールをダウンロードできませんでした。",
+    webOnly: "総合ルールはWizards of the Coastのサイトにあります。",
+    allOf: "{{section}}のすべて",
+    noResults: "一致するルールはありません。",
+    notFound: "このルールは、このバージョンのルールにはありません。",
+  },
 } satisfies LocaleNamespace

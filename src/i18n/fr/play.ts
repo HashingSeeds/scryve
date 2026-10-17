@@ -368,4 +368,17 @@ export default {
       scoreIsDraw: "Un score de {{wins}}-{{losses}} est un match nul",
     },
   },
+  rules: {
+    title: "Règles",
+    search: "Rechercher dans les règles",
+    glossary: "Glossaire",
+    effective: "Règles complètes, en vigueur le {{date}}",
+    official: "Règles officielles",
+    downloading: "Téléchargement des règles complètes depuis Wizards of the Coast.",
+    failed: "Impossible de télécharger les règles.",
+    webOnly: "Les règles complètes sont disponibles sur le site de Wizards of the Coast.",
+    allOf: "Tout {{section}}",
+    noResults: "Aucune règle ne correspond.",
+    notFound: "Cette règle n'existe pas dans cette version des règles.",
+  },
 } satisfies LocaleNamespace

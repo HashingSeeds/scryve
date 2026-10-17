@@ -297,6 +297,7 @@ export default {
       dice: "पासा",
       players: "खिलाड़ी",
       history: "इतिहास",
+      rules: "नियम",
       end: "समाप्त",
       closeDice: "पासा बंद करें",
       exitCommanderDamage: "commander damage से बाहर निकलें",

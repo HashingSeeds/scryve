@@ -91,6 +91,7 @@ export const colors = {
       "home": "#356A86",
       "setup": "#80602A",
       "history": "#6B4A63",
+      "rules": "#5E6A2E",
       "connect": "#236B63",
       "invite": "#2F6E8C",
       "end-game": palette.angry500,

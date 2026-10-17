@@ -342,4 +342,17 @@ export default {
       scoreIsDraw: "{{wins}}-{{losses}} 스코어는 무승부입니다",
     },
   },
+  rules: {
+    title: "규칙",
+    search: "규칙 검색",
+    glossary: "용어집",
+    effective: "종합 규칙, {{date}} 시행",
+    official: "공식 규칙",
+    downloading: "Wizards of the Coast에서 종합 규칙을 다운로드하는 중입니다.",
+    failed: "규칙을 다운로드하지 못했습니다.",
+    webOnly: "종합 규칙은 Wizards of the Coast 사이트에서 볼 수 있습니다.",
+    allOf: "{{section}} 전체",
+    noResults: "일치하는 규칙이 없습니다.",
+    notFound: "이 규칙은 현재 버전의 규칙에 없습니다.",
+  },
 } satisfies LocaleNamespace

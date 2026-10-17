@@ -6,6 +6,7 @@ export type GameMenuActionKind =
   | "home"
   | "setup"
   | "history"
+  | "rules"
   | "connect"
   | "invite"
   | "end-game"

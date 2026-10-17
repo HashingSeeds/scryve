@@ -83,6 +83,7 @@ export const colors = {
       "home": palette.secondary100,
       "setup": "#D6A85F",
       "history": "#D98CB9",
+      "rules": "#C3CF7E",
       "connect": "#70C7BC",
       "invite": "#8CC2E0",
       "end-game": palette.destructive500,

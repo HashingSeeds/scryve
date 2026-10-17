@@ -443,6 +443,7 @@ export default {
     dice: "पासे",
     game: "गेम",
     history: "इतिहास",
+    rules: "नियम",
     connect: "कनेक्ट करें",
     end: "समाप्त",
     closeDice: "पासे बंद करें",

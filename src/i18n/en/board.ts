@@ -403,6 +403,7 @@ const board = {
     dice: "Dice",
     game: "Game",
     history: "History",
+    rules: "Rules",
     connect: "Connect",
     end: "End",
     closeDice: "Close dice",

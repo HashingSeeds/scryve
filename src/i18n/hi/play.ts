@@ -353,4 +353,17 @@ export default {
       scoreIsDraw: "{{wins}}-{{losses}} का स्कोर ड्रॉ है",
     },
   },
+  rules: {
+    title: "नियम",
+    search: "नियम खोजें",
+    glossary: "शब्दावली",
+    effective: "Comprehensive Rules, {{date}} से प्रभावी",
+    official: "आधिकारिक नियम",
+    downloading: "Wizards of the Coast से Comprehensive Rules डाउनलोड हो रहे हैं।",
+    failed: "नियम डाउनलोड नहीं हो सके।",
+    webOnly: "Comprehensive Rules Wizards of the Coast की साइट पर उपलब्ध हैं।",
+    allOf: "{{section}} के सभी नियम",
+    noResults: "कोई नियम नहीं मिला।",
+    notFound: "यह नियम इस संस्करण में नहीं है।",
+  },
 } satisfies LocaleNamespace
