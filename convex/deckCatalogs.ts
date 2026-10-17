@@ -9,6 +9,7 @@ import { action, internalAction, internalMutation, internalQuery, query } from "
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { assertDeckGameFormat, magicCatalogCardFields } from "./lib/deckGames"
 import { deckRateLimiter } from "./lib/deckRateLimits"
+import { storesValue } from "./lib/documents"
 import { MAX_CATALOG_BATCH } from "./lib/games/cards"
 import curatedDecks from "./lib/games/curatedDecks.json"
 import { limitlessDecklistUrl, parseLimitlessExternalId } from "./lib/games/limitless"
@@ -158,9 +159,13 @@ export const upsert = internalMutation({
       .query("deckCatalogCards")
       .withIndex("by_catalog_deck_id", (query) => query.eq("catalogDeckId", catalogDeckId))
       .take(MAX_DECK_CARDS + 1)
+    const entries = args.entries.map((entry) => ({ catalogDeckId, game, ...entry }))
+    const unchanged =
+      storedEntries.length === entries.length &&
+      storedEntries.every((stored, index) => storesValue(stored, entries[index]))
+    if (unchanged) return catalogDeckId
     for (const entry of storedEntries) await ctx.db.delete(entry._id)
-    for (const entry of args.entries)
-      await ctx.db.insert("deckCatalogCards", { catalogDeckId, game, ...entry })
+    for (const entry of entries) await ctx.db.insert("deckCatalogCards", entry)
     return catalogDeckId
   },
 })
