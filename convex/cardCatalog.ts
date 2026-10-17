@@ -274,6 +274,25 @@ export const searchCached = internalQuery({
   },
 })
 
+export const cachedByNames = internalQuery({
+  args: { game: v.string(), names: v.array(v.string()) },
+  handler: async (ctx, args) =>
+    await Promise.all(
+      args.names.map(async (name) => {
+        const candidates = await ctx.db
+          .query("gameCards")
+          .withSearchIndex("search_name", (query) =>
+            query.search("name", name).eq("game", args.game),
+          )
+          .take(20)
+        const card = candidates.find(
+          (candidate) => candidate.nameNormalized === normalizeCardName(name),
+        )
+        return card ? await projectedCard(ctx, card) : null
+      }),
+    ),
+})
+
 export const lookupCached = internalQuery({
   args: { game: v.string(), cardId: v.string() },
   handler: async (ctx, args) => {

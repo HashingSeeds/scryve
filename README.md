@@ -86,6 +86,10 @@ pnpm run lint:check
 pnpm test --runInBand
 ```
 
+## Flesh and Blood precons
+
+Browse lists the official precons in `convex/lib/games/fabPrecons.json`. To add one, copy its list by hand from `https://fabtcg.com/decklists/<slug>/` (hero, then each card with its pitch and count), then run `node scripts/fab-precons.cjs`. It refreshes the test fixture from the pinned fab-cube release and names any card that release lacks; such a deck waits for the fab-cube bump.
+
 ## Builds
 
 Builds run locally through [EAS](https://docs.expo.dev/build/introduction/). Each target in `package.json` is `<platform>:<profile>`:

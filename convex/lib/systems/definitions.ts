@@ -447,7 +447,7 @@ export const SYSTEMS = {
         integration: available("scryve"),
         cardCatalog: available("fab-cube", "Synced from the fab-cube dataset."),
         deckImport: available("fab-cube"),
-        exampleDecks: { technical: "unavailable", release: "disabled" },
+        exampleDecks: available("legend-story-studios", "Official precon lists only."),
         images: available("legend-story-studios", "Functional card context only."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),

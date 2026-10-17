@@ -1,5 +1,8 @@
+import fabPrecons from "./fabPrecons.json"
 import fabCube from "./fixtures/fabCube.json"
-import { normalizeFabCubeCards } from "./fleshAndBlood"
+import fabPreconCards from "./fixtures/fabPreconCards.json"
+import { FAB_CUBE_DATASET, fabPreconEntries, normalizeFabCubeCards } from "./fleshAndBlood"
+import { SYSTEMS } from "../systems"
 
 const cards = normalizeFabCubeCards(fabCube)
 
@@ -82,5 +85,23 @@ describe("the-fab-cube normalizer", () => {
       ]),
     ).toEqual([])
     expect(normalizeFabCubeCards({ cards: fabCube })).toEqual([])
+  })
+})
+
+describe("official precons", () => {
+  it("each list one hero, a FaB format, and counted cards the pinned fab-cube release has", async () => {
+    expect(fabPreconCards.tag).toBe(await FAB_CUBE_DATASET.version())
+    const heroes = new Set(fabPreconCards.heroes)
+    const known = new Set(fabPreconCards.cards)
+    const formats = new Set<string>(SYSTEMS.fab.formats.map(({ id }) => id))
+    const problems = fabPrecons.flatMap((deck) => [
+      ...(formats.has(deck.format) ? [] : [`${deck.name}: format ${deck.format}`]),
+      ...fabPreconEntries(deck).flatMap(({ name, quantity, section }) =>
+        quantity > 0 && (section === "hero" ? heroes : known).has(name)
+          ? []
+          : [`${deck.name}: ${name}`],
+      ),
+    ])
+    expect(problems).toEqual([])
   })
 })

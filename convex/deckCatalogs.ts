@@ -19,7 +19,6 @@ import {
   assertGameSystem,
   capabilityReleased,
   GAME_SYSTEM_IDS,
-  integration,
   integrationFor,
   requireReleasedCapability,
 } from "./lib/integrations"
@@ -33,8 +32,9 @@ const PRUNE_BATCH = 20
 function deckFeed(game: string) {
   if (!isProviderGame(game)) return undefined
   const feed = GAME_PROVIDERS[game].deckFeed
-  const provider = integration(game)?.capabilities.exampleDecks.provider
-  return feed && provider ? { ...feed, game, provider } : undefined
+  return (
+    feed && { ...feed, game, provider: integrationFor(game).capabilities.exampleDecks.provider }
+  )
 }
 
 const entryValidator = v.object({
@@ -439,8 +439,6 @@ async function browseDecks(
 ): Promise<BrowseResult> {
   const game = assertGameSystem(args.game)
   const format = assertDeckGameFormat(game, args.format ?? SYSTEMS[game].defaultFormat.play)
-  if (integrationFor(game).capabilities.exampleDecks.technical === "unavailable")
-    return { decks: [], cursor: null, status: "unsupported" }
   const feed = deckFeed(game)
   await requireActionCapability(ctx, game, "exampleDecks")
   if (args.query.trim().length > 120) return { decks: [], cursor: null, status: "ready" }

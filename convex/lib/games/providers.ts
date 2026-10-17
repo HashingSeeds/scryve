@@ -1,6 +1,6 @@
 import type { CardCatalog } from "./cards"
 import type { DeckFeed, DeckLinkSource, DeckListRules } from "./decks"
-import { FAB_CUBE_DATASET, FAB_DECK_LIST } from "./fleshAndBlood"
+import { FAB_CUBE_DATASET, FAB_DECK_LIST, FAB_PRECON_FEED } from "./fleshAndBlood"
 import { LIMITLESS_FEED, LIMITLESS_LINK } from "./limitless"
 import { POKEMON_DECK_LIST, TCGDEX_CATALOG } from "./pokemon"
 import { YGOPRODECK_CATALOG } from "./yugioh"
@@ -33,7 +33,7 @@ export const GAME_PROVIDERS: Readonly<Record<ProviderGame, GameProvider>> = {
     catalog: { bulk: FAB_CUBE_DATASET },
     deckList: FAB_DECK_LIST,
     deckLink: null,
-    deckFeed: null,
+    deckFeed: FAB_PRECON_FEED,
   },
 }
 

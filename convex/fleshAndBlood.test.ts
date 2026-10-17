@@ -1,9 +1,10 @@
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
+import fabPrecons from "./lib/games/fabPrecons.json"
 import fabCube from "./lib/games/fixtures/fabCube.json"
 
-async function syncedFab() {
-  jest.spyOn(global, "fetch").mockImplementation(async () => new Response(JSON.stringify(fabCube)))
+async function syncedFab(dataset: unknown[] = fabCube) {
+  jest.spyOn(global, "fetch").mockImplementation(async () => new Response(JSON.stringify(dataset)))
   const t = makeConvexTest()
   await t.action(internal.cardDatasetSync.sync, { game: "fab" })
   return t
@@ -131,11 +132,55 @@ describe("Flesh and Blood", () => {
     }
   })
 
-  it("serves image fallbacks from the catalog and has no deck links or example decks", async () => {
+  it("browses official precons by format, hero first, with their sourced counts", async () => {
+    const deck = fabPrecons.find(({ format }) => format === "blitz")
+    if (!deck) throw new Error("No Blitz precon")
+    const pitches = new Map([
+      ["red", "1"],
+      ["yellow", "2"],
+      ["blue", "3"],
+    ])
+    const printing = (id: string) => [
+      { unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` },
+    ]
+    const dataset = [
+      { unique_id: "hero", name: deck.hero, printings: printing("hero") },
+      ...deck.cards.map((card, index) => ({
+        unique_id: `card-${index}`,
+        name: card.name,
+        pitch: pitches.get(card.pitch ?? "") ?? "",
+        printings: printing(`card-${index}`),
+      })),
+    ]
+    const actor = await player(await syncedFab(dataset), "fab-precons")
+
+    const browsed = await actor.action(api.deckCatalogs.browse, {
+      game: "fab",
+      format: "blitz",
+      query: "",
+      source: "all",
+    })
+
+    expect(browsed).toMatchObject({
+      status: "ready",
+      decks: [{ name: deck.name, kind: "official", format: "blitz", sourceUrl: deck.sourceUrl }],
+    })
+    const { entries } = await actor.query(api.deckCatalogs.detail, {
+      catalogDeckId: browsed.decks[0]._id,
+    })
+    expect(entries[0]).toMatchObject({
+      name: deck.hero,
+      section: "hero",
+      quantity: 1,
+      imageUrl: "https://img.test/hero.png",
+    })
+    expect(entries.slice(1).map(({ quantity }) => quantity)).toEqual(
+      deck.cards.map(({ count }) => count),
+    )
+  })
+
+  it("serves image fallbacks from the catalog and has no deck links", async () => {
     const actor = await player(await syncedFab(), "fab-browser")
-    await expect(
-      actor.action(api.deckCatalogs.browse, { game: "fab", query: "" }),
-    ).resolves.toEqual({ decks: [], cursor: null, status: "unsupported" })
     await expect(
       actor.action(api.deckImports.resolveLink, {
         game: "fab",

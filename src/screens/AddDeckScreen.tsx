@@ -317,12 +317,15 @@ function preconDetail(deck: PreconstructedDeck) {
     .join(" · ")
 }
 
+const PUBLISHERS = new Map([
+  ["ygo", "Konami"],
+  ["pokemon", "Pokémon"],
+  ["fab", "Legend Story Studios"],
+])
+
 function catalogSourceLabel(deck: CatalogDeck) {
   return deck.kind === "official"
-    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh! and Pokémon, named by publisher.
-      deck.game === "ygo"
-      ? "Konami"
-      : "Pokémon"
+    ? PUBLISHERS.get(deck.game)
     : deck.source === "mtgo-examples"
       ? translate("decks:addDeck.sourceMtgoExample")
       : deck.source === "limitless"
