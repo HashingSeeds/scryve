@@ -51,7 +51,6 @@ export type DeckLinkSource = {
   readonly source: DeckSource
   readonly sourceName: string
   readonly open: (url: string) => { sourceUrl: string; load: () => Promise<LinkedDeck> }
-  /** why: runs outside the recorded load, so waiting on Scryve's own rate limit never marks the provider unhealthy. */
   readonly throttle?: (ctx: ActionCtx) => Promise<void>
 }
 
@@ -63,6 +62,5 @@ export type DeckFeed = {
     includeImages: boolean,
     format: string,
   ) => Promise<{ count: number; status: number }>
-  /** why: a successful refresh can cache no decks, so its health record stands in for the newest deck. */
   readonly refreshMayCacheNothing?: true
 }

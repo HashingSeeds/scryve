@@ -322,6 +322,32 @@ it("seeds complete Magic examples once and returns legacy fields for local saves
   }
 })
 
+it("counts a successful empty Limitless refresh as the newest fetch, but not a YGOPRODeck one", async () => {
+  const t = convexTest(schema, modules)
+  const lastSuccessAt = Date.now()
+  const success = { status: "healthy" as const, lastAttemptAt: lastSuccessAt, lastSuccessAt }
+  await t.mutation(internal.providerHealth.record, {
+    ...success,
+    game: "pokemon",
+    provider: "limitless",
+    operation: "deck-feed-refresh:standard",
+    message: "0 decks",
+  })
+  await t.mutation(internal.providerHealth.record, {
+    ...success,
+    game: "ygo",
+    provider: "ygoprodeck-decks",
+    operation: "deck-feed-refresh",
+    message: "0 decks",
+  })
+  await expect(
+    t.query(internal.deckCatalogs.latestFetch, { game: "pokemon", format: "standard" }),
+  ).resolves.toEqual({ fetchedAt: lastSuccessAt })
+  await expect(
+    t.query(internal.deckCatalogs.latestFetch, { game: "ygo", format: "advanced" }),
+  ).resolves.toBeNull()
+})
+
 it("lets guests populate a cold feed and rate limits repeated provider failures", async () => {
   const t = convexTest(schema, modules)
   registerRateLimiter(t)

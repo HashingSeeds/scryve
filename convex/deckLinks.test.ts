@@ -226,6 +226,9 @@ describe("resolveLink", () => {
         }),
       ).rejects.toMatchObject({ data: { code: "rate_limited", retryAfterMs: expect.any(Number) } })
       expect(fetchSpy).not.toHaveBeenCalled()
+      await expect(
+        t.run(async (ctx) => await ctx.db.query("providerHealth").collect()),
+      ).resolves.toEqual([])
     } finally {
       fetchSpy.mockRestore()
     }

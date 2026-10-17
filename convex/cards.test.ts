@@ -36,7 +36,7 @@ describe("card provider caching and health", () => {
     await expect(
       t.action(api.cards.byCatalogId, { game: "ygo", cardId: "rush:missing" }),
     ).rejects.toMatchObject({
-      data: { code: "card_not_found" },
+      data: { code: "card_not_found", message: "Rush Duel card is not in the catalog" },
     })
     expect(fetchSpy).not.toHaveBeenCalled()
   })

@@ -441,6 +441,12 @@ export default defineSchema({
     .index("by_game_card_id", ["gameCardId"])
     .index("by_game_and_printing_id", ["game", "printingId"]),
 
+  cardDatasetSyncs: defineTable({
+    game: v.string(),
+    version: v.optional(v.string()),
+    pending: v.optional(v.object({ version: v.string(), nextIndex: v.number() })),
+  }).index("by_game", ["game"]),
+
   providerHealth: defineTable({
     game: v.string(),
     provider: v.string(),

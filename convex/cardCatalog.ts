@@ -7,6 +7,7 @@ import {
   MAX_CARD_FACES,
   MAX_CARD_FACETS,
   MAX_CATALOG_BATCH,
+  MAX_DATASET_BATCH,
   normalizeCardName,
   type CatalogCard,
   type NormalizedCard,
@@ -113,6 +114,49 @@ export const cacheMany = internalMutation({
       throw new ConvexError({ code: "catalog_batch_too_large", message: "Card batch is too large" })
     for (const card of args.cards) await upsertCard(ctx, card)
     return null
+  },
+})
+
+export const datasetSync = internalQuery({
+  args: { game: v.string() },
+  handler: async (ctx, { game }) =>
+    await ctx.db
+      .query("cardDatasetSyncs")
+      .withIndex("by_game", (query) => query.eq("game", game))
+      .unique(),
+})
+
+export const writeDatasetBatch = internalMutation({
+  args: {
+    game: v.string(),
+    version: v.string(),
+    offset: v.number(),
+    total: v.number(),
+    cards: v.array(normalizedCardValidator.omit("game")),
+  },
+  handler: async (ctx, args) => {
+    const game = assertGameSystem(args.game)
+    if (args.cards.length > MAX_DATASET_BATCH)
+      throw new ConvexError({ code: "catalog_batch_too_large", message: "Card batch is too large" })
+    const state = await ctx.db
+      .query("cardDatasetSyncs")
+      .withIndex("by_game", (query) => query.eq("game", game))
+      .unique()
+    const cursor = state?.pending?.version === args.version ? state.pending.nextIndex : 0
+    if (args.offset !== 0 && args.offset !== cursor) return null
+    for (const card of args.cards) await upsertCard(ctx, { ...card, game })
+    const nextIndex = args.offset + args.cards.length
+    const value =
+      nextIndex >= args.total
+        ? { game, version: args.version }
+        : {
+            game,
+            ...(state?.version === undefined ? {} : { version: state.version }),
+            pending: { version: args.version, nextIndex },
+          }
+    if (state) await ctx.db.replace(state._id, value)
+    else await ctx.db.insert("cardDatasetSyncs", value)
+    return nextIndex
   },
 })
 

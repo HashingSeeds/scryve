@@ -1,0 +1,401 @@
+{
+  "metadata": {
+    "formatVersion": "2.4.0",
+    "generatedOn": "2026-10-16T16:43:42",
+    "language": "en"
+  },
+  "cards": [
+    {
+      "abilities": [
+        {
+          "fullText": "Shift 6 (You may pay 6 ⬡ to play this on top of\none of your characters named Hades.)",
+          "keyword": "Shift",
+          "keywordValue": "6",
+          "keywordValueNumber": 6,
+          "reminderText": "You may pay 6 ⬡ to play this on top of one of your characters named Hades.",
+          "type": "keyword"
+        },
+        {
+          "effect": "This character gets +1 ◊ for each other Villain character you have in play.",
+          "fullText": "SINISTER PLOT This character gets +1 ◊ for\neach other Villain character you have in play.",
+          "name": "SINISTER PLOT",
+          "type": "static"
+        }
+      ],
+      "allowedInFormats": {
+        "Core": {
+          "allowed": false,
+          "allowedUntilDate": "2025-09-05"
+        },
+        "Infinity": {
+          "allowed": true
+        }
+      },
+      "allowedInTournamentsFromDate": "2023-09-08",
+      "artists": [
+        "Alex Accorsi"
+      ],
+      "artistsText": "Alex Accorsi",
+      "code": "05",
+      "color": "Amber",
+      "cost": 8,
+      "enchantedId": 205,
+      "flavorText": "“Oh hey, I'm gonna need new business cards.”",
+      "foilTypes": [
+        "None",
+        "Silver"
+      ],
+      "fullIdentifier": "5/204 • EN • 1",
+      "fullName": "Hades - King of Olympus",
+      "fullText": "Shift 6 (You may pay 6 ⬡ to play this on top of\none of your characters named Hades.)\nSINISTER PLOT This character gets +1 ◊ for\neach other Villain character you have in play.",
+      "fullTextSections": [
+        "Shift 6 (You may pay 6 ⬡ to play this on top of\none of your characters named Hades.)",
+        "SINISTER PLOT This character gets +1 ◊ for\neach other Villain character you have in play."
+      ],
+      "id": 5,
+      "images": {
+        "foilMask": "https://api.lorcana.ravensburger.com/images/en/set1/5_303214b25d9c8c58e4bd9a5fb3069d1f521de3a7.jpg",
+        "full": "https://api.lorcana.ravensburger.com/images/en/set1/5_eb74bbe5d3dfea633d596496243d7972e930b81a.jpg",
+        "thumbnail": "https://api.lorcana.ravensburger.com/images/en/set1/5_8db49403364e3f7f9fcad15e3e5f656db4fcdf12.jpg"
+      },
+      "inkwell": false,
+      "keywordAbilities": [
+        "Shift"
+      ],
+      "lore": 1,
+      "name": "Hades",
+      "number": 5,
+      "rarity": "Rare",
+      "setCode": "1",
+      "simpleName": "hades king of olympus",
+      "story": "Hercules",
+      "strength": 6,
+      "subtypes": [
+        "Floodborn",
+        "Villain",
+        "King",
+        "Deity"
+      ],
+      "subtypesText": "Floodborn • Villain • King • Deity",
+      "type": "Character",
+      "version": "King of Olympus",
+      "willpower": 7
+    },
+    {
+      "abilities": [
+        {
+          "fullText": "Shift 6 (You may pay 6 ⬡ to play this on top of one\nof your characters named Hades.)",
+          "keyword": "Shift",
+          "keywordValue": "6",
+          "keywordValueNumber": 6,
+          "reminderText": "You may pay 6 ⬡ to play this on top of one of your characters named Hades.",
+          "type": "keyword"
+        },
+        {
+          "effect": "This character gets +1 ◊ for each other Villain character you have in play.",
+          "fullText": "SINISTER PLOT This character gets +1 ◊ for each\nother Villain character you have in play.",
+          "name": "SINISTER PLOT",
+          "type": "static"
+        }
+      ],
+      "allowedInFormats": {
+        "Core": {
+          "allowed": false,
+          "allowedUntilDate": "2025-09-05"
+        },
+        "Infinity": {
+          "allowed": true
+        }
+      },
+      "allowedInTournamentsFromDate": "2023-09-08",
+      "artists": [
+        "Juan Diego Leon"
+      ],
+      "artistsNormalized": [
+        "Juan Diego León"
+      ],
+      "artistsText": "Juan Diego Leon",
+      "baseId": 5,
+      "code": "3j",
+      "color": "Amber",
+      "cost": 8,
+      "foilTypes": [
+        "Lava"
+      ],
+      "fullIdentifier": "205/204 • EN • 1",
+      "fullName": "Hades - King of Olympus",
+      "fullText": "Shift 6 (You may pay 6 ⬡ to play this on top of one\nof your characters named Hades.)\nSINISTER PLOT This character gets +1 ◊ for each\nother Villain character you have in play.",
+      "fullTextSections": [
+        "Shift 6 (You may pay 6 ⬡ to play this on top of one\nof your characters named Hades.)",
+        "SINISTER PLOT This character gets +1 ◊ for each\nother Villain character you have in play."
+      ],
+      "id": 205,
+      "images": {
+        "foilMask": "https://api.lorcana.ravensburger.com/images/en/set1/205_f6a4594da5fafca8abebfb362d09ad8041521d35.jpg",
+        "full": "https://api.lorcana.ravensburger.com/images/en/set1/205_b39a86f5b11b007683bbdc7d0f181d8a94134581.jpg",
+        "thumbnail": "https://api.lorcana.ravensburger.com/images/en/set1/205_9d92911e97f93e5d64c5bd1d11dfd04e478c2374.jpg"
+      },
+      "inkwell": false,
+      "keywordAbilities": [
+        "Shift"
+      ],
+      "lore": 1,
+      "name": "Hades",
+      "number": 205,
+      "rarity": "Enchanted",
+      "setCode": "1",
+      "simpleName": "hades king of olympus",
+      "story": "Hercules",
+      "strength": 6,
+      "subtypes": [
+        "Floodborn",
+        "Villain",
+        "King",
+        "Deity"
+      ],
+      "subtypesText": "Floodborn • Villain • King • Deity",
+      "type": "Character",
+      "version": "King of Olympus",
+      "willpower": 7
+    },
+    {
+      "abilities": [
+        {
+          "effect": "When you play this character and whenever he quests, you may banish one of your items to draw 2 cards.",
+          "fullText": "ARTIFICER When you play this character and\nwhenever he quests, you may banish one of your\nitems to draw 2 cards.",
+          "name": "ARTIFICER",
+          "type": "triggered"
+        }
+      ],
+      "allowedInFormats": {
+        "Core": {
+          "allowed": false,
+          "allowedUntilDate": "2025-04-08",
+          "bannedSinceDate": "2025-04-08"
+        },
+        "Infinity": {
+          "allowed": false,
+          "bannedSinceDate": "2026-03-26"
+        }
+      },
+      "allowedInTournamentsFromDate": "2023-12-08",
+      "artists": [
+        "Leonardo Giammichele"
+      ],
+      "artistsText": "Leonardo Giammichele",
+      "code": "5T",
+      "color": "Sapphire",
+      "cost": 4,
+      "flavorText": "His creations are even more wondrous with the\nIlluminary's resources at his fingertips.",
+      "foilTypes": [
+        "None",
+        "Silver"
+      ],
+      "fullIdentifier": "149/204 • EN • 2",
+      "fullName": "Hiram Flaversham - Toymaker",
+      "fullText": "ARTIFICER When you play this character and\nwhenever he quests, you may banish one of your\nitems to draw 2 cards.",
+      "fullTextSections": [
+        "ARTIFICER When you play this character and\nwhenever he quests, you may banish one of your\nitems to draw 2 cards."
+      ],
+      "id": 365,
+      "images": {
+        "foilMask": "https://api.lorcana.ravensburger.com/images/en/set2/149_d97c86ffde398e9c64f856d1ac469b380afb7f53.jpg",
+        "full": "https://api.lorcana.ravensburger.com/images/en/set2/149_e1015f9e276e726ddd4333ebee57c12d5019a37f.jpg",
+        "thumbnail": "https://api.lorcana.ravensburger.com/images/en/set2/149_2c8c2611099dc474492fb182f7732681e8c5e5eb.jpg"
+      },
+      "inkwell": true,
+      "lore": 1,
+      "name": "Hiram Flaversham",
+      "number": 149,
+      "rarity": "Rare",
+      "setCode": "2",
+      "simpleName": "hiram flaversham toymaker",
+      "story": "The Great Mouse Detective",
+      "strength": 1,
+      "subtypes": [
+        "Storyborn",
+        "Inventor"
+      ],
+      "subtypesText": "Storyborn • Inventor",
+      "type": "Character",
+      "version": "Toymaker",
+      "willpower": 6
+    },
+    {
+      "abilities": [
+        {
+          "effect": "Your other characters get +2 ⛉.",
+          "fullText": "DESTINY CALLING Your other characters get +2 ⛉.",
+          "name": "DESTINY CALLING",
+          "type": "static"
+        }
+      ],
+      "allowedInFormats": {
+        "Core": {
+          "allowed": false,
+          "allowedUntilDate": "2026-07-17"
+        },
+        "Infinity": {
+          "allowed": true
+        }
+      },
+      "allowedInTournamentsFromDate": "2025-03-28",
+      "artists": [
+        "Stefano Zanchi"
+      ],
+      "artistsText": "Stefano Zanchi",
+      "code": "n8",
+      "color": "Amber-Steel",
+      "colors": [
+        "Amber",
+        "Steel"
+      ],
+      "cost": 6,
+      "flavorText": "“Don't forget, you are awesome. You can handle\nanything. Now channel your inner awesomeness and\nCLEAR THIS TRAP!”",
+      "foilTypes": [
+        "None",
+        "Silver"
+      ],
+      "fullIdentifier": "1/204 • EN • 7",
+      "fullName": "Rhino - Motivational Speaker",
+      "fullText": "DESTINY CALLING Your other characters get +2 ⛉.",
+      "fullTextSections": [
+        "DESTINY CALLING Your other characters get +2 ⛉."
+      ],
+      "id": 1434,
+      "images": {
+        "foilMask": "https://api.lorcana.ravensburger.com/images/en/set7/1_e7e5a8f7a49f4ad3c85016dc39f43b0b5b400329.jpg",
+        "full": "https://api.lorcana.ravensburger.com/images/en/set7/1_a32a6dfd2862b3c52e889edcbb8022fd19d42af5.jpg",
+        "thumbnail": "https://api.lorcana.ravensburger.com/images/en/set7/1_7ddb6a0038d87c1695a8f5187ada289314c5c8b1.jpg"
+      },
+      "inkwell": false,
+      "lore": 2,
+      "name": "Rhino",
+      "number": 1,
+      "rarity": "Rare",
+      "setCode": "7",
+      "simpleName": "rhino motivational speaker",
+      "story": "Bolt",
+      "strength": 4,
+      "subtypes": [
+        "Storyborn",
+        "Ally"
+      ],
+      "subtypesText": "Storyborn • Ally",
+      "type": "Character",
+      "version": "Motivational Speaker",
+      "willpower": 7
+    },
+    {
+      "allowedInFormats": {
+        "Core": {
+          "allowed": false,
+          "allowedUntilDate": "2025-09-05"
+        },
+        "Infinity": {
+          "allowed": true
+        }
+      },
+      "allowedInTournamentsFromDate": "2024-03-15",
+      "artists": [
+        "Cécile Carre"
+      ],
+      "artistsText": "Cécile Carre",
+      "code": "7y",
+      "color": "Amber",
+      "cost": 1,
+      "flavorText": "The mermaids told Peter they'd seen some items floating by several days earlier,\nbut they were more concerned that one of their sisters had gone missing.",
+      "foilTypes": [
+        "None",
+        "Silver"
+      ],
+      "fullIdentifier": "32/204 • EN • 3",
+      "fullName": "Never Land - Mermaid Lagoon",
+      "fullText": "",
+      "fullTextSections": [],
+      "id": 468,
+      "images": {
+        "foilMask": "https://api.lorcana.ravensburger.com/images/en/set3/32_227fa68929406b6fbc22afd242d23a3692b5c684.jpg",
+        "full": "https://api.lorcana.ravensburger.com/images/en/set3/32_15cb6cd4a24261e0313adfa052dad71aae831f60.jpg",
+        "thumbnail": "https://api.lorcana.ravensburger.com/images/en/set3/32_504d4314d7ff726cf9bbd310ff8dbd0970b1d36f.jpg"
+      },
+      "inkwell": true,
+      "lore": 1,
+      "moveCost": 1,
+      "name": "Never Land",
+      "number": 32,
+      "rarity": "Common",
+      "setCode": "3",
+      "simpleName": "never land mermaid lagoon",
+      "story": "Peter Pan",
+      "type": "Location",
+      "version": "Mermaid Lagoon",
+      "willpower": 4
+    },
+    {
+      "abilities": [
+        {
+          "effect": "A character with cost 2 or more can ⟳ to sing this song for free.",
+          "fullText": "(A character with cost 2 or more can ⟳ to sing this\nsong for free.)",
+          "type": "static"
+        }
+      ],
+      "allowedInFormats": {
+        "Core": {
+          "allowed": true
+        },
+        "Infinity": {
+          "allowed": true
+        }
+      },
+      "allowedInTournamentsFromDate": "2023-09-08",
+      "artists": [
+        "R. La Barbera",
+        "L. Giammichele"
+      ],
+      "artistsNormalized": [
+        "Rosa la Barbera",
+        "Leonardo Giammichele"
+      ],
+      "artistsText": "R. La Barbera / L. Giammichele",
+      "code": "0p",
+      "color": "Amber",
+      "cost": 2,
+      "effects": [
+        "Look at the top 4 cards of your deck. You may reveal a\ncharacter card and put it into your hand. Put the rest\non the bottom of your deck in any order."
+      ],
+      "foilTypes": [
+        "None",
+        "Silver"
+      ],
+      "fullIdentifier": "25/204 • EN • 1",
+      "fullName": "Be Our Guest",
+      "fullText": "(A character with cost 2 or more can ⟳ to sing this\nsong for free.)\nLook at the top 4 cards of your deck. You may reveal a\ncharacter card and put it into your hand. Put the rest\non the bottom of your deck in any order.",
+      "fullTextSections": [
+        "(A character with cost 2 or more can ⟳ to sing this\nsong for free.)",
+        "Look at the top 4 cards of your deck. You may reveal a\ncharacter card and put it into your hand. Put the rest\non the bottom of your deck in any order."
+      ],
+      "id": 25,
+      "images": {
+        "foilMask": "https://api.lorcana.ravensburger.com/images/en/set1/25_ab5dcdf3c2283ef6dd950c3a1fc4e9db39aca033.jpg",
+        "full": "https://api.lorcana.ravensburger.com/images/en/set1/25_70ed49868782fed4a347083366d534f041af88a6.jpg",
+        "thumbnail": "https://api.lorcana.ravensburger.com/images/en/set1/25_34e3239b07035c77432ffa3623ef3bdd5ccb2e68.jpg"
+      },
+      "inkwell": true,
+      "name": "Be Our Guest",
+      "number": 25,
+      "rarity": "Uncommon",
+      "reprintedAsIds": [
+        1967
+      ],
+      "setCode": "1",
+      "simpleName": "be our guest",
+      "story": "Beauty and the Beast",
+      "subtypes": [
+        "Song"
+      ],
+      "subtypesText": "Song",
+      "type": "Action"
+    }
+  ]
+}
