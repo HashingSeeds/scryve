@@ -203,6 +203,7 @@ async function refreshStarterDecks(
 }
 
 export const LORCANA_STARTER_DECKS = {
+  source: STARTER_DECK_SOURCE,
   formats: ["core", "infinity"],
   operation: (format) => `starter-decks:${format}`,
   refresh: refreshStarterDecks,

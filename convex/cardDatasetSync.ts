@@ -4,10 +4,11 @@ import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import { internalAction } from "./_generated/server"
-import { MAX_DATASET_BATCH, type DatasetCard } from "./lib/games/cards"
+import { datasetCardKey, MAX_DATASET_BATCH, type DatasetCard } from "./lib/games/cards"
 import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 
 const MAX_BATCH_PRINTINGS = 1_000
+const MAX_SWEEP_CARD_KEYS = 8_192
 const SYNC_BUDGET_MS = 5 * 60 * 1000
 
 /** why: each printing is one more index read, and a mutation past 4,096 fails in production only; convex-test has no such limit. */
@@ -34,6 +35,8 @@ export const sync = internalAction({
     if (state?.version === version) return null
     const cards = (await dataset.load(version)).sort((a, b) => (a.cardId < b.cardId ? -1 : 1))
     if (cards.length === 0) throw new Error(`${game} dataset ${version} has no cards`)
+    if (cards.length > MAX_SWEEP_CARD_KEYS)
+      throw new Error(`${game} dataset ${version} has more cards than one sweep can check`)
     const pending = state?.pending?.version === version ? state.pending : undefined
     const continueLater = async () => {
       await ctx.scheduler.runAfter(0, internal.cardDatasetSync.sync, { game })
@@ -52,6 +55,7 @@ export const sync = internalAction({
       if (next === null) return null
       offset = next
     }
+    const cardKeys = cards.map(datasetCardKey)
     let cursor = pending?.sweepCursor ?? null
     do {
       if (Date.now() - startedAt > SYNC_BUDGET_MS) return await continueLater()
@@ -60,6 +64,7 @@ export const sync = internalAction({
         version,
         total: cards.length,
         cursor,
+        cardKeys,
       })
       if (swept === null) return null
       cursor = swept.cursor

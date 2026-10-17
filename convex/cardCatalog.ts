@@ -4,11 +4,13 @@ import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, internalQuery, query } from "./_generated/server"
+import { storesValue } from "./lib/documents"
 import {
   MAX_CARD_FACES,
   MAX_CARD_FACETS,
   MAX_CATALOG_BATCH,
   MAX_DATASET_BATCH,
+  datasetCardKey,
   normalizeCardName,
   type CatalogCard,
   type NormalizedCard,
@@ -65,7 +67,8 @@ function assertNormalizedCard(card: NormalizedCard) {
   }
 }
 
-async function upsertCard(ctx: MutationCtx, card: NormalizedCard, now = Date.now()) {
+async function upsertCard(ctx: MutationCtx, card: NormalizedCard, fromDataset = false) {
+  const now = Date.now()
   assertNormalizedCard(card)
   const existing = await ctx.db
     .query("gameCards")
@@ -92,20 +95,36 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard, now = Date.now
     updatedAt: now,
   }
   const gameCardId = existing?._id ?? (await ctx.db.insert("gameCards", logicalValue))
-  if (existing) await ctx.db.replace(existing._id, logicalValue)
+  if (existing && !storesValue(existing, { ...logicalValue, updatedAt: existing.updatedAt }))
+    await ctx.db.replace(existing._id, logicalValue)
 
-  for (const printing of card.printings.slice(0, MAX_CARD_PRINTINGS)) {
-    const stored = await ctx.db
-      .query("cardPrintings")
-      .withIndex("by_game_and_printing_id", (query) =>
-        query.eq("game", card.game).eq("printingId", printing.printingId),
-      )
-      .unique()
+  const printings = card.printings.slice(0, MAX_CARD_PRINTINGS)
+  const ownPrintings =
+    fromDataset && existing
+      ? await ctx.db
+          .query("cardPrintings")
+          .withIndex("by_game_card_id", (query) => query.eq("gameCardId", existing._id))
+          .take(MAX_SWEPT_PRINTINGS)
+      : []
+  const ownById = new Map(ownPrintings.map((printing) => [printing.printingId, printing]))
+  for (const printing of printings) {
+    const stored =
+      ownById.get(printing.printingId) ??
+      (await ctx.db
+        .query("cardPrintings")
+        .withIndex("by_game_and_printing_id", (query) =>
+          query.eq("game", card.game).eq("printingId", printing.printingId),
+        )
+        .unique())
     if (briefSearchResults && stored?.typeLabel && !printing.typeLabel) continue
     const value = { gameCardId, game: card.game, ...printing, updatedAt: now }
-    if (stored) await ctx.db.replace(stored._id, value)
-    else await ctx.db.insert("cardPrintings", value)
+    if (!stored) await ctx.db.insert("cardPrintings", value)
+    else if (!storesValue(stored, { ...value, updatedAt: stored.updatedAt }))
+      await ctx.db.replace(stored._id, value)
   }
+  const kept = new Set(printings.map((printing) => printing.printingId))
+  for (const printing of ownPrintings)
+    if (!kept.has(printing.printingId)) await ctx.db.delete(printing._id)
   return gameCardId
 }
 
@@ -151,7 +170,7 @@ export const writeDatasetBatch = internalMutation({
     const restart = args.offset === 0 && state?.version === args.storedVersion
     if (!resume && !restart) return null
     const startedAt = resume ? pending.startedAt : Date.now()
-    for (const card of args.cards) await upsertCard(ctx, { ...card, game }, startedAt)
+    for (const card of args.cards) await upsertCard(ctx, { ...card, game }, true)
     const nextIndex = args.offset + args.cards.length
     const value = {
       game,
@@ -170,6 +189,7 @@ export const sweepDatasetBatch = internalMutation({
     version: v.string(),
     total: v.number(),
     cursor: v.union(v.string(), v.null()),
+    cardKeys: v.array(v.string()),
   },
   handler: async (ctx, args) => {
     const game = assertGameSystem(args.game)
@@ -189,16 +209,15 @@ export const sweepDatasetBatch = internalMutation({
       .query("gameCards")
       .withIndex("by_game_and_identity_namespace_and_card_id", (query) => query.eq("game", game))
       .paginate({ numItems: SWEEP_BATCH, cursor: args.cursor })
+    const kept = new Set(args.cardKeys)
     for (const card of cards.page) {
-      const cardRemoved = card.updatedAt !== pending.startedAt
+      if (kept.has(datasetCardKey(card))) continue
       const printings = await ctx.db
         .query("cardPrintings")
         .withIndex("by_game_card_id", (query) => query.eq("gameCardId", card._id))
         .take(MAX_SWEPT_PRINTINGS)
-      for (const printing of printings)
-        if (cardRemoved || printing.updatedAt !== pending.startedAt)
-          await ctx.db.delete(printing._id)
-      if (cardRemoved) await ctx.db.delete(card._id)
+      for (const printing of printings) await ctx.db.delete(printing._id)
+      await ctx.db.delete(card._id)
     }
     if (cards.isDone) {
       await ctx.db.replace(state._id, { game, version: args.version })
