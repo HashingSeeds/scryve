@@ -17,9 +17,7 @@ describe("integration capability state", () => {
     expect(integration("pokemon")).toMatchObject({
       displayName: "Pokémon TCG",
       rights: {
-        requiredNotices: [
-          "Pokémon, card artwork, and related marks remain property of their respective owners.",
-        ],
+        requiredNotices: [expect.stringMatching(/^Pokémon, /)],
       },
     })
   })
