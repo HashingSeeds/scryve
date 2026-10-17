@@ -19,11 +19,12 @@ import { cardCountLabel } from "./deckCopy"
 import type { DeckStatsRecord, StatsSource } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
+import { systemDefinition } from "../../../convex/lib/systems"
 
 export type DeckTab = "cards" | "notes" | "analysis"
 
 export function deckTabs(game?: string): readonly DeckTab[] {
-  return game === "mtg" ? ["cards", "analysis", "notes"] : ["cards", "notes"]
+  return systemDefinition(game)?.deckAnalysis ? ["cards", "analysis", "notes"] : ["cards", "notes"]
 }
 
 export const DECK_TAB_LABELS = {

@@ -92,6 +92,7 @@ import {
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
+import { systemDefinition } from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
@@ -286,7 +287,8 @@ export function NewGameScreen({
   const [exitingGameId, setExitingGameId] = useState<string>()
   const [pickingHostSeat, setPickingHostSeat] = useState(false)
   const connectedMode = mode === "connected"
-  const treacheryAvailable = connectedMode && system === "mtg"
+  const treacheryAvailable =
+    connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
   const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)

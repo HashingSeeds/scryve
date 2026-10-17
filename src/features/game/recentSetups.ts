@@ -6,6 +6,7 @@ import { isPlaySystemId, playFormatLabel, playSystemFormat, type PlaySystemId } 
 import { isRoundClockSetup } from "./roundClock"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf } from "../../../convex/lib/matchResults"
+import { systemDefinition } from "../../../convex/lib/systems"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
 
 export const MAX_RECENT_SETUPS = 5
@@ -102,7 +103,7 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
   if (
     value.variant !== undefined &&
     (value.variant !== "treachery" ||
-      system !== "mtg" ||
+      !systemDefinition(system)?.variants.includes(value.variant) ||
       !isTreacheryPlayerCount(value.playerCount))
   )
     return undefined

@@ -22,6 +22,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
+import { systemDice } from "@/features/game/dice"
 import {
   canContinueMatch,
   drawsLabel,
@@ -151,8 +152,7 @@ export function CurrentGameScreen({
         accessibilityLabel: translate("board:firstPlayer.loserChooses", { name: loser.name }),
         onPress: offer(() => diceAsk(loser.id, "loss")),
       }
-    // why: official Pokémon rules only cover two players; larger tables roll off like other games.
-    if (system === "pokemon" && playerCount === 2)
+    if (systemDice(system).twoPlayerCoinFlip && playerCount === 2)
       return {
         color: colors.gameMenu.actions.dice,
         glyph: { tool: "coin" },

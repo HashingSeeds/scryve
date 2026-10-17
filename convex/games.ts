@@ -736,13 +736,14 @@ export const createLobby = mutation({
     if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
     assertPlayerCount(args.playerCount)
     if (args.variant !== undefined) {
-      if (gameSystem !== "mtg") throw new Error("Treachery is a Magic variant")
+      if (!systemDefinition(gameSystem)?.variants.includes(args.variant))
+        throw new Error("Treachery is a Magic variant")
       if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
       if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     }
     assertStartingLife(
       args.startingLife,
-      gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
+      systemDefinition(gameSystem)?.counter.maxStartingValue ?? 999,
     )
     if (args.lifeStep !== undefined) {
       assertLifeDelta(args.lifeStep)
@@ -1025,7 +1026,7 @@ async function resolveLocalGameSetup(
   if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
   assertStartingLife(
     args.startingLife,
-    gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
+    systemDefinition(gameSystem)?.counter.maxStartingValue ?? 999,
   )
   if (args.lifeStep !== undefined) {
     assertLifeDelta(args.lifeStep)

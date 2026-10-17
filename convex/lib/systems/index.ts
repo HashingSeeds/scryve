@@ -74,9 +74,7 @@ export function isCounterOut(
   return others.some((other) => counterStanding(counter, other) >= finish)
 }
 
-const LIFE_FLOORED_AT_ZERO: ReadonlySet<unknown> = new Set<SystemId>(["ygo"])
-
 export function flooredLifeDelta(system: unknown, life: number, delta: number): number {
-  if (!LIFE_FLOORED_AT_ZERO.has(system)) return delta
+  if (!systemDefinition(system)?.counter.flooredAtZero) return delta
   return Math.max(delta, Math.min(0, -life))
 }
