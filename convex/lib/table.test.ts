@@ -4,6 +4,7 @@ import {
   EMPTY_TABLE,
   isValidTableSnapshot,
   matchesValidator,
+  MAX_POKEMON_HP,
   pokemonBoardOf,
   pokemonCardFromCatalog,
   pokemonPrizeValue,
@@ -285,6 +286,26 @@ describe("Pokémon conditions", () => {
       damage: 0,
       burned: true,
     })
+  })
+
+  it("keeps conditions when a Pokémon placed without a card gets its first card", () => {
+    const sickCardless = boardWith(
+      {
+        kind: "pokemon.placed",
+        playerId: "me",
+        pokemonId: "active-001",
+        slot: "active",
+        card: { hp: MAX_POKEMON_HP, prizes: 1 },
+      },
+      condition("active-001", "poisoned"),
+    )
+    const carded = run(sickCardless, {
+      kind: "pokemon.updated",
+      playerId: "me",
+      pokemonId: "active-001",
+      card: { ...pidgey, cardId: "sv1-16" },
+    })!.table
+    expect(pokemonBoardOf(carded, "me").active).toMatchObject({ cardId: "sv1-16", poisoned: true })
   })
 
   it("clears conditions when the Pokémon retreats, evolves, or goes back to the bench on undo", () => {
