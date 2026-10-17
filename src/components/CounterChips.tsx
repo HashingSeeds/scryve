@@ -33,6 +33,8 @@ export interface SeatTable {
   adjustCounter: (counterId: string, delta: number) => void
   takeDesignation: (designationId: string) => void
   releaseDesignation: (designationId: string) => void
+  tableItemRules?: Readonly<Partial<Record<string, string>>>
+  openRule?: (ruleId: string) => void
 }
 
 const NO_COUNTERS: Readonly<Record<string, number>> = {}
@@ -495,6 +497,8 @@ function CounterSheet({
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
   const counterLabel = counter ? tableItemLabel(counter) : ""
+  const ruleId = counter && seat.tableItemRules?.[counter.id]
+  const { openRule } = seat
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
@@ -537,15 +541,28 @@ function CounterSheet({
               </BoardPressable>
             ))}
           </View>
-          <View pointerEvents="none" style={themed($sheetHeader)}>
-            <TableGlyph id={counter.id} size={16} color={ink} />
-            <Text
-              text={counterLabel}
-              weight="bold"
-              size="xs"
-              numberOfLines={1}
-              style={{ color: ink }}
-            />
+          <View pointerEvents="box-none" style={themed($sheetHeader)}>
+            <View pointerEvents="none" style={[themed($sheetHeader), $shrink]}>
+              <TableGlyph id={counter.id} size={16} color={ink} />
+              <Text
+                text={counterLabel}
+                weight="bold"
+                size="xs"
+                numberOfLines={1}
+                style={[$shrink, { color: ink }]}
+              />
+            </View>
+            {ruleId && openRule ? (
+              <BoardPressable
+                testID={`counter-rule-${seatNumber}`}
+                accessibilityRole="link"
+                accessibilityLabel={translate("board:counters.rule", { rule: ruleId })}
+                hitSlop={8}
+                onPress={() => openRule(ruleId)}
+              >
+                <Text text={ruleId} size="xs" style={[$ruleLink, { color: ink }]} />
+              </BoardPressable>
+            ) : null}
           </View>
           <View pointerEvents="none" style={$sheetCenter}>
             <Text
@@ -821,6 +838,10 @@ const $sheetHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
   gap: spacing.xxs,
 })
+
+const $shrink: ViewStyle = { flexShrink: 1 }
+
+const $ruleLink: TextStyle = { textDecorationLine: "underline" }
 
 const $sheetCenter: ViewStyle = { flex: 1, alignItems: "center", justifyContent: "center" }
 

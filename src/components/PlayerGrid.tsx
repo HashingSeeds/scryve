@@ -10,6 +10,7 @@ import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
+import { tableItemRulesOf } from "@/features/rules/gameRules"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -130,6 +131,7 @@ export interface PlayerGridProps {
   commanderDamage?: CommanderDamageGridBinding
   table?: TableRuntime
   dice?: DiceGridBinding
+  onOpenRule?: (ruleId: string) => void
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -150,6 +152,7 @@ export function PlayerGrid({
   commanderDamage,
   table,
   dice,
+  onOpenRule,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -201,6 +204,7 @@ export function PlayerGrid({
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const stable = useStableCallbacks()
   const systemId = playSystemRules(system).id
+  const tableItemRules = tableItemRulesOf(system)
   const layout = getPlayerGridLayout({
     playerCount: players.length,
     width,
@@ -468,6 +472,9 @@ export function PlayerGrid({
                               (designationId: string) =>
                                 table.releaseDesignation(player.id, designationId),
                             ),
+                            ...(tableItemRules && onOpenRule
+                              ? { tableItemRules, openRule: stable("openRule", onOpenRule) }
+                              : {}),
                           }
                         : undefined
                     }

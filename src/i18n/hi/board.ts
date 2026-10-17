@@ -347,6 +347,7 @@ export default {
     addCounter: "{{label}} जोड़ें",
     giveUp: "{{label}} छोड़ें",
     take: "{{label}} लें",
+    rule: "नियम {{rule}}",
   },
   seat: {
     identity: "सीट {{seat}}, {{name}}",

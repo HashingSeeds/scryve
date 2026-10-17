@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { FlatList, Linking, Platform, Pressable, View } from "react-native"
+import { FlatList, Linking, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
 import { Header } from "@/components/Header"
@@ -15,7 +15,7 @@ import {
   type GlossaryEntry,
   type Rule,
 } from "@/features/rules/comprehensiveRules"
-import type { TextRules } from "@/features/rules/gameRules"
+import { RULES_TEXT_IN_APP, type TextRules } from "@/features/rules/gameRules"
 import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -195,7 +195,7 @@ export function RulesScreen({
       contentContainerStyle={$flex}
     >
       <Header title={title} leftTx="common:back" onLeftPress={onBack} />
-      {Platform.OS === "web" ? (
+      {!RULES_TEXT_IN_APP ? (
         <View style={themed($message)}>
           <Text size="sm" tx="play:rules.webOnly" txOptions={{ publisher: source.publisher }} />
           {officialLink}

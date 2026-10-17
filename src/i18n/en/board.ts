@@ -313,6 +313,7 @@ const board = {
     addCounter: "Add {{label}}",
     giveUp: "Give up {{label}}",
     take: "Take {{label}}",
+    rule: "Rule {{rule}}",
   },
   seat: {
     identity: "Seat {{seat}}, {{name}}",

@@ -67,7 +67,7 @@ export interface CurrentGameScreenProps {
   initialEndOpen?: boolean
   onDecks?: () => void
   onHistory?: () => void
-  onRules?: (system: SystemId) => void
+  onRules?: (system: SystemId, ruleId?: string) => void
   onSetup?: () => void
   onConnect?: () => void
   onSettings?: () => void
@@ -407,6 +407,7 @@ export function CurrentGameScreen({
               players={runtime.game.players}
               system={system}
               lifeStep={runtime.game.lifeStep}
+              onOpenRule={(ruleId) => system && onRules?.(system, ruleId)}
               layoutVariant={layoutVariant}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}

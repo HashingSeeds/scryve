@@ -1,11 +1,14 @@
-import { Alert, Linking } from "react-native"
+import { Alert, Linking, Platform } from "react-native"
 
 import { translate } from "@/i18n/translate"
 
 import type { ComprehensiveRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
-import { isSystemId, type SystemId } from "../../../convex/lib/systems"
+import { isSystemId, type SYSTEMS, type SystemId } from "../../../convex/lib/systems"
+
+type MagicTable = (typeof SYSTEMS)["mtg"]["table"]
+type MagicTableItemId = (MagicTable["counters"] | MagicTable["designations"])[number]["id"]
 
 export type TextRules = {
   kind: "text"
@@ -16,6 +19,7 @@ export type TextRules = {
   parse: (text: string) => ComprehensiveRules | undefined
   references: RegExp
   revalidate?: true
+  tableItemRules: Readonly<Partial<Record<string, string>>>
 }
 export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
@@ -28,6 +32,11 @@ export const GAME_RULES = {
     cacheKey: "scryve.rules",
     parse: parseMagicRules,
     references: MAGIC_RULE_REFERENCE,
+    tableItemRules: {
+      poison: "104.3d",
+      energy: "107.14",
+      commanderTax: "903.8",
+    } satisfies Partial<Record<MagicTableItemId, string>>,
   },
   pokemon: { kind: "link", pageUrl: "https://www.pokemon.com/us/pokemon-tcg/rules" },
   ygo: { kind: "link", pageUrl: "https://www.yugioh-card.com/en/rulebook/" },
@@ -40,11 +49,19 @@ export const GAME_RULES = {
     parse: parseFabRules,
     references: FAB_RULE_REFERENCE,
     revalidate: true,
+    tableItemRules: {},
   },
 } satisfies Record<SystemId, GameRules>
 
+export const RULES_TEXT_IN_APP = Platform.OS !== "web"
+
 export function gameRules(system: unknown): GameRules | undefined {
   return isSystemId(system) ? GAME_RULES[system] : undefined
+}
+
+export function tableItemRulesOf(system: unknown) {
+  const rules = gameRules(system)
+  return RULES_TEXT_IN_APP && rules?.kind === "text" ? rules.tableItemRules : undefined
 }
 
 export function openRules(rules: GameRules, showText?: () => void) {
