@@ -656,6 +656,7 @@ it("pruning a feed keeps its newest decks and leaves other sources alone", async
   } finally {
     jest.useRealTimers()
   }
+})
 
 it("refreshing a catalog deck rewrites its cards only when they changed", async () => {
   const t = convexTest(schema, modules)
