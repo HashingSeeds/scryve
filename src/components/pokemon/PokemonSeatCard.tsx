@@ -508,6 +508,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   }}
                   delayLongPress={LONG_PRESS_MS}
                   onLongPress={() => placeOn("bench", ADD_TRIGGER, !tapPicksCard)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && event.shiftKey)
+                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
+                  }}
                   onPress={() => placeOn("bench", ADD_TRIGGER, tapPicksCard)}
                   style={({ pressed }) => [
                     themed($chip),
@@ -588,7 +592,12 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }}
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
+            // why: React Native Web never fires long press from the keyboard, so keyboard players hold with Shift+Enter.
             onLongPress={() => placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && event.shiftKey)
+                placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)
+            }}
             onPress={() =>
               board.bench.length
                 ? openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
