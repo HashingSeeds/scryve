@@ -89,15 +89,15 @@ describe("the-fab-cube normalizer", () => {
 })
 
 describe("official precons", () => {
-  it("each list one hero, a FaB format, and counted cards the pinned fab-cube release has", async () => {
+  it("each list one hero, a FaB format, and counted cards by their pinned fab-cube ids", async () => {
     expect(fabPreconCards.tag).toBe(await FAB_CUBE_DATASET.version())
-    const heroes = new Set(fabPreconCards.heroes)
-    const known = new Set(fabPreconCards.cards)
+    const heroes = new Map(Object.entries(fabPreconCards.heroes))
+    const known = new Map(Object.entries(fabPreconCards.cards))
     const formats = new Set<string>(SYSTEMS.fab.formats.map(({ id }) => id))
     const problems = fabPrecons.flatMap((deck) => [
       ...(formats.has(deck.format) ? [] : [`${deck.name}: format ${deck.format}`]),
-      ...fabPreconEntries(deck).flatMap(({ name, quantity, section }) =>
-        quantity > 0 && (section === "hero" ? heroes : known).has(name)
+      ...fabPreconEntries(deck).flatMap(({ cardId, name, quantity, section }) =>
+        quantity > 0 && (section === "hero" ? heroes : known).get(cardId) === name
           ? []
           : [`${deck.name}: ${name}`],
       ),

@@ -88,7 +88,7 @@ pnpm test --runInBand
 
 ## Flesh and Blood precons
 
-Browse lists the official precons in `convex/lib/games/fabPrecons.json`. To add one, copy its list by hand from `https://fabtcg.com/decklists/<slug>/` (hero, then each card with its pitch and count), then run `node scripts/fab-precons.cjs`. It refreshes the test fixture from the pinned fab-cube release and names any card that release lacks; such a deck waits for the fab-cube bump.
+Browse lists the official precons in `convex/lib/games/fabPrecons.json`. To add one, copy its list by hand from `https://fabtcg.com/decklists/<slug>/` (hero, then each card with its pitch and count), then run `node scripts/fab-precons.cjs`. It fills in each card's fab-cube id from the pinned release, refreshes the test fixture, and names any card that release lacks; such a deck waits for the fab-cube bump.
 
 ## Builds
 

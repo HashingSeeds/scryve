@@ -127,8 +127,9 @@ export const FAB_DECK_LIST = {
 
 export function fabPreconEntries(deck: (typeof fabPrecons)[number]) {
   return [
-    { name: deck.hero, quantity: 1, section: "hero" },
+    { cardId: deck.heroId, name: deck.hero, quantity: 1, section: "hero" },
     ...deck.cards.map((card) => ({
+      cardId: card.id,
       name: card.pitch ? `${card.name} (${card.pitch})` : card.name,
       quantity: card.count,
       section: card.pitch ? "main" : "arena",
@@ -143,9 +144,9 @@ async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format:
   let count = 0
   for (const deck of decks) {
     const entries = fabPreconEntries(deck)
-    const cards = await ctx.runQuery(internal.cardCatalog.cachedByNames, {
+    const cards = await ctx.runQuery(internal.cardCatalog.lookupManyCached, {
       game: "fab",
-      names: entries.map((entry) => entry.name),
+      cardIds: entries.map((entry) => entry.cardId),
     })
     const resolved = entries.flatMap((entry, index) => {
       const card = cards[index]

@@ -44,9 +44,9 @@ function blitzPrecon() {
     { unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` },
   ]
   const dataset = [
-    { unique_id: "hero", name: deck.hero, printings: printing("hero") },
+    { unique_id: deck.heroId, name: deck.hero, printings: printing("hero") },
     ...deck.cards.map((card, index) => ({
-      unique_id: `card-${index}`,
+      unique_id: card.id,
       name: card.name,
       pitch: pitches.get(card.pitch ?? "") ?? "",
       printings: printing(`card-${index}`),
@@ -221,10 +221,13 @@ describe("Flesh and Blood", () => {
       const card = await ctx.db
         .query("gameCards")
         .withIndex("by_game_and_identity_namespace_and_card_id", (q) =>
-          q.eq("game", "fab").eq("identityNamespace", "fab-cube-card").eq("cardId", "card-0"),
+          q
+            .eq("game", "fab")
+            .eq("identityNamespace", "fab-cube-card")
+            .eq("cardId", deck.cards[0].id),
         )
         .unique()
-      if (!card) throw new Error("card-0 was not synced")
+      if (!card) throw new Error("The first card was not synced")
       await ctx.db.delete(card._id)
     })
     jest.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60 * 60 * 1000)
