@@ -35,6 +35,7 @@ import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
 import { api } from "../../../convex/_generated/api"
+import { identitySection } from "../../../convex/lib/systems"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
@@ -70,7 +71,7 @@ export function CardSearchScreen({
   const [section, setSection] = useState(
     initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
-  const choosingCommander = game === "mtg" && format === "commander" && section === "commander"
+  const choosingCommander = identitySection(game, format)?.id === section
   const [candidate, setCandidate] = useState<DeckCard>()
   const [candidateError, setCandidateError] = useState<string>()
   const candidateDetails = useCardDetails(

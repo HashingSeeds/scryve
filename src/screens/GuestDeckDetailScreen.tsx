@@ -18,7 +18,8 @@ import {
   getCommanderWarnings,
   selectCommander,
 } from "@/features/decks/commanderSelection"
-import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
+import { cardDetailsKey, printingKey } from "@/features/decks/deckCards"
+import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import { DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
@@ -35,6 +36,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
+import { identitySection } from "../../convex/lib/systems"
 
 type GuestDeckDetailScreenProps = { localId: string; onBack: () => void }
 type GuestCard = GuestDeckPayload["cards"][number]
@@ -81,7 +83,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
           catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
         }
       : undefined,
-    focusedGame === "mtg" && (draft ?? stored?.deck)?.format === "commander",
+    identitySection(focusedGame, (draft ?? stored?.deck)?.format) !== undefined,
   )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)
@@ -136,13 +138,8 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
   const current = draft ?? stored?.deck
   if (!current) return null
   const game = current.game ?? DEFAULT_DECK_GAME
-  const singleCommander =
-    game === "mtg" &&
-    current.format === "commander" &&
-    current.cards.reduce(
-      (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
-      0,
-    ) <= 1
+  const rules = { game, format: current.format }
+  const singleCommander = canChooseCommander(rules, current.cards)
   const cachedRules = commanderSelected ? loadCardDetails() : {}
   const commanderWarnings = commanderSelected
     ? getCommanderWarnings(current.cards, (card) => cachedRules[cardDetailsKey(card, game)])
@@ -335,11 +332,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             setUndo(undefined)
-            if (
-              game === "mtg" &&
-              current.format === "commander" &&
-              cardSection(card) === "commander"
-            ) {
+            if (isCommanderPick(rules, card)) {
               const cached = loadCardDetails()
               const result = addCommander(
                 current.cards,
@@ -396,16 +389,13 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
           onSetCommander={editing && singleCommander ? chooseCommander : undefined}
           {...(editing
             ? {
-                onIncrement:
-                  cardSection(focusedCard) === "commander" &&
-                  game === "mtg" &&
-                  current.format === "commander"
-                    ? undefined
-                    : () =>
-                        updateCard(focusedIndex, {
-                          ...focusedCard,
-                          quantity: Math.min(999, focusedCard.quantity + 1),
-                        }),
+                onIncrement: isCommanderPick(rules, focusedCard)
+                  ? undefined
+                  : () =>
+                      updateCard(focusedIndex, {
+                        ...focusedCard,
+                        quantity: Math.min(999, focusedCard.quantity + 1),
+                      }),
                 onDecrement: () => {
                   if (focusedCard.quantity <= 1) setFocusedIndex(undefined)
                   updateCard(

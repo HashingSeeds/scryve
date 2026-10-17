@@ -3,6 +3,7 @@ import { translate } from "@/i18n/translate"
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
+import { identitySection } from "../../../convex/lib/systems"
 
 export const MAX_CARD_COPIES = 999
 
@@ -124,19 +125,16 @@ export function cardLimitError(cards: readonly DeckCard[], card: DeckCard) {
   return undefined
 }
 
-function isCommanderDeck(deck: DeckRules) {
-  return deck.game === "mtg" && deck.format === "commander"
-}
-
 export function isCommanderPick(deck: DeckRules, card: DeckCard) {
-  return isCommanderDeck(deck) && cardSection(card) === "commander"
+  return identitySection(deck.game, deck.format)?.id === cardSection(card)
 }
 
 export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) {
+  const identity = identitySection(deck.game, deck.format)
   return (
-    isCommanderDeck(deck) &&
+    identity !== undefined &&
     cards.reduce(
-      (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
+      (count, card) => count + (cardSection(card) === identity.id ? card.quantity : 0),
       0,
     ) <= 1
   )

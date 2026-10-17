@@ -2,6 +2,7 @@ import {
   counterStanding,
   formatDefinition,
   hasCommandZone,
+  identitySection,
   isCounterOut,
   SYSTEM_IDS,
   SYSTEMS,
@@ -17,6 +18,16 @@ describe("system definitions", () => {
       startingValue: 25,
     })
     expect(hasCommandZone("mtg", "brawl")).toBe(true)
+  })
+
+  it("picks an identity card only in Commander, whose picker checks Commander legality", () => {
+    const identities = SYSTEM_IDS.flatMap((system) =>
+      SYSTEMS[system].formats.flatMap((format) => {
+        const section = identitySection(system, format.id)
+        return section ? [`${system}:${format.id}:${section.id}`] : []
+      }),
+    )
+    expect(identities).toEqual(["mtg:commander:commander"])
   })
 
   it("tracks commander damage only in Commander", () => {
