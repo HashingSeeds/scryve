@@ -542,14 +542,16 @@ function CounterSheet({
             ))}
           </View>
           <View pointerEvents="box-none" style={themed($sheetHeader)}>
-            <TableGlyph id={counter.id} size={16} color={ink} />
-            <Text
-              text={counterLabel}
-              weight="bold"
-              size="xs"
-              numberOfLines={1}
-              style={[$headerLabel, { color: ink }]}
-            />
+            <View pointerEvents="none" style={[themed($sheetHeader), $shrink]}>
+              <TableGlyph id={counter.id} size={16} color={ink} />
+              <Text
+                text={counterLabel}
+                weight="bold"
+                size="xs"
+                numberOfLines={1}
+                style={[$shrink, { color: ink }]}
+              />
+            </View>
             {ruleId && openRule ? (
               <BoardPressable
                 testID={`counter-rule-${seatNumber}`}
@@ -837,7 +839,7 @@ const $sheetHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 
-const $headerLabel: TextStyle = { flexShrink: 1 }
+const $shrink: ViewStyle = { flexShrink: 1 }
 
 const $ruleLink: TextStyle = { textDecorationLine: "underline" }
 
