@@ -69,6 +69,7 @@ export default function NewLocalGameRoute() {
   const [decks, setDecks] = useState<DeckChoices>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
+  const [recentSetups] = useState(() => localGameRepository.loadRecentSetups())
   const [defaultMeSeat] = useState(() => {
     const remembered = localGameRepository.loadMeSeat()
     return remembered === "none" ? undefined : (remembered ?? 0)
@@ -128,6 +129,7 @@ export default function NewLocalGameRoute() {
         defaults={defaults}
         mode={mode}
         initialGame={initialGame}
+        recentSetups={recentSetups}
         localGame={blocking ? activeGame : undefined}
         localMatchEnd={matchEndGame ? { game: matchEndGame, onEnd: endMatch } : undefined}
         account={ownerId ? { ownerId, defaultMeSeat, decks } : undefined}

@@ -43,6 +43,7 @@ jest.mock("@/features/game/localPersistence", () => ({
     loadActiveGame: () => ({ id: "game-1" }),
     loadSettings: () => ({}),
     loadMeSeat: () => undefined,
+    loadRecentSetups: () => [],
   },
 }))
 jest.mock("@/screens/JoinConnectedScreen", () => ({

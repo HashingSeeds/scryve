@@ -5,7 +5,6 @@ import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { hasLocalGameStarted } from "@/features/game/domain"
-import { gameSetupHref } from "@/features/game/gameSetup"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 
@@ -32,7 +31,7 @@ export default function CurrentLocalGameRoute() {
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
       onRules={(rule) => router.push({ pathname: "/rules", params: rule ? { rule } : {} })}
-      onSetup={() => router.push(gameSetupHref())}
+      onSetup={() => router.push("/game/new")}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
       onAccount={() => router.push("/account")}

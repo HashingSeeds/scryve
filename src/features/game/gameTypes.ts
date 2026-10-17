@@ -43,14 +43,44 @@ export const MORE_GAME_TYPES: readonly GameType[] = VISIBLE_SYSTEM_IDS.flatMap((
     .map(({ id }) => ({ id: `${system}-${id}`, system, format: id })),
 )
 
-export function isFeaturedGameType(id: string) {
-  return FEATURED_GAME_TYPES.some((type) => type.id === id)
-}
-
 export function gameTypeId(system: PlaySystemId | undefined, format?: string, treachery = false) {
   if (!system || !format) return "none"
   if (treachery) return "treachery"
   return featuredFormat(system, format)?.id ?? `${system}-${format}`
+}
+
+const SUGGESTED_COUNT = 3
+
+type Played = Pick<GameType, "system" | "format" | "variant">
+
+export function newGameTypes({
+  chosen,
+  recent,
+  connected,
+}: {
+  chosen?: Played
+  recent?: Played
+  connected: boolean
+}) {
+  const offered = [...FEATURED_GAME_TYPES, ...MORE_GAME_TYPES].filter(
+    (type) => connected || type.variant !== "treachery",
+  )
+  const recentId =
+    recent && gameTypeId(recent.system, recent.format, recent.variant === "treachery")
+  const candidates = offered.filter((type) => type.id !== recentId)
+  const chosenId = chosen && gameTypeId(chosen.system, chosen.format)
+  const played = [chosen?.system, recent?.system]
+  const featured = candidates.filter((type) => type.system && FEATURED_GAME_TYPES.includes(type))
+  const ranked = new Set([
+    ...candidates.filter((type) => type.system && type.id === chosenId),
+    ...featured.filter((type) => played.includes(type.system)),
+    ...featured,
+  ])
+  const suggested = [
+    ...[...ranked].slice(0, SUGGESTED_COUNT),
+    ...candidates.filter((type) => !type.system),
+  ]
+  return { suggested, more: offered.filter((type) => !suggested.includes(type)) }
 }
 
 export function gameTypeLabel(type: GameType) {
