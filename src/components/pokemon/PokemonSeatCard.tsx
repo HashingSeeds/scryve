@@ -514,8 +514,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   delayLongPress={LONG_PRESS_MS}
                   onLongPress={() => placeOn("bench", ADD_TRIGGER, !tapPicksCard)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && event.shiftKey)
-                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
+                    if (HOLD_KEYS.has(event.key)) placeOn("bench", ADD_TRIGGER, !tapPicksCard)
                   }}
                   onPress={() => placeOn("bench", ADD_TRIGGER, tapPicksCard)}
                   style={({ pressed }) => [
@@ -596,10 +595,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }}
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
-            // why: React Native Web never fires long press from the keyboard, so keyboard players hold with Shift+Enter.
+            // why: React Native Web never fires long press from the keyboard, and Enter also presses, so keyboard players hold with + or the up arrow.
             onLongPress={() => placeActive(!tapPicksCard)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && event.shiftKey) placeActive(!tapPicksCard)
+              if (HOLD_KEYS.has(event.key)) placeActive(!tapPicksCard)
             }}
             onPress={() => placeActive(tapPicksCard)}
             style={({ pressed }) => [
@@ -672,7 +671,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }}
             // why: React Native Web never fires long press from the keyboard, so keyboard players put a prize back with + or the up arrow.
             onKeyDown={(event) => {
-              if (event.key === "+" || event.key === "=" || event.key === "ArrowUp") putPrizeBack()
+              if (HOLD_KEYS.has(event.key)) putPrizeBack()
             }}
             onPress={() => prizes > 0 && onChangePrizes(-1)}
             onLongPress={putPrizeBack}
@@ -1406,6 +1405,7 @@ const $chipReadout: ViewStyle = { flexDirection: "row", alignItems: "baseline", 
 const $readoutRow: ViewStyle = { flexDirection: "row", alignItems: "baseline", columnGap: 6 }
 const $reveal: ViewStyle = { position: "absolute", left: 0, right: 0, top: 0, alignItems: "center" }
 const REVEAL_MS = 600
+const HOLD_KEYS = new Set(["+", "=", "ArrowUp"])
 const $hero: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
