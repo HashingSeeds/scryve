@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, {
@@ -372,8 +372,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       }
 
   function placeOn(slot: PokemonSlot, from: string, picksCard: boolean) {
-    if (picksCard) openSheet({ kind: "place", slot }, from)
-    else table.placePokemon(playerId, slot, CARDLESS_POKEMON)
+    // why: when the table refuses a cardless Pokémon, the sheet says why instead of the tap doing nothing.
+    if (picksCard || table.placePokemon(playerId, slot, CARDLESS_POKEMON) === null)
+      openSheet({ kind: "place", slot }, from)
   }
 
   function switchIn(pokemonId: string) {
@@ -1147,7 +1148,8 @@ function useCardReveal(pokemon: PokemonInPlay) {
   const wasCardless = useRef(cardless)
   const reducedMotion = useReducedMotion()
   const [reveal, setReveal] = useState<{ hp: number; damage: number } | null>(null)
-  useEffect(() => {
+  // why: a layout effect starts the reveal before paint, so HP left never flashes ahead of the printed HP.
+  useLayoutEffect(() => {
     const was = wasCardless.current
     wasCardless.current = cardless
     if (!was || cardless || pokemon.damage === 0 || reducedMotion !== false) return
