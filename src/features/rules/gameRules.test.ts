@@ -2,8 +2,9 @@ import { Alert, Linking } from "react-native"
 
 import { GAME_RULES, gameRules, openRules } from "./gameRules"
 
-it("gameRules gives Magic its text, links Pokémon and Yu-Gi-Oh!, and skips unknown systems", () => {
+it("gameRules gives Magic and Flesh and Blood their text, links Pokémon and Yu-Gi-Oh!, and skips unknown systems", () => {
   expect(gameRules("mtg")?.kind).toBe("text")
+  expect(gameRules("fab")?.kind).toBe("text")
   expect(gameRules("pokemon")?.kind).toBe("link")
   expect(gameRules("ygo")?.kind).toBe("link")
   expect(gameRules("lorcana")).toBeUndefined()

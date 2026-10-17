@@ -19,6 +19,7 @@ import {
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
+import { deckStartingValue } from "./lib/deckStartingValue"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { gatedTableAction, gatedTableState, tableRelatedSeatId } from "./lib/gameEngine"
 import { limitGameRate } from "./lib/gameRateLimits"
@@ -468,6 +469,10 @@ async function commanderDamageProjection(
   }
 }
 
+function gameDeckRules(game: Doc<"games">) {
+  return [game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset] as const
+}
+
 async function deckSelectionIsPlayable(
   ctx: QueryCtx,
   deckVersionId: Id<"deckVersions">,
@@ -476,11 +481,12 @@ async function deckSelectionIsPlayable(
   const version = await ctx.db.get(deckVersionId)
   if (!version || version.archivedAt !== undefined) return false
   const deck = await ctx.db.get(version.deckId)
+  const [system, format] = gameDeckRules(game)
   return (
     deck !== null &&
     deck.archivedAt === undefined &&
-    (deck.game ?? DEFAULT_DECK_GAME) === (game.system ?? game.game ?? DEFAULT_DECK_GAME) &&
-    deck.format === (game.format ?? game.ruleset)
+    (deck.game ?? DEFAULT_DECK_GAME) === system &&
+    deck.format === format
   )
 }
 
@@ -1987,11 +1993,16 @@ export const startGame = mutation({
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
+      const deckLife =
+        player.deckVersionId && !invalidSinceSelection
+          ? await deckStartingValue(ctx, player.deckVersionId, ...gameDeckRules(game))
+          : undefined
       await ctx.db.patch(player._id, {
         resumable: true,
         color: player.color,
         shape: player.shape,
         ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
+        ...(deckLife === undefined ? {} : { currentLife: deckLife }),
         ...roles?.[index],
       })
     }
@@ -2803,7 +2814,10 @@ async function startRematch(
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
       ...(await rematchProMark(ctx, player)),
-      currentLife: finished.startingLife,
+      currentLife:
+        (deckVersionId
+          ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
+          : undefined) ?? finished.startingLife,
       eventCount: 0,
       resumable: true,
       joinedAt: now,

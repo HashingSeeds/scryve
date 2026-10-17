@@ -109,12 +109,14 @@ const board = {
       mtg: "Tied on life",
       ygo: "Tied on life points",
       pokemon: "Tied on prize cards",
+      fab: "Tied on life",
     },
     leads: {
       none: "{{name}} leads on life",
       mtg: "{{name}} leads on life",
       ygo: "{{name}} leads on life points",
       pokemon: "{{name}} leads on prize cards",
+      fab: "{{name}} leads on life",
     },
   },
   clock: {
@@ -336,12 +338,14 @@ const board = {
       ygo: "Tap to change {{identity}}'s Life Points by {{delta}}. Long press for more controls.",
       pokemon:
         "Tap to change {{identity}}'s Prize cards by {{delta}}. Long press for more controls.",
+      fab: "Tap to change {{identity}}'s life by {{delta}}. Long press for more controls.",
     },
     moreControls: {
       none: "{{identity}}, more life controls",
       mtg: "{{identity}}, more life controls",
       ygo: "{{identity}}, more Life Points controls",
       pokemon: "{{identity}}, more Prize cards controls",
+      fab: "{{identity}}, more life controls",
     },
   },
   grid: {
@@ -353,7 +357,9 @@ const board = {
       ygo_one: "{{count}} player Life Points grid",
       ygo_other: "{{count}} player Life Points grid",
       pokemon_one: "{{count}} player Prize cards grid",
+      fab_one: "{{count}} player life grid",
       pokemon_other: "{{count}} player Prize cards grid",
+      fab_other: "{{count}} player life grid",
     },
   },
   pokemonSheet: {
@@ -434,18 +440,21 @@ const board = {
       mtg: "{{name}} life change",
       ygo: "{{name}} Life Points change",
       pokemon: "{{name}} Prize cards change",
+      fab: "{{name}} life change",
     },
     add: {
       none: "Add {{amount}} life",
       mtg: "Add {{amount}} life",
       ygo: "Add {{amount}} Life Points",
       pokemon: "Add {{amount}} Prize cards",
+      fab: "Add {{amount}} life",
     },
     subtract: {
       none: "Subtract {{amount}} life",
       mtg: "Subtract {{amount}} life",
       ygo: "Subtract {{amount}} Life Points",
       pokemon: "Subtract {{amount}} Prize cards",
+      fab: "Subtract {{amount}} life",
     },
   },
 }

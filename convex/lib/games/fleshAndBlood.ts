@@ -10,10 +10,17 @@ import {
   type BulkDataset,
   type DatasetCard,
 } from "./cards"
+import type { DeckListRules } from "./decks"
 
 /** why: the dataset's develop branch can break, so sync reads a release tag. Bump it to ship new sets. */
 const FAB_CUBE_TAG = "v8.2.0"
 export const FAB_CUBE_NAMESPACE = "fab-cube-card"
+
+const PITCH_COLORS = new Map([
+  ["1", "red"],
+  ["2", "yellow"],
+  ["3", "blue"],
+])
 
 const FAB_FORMATS = [
   { key: "cc", field: "cc" },
@@ -38,8 +45,10 @@ export function normalizeFabCubeCards(value: unknown): DatasetCard[] {
   return value.flatMap((candidate) => {
     const card = objectRecord(candidate)
     const cardId = stringValue(card?.unique_id)
-    const name = stringValue(card?.name)?.trim()
-    if (!card || !cardId || !name) return []
+    const printedName = stringValue(card?.name)?.trim()
+    if (!card || !cardId || !printedName) return []
+    const pitch = PITCH_COLORS.get(String(card.pitch))
+    const name = pitch ? `${printedName} (${pitch})` : printedName
     const text = stringValue(card.functional_text_plain)
     const typeLabel = stringValue(card.type_text)
     const costLabel = stringValue(card.cost)
@@ -99,3 +108,16 @@ export const FAB_CUBE_DATASET = {
       ),
     ),
 } satisfies BulkDataset
+
+export const FAB_DECK_LIST = {
+  sectionHeadings: {
+    hero: ["hero"],
+    arena: ["arena cards", "arena", "equipment", "weapons"],
+    main: ["deck cards", "deck", "main deck", "main"],
+  },
+  skipsLine: (line) => /^(?:name|format):|^made with\b|^see the full deck\b/i.test(line),
+  headerCard: (line) => {
+    const hero = /^hero:\s*(.+)$/i.exec(line)?.[1]?.trim()
+    return hero ? { section: "hero", reference: hero } : undefined
+  },
+} satisfies DeckListRules

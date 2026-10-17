@@ -145,7 +145,11 @@ export function RulesScreen({
         return (
           <View style={themed($entry)}>
             <Text size="sm" weight="medium" text={item.entry.term} />
-            <RuleText text={item.entry.text} onOpenRule={onOpenRule} />
+            <RuleText
+              reference={source.references}
+              text={item.entry.text}
+              onOpenRule={onOpenRule}
+            />
           </View>
         )
       case "rule":
@@ -162,9 +166,15 @@ export function RulesScreen({
               style={item.target ? themed($link) : undefined}
               text={item.rule.id}
             />
-            <RuleText text={item.rule.text} onOpenRule={onOpenRule} />
+            <RuleText reference={source.references} text={item.rule.text} onOpenRule={onOpenRule} />
             {item.rule.examples.map((example) => (
-              <RuleText key={example} text={example} onOpenRule={onOpenRule} dim />
+              <RuleText
+                reference={source.references}
+                key={example}
+                text={example}
+                onOpenRule={onOpenRule}
+                dim
+              />
             ))}
           </Pressable>
         )
@@ -187,7 +197,7 @@ export function RulesScreen({
       <Header title={title} leftTx="common:back" onLeftPress={onBack} />
       {Platform.OS === "web" ? (
         <View style={themed($message)}>
-          <Text size="sm" tx="play:rules.webOnly" />
+          <Text size="sm" tx="play:rules.webOnly" txOptions={{ publisher: source.publisher }} />
           {officialLink}
         </View>
       ) : !rules ? (
@@ -199,7 +209,12 @@ export function RulesScreen({
               testID="rules-failed"
             />
           ) : (
-            <Text size="sm" style={themed($dim)} tx="play:rules.downloading" />
+            <Text
+              size="sm"
+              style={themed($dim)}
+              tx="play:rules.downloading"
+              txOptions={{ publisher: source.publisher }}
+            />
           )}
         </View>
       ) : (
@@ -244,12 +259,14 @@ export function RulesScreen({
           ListFooterComponent={
             contents && !query.trim() ? (
               <View style={themed($footer)}>
-                <Text
-                  size="xs"
-                  style={themed($dim)}
-                  tx="play:rules.effective"
-                  txOptions={{ date: rules.effectiveDate }}
-                />
+                {rules.effectiveDate ? (
+                  <Text
+                    size="xs"
+                    style={themed($dim)}
+                    tx="play:rules.effective"
+                    txOptions={{ date: rules.effectiveDate }}
+                  />
+                ) : null}
                 {officialLink}
                 {rules.notice.map((line) => (
                   <Text key={line} size="xxs" style={themed($dim)} text={line} />
@@ -265,17 +282,19 @@ export function RulesScreen({
 
 function RuleText({
   text,
+  reference,
   onOpenRule,
   dim,
 }: {
   text: string
+  reference: RegExp
   onOpenRule: (id: string) => void
   dim?: boolean
 }) {
   const { themed } = useAppTheme()
   return (
     <Text size="sm" style={dim ? themed($dim) : undefined}>
-      {ruleReferences(text).map((part, index) =>
+      {ruleReferences(text, reference).map((part, index) =>
         typeof part === "string" ? (
           part
         ) : (

@@ -87,6 +87,7 @@ import { useStoreReview } from "@/utils/useStoreReview"
 import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
 import { shownMarkShape } from "../../convex/lib/appearance"
+import type { SystemId } from "../../convex/lib/systems"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -96,7 +97,7 @@ type ConnectedBoardScreenProps = {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (system: SystemId) => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -251,7 +252,7 @@ type ConnectedBoardReadyProps = {
   initialInviteOpen?: boolean
   onBack?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (system: SystemId) => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -329,7 +330,7 @@ interface ConnectedBoardRuntimeProps {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (system: SystemId) => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -813,7 +814,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             disabled: rules.kind === "text" && !onRules,
             onPress: () => {
               setMenuOpen(false)
-              openRules(rules, onRules)
+              openRules(rules, () => system && onRules?.(system))
             },
           }
         : {
@@ -861,6 +862,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       onHistory,
       onRules,
       rules,
+      system,
     ],
   )
   const seatColors = useSeatColors(players)

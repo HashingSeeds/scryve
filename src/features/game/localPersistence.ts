@@ -228,6 +228,9 @@ function parsePlayers(value: unknown): GamePlayer[] | null {
       ...(isPlayerMarkShape(candidate.shape) ? { shape: candidate.shape } : {}),
       life: candidate.life,
       seat: candidate.seat,
+      ...(typeof candidate.startingLife === "number" && Number.isInteger(candidate.startingLife)
+        ? { startingLife: candidate.startingLife }
+        : {}),
     })
   }
   return players

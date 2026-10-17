@@ -3,7 +3,9 @@ import {
   formatDefinition,
   hasCommandZone,
   identitySection,
+  identityStartingValue,
   isCounterOut,
+  picksCommander,
   SYSTEM_IDS,
   SYSTEMS,
   tableRules,
@@ -20,14 +22,37 @@ describe("system definitions", () => {
     expect(hasCommandZone("mtg", "brawl")).toBe(true)
   })
 
-  it("picks an identity card only in Commander, whose picker checks Commander legality", () => {
+  it("picks an identity card in Commander and every Flesh and Blood format, and only Commander runs the Commander picker", () => {
     const identities = SYSTEM_IDS.flatMap((system) =>
       SYSTEMS[system].formats.flatMap((format) => {
         const section = identitySection(system, format.id)
         return section ? [`${system}:${format.id}:${section.id}`] : []
       }),
     )
-    expect(identities).toEqual(["mtg:commander:commander"])
+    expect(identities).toEqual([
+      "mtg:commander:commander",
+      ...SYSTEMS.fab.formats.map(({ id }) => `fab:${id}:hero`),
+    ])
+    expect(
+      SYSTEM_IDS.flatMap((system) =>
+        SYSTEMS[system].formats.flatMap(({ id }) => (picksCommander(system, id) ? [id] : [])),
+      ),
+    ).toEqual(["commander"])
+  })
+
+  it("starts a seat at its identity card's printed life, within the counter's range", () => {
+    const hero = (health: string) => [
+      { key: "pitch", value: "1" },
+      { key: "health", value: health },
+    ]
+    expect(identityStartingValue("fab", "cc", hero("38"))).toBe(38)
+    expect(identityStartingValue("fab", "blitz", hero("20"))).toBe(20)
+    expect(identityStartingValue("fab", "cc", hero("*"))).toBeUndefined()
+    expect(identityStartingValue("fab", "cc", hero("0"))).toBeUndefined()
+    expect(identityStartingValue("fab", "cc", [])).toBeUndefined()
+    expect(identityStartingValue("mtg", "commander", hero("40"))).toBeUndefined()
+    expect(formatDefinition("fab", "blitz")?.startingValue).toBe(20)
+    expect(SYSTEMS.fab.counter).toMatchObject({ defaultValue: 40, goal: { kind: "survive" } })
   })
 
   it("tracks commander damage only in Commander", () => {

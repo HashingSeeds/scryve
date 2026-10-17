@@ -13,6 +13,7 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
+import { deckStartingValue } from "./lib/deckStartingValue"
 import {
   syncedDeck,
   syncedDeckValidator,
@@ -1394,6 +1395,17 @@ export const versionCards = query({
       revision: syncedVersion(version).revision,
       cards: cards.map((card) => projectCard(deck, false, card)),
     }
+  },
+})
+
+export const startingValue = query({
+  args: { versionId: v.id("deckVersions") },
+  handler: async (ctx, args) => {
+    const { deck, version } = await ownedVersion(ctx, args.versionId)
+    return (
+      (await deckStartingValue(ctx, version._id, deck.game ?? DEFAULT_DECK_GAME, deck.format)) ??
+      null
+    )
   },
 })
 

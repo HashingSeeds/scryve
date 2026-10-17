@@ -41,6 +41,7 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
   mtg: playRulesFor("mtg"),
   ygo: playRulesFor("ygo"),
   pokemon: playRulesFor("pokemon"),
+  fab: playRulesFor("fab"),
 }
 
 const GENERIC_COUNTER: CounterRules = {

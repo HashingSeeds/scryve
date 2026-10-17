@@ -17,6 +17,8 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { systemDefinition } from "../../convex/lib/systems"
+
 export type FocusedCard = CardImageIdentity & {
   name: string
   imageUrl?: string
@@ -132,6 +134,7 @@ export function CardFocusDialog({
           ? translate("decks:cardFocus.notLegal")
           : undefined
   const printing = details ? printingLine(details) : ""
+  const imageCredit = systemDefinition(card.game)?.integration.rights.imageCredit
   const colorIdentity = cardColorIdentityLabel(details, card.name)
   const smallImageUrl = face ? face.smallImageUrl : (details?.smallImageUrl ?? card.smallImageUrl)
   const displayImageUrl = face
@@ -209,6 +212,7 @@ export function CardFocusDialog({
           {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
           {visibleDetails?.oracleText ? <Text selectable text={visibleDetails.oracleText} /> : null}
           {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
+          {imageCredit ? <Text size="xxs" style={themed($dimText)} text={imageCredit} /> : null}
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} tx="decks:cardFocus.loadingDetails" />
           ) : null}

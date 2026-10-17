@@ -59,13 +59,15 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
 
+import type { SystemId } from "../../convex/lib/systems"
+
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
   fresh?: boolean
   initialEndOpen?: boolean
   onDecks?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (system: SystemId) => void
   onSetup?: () => void
   onConnect?: () => void
   onSettings?: () => void
@@ -328,7 +330,7 @@ export function CurrentGameScreen({
             disabled: rules.kind === "text" && !onRules,
             onPress: () => {
               closeMenu()
-              openRules(rules, onRules)
+              openRules(rules, () => system && onRules?.(system))
             },
           }
         : {
@@ -370,6 +372,7 @@ export function CurrentGameScreen({
       onRules,
       onSetup,
       rules,
+      system,
       showEndConfirmation,
     ],
   )

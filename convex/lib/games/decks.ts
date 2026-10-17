@@ -25,6 +25,7 @@ export function nameReference(reference: string): DeckListReference {
 export type DeckListRules = {
   readonly sectionHeadings: Readonly<Record<string, readonly string[]>>
   readonly skipsLine?: (line: string) => boolean
+  readonly headerCard?: (line: string) => { section: string; reference: string } | undefined
   readonly shareCode?: (list: string) => ParsedDeckList | undefined
   readonly bareCardId?: (line: string) => string | undefined
   readonly reference?: (reference: string) => DeckListReference | undefined

@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-10-16",
-  effectiveDate: "October 16, 2026",
+  version: "2026-10-17",
+  effectiveDate: "October 17, 2026",
   sections: [
     {
       blocks: [
@@ -54,6 +54,23 @@ export const gameContentNotices = {
         {
           type: "paragraph",
           text: "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through TCGdex, and tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by those organizations.",
+        },
+      ],
+    },
+    {
+      heading: "Flesh and Blood",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "Scryve is in no way affiliated with Legend Story Studios. Legend Story Studios®, Flesh and Blood™, and set names are trademarks of Legend Story Studios. Flesh and Blood characters, cards, logos, and art are property of Legend Story Studios.",
+        },
+        {
+          type: "paragraph",
+          text: "Card data is provided through the fab-cube dataset, and card images load from Legend Story Studios. Card images © Legend Story Studios. Scryve uses these materials for card identification, deck management, play tracking, and reference.",
+        },
+        {
+          type: "paragraph",
+          text: "The Flesh and Blood Comprehensive Rules are downloaded from Legend Story Studios to your device when you start a Flesh and Blood game or open Rules, and shown with their original notices. Scryve does not host or distribute them. The official rules are at https://rules.fabtcg.com/en/.",
         },
       ],
     },

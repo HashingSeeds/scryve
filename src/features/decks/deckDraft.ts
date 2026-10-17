@@ -3,7 +3,7 @@ import { translate } from "@/i18n/translate"
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
-import { identitySection } from "../../../convex/lib/systems"
+import { identitySection, picksCommander } from "../../../convex/lib/systems"
 
 export const MAX_CARD_COPIES = 999
 
@@ -133,6 +133,7 @@ export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) 
   const identity = identitySection(deck.game, deck.format)
   return (
     identity !== undefined &&
+    picksCommander(deck.game, deck.format) &&
     cards.reduce(
       (count, card) => count + (cardSection(card) === identity.id ? card.quantity : 0),
       0,
@@ -145,6 +146,11 @@ export function addCommanderCard<T extends DeckCard>(
   card: T,
   detailsFor: CardDetailsLookup<T>,
 ) {
+  const section = cardSection(card)
+  if (section !== "commander")
+    return {
+      cards: [...cards.filter((entry) => cardSection(entry) !== section), { ...card, quantity: 1 }],
+    }
   const result = addCommander(cards, card, detailsFor, card.commanderColor)
   if ("error" in result) return result
   if (result.cards.length > MAX_DECK_CARDS)

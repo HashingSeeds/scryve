@@ -522,6 +522,7 @@ export default {
       "Pega una lista de Pokémon TCG Live con cantidades, nombres, códigos de set y números de carta.",
     listHelperMtg:
       'Usa líneas como "1 Sol Ring". Se admiten los encabezados Commander, Mainboard y Sideboard.',
+    listHelperFab: 'Pega una lista de cartas de Fabrary o líneas como "3x Snatch (red)".',
     returnToReview: "Volver a la revisión",
     loadingDeck: "Cargando mazo…",
     reloadSource: "Recargar origen",

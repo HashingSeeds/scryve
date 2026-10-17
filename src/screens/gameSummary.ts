@@ -27,6 +27,7 @@ export interface SummaryPlayer {
   deckLabel?: string
   color: string
   life: number
+  startingLife?: number
   outcome: SummaryOutcome
   deleted?: boolean
 }
@@ -96,6 +97,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
       name: player.name,
       color: player.color,
       life: player.life,
+      ...(player.startingLife === undefined ? {} : { startingLife: player.startingLife }),
       outcome: localOutcome(game.result, player.id),
     })),
   }

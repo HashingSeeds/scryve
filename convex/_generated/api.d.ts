@@ -33,6 +33,7 @@ import type * as lib_cardImageFallback from "../lib/cardImageFallback.js";
 import type * as lib_deckGames from "../lib/deckGames.js";
 import type * as lib_deckRateLimits from "../lib/deckRateLimits.js";
 import type * as lib_deckSources from "../lib/deckSources.js";
+import type * as lib_deckStartingValue from "../lib/deckStartingValue.js";
 import type * as lib_deckSync from "../lib/deckSync.js";
 import type * as lib_deckVersions from "../lib/deckVersions.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
@@ -107,6 +108,7 @@ declare const fullApi: ApiFromModules<{
   "lib/deckGames": typeof lib_deckGames;
   "lib/deckRateLimits": typeof lib_deckRateLimits;
   "lib/deckSources": typeof lib_deckSources;
+  "lib/deckStartingValue": typeof lib_deckStartingValue;
   "lib/deckSync": typeof lib_deckSync;
   "lib/deckVersions": typeof lib_deckVersions;
   "lib/entitlements": typeof lib_entitlements;

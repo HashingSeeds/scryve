@@ -151,6 +151,7 @@ export interface NewGameScreenProps {
   onEndLocal?: (result: LocalGameResult) => void
   onAbandonLocal?: () => void
   onSavePlayers?: (players: NewPlayerInput[], account?: LocalGameAccountInput) => void
+  onDeckChange?: (versionId: string | undefined) => void
   onJoin?: () => void
   onResumeConnected?: (game: ResumableGame) => void
   onNearby?: (setup: LanSetup) => void
@@ -193,6 +194,7 @@ export function NewGameScreen({
   onEndLocal,
   onAbandonLocal,
   onSavePlayers,
+  onDeckChange,
   onJoin,
   onResumeConnected,
   onNearby,
@@ -351,6 +353,8 @@ export function NewGameScreen({
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
     deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
+  const chosenDeckVersionId = deck?.versionId
+  useEffect(() => onDeckChange?.(chosenDeckVersionId), [onDeckChange, chosenDeckVersionId])
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account

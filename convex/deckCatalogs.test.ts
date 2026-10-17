@@ -5,6 +5,7 @@ import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import { internalMutation } from "./_generated/server"
 import { DECK_GAME_LIST } from "./lib/deckGames"
+import { integration } from "./lib/integrations"
 import schema from "./schema"
 
 const modules = {
@@ -466,7 +467,9 @@ it("provides two complete, attributed examples for every selectable format witho
   const t = convexTest(schema, modules)
   const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
   try {
-    for (const game of DECK_GAME_LIST) {
+    for (const game of DECK_GAME_LIST.filter(
+      ({ id }) => integration(id)?.capabilities.exampleDecks.technical === "available",
+    )) {
       for (const format of game.formats) {
         const args = { game: game.id, format: format.id, query: "", source: "examples" as const }
         const result = await t.action(api.deckCatalogs.browse, args)

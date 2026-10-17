@@ -72,6 +72,7 @@ const DECK_LIST_HELPERS = {
   mtg: "decks:addDeck.listHelperMtg",
   ygo: "decks:addDeck.listHelperYgo",
   pokemon: "decks:addDeck.listHelperPokemon",
+  fab: "decks:addDeck.listHelperFab",
 } as const satisfies Record<SystemId, TxKeyPath>
 
 type CreationMode = "precon" | "paste" | "blank"
@@ -175,7 +176,7 @@ type ImportedCard = PreviewCard & {
 }
 
 type GenericImportedCard = {
-  game: "ygo" | "pokemon"
+  game: Exclude<SystemId, "mtg">
   identityNamespace?: string
   cardId?: string
   providerCardId?: string

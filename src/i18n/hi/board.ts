@@ -128,12 +128,14 @@ export default {
       mtg: "लाइफ में बराबरी",
       ygo: "लाइफ़ पॉइंट बराबर हैं",
       pokemon: "प्राइज़ कार्ड बराबर हैं",
+      fab: "लाइफ में बराबरी",
     },
     leads: {
       none: "{{name}} लाइफ में आगे है",
       mtg: "{{name}} लाइफ में आगे है",
       ygo: "{{name}} लाइफ़ पॉइंट में आगे है",
       pokemon: "{{name}} प्राइज़ कार्ड में आगे है",
+      fab: "{{name}} लाइफ में आगे है",
     },
   },
   clock: {
@@ -370,12 +372,14 @@ export default {
       ygo: "{{identity}} के लाइफ़ पॉइंट {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
       pokemon:
         "{{identity}} के प्राइज़ कार्ड {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
+      fab: "{{identity}} का लाइफ {{delta}} से बदलने के लिए टैप करें। और कंट्रोल के लिए देर तक दबाएं।",
     },
     moreControls: {
       none: "{{identity}}, और लाइफ कंट्रोल",
       mtg: "{{identity}}, और लाइफ कंट्रोल",
       ygo: "{{identity}}, लाइफ़ पॉइंट के और विकल्प",
       pokemon: "{{identity}}, प्राइज़ कार्ड के और विकल्प",
+      fab: "{{identity}}, और लाइफ कंट्रोल",
     },
   },
   grid: {
@@ -388,6 +392,8 @@ export default {
       ygo_other: "{{count}} खिलाड़ियों का लाइफ़ पॉइंट ग्रिड",
       pokemon_one: "{{count}} खिलाड़ी का प्राइज़ कार्ड ग्रिड",
       pokemon_other: "{{count}} खिलाड़ियों का प्राइज़ कार्ड ग्रिड",
+      fab_one: "{{count}} खिलाड़ी का लाइफ ग्रिड",
+      fab_other: "{{count}} खिलाड़ियों का लाइफ ग्रिड",
     },
   },
   pokemonSheet: {
@@ -474,18 +480,21 @@ export default {
       mtg: "{{name}} का life बदलाव",
       ygo: "{{name}} के लाइफ़ पॉइंट में बदलाव",
       pokemon: "{{name}} के प्राइज़ कार्ड में बदलाव",
+      fab: "{{name}} का life बदलाव",
     },
     add: {
       none: "{{amount}} life जोड़ें",
       mtg: "{{amount}} life जोड़ें",
       ygo: "{{amount}} लाइफ़ पॉइंट जोड़ें",
       pokemon: "{{amount}} प्राइज़ कार्ड जोड़ें",
+      fab: "{{amount}} life जोड़ें",
     },
     subtract: {
       none: "{{amount}} life घटाएँ",
       mtg: "{{amount}} life घटाएँ",
       ygo: "{{amount}} लाइफ़ पॉइंट घटाएँ",
       pokemon: "{{amount}} प्राइज़ कार्ड घटाएँ",
+      fab: "{{amount}} life घटाएँ",
     },
   },
 } satisfies LocaleNamespace

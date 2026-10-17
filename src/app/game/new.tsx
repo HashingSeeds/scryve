@@ -8,6 +8,10 @@ import {
   LocalGamePublishSource,
   type PublishedGame,
 } from "@/features/connected/LocalGamePublishSource"
+import {
+  DeckStartingValueSource,
+  type DeckStartingValue,
+} from "@/features/decks/DeckStartingValueSource"
 import { LocalDeckChoicesSource, type DeckChoices } from "@/features/decks/LocalDeckChoicesSource"
 import {
   applyGameCommand,
@@ -67,6 +71,8 @@ export default function NewLocalGameRoute() {
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [localConnect, setLocalConnect] = useState<LocalConnectFeed>()
   const [decks, setDecks] = useState<DeckChoices>()
+  const [chosenDeck, setChosenDeck] = useState<string>()
+  const [deckStartingValue, setDeckStartingValue] = useState<DeckStartingValue>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
   const [defaultMeSeat] = useState(() => {
@@ -119,6 +125,9 @@ export default function NewLocalGameRoute() {
     <>
       <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
       {ownerId ? <LocalDeckChoicesSource onChange={setDecks} /> : null}
+      {ownerId && Array.isArray(decks) && chosenDeck ? (
+        <DeckStartingValueSource versionId={chosenDeck} onChange={setDeckStartingValue} />
+      ) : null}
       {connectableGame ? (
         <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
           {(feed) => <ReportLocalConnect feed={feed} onChange={setLocalConnect} />}
@@ -145,8 +154,18 @@ export default function NewLocalGameRoute() {
         }
         onModeChange={setMode}
         onBack={() => goBack({ pathname: "/", params: { destination: "play" } })}
+        onDeckChange={setChosenDeck}
         onStartLocal={(players, startingLife, setup) => {
-          if (!startLocalGame({ players, startingLife, ...setup }))
+          const deckLife =
+            deckStartingValue?.versionId === setup.account?.deckVersionId
+              ? deckStartingValue?.value
+              : undefined
+          const seated = players.map((player, seat) =>
+            seat === setup.account?.meSeat && deckLife !== undefined
+              ? { ...player, startingLife: deckLife }
+              : player,
+          )
+          if (!startLocalGame({ players: seated, startingLife, ...setup }))
             setActiveGame(localGameRepository.loadActiveGame())
         }}
         connected={connected}

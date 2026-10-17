@@ -16,10 +16,10 @@ function facets(name: string) {
 describe("the-fab-cube normalizer", () => {
   it("maps a card, its printings, and its stats", () => {
     expect(cards).toHaveLength(fabCube.length)
-    expect(card("Snatch")).toMatchObject({
+    expect(card("Snatch (red)")).toMatchObject({
       identityNamespace: "fab-cube-card",
       cardId: "PHktCwKzLmBMwmCBwb7Cw",
-      nameNormalized: "snatch",
+      nameNormalized: "snatch (red)",
       printings: [
         {
           provider: "fab-cube",
@@ -32,7 +32,7 @@ describe("the-fab-cube normalizer", () => {
           costLabel: "0",
           faces: [
             {
-              name: "Snatch",
+              name: "Snatch (red)",
               text: "When this hits, draw a card.",
               imageUrl:
                 "https://storage.googleapis.com/fabmaster/media/images/1HP371.width-450.png",
@@ -42,7 +42,12 @@ describe("the-fab-cube normalizer", () => {
         expect.anything(),
       ],
     })
-    expect(facets("Snatch")).toMatchObject({ color: "Red", pitch: "1", power: "4", defense: "2" })
+    expect(facets("Snatch (red)")).toMatchObject({
+      color: "Red",
+      pitch: "1",
+      power: "4",
+      defense: "2",
+    })
   })
 
   it("puts hero life and intelligence in facets", () => {
@@ -59,14 +64,14 @@ describe("the-fab-cube normalizer", () => {
       "legality:cc": "living-legend",
       "legality:blitz": "not-legal",
     })
-    expect(facets("Ball Lightning")).toMatchObject({
+    expect(facets("Ball Lightning (red)")).toMatchObject({
       "legality:cc": "banned",
       "legality:blitz": "banned",
       "legality:commoner": "legal",
       "legality:silverAge": "banned",
       "legality:upf": "legal",
     })
-    expect(facets("Awakening")).toMatchObject({ "legality:ll": "restricted" })
+    expect(facets("Awakening (blue)")).toMatchObject({ "legality:ll": "restricted" })
   })
 
   it("skips records without an identity or a printing", () => {

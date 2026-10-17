@@ -1,5 +1,6 @@
 import type { CardCatalog } from "./cards"
 import type { DeckFeed, DeckLinkSource, DeckListRules } from "./decks"
+import { FAB_CUBE_DATASET, FAB_DECK_LIST } from "./fleshAndBlood"
 import { LIMITLESS_FEED, LIMITLESS_LINK } from "./limitless"
 import { POKEMON_DECK_LIST, TCGDEX_CATALOG } from "./pokemon"
 import { YGOPRODECK_CATALOG } from "./yugioh"
@@ -9,7 +10,7 @@ import type { GameSystemId } from "../integrations"
 type GameProvider = {
   readonly catalog: CardCatalog
   readonly deckList: DeckListRules
-  readonly deckLink: DeckLinkSource
+  readonly deckLink: DeckLinkSource | null
   readonly deckFeed: DeckFeed | null
 }
 
@@ -27,6 +28,12 @@ export const GAME_PROVIDERS: Readonly<Record<ProviderGame, GameProvider>> = {
     deckList: POKEMON_DECK_LIST,
     deckLink: LIMITLESS_LINK,
     deckFeed: LIMITLESS_FEED,
+  },
+  fab: {
+    catalog: { bulk: FAB_CUBE_DATASET },
+    deckList: FAB_DECK_LIST,
+    deckLink: null,
+    deckFeed: null,
   },
 }
 

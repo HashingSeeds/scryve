@@ -303,6 +303,7 @@ export default {
         mtg: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
         ygo: "Impossible de synchroniser la modification de {{delta}} Life Points",
         pokemon: "Une modification de {{delta}} cartes Récompense n'a pas pu être synchronisée",
+        fab: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
       },
       commanderDamage:
         "Une attribution de {{delta}} dégâts de commandant n'a pas pu être synchronisée",

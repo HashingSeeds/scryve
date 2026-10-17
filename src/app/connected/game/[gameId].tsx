@@ -39,7 +39,7 @@ export default function ConnectedGameRoute() {
         onGameAbandoned={() => router.replace("/game/new?mode=connected")}
         onBack={() => router.replace("/game/new?mode=connected")}
         onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
-        onRules={() => router.push("/rules")}
+        onRules={(system) => router.push({ pathname: "/rules", params: { system } })}
         onDecks={() => router.push("/connected/decks")}
         onSettings={() => router.push("/settings")}
         accountEntry={auth.isSignedIn ? "account" : "signIn"}
