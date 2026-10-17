@@ -383,7 +383,7 @@ export const SYSTEMS = {
   lorcana: {
     label: "Disney Lorcana",
     shortLabel: "Lorcana",
-    available: true,
+    release: "beta",
     defaultFormat: { deck: "core", play: "core" },
     counter: {
       label: "lore",
