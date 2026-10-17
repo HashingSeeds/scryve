@@ -107,6 +107,7 @@ function shelf(
         onPlay={jest.fn()}
         onSelect={jest.fn()}
         onAddDeck={jest.fn()}
+        onHistory={jest.fn()}
         onSettings={jest.fn()}
         onAccount={jest.fn()}
         {...props}
@@ -637,6 +638,7 @@ describe("DecksScreen", () => {
           onPlay={jest.fn()}
           onSelect={jest.fn()}
           onAddDeck={jest.fn()}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
         />

@@ -7,7 +7,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { type AccountEntry, AppUtilityMenu } from "./AppUtilityMenu"
+import { type AccountEntry, AppUtilityMenu, UTILITY_MENU_HEIGHT } from "./AppUtilityMenu"
 import { Text } from "./Text"
 
 export type AppDestination = "decks" | "returnToGame" | "play" | "backToLobby"
@@ -15,12 +15,14 @@ export type AppDestination = "decks" | "returnToGame" | "play" | "backToLobby"
 export function FloatingAppNavigation({
   destination,
   onDestination,
+  onHistory,
   onSettings,
   onAccount,
   accountEntry = "account",
 }: {
   destination: AppDestination
   onDestination: () => void
+  onHistory: () => void
   onSettings: () => void
   onAccount: () => void
   accountEntry?: AccountEntry
@@ -44,6 +46,7 @@ export function FloatingAppNavigation({
           compact
           placement="bottomLeft"
           accountEntry={accountEntry}
+          onHistory={onHistory}
           onSettings={onSettings}
           onAccount={onAccount}
           onOpenChange={setUtilityOpen}
@@ -77,7 +80,7 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   justifyContent: "flex-end",
 })
-const $expandedNavigation: ViewStyle = { height: 108 }
+const $expandedNavigation: ViewStyle = { height: UTILITY_MENU_HEIGHT }
 const $utilityAboveDestination: ViewStyle = { position: "absolute", left: 0, bottom: 0, zIndex: 1 }
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 92,

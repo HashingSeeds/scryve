@@ -23,6 +23,7 @@ export function AppUtilityMenu({
   visible = true,
   compact = false,
   placement = "topRight",
+  onHistory,
   onSettings,
   onAccount,
   onOpenChange,
@@ -31,6 +32,7 @@ export function AppUtilityMenu({
   visible?: boolean
   compact?: boolean
   placement?: "topRight" | "bottomLeft"
+  onHistory: () => void
   onSettings: () => void
   onAccount: () => void
   onOpenChange?: (open: boolean) => void
@@ -57,7 +59,7 @@ export function AppUtilityMenu({
 
   const containerStyle = useAnimatedStyle(() => ({
     width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, compact ? 148 : 188]),
-    height: interpolate(progress.value, [0, 1], [44, 108]),
+    height: interpolate(progress.value, [0, 1], [44, UTILITY_MENU_HEIGHT]),
     borderRadius: compact ? interpolate(progress.value, [0, 1], [22, 16]) : 0,
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
@@ -144,6 +146,19 @@ export function AppUtilityMenu({
           style={[$fill, themed($items), itemsStyle]}
         >
           <Pressable
+            testID="utility-history-button"
+            accessibilityRole="button"
+            style={themed($item)}
+            onPress={() => choose(onHistory)}
+          >
+            <Text
+              tx="common:appMenu.history"
+              weight="medium"
+              numberOfLines={1}
+              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            />
+          </Pressable>
+          <Pressable
             testID="utility-settings-button"
             accessibilityRole="button"
             accessibilityLabel={translate(
@@ -180,11 +195,12 @@ export function AppUtilityMenu({
 }
 
 const MENU_MAX_FONT_SCALE = 1.5
+export const UTILITY_MENU_HEIGHT = 160
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
-const $expandedSlot: ViewStyle = { width: 188, height: 108 }
-const $expandedCompactSlot: ViewStyle = { width: 148, height: 108 }
+const $expandedSlot: ViewStyle = { width: 188, height: UTILITY_MENU_HEIGHT }
+const $expandedCompactSlot: ViewStyle = { width: 148, height: UTILITY_MENU_HEIGHT }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,

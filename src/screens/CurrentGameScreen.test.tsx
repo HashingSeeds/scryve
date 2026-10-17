@@ -92,6 +92,7 @@ describe("CurrentGameScreen", () => {
           })}
           repository={new LocalGameRepository(new MemoryStorage())}
           onDecks={jest.fn()}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
           onViewSummary={jest.fn()}
@@ -133,6 +134,7 @@ describe("CurrentGameScreen", () => {
           initialGame={game()}
           repository={new LocalGameRepository(new MemoryStorage())}
           onDecks={jest.fn()}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
           onViewSummary={jest.fn()}

@@ -25,6 +25,7 @@ it.each([
         <FloatingAppNavigation
           destination="decks"
           onDestination={jest.fn()}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
         />
@@ -44,6 +45,7 @@ describe("FloatingAppNavigation", () => {
         <FloatingAppNavigation
           destination="returnToGame"
           onDestination={jest.fn()}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
         />
@@ -61,6 +63,6 @@ describe("FloatingAppNavigation", () => {
 
     fireEvent.press(view.getByTestId("utility-menu-button"))
 
-    expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({ height: 108 })
+    expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({ height: 160 })
   })
 })
