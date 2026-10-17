@@ -33,6 +33,8 @@ export interface SeatTable {
   adjustCounter: (counterId: string, delta: number) => void
   takeDesignation: (designationId: string) => void
   releaseDesignation: (designationId: string) => void
+  tableItemRules?: Readonly<Partial<Record<string, string>>>
+  openRule?: (ruleId: string) => void
 }
 
 const NO_COUNTERS: Readonly<Record<string, number>> = {}
@@ -495,6 +497,8 @@ function CounterSheet({
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
   const counterLabel = counter ? tableItemLabel(counter) : ""
+  const ruleId = counter && seat.tableItemRules?.[counter.id]
+  const { openRule } = seat
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
@@ -566,6 +570,15 @@ function CounterSheet({
                 onClose()
               }}
             />
+            {ruleId && openRule ? (
+              <SheetTextButton
+                testID={`counter-rule-${seatNumber}`}
+                text={ruleId}
+                accessibilityLabel={translate("board:counters.rule", { rule: ruleId })}
+                ink={ink}
+                onPress={() => openRule(ruleId)}
+              />
+            ) : null}
             <SheetTextButton
               testID={`counter-done-${seatNumber}`}
               text={translate("common:done")}

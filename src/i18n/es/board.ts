@@ -359,6 +359,7 @@ export default {
     addCounter: "Añadir {{label}}",
     giveUp: "Ceder {{label}}",
     take: "Tomar {{label}}",
+    rule: "Regla {{rule}}",
   },
   seat: {
     identity: "Asiento {{seat}}, {{name}}",
