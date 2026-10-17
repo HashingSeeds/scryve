@@ -34,23 +34,36 @@ export const sync = internalAction({
     if (state?.version === version) return null
     const cards = (await dataset.load(version)).sort((a, b) => (a.cardId < b.cardId ? -1 : 1))
     if (cards.length === 0) throw new Error(`${game} dataset ${version} has no cards`)
-    let offset = state?.pending?.version === version ? state.pending.nextIndex : 0
+    const pending = state?.pending?.version === version ? state.pending : undefined
+    const continueLater = async () => {
+      await ctx.scheduler.runAfter(0, internal.cardDatasetSync.sync, { game })
+      return null
+    }
+    let offset = pending?.nextIndex ?? 0
     while (offset < cards.length) {
-      if (Date.now() - startedAt > SYNC_BUDGET_MS) {
-        await ctx.scheduler.runAfter(0, internal.cardDatasetSync.sync, { game })
-        return null
-      }
+      if (Date.now() - startedAt > SYNC_BUDGET_MS) return await continueLater()
       const next = await ctx.runMutation(internal.cardCatalog.writeDatasetBatch, {
         game,
         version,
         storedVersion: state?.version,
         offset,
-        total: cards.length,
         cards: cards.slice(offset, batchEnd(cards, offset)),
       })
       if (next === null) return null
       offset = next
     }
+    let cursor = pending?.sweepCursor ?? null
+    do {
+      if (Date.now() - startedAt > SYNC_BUDGET_MS) return await continueLater()
+      const swept = await ctx.runMutation(internal.cardCatalog.sweepDatasetBatch, {
+        game,
+        version,
+        total: cards.length,
+        cursor,
+      })
+      if (swept === null) return null
+      cursor = swept.cursor
+    } while (cursor !== null)
     return null
   },
 })

@@ -20,10 +20,10 @@ function datasetCard(index: number): DatasetCard {
 
 const datasetCards = Array.from({ length: 150 }, (_, index) => datasetCard(index)).reverse()
 
-function useDataset(version: string) {
+function useDataset(version: string, cards = datasetCards) {
   const dataset = {
     version: jest.fn(async () => version),
-    load: jest.fn(async () => datasetCards),
+    load: jest.fn(async () => cards),
   } satisfies BulkDataset
   jest.replaceProperty(GAME_PROVIDERS, "ygo", { ...GAME_PROVIDERS.ygo, catalog: { bulk: dataset } })
   return dataset
@@ -70,7 +70,7 @@ describe("bulk card dataset sync", () => {
       await ctx.db.insert("cardDatasetSyncs", {
         game: "ygo",
         version: "v1",
-        pending: { version: "v2", nextIndex: 100 },
+        pending: { version: "v2", nextIndex: 100, startedAt: Date.now() },
       })
     })
 
@@ -84,7 +84,6 @@ describe("bulk card dataset sync", () => {
         game: "ygo",
         version: "v2",
         offset: 100,
-        total: 150,
         cards: [datasetCard(100)],
       }),
     ).resolves.toBeNull()
@@ -94,7 +93,6 @@ describe("bulk card dataset sync", () => {
         version: "v1",
         storedVersion: "v1",
         offset: 0,
-        total: 1,
         cards: [datasetCard(0)],
       }),
     ).resolves.toBeNull()
@@ -109,12 +107,48 @@ describe("bulk card dataset sync", () => {
     await t.run(async (ctx) => {
       await ctx.db.insert("cardDatasetSyncs", {
         game: "ygo",
-        pending: { version: "v2", nextIndex: 100 },
+        pending: { version: "v2", nextIndex: 100, startedAt: Date.now() },
       })
     })
 
     await t.action(internal.cardDatasetSync.sync, { game: "ygo" })
 
     expect(await storedCardIds(t)).toHaveLength(150)
+  })
+
+  it("removes cards and printings the new version no longer has", async () => {
+    const t = makeConvexTest()
+    useDataset("v1")
+    await t.action(internal.cardDatasetSync.sync, { game: "ygo" })
+    const reprinted = datasetCard(10)
+    useDataset("v2", [
+      ...datasetCards.filter((card) => card.cardId !== "bulk-005" && card.cardId !== "bulk-010"),
+      {
+        ...reprinted,
+        printings: [{ ...reprinted.printings[0], printingId: "bulk-010-corrected" }],
+      },
+      datasetCard(200),
+    ])
+
+    await t.action(internal.cardDatasetSync.sync, { game: "ygo" })
+
+    const ids = await storedCardIds(t)
+    expect(ids).toHaveLength(150)
+    expect(ids).not.toContain("bulk-005")
+    expect(ids).toContain("bulk-200")
+    const printingIds = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("cardPrintings")
+          .collect()
+          .then((printings) => printings.map((printing) => printing.printingId)),
+    )
+    expect(printingIds).toHaveLength(150)
+    expect(printingIds).toEqual(expect.arrayContaining(["bulk-010-corrected"]))
+    expect(printingIds).not.toEqual(expect.arrayContaining(["bulk-005"]))
+    expect(printingIds).not.toEqual(expect.arrayContaining(["bulk-010"]))
+    const state = await t.query(internal.cardCatalog.datasetSync, { game: "ygo" })
+    expect(state).toMatchObject({ version: "v2" })
+    expect(state).not.toHaveProperty("pending")
   })
 })

@@ -444,7 +444,14 @@ export default defineSchema({
   cardDatasetSyncs: defineTable({
     game: v.string(),
     version: v.optional(v.string()),
-    pending: v.optional(v.object({ version: v.string(), nextIndex: v.number() })),
+    pending: v.optional(
+      v.object({
+        version: v.string(),
+        nextIndex: v.number(),
+        startedAt: v.number(),
+        sweepCursor: v.optional(v.string()),
+      }),
+    ),
   }).index("by_game", ["game"]),
 
   providerHealth: defineTable({
