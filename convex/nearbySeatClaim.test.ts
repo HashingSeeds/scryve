@@ -90,6 +90,7 @@ describe("claimNearbySeat", () => {
       status: "claimed",
     })
 
+    expect(publicId).toBe(PUBLIC_ID)
     const history = await historyOf(guest)
     expect(history.page).toHaveLength(1)
     expect(history.page[0]).toMatchObject({
@@ -192,6 +193,10 @@ describe("claimNearbySeat", () => {
     )
 
     const { publicId } = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    expect(publicId).not.toBe(PUBLIC_ID)
+    await expect(
+      host.mutation(api.games.publishFinishedLocalGame, await nearbyGame()),
+    ).resolves.toMatchObject({ publicId })
     await expect(
       other.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: OTHER_TOKEN }),
     ).resolves.toEqual({ status: "claimed" })

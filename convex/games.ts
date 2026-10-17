@@ -1317,9 +1317,16 @@ export const publishFinishedLocalGame = mutation({
       if (winners.some((localId) => !localIds.has(localId)))
         throw new Error("Winner must belong to this game")
     }
-    const publicId =
-      seatPassHashes.length > 0 ? await nearbyGamePublicId(args.publicId, user._id) : args.publicId
-    const existing = await findGameByPublicId(ctx, publicId)
+    let publicId = args.publicId
+    let existing = await findGameByPublicId(ctx, publicId)
+    if (
+      existing &&
+      seatPassHashes.length > 0 &&
+      (existing.mode !== "local" || existing.hostUserId !== user._id)
+    ) {
+      publicId = await nearbyGamePublicId(args.publicId, user._id)
+      existing = await findGameByPublicId(ctx, publicId)
+    }
     if (existing) {
       if (existing.mode !== "local" || existing.hostUserId !== user._id)
         throw new Error("Game identifier collision; retry")
@@ -1452,8 +1459,10 @@ export const claimNearbySeat = mutation({
       .withIndex("by_seat_pass_hash", (q) => q.eq("seatPassHash", hash))) {
       const game = await ctx.db.get(candidate.gameId)
       if (
-        game?.hostUserId &&
-        game.publicId === (await nearbyGamePublicId(args.publicId, game.hostUserId))
+        game &&
+        (game.publicId === args.publicId ||
+          (game.hostUserId &&
+            game.publicId === (await nearbyGamePublicId(args.publicId, game.hostUserId))))
       ) {
         found = { game, seat: candidate }
         break

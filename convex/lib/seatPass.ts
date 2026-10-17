@@ -8,7 +8,7 @@ export async function hashSeatPassToken(token: string) {
 
 export const isSeatPassHash = (value: string) => SEAT_PASS_HASH.test(value)
 
-/** why: nearby round IDs reach every guest, so a guest could publish under one first; scoping the stored ID to the uploader keeps the host's upload from colliding. */
+/** why: nearby round IDs reach every guest, so one could publish under the host's round first; the host then stores its upload under this ID instead of failing. */
 export async function nearbyGamePublicId(roundId: string, hostUserId: string) {
   return `lan_${(await hashSeatPassToken(`${roundId}:${hostUserId}`)).slice(0, 40)}`
 }
