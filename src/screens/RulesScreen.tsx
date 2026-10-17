@@ -299,7 +299,11 @@ const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.xl,
   gap: spacing.xs,
 })
-const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({ padding: spacing.md, gap: spacing.sm })
+const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  padding: spacing.md,
+  gap: spacing.sm,
+})
 const $chapter: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginTop: spacing.md,
