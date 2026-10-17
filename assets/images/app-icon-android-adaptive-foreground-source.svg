@@ -1,10 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
-  <g transform="translate(256 256) scale(0.7) translate(-256 -256)">
-    <rect x="54" y="54" width="194" height="194" rx="54" fill="#B85636"/>
-    <rect x="264" y="54" width="194" height="194" rx="54" fill="#41476E"/>
-    <rect x="54" y="264" width="194" height="194" rx="54" fill="#39755C"/>
-    <rect x="264" y="264" width="194" height="194" rx="54" fill="#94632D"/>
-    <circle cx="256" cy="256" r="72" fill="#050505" stroke="#F4F2F1" stroke-width="10"/>
+  <g transform="translate(256 256) scale(0.633) translate(-256 -256)">
+    <defs><clipPath id="board"><rect x="54" y="54" width="404" height="404" rx="120"/></clipPath></defs>
+    <g clip-path="url(#board)">
+      <rect x="54" y="54" width="194" height="194" rx="54" fill="#B85636"/>
+      <rect x="264" y="54" width="194" height="194" rx="54" fill="#41476E"/>
+      <rect x="54" y="264" width="194" height="194" rx="54" fill="#39755C"/>
+      <rect x="264" y="264" width="194" height="194" rx="54" fill="#94632D"/>
+    </g>
+    <path d="M241.44 174.58 Q256.00 164.00 270.56 174.58 L328.93 216.99 Q343.50 227.57 337.93 244.69 L315.64 313.31 Q310.08 330.43 292.08 330.43 L219.92 330.43 Q201.92 330.43 196.36 313.31 L174.07 244.69 Q168.50 227.57 183.07 216.99Z" fill="#36333D" stroke="#000000" stroke-width="20" stroke-linejoin="round" paint-order="stroke"/>
     <g fill="#F4F2F1">
       <rect x="221" y="225" width="70" height="10" rx="5"/>
       <rect x="221" y="251" width="70" height="10" rx="5"/>
