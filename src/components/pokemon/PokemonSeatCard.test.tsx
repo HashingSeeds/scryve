@@ -131,6 +131,20 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-unit-seat-1")).toHaveTextContent("HP")
   })
 
+  it("saves a name on a cardless Pokémon without asking for its HP", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId("pokemon-place-active-seat-1"))
+    fireEvent.press(screen.getByTestId("pokemon-edit-active-seat-1"))
+    fireEvent.changeText(screen.getByTestId("pokemon-name-input-seat-1"), "Pikachu")
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+
+    expect(screen.queryByTestId("pokemon-sheet-seat-1")).toBeNull()
+    expect(board(table).active).toMatchObject({ name: "Pikachu", damage: 0 })
+    expect(screen.getByTestId("pokemon-unit-seat-1")).toHaveTextContent("DMG")
+  })
+
   it("picks a card on tap and counts damage on hold for a seat with a deck", () => {
     const table = pokemonTable(["Ada", "Grace"])
     render(<Seat harness={table} seat={0} deck={{ ownerId: "owner", versionId: "version" }} />)
