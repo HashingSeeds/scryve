@@ -23,7 +23,7 @@ const SOURCE = [
   "100.1. These Magic rules apply to any Magic game.",
   " ",
   "100.1a A two-player game begins with two players. See rule 103.8a.",
-  "Example: A game of two players.",
+  "Example: A game of two players.\u2028\u00a0\u00a0It ends.",
   " ",
   "100.10. Rule ten.   Its second paragraph.",
   " ",
@@ -63,7 +63,7 @@ describe("parseComprehensiveRules", () => {
       {
         id: "100.1a",
         text: "A two-player game begins with two players. See rule 103.8a.",
-        examples: ["Example: A game of two players."],
+        examples: ["Example: A game of two players.\nIt ends."],
       },
       { id: "100.10", text: "Rule ten.\nIts second paragraph.", examples: [] },
       { id: "100.10aa", text: "Rule ten, double letter.", examples: [] },

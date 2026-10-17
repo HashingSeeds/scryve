@@ -53,6 +53,7 @@ export function parseComprehensiveRules(source: string): ComprehensiveRules | un
       chapters.push({ id: chapterMatch[1], title: chapterMatch[2], sections: [] })
       rule = undefined
     } else if (rule && line.startsWith("Example:")) rule.examples.push(line)
+    else if (rule?.examples.length) rule.examples[rule.examples.length - 1] += `\n${line}`
     else if (rule) rule.text += `\n${line}`
   }
   if (chapters.length === 0) return undefined
