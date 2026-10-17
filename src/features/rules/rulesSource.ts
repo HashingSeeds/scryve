@@ -17,7 +17,7 @@ type RulesStore = {
 type Fetcher = (url: string) => Promise<Pick<Response, "ok" | "status" | "text">>
 
 const loaded = new WeakMap<RulesStore, { url: string; rules: ComprehensiveRules }>()
-const downloads = new WeakMap<RulesStore, Promise<string>>()
+const downloads = new WeakMap<RulesStore, Promise<ComprehensiveRules>>()
 
 function storedUrl(store: RulesStore) {
   try {
@@ -42,34 +42,28 @@ export function loadStoredRules(store: RulesStore = storage) {
   }
 }
 
-async function fetchText(store: RulesStore, fetcher: Fetcher) {
+async function fetchRules(store: RulesStore, fetcher: Fetcher) {
   const response = await fetcher(RULES_URL)
   if (!response.ok) throw new Error(`Rules download failed with ${response.status}`)
   const text = await response.text()
-  if (!text.includes("These rules are effective as of"))
-    throw new Error("Rules download was not the Comprehensive Rules")
+  const rules = parseComprehensiveRules(text)
+  if (!rules) throw new Error("Rules download was not the Comprehensive Rules")
   try {
     store.set(TEXT_KEY, text)
     store.set(URL_KEY, RULES_URL)
   } catch (error) {
     console.error("[rules] failed to cache the rules", error)
   }
-  return text
-}
-
-function downloadText(store: RulesStore, fetcher: Fetcher) {
-  const pending = downloads.get(store)
-  if (pending) return pending
-  const next = fetchText(store, fetcher).finally(() => downloads.delete(store))
-  downloads.set(store, next)
-  return next
-}
-
-export async function downloadRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
-  const rules = parseComprehensiveRules(await downloadText(store, fetcher))
-  if (!rules) throw new Error("Rules download could not be read")
   loaded.set(store, { url: RULES_URL, rules })
   return rules
+}
+
+export function downloadRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
+  const pending = downloads.get(store)
+  if (pending) return pending
+  const next = fetchRules(store, fetcher).finally(() => downloads.delete(store))
+  downloads.set(store, next)
+  return next
 }
 
 // why: media.wizards.com sends no CORS header, so web links to the official page instead.
@@ -77,7 +71,7 @@ const canDownload = Platform.OS !== "web"
 
 export function prefetchRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
   if (!canDownload || storedUrl(store) === RULES_URL) return
-  downloadText(store, fetcher).catch(() => {})
+  downloadRules(store, fetcher).catch(() => {})
 }
 
 export function useComprehensiveRules() {
