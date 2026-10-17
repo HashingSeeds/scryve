@@ -27,7 +27,7 @@ export function AppUtilityMenu({
   placement = "topRight",
   onSettings,
   onAccount,
-  onOpenChange,
+  onOpenHeightChange,
   accountEntry = "account",
 }: {
   visible?: boolean
@@ -35,7 +35,7 @@ export function AppUtilityMenu({
   placement?: "topRight" | "bottomLeft"
   onSettings: () => void
   onAccount: () => void
-  onOpenChange?: (open: boolean) => void
+  onOpenHeightChange?: (height: number) => void
   accountEntry?: AccountEntry
 }) {
   const { themed } = useAppTheme()
@@ -51,9 +51,9 @@ export function AppUtilityMenu({
   useEffect(() => {
     if (!visible && open) {
       setOpen(false)
-      onOpenChange?.(false)
+      onOpenHeightChange?.(0)
     }
-  }, [onOpenChange, open, visible])
+  }, [onOpenHeightChange, open, visible])
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, {
@@ -73,7 +73,7 @@ export function AppUtilityMenu({
 
   const close = () => {
     setOpen(false)
-    onOpenChange?.(false)
+    onOpenHeightChange?.(0)
   }
   useCloseOnBack(open, close)
 
@@ -122,7 +122,7 @@ export function AppUtilityMenu({
             style={themed($trigger)}
             onPress={() => {
               setOpen(true)
-              onOpenChange?.(true)
+              onOpenHeightChange?.(ITEM_HEIGHT * itemCount)
             }}
           >
             {compact ? (

@@ -27,7 +27,7 @@ export function FloatingAppNavigation({
 }) {
   const { themed, theme } = useAppTheme()
   const insets = useSafeAreaInsets()
-  const [utilityOpen, setUtilityOpen] = useState(false)
+  const [utilityHeight, setUtilityHeight] = useState(0)
 
   return (
     <View
@@ -35,7 +35,7 @@ export function FloatingAppNavigation({
       pointerEvents="box-none"
       style={[
         themed($navigation),
-        utilityOpen && $expandedNavigation,
+        utilityHeight > 0 && { height: utilityHeight },
         { bottom: Math.max(insets.bottom, theme.spacing.md) },
       ]}
     >
@@ -46,7 +46,7 @@ export function FloatingAppNavigation({
           accountEntry={accountEntry}
           onSettings={onSettings}
           onAccount={onAccount}
-          onOpenChange={setUtilityOpen}
+          onOpenHeightChange={setUtilityHeight}
         />
       </View>
       <Pressable
@@ -77,7 +77,6 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   justifyContent: "flex-end",
 })
-const $expandedNavigation: ViewStyle = { height: 108 }
 const $utilityAboveDestination: ViewStyle = { position: "absolute", left: 0, bottom: 0, zIndex: 1 }
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 92,
