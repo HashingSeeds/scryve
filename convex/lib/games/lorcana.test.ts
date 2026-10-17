@@ -137,4 +137,10 @@ describe("LorcanaJSON normalizer", () => {
       expect.objectContaining({ code: "S12-1", name: "Core Starter" }),
     ])
   })
+
+  it.each([0, 1.5, -2, undefined])("rejects a starter deck card with amount %s", (amount) => {
+    const deck = { name: "Bad Starter", type: "Starter Deck", cards: [{ id: 25, amount }] }
+    const zip = zipSync({ "deckdata.S1-1.json": strToU8(JSON.stringify(deck)) })
+    expect(() => normalizeLorcanaStarterDecks(zip)).toThrow("malformed card entry")
+  })
 })

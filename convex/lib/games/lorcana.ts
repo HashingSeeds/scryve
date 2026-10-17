@@ -120,17 +120,22 @@ export const LORCANA_JSON_DATASET = {
 
 export const LORCANA_DECK_LIST = { sectionHeadings: { main: ["deck"] } } satisfies DeckListRules
 
+const isPositiveInteger = (value: number | undefined): value is number =>
+  value !== undefined && Number.isInteger(value) && value > 0
+
 export function normalizeLorcanaStarterDecks(zip: Uint8Array) {
   const decks = Object.entries(unzipSync(zip)).flatMap(([fileName, bytes]) => {
     const code = /^deckdata\.(.+)\.json$/.exec(fileName)?.[1]
     const deck = code ? objectRecord(JSON.parse(strFromU8(bytes))) : null
     const name = stringValue(deck?.name)
     if (!code || !name || deck?.type !== "Starter Deck") return []
-    const cards = (Array.isArray(deck.cards) ? deck.cards : []).flatMap((value) => {
+    const cards = (Array.isArray(deck.cards) ? deck.cards : []).map((value) => {
       const card = objectRecord(value)
       const id = finiteNumber(card?.id)
       const quantity = finiteNumber(card?.amount)
-      return id === undefined || !quantity ? [] : [{ printingId: String(id), quantity }]
+      if (!isPositiveInteger(id) || !isPositiveInteger(quantity))
+        throw new Error(`LorcanaJSON starter deck ${code} has a malformed card entry`)
+      return { printingId: String(id), quantity }
     })
     return cards.length ? [{ code, name, cards }] : []
   })
