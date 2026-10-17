@@ -155,10 +155,6 @@ export function playSystemShortLabel(value: unknown): string {
   return isPlaySystemId(value) ? SYSTEMS[value].shortLabel : translate("systems:noSystem")
 }
 
-export function playSystemChoices() {
-  return [NO_PLAY_SYSTEM, ...PLAY_SYSTEM_IDS].map((id) => ({ id, label: playSystemShortLabel(id) }))
-}
-
 export function counterHeading(value: unknown): string {
   return translate(`systems:counterHeading.${playSystemRules(value).id}`)
 }
