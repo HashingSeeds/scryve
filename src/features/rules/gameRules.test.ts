@@ -3,11 +3,12 @@ import { Alert, Linking } from "react-native"
 import { GAME_RULES, gameRules, openRules } from "./gameRules"
 import { SYSTEMS } from "../../../convex/lib/systems"
 
-it("gameRules gives Magic its text, links Pokémon and Yu-Gi-Oh!, and skips unknown systems", () => {
+it("gameRules gives Magic its text, links the other games, and skips unknown systems", () => {
   expect(gameRules("mtg")?.kind).toBe("text")
   expect(gameRules("pokemon")?.kind).toBe("link")
   expect(gameRules("ygo")?.kind).toBe("link")
-  expect(gameRules("lorcana")).toBeUndefined()
+  expect(gameRules("lorcana")?.kind).toBe("link")
+  expect(gameRules("fab")).toBeUndefined()
   expect(gameRules(undefined)).toBeUndefined()
 })
 

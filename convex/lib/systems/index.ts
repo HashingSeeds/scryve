@@ -60,6 +60,13 @@ export function lowerLeads({ goal, defaultValue }: CounterDefinition) {
   return goal.kind === "race" && goal.to < defaultValue
 }
 
+export function startingValueRange(system: unknown) {
+  const counter = systemDefinition(system)?.counter
+  if (!counter) return { min: 1, max: 999 }
+  const countsUp = counter.goal.kind === "race" && !lowerLeads(counter)
+  return { min: countsUp ? 0 : 1, max: counter.maxStartingValue }
+}
+
 /** why: one ordering for every goal, where a higher standing always leads. */
 export function counterStanding(counter: CounterDefinition, value: number) {
   return lowerLeads(counter) ? -value : value

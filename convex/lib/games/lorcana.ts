@@ -1,3 +1,5 @@
+import { strFromU8, unzipSync } from "fflate"
+
 import {
   compact,
   facet,
@@ -9,8 +11,12 @@ import {
   stringList,
   stringValue,
   type BulkDataset,
+  type CatalogCard,
   type DatasetCard,
 } from "./cards"
+import { FEED_REQUEST_TIMEOUT_MS, type DeckFeed, type DeckListRules } from "./decks"
+import { internal } from "../../_generated/api"
+import type { ActionCtx } from "../../_generated/server"
 
 const LORCANA_JSON_URL = "https://lorcanajson.org/files/current/en"
 export const LORCANA_JSON_NAMESPACE = "lorcanajson-card"
@@ -111,3 +117,103 @@ export const LORCANA_JSON_DATASET = {
     return normalizeLorcanaJsonCards(allCards)
   },
 } satisfies BulkDataset
+
+export const LORCANA_DECK_LIST = { sectionHeadings: { main: ["deck"] } } satisfies DeckListRules
+
+const isPositiveInteger = (value: number | undefined): value is number =>
+  value !== undefined && Number.isInteger(value) && value > 0
+
+export function normalizeLorcanaStarterDecks(zip: Uint8Array) {
+  const decks = Object.entries(unzipSync(zip)).flatMap(([fileName, bytes]) => {
+    const code = /^deckdata\.(.+)\.json$/.exec(fileName)?.[1]
+    const deck = code ? objectRecord(JSON.parse(strFromU8(bytes))) : null
+    const name = stringValue(deck?.name)
+    if (!code || !name || deck?.type !== "Starter Deck") return []
+    const cards = (Array.isArray(deck.cards) ? deck.cards : []).map((value) => {
+      const card = objectRecord(value)
+      const id = finiteNumber(card?.id)
+      const quantity = finiteNumber(card?.amount)
+      if (!isPositiveInteger(id) || !isPositiveInteger(quantity))
+        throw new Error(`LorcanaJSON starter deck ${code} has a malformed card entry`)
+      return { printingId: String(id), quantity }
+    })
+    return cards.length ? [{ code, name, cards }] : []
+  })
+  return decks.sort((a, b) => a.code.localeCompare(b.code, "en", { numeric: true }))
+}
+
+const STARTER_DECK_SOURCE = "lorcanajson"
+
+async function refreshStarterDecks(
+  ctx: ActionCtx,
+  includeImages: boolean,
+  format: string,
+): Promise<{ count: number; status: number }> {
+  const response = await fetch(`${LORCANA_JSON_URL}/decks/allDecks.zip`, {
+    headers: { "User-Agent": "Scryve/1.0" },
+    signal: AbortSignal.timeout(FEED_REQUEST_TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`LorcanaJSON decks returned ${response.status}`)
+  const decks = normalizeLorcanaStarterDecks(new Uint8Array(await response.arrayBuffer()))
+  let resolved = 0
+  const unresolved: string[] = []
+  const kept: string[] = []
+  for (const deck of decks) {
+    const found: Array<CatalogCard | null> = await ctx.runQuery(
+      internal.cardCatalog.lookupManyCached,
+      { game: "lorcana", cardIds: deck.cards.map((entry) => entry.printingId) },
+    )
+    const entries = deck.cards.flatMap((entry, index) => {
+      const card = found[index]
+      return card ? [{ entry, card }] : []
+    })
+    if (entries.length < deck.cards.length) {
+      unresolved.push(`${format}:${deck.code}`)
+      continue
+    }
+    resolved += 1
+    const legal = entries.every(({ card }) =>
+      card.facets.some(({ key, value }) => key === `legality:${format}` && value === "legal"),
+    )
+    if (!legal) continue
+    const externalId = `${format}:${deck.code}`
+    kept.push(externalId)
+    await ctx.runMutation(internal.deckCatalogs.upsert, {
+      game: "lorcana",
+      source: STARTER_DECK_SOURCE,
+      externalId,
+      kind: "official",
+      name: deck.name,
+      format,
+      entries: entries.map(({ entry, card }) => ({
+        identityNamespace: card.identityNamespace,
+        cardId: card.cardId,
+        providerCardId: entry.printingId,
+        printingId: entry.printingId,
+        name: card.name,
+        quantity: entry.quantity,
+        section: "main",
+        entryKind: "card",
+        originalReference: entry.printingId,
+        ...(card.category ? { category: card.category } : {}),
+        ...(includeImages && card.imageUrl ? { imageUrl: card.imageUrl } : {}),
+        ...(includeImages && card.smallImageUrl ? { smallImageUrl: card.smallImageUrl } : {}),
+      })),
+    })
+  }
+  if (!resolved) throw new Error("No LorcanaJSON starter deck matched the synced cards")
+  await ctx.runMutation(internal.deckCatalogs.removeStale, {
+    game: "lorcana",
+    source: STARTER_DECK_SOURCE,
+    format,
+    keep: [...kept, ...unresolved],
+  })
+  return { count: kept.length, status: response.status }
+}
+
+export const LORCANA_STARTER_DECKS = {
+  source: STARTER_DECK_SOURCE,
+  formats: ["core", "infinity"],
+  operation: (format) => `starter-decks:${format}`,
+  refresh: refreshStarterDecks,
+} satisfies DeckFeed

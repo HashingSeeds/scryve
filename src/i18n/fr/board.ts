@@ -130,12 +130,14 @@ export default {
       mtg: "Égalité de points de vie",
       ygo: "Égalité de Life Points",
       pokemon: "Égalité de cartes Récompense",
+      lorcana: "Égalité de Lore",
     },
     leads: {
       none: "{{name}} mène aux points de vie",
       mtg: "{{name}} mène aux points de vie",
       ygo: "{{name}} mène aux Life Points",
       pokemon: "{{name}} mène aux cartes Récompense",
+      lorcana: "{{name}} mène au Lore",
     },
   },
   clock: {
@@ -397,12 +399,15 @@ export default {
       ygo: "Touchez pour modifier les Life Points de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
       pokemon:
         "Touchez pour modifier les cartes Récompense de {{identity}} de {{delta}}. Appui long pour plus d'options.",
+      lorcana:
+        "Touchez pour modifier le Lore de {{identity}} de {{delta}}. Appui long pour plus d'options.",
     },
     moreControls: {
       none: "{{identity}}, plus de commandes de points de vie",
       mtg: "{{identity}}, plus de commandes de points de vie",
       ygo: "{{identity}}, plus de commandes de Life Points",
       pokemon: "{{identity}}, plus d'options de cartes Récompense",
+      lorcana: "{{identity}}, plus d'options de Lore",
     },
   },
   grid: {
@@ -419,6 +424,9 @@ export default {
       pokemon_one: "Grille des cartes Récompense de {{count}} joueur",
       pokemon_many: "Grille des cartes Récompense de {{count}} de joueurs",
       pokemon_other: "Grille des cartes Récompense de {{count}} joueurs",
+      lorcana_one: "Grille de Lore de {{count}} joueur",
+      lorcana_many: "Grille de Lore de {{count}} de joueurs",
+      lorcana_other: "Grille de Lore de {{count}} joueurs",
     },
   },
   pokemonSheet: {
@@ -506,18 +514,21 @@ export default {
       mtg: "Changement de vie de {{name}}",
       ygo: "Modification des Life Points de {{name}}",
       pokemon: "Modification des cartes Récompense de {{name}}",
+      lorcana: "Modification du Lore de {{name}}",
     },
     add: {
       none: "Ajouter {{amount}} de vie",
       mtg: "Ajouter {{amount}} de vie",
       ygo: "Ajouter {{amount}} Life Points",
       pokemon: "Ajouter {{amount}} cartes Récompense",
+      lorcana: "Ajouter {{amount}} éclats de Lore",
     },
     subtract: {
       none: "Retirer {{amount}} de vie",
       mtg: "Retirer {{amount}} de vie",
       ygo: "Retirer {{amount}} Life Points",
       pokemon: "Retirer {{amount}} cartes Récompense",
+      lorcana: "Retirer {{amount}} éclats de Lore",
     },
   },
 } satisfies LocaleNamespace

@@ -4,6 +4,7 @@ import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import { internalAction } from "./_generated/server"
+import { actionCapabilityEnabled } from "./lib/actionCapabilities"
 import { datasetCardKey, MAX_DATASET_BATCH, type DatasetCard } from "./lib/games/cards"
 import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 
@@ -27,7 +28,9 @@ function batchEnd(cards: readonly DatasetCard[], offset: number) {
 export const sync = internalAction({
   args: { game: v.string() },
   handler: async (ctx, { game }): Promise<null> => {
-    const dataset = isProviderGame(game) ? GAME_PROVIDERS[game].catalog.bulk : undefined
+    if (!isProviderGame(game)) throw new Error(`${game} has no bulk card catalog`)
+    const { catalog, deckFeed } = GAME_PROVIDERS[game]
+    const dataset = catalog.bulk
     if (!dataset) throw new Error(`${game} has no bulk card catalog`)
     const startedAt = Date.now()
     const version = await dataset.version()
@@ -69,6 +72,9 @@ export const sync = internalAction({
       if (swept === null) return null
       cursor = swept.cursor
     } while (cursor !== null)
+    if (deckFeed && (await actionCapabilityEnabled(ctx, game, "exampleDecks")))
+      for (const format of deckFeed.formats)
+        await ctx.scheduler.runAfter(0, internal.deckCatalogs.refresh, { game, format })
     return null
   },
 })

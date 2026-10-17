@@ -522,6 +522,7 @@ export default {
       "Pega una lista de Pokémon TCG Live con cantidades, nombres, códigos de set y números de carta.",
     listHelperMtg:
       'Usa líneas como "1 Sol Ring". Se admiten los encabezados Commander, Mainboard y Sideboard.',
+    listHelperLorcana: 'Usa líneas como "4 Aladdin - Heroic Outlaw".',
     returnToReview: "Volver a la revisión",
     loadingDeck: "Cargando mazo…",
     reloadSource: "Recargar origen",

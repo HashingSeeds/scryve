@@ -486,6 +486,7 @@ const decks = {
       "Paste a Pokémon TCG Live list with quantities, names, set codes, and card numbers.",
     listHelperMtg:
       'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.',
+    listHelperLorcana: 'Use lines like "4 Aladdin - Heroic Outlaw".',
     returnToReview: "Return to review",
     loadingDeck: "Loading deck…",
     reloadSource: "Reload source",
