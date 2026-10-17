@@ -8,7 +8,8 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { cardSection, printingKey, type DeckCard } from "./deckCards"
+import { printingKey, type DeckCard } from "./deckCards"
+import { isCommanderPick } from "./deckDraft"
 
 export function DeckCardRow({
   card,
@@ -88,11 +89,7 @@ export function DeckCardRow({
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={translate("decks:cardRow.increase", { card: card.name })}
-            disabled={
-              disabled ||
-              card.quantity >= 999 ||
-              (game === "mtg" && format === "commander" && cardSection(card) === "commander")
-            }
+            disabled={disabled || card.quantity >= 999 || isCommanderPick({ game, format }, card)}
             style={$touch}
             onPress={() => onIncrement(card)}
           >

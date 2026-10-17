@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- each system's card details still have their own lookup here. */
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAction, useConvexConnectionState } from "convex/react"
 
