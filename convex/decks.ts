@@ -29,7 +29,7 @@ import {
   requireVersionCapacity,
 } from "./lib/entitlements"
 import { limitGameRate } from "./lib/gameRateLimits"
-import { ygoImageUrl } from "./lib/games/yugioh"
+import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 import {
   capabilityReleased,
   integration,
@@ -679,10 +679,9 @@ export const setFavorite = mutation({
 
 function projectCard(deck: Doc<"decks">, includeImages: boolean, card: Doc<"deckCards">) {
   if (includeImages) {
-    const imageUrl =
-      deck.game === "ygo"
-        ? ygoImageUrl(card.printingId, card.providerCardId, card.cardId)
-        : undefined
+    const imageUrl = isProviderGame(deck.game)
+      ? GAME_PROVIDERS[deck.game].catalog.imageUrl?.(card)
+      : undefined
     return imageUrl
       ? {
           ...card,

@@ -1,3 +1,4 @@
+import type { ActionCtx } from "../../_generated/server"
 import type { GameSystemId } from "../integrations"
 
 export const MAX_CARD_FACES = 4
@@ -53,6 +54,28 @@ export type CatalogCard = {
   imageUrl?: string
   smallImageUrl?: string
   faces: CardFace[]
+}
+
+export type ProviderCards = Promise<{ cards: NormalizedCard[]; status: number }>
+
+export type CardCatalog = {
+  readonly search: (ctx: ActionCtx, query: string, includeImages: boolean) => ProviderCards
+  readonly byId: (ctx: ActionCtx, cardId: string, includeImages: boolean) => ProviderCards
+  readonly cachedCardComplete?: (card: CatalogCard) => boolean
+  /** why: search returns brief cards, so caching one must not erase what a full lookup stored. */
+  readonly briefSearchResults?: true
+  readonly imageUrl?: (card: {
+    printingId?: string
+    providerCardId?: string
+    cardId?: string
+  }) => string | undefined
+  /** why: Scryve ships these with curated decks of `format`. The provider has none, so they have no images and a cache miss is final. */
+  readonly seeded?: {
+    readonly format: string
+    readonly cards: readonly NormalizedCard[]
+    readonly owns: (cardId: string) => boolean
+    readonly missing: string
+  }
 }
 
 export function objectRecord(value: unknown): Record<string, unknown> | null {

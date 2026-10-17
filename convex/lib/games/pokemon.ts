@@ -4,8 +4,11 @@ import {
   normalizeCardName,
   objectRecord,
   stringValue,
+  type CardCatalog,
+  type CatalogCard,
   type NormalizedCard,
 } from "./cards"
+import type { DeckListEntry, DeckListRules } from "./decks"
 import { internal } from "../../_generated/api"
 import type { ActionCtx } from "../../_generated/server"
 import { POKEMON_HP_FACET } from "../table"
@@ -346,3 +349,44 @@ export async function pokemonImageCandidates(ctx: ActionCtx, cardId: string) {
   }
   return images
 }
+
+// why: brief search results lack a type line, and Pokémon cached before HP was stored lack HP, so both refetch once.
+function isFullPokemonCard(card: CatalogCard) {
+  return (
+    card.typeLabel !== undefined &&
+    (card.category !== "Pokemon" || card.facets.some(({ key }) => key === POKEMON_HP_FACET))
+  )
+}
+
+export const TCGDEX_CATALOG = {
+  search: searchPokemon,
+  byId: pokemonCardById,
+  cachedCardComplete: isFullPokemonCard,
+  briefSearchResults: true,
+} satisfies CardCatalog
+
+function pokemonName(reference: string) {
+  const match = reference.match(/^(.+?)\s+[A-Z0-9-]{2,8}\s+[A-Za-z0-9-]+$/)
+  return (match?.[1] ?? reference).trim()
+}
+
+function pokemonPrintingReference(entry: DeckListEntry) {
+  const reference = entry.originalReference.slice(entry.name.length).trim()
+  return reference && reference !== entry.originalReference ? reference : undefined
+}
+
+export const POKEMON_DECK_LIST = {
+  sectionHeadings: { main: ["pokémon", "pokemon", "trainer", "energy", "deck"] },
+  skipsLine: (line) => /^(?:(?:pok[eé]mon|trainer|energy):\s*\d+|total cards:\s*\d+)$/i.test(line),
+  reference: (reference) => ({
+    name: pokemonName(reference),
+    key: normalizeCardName(reference),
+  }),
+  lookupKey: (entry) => `reference:${normalizeCardName(entry.originalReference)}`,
+  printingLookup: (entry) => {
+    const reference = pokemonPrintingReference(entry)
+    return reference
+      ? (ctx, includeImages) => pokemonCardByReference(ctx, entry.name, reference, includeImages)
+      : undefined
+  },
+} satisfies DeckListRules
