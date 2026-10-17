@@ -251,12 +251,18 @@ export default {
     placeActiveFromBenchHint:
       "Active बनाने के लिए बेंच Pokémon को टैप करें, या यहाँ टैप करके एक रखें",
     placeActiveHint: "Active Pokémon रखने के लिए टैप करें। उसका कार्ड चुनने के लिए देर तक दबाएँ।",
+    placeActiveDeckHint:
+      "Active Pokémon चुनने के लिए टैप करें। बिना कार्ड के डैमेज गिनने के लिए देर तक दबाएँ।",
     placeActive: "Active रखें",
     noActive: "कोई Active नहीं",
     orTapBench: "या बेंच Pokémon को टैप करें",
     holdToChoose: "कार्ड चुनने के लिए देर तक दबाएँ",
     holdToChooseHint: "उसका कार्ड चुनने के लिए देर तक दबाएँ",
     chooseCard: "कार्ड चुनें",
+    holdToCount: "डैमेज गिनने के लिए देर तक दबाएँ",
+    holdToCountHint: "बिना कार्ड के डैमेज गिनने के लिए देर तक दबाएँ",
+    countDamage: "बिना कार्ड के डैमेज गिनें",
+    unit: { hp: "HP", damage: "डैमेज" },
     prizesHint: "प्राइज़ कार्ड लेने के लिए टैप करें। वापस रखने के लिए देर तक दबाएँ।",
     putPrizeBack: "प्राइज़ कार्ड वापस रखें",
     whoTakes_one: "{{name}} नॉक आउट हुआ। {{count}} प्राइज़ कार्ड कौन लेगा?",

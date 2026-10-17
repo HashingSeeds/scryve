@@ -38,7 +38,12 @@ import {
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
 import type { SeatDeck } from "./usePokemonDeck"
 import { shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
-import { findPokemon, pokemonBoardOf, type PokemonInPlay } from "../../../convex/lib/table"
+import {
+  findPokemon,
+  pokemonBoardOf,
+  type PokemonInPlay,
+  type PokemonSlot,
+} from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
 import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
@@ -350,6 +355,27 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     touchFocus(pokemon.id)
   }
 
+  // why: a seat with a deck wants its cards tracked, so a tap picks the card and a hold counts damage without one. Seats without a deck are the other way round.
+  const tapPicksCard = deck !== undefined
+  const holdCopy = tapPicksCard
+    ? {
+        caption: translate("board:pokemon.holdToCount"),
+        hint: translate("board:pokemon.holdToCountHint"),
+        action: translate("board:pokemon.countDamage"),
+        placeActiveHint: translate("board:pokemon.placeActiveDeckHint"),
+      }
+    : {
+        caption: translate("board:pokemon.holdToChoose"),
+        hint: translate("board:pokemon.holdToChooseHint"),
+        action: translate("board:pokemon.chooseCard"),
+        placeActiveHint: translate("board:pokemon.placeActiveHint"),
+      }
+
+  function placeOn(slot: PokemonSlot, from: string, picksCard: boolean) {
+    if (picksCard) openSheet({ kind: "place", slot }, from)
+    else table.placePokemon(playerId, slot, CARDLESS_POKEMON)
+  }
+
   function switchIn(pokemonId: string) {
     table.switchActive(playerId, pokemonId)
     setFocus(null)
@@ -475,17 +501,15 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   testID={`pokemon-bench-add-seat-${seatNumber}`}
                   accessibilityRole="button"
                   accessibilityLabel={translate("board:pokemon.addBench", { identity })}
-                  accessibilityHint={translate("board:pokemon.holdToChooseHint")}
-                  accessibilityActions={[
-                    { name: "longpress", label: translate("board:pokemon.chooseCard") },
-                  ]}
+                  accessibilityHint={holdCopy.hint}
+                  accessibilityActions={[{ name: "longpress", label: holdCopy.action }]}
                   onAccessibilityAction={({ nativeEvent }) => {
                     if (nativeEvent.actionName === "longpress")
-                      openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)
+                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
                   }}
                   delayLongPress={LONG_PRESS_MS}
-                  onLongPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
-                  onPress={() => table.placePokemon(playerId, "bench", CARDLESS_POKEMON)}
+                  onLongPress={() => placeOn("bench", ADD_TRIGGER, !tapPicksCard)}
+                  onPress={() => placeOn("bench", ADD_TRIGGER, tapPicksCard)}
                   style={({ pressed }) => [
                     themed($chip),
                     $slot,
@@ -553,26 +577,24 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               canEdit
                 ? board.bench.length
                   ? translate("board:pokemon.placeActiveFromBenchHint")
-                  : translate("board:pokemon.placeActiveHint")
+                  : holdCopy.placeActiveHint
                 : undefined
             }
             accessibilityActions={
-              controlsLive
-                ? [{ name: "longpress", label: translate("board:pokemon.chooseCard") }]
-                : undefined
+              controlsLive ? [{ name: "longpress", label: holdCopy.action }] : undefined
             }
             onAccessibilityAction={({ nativeEvent }) => {
               if (nativeEvent.actionName === "longpress")
-                openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
+                placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)
             }}
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
-            onLongPress={() => openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)}
+            onLongPress={() => placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)}
             // why: once a bench exists, the empty Active is a promotion from it, not a new Pokémon.
             onPress={() =>
               board.bench.length
                 ? openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
-                : table.placePokemon(playerId, "active", CARDLESS_POKEMON)
+                : placeOn("active", PLACE_ACTIVE_TRIGGER, tapPicksCard)
             }
             style={({ pressed }) => [
               themed($placeActive),
@@ -593,7 +615,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             />
             {canEdit ? (
               <Text
-                tx={board.bench.length ? "board:pokemon.orTapBench" : "board:pokemon.holdToChoose"}
+                text={board.bench.length ? translate("board:pokemon.orTapBench") : holdCopy.caption}
                 size="xxs"
                 style={[{ color: ink }, $dim70]}
               />
@@ -860,6 +882,8 @@ function PokemonHero({
   const [heroWidth, setHeroWidth] = useState(0)
   const cardless = isCardless(pokemon)
   const readout = pokemonReadout(pokemon)
+  const reveal = useCardReveal(pokemon)
+  const unit = translate(cardless ? "board:pokemon.unit.damage" : "board:pokemon.unit.hp")
   const name = pokemonName(pokemon)
   const slotLabel = bench ? translate("board:pokemon.benchSlot", { name }) : name
   const onInk = accessibleForeground(ink)
@@ -961,30 +985,49 @@ function PokemonHero({
         </View>
       ) : null}
       <View pointerEvents="box-none" style={themed($heroReadout)}>
-        <Text
-          testID={`pokemon-hp-seat-${seatNumber}`}
-          text={String(readout)}
-          accessible
-          accessibilityLabel={
-            cardless
-              ? translate("board:pokemon.damageLabel", {
-                  identity,
-                  slot: slotLabel,
-                  damage: readout,
-                })
-              : translate("board:pokemon.hpLabel", {
-                  identity,
-                  slot: slotLabel,
-                  remaining: readout,
-                  hp: pokemon.hp,
-                  damage: pokemon.damage,
-                })
-          }
-          accessibilityLiveRegion="polite"
-          maxFontSizeMultiplier={1.3}
-          numberOfLines={1}
-          style={[themed($hp), { fontSize, lineHeight: getLifeLineHeight(fontSize), color: ink }]}
-        />
+        <View pointerEvents="box-none" style={$readoutRow}>
+          <Text
+            testID={`pokemon-unit-seat-${seatNumber}`}
+            text={unit}
+            weight="bold"
+            accessible={false}
+            maxFontSizeMultiplier={1.3}
+            style={[{ fontSize: fontSize * 0.2, color: ink }, $dim80]}
+          />
+          <Text
+            testID={`pokemon-hp-seat-${seatNumber}`}
+            text={String(reveal?.hp ?? readout)}
+            accessible
+            accessibilityLabel={
+              cardless
+                ? translate("board:pokemon.damageLabel", {
+                    identity,
+                    slot: slotLabel,
+                    damage: readout,
+                  })
+                : translate("board:pokemon.hpLabel", {
+                    identity,
+                    slot: slotLabel,
+                    remaining: readout,
+                    hp: pokemon.hp,
+                    damage: pokemon.damage,
+                  })
+            }
+            accessibilityLiveRegion="polite"
+            maxFontSizeMultiplier={1.3}
+            numberOfLines={1}
+            style={[themed($hp), { fontSize, lineHeight: getLifeLineHeight(fontSize), color: ink }]}
+          />
+          {/* why: an unseen copy of the unit balances the row, so the number stays centered under the caption. */}
+          <Text
+            text={unit}
+            weight="bold"
+            accessible={false}
+            maxFontSizeMultiplier={1.3}
+            style={[{ fontSize: fontSize * 0.2 }, $hidden]}
+          />
+          {reveal ? <DamageReveal damage={reveal.damage} ink={ink} fontSize={fontSize} /> : null}
+        </View>
         <View style={themed($captionRow)} pointerEvents="box-none">
           {bench ? (
             <Text
@@ -1099,6 +1142,54 @@ function DrainBar({
   )
 }
 
+function useCardReveal(pokemon: PokemonInPlay) {
+  const cardless = isCardless(pokemon)
+  const wasCardless = useRef(cardless)
+  const reducedMotion = useReducedMotion()
+  const [reveal, setReveal] = useState<{ hp: number; damage: number } | null>(null)
+  useEffect(() => {
+    const was = wasCardless.current
+    wasCardless.current = cardless
+    if (!was || cardless || pokemon.damage === 0 || reducedMotion !== false) return
+    setReveal({ hp: pokemon.hp, damage: pokemon.damage })
+    const timer = setTimeout(() => setReveal(null), REVEAL_MS)
+    return () => clearTimeout(timer)
+  }, [cardless]) // eslint-disable-line react-hooks/exhaustive-deps
+  // why: a tap mid-reveal must show the real HP at once, not the printed HP until the timer ends.
+  useEffect(() => setReveal(null), [pokemon.damage])
+  return reveal
+}
+
+function DamageReveal({
+  damage,
+  ink,
+  fontSize,
+}: {
+  damage: number
+  ink: string
+  fontSize: number
+}) {
+  const progress = useSharedValue(0)
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: REVEAL_MS, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(progress)
+  }, [progress])
+  const rise = useAnimatedStyle(() => ({
+    opacity: 1 - progress.value,
+    transform: [{ translateY: -progress.value * fontSize * 0.6 }],
+  }))
+  return (
+    <Animated.View testID="pokemon-damage-reveal" pointerEvents="none" style={[$reveal, rise]}>
+      <Text
+        text={`−${damage}`}
+        weight="bold"
+        maxFontSizeMultiplier={1.3}
+        style={{ fontSize: fontSize * 0.36, color: ink }}
+      />
+    </Animated.View>
+  )
+}
+
 function useRecentDeltaValue(damage: number) {
   const store = useRecentDelta(damage)
   const [value, setValue] = useState(store.get)
@@ -1197,14 +1288,22 @@ function BenchChip({
           $dim85,
         ]}
       />
-      <Text
-        testID={`pokemon-bench-hp-${pokemon.id}`}
-        text={String(readout)}
-        weight="bold"
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[$chipHp, { fontSize: chip.hpSize, lineHeight: chip.hpLine, color: ink }]}
-      />
+      <View style={$chipReadout}>
+        <Text
+          tx={cardless ? "board:pokemon.unit.damage" : "board:pokemon.unit.hp"}
+          weight="bold"
+          allowFontScaling={false}
+          style={[{ fontSize: chip.nameSize * 0.8, color: ink }, $dim80]}
+        />
+        <Text
+          testID={`pokemon-bench-hp-${pokemon.id}`}
+          text={String(readout)}
+          weight="bold"
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[$chipHp, { fontSize: chip.hpSize, lineHeight: chip.hpLine, color: ink }]}
+        />
+      </View>
       <View style={$chipPips} pointerEvents="none">
         {Array.from({ length: pokemon.prizes }, (_, index) => (
           <View key={index} style={[$chipPip, { backgroundColor: ink }]} />
@@ -1301,6 +1400,10 @@ const $benchChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xxs + 2,
 })
 const $chipHp: TextStyle = { fontVariant: ["tabular-nums"] }
+const $chipReadout: ViewStyle = { flexDirection: "row", alignItems: "baseline", columnGap: 3 }
+const $readoutRow: ViewStyle = { flexDirection: "row", alignItems: "baseline", columnGap: 6 }
+const $reveal: ViewStyle = { position: "absolute", left: 0, right: 0, top: 0, alignItems: "center" }
+const REVEAL_MS = 600
 const $hero: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",

@@ -260,12 +260,18 @@ export default {
     placeActiveFromBenchHint:
       "Touchez un Pokémon du Banc pour le passer en Actif, ou touchez ici pour en placer un",
     placeActiveHint: "Touchez pour placer un Pokémon Actif. Appui long pour choisir sa carte.",
+    placeActiveDeckHint:
+      "Touchez pour choisir un Pokémon Actif. Appui long pour compter les dégâts sans carte.",
     placeActive: "Placer l'Actif",
     noActive: "Aucun Actif",
     orTapBench: "ou touchez un Pokémon du Banc",
     holdToChoose: "appui long pour choisir une carte",
     holdToChooseHint: "Appui long pour choisir sa carte",
     chooseCard: "Choisir la carte",
+    holdToCount: "appui long pour compter les dégâts",
+    holdToCountHint: "Appui long pour compter les dégâts sans carte",
+    countDamage: "Compter les dégâts sans carte",
+    unit: { hp: "PV", damage: "DÉG" },
     prizesHint: "Touchez pour prendre une Récompense. Appui long pour en reposer une.",
     putPrizeBack: "Reposer une Récompense",
     whoTakes_one: "{{name}} est K.O. Qui prend {{count}} carte Récompense ?",
