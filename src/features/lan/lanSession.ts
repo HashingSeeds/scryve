@@ -6,7 +6,7 @@ import type { Service } from "react-native-zeroconf"
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
-import { createClientId } from "@/features/game/domain"
+import { createClientId, wellFormedPlayerName } from "@/features/game/domain"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
@@ -75,7 +75,7 @@ const deviceName = () =>
       ? "Android"
       : "Player"
 
-const playerName = () => loadLanName().trim() || deviceName()
+const playerName = () => wellFormedPlayerName(loadLanName()) || deviceName()
 
 // why: a guest whose app restarts mid-game reclaims its seat with this; only the latest game's pass is worth keeping.
 function savedPass(serviceName: string): LanSeatPass | undefined {

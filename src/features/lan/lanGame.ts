@@ -31,6 +31,7 @@ import {
   asPlayerId,
   MAX_PLAYER_NAME_LENGTH,
   MAX_PLAYERS,
+  wellFormedPlayerName,
 } from "../game/domain"
 import { isPlaySystemId, playSystemFormats, type PlaySystemId } from "../game/playSystems"
 
@@ -457,21 +458,10 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
   return null
 }
 
-const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
-
-// why: the host uploads every guest's name, and Convex refuses a blank name or broken UTF-16 for the whole game.
-const guestName = (raw: string) =>
-  raw
-    .replace(LONE_SURROGATE, "")
-    .trim()
-    .slice(0, MAX_PLAYER_NAME_LENGTH)
-    .replace(LONE_SURROGATE, "")
-    .trim()
-
 export function parseGuestMessage(line: string): LanGuestMessage | null {
   const value: unknown = JSON.parse(line)
   if (!isRecord(value)) return null
-  const name = typeof value.name === "string" ? guestName(value.name) : ""
+  const name = typeof value.name === "string" ? wellFormedPlayerName(value.name) : ""
   if (value.type === "join" && name && (value.pass === undefined || isPass(value.pass)))
     return {
       type: "join",

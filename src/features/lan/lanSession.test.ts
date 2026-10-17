@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
+import { saveLanName } from "./lanAvailability"
 import {
   createLanGame,
   LAN_PROTOCOL,
@@ -157,6 +158,17 @@ describe("nearby host", () => {
         [bob.pass().key, `hash-${bob.pass().token}`],
       ]),
     )
+  })
+
+  it("hosts under a saved name cut inside a character without the broken half", async () => {
+    saveLanName(`${"a".repeat(23)}😀`)
+    const { session, alice } = await startedGame()
+    saveLanName("")
+
+    await session.writes.finish({ kind: "win", winnerPlayerIds: [alice.pass().key] })
+
+    const [game] = jest.mocked(archiveLanGame).mock.calls[0]
+    expect(game.seats.map((seat) => seat.name)).toEqual(["a".repeat(23), "Alice", "Bob"])
   })
 
   it("waits for a guest's pass hash before saving the round", async () => {
