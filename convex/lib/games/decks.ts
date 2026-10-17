@@ -56,6 +56,7 @@ export type DeckLinkSource = {
 }
 
 export type DeckFeed = {
+  readonly source: string
   readonly formats: readonly string[]
   readonly operation: (format: string) => string
   readonly refresh: (
