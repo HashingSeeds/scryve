@@ -3,6 +3,7 @@ import favicon from "../../../assets/images/app-icon-web-favicon.png?url"
 import shareImage from "../../../assets/images/app-icon-all.png?url"
 // Rubik, latin subset, one variable file for every weight (license beside it).
 import rubik from "../assets/fonts/Rubik-latin.woff2?url"
+import { SYSTEM_IDS, SYSTEMS } from "../../../convex/lib/systems"
 import { APP_LINKS, APP_STORE_ID } from "../links"
 import "../styles/site.css"
 
@@ -13,6 +14,9 @@ interface Props {
 
 const { title, description } = Astro.props
 const canonical = new URL(Astro.url.pathname, Astro.site)
+const requiredNotices = SYSTEM_IDS.flatMap((id) =>
+  SYSTEMS[id].release === "general" ? SYSTEMS[id].integration.rights.requiredNotices : [],
+)
 // `optional` never swaps fonts in after first paint: the file is preloaded, so it is almost
 // always ready, and when it isn't the page keeps the system font rather than reflowing.
 const fontFace = `@font-face{font-family:"Rubik";src:url("${rubik}") format("woff2");font-weight:300 900;font-display:optional}`
@@ -53,16 +57,7 @@ const fontFace = `@font-face{font-family:"Rubik";src:url("${rubik}") format("wof
         <a href={APP_LINKS.deleteAccount}>Delete account</a>
         <a href={APP_LINKS.gameContentNotices}>Game content notices</a>
       </nav>
-      <p>
-        Scryve is not affiliated with or endorsed by Wizards of the Coast, Konami, Nintendo, or The
-        Pokémon Company. Magic: The Gathering, Yu-Gi-Oh!, and Pokémon are trademarks of their
-        respective owners.
-      </p>
-      <p>
-        Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not
-        approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the
-        Coast. ©Wizards of the Coast LLC.
-      </p>
+      {requiredNotices.map((notice) => <p>{notice}</p>)}
       <p>© {new Date().getFullYear()} Hashing Seeds LLC</p>
     </footer>
   </body>
