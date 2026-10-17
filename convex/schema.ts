@@ -411,6 +411,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_game_and_identity_namespace_and_card_id", ["game", "identityNamespace", "cardId"])
+    .index("by_game_and_name_normalized", { fields: ["game", "nameNormalized"], staged: true })
     .searchIndex("search_name", { searchField: "name", filterFields: ["game"] }),
 
   cardPrintings: defineTable({
