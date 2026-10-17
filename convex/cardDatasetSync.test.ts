@@ -116,6 +116,34 @@ describe("bulk card dataset sync", () => {
     expect(await storedCardIds(t)).toHaveLength(150)
   })
 
+  it("a new version rewrites only the cards and printings that changed", async () => {
+    const t = makeConvexTest()
+    useDataset("v1")
+    await t.action(internal.cardDatasetSync.sync, { game: "ygo" })
+    const before = await t.run(async (ctx) => ({
+      cards: await ctx.db.query("gameCards").collect(),
+      printings: await ctx.db.query("cardPrintings").collect(),
+    }))
+    const renamed = { ...datasetCard(3), name: "Renamed Card", nameNormalized: "renamed card" }
+    useDataset(
+      "v2",
+      datasetCards.map((card) => (card.cardId === renamed.cardId ? renamed : card)),
+    )
+    jest.spyOn(Date, "now").mockReturnValue(Date.now() + 60_000)
+
+    await t.action(internal.cardDatasetSync.sync, { game: "ygo" })
+
+    const after = await t.run(async (ctx) => ({
+      cards: await ctx.db.query("gameCards").collect(),
+      printings: await ctx.db.query("cardPrintings").collect(),
+    }))
+    const rewritten = after.cards.filter(
+      (card) => card.updatedAt !== before.cards.find((old) => old._id === card._id)?.updatedAt,
+    )
+    expect(rewritten.map((card) => card.cardId)).toEqual(["bulk-003"])
+    expect(after.printings).toEqual(before.printings)
+  })
+
   it("removes cards and printings the new version dropped, and only the sync writes them", async () => {
     const t = makeConvexTest()
     useDataset("v1")

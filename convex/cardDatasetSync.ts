@@ -4,7 +4,7 @@ import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import { internalAction } from "./_generated/server"
-import { MAX_DATASET_BATCH, type DatasetCard } from "./lib/games/cards"
+import { datasetCardKey, MAX_DATASET_BATCH, type DatasetCard } from "./lib/games/cards"
 import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 
 const MAX_BATCH_PRINTINGS = 1_000
@@ -52,6 +52,7 @@ export const sync = internalAction({
       if (next === null) return null
       offset = next
     }
+    const cardKeys = cards.map(datasetCardKey)
     let cursor = pending?.sweepCursor ?? null
     do {
       if (Date.now() - startedAt > SYNC_BUDGET_MS) return await continueLater()
@@ -60,6 +61,7 @@ export const sync = internalAction({
         version,
         total: cards.length,
         cursor,
+        cardKeys,
       })
       if (swept === null) return null
       cursor = swept.cursor

@@ -656,4 +656,35 @@ it("pruning a feed keeps its newest decks and leaves other sources alone", async
   } finally {
     jest.useRealTimers()
   }
+
+it("refreshing a catalog deck rewrites its cards only when they changed", async () => {
+  const t = convexTest(schema, modules)
+  const deck = {
+    game: "mtg",
+    source: "fixture",
+    externalId: "deck-1",
+    kind: "example",
+    name: "Fixture Deck",
+    format: "modern",
+    entries: [{ name: "Island", quantity: 20, section: "main", entryKind: "card" }],
+  }
+  const cardIds = async (catalogDeckId: string) =>
+    await t.run(async (ctx) =>
+      (await ctx.db.query("deckCatalogCards").collect())
+        .filter((card) => card.catalogDeckId === catalogDeckId)
+        .map((card) => card._id),
+    )
+
+  const catalogDeckId = await t.mutation(internal.deckCatalogs.upsert, deck)
+  const first = await cardIds(catalogDeckId)
+  await t.mutation(internal.deckCatalogs.upsert, deck)
+  expect(await cardIds(catalogDeckId)).toEqual(first)
+
+  await t.mutation(internal.deckCatalogs.upsert, {
+    ...deck,
+    entries: [{ ...deck.entries[0], quantity: 19 }],
+  })
+  const changed = await cardIds(catalogDeckId)
+  expect(changed).toHaveLength(1)
+  expect(changed).not.toEqual(first)
 })

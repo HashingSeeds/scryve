@@ -62,6 +62,9 @@ export type ProviderCards = Promise<{ cards: NormalizedCard[]; status: number }>
 
 export type DatasetCard = Omit<NormalizedCard, "game">
 
+export const datasetCardKey = (card: Pick<DatasetCard, "identityNamespace" | "cardId">) =>
+  JSON.stringify([card.identityNamespace, card.cardId])
+
 export type BulkDataset = {
   readonly version: () => Promise<string>
   readonly load: (version: string) => Promise<DatasetCard[]>
