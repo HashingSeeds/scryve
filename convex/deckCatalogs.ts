@@ -391,7 +391,11 @@ async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
     })
     return false
   }
-  await ctx.runMutation(internal.deckCatalogs.pruneFeed, { game, format, source: feed.source })
+  await ctx.scheduler.runAfter(0, internal.deckCatalogs.pruneFeed, {
+    game,
+    format,
+    source: feed.source,
+  })
   return true
 }
 
