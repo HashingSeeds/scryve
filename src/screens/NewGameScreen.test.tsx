@@ -1418,6 +1418,35 @@ describe("NewGameScreen", () => {
     expect(host).toHaveBeenCalledWith(lobby)
   })
 
+  it("selects the recent setup, not the full list, once the game it came from ends", () => {
+    const game = runningLocalGame()
+    const props = {
+      defaults: DEFAULT_LOCAL_SETTINGS,
+      mode: "local" as const,
+      onModeChange: jest.fn(),
+      onBack: jest.fn(),
+      onStartLocal: jest.fn(),
+      initialGame: game,
+      recentSetups: [
+        {
+          savedAt: 1,
+          mode: "local" as const,
+          game: {
+            players: game.players,
+            startingLife: 20,
+            system: "mtg" as const,
+            format: "commander",
+          },
+        },
+      ],
+    }
+    const view = render(themed(<NewGameScreen {...props} localGame={game} />))
+    view.rerender(themed(<NewGameScreen {...props} />))
+
+    expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(true)
+    expect(view.queryByTestId("game-type-mtg-modern")).toBeNull()
+  })
+
   it("leaves the recent setup off a running game's setup", () => {
     setup({
       initialGame: runningLocalGame(),

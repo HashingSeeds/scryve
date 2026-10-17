@@ -244,7 +244,14 @@ function NewGameForm({
   const { fontScale } = useWindowDimensions()
   const recent = newestRecent({ localGame, recentSetups, mode })
   const [replayKept, setReplayKept] = useState(true)
-  const recentSelected = Boolean(recent) && recent === replaying && replayKept
+  const recentPlayed = recent && (recent.mode === "local" ? recent.game : recent.lobby)
+  const recentTypeId =
+    recentPlayed &&
+    gameTypeId(
+      recentPlayed.system,
+      recentPlayed.format,
+      recent?.mode === "connected" && recent.lobby.variant === "treachery",
+    )
   const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
   const [seedGame] = useState(() =>
     replaying?.mode === "local" ? createLocalGame(replaying.game) : initialGame,
@@ -297,13 +304,14 @@ function NewGameForm({
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
+  const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
-    initialGame && (initialGame.account || hasLocalGameStarted(initialGame))
-      ? meSeatOf(initialGame)
+    claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
+      ? meSeatOf(claimedGame)
       : account?.defaultMeSeat,
   )
   const [deck, setDeck] = useState<Pick<DeckChoice, "versionId" | "name"> | undefined>(() => {
-    const chosen = initialGame?.account
+    const chosen = claimedGame?.account
     return chosen?.deckVersionId
       ? { versionId: chosen.deckVersionId, name: chosen.deckName ?? "Deck" }
       : undefined
@@ -370,9 +378,11 @@ function NewGameForm({
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
   const selectedTypeId = gameTypeId(system, format, treachery)
+  const recentSelected =
+    replayKept && Boolean(recent) && (recent === replaying || selectedTypeId === recentTypeId)
   const gameTypes = newGameTypes({
     chosen: { system: defaults.defaultSystem, format: defaults.defaultFormat },
-    recent: recent && (recent.mode === "local" ? recent.game : recent.lobby),
+    recent: recentPlayed,
     connected: connectedMode,
   })
   const allFormatsShown =
