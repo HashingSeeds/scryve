@@ -541,15 +541,26 @@ function CounterSheet({
               </BoardPressable>
             ))}
           </View>
-          <View pointerEvents="none" style={themed($sheetHeader)}>
+          <View pointerEvents="box-none" style={themed($sheetHeader)}>
             <TableGlyph id={counter.id} size={16} color={ink} />
             <Text
               text={counterLabel}
               weight="bold"
               size="xs"
               numberOfLines={1}
-              style={{ color: ink }}
+              style={[$headerLabel, { color: ink }]}
             />
+            {ruleId && openRule ? (
+              <BoardPressable
+                testID={`counter-rule-${seatNumber}`}
+                accessibilityRole="link"
+                accessibilityLabel={translate("board:counters.rule", { rule: ruleId })}
+                hitSlop={8}
+                onPress={() => openRule(ruleId)}
+              >
+                <Text text={ruleId} size="xs" style={[$ruleLink, { color: ink }]} />
+              </BoardPressable>
+            ) : null}
           </View>
           <View pointerEvents="none" style={$sheetCenter}>
             <Text
@@ -570,15 +581,6 @@ function CounterSheet({
                 onClose()
               }}
             />
-            {ruleId && openRule ? (
-              <SheetTextButton
-                testID={`counter-rule-${seatNumber}`}
-                text={ruleId}
-                accessibilityLabel={translate("board:counters.rule", { rule: ruleId })}
-                ink={ink}
-                onPress={() => openRule(ruleId)}
-              />
-            ) : null}
             <SheetTextButton
               testID={`counter-done-${seatNumber}`}
               text={translate("common:done")}
@@ -834,6 +836,10 @@ const $sheetHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
   gap: spacing.xxs,
 })
+
+const $headerLabel: TextStyle = { flexShrink: 1 }
+
+const $ruleLink: TextStyle = { textDecorationLine: "underline" }
 
 const $sheetCenter: ViewStyle = { flex: 1, alignItems: "center", justifyContent: "center" }
 

@@ -1,4 +1,4 @@
-import { Alert, Linking } from "react-native"
+import { Alert, Linking, Platform } from "react-native"
 
 import { translate } from "@/i18n/translate"
 
@@ -36,13 +36,15 @@ export const GAME_RULES = {
   ygo: { kind: "link", pageUrl: "https://www.yugioh-card.com/en/rulebook/" },
 } satisfies Record<SystemId, GameRules>
 
+export const RULES_TEXT_IN_APP = Platform.OS !== "web"
+
 export function gameRules(system: unknown): GameRules | undefined {
   return isSystemId(system) ? GAME_RULES[system] : undefined
 }
 
 export function tableItemRulesOf(system: unknown) {
   const rules = gameRules(system)
-  return rules?.kind === "text" ? rules.tableItemRules : undefined
+  return RULES_TEXT_IN_APP && rules?.kind === "text" ? rules.tableItemRules : undefined
 }
 
 export function openRules(rules: GameRules, showText?: () => void) {

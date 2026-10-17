@@ -102,6 +102,23 @@ describe("CounterChips", () => {
     expect(table.adjustCounter).toHaveBeenCalledWith("poison", -1)
   })
 
+  it("opens the rule that governs an edited counter, and shows none for a counter without one", () => {
+    const openRule = jest.fn()
+    const table = seat({
+      counters: { poison: 3, experience: 1 },
+      tableItemRules: { poison: "104.3d" },
+      openRule,
+    })
+    const view = chips(table)
+
+    fireEvent(view.getByTestId("counter-chip-1-poison"), "longPress")
+    fireEvent.press(view.getByLabelText("Rule 104.3d"))
+    expect(openRule).toHaveBeenCalledWith("104.3d")
+    fireEvent.press(view.getByTestId("counter-done-1"))
+    fireEvent(view.getByTestId("counter-chip-1-experience"), "longPress")
+    expect(view.queryByTestId("counter-rule-1")).toBeNull()
+  })
+
   it("shows another device's chips without letting this one change them", () => {
     const table = seat({ counters: { poison: 10 }, held: ["monarch"], editable: false })
     const view = chips(table)
