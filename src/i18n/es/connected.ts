@@ -298,7 +298,7 @@ export default {
         mtg: "No se pudo sincronizar un cambio de vida de {{delta}}",
         ygo: "No se pudo sincronizar un cambio de {{delta}} Puntos de Vida",
         pokemon: "No se pudo sincronizar un cambio de {{delta}} cartas de Premio",
-        lorcana: "No se pudo sincronizar un cambio de {{delta}} de leyenda",
+        lorcana: "No se pudo sincronizar un cambio de {{delta}} puntos de leyenda",
       },
       commanderDamage: "No se pudo sincronizar una asignación de {{delta}} de daño de comandante",
       table: "No se pudo sincronizar un cambio en la mesa",

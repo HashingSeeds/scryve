@@ -69,9 +69,9 @@ export default {
     pokemon_one: "{{count}} carta de Premio",
     pokemon_many: "{{count}} de cartas de Premio",
     pokemon_other: "{{count}} cartas de Premio",
-    lorcana_one: "{{count}} de leyenda",
-    lorcana_many: "{{count}} de leyenda",
-    lorcana_other: "{{count}} de leyenda",
+    lorcana_one: "{{count}} punto de leyenda",
+    lorcana_many: "{{count}} de puntos de leyenda",
+    lorcana_other: "{{count}} puntos de leyenda",
   },
   counterChange: {
     none_one: "{{count}} cambio de vidas",

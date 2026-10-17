@@ -509,14 +509,14 @@ export default {
       mtg: "Sumar {{amount}} de vida",
       ygo: "Sumar {{amount}} Puntos de Vida",
       pokemon: "Sumar {{amount}} cartas de Premio",
-      lorcana: "Sumar {{amount}} de leyenda",
+      lorcana: "Sumar {{amount}} puntos de leyenda",
     },
     subtract: {
       none: "Restar {{amount}} de vida",
       mtg: "Restar {{amount}} de vida",
       ygo: "Restar {{amount}} Puntos de Vida",
       pokemon: "Restar {{amount}} cartas de Premio",
-      lorcana: "Restar {{amount}} de leyenda",
+      lorcana: "Restar {{amount}} puntos de leyenda",
     },
   },
 } satisfies LocaleNamespace
