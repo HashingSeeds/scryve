@@ -1,0 +1,464 @@
+[
+  {
+    "unique_id": "mHBtPppktRTkWpnf69dHj",
+    "name": "Aurora, Shooting Star",
+    "color": "",
+    "pitch": "",
+    "cost": "",
+    "power": "",
+    "defense": "",
+    "health": "40",
+    "intelligence": "4",
+    "arcane": "",
+    "types": [
+      "Elemental",
+      "Runeblade",
+      "Hero"
+    ],
+    "traits": [],
+    "card_keywords": [
+      "Essence of Lightning"
+    ],
+    "abilities_and_effects": [],
+    "ability_and_effect_keywords": [],
+    "granted_keywords": [],
+    "removed_keywords": [],
+    "interacts_with_keywords": [],
+    "functional_text": "**Once per Turn Instant** - {r}{r}: Create an Embodiment of Lightning token. Activate this only if you've played a Lightning card this turn.\n\n**Essence of Lightning**",
+    "functional_text_plain": "Once per Turn Instant - {r}{r}: Create an Embodiment of Lightning token. Activate this only if you've played a Lightning card this turn.\nEssence of Lightning",
+    "type_text": "Elemental Runeblade Hero",
+    "played_horizontally": false,
+    "blitz_legal": false,
+    "cc_legal": true,
+    "commoner_legal": false,
+    "ll_legal": true,
+    "silver_age_legal": false,
+    "blitz_living_legend": false,
+    "cc_living_legend": true,
+    "cc_living_legend_start": "2025-05-09T00:00:00.000Z",
+    "blitz_banned": false,
+    "cc_banned": false,
+    "commoner_banned": false,
+    "ll_banned": false,
+    "silver_age_banned": false,
+    "upf_banned": false,
+    "blitz_suspended": false,
+    "cc_suspended": false,
+    "commoner_suspended": false,
+    "ll_restricted": false,
+    "referenced_cards": [
+      "QBwTWNc9FMGQfwHRTTdHj"
+    ],
+    "cards_referenced_by": [
+      "7J87gL6NR9MjHMLM6cWGB"
+    ],
+    "printings": [
+      {
+        "unique_id": "7zQtFncnN8MWWJBfgGLmD",
+        "set_printing_unique_id": "RHCcdJ96gKmmT9jPCwTbP",
+        "id": "AST001",
+        "set_id": "AST",
+        "edition": "N",
+        "foiling": "S",
+        "rarity": "M",
+        "expansion_slot": false,
+        "artists": [
+          "Asur Misoa"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://d2wlb52bya4y8z.cloudfront.net/media/cards/large/AST001.webp",
+        "image_rotation_degrees": 0
+      },
+      {
+        "unique_id": "C6CT9mgGgbjPBtMrknKhj",
+        "set_printing_unique_id": "NrpJFBQQGpNM8D9w8BBfG",
+        "id": "HER120",
+        "set_id": "HER",
+        "edition": "N",
+        "foiling": "R",
+        "rarity": "P",
+        "expansion_slot": false,
+        "artists": [
+          "Asur Misoa"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/cardfaces/promos/HER120.png",
+        "image_rotation_degrees": 0
+      }
+    ]
+  },
+  {
+    "unique_id": "PHktCwKzLmBMwmCBwb7Cw",
+    "name": "Snatch",
+    "color": "Red",
+    "pitch": "1",
+    "cost": "0",
+    "power": "4",
+    "defense": "2",
+    "health": "",
+    "intelligence": "",
+    "arcane": "",
+    "types": [
+      "Generic",
+      "Action",
+      "Attack"
+    ],
+    "traits": [],
+    "card_keywords": [],
+    "abilities_and_effects": [],
+    "ability_and_effect_keywords": [],
+    "granted_keywords": [],
+    "removed_keywords": [],
+    "interacts_with_keywords": [],
+    "functional_text": "When this hits, draw a card.",
+    "functional_text_plain": "When this hits, draw a card.",
+    "type_text": "Generic Action - Attack",
+    "played_horizontally": false,
+    "blitz_legal": true,
+    "cc_legal": true,
+    "commoner_legal": false,
+    "ll_legal": true,
+    "silver_age_legal": true,
+    "blitz_living_legend": false,
+    "cc_living_legend": false,
+    "blitz_banned": false,
+    "cc_banned": false,
+    "commoner_banned": false,
+    "ll_banned": false,
+    "silver_age_banned": false,
+    "upf_banned": false,
+    "blitz_suspended": false,
+    "cc_suspended": false,
+    "commoner_suspended": false,
+    "ll_restricted": false,
+    "printings": [
+      {
+        "unique_id": "dwt7wcDTPQFrjmz7jgQcT",
+        "set_printing_unique_id": "rW8hnzQk9DFq89t6Gm9cH",
+        "id": "1HP371",
+        "set_id": "1HP",
+        "edition": "N",
+        "foiling": "S",
+        "rarity": "R",
+        "expansion_slot": false,
+        "artists": [
+          "Yulia Litvinova"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/media/images/1HP371.width-450.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "271013",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/271013?Language=English&Printing=Normal"
+      },
+      {
+        "unique_id": "P6QFTrNhHWF9WJ8PWKQQ9",
+        "set_printing_unique_id": "nLHMCLWr6cnfBgpFjKLWW",
+        "id": "ANQ031",
+        "set_id": "ANQ",
+        "edition": "N",
+        "foiling": "S",
+        "rarity": "R",
+        "expansion_slot": false,
+        "artists": [
+          "Yulia Litvinova"
+        ],
+        "art_variations": [
+          "AB"
+        ],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://legendstory-production-s3-public.s3.amazonaws.com/media/cards/large/ANQ031.webp",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "678584",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/678584?Language=English&Printing=Normal"
+      }
+    ]
+  },
+  {
+    "unique_id": "TJdbQPDBpnLGpNmmN7fhg",
+    "name": "Ball Lightning",
+    "color": "Red",
+    "pitch": "1",
+    "cost": "0",
+    "power": "3",
+    "defense": "0",
+    "health": "",
+    "intelligence": "",
+    "arcane": "",
+    "types": [
+      "Lightning",
+      "Action",
+      "Attack"
+    ],
+    "traits": [],
+    "card_keywords": [
+      "Go again"
+    ],
+    "abilities_and_effects": [],
+    "ability_and_effect_keywords": [],
+    "granted_keywords": [],
+    "removed_keywords": [],
+    "interacts_with_keywords": [],
+    "functional_text": "Whenever a Lightning or Elemental action card would deal damage this combat chain, instead it deals that much damage plus 1.\n\n**Go again**",
+    "functional_text_plain": "Whenever a Lightning or Elemental action card would deal damage this combat chain, instead it deals that much damage plus 1.\nGo again",
+    "type_text": "Lightning Action - Attack",
+    "played_horizontally": false,
+    "blitz_legal": true,
+    "cc_legal": true,
+    "commoner_legal": true,
+    "ll_legal": true,
+    "silver_age_legal": true,
+    "blitz_living_legend": false,
+    "cc_living_legend": false,
+    "blitz_banned": true,
+    "blitz_banned_start": "2022-01-17T00:00:00.000Z",
+    "cc_banned": true,
+    "cc_banned_start": "2022-01-17T00:00:00.000Z",
+    "commoner_banned": false,
+    "ll_banned": false,
+    "silver_age_banned": true,
+    "silver_age_banned_start": "2025-10-19T00:00:00.000Z",
+    "upf_banned": false,
+    "blitz_suspended": false,
+    "cc_suspended": false,
+    "commoner_suspended": false,
+    "ll_restricted": false,
+    "printings": [
+      {
+        "unique_id": "JGQNmrhbMwfdMpWmrrLCq",
+        "set_printing_unique_id": "NhgmFkNBHjCqB6rBzFp8W",
+        "id": "ELE186",
+        "set_id": "ELE",
+        "edition": "F",
+        "foiling": "S",
+        "rarity": "C",
+        "expansion_slot": false,
+        "artists": [
+          "Alexander Gering"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/media/images/ELE186.width-450.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "248396",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/248396?Language=English&Printing=1st+Edition+Normal"
+      },
+      {
+        "unique_id": "6HpK8TjGmmmccntm7N8tH",
+        "set_printing_unique_id": "NhgmFkNBHjCqB6rBzFp8W",
+        "id": "ELE186",
+        "set_id": "ELE",
+        "edition": "F",
+        "foiling": "R",
+        "rarity": "C",
+        "expansion_slot": false,
+        "artists": [
+          "Alexander Gering"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/media/images/ELE186.width-450.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "248396",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/248396?Language=English&Printing=1st+Edition+Rainbow+Foil"
+      }
+    ]
+  },
+  {
+    "unique_id": "C7jcJhrdpQTMfd7F79jK9",
+    "name": "Achilles Accelerator",
+    "color": "",
+    "pitch": "",
+    "cost": "",
+    "power": "",
+    "defense": "0",
+    "health": "",
+    "intelligence": "",
+    "arcane": "",
+    "types": [
+      "Mechanologist",
+      "Equipment",
+      "Legs"
+    ],
+    "traits": [],
+    "card_keywords": [
+      "Arcane Barrier 1"
+    ],
+    "abilities_and_effects": [
+      "Instant"
+    ],
+    "ability_and_effect_keywords": [],
+    "granted_keywords": [],
+    "removed_keywords": [],
+    "interacts_with_keywords": [
+      "Boost"
+    ],
+    "functional_text": "**Instant** - Destroy Achilles Accelerator: Gain 1 action point. Activate this ability only if you have **boosted** this turn.\n\n**Arcane Barrier 1**",
+    "functional_text_plain": "Instant - Destroy Achilles Accelerator: Gain 1 action point. Activate this ability only if you have boosted this turn.\nArcane Barrier 1",
+    "type_text": "Mechanologist Equipment - Legs",
+    "played_horizontally": false,
+    "blitz_legal": true,
+    "cc_legal": true,
+    "commoner_legal": true,
+    "ll_legal": true,
+    "silver_age_legal": true,
+    "blitz_living_legend": false,
+    "cc_living_legend": false,
+    "blitz_banned": false,
+    "cc_banned": false,
+    "commoner_banned": false,
+    "ll_banned": false,
+    "silver_age_banned": false,
+    "upf_banned": false,
+    "blitz_suspended": false,
+    "cc_suspended": false,
+    "commoner_suspended": false,
+    "ll_restricted": false,
+    "printings": [
+      {
+        "unique_id": "kPqDqMQbNf9dr8bQmwfpg",
+        "set_printing_unique_id": "rW8hnzQk9DFq89t6Gm9cH",
+        "id": "1HP186",
+        "set_id": "1HP",
+        "edition": "N",
+        "foiling": "S",
+        "rarity": "C",
+        "expansion_slot": false,
+        "artists": [
+          "Pavel Chuvin"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/media/images/1HP186.width-450.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "270942",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/270942?Language=English&Printing=Normal"
+      },
+      {
+        "unique_id": "RcBhTbPDG6hqChKBHMMBz",
+        "set_printing_unique_id": "fJhkbkJH6WPtr8ztNTcp9",
+        "id": "ARC005",
+        "set_id": "ARC",
+        "edition": "F",
+        "foiling": "S",
+        "rarity": "C",
+        "expansion_slot": false,
+        "artists": [
+          "Pavel Chuvin"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/cardfaces/2020-ARC/ARC005.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "225541",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/225541?Language=English&Printing=1st+Edition+Normal"
+      }
+    ]
+  },
+  {
+    "unique_id": "phCFwdjG8dKDCmr7d7F7M",
+    "name": "Awakening",
+    "color": "Blue",
+    "pitch": "3",
+    "cost": "2",
+    "power": "",
+    "defense": "",
+    "health": "",
+    "intelligence": "",
+    "arcane": "",
+    "types": [
+      "Elemental",
+      "Guardian",
+      "Instant"
+    ],
+    "traits": [],
+    "card_keywords": [
+      "Earth Fusion"
+    ],
+    "abilities_and_effects": [],
+    "ability_and_effect_keywords": [],
+    "granted_keywords": [],
+    "removed_keywords": [],
+    "interacts_with_keywords": [],
+    "functional_text": "**Earth Fusion**\n\nIf you have less {h} than an opposing hero, create Seismic Surge tokens equal to the difference. If Awakening was **fused**, instead create twice that many Seismic Surge tokens.\n\nSearch your deck for a Guardian attack action card with cost less than or equal to the number of Seismic Surge tokens you control, reveal it, put it into your hand, then shuffle your deck.",
+    "functional_text_plain": "Earth Fusion\nIf you have less {h} than an opposing hero, create Seismic Surge tokens equal to the difference. If Awakening was fused, instead create twice that many Seismic Surge tokens.\nSearch your deck for a Guardian attack action card with cost less than or equal to the number of Seismic Surge tokens you control, reveal it, put it into your hand, then shuffle your deck.",
+    "type_text": "Elemental Guardian Instant",
+    "played_horizontally": false,
+    "blitz_legal": true,
+    "cc_legal": true,
+    "commoner_legal": false,
+    "ll_legal": true,
+    "silver_age_legal": false,
+    "blitz_living_legend": false,
+    "cc_living_legend": false,
+    "blitz_banned": true,
+    "blitz_banned_start": "2022-05-02T00:00:00.000Z",
+    "cc_banned": true,
+    "cc_banned_start": "2022-05-02T00:00:00.000Z",
+    "commoner_banned": false,
+    "ll_banned": false,
+    "silver_age_banned": false,
+    "upf_banned": false,
+    "blitz_suspended": false,
+    "cc_suspended": false,
+    "commoner_suspended": false,
+    "ll_restricted": true,
+    "ll_restricted_affects_full_cycle": false,
+    "ll_restricted_start": "2023-12-22T00:00:00.000Z",
+    "referenced_cards": [
+      "Rf8CHpzmhJNppCtDDKWDm"
+    ],
+    "printings": [
+      {
+        "unique_id": "Ptnp6Fj9nQFjhkNwzKnF9",
+        "set_printing_unique_id": "NhgmFkNBHjCqB6rBzFp8W",
+        "id": "ELE006",
+        "set_id": "ELE",
+        "edition": "F",
+        "foiling": "S",
+        "rarity": "M",
+        "expansion_slot": false,
+        "artists": [
+          "Nathaniel Himawan"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/media/images/ELE006.width-450.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "248362",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/248362?Language=English&Printing=1st+Edition+Normal"
+      },
+      {
+        "unique_id": "FcDpmn8PHngQwbchzMhwh",
+        "set_printing_unique_id": "NhgmFkNBHjCqB6rBzFp8W",
+        "id": "ELE006",
+        "set_id": "ELE",
+        "edition": "F",
+        "foiling": "R",
+        "rarity": "M",
+        "expansion_slot": false,
+        "artists": [
+          "Nathaniel Himawan"
+        ],
+        "art_variations": [],
+        "flavor_text": "",
+        "flavor_text_plain": "",
+        "image_url": "https://storage.googleapis.com/fabmaster/media/images/ELE006.width-450.png",
+        "image_rotation_degrees": 0,
+        "tcgplayer_product_id": "248362",
+        "tcgplayer_url": "https://www.tcgplayer.com/product/248362?Language=English&Printing=1st+Edition+Rainbow+Foil"
+      }
+    ]
+  }
+]

@@ -306,7 +306,9 @@ async function resolveGenericEntries(
 
     const result = lookupPrinting
       ? await lookupPrinting(ctx, includeImages)
-      : await catalog.search(ctx, entry.name, includeImages)
+      : catalog.bulk
+        ? { cards: [] }
+        : await catalog.search(ctx, entry.name, includeImages)
     const resolved = result.cards.find(
       (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
     )

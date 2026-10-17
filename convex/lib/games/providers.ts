@@ -15,7 +15,6 @@ type GameProvider = {
 
 export type ProviderGame = Exclude<GameSystemId, "mtg">
 
-/** why: keyed by every system but Magic, so a new system fails typecheck here until it supplies a provider. Magic predates this and keeps its Scryfall, Archidekt, and MTGJSON paths. */
 export const GAME_PROVIDERS: Readonly<Record<ProviderGame, GameProvider>> = {
   ygo: {
     catalog: YGOPRODECK_CATALOG,
