@@ -35,7 +35,7 @@ export const gameContentNotices = {
         },
         {
           type: "paragraph",
-          text: "The Magic: The Gathering Comprehensive Rules are downloaded from Wizards of the Coast when you open Rules, and shown with their original notices. Scryve does not host or distribute them. The official rules are at https://magic.wizards.com/en/rules.",
+          text: "The Magic: The Gathering Comprehensive Rules are downloaded from Wizards of the Coast to your device when you start a Magic game or open Rules, and shown with their original notices. Scryve does not host or distribute them. The official rules are at https://magic.wizards.com/en/rules.",
         },
       ],
     },
