@@ -21,7 +21,10 @@ async function syncedLorcana(decks: Record<string, unknown> = lorcanaJsonDecks) 
     )
   })
   const t = makeConvexTest()
+  jest.useFakeTimers()
   await t.action(internal.cardDatasetSync.sync, { game: "lorcana" })
+  await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+  jest.useRealTimers()
   return t
 }
 
@@ -114,6 +117,18 @@ describe("Disney Lorcana", () => {
     jest.spyOn(Date, "now").mockReturnValue(tomorrow)
     await t.action(internal.deckCatalogs.refresh, { game: "lorcana", format: "core" })
     expect(await names("core")).toEqual([])
+  })
+
+  it("caches starter decks once the first card sync finishes, before anyone browses", async () => {
+    const t = await syncedLorcana()
+
+    const page = await t.query(internal.deckCatalogs.browseCached, {
+      game: "lorcana",
+      format: "infinity",
+      query: "",
+      paginationOpts: { numItems: 30, cursor: null },
+    })
+    expect(page.page.map((deck) => deck.name)).toEqual(["Core Starter", "Rotated Starter"])
   })
 
   it("keeps a listed starter deck while its cards are missing from a partial sync", async () => {
