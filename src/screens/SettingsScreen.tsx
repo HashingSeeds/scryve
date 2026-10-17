@@ -24,10 +24,10 @@ import {
   NO_PLAY_SYSTEM,
   defaultStartingLife,
   playFormatOptions,
-  playSystemChoices,
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import { playSystemChoices } from "@/features/game/systemVisibility"
 import {
   backToPreview,
   betaUpdatesChosen,

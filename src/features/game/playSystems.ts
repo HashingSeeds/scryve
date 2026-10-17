@@ -1,7 +1,6 @@
 import systems from "@/i18n/en/systems"
 import { translate } from "@/i18n/translate"
 
-import { VISIBLE_SYSTEM_IDS } from "./systemVisibility"
 import { deckFormatLabel, deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
@@ -154,13 +153,6 @@ function hasOwnKey<Table extends object>(
 
 export function playSystemShortLabel(value: unknown): string {
   return isPlaySystemId(value) ? SYSTEMS[value].shortLabel : translate("systems:noSystem")
-}
-
-export function playSystemChoices() {
-  return [NO_PLAY_SYSTEM, ...VISIBLE_SYSTEM_IDS].map((id) => ({
-    id,
-    label: playSystemShortLabel(id),
-  }))
 }
 
 export function counterHeading(value: unknown): string {
