@@ -1,6 +1,7 @@
 import systems from "@/i18n/en/systems"
 import { translate } from "@/i18n/translate"
 
+import { VISIBLE_SYSTEM_IDS } from "./systemVisibility"
 import { deckFormatLabel, deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
@@ -156,7 +157,10 @@ export function playSystemShortLabel(value: unknown): string {
 }
 
 export function playSystemChoices() {
-  return [NO_PLAY_SYSTEM, ...PLAY_SYSTEM_IDS].map((id) => ({ id, label: playSystemShortLabel(id) }))
+  return [NO_PLAY_SYSTEM, ...VISIBLE_SYSTEM_IDS].map((id) => ({
+    id,
+    label: playSystemShortLabel(id),
+  }))
 }
 
 export function counterHeading(value: unknown): string {
