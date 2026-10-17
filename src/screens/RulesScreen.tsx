@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { FlatList, Linking, Platform, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
@@ -88,6 +88,9 @@ export function RulesScreen({
     () => (rules ? rowsFor(rules, { ruleId, glossary, query }) : []),
     [rules, ruleId, glossary, query],
   )
+  const targetIndex = rows.findIndex((row) => row.kind === "rule" && row.target)
+  const list = useRef<FlatList<Row>>(null)
+  const scrolledToTarget = useRef(false)
   const section = rules && ruleId ? findRules(rules, ruleId)?.section : undefined
   const title = glossary
     ? translate("play:rules.glossary")
@@ -198,8 +201,18 @@ export function RulesScreen({
         </View>
       ) : (
         <FlatList
+          ref={list}
           testID="rules-list"
           data={rows}
+          initialNumToRender={Math.max(10, targetIndex + 1)}
+          onContentSizeChange={() => {
+            if (targetIndex <= 0 || scrolledToTarget.current) return
+            scrolledToTarget.current = true
+            list.current?.scrollToIndex({ index: targetIndex, animated: false })
+          }}
+          onScrollToIndexFailed={({ index }) =>
+            setTimeout(() => list.current?.scrollToIndex({ index, animated: false }), 50)
+          }
           keyExtractor={(row) => row.key}
           renderItem={renderRow}
           keyboardShouldPersistTaps="handled"
