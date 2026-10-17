@@ -10,8 +10,8 @@ const requiredNotices = (system: SystemId) =>
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-10-16",
-  effectiveDate: "October 16, 2026",
+  version: "2026-10-17",
+  effectiveDate: "October 17, 2026",
   sections: [
     {
       blocks: [
@@ -60,6 +60,16 @@ export const gameContentNotices = {
         {
           type: "paragraph",
           text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through TCGdex, and tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by TCGdex or Limitless.",
+        },
+      ],
+    },
+    {
+      heading: "Disney Lorcana",
+      blocks: [
+        ...requiredNotices("lorcana"),
+        {
+          type: "paragraph",
+          text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data and official starter deck lists are provided through LorcanaJSON, and card images load from Ravensburger. Scryve is not affiliated with or endorsed by LorcanaJSON.",
         },
       ],
     },

@@ -1,6 +1,7 @@
 import type { CardCatalog } from "./cards"
 import type { DeckFeed, DeckLinkSource, DeckListRules } from "./decks"
 import { LIMITLESS_FEED, LIMITLESS_LINK } from "./limitless"
+import { LORCANA_DECK_LIST, LORCANA_JSON_DATASET, LORCANA_STARTER_DECKS } from "./lorcana"
 import { POKEMON_DECK_LIST, TCGDEX_CATALOG } from "./pokemon"
 import { YGOPRODECK_CATALOG } from "./yugioh"
 import { YDK_DECK_LIST, YGOPRODECK_FEED, YGOPRODECK_LINK } from "./yugiohDecks"
@@ -9,7 +10,7 @@ import type { GameSystemId } from "../integrations"
 type GameProvider = {
   readonly catalog: CardCatalog
   readonly deckList: DeckListRules
-  readonly deckLink: DeckLinkSource
+  readonly deckLink: DeckLinkSource | null
   readonly deckFeed: DeckFeed | null
 }
 
@@ -27,6 +28,12 @@ export const GAME_PROVIDERS: Readonly<Record<ProviderGame, GameProvider>> = {
     deckList: POKEMON_DECK_LIST,
     deckLink: LIMITLESS_LINK,
     deckFeed: LIMITLESS_FEED,
+  },
+  lorcana: {
+    catalog: { bulk: LORCANA_JSON_DATASET },
+    deckList: LORCANA_DECK_LIST,
+    deckLink: null,
+    deckFeed: LORCANA_STARTER_DECKS,
   },
 }
 

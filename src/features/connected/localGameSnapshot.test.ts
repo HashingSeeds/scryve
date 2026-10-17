@@ -218,7 +218,7 @@ describe("buildFinishedLocalGameSnapshot", () => {
       schemaVersion: 1,
       id: game.id,
       status: "finished",
-      system: "lorcana",
+      system: "not-a-system",
       startingLife: 20,
       players: game.players,
       eventCount: 1,

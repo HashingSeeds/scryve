@@ -17,8 +17,8 @@ describe("connected lobby server policy", () => {
     expect(() => assertPlayerCount(count)).toThrow("2–6"),
   )
   it("validates life, names, colors, and 256-bit URL-safe tokens", () => {
-    expect(() => assertStartingLife(0)).toThrow()
-    expect(() => assertStartingLife(20)).not.toThrow()
+    expect(() => assertStartingLife(0, { min: 1, max: 999 })).toThrow()
+    expect(() => assertStartingLife(20, { min: 1, max: 999 })).not.toThrow()
     expect(assertDisplayName(" Ada ")).toBe("Ada")
     expect(() => assertDisplayName(" ")).toThrow()
     expect(() => assertAllowedColor("red")).toThrow()

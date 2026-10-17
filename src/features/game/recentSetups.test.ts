@@ -77,6 +77,26 @@ describe("recent setups", () => {
     expect(recentSetupLabel({ savedAt: 1, ...local(["Ada", "Grace"]) })).toBe("Commander")
   })
 
+  it("keeps a Lorcana setup that starts at 0 lore", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const lorcana: NewRecentSetup = {
+      mode: "local",
+      game: {
+        players: [
+          { name: "Ada", color: "#B85636" },
+          { name: "Grace", color: "#41476E" },
+        ],
+        startingLife: 0,
+        system: "lorcana",
+        format: "core",
+      },
+    }
+    repository.rememberSetup(lorcana, 1)
+    expect(repository.loadRecentSetups()).toMatchObject([
+      { mode: "local", game: { startingLife: 0 } },
+    ])
+  })
+
   it("survives storage that is missing, corrupt, or partly invalid", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

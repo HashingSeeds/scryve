@@ -1193,6 +1193,11 @@ export const resolveLink = action({
       return { sourceName: "Archidekt", ...(await resolveArchidektDeck(ctx, link, deck)) }
     }
     const source = GAME_PROVIDERS[game].deckLink
+    if (!source)
+      throw new ConvexError({
+        code: "deck_link_unsupported",
+        message: "Deck links are not supported for this game",
+      })
     const link = source.open(args.url)
     await limitDeckImport(ctx)
     await requireActionCapability(ctx, game, "deckImport")

@@ -44,7 +44,7 @@ const printingValidator = v.object({
 })
 
 export const normalizedCardValidator = v.object({
-  game: v.union(v.literal("mtg"), v.literal("ygo"), v.literal("pokemon")),
+  game: v.union(v.literal("mtg"), v.literal("ygo"), v.literal("pokemon"), v.literal("lorcana")),
   identityNamespace: v.string(),
   cardId: v.string(),
   name: v.string(),
@@ -274,29 +274,37 @@ export const searchCached = internalQuery({
   },
 })
 
+async function lookupCard(ctx: QueryCtx, game: string, cardId: string) {
+  const integrationNamespace = integration(game)?.identityNamespace
+  if (!integrationNamespace) return null
+  const logical = await ctx.db
+    .query("gameCards")
+    .withIndex("by_game_and_identity_namespace_and_card_id", (query) =>
+      query.eq("game", game).eq("identityNamespace", integrationNamespace).eq("cardId", cardId),
+    )
+    .unique()
+  if (logical) return await projectedCard(ctx, logical)
+  const printing = await ctx.db
+    .query("cardPrintings")
+    .withIndex("by_game_and_printing_id", (query) =>
+      query.eq("game", game).eq("printingId", cardId),
+    )
+    .unique()
+  const card = printing ? await ctx.db.get(printing.gameCardId) : null
+  return card ? await projectedCard(ctx, card, printing ?? undefined) : null
+}
+
 export const lookupCached = internalQuery({
   args: { game: v.string(), cardId: v.string() },
+  handler: async (ctx, args) => await lookupCard(ctx, args.game, args.cardId),
+})
+
+export const lookupManyCached = internalQuery({
+  args: { game: v.string(), cardIds: v.array(v.string()) },
   handler: async (ctx, args) => {
-    const integrationNamespace = integration(args.game)?.identityNamespace
-    if (!integrationNamespace) return null
-    const logical = await ctx.db
-      .query("gameCards")
-      .withIndex("by_game_and_identity_namespace_and_card_id", (query) =>
-        query
-          .eq("game", args.game)
-          .eq("identityNamespace", integrationNamespace)
-          .eq("cardId", args.cardId),
-      )
-      .unique()
-    if (logical) return await projectedCard(ctx, logical)
-    const printing = await ctx.db
-      .query("cardPrintings")
-      .withIndex("by_game_and_printing_id", (query) =>
-        query.eq("game", args.game).eq("printingId", args.cardId),
-      )
-      .unique()
-    const card = printing ? await ctx.db.get(printing.gameCardId) : null
-    return card ? await projectedCard(ctx, card, printing ?? undefined) : null
+    if (args.cardIds.length > MAX_DATASET_BATCH)
+      throw new ConvexError({ code: "too_many_cards", message: "Too many cards to look up" })
+    return await Promise.all(args.cardIds.map((cardId) => lookupCard(ctx, args.game, cardId)))
   },
 })
 

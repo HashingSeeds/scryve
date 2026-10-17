@@ -25,7 +25,11 @@ function useDataset(version: string, cards = datasetCards) {
     version: jest.fn(async () => version),
     load: jest.fn(async () => cards),
   } satisfies BulkDataset
-  jest.replaceProperty(GAME_PROVIDERS, "ygo", { ...GAME_PROVIDERS.ygo, catalog: { bulk: dataset } })
+  jest.replaceProperty(GAME_PROVIDERS, "ygo", {
+    ...GAME_PROVIDERS.ygo,
+    catalog: { bulk: dataset },
+    deckFeed: null,
+  })
   return dataset
 }
 

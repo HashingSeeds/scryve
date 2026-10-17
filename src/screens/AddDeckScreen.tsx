@@ -66,6 +66,7 @@ import {
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
+import type { ProviderGame } from "../../convex/lib/games/providers"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
 import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
@@ -73,6 +74,7 @@ const DECK_LIST_HELPERS = {
   mtg: "decks:addDeck.listHelperMtg",
   ygo: "decks:addDeck.listHelperYgo",
   pokemon: "decks:addDeck.listHelperPokemon",
+  lorcana: "decks:addDeck.listHelperLorcana",
 } as const satisfies Record<SystemId, TxKeyPath>
 
 type CreationMode = "precon" | "paste" | "blank"
@@ -176,7 +178,7 @@ type ImportedCard = PreviewCard & {
 }
 
 type GenericImportedCard = {
-  game: "ygo" | "pokemon"
+  game: ProviderGame
   identityNamespace?: string
   cardId?: string
   providerCardId?: string
@@ -318,10 +320,12 @@ function preconDetail(deck: PreconstructedDeck) {
 
 function catalogSourceLabel(deck: CatalogDeck) {
   return deck.kind === "official"
-    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh! and Pokémon, named by publisher.
+    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh!, Pokémon, and Lorcana, named by publisher.
       deck.game === "ygo"
       ? "Konami"
-      : "Pokémon"
+      : deck.game === "lorcana"
+        ? "Ravensburger"
+        : "Pokémon"
     : deck.source === "mtgo-examples"
       ? translate("decks:addDeck.sourceMtgoExample")
       : deck.source === "limitless"

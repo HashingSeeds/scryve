@@ -5,9 +5,9 @@ import {
   identitySection,
   isCounterOut,
   SYSTEM_IDS,
+  startingValueRange,
   SYSTEMS,
   tableRules,
-  type CounterDefinition,
 } from "."
 
 describe("system definitions", () => {
@@ -48,11 +48,18 @@ describe("system definitions", () => {
     expect(isCounterOut(prizes, 4, [0])).toBe(true)
     expect(isCounterOut(prizes, 0, [1])).toBe(false)
 
-    const lore: CounterDefinition = { ...life, defaultValue: 0, goal: { kind: "race", to: 20 } }
+    const lore = SYSTEMS.lorcana.counter
     expect(isCounterOut(lore, 0, [21])).toBe(true)
     expect(isCounterOut(lore, 20, [19])).toBe(false)
     expect(counterStanding(lore, 12)).toBeGreaterThan(counterStanding(lore, 3))
     expect(counterStanding(prizes, 1)).toBeGreaterThan(counterStanding(prizes, 3))
+  })
+
+  it("starts a counting-up race from 0 and short of its goal", () => {
+    expect(startingValueRange("lorcana")).toEqual({ min: 0, max: 19 })
+    expect(startingValueRange("pokemon")).toMatchObject({ min: 1 })
+    expect(startingValueRange("mtg")).toMatchObject({ min: 1 })
+    expect(startingValueRange(undefined)).toEqual({ min: 1, max: 999 })
   })
 
   it("offers experience and commander tax only where a command zone exists, and a Pokémon board only in Pokémon", () => {
