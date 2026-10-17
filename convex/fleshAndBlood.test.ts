@@ -32,6 +32,29 @@ const FABRARY_LIST = [
   "See the full deck @ https://fabrary.net/decks/01ABC",
 ].join("\n")
 
+function blitzPrecon() {
+  const deck = fabPrecons.find(({ format }) => format === "blitz")
+  if (!deck) throw new Error("No Blitz precon")
+  const pitches = new Map([
+    ["red", "1"],
+    ["yellow", "2"],
+    ["blue", "3"],
+  ])
+  const printing = (id: string) => [
+    { unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` },
+  ]
+  const dataset = [
+    { unique_id: "hero", name: deck.hero, printings: printing("hero") },
+    ...deck.cards.map((card, index) => ({
+      unique_id: `card-${index}`,
+      name: card.name,
+      pitch: pitches.get(card.pitch ?? "") ?? "",
+      printings: printing(`card-${index}`),
+    })),
+  ]
+  return { deck, dataset }
+}
+
 describe("Flesh and Blood", () => {
   afterEach(() => jest.restoreAllMocks())
 
@@ -133,25 +156,7 @@ describe("Flesh and Blood", () => {
   })
 
   it("browses official precons by format, hero first, with their sourced counts", async () => {
-    const deck = fabPrecons.find(({ format }) => format === "blitz")
-    if (!deck) throw new Error("No Blitz precon")
-    const pitches = new Map([
-      ["red", "1"],
-      ["yellow", "2"],
-      ["blue", "3"],
-    ])
-    const printing = (id: string) => [
-      { unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` },
-    ]
-    const dataset = [
-      { unique_id: "hero", name: deck.hero, printings: printing("hero") },
-      ...deck.cards.map((card, index) => ({
-        unique_id: `card-${index}`,
-        name: card.name,
-        pitch: pitches.get(card.pitch ?? "") ?? "",
-        printings: printing(`card-${index}`),
-      })),
-    ]
+    const { deck, dataset } = blitzPrecon()
     const actor = await player(await syncedFab(dataset), "fab-precons")
 
     const browsed = await actor.action(api.deckCatalogs.browse, {
@@ -177,6 +182,43 @@ describe("Flesh and Blood", () => {
     expect(entries.slice(1).map(({ quantity }) => quantity)).toEqual(
       deck.cards.map(({ count }) => count),
     )
+  })
+
+  it("keeps a listed precon while its cards are missing from a partial sync, and drops unlisted ones", async () => {
+    const { deck, dataset } = blitzPrecon()
+    const t = await syncedFab(dataset)
+    await t.action(internal.deckCatalogs.refresh, { game: "fab", format: "blitz" })
+    await t.mutation(internal.deckCatalogs.upsert, {
+      game: "fab",
+      source: "legend-story-studios",
+      externalId: "https://fabtcg.com/decklists/retired-precon/",
+      kind: "official",
+      name: "Retired precon",
+      format: "blitz",
+      entries: [],
+    })
+    await t.run(async (ctx) => {
+      const card = await ctx.db
+        .query("gameCards")
+        .withIndex("by_game_and_identity_namespace_and_card_id", (q) =>
+          q.eq("game", "fab").eq("identityNamespace", "fab-cube-card").eq("cardId", "card-0"),
+        )
+        .unique()
+      if (!card) throw new Error("card-0 was not synced")
+      await ctx.db.delete(card._id)
+    })
+    jest.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60 * 60 * 1000)
+
+    await t.action(internal.deckCatalogs.refresh, { game: "fab", format: "blitz" })
+
+    const listed = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("deckCatalogs")
+          .withIndex("by_game_and_fetched_at", (q) => q.eq("game", "fab"))
+          .take(10),
+    )
+    expect(listed.map(({ name }) => name)).toEqual([deck.name])
   })
 
   it("serves image fallbacks from the catalog and has no deck links", async () => {

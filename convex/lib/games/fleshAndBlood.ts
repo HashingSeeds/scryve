@@ -179,6 +179,12 @@ async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format:
     })
     count += 1
   }
+  await ctx.runMutation(internal.deckCatalogs.removeStale, {
+    game: "fab",
+    source: FAB_PRECON_FEED.source,
+    format,
+    keep: decks.map((deck) => deck.sourceUrl),
+  })
   if (count === 0) throw new Error("Flesh and Blood cards are not synced yet")
   return { count, status: 200 }
 }
