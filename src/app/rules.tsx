@@ -8,7 +8,7 @@ export default function RulesRoute() {
     <RulesScreen
       ruleId={rule}
       glossary={glossary !== undefined}
-      onBack={() => router.back()}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
       onOpenRule={(id) => router.push({ pathname: "/rules", params: { rule: id } })}
       onOpenGlossary={() => router.push({ pathname: "/rules", params: { glossary: "1" } })}
     />
