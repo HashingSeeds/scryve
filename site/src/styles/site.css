@@ -1251,10 +1251,13 @@ figure {
   pointer-events: auto;
 }
 
-/* Scroll sets --turn: on its side in the hero, standing up during the intro. */
+/* Scroll sets --turn: on its side in the hero, standing up during the intro. It starts on its
+   side so a phone, whose first layout can miss the small-screen styles, never shows it standing
+   and then turns it. */
 .phone.main {
+  --turn: -90deg;
   z-index: 1;
-  rotate: var(--turn, 0deg);
+  rotate: var(--turn);
 }
 
 /* The second phone waits tucked behind the first, dimmed. For connected play the two slide
