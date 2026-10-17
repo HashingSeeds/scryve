@@ -27,6 +27,16 @@ export default {
     continue: "Continuer",
     endGame: "Terminer la partie",
   },
+  whatYouPlay: {
+    heading: "À quoi jouez-vous ?",
+    changeLater: "Vous pouvez modifier cela dans les Réglages.",
+    showMoreFormats_one: "Afficher {{count}} format de plus",
+    showMoreFormats_many: "Afficher {{count}} de formats de plus",
+    showMoreFormats_other: "Afficher {{count}} formats de plus",
+    play: "Jouer",
+    acceptance:
+      "En jouant, vous acceptez les <terms>Conditions d'utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
+  },
   recentSetups: {
     title: "Configurations récentes",
     newSetup: "Nouvelle configuration",

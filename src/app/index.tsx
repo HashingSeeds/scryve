@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Linking, Platform, View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
@@ -12,8 +12,11 @@ import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { gameSetupHref } from "@/features/game/gameSetup"
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
+import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
+import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import type { TxKeyPath } from "@/i18n"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
+import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -83,15 +86,19 @@ export default function Index() {
   const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
   const [newerGame, setNewerGame] = useState(() => localGameRepository.hasNewerActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
-  useFocusEffect(
-    useCallback(() => {
-      const nextSettings = localGameRepository.loadSettings()
-      setSettings(nextSettings)
-      setLoadedGame(localGameRepository.loadActiveGame())
-      setNewerGame(localGameRepository.hasNewerActiveGame())
-      setFreshGame(createFreshGame(prepared, nextSettings))
-    }, [prepared]),
-  )
+  const reload = useCallback(() => {
+    const nextSettings = localGameRepository.loadSettings()
+    setSettings(nextSettings)
+    setLoadedGame(localGameRepository.loadActiveGame())
+    setNewerGame(localGameRepository.hasNewerActiveGame())
+    setFreshGame(createFreshGame(prepared, nextSettings))
+  }, [prepared])
+  useFocusEffect(reload)
+  const consentSettled = useLegalConsentSettled()
+  // why: the first-launch consent screen answers "What do you play?" while this route sits hidden behind it.
+  useEffect(() => {
+    if (consentSettled && settings.askWhatYouPlay) reload()
+  }, [consentSettled, reload, settings.askWhatYouPlay])
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
   const newestResumeGame = useNewestResumeGame()
   const resumeRedirect = resumeRedirectFor(
@@ -108,6 +115,21 @@ export default function Index() {
 
   if (resumeRedirect) return <Redirect href={resumeRedirect} />
   if (restoringAccount) return null
+
+  if (settings.askWhatYouPlay && !activeGame && !prepared) {
+    if (!consentSettled) return null
+    return (
+      <WhatYouPlayScreen
+        defaultPlayerCount={settings.defaultPlayerCount}
+        onChoose={(type) => {
+          const next = settingsForWhatYouPlay(settings, type)
+          localGameRepository.saveSettings(next)
+          setSettings(next)
+          setFreshGame(createFreshGame(prepared, next))
+        }}
+      />
+    )
+  }
 
   if (destination !== "play" && (!activeGame || stale) && settings.launchDestination === "decks") {
     return <Redirect href="/connected/decks" />

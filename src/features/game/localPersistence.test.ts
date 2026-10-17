@@ -244,6 +244,16 @@ describe("LocalGameRepository", () => {
     expect(repository.loadSettings()).toEqual(DEFAULT_LOCAL_SETTINGS)
   })
 
+  it("asks what you play only on a fresh install", () => {
+    const fresh = new LocalGameRepository(new MemoryStorage())
+    expect(fresh.loadSettings().askWhatYouPlay).toBe(true)
+    expect(fresh.loadSettings().askWhatYouPlay).toBe(true)
+
+    const existing = new MemoryStorage()
+    existing.set(LOCAL_KEYS.settings, JSON.stringify(DEFAULT_LOCAL_SETTINGS))
+    expect(new LocalGameRepository(existing).loadSettings().askWhatYouPlay).toBeUndefined()
+  })
+
   it("migrates unversioned legacy settings", () => {
     const storage = new MemoryStorage()
     storage.set(

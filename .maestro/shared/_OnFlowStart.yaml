@@ -46,3 +46,15 @@ appId: ${MAESTRO_APP_ID}
       - tapOn:
           id: "accept-legal-button"
       - waitForAnimationToEnd
+
+# a cleared install asks what the player plays, and "Play" accepts the legal
+# documents. "No system" keeps the 2 players at 20 life that flows assert against.
+- runFlow:
+    when:
+      visible: "What do you play?"
+    commands:
+      - tapOn:
+          id: "what-you-play-none"
+      - tapOn:
+          id: "what-you-play-start"
+      - waitForAnimationToEnd
