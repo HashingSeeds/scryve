@@ -38,6 +38,11 @@ describe("system visibility", () => {
     expect(visibility.isSystemVisible("pokemon")).toBe(false)
     expect(visibility.isSystemVisible("not-a-system")).toBe(false)
     expect(gameTypeSystems(gameTypes)).toEqual(new Set(["mtg", "ygo", undefined]))
+    const { suggested, more } = gameTypes.newGameTypes({
+      chosen: { system: "pokemon", format: "standard" },
+      connected: false,
+    })
+    expect([...suggested, ...more].some((type) => type.system === "pokemon")).toBe(false)
   })
 
   it.each(["beta", "preview", "development"])("shows beta systems on %s", async (environment) => {

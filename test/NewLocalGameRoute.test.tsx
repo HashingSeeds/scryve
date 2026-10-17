@@ -8,8 +8,9 @@ import {
   createNextMatchGame,
   defaultCommandContext,
 } from "@/features/game/domain"
-import { localGameRepository } from "@/features/game/localPersistence"
+import { LOCAL_KEYS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
+import { storage } from "@/utils/storage"
 
 import NewLocalGameRoute from "../src/app/game/new"
 
@@ -92,8 +93,52 @@ describe("new local game route", () => {
     mockLocalConnectFeed = {}
     mockSignedInAs = undefined
     publishedReporter = undefined
+    storage.delete(LOCAL_KEYS.recentSetups)
   })
   afterEach(() => localGameRepository.clearActiveGame())
+
+  it("opens on the newest setup for the tab, so Start replays it", () => {
+    const game = {
+      players: [
+        { name: "Ada", color: "#B85636" },
+        { name: "Grace", color: "#41476E" },
+      ],
+      startingLife: 40,
+      system: "mtg" as const,
+      format: "commander",
+      layout: "auto" as const,
+      lifeStep: 1,
+    }
+    localGameRepository.rememberSetup({ mode: "local", game }, 1)
+    localGameRepository.rememberSetup(
+      {
+        mode: "connected",
+        lobby: {
+          playerCount: 5,
+          startingLife: 40,
+          ruleset: "commander",
+          system: "mtg",
+          format: "commander",
+          variant: "treachery",
+          deckRequired: false,
+          layout: "auto",
+          lifeStep: 1,
+        },
+      },
+      2,
+    )
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("recent-setup")).toHaveTextContent("CommanderMagic · Ada, Grace✓")
+    expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(router.dismissTo).toHaveBeenCalled()
+    expect(localGameRepository.loadRecentSetups()[0]).toMatchObject({ mode: "local", game })
+  })
 
   it("connects setup to persisted current-game navigation", () => {
     const view = render(
