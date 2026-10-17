@@ -508,14 +508,14 @@ export default {
       mtg: "Ajouter {{amount}} de vie",
       ygo: "Ajouter {{amount}} Life Points",
       pokemon: "Ajouter {{amount}} cartes Récompense",
-      lorcana: "Ajouter {{amount}} Lore",
+      lorcana: "Ajouter {{amount}} éclats de Lore",
     },
     subtract: {
       none: "Retirer {{amount}} de vie",
       mtg: "Retirer {{amount}} de vie",
       ygo: "Retirer {{amount}} Life Points",
       pokemon: "Retirer {{amount}} cartes Récompense",
-      lorcana: "Retirer {{amount}} Lore",
+      lorcana: "Retirer {{amount}} éclats de Lore",
     },
   },
 } satisfies LocaleNamespace

@@ -51,6 +51,7 @@ Rules:
 - Keep every {{placeholder}} exactly as written, including the name inside the braces, and keep every <tag>. Placeholders hold numbers, player names, deck names, or card names.
 - Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon, Pokémon TCG, Disney Lorcana, Lorcana, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, and format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed).
 - Use the publisher's official localized term where one exists: poison counters, commander damage, commander tax, the Monarch, the Initiative, HP. The request lists fixed terms for life (Magic), Life Points (Yu-Gi-Oh!), Prize cards (Pokémon) and lore (Lorcana); always use exactly those, inflected as the grammar needs.
+- In French, a counted amount of Lorcana lore is "éclats de Lore" ("20 éclats de Lore"); use "Lore" alone when nothing is counted.
 - Product vocabulary, translate consistently: "local game" is a game on one shared device; "connected game" is players on their own phones; "cloud" means synced through Scryve's servers; "nearby" means phones on the same Wi-Fi; "seat" is a player's place at the table; "host" is the player who created a connected game.
 - Keep the " · " separator, ellipsis characters, and abbreviations like "5m ago" equally compact.
 - Each entry has a "context" key path that tells you where the string appears. Use it as context; never translate it.
