@@ -63,7 +63,7 @@ describe("bulk card dataset sync", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it("resumes the current version from its cursor and ignores a batch behind it", async () => {
+  it("resumes from its cursor and ignores batches from a sync that started before it finished", async () => {
     const t = makeConvexTest()
     useDataset("v2")
     await t.run(async (ctx) => {
@@ -86,6 +86,16 @@ describe("bulk card dataset sync", () => {
         offset: 100,
         total: 150,
         cards: [datasetCard(100)],
+      }),
+    ).resolves.toBeNull()
+    await expect(
+      t.mutation(internal.cardCatalog.writeDatasetBatch, {
+        game: "ygo",
+        version: "v1",
+        storedVersion: "v1",
+        offset: 0,
+        total: 1,
+        cards: [datasetCard(0)],
       }),
     ).resolves.toBeNull()
     await expect(t.query(internal.cardCatalog.datasetSync, { game: "ygo" })).resolves.toEqual(

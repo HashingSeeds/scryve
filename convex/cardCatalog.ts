@@ -130,6 +130,7 @@ export const writeDatasetBatch = internalMutation({
   args: {
     game: v.string(),
     version: v.string(),
+    storedVersion: v.optional(v.string()),
     offset: v.number(),
     total: v.number(),
     cards: v.array(normalizedCardValidator.omit("game")),
@@ -142,8 +143,10 @@ export const writeDatasetBatch = internalMutation({
       .query("cardDatasetSyncs")
       .withIndex("by_game", (query) => query.eq("game", game))
       .unique()
-    const cursor = state?.pending?.version === args.version ? state.pending.nextIndex : 0
-    if (args.offset !== 0 && args.offset !== cursor) return null
+    const resume =
+      state?.pending?.version === args.version && args.offset === state.pending.nextIndex
+    const restart = args.offset === 0 && state?.version === args.storedVersion
+    if (!resume && !restart) return null
     for (const card of args.cards) await upsertCard(ctx, { ...card, game })
     const nextIndex = args.offset + args.cards.length
     const value =

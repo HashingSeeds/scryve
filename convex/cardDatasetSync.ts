@@ -43,6 +43,7 @@ export const sync = internalAction({
       const next = await ctx.runMutation(internal.cardCatalog.writeDatasetBatch, {
         game,
         version,
+        storedVersion: state?.version,
         offset,
         total: cards.length,
         cards: cards.slice(offset, batchEnd(cards, offset)),
