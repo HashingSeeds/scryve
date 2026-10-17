@@ -399,8 +399,7 @@ export default defineSchema({
     quantity: v.number(),
     board: v.optional(v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))),
   })
-    .index("by_deck_version", ["deckVersionId"])
-    .index("by_game_and_printing_id", ["game", "printingId"]),
+    .index("by_deck_version", ["deckVersionId"]),
 
   gameCards: defineTable({
     game: v.string(),
@@ -513,8 +512,7 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     smallImageUrl: v.optional(v.string()),
   })
-    .index("by_catalog_deck_id", ["catalogDeckId"])
-    .index("by_game_and_printing_id", ["game", "printingId"]),
+    .index("by_catalog_deck_id", ["catalogDeckId"]),
 
   deckGameResults: defineTable({
     deckId: v.id("decks"),
