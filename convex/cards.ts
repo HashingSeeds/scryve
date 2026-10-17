@@ -7,10 +7,10 @@ import { action, internalMutation, internalQuery, query } from "./_generated/ser
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
 import { limitCardLookup } from "./lib/deckRateLimits"
-import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
-import { CARD_CATALOGS } from "./lib/games/catalogs"
+import type { CardCatalog, CatalogCard, NormalizedCard } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardByReference } from "./lib/games/pokemon"
+import { GAME_PROVIDERS } from "./lib/games/providers"
 import {
   assertGameSystem,
   integrationFor,
@@ -23,9 +23,9 @@ import {
   normalizeScryfallCard,
   objectRecord,
 } from "./lib/scryfall"
-import { POKEMON_HP_FACET } from "./lib/table"
 
 const MAX_SEARCH_RESULTS = 20
+const MAX_CATALOG_QUERY_LENGTH = 120
 
 function catalogWithoutImages(card: CatalogCard): CatalogCard {
   const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...cardWithoutImages } = card
@@ -70,11 +70,15 @@ function hasCatalogImage(card: CatalogCard) {
   )
 }
 
-// why: brief search results lack a type line, and Pokémon cached before HP was stored lack HP, so both refetch once.
-function isFullPokemonCard(card: CatalogCard) {
+function cachedCardUsable(
+  catalog: CardCatalog,
+  card: CatalogCard,
+  cardId: string,
+  includeImages: boolean,
+) {
   return (
-    card.typeLabel !== undefined &&
-    (card.category !== "Pokemon" || card.facets.some((facet) => facet.key === POKEMON_HP_FACET))
+    (catalog.cachedCardComplete?.(card) ?? true) &&
+    (!includeImages || catalog.seeded?.owns(cardId) === true || hasCatalogImage(card))
   )
 }
 
@@ -110,83 +114,91 @@ async function recordHealth(
   })
 }
 
+async function searchScryfall(
+  ctx: ActionCtx,
+  query: string,
+  deviceId: string | undefined,
+): Promise<CardReference[]> {
+  if (query.length > 1024)
+    throw new ConvexError({
+      code: "query_too_long",
+      message: "Choose fewer filters or shorten your search.",
+    })
+  if (query.length < 2) return []
+  await requireActionCapability(ctx, "mtg", "cardCatalog")
+  await limitCardLookup(ctx, deviceId)
+  const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
+  const response = await fetchScryfall(ctx, path)
+  if (response.status === 404) return []
+  if (!response.ok)
+    throw new ConvexError({
+      code: "scryfall_unavailable",
+      message: `Card search is temporarily unavailable (${response.status})`,
+    })
+  const payload = objectRecord((await response.json()) as unknown)
+  const data = Array.isArray(payload?.data) ? payload.data : []
+  const cards = data
+    .map(normalizeScryfallCard)
+    .filter((card): card is CardReference => card !== null)
+    .slice(0, MAX_SEARCH_RESULTS)
+  if (cards.length > 0) await ctx.runMutation(internal.cards.cacheMany, { cards })
+  const catalogCards = data
+    .map(normalizeScryfallCatalogCard)
+    .filter((card): card is NormalizedCard => card !== null)
+    .slice(0, MAX_SEARCH_RESULTS)
+  if (catalogCards.length > 0)
+    await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: catalogCards })
+  return cards
+}
+
 export const search = action({
   args: { query: v.string(), game: v.optional(v.string()), deviceId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CardReference[] | CatalogCard[]> => {
     const query = args.query.trim()
     const game = assertGameSystem(args.game ?? "mtg")
-    if (game === "mtg" && query.length > 1024)
-      throw new ConvexError({
-        code: "query_too_long",
-        message: "Choose fewer filters or shorten your search.",
-      })
-    if (query.length < 2 || (game !== "mtg" && query.length > 120)) return []
+    if (game === "mtg") return await searchScryfall(ctx, query, args.deviceId)
+    if (query.length < 2 || query.length > MAX_CATALOG_QUERY_LENGTH) return []
     await requireActionCapability(ctx, game, "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
-    if (game !== "mtg") {
-      const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
-        game,
-        query,
-        limit: MAX_SEARCH_RESULTS,
-      })
-      if (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage)))
-        return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
-      await limitCardLookup(ctx, args.deviceId)
-      const provider = integrationFor(game).capabilities.cardCatalog.provider
-      const startedAt = Date.now()
-      try {
-        const result = await CARD_CATALOGS[game].search(ctx, query, includeImages)
-        if (result.cards.length > 0)
-          await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
-        await recordHealth(ctx, {
-          game,
-          provider,
-          operation: "card-search",
-          startedAt,
-          status: "healthy",
-          httpStatus: result.status,
-          message: `${result.cards.length} cards normalized`,
-        })
-        return result.cards.map((card) => catalogResult(card, includeImages))
-      } catch (error) {
-        await recordHealth(ctx, {
-          game,
-          provider,
-          operation: "card-search",
-          startedAt,
-          status: "unavailable",
-          ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
-          message: error instanceof Error ? error.message : "Provider search failed",
-        })
-        throw new ConvexError({
-          code: "card_provider_unavailable",
-          message: "Card search is temporarily unavailable",
-        })
-      }
-    }
+    const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
+      game,
+      query,
+      limit: MAX_SEARCH_RESULTS,
+    })
+    if (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage)))
+      return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
     await limitCardLookup(ctx, args.deviceId)
-    const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
-    const response = await fetchScryfall(ctx, path)
-    if (response.status === 404) return []
-    if (!response.ok)
-      throw new ConvexError({
-        code: "scryfall_unavailable",
-        message: `Card search is temporarily unavailable (${response.status})`,
+    const provider = integrationFor(game).capabilities.cardCatalog.provider
+    const startedAt = Date.now()
+    try {
+      const result = await GAME_PROVIDERS[game].catalog.search(ctx, query, includeImages)
+      if (result.cards.length > 0)
+        await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+      await recordHealth(ctx, {
+        game,
+        provider,
+        operation: "card-search",
+        startedAt,
+        status: "healthy",
+        httpStatus: result.status,
+        message: `${result.cards.length} cards normalized`,
       })
-    const payload = objectRecord((await response.json()) as unknown)
-    const data = Array.isArray(payload?.data) ? payload.data : []
-    const cards = data
-      .map(normalizeScryfallCard)
-      .filter((card): card is CardReference => card !== null)
-      .slice(0, MAX_SEARCH_RESULTS)
-    if (cards.length > 0) await ctx.runMutation(internal.cards.cacheMany, { cards })
-    const catalogCards = data
-      .map(normalizeScryfallCatalogCard)
-      .filter((card): card is NormalizedCard => card !== null)
-      .slice(0, MAX_SEARCH_RESULTS)
-    if (catalogCards.length > 0)
-      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: catalogCards })
-    return cards
+      return result.cards.map((card) => catalogResult(card, includeImages))
+    } catch (error) {
+      await recordHealth(ctx, {
+        game,
+        provider,
+        operation: "card-search",
+        startedAt,
+        status: "unavailable",
+        ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+        message: error instanceof Error ? error.message : "Provider search failed",
+      })
+      throw new ConvexError({
+        code: "card_provider_unavailable",
+        message: "Card search is temporarily unavailable",
+      })
+    }
   },
 })
 
@@ -240,8 +252,8 @@ export const byCatalogId = action({
     })
     if (
       cached &&
-      (game !== "pokemon" || isFullPokemonCard(cached)) &&
-      (!includeImages || game === "mtg" || cardId.startsWith("rush:") || hasCatalogImage(cached))
+      (game === "mtg" ||
+        cachedCardUsable(GAME_PROVIDERS[game].catalog, cached, cardId, includeImages))
     )
       return includeImages ? cached : catalogWithoutImages(cached)
     await limitCardLookup(ctx, args.deviceId)
@@ -260,16 +272,14 @@ export const byCatalogId = action({
       await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: [card] })
       return catalogResult(card, includeImages)
     }
-    if (game === "ygo" && cardId.startsWith("rush:"))
-      throw new ConvexError({
-        code: "card_not_found",
-        message: "Rush Duel card is not in the catalog",
-      })
+    const catalog = GAME_PROVIDERS[game].catalog
+    if (catalog.seeded?.owns(cardId))
+      throw new ConvexError({ code: "card_not_found", message: catalog.seeded.missing })
     const provider = integrationFor(game).capabilities.cardCatalog.provider
     const startedAt = Date.now()
     const result = await (async () => {
       try {
-        return await CARD_CATALOGS[game].byId(ctx, cardId, includeImages)
+        return await catalog.byId(ctx, cardId, includeImages)
       } catch (error) {
         await recordHealth(ctx, {
           game,

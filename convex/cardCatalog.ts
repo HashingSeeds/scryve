@@ -11,6 +11,7 @@ import {
   type CatalogCard,
   type NormalizedCard,
 } from "./lib/games/cards"
+import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 import { assertGameSystem, integration, requireReleasedCapability } from "./lib/integrations"
 
 const MAX_CARD_PRINTINGS = 100
@@ -72,9 +73,10 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
     )
     .unique()
   const now = Date.now()
-  // why: TCGdex search returns brief cards with no category; caching one must not erase the HP, stage, and types a full lookup stored.
+  const briefSearchResults =
+    isProviderGame(card.game) && GAME_PROVIDERS[card.game].catalog.briefSearchResults === true
   const keepsFullCard =
-    card.game === "pokemon" && existing?.category !== undefined && card.category === undefined
+    briefSearchResults && existing?.category !== undefined && card.category === undefined
   const category = keepsFullCard ? existing.category : card.category
   const logicalValue = {
     game: assertGameSystem(card.game),
@@ -96,7 +98,7 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
         query.eq("game", card.game).eq("printingId", printing.printingId),
       )
       .unique()
-    if (card.game === "pokemon" && stored?.typeLabel && !printing.typeLabel) continue
+    if (briefSearchResults && stored?.typeLabel && !printing.typeLabel) continue
     const value = { gameCardId, game: card.game, ...printing, updatedAt: now }
     if (stored) await ctx.db.replace(stored._id, value)
     else await ctx.db.insert("cardPrintings", value)

@@ -5,8 +5,10 @@ import {
   normalizeCardName,
   objectRecord,
   stringValue,
+  type CardCatalog,
   type NormalizedCard,
 } from "./cards"
+import rushCards from "./rushCards.json"
 import { internal } from "../../_generated/api"
 import type { ActionCtx } from "../../_generated/server"
 import { env } from "../../_generated/server"
@@ -152,3 +154,41 @@ export function ygoSection(card: NormalizedCard) {
     ? "extra"
     : "main"
 }
+
+export async function cardsByYgoIdBatches(
+  ctx: ActionCtx,
+  ids: readonly string[],
+  includeImages: boolean,
+) {
+  const cards: NormalizedCard[] = []
+  for (let offset = 0; offset < ids.length; offset += 40) {
+    const result = await cardsByYgoIds(ctx, ids.slice(offset, offset + 40), includeImages)
+    cards.push(...result.cards)
+  }
+  return cards
+}
+
+/** why: YGOPRODeck has no Rush Duel cards, so Scryve ships them with the curated Rush decks. */
+const RUSH_CARDS = {
+  format: "rush",
+  cards: rushCards.map((card) => ({ ...card, game: "ygo" as const })),
+  owns: (cardId: string) => cardId.startsWith("rush:"),
+  missing: "Rush Duel card is not in the catalog",
+}
+
+export async function ygoprodeckImageCandidates(ctx: ActionCtx, cardId: string) {
+  if (RUSH_CARDS.owns(cardId)) return []
+  const result = await cardsByYgoIds(ctx, [cardId])
+  return result.cards
+    .flatMap((card) =>
+      card.printings.flatMap((printing) => printing.faces.flatMap((face) => face.imageUrl ?? [])),
+    )
+    .slice(0, 8)
+}
+
+export const YGOPRODECK_CATALOG = {
+  search: searchYgo,
+  byId: (ctx, cardId, includeImages) => cardsByYgoIds(ctx, [cardId], includeImages),
+  imageUrl: (card) => ygoImageUrl(card.printingId, card.providerCardId, card.cardId),
+  seeded: RUSH_CARDS,
+} satisfies CardCatalog

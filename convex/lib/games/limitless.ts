@@ -1,7 +1,21 @@
 import { ConvexError } from "convex/values"
 
-import { normalizeCardName, objectRecord, stringValue } from "./cards"
-import { deckSourceUrl, invalidSourceDeck } from "../deckSources"
+import { normalizeCardName, objectRecord, stringValue, type NormalizedCard } from "./cards"
+import {
+  FEED_REQUEST_TIMEOUT_MS,
+  MAX_FEED_DECKS,
+  type DeckFeed,
+  type DeckLinkSource,
+  type DeckListEntry,
+} from "./decks"
+import { pokemonCardSummaries } from "./pokemon"
+import { internal } from "../../_generated/api"
+import type { ActionCtx } from "../../_generated/server"
+import { deckSourceUrl, fetchDeckSource, invalidSourceDeck } from "../deckSources"
+
+const LIMITLESS_BASE_URL = "https://play.limitlesstcg.com/api"
+const LIMITLESS_STANDINGS_MAX_BYTES = 8 * 1024 * 1024
+const LIMITLESS_MAX_WAIT_MS = 5_000
 
 export type LimitlessDeckEntry = {
   name: string
@@ -147,3 +161,193 @@ export function limitlessPlayerDecklist(standingsValue: unknown, player: string)
   const archetype = stringValue(objectRecord(standing.deck)?.name)?.trim().slice(0, 200)
   return { name: archetype || `${author}'s deck`, author, entries, invalidLines }
 }
+
+function limitlessEntries(rows: readonly LimitlessDeckEntry[]) {
+  const entries = new Map<string, DeckListEntry>()
+  for (const row of rows) {
+    const originalReference = `${row.name} ${row.originalReference}`
+    const key = normalizeCardName(originalReference)
+    const current = entries.get(key)
+    entries.set(key, {
+      name: row.name,
+      quantity: (current?.quantity ?? 0) + row.quantity,
+      section: "main",
+      originalReference,
+      sectionExplicit: true,
+    })
+  }
+  return [...entries.values()]
+}
+
+export const LIMITLESS_LINK = {
+  source: "limitless",
+  sourceName: "Limitless",
+  open: (url) => {
+    const link = limitlessDeckLink(url)
+    return {
+      sourceUrl: link.sourceUrl,
+      load: async () => {
+        const body = await fetchDeckSource(
+          "limitless",
+          `${LIMITLESS_BASE_URL}/tournaments/${encodeURIComponent(link.tournamentId)}/standings`,
+          { accept: "application/json", maxBytes: LIMITLESS_STANDINGS_MAX_BYTES },
+        )
+        let standings: unknown
+        try {
+          standings = JSON.parse(body)
+        } catch {
+          invalidSourceDeck("limitless")
+        }
+        const deck = limitlessPlayerDecklist(standings, link.player)
+        return {
+          name: deck.name,
+          author: deck.author,
+          entries: limitlessEntries(deck.entries),
+          invalidLines: deck.invalidLines,
+        }
+      },
+    }
+  },
+  throttle: async (ctx) => {
+    const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
+      bucket: "limitless:imports",
+      intervalMs: 1_000,
+      maxWaitMs: LIMITLESS_MAX_WAIT_MS,
+    })
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+  },
+} satisfies DeckLinkSource
+
+async function limitlessJson(ctx: ActionCtx, path: string) {
+  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
+    bucket: "limitless:tournaments",
+    intervalMs: 6_000,
+  })
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+  const response = await fetch(`${LIMITLESS_BASE_URL}${path}`, {
+    headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
+    signal: AbortSignal.timeout(FEED_REQUEST_TIMEOUT_MS),
+  })
+  if (!response.ok)
+    throw Object.assign(new Error(`Limitless returned ${response.status}`), { response })
+  return { value: (await response.json()) as unknown, status: response.status }
+}
+
+async function pokemonSummariesWhenAvailable(
+  ctx: ActionCtx,
+  references: readonly { name: string; collectorNumber: string }[],
+  includeImages: boolean,
+) {
+  try {
+    return (await pokemonCardSummaries(ctx, references, includeImages)).cards
+  } catch {
+    return []
+  }
+}
+
+async function refreshPokemonTopDecks(
+  ctx: ActionCtx,
+  includeImages: boolean,
+  format: string,
+): Promise<{ count: number; status: number }> {
+  let decks: LimitlessDeck[] = []
+  const seenTournaments = new Set<string>()
+  for (let page = 1; page <= 2 && decks.length < MAX_FEED_DECKS; page++) {
+    const response = await limitlessJson(
+      ctx,
+      `/tournaments?game=PTCG&format=${encodeURIComponent(format.toUpperCase())}&limit=5&page=${page}`,
+    )
+    if (!Array.isArray(response.value))
+      throw new Error("Limitless returned an invalid tournament list")
+    for (const tournament of response.value.slice(0, 5)) {
+      if (typeof tournament !== "object" || tournament === null || !("id" in tournament)) continue
+      const id = tournament.id
+      if (typeof id !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(id) || seenTournaments.has(id))
+        continue
+      seenTournaments.add(id)
+      const standings = await limitlessJson(ctx, `/tournaments/${encodeURIComponent(id)}/standings`)
+      if (!Array.isArray(standings.value)) throw new Error("Limitless returned invalid standings")
+      decks.push(
+        ...normalizeLimitlessStandings(tournament, standings.value).filter(
+          (deck) => deck.format === format,
+        ),
+      )
+      if (decks.length >= MAX_FEED_DECKS) break
+    }
+    if (response.value.length < 5) break
+  }
+  decks = decks.slice(0, MAX_FEED_DECKS)
+  if (decks.length === 0) return { count: 0, status: 200 }
+
+  const summaries = await pokemonSummariesWhenAvailable(
+    ctx,
+    decks.flatMap((deck) => deck.entries),
+    includeImages,
+  )
+  const byNameAndNumber = new Map<string, NormalizedCard[]>()
+  for (const card of summaries) {
+    const collectorNumber = card.cardId.match(/-([0-9]+[a-z]?)$/i)?.[1]
+    if (!collectorNumber) continue
+    const key = pokemonSummaryLookupKey(card.name, collectorNumber)
+    byNameAndNumber.set(key, [...(byNameAndNumber.get(key) ?? []), card])
+  }
+  const resolved = new Map<string, NormalizedCard>()
+  for (const deck of decks) {
+    for (const entry of deck.entries) {
+      const candidates = byNameAndNumber.get(
+        pokemonSummaryLookupKey(entry.name, entry.collectorNumber),
+      )
+      if (candidates?.length === 1) resolved.set(entry.originalReference, candidates[0])
+    }
+  }
+  const resolvedCards = [...new Set(resolved.values())]
+  for (let offset = 0; offset < resolvedCards.length; offset += 25) {
+    await ctx.runMutation(internal.cardCatalog.cacheMany, {
+      cards: resolvedCards.slice(offset, offset + 25),
+    })
+  }
+
+  for (const deck of decks) {
+    await ctx.runMutation(internal.deckCatalogs.upsert, {
+      game: "pokemon",
+      source: "limitless",
+      externalId: deck.externalId,
+      kind: "tournament",
+      name: deck.name,
+      format: deck.format,
+      sourceUrl: deck.sourceUrl,
+      ...(deck.publishedAt === undefined ? {} : { publishedAt: deck.publishedAt }),
+      entries: deck.entries.map((entry) => {
+        const card = resolved.get(entry.originalReference)
+        const printing = card?.printings[0]
+        const face = printing?.faces[0]
+        return {
+          ...(card
+            ? {
+                identityNamespace: card.identityNamespace,
+                cardId: card.cardId,
+                providerCardId: printing?.providerCardId,
+                printingId: printing?.printingId,
+                ...(face?.imageUrl ? { imageUrl: face.imageUrl } : {}),
+                ...(face?.smallImageUrl ? { smallImageUrl: face.smallImageUrl } : {}),
+              }
+            : {}),
+          name: card?.name ?? entry.name,
+          quantity: entry.quantity,
+          section: "main",
+          entryKind: "card",
+          originalReference: entry.originalReference,
+          category: entry.category,
+        }
+      }),
+    })
+  }
+  return { count: decks.length, status: 200 }
+}
+
+export const LIMITLESS_FEED = {
+  formats: ["standard", "expanded"],
+  operation: (format) => `deck-feed-refresh:${format}`,
+  refresh: refreshPokemonTopDecks,
+  refreshMayCacheNothing: true,
+} satisfies DeckFeed

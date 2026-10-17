@@ -8,27 +8,30 @@ import { action, internalAction, internalMutation, internalQuery, query } from "
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { assertDeckGameFormat, magicCatalogCardFields } from "./lib/deckGames"
 import { deckRateLimiter } from "./lib/deckRateLimits"
-import { MAX_CATALOG_BATCH, type NormalizedCard } from "./lib/games/cards"
+import { MAX_CATALOG_BATCH } from "./lib/games/cards"
 import curatedDecks from "./lib/games/curatedDecks.json"
-import {
-  limitlessDecklistUrl,
-  normalizeLimitlessStandings,
-  parseLimitlessExternalId,
-  pokemonSummaryLookupKey,
-  type LimitlessDeck,
-} from "./lib/games/limitless"
+import { limitlessDecklistUrl, parseLimitlessExternalId } from "./lib/games/limitless"
 import magicExamples from "./lib/games/magicExamples.json"
-import { pokemonCardSummaries } from "./lib/games/pokemon"
-import rushCards from "./lib/games/rushCards.json"
-import { cardsByYgoIds, ygoImageUrl } from "./lib/games/yugioh"
-import { normalizeYgoDeckFeed, YGO_DECK_FEED_URL } from "./lib/games/yugiohDecks"
-import { assertGameSystem, capabilityReleased, requireReleasedCapability } from "./lib/integrations"
+import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
+import {
+  assertGameSystem,
+  capabilityReleased,
+  GAME_SYSTEM_IDS,
+  integrationFor,
+  requireReleasedCapability,
+} from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
+import { SYSTEMS } from "./lib/systems"
 
 const FEED_TTL_MS = 24 * 60 * 60 * 1000
-const MAX_FEED_DECKS = 20
-const LIMITLESS_BASE_URL = "https://play.limitlesstcg.com/api"
-const PROVIDER_REQUEST_TIMEOUT_MS = 10_000
+
+function deckFeed(game: string) {
+  if (!isProviderGame(game)) return undefined
+  const feed = GAME_PROVIDERS[game].deckFeed
+  return (
+    feed && { ...feed, game, provider: integrationFor(game).capabilities.exampleDecks.provider }
+  )
+}
 
 const entryValidator = v.object({
   identityNamespace: v.optional(v.string()),
@@ -224,13 +227,11 @@ async function seedDecks(
       .unique()
     if (existing && !args.overwrite) continue
     await ctx.runMutation(internal.deckCatalogs.upsert, deck)
-    if (deck.game === "ygo" && deck.format === "rush") {
-      for (let offset = 0; offset < rushCards.length; offset += MAX_CATALOG_BATCH)
+    const seeded = isProviderGame(deck.game) ? GAME_PROVIDERS[deck.game].catalog.seeded : undefined
+    if (seeded?.format === deck.format) {
+      for (let offset = 0; offset < seeded.cards.length; offset += MAX_CATALOG_BATCH)
         await ctx.runMutation(internal.cardCatalog.cacheMany, {
-          cards: rushCards.slice(offset, offset + MAX_CATALOG_BATCH).map((card) => ({
-            ...card,
-            game: "ygo" as const,
-          })),
+          cards: seeded.cards.slice(offset, offset + MAX_CATALOG_BATCH),
         })
     }
   }
@@ -292,14 +293,15 @@ export const latestFetch = internalQuery({
       format: args.format,
       query: "",
     }).first()
-    if (args.game === "pokemon") {
+    const feed = deckFeed(args.game)
+    if (feed?.refreshMayCacheNothing) {
       const refresh = await ctx.db
         .query("providerHealth")
         .withIndex("by_game_and_provider_and_operation", (q) =>
           q
-            .eq("game", "pokemon")
-            .eq("provider", "limitless")
-            .eq("operation", `deck-feed-refresh:${args.format ?? "standard"}`),
+            .eq("game", feed.game)
+            .eq("provider", feed.provider)
+            .eq("operation", feed.operation(args.format ?? feed.formats[0])),
         )
         .unique()
       if (refresh?.lastSuccessAt !== undefined && refresh.lastSuccessAt > (latest?.fetchedAt ?? 0))
@@ -309,259 +311,38 @@ export const latestFetch = internalQuery({
   },
 })
 
-async function limitlessJson(ctx: ActionCtx, path: string) {
-  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
-    bucket: "limitless:tournaments",
-    intervalMs: 6_000,
-  })
-  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-  const response = await fetch(`${LIMITLESS_BASE_URL}${path}`, {
-    headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
-    signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok)
-    throw Object.assign(new Error(`Limitless returned ${response.status}`), { response })
-  return { value: (await response.json()) as unknown, status: response.status }
-}
-
-async function pokemonSummariesWhenAvailable(
-  ctx: ActionCtx,
-  references: readonly { name: string; collectorNumber: string }[],
-  includeImages: boolean,
-) {
-  try {
-    return (await pokemonCardSummaries(ctx, references, includeImages)).cards
-  } catch {
-    return []
-  }
-}
-
-async function refreshPokemonTopDecks(
-  ctx: ActionCtx,
-  includeImages: boolean,
-  format: string,
-): Promise<{ count: number; status: number }> {
-  let decks: LimitlessDeck[] = []
-  const seenTournaments = new Set<string>()
-  for (let page = 1; page <= 2 && decks.length < MAX_FEED_DECKS; page++) {
-    const response = await limitlessJson(
-      ctx,
-      `/tournaments?game=PTCG&format=${encodeURIComponent(format.toUpperCase())}&limit=5&page=${page}`,
-    )
-    if (!Array.isArray(response.value))
-      throw new Error("Limitless returned an invalid tournament list")
-    for (const tournament of response.value.slice(0, 5)) {
-      if (typeof tournament !== "object" || tournament === null || !("id" in tournament)) continue
-      const id = tournament.id
-      if (typeof id !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(id) || seenTournaments.has(id))
-        continue
-      seenTournaments.add(id)
-      const standings = await limitlessJson(ctx, `/tournaments/${encodeURIComponent(id)}/standings`)
-      if (!Array.isArray(standings.value)) throw new Error("Limitless returned invalid standings")
-      decks.push(
-        ...normalizeLimitlessStandings(tournament, standings.value).filter(
-          (deck) => deck.format === format,
-        ),
-      )
-      if (decks.length >= MAX_FEED_DECKS) break
-    }
-    if (response.value.length < 5) break
-  }
-  decks = decks.slice(0, MAX_FEED_DECKS)
-  if (decks.length === 0) return { count: 0, status: 200 }
-
-  const summaries = await pokemonSummariesWhenAvailable(
-    ctx,
-    decks.flatMap((deck) => deck.entries),
-    includeImages,
-  )
-  const byNameAndNumber = new Map<string, NormalizedCard[]>()
-  for (const card of summaries) {
-    const collectorNumber = card.cardId.match(/-([0-9]+[a-z]?)$/i)?.[1]
-    if (!collectorNumber) continue
-    const key = pokemonSummaryLookupKey(card.name, collectorNumber)
-    byNameAndNumber.set(key, [...(byNameAndNumber.get(key) ?? []), card])
-  }
-  const resolved = new Map<string, NormalizedCard>()
-  for (const deck of decks) {
-    for (const entry of deck.entries) {
-      const candidates = byNameAndNumber.get(
-        pokemonSummaryLookupKey(entry.name, entry.collectorNumber),
-      )
-      if (candidates?.length === 1) resolved.set(entry.originalReference, candidates[0])
-    }
-  }
-  const resolvedCards = [...new Set(resolved.values())]
-  for (let offset = 0; offset < resolvedCards.length; offset += 25) {
-    await ctx.runMutation(internal.cardCatalog.cacheMany, {
-      cards: resolvedCards.slice(offset, offset + 25),
-    })
-  }
-
-  for (const deck of decks) {
-    await ctx.runMutation(internal.deckCatalogs.upsert, {
-      game: "pokemon",
-      source: "limitless",
-      externalId: deck.externalId,
-      kind: "tournament",
-      name: deck.name,
-      format: deck.format,
-      sourceUrl: deck.sourceUrl,
-      ...(deck.publishedAt === undefined ? {} : { publishedAt: deck.publishedAt }),
-      entries: deck.entries.map((entry) => {
-        const card = resolved.get(entry.originalReference)
-        const printing = card?.printings[0]
-        const face = printing?.faces[0]
-        return {
-          ...(card
-            ? {
-                identityNamespace: card.identityNamespace,
-                cardId: card.cardId,
-                providerCardId: printing?.providerCardId,
-                printingId: printing?.printingId,
-                ...(face?.imageUrl ? { imageUrl: face.imageUrl } : {}),
-                ...(face?.smallImageUrl ? { smallImageUrl: face.smallImageUrl } : {}),
-              }
-            : {}),
-          name: card?.name ?? entry.name,
-          quantity: entry.quantity,
-          section: "main",
-          entryKind: "card",
-          originalReference: entry.originalReference,
-          category: entry.category,
-        }
-      }),
-    })
-  }
-  return { count: decks.length, status: 200 }
-}
-
-async function refreshYgoTopDecks(ctx: ActionCtx, includeImages: boolean) {
-  const game = "ygo"
-  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
-    bucket: "ygoprodeck:deck-feed",
-    intervalMs: 1_000,
-  })
-  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-  const response = await fetch(`${YGO_DECK_FEED_URL}?_sft_category=Tournament%20Meta%20Decks`, {
-    headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
-    signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw new Error(`Yu-Gi-Oh! deck feed returned ${response.status}`)
-  const feed = normalizeYgoDeckFeed((await response.json()) as unknown).slice(0, MAX_FEED_DECKS)
-  if (feed.length === 0) throw new Error("Yu-Gi-Oh! deck feed contained no usable decks")
-
-  const ids = [
-    ...new Set(feed.flatMap((deck) => deck.entries.map((entry) => entry.providerCardId))),
-  ]
-  const cards: NormalizedCard[] = []
-  for (let offset = 0; offset < ids.length; offset += 40) {
-    const result = await cardsByYgoIds(ctx, ids.slice(offset, offset + 40), includeImages)
-    cards.push(...result.cards)
-  }
-  for (let offset = 0; offset < cards.length; offset += 25) {
-    await ctx.runMutation(internal.cardCatalog.cacheMany, {
-      cards: cards.slice(offset, offset + 25),
-    })
-  }
-  const byId = new Map<string, (typeof cards)[number]>()
-  for (const card of cards) {
-    byId.set(card.cardId, card)
-    for (const printing of card.printings) byId.set(printing.printingId, card)
-  }
-
-  for (const deck of feed) {
-    await ctx.runMutation(internal.deckCatalogs.upsert, {
-      game,
-      source: "ygoprodeck-decks",
-      externalId: deck.externalId,
-      kind: deck.kind,
-      name: deck.name,
-      format: "advanced",
-      sourceUrl: deck.sourceUrl,
-      entries: deck.entries.map((entry) => {
-        const card = byId.get(entry.providerCardId)
-        const printing =
-          card?.printings.find((candidate) => candidate.printingId === entry.providerCardId) ??
-          card?.printings[0]
-        const face = printing?.faces[0]
-        return {
-          ...(card
-            ? {
-                identityNamespace: card.identityNamespace,
-                cardId: card.cardId,
-                providerCardId: printing?.providerCardId ?? entry.providerCardId,
-                printingId: printing?.printingId ?? entry.providerCardId,
-                name: card.name,
-                ...(card.category ? { category: card.category } : {}),
-                ...(face?.imageUrl ? { imageUrl: face.imageUrl } : {}),
-                ...(face?.smallImageUrl ? { smallImageUrl: face.smallImageUrl } : {}),
-              }
-            : {
-                providerCardId: entry.providerCardId,
-                name: `Card ${entry.providerCardId}`,
-              }),
-          quantity: entry.quantity,
-          section: entry.section,
-          entryKind: "card",
-          originalReference: entry.providerCardId,
-        }
-      }),
-    })
-  }
-  return { count: feed.length, status: response.status }
-}
-
-function feedProvider(game: string) {
-  return game === "pokemon" ? "limitless" : "ygoprodeck-decks"
-}
-
-function feedOperation(game: string, format: string) {
-  return game === "pokemon" ? `deck-feed-refresh:${format}` : "deck-feed-refresh"
-}
-
 export const feedState = internalQuery({
   args: { game: v.string(), format: v.string() },
-  handler: async (ctx, { game, format }) =>
-    await ctx.db
+  handler: async (ctx, { game, format }) => {
+    const feed = deckFeed(game)
+    if (!feed) return null
+    return await ctx.db
       .query("providerHealth")
       .withIndex("by_game_and_provider_and_operation", (q) =>
-        q
-          .eq("game", game)
-          .eq("provider", feedProvider(game))
-          .eq("operation", feedOperation(game, format)),
+        q.eq("game", game).eq("provider", feed.provider).eq("operation", feed.operation(format)),
       )
-      .unique(),
+      .unique()
+  },
 })
 
 async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
   assertDeckGameFormat(game, format)
-  if (
-    !(game === "ygo" && format === "advanced") &&
-    !(game === "pokemon" && ["standard", "expanded"].includes(format))
-  )
-    return false
+  const feed = deckFeed(game)
+  if (!feed?.formats.includes(format)) return false
   const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
   const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
   const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
   if (fetchedAt !== undefined && Date.now() - fetchedAt < FEED_TTL_MS) return true
   const startedAt = Date.now()
   try {
-    await requireActionCapability(ctx, game === "pokemon" ? "pokemon" : "ygo", "exampleDecks")
-    const includeImages = await actionCapabilityEnabled(
-      ctx,
-      game === "pokemon" ? "pokemon" : "ygo",
-      "images",
-    )
-    const result =
-      game === "pokemon"
-        ? await refreshPokemonTopDecks(ctx, includeImages, format)
-        : await refreshYgoTopDecks(ctx, includeImages)
+    await requireActionCapability(ctx, feed.game, "exampleDecks")
+    const includeImages = await actionCapabilityEnabled(ctx, feed.game, "images")
+    const result = await feed.refresh(ctx, includeImages, format)
     const finishedAt = Date.now()
     await ctx.runMutation(internal.providerHealth.record, {
       game,
-      provider: feedProvider(game),
-      operation: feedOperation(game, format),
+      provider: feed.provider,
+      operation: feed.operation(format),
       status: "healthy",
       lastAttemptAt: finishedAt,
       lastSuccessAt: finishedAt,
@@ -574,8 +355,8 @@ async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
     const finishedAt = Date.now()
     await ctx.runMutation(internal.providerHealth.record, {
       game,
-      provider: feedProvider(game),
-      operation: feedOperation(game, format),
+      provider: feed.provider,
+      operation: feed.operation(format),
       status: "unavailable",
       lastAttemptAt: finishedAt,
       responseMs: finishedAt - startedAt,
@@ -619,13 +400,11 @@ async function browseDecks(
   },
 ): Promise<BrowseResult> {
   const game = assertGameSystem(args.game)
-  const format = assertDeckGameFormat(
-    game,
-    args.format ?? (game === "ygo" ? "advanced" : "standard"),
-  )
+  const format = assertDeckGameFormat(game, args.format ?? SYSTEMS[game].defaultFormat.play)
+  const feed = deckFeed(game)
   await requireActionCapability(ctx, game, "exampleDecks")
   if (args.query.trim().length > 120) return { decks: [], cursor: null, status: "ready" }
-  if (game === "mtg" || args.source)
+  if (!feed || args.source)
     await ctx.runMutation(internal.deckCatalogs.seedCuratedDecks, { game, format })
   const readPage = async () => {
     const page = await ctx.runQuery(internal.deckCatalogs.browseCached, {
@@ -639,14 +418,11 @@ async function browseDecks(
   }
   const cached = await readPage()
   if (args.source === "official") return { ...cached, status: "ready" }
-  const supported =
-    game === "mtg"
-      ? exampleDecks.some((deck) => deck.game === game && deck.format === format)
-      : game === "ygo"
-        ? format === "advanced"
-        : ["standard", "expanded"].includes(format)
+  const supported = feed
+    ? feed.formats.includes(format)
+    : exampleDecks.some((deck) => deck.game === game && deck.format === format)
   if (!supported) return { ...cached, status: cached.decks.length ? "ready" : "unsupported" }
-  if (game === "mtg") return { ...cached, status: "ready" }
+  if (!feed) return { ...cached, status: "ready" }
   const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
   const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
   const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
@@ -701,19 +477,17 @@ export const refreshScheduled = internalAction({
   handler: async (ctx) => {
     if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks"))
       await ctx.runMutation(internal.deckCatalogs.seedMagicExamples, {})
-    for (const [game, format] of [
-      ["ygo", "advanced"],
-      ["pokemon", "standard"],
-      ["pokemon", "expanded"],
-    ] as const) {
-      if (!(await actionCapabilityEnabled(ctx, game, "exampleDecks"))) continue
-      const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
-      if (health?.lastSuccessAt && Date.now() - health.lastSuccessAt < FEED_TTL_MS) continue
-      await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
-        game,
-        format,
-        background: true,
-      })
+    for (const game of GAME_SYSTEM_IDS.filter(isProviderGame)) {
+      for (const format of GAME_PROVIDERS[game].deckFeed?.formats ?? []) {
+        if (!(await actionCapabilityEnabled(ctx, game, "exampleDecks"))) continue
+        const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
+        if (health?.lastSuccessAt && Date.now() - health.lastSuccessAt < FEED_TTL_MS) continue
+        await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
+          game,
+          format,
+          background: true,
+        })
+      }
     }
     return null
   },
@@ -736,10 +510,9 @@ export const detail = query({
       entries: entries.slice(0, MAX_DECK_CARDS).map((storedEntry) => {
         const entry = { ...storedEntry, ...magicCatalogCardFields(storedEntry) }
         if (includeImages) {
-          const imageUrl =
-            deck.game === "ygo"
-              ? ygoImageUrl(entry.printingId, entry.providerCardId, entry.cardId)
-              : undefined
+          const imageUrl = isProviderGame(deck.game)
+            ? GAME_PROVIDERS[deck.game].catalog.imageUrl?.(entry)
+            : undefined
           return imageUrl
             ? {
                 ...entry,
