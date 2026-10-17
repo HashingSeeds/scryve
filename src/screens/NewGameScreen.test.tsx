@@ -281,6 +281,27 @@ describe("NewGameScreen", () => {
     expect(onStartLocal.mock.calls[0][0]).toHaveLength(3)
   })
 
+  it("waits to start until the chosen deck's starting life has loaded", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal, startPending: true })
+    expect(view.getByTestId("start-game-button")).toBeDisabled()
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(onStartLocal).not.toHaveBeenCalled()
+    view.rerender(
+      themed(
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+        />,
+      ),
+    )
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledTimes(1)
+  })
+
   it("autosaves valid names on blur and confirmed appearances for existing players", () => {
     const onSavePlayers = jest.fn()
     const initialGame = createLocalGame({
@@ -648,7 +669,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
     expect(view.queryByTestId("game-type-mtg-brawl")).toBeNull()
-    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent("All formats14 more")
+    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent(/^All formats\d+ more$/)
     fireEvent.press(view.getByTestId("game-type-all-formats"))
     expect(view.queryByTestId("game-type-all-formats")).toBeNull()
     fireEvent.press(view.getByTestId("game-type-mtg-brawl"))

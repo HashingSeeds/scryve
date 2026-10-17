@@ -19,6 +19,7 @@ import {
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
+import { deckStartingValue } from "./lib/deckStartingValue"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { gatedTableAction, gatedTableState, tableRelatedSeatId } from "./lib/gameEngine"
 import { limitGameRate } from "./lib/gameRateLimits"
@@ -468,6 +469,10 @@ async function commanderDamageProjection(
   }
 }
 
+function gameDeckRules(game: Doc<"games">) {
+  return [game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset] as const
+}
+
 async function deckSelectionIsPlayable(
   ctx: QueryCtx,
   deckVersionId: Id<"deckVersions">,
@@ -476,11 +481,12 @@ async function deckSelectionIsPlayable(
   const version = await ctx.db.get(deckVersionId)
   if (!version || version.archivedAt !== undefined) return false
   const deck = await ctx.db.get(version.deckId)
+  const [system, format] = gameDeckRules(game)
   return (
     deck !== null &&
     deck.archivedAt === undefined &&
-    (deck.game ?? DEFAULT_DECK_GAME) === (game.system ?? game.game ?? DEFAULT_DECK_GAME) &&
-    deck.format === (game.format ?? game.ruleset)
+    (deck.game ?? DEFAULT_DECK_GAME) === system &&
+    deck.format === format
   )
 }
 
@@ -1987,11 +1993,16 @@ export const startGame = mutation({
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
+      const deckLife =
+        player.deckVersionId && !invalidSinceSelection
+          ? await deckStartingValue(ctx, player.deckVersionId, ...gameDeckRules(game))
+          : undefined
       await ctx.db.patch(player._id, {
         resumable: true,
         color: player.color,
         shape: player.shape,
         ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
+        ...(deckLife === undefined ? {} : { currentLife: deckLife, startingLife: deckLife }),
         ...roles?.[index],
       })
     }
@@ -2791,6 +2802,9 @@ async function startRematch(
       player.deckVersionId && (await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         ? player.deckVersionId
         : undefined
+    const deckLife = deckVersionId
+      ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
+      : undefined
     await ctx.db.insert("gamePlayers", {
       gameId,
       seat: player.seat,
@@ -2803,7 +2817,8 @@ async function startRematch(
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
       ...(await rematchProMark(ctx, player)),
-      currentLife: finished.startingLife,
+      ...(deckLife === undefined ? {} : { startingLife: deckLife }),
+      currentLife: deckLife ?? finished.startingLife,
       eventCount: 0,
       resumable: true,
       joinedAt: now,
@@ -3269,14 +3284,25 @@ export const connectedSummary = query({
     if (!summary) return null
     const viewer = await requireUser(ctx)
     const blocked = await blockedUserIdsFor(ctx, viewer._id)
+    const system = summary.system ?? summary.game ?? DEFAULT_DECK_GAME
+    const format = summary.format ?? summary.ruleset
+    const players = maskSummaryPlayersForViewer(summary.players, viewer._id, blocked, {
+      localGame: game.mode === "local",
+    })
     return {
       ...summary,
       game: summary.game ?? DEFAULT_DECK_GAME,
-      system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
-      format: summary.format ?? summary.ruleset,
-      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked, {
-        localGame: game.mode === "local",
-      }),
+      system,
+      format,
+      players: await Promise.all(
+        players.map(async (player) => {
+          const startingLife =
+            (await ctx.db.get(player.playerId))?.startingLife ??
+            (player.deckVersionId &&
+              (await deckStartingValue(ctx, player.deckVersionId, system, format)))
+          return { ...player, ...(startingLife ? { startingLife } : {}) }
+        }),
+      ),
       viewerPlayerIds: summary.players
         .filter((player) => player.userId === viewer._id)
         .map((player) => player.playerId),

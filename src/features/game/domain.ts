@@ -146,7 +146,11 @@ export function createLocalGame(input: {
   if (!validatePlayerCount(input.players.length)) {
     throw new Error("A local game requires 2–6 players.")
   }
-  if (!validateStartingLife(input.startingLife, system)) {
+  if (
+    [input.startingLife, ...input.players.map((player) => player.startingLife)].some(
+      (life) => life !== undefined && !validateStartingLife(life, system),
+    )
+  ) {
     throw new Error(startingValueRangeMessage(system))
   }
   if (!isLifeDelta(lifeStep) || lifeStep < 1)
@@ -163,8 +167,11 @@ export function createLocalGame(input: {
     name: validatedNames.names[seat],
     color: player.color || PLAYER_COLORS[seat],
     shape: player.shape ?? shapeForSeat(seat + 1, PLAYER_MARK_SHAPES),
-    life: input.startingLife,
+    life: player.startingLife ?? input.startingLife,
     seat,
+    ...(player.startingLife !== undefined && player.startingLife !== input.startingLife
+      ? { startingLife: player.startingLife }
+      : {}),
   }))
 
   return {
@@ -314,7 +321,12 @@ export function withFirstChooser(game: LocalGame, seat: number | undefined): Loc
 
 function createRematchBoard(game: LocalGame, now?: number): LocalGame {
   return createLocalGame({
-    players: game.players.map(({ name, color, shape }) => ({ name, color, shape })),
+    players: game.players.map(({ name, color, shape, startingLife }) => ({
+      name,
+      color,
+      shape,
+      startingLife,
+    })),
     startingLife: game.startingLife,
     system: game.system,
     format: game.format,
@@ -608,7 +620,8 @@ export function hasPlayBegun(game: LocalGame): boolean {
     game.events.some(({ type }) => type === "life.changed" || type === "commanderDamage.assigned")
   )
     return true
-  if (game.players.some((player) => player.life !== game.startingLife)) return true
+  if (game.players.some((player) => player.life !== (player.startingLife ?? game.startingLife)))
+    return true
   const table = game.table
   if (!table) return false
   if (Object.keys(table.designations).length > 0) return true
@@ -622,7 +635,7 @@ export function hasPlayBegun(game: LocalGame): boolean {
 export function hasLocalGameStarted(game: LocalGame): boolean {
   return (
     game.events.length > 0 ||
-    game.players.some((player) => player.life !== game.startingLife) ||
+    game.players.some((player) => player.life !== (player.startingLife ?? game.startingLife)) ||
     Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0) ||
     tableHasState(game.table)
   )

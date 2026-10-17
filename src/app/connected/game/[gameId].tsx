@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedGate } from "@/features/connected/ConnectedGate"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
+import { rulesHref } from "@/features/rules/gameRules"
 import { ConnectedBoardScreen } from "@/screens/ConnectedBoardScreen"
 
 export default function ConnectedGameRoute() {
@@ -39,7 +40,7 @@ export default function ConnectedGameRoute() {
         onGameAbandoned={() => router.replace("/game/new?mode=connected")}
         onBack={() => router.replace("/game/new?mode=connected")}
         onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
-        onRules={(rule) => router.push({ pathname: "/rules", params: rule ? { rule } : {} })}
+        onRules={(system, rule) => router.push(rulesHref(system, rule))}
         onDecks={() => router.push("/connected/decks")}
         onSettings={() => router.push("/settings")}
         accountEntry={auth.isSignedIn ? "account" : "signIn"}

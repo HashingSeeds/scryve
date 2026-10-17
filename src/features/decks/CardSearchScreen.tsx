@@ -35,7 +35,7 @@ import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
 import { api } from "../../../convex/_generated/api"
-import { identitySection } from "../../../convex/lib/systems"
+import { picksCommander, systemDefinition } from "../../../convex/lib/systems"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
@@ -71,7 +71,8 @@ export function CardSearchScreen({
   const [section, setSection] = useState(
     initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
-  const choosingCommander = identitySection(game, format)?.id === section
+  const choosingCommander = section === "commander" && picksCommander(game, format)
+  const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
   const [candidateError, setCandidateError] = useState<string>()
   const candidateDetails = useCardDetails(
@@ -647,6 +648,9 @@ export function CardSearchScreen({
             </ResultRow>
           ))}
           {catalogResults?.length === 0 ? <Text tx="decks:cardSearch.noResults" /> : null}
+          {catalogResults?.length && imageCredit ? (
+            <Text size="xxs" style={{ color: theme.colors.textDim }} text={imageCredit} />
+          ) : null}
           {searchError ? (
             <RetryableError
               message={searchError.message}

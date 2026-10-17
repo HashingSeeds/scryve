@@ -157,10 +157,12 @@ export function parseGenericDeckList(list: string, game: ProviderGame): ParsedDe
     }
     if (rules.skipsLine?.(line)) continue
 
+    const header = rules.headerCard?.(line)
     const bareCardId = rules.bareCardId?.(line)
     const quantityMatch = line.match(/^(\d{1,3})\s*x?\s+(.+)$/i)
-    const quantity = bareCardId ? 1 : quantityMatch ? Number(quantityMatch[1]) : 0
-    const originalReference = bareCardId ?? quantityMatch?.[2]?.trim() ?? ""
+    const quantity = header || bareCardId ? 1 : quantityMatch ? Number(quantityMatch[1]) : 0
+    const originalReference = header?.reference ?? bareCardId ?? quantityMatch?.[2]?.trim() ?? ""
+    const entrySection = header?.section ?? section
     const reference =
       originalReference && quantity >= 1 && quantity <= 999
         ? parseReference(originalReference)
@@ -169,15 +171,15 @@ export function parseGenericDeckList(list: string, game: ProviderGame): ParsedDe
       invalidLines.push(sourceLine)
       continue
     }
-    const key = `${section}:${reference.key}`
+    const key = `${entrySection}:${reference.key}`
     const current = entries.get(key)
     entries.set(key, {
       name: reference.name,
       quantity: (current?.quantity ?? 0) + quantity,
-      section,
+      section: entrySection,
       originalReference,
       ...(reference.providerCardId ? { providerCardId: reference.providerCardId } : {}),
-      sectionExplicit,
+      sectionExplicit: sectionExplicit || header !== undefined,
     })
   }
   return { entries: [...entries.values()], invalidLines }
@@ -1193,6 +1195,11 @@ export const resolveLink = action({
       return { sourceName: "Archidekt", ...(await resolveArchidektDeck(ctx, link, deck)) }
     }
     const source = GAME_PROVIDERS[game].deckLink
+    if (!source)
+      throw new ConvexError({
+        code: "deck_link_unsupported",
+        message: "Deck links are not supported for this game",
+      })
     const link = source.open(args.url)
     await limitDeckImport(ctx)
     await requireActionCapability(ctx, game, "deckImport")

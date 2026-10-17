@@ -10,10 +10,20 @@ import {
   type BulkDataset,
   type DatasetCard,
 } from "./cards"
+import type { DeckFeed, DeckListRules } from "./decks"
+import fabPrecons from "./fabPrecons.json"
+import { internal } from "../../_generated/api"
+import type { ActionCtx } from "../../_generated/server"
 
 /** why: the dataset's develop branch can break, so sync reads a release tag. Bump it to ship new sets. */
 const FAB_CUBE_TAG = "v8.2.0"
 export const FAB_CUBE_NAMESPACE = "fab-cube-card"
+
+const PITCH_COLORS = new Map([
+  ["1", "red"],
+  ["2", "yellow"],
+  ["3", "blue"],
+])
 
 const FAB_FORMATS = [
   { key: "cc", field: "cc" },
@@ -38,8 +48,10 @@ export function normalizeFabCubeCards(value: unknown): DatasetCard[] {
   return value.flatMap((candidate) => {
     const card = objectRecord(candidate)
     const cardId = stringValue(card?.unique_id)
-    const name = stringValue(card?.name)?.trim()
-    if (!card || !cardId || !name) return []
+    const printedName = stringValue(card?.name)?.trim()
+    if (!card || !cardId || !printedName) return []
+    const pitch = PITCH_COLORS.get(String(card.pitch))
+    const name = pitch ? `${printedName} (${pitch})` : printedName
     const text = stringValue(card.functional_text_plain)
     const typeLabel = stringValue(card.type_text)
     const costLabel = stringValue(card.cost)
@@ -99,3 +111,88 @@ export const FAB_CUBE_DATASET = {
       ),
     ),
 } satisfies BulkDataset
+
+export const FAB_DECK_LIST = {
+  sectionHeadings: {
+    hero: ["hero"],
+    arena: ["arena cards", "arena", "equipment", "weapons"],
+    main: ["deck cards", "deck", "main deck", "main"],
+  },
+  skipsLine: (line) => /^(?:name|format):|^made with\b|^see the full deck\b/i.test(line),
+  headerCard: (line) => {
+    const hero = /^hero:\s*(.+)$/i.exec(line)?.[1]?.trim()
+    return hero ? { section: "hero", reference: hero } : undefined
+  },
+} satisfies DeckListRules
+
+export function fabPreconEntries(deck: (typeof fabPrecons)[number]) {
+  return [
+    { cardId: deck.heroId, name: deck.hero, quantity: 1, section: "hero" },
+    ...deck.cards.map((card) => ({
+      cardId: card.id,
+      name: card.pitch ? `${card.name} (${card.pitch})` : card.name,
+      quantity: card.count,
+      section: card.pitch ? "main" : "arena",
+    })),
+  ]
+}
+
+async function refreshFabPrecons(ctx: ActionCtx, includeImages: boolean, format: string) {
+  const decks = fabPrecons
+    .filter((deck) => deck.format === format)
+    .sort((a, b) => a.releasedAt.localeCompare(b.releasedAt))
+  let count = 0
+  for (const deck of decks) {
+    const entries = fabPreconEntries(deck)
+    const cards = await ctx.runQuery(internal.cardCatalog.lookupManyCached, {
+      game: "fab",
+      cardIds: entries.map((entry) => entry.cardId),
+    })
+    const resolved = entries.flatMap((entry, index) => {
+      const card = cards[index]
+      if (!card) return []
+      return [
+        {
+          identityNamespace: card.identityNamespace,
+          cardId: card.cardId,
+          ...(card.providerCardId ? { providerCardId: card.providerCardId } : {}),
+          ...(card.printingId ? { printingId: card.printingId } : {}),
+          name: card.name,
+          quantity: entry.quantity,
+          section: entry.section,
+          entryKind: "card",
+          ...(includeImages && card.imageUrl ? { imageUrl: card.imageUrl } : {}),
+          ...(includeImages && card.smallImageUrl ? { smallImageUrl: card.smallImageUrl } : {}),
+        },
+      ]
+    })
+    if (resolved.length < entries.length) continue
+    await ctx.runMutation(internal.deckCatalogs.upsert, {
+      game: "fab",
+      source: FAB_PRECON_FEED.source,
+      externalId: deck.sourceUrl,
+      kind: "official",
+      name: deck.name,
+      format,
+      sourceUrl: deck.sourceUrl,
+      publishedAt: Date.parse(deck.releasedAt),
+      entries: resolved,
+    })
+    count += 1
+  }
+  await ctx.runMutation(internal.deckCatalogs.removeStale, {
+    game: "fab",
+    source: FAB_PRECON_FEED.source,
+    format,
+    keep: decks.map((deck) => deck.sourceUrl),
+  })
+  if (count === 0) throw new Error("Flesh and Blood cards are not synced yet")
+  return { count, status: 200 }
+}
+
+export const FAB_PRECON_FEED = {
+  source: "legend-story-studios",
+  formats: [...new Set(fabPrecons.map((deck) => deck.format))],
+  operation: (format) => `deck-feed-refresh:${format}`,
+  refresh: refreshFabPrecons,
+} satisfies DeckFeed

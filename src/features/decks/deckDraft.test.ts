@@ -185,6 +185,27 @@ describe("deck draft commander", () => {
   })
 })
 
+it("holds one Flesh and Blood hero, replacing it without the Commander picker", () => {
+  const fabDeck = { game: "fab", format: "cc" }
+  const hero = (name: string) =>
+    card(name, { scryfallId: undefined, cardId: name, section: "hero" })
+  const deck = [hero("Dorinthea Ironsong"), card("Snatch (red)", { section: "main", quantity: 3 })]
+  expect(isCommanderPick(fabDeck, hero("Kano"))).toBe(true)
+  expect(canChooseCommander(fabDeck, deck)).toBe(false)
+  const result = addCommanderCard(deck, hero("Kano"), () => undefined)
+  expect("cards" in result && result.cards.map(({ name, quantity }) => [name, quantity])).toEqual([
+    ["Snatch (red)", 3],
+    ["Kano", 1],
+  ])
+})
+
+it("keeps the entry limit when a hero joins a full deck", () => {
+  const hero = card("Kano", { scryfallId: undefined, cardId: "Kano", section: "hero" })
+  expect(addCommanderCard(entries(MAX_DECK_CARDS), hero, () => undefined)).toEqual({
+    error: expect.any(String),
+  })
+})
+
 describe("planDeckSave", () => {
   it("queues card edits and lets the note follow whichever route it can", () => {
     expect(

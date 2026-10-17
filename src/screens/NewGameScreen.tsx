@@ -96,7 +96,7 @@ import {
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
-import { systemDefinition } from "../../convex/lib/systems"
+import { identitySection, systemDefinition } from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
@@ -156,6 +156,8 @@ export interface NewGameScreenProps {
   onEndLocal?: (result: LocalGameResult) => void
   onAbandonLocal?: () => void
   onSavePlayers?: (players: NewPlayerInput[], account?: LocalGameAccountInput) => void
+  onDeckChange?: (versionId: string | undefined) => void
+  startPending?: boolean
   onJoin?: () => void
   onResumeConnected?: (game: ResumableGame) => void
   onNearby?: (setup: LanSetup) => void
@@ -227,6 +229,8 @@ function NewGameForm({
   onEndLocal,
   onAbandonLocal,
   onSavePlayers,
+  onDeckChange,
+  startPending,
   onJoin,
   onResumeConnected,
   onNearby,
@@ -405,6 +409,10 @@ function NewGameForm({
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
     deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
+  const startingValueDeck = identitySection(system, format)?.startingValueFacet
+    ? deck?.versionId
+    : undefined
+  useEffect(() => onDeckChange?.(startingValueDeck), [onDeckChange, startingValueDeck])
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account
@@ -418,7 +426,7 @@ function NewGameForm({
   )
   const valid = connectedMode
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
-    : validLife && nameValidation.valid && !localGame
+    : validLife && nameValidation.valid && !localGame && !startPending
   const busy = connectedMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)

@@ -152,6 +152,7 @@ export default defineSchema({
     proShape: v.optional(v.string()),
     foil: v.optional(v.boolean()),
     currentLife: v.number(),
+    startingLife: v.optional(v.number()),
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),

@@ -3,19 +3,18 @@ export type RuleSection = { id: string; title: string; rules: Rule[] }
 export type RuleChapter = { id: string; title: string; sections: RuleSection[] }
 export type GlossaryEntry = { term: string; text: string }
 export type ComprehensiveRules = {
-  effectiveDate: string
+  effectiveDate?: string
   chapters: RuleChapter[]
   glossary: GlossaryEntry[]
   notice: string[]
 }
 
 export function findRules(rules: ComprehensiveRules, id: string) {
-  const sectionId = id.slice(0, 3)
   const section = rules.chapters
     .flatMap((chapter) => chapter.sections)
-    .find((candidate) => candidate.id === sectionId)
+    .find((candidate) => id === candidate.id || id.startsWith(`${candidate.id}.`))
   if (!section) return undefined
-  if (id === sectionId) return { section, rules: section.rules }
+  if (id === section.id) return { section, rules: section.rules }
   const base = id.replace(/[a-z]+$/, "")
   const group = section.rules.filter(
     (rule) =>
@@ -39,14 +38,13 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   return [...terms, ...matches].slice(0, limit)
 }
 
-const REFERENCE = /\b(\d{3}\.\d+[a-z]{0,2})\b|\b(rules? )(\d{3})\b(?!\.\d)/g
-
-export function ruleReferences(text: string) {
+export function ruleReferences(text: string, reference: RegExp) {
   const parts: (string | { id: string })[] = []
   let last = 0
-  for (const match of text.matchAll(REFERENCE)) {
-    const start = match.index + (match[2]?.length ?? 0)
-    const id = match[1] ?? match[3]
+  for (const match of text.matchAll(reference)) {
+    const id = match.slice(1).find((group) => group !== undefined)
+    if (!id) continue
+    const start = match.index + match[0].indexOf(id)
     parts.push(text.slice(last, start), { id })
     last = start + id.length
   }

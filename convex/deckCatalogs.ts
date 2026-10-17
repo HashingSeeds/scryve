@@ -170,6 +170,28 @@ export const upsert = internalMutation({
   },
 })
 
+export const removeStale = internalMutation({
+  args: { game: v.string(), source: v.string(), format: v.string(), keep: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_source_and_external_id", (q) =>
+        q.eq("game", args.game).eq("source", args.source),
+      )
+      .take(200)
+    for (const row of rows) {
+      if (row.format !== args.format || args.keep.includes(row.externalId)) continue
+      const entries = await ctx.db
+        .query("deckCatalogCards")
+        .withIndex("by_catalog_deck_id", (q) => q.eq("catalogDeckId", row._id))
+        .take(MAX_DECK_CARDS + 1)
+      for (const entry of entries) await ctx.db.delete(entry._id)
+      await ctx.db.delete(row._id)
+    }
+    return null
+  },
+})
+
 export const pruneFeed = internalMutation({
   args: { game: v.string(), format: v.string(), source: v.string() },
   handler: async (ctx, args) => {

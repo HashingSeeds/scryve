@@ -1,5 +1,9 @@
+import { renderHook } from "@testing-library/react-native"
+
+import { storage } from "@/utils/storage"
+
 import { GAME_RULES } from "./gameRules"
-import { downloadRules, loadStoredRules, prefetchRules } from "./rulesSource"
+import { downloadRules, loadStoredRules, prefetchRules, useComprehensiveRules } from "./rulesSource"
 
 const MAGIC = GAME_RULES.mtg
 
@@ -79,9 +83,74 @@ it("prefetchRules downloads once, shares the download with Rules, and skips a cu
   expect(loadStoredRules(MAGIC, store)?.rules).toBe(rules)
 })
 
+it("shows rules a prefetch stored after the screen first read the cache", () => {
+  const stored = new Map([
+    ["scryve.rules.url.v1", MAGIC.url],
+    ["scryve.rules.text.v1", SOURCE],
+  ])
+  let reads = 0
+  jest
+    .spyOn(storage, "getString")
+    .mockImplementation((key) => (reads++ === 0 ? undefined : stored.get(key)))
+  const fetcher = jest.spyOn(global, "fetch")
+  const { result } = renderHook(() => useComprehensiveRules(MAGIC))
+  expect(result.current.rules?.effectiveDate).toBe("September 25, 2026")
+  expect(fetcher).not.toHaveBeenCalled()
+  jest.restoreAllMocks()
+})
+
 it("loads Magic rules cached under the keys earlier builds wrote", () => {
   const store = memoryStore()
   store.set("scryve.rules.url.v1", MAGIC.url)
   store.set("scryve.rules.text.v1", SOURCE)
   expect(loadStoredRules(MAGIC, store)?.rules.effectiveDate).toBe("September 25, 2026")
+})
+
+it("rechecks Flesh and Blood rules once per launch, keeping the stored copy on 304", async () => {
+  const FAB = GAME_RULES.fab
+  const fabSource = (rule: string) =>
+    [
+      "1 Game Concepts",
+      "1.0 General",
+      `1.0.1 ${rule}`,
+      "1 Glossary",
+      "1.-1.3 Ability",
+      "Text.",
+    ].join("\n")
+  const headers = new Headers({ "ETag": '"v1"', "Last-Modified": "Tue, 29 Sep 2026 08:42:59 GMT" })
+  const firstLaunch = memoryStore()
+  await downloadRules(FAB, firstLaunch, async () => ({
+    ok: true,
+    status: 200,
+    headers,
+    text: async () => fabSource("First."),
+  }))
+
+  const relaunch = memoryStore()
+  for (const key of ["url", "text", "etag", "modified"]) {
+    const value = firstLaunch.getString(`scryve.rules.fab.${key}.v1`)
+    if (value) relaunch.set(`scryve.rules.fab.${key}.v1`, value)
+  }
+  const notModified = jest.fn(async () => ({ ok: false, status: 304, text: async () => "" }))
+  prefetchRules(FAB, relaunch, notModified)
+  const rules = await downloadRules(FAB, relaunch, notModified)
+  prefetchRules(FAB, relaunch, notModified)
+  expect(notModified).toHaveBeenCalledTimes(1)
+  expect(notModified).toHaveBeenCalledWith(FAB.url, {
+    headers: { "If-None-Match": '"v1"', "If-Modified-Since": "Tue, 29 Sep 2026 08:42:59 GMT" },
+  })
+  expect(rules.chapters[0].sections[0].rules[0].text).toBe("First.")
+
+  const updated = memoryStore()
+  for (const key of ["url", "text", "etag"]) {
+    const value = firstLaunch.getString(`scryve.rules.fab.${key}.v1`)
+    if (value) updated.set(`scryve.rules.fab.${key}.v1`, value)
+  }
+  await downloadRules(FAB, updated, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => fabSource("Second."),
+  }))
+  expect(loadStoredRules(FAB, updated)?.rules.chapters[0].sections[0].rules[0].text).toBe("Second.")
+  expect(loadStoredRules(MAGIC, updated)).toBeUndefined()
 })

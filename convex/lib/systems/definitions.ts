@@ -4,6 +4,7 @@ export type DeckSection = {
   readonly id: string
   readonly label: string
   readonly identity?: true
+  readonly startingValueFacet?: string
 }
 
 /** why: survive games knock a seat out at 0 or below; race games end when any seat reaches `to`, counting toward it from the default value. */
@@ -67,6 +68,7 @@ export type IntegrationDefinition = {
     readonly basis: "fan_policy" | "fair_use" | "explicit_license" | "publisher_api" | "unknown"
     readonly imageUse: "licensed" | "functional_card_context" | "text_only" | "none"
     readonly requiredNotices: readonly string[]
+    readonly imageCredit?: string
   }
 }
 
@@ -152,7 +154,13 @@ const YUGIOH_SECTIONS = [
 
 const POKEMON_SECTIONS = [{ id: "main", label: "Deck" }] as const
 
-export const SYSTEM_IDS = ["mtg", "ygo", "pokemon"] as const
+const FAB_SECTIONS = [
+  { id: "hero", label: "Hero", identity: true, startingValueFacet: "health" },
+  { id: "arena", label: "Arena" },
+  { id: "main", label: "Deck" },
+] as const
+
+export const SYSTEM_IDS = ["mtg", "ygo", "pokemon", "fab"] as const
 export type SystemId = (typeof SYSTEM_IDS)[number]
 
 export const SYSTEMS = {
@@ -377,6 +385,83 @@ export const SYSTEMS = {
         requiredNotices: [
           "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve is not affiliated with or endorsed by Nintendo, Creatures, GAME FREAK, or The Pokémon Company.",
         ],
+      },
+    },
+  },
+  fab: {
+    label: "Flesh and Blood",
+    shortLabel: "FaB",
+    release: "beta",
+    defaultFormat: { deck: "cc", play: "cc" },
+    counter: {
+      label: "life",
+      heading: "Life",
+      singular: "life",
+      plural: "life",
+      defaultValue: 40,
+      presets: [20, 40],
+      tapStep: 1,
+      quickAdjustments: [5, 1],
+      scrubStep: 1,
+      scrubSteps: 20,
+      goal: { kind: "survive" },
+      maxStartingValue: 999,
+      flooredAtZero: true,
+    },
+    formats: [
+      {
+        id: "cc",
+        label: "Classic Constructed",
+        blurb: "60+ cards, 3 copies",
+        sections: FAB_SECTIONS,
+      },
+      {
+        id: "blitz",
+        label: "Blitz",
+        blurb: "Young hero, 40 cards",
+        sections: FAB_SECTIONS,
+        startingValue: 20,
+      },
+      {
+        id: "silverAge",
+        label: "Silver Age",
+        blurb: "Commons and rares",
+        sections: FAB_SECTIONS,
+        startingValue: 20,
+      },
+      { id: "ll", label: "Living Legend", blurb: "Legends allowed", sections: FAB_SECTIONS },
+      {
+        id: "upf",
+        label: "Ultimate Pit Fight",
+        blurb: "Multiplayer",
+        sections: FAB_SECTIONS,
+        startingValue: 20,
+      },
+    ],
+    table: { counters: [], designations: [] },
+    variants: [],
+    firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
+    roundClock: { minutes: 55, endOfRoundTurns: 1 },
+    deckAnalysis: false,
+    integration: {
+      identityNamespace: "fab-cube-card",
+      capabilities: {
+        integration: available("scryve"),
+        cardCatalog: available("fab-cube", "Synced from the fab-cube dataset."),
+        deckImport: available("fab-cube"),
+        exampleDecks: available("legend-story-studios", "Official precon lists only."),
+        images: available("legend-story-studios", "Functional card context only."),
+        playTracking: available("scryve"),
+        aggregateMetagameStats: available("scryve"),
+      },
+      rights: {
+        review: "reviewed",
+        basis: "fair_use",
+        imageUse: "functional_card_context",
+        requiredNotices: [
+          "Scryve is in no way affiliated with Legend Story Studios. Legend Story Studios®, Flesh and Blood™, and set names are trademarks of Legend Story Studios. Flesh and Blood characters, cards, logos, and art are property of Legend Story Studios.",
+        ],
+        imageCredit: "© Legend Story Studios",
       },
     },
   },

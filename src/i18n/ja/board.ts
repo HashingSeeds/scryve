@@ -127,12 +127,14 @@ export default {
       mtg: "ライフが同点",
       ygo: "ライフポイントが同点",
       pokemon: "サイドの枚数が同じ",
+      fab: "ライフが同点",
     },
     leads: {
       none: "{{name}}がライフでリード",
       mtg: "{{name}}がライフでリード",
       ygo: "{{name}}がライフポイントでリード",
       pokemon: "{{name}}がサイドでリード",
+      fab: "{{name}}がライフでリード",
     },
   },
   clock: {
@@ -359,12 +361,14 @@ export default {
       ygo: "タップで{{identity}}のライフポイントを{{delta}}変更。長押しでその他の操作。",
       pokemon:
         "タップで{{identity}}のサイドを{{delta}}変更します。長押しでその他の操作ができます。",
+      fab: "タップで{{identity}}のライフを{{delta}}変更。長押しでその他の操作。",
     },
     moreControls: {
       none: "{{identity}}、ライフのその他の操作",
       mtg: "{{identity}}、ライフのその他の操作",
       ygo: "{{identity}}、ライフポイントのその他の操作",
       pokemon: "{{identity}}、サイドのその他の操作",
+      fab: "{{identity}}、ライフのその他の操作",
     },
   },
   grid: {
@@ -373,6 +377,7 @@ export default {
       mtg_other: "{{count}}人のライフ一覧",
       ygo_other: "{{count}}人のライフポイント一覧",
       pokemon_other: "{{count}}人のサイド一覧",
+      fab_other: "{{count}}人のライフ一覧",
     },
   },
   pokemonSheet: {
@@ -458,18 +463,21 @@ export default {
       mtg: "{{name}}のライフ変更",
       ygo: "{{name}}のライフポイント変更",
       pokemon: "{{name}}のサイド変更",
+      fab: "{{name}}のライフ変更",
     },
     add: {
       none: "ライフを{{amount}}増やす",
       mtg: "ライフを{{amount}}増やす",
       ygo: "ライフポイントを{{amount}}加算",
       pokemon: "サイドを{{amount}}増やす",
+      fab: "ライフを{{amount}}増やす",
     },
     subtract: {
       none: "ライフを{{amount}}減らす",
       mtg: "ライフを{{amount}}減らす",
       ygo: "ライフポイントを{{amount}}減算",
       pokemon: "サイドを{{amount}}減らす",
+      fab: "ライフを{{amount}}減らす",
     },
   },
 } satisfies LocaleNamespace

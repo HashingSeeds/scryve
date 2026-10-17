@@ -67,7 +67,7 @@ import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
-import { identitySection } from "../../convex/lib/systems"
+import { picksCommander } from "../../convex/lib/systems"
 
 type DeckDialog =
   | "none"
@@ -382,7 +382,7 @@ function DeckDetailContent({
           catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
         }
       : undefined,
-    identitySection(game, deck?.format) !== undefined,
+    picksCommander(game, deck?.format),
   )
 
   const { displayCards } = view

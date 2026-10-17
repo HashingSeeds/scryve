@@ -130,12 +130,14 @@ export default {
       mtg: "Empate en vida",
       ygo: "Empate en Puntos de Vida",
       pokemon: "Empate en cartas de Premio",
+      fab: "Empate en vida",
     },
     leads: {
       none: "{{name}} lidera en vida",
       mtg: "{{name}} lidera en vida",
       ygo: "{{name}} lidera en Puntos de Vida",
       pokemon: "{{name}} lidera en cartas de Premio",
+      fab: "{{name}} lidera en vida",
     },
   },
   clock: {
@@ -385,12 +387,14 @@ export default {
       ygo: "Toca para cambiar los Puntos de Vida de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
       pokemon:
         "Toca para cambiar las cartas de Premio de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
+      fab: "Toca para cambiar la vida de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
     },
     moreControls: {
       none: "{{identity}}, más controles de vida",
       mtg: "{{identity}}, más controles de vida",
       ygo: "{{identity}}, más controles de Puntos de Vida",
       pokemon: "{{identity}}, más controles de cartas de Premio",
+      fab: "{{identity}}, más controles de vida",
     },
   },
   grid: {
@@ -407,6 +411,9 @@ export default {
       pokemon_one: "Cuadrícula de cartas de Premio de {{count}} jugador",
       pokemon_many: "Cuadrícula de cartas de Premio de {{count}} de jugadores",
       pokemon_other: "Cuadrícula de cartas de Premio de {{count}} jugadores",
+      fab_one: "Cuadrícula de vida de {{count}} jugador",
+      fab_many: "Cuadrícula de vida de {{count}} de jugadores",
+      fab_other: "Cuadrícula de vida de {{count}} jugadores",
     },
   },
   pokemonSheet: {
@@ -494,18 +501,21 @@ export default {
       mtg: "Cambio de vida de {{name}}",
       ygo: "Cambio de Puntos de Vida de {{name}}",
       pokemon: "Cambio de cartas de Premio de {{name}}",
+      fab: "Cambio de vida de {{name}}",
     },
     add: {
       none: "Sumar {{amount}} de vida",
       mtg: "Sumar {{amount}} de vida",
       ygo: "Sumar {{amount}} Puntos de Vida",
       pokemon: "Sumar {{amount}} cartas de Premio",
+      fab: "Sumar {{amount}} de vida",
     },
     subtract: {
       none: "Restar {{amount}} de vida",
       mtg: "Restar {{amount}} de vida",
       ygo: "Restar {{amount}} Puntos de Vida",
       pokemon: "Restar {{amount}} cartas de Premio",
+      fab: "Restar {{amount}} de vida",
     },
   },
 } satisfies LocaleNamespace

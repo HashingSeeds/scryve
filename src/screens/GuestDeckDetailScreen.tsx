@@ -13,13 +13,9 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import {
-  addCommander,
-  getCommanderWarnings,
-  selectCommander,
-} from "@/features/decks/commanderSelection"
+import { getCommanderWarnings, selectCommander } from "@/features/decks/commanderSelection"
 import { cardDetailsKey, printingKey } from "@/features/decks/deckCards"
-import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
+import { addCommanderCard, canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import { DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
@@ -36,7 +32,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
-import { identitySection } from "../../convex/lib/systems"
+import { picksCommander } from "../../convex/lib/systems"
 
 type GuestDeckDetailScreenProps = { localId: string; onBack: () => void }
 type GuestCard = GuestDeckPayload["cards"][number]
@@ -83,7 +79,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
           catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
         }
       : undefined,
-    identitySection(focusedGame, (draft ?? stored?.deck)?.format) !== undefined,
+    picksCommander(focusedGame, (draft ?? stored?.deck)?.format),
   )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)
@@ -334,15 +330,12 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
             setUndo(undefined)
             if (isCommanderPick(rules, card)) {
               const cached = loadCardDetails()
-              const result = addCommander(
+              const result = addCommanderCard(
                 current.cards,
                 card,
                 (entry) => cached[cardDetailsKey(entry, game)],
-                card.commanderColor,
               )
               if ("error" in result) return result.error
-              if (result.cards.length > MAX_DECK_CARDS)
-                return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
               update({ cards: result.cards })
               setCommanderSelected(true)
               if (choosingCommander) setAdding(false)

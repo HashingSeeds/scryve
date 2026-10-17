@@ -132,7 +132,7 @@ export function isCommanderPick(deck: DeckRules, card: DeckCard) {
 export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) {
   const identity = identitySection(deck.game, deck.format)
   return (
-    identity !== undefined &&
+    identity?.id === "commander" &&
     cards.reduce(
       (count, card) => count + (cardSection(card) === identity.id ? card.quantity : 0),
       0,
@@ -145,7 +145,16 @@ export function addCommanderCard<T extends DeckCard>(
   card: T,
   detailsFor: CardDetailsLookup<T>,
 ) {
-  const result = addCommander(cards, card, detailsFor, card.commanderColor)
+  const section = cardSection(card)
+  const result =
+    section === "commander"
+      ? addCommander(cards, card, detailsFor, card.commanderColor)
+      : {
+          cards: [
+            ...cards.filter((entry) => cardSection(entry) !== section),
+            { ...card, quantity: 1 },
+          ],
+        }
   if ("error" in result) return result
   if (result.cards.length > MAX_DECK_CARDS)
     return { error: translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS }) }

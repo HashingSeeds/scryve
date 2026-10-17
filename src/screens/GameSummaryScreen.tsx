@@ -81,10 +81,11 @@ function StandingRow({
       : player.outcome === "loss"
         ? theme.colors.error
         : theme.colors.textDim
+  const seatStartingLife = player.startingLife ?? startingLife
   const changeFromStart =
-    startingLife === undefined
+    seatStartingLife === undefined
       ? undefined
-      : counterDeltaFromStartLabel(system, player.life, startingLife)
+      : counterDeltaFromStartLabel(system, player.life, seatStartingLife)
   const detail = [
     player.username ? `@${player.username}` : undefined,
     player.deckLabel,
