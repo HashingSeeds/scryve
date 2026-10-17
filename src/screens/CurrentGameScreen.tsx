@@ -51,6 +51,7 @@ import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { prefetchRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -101,6 +102,9 @@ export function CurrentGameScreen({
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const { isFoil } = useRevenueCat()
   const system = runtime.game.system
+  useEffect(() => {
+    if (system === "mtg") prefetchRules()
+  }, [system])
   const [menuOpen, setMenuOpen] = useState(false)
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()

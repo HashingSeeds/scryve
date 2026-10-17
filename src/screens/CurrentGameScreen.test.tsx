@@ -5,9 +5,12 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
+import { prefetchRules } from "@/features/rules/rulesSource"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
+
+jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
 
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
@@ -162,6 +165,7 @@ describe("CurrentGameScreen", () => {
   })
 
   it("gives Magic games a Rules action where History sits, keeping History in More", () => {
+    jest.mocked(prefetchRules).mockClear()
     const onRules = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
@@ -186,6 +190,7 @@ describe("CurrentGameScreen", () => {
       </ThemeProvider>,
     )
 
+    expect(prefetchRules).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("game-menu-button"))
     expect(view.queryByTestId("history-button")).toBeNull()
     fireEvent.press(view.getByTestId("rules-button"))

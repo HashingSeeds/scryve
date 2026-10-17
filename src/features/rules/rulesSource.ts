@@ -7,50 +7,77 @@ import { parseComprehensiveRules, type ComprehensiveRules } from "./comprehensiv
 
 export const RULES_URL = "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
 export const RULES_PAGE_URL = "https://magic.wizards.com/en/rules"
-const RULES_KEY = "scryve.rules.comprehensive.v1"
+const URL_KEY = "scryve.rules.url.v1"
+const TEXT_KEY = "scryve.rules.text.v1"
 
 type RulesStore = {
   getString(key: string): string | undefined
   set(key: string, value: string): void
 }
+type Fetcher = (url: string) => Promise<Pick<Response, "ok" | "status" | "text">>
 
-let parsed: { source: string; rules: ComprehensiveRules } | undefined
+const loaded = new WeakMap<RulesStore, { url: string; rules: ComprehensiveRules }>()
+const downloads = new WeakMap<RulesStore, Promise<string>>()
 
-function parse(source: string) {
-  if (parsed?.source === source) return parsed.rules
-  const rules = parseComprehensiveRules(source)
-  if (rules) parsed = { source, rules }
-  return rules
-}
-
-export function loadStoredRules(store: RulesStore = storage) {
+function storedUrl(store: RulesStore) {
   try {
-    const stored: unknown = JSON.parse(store.getString(RULES_KEY) ?? "null")
-    if (typeof stored !== "object" || stored === null) return undefined
-    if (!("url" in stored) || typeof stored.url !== "string") return undefined
-    if (!("text" in stored) || typeof stored.text !== "string") return undefined
-    const rules = parse(stored.text)
-    return rules ? { url: stored.url, rules } : undefined
+    return store.getString(URL_KEY)
   } catch {
     return undefined
   }
 }
 
-export async function downloadRules(
-  store: RulesStore = storage,
-  fetcher: (url: string) => Promise<Pick<Response, "ok" | "status" | "text">> = fetch,
-) {
+export function loadStoredRules(store: RulesStore = storage) {
+  const url = storedUrl(store)
+  const cached = loaded.get(store)
+  if (cached?.url === url) return cached
+  try {
+    const text = store.getString(TEXT_KEY)
+    const rules = url && text ? parseComprehensiveRules(text) : undefined
+    if (!url || !rules) return undefined
+    loaded.set(store, { url, rules })
+    return { url, rules }
+  } catch {
+    return undefined
+  }
+}
+
+async function fetchText(store: RulesStore, fetcher: Fetcher) {
   const response = await fetcher(RULES_URL)
   if (!response.ok) throw new Error(`Rules download failed with ${response.status}`)
   const text = await response.text()
-  const rules = parse(text)
-  if (!rules) throw new Error("Rules download was not the Comprehensive Rules")
+  if (!text.includes("These rules are effective as of"))
+    throw new Error("Rules download was not the Comprehensive Rules")
   try {
-    store.set(RULES_KEY, JSON.stringify({ url: RULES_URL, text }))
+    store.set(TEXT_KEY, text)
+    store.set(URL_KEY, RULES_URL)
   } catch (error) {
     console.error("[rules] failed to cache the rules", error)
   }
+  return text
+}
+
+function downloadText(store: RulesStore, fetcher: Fetcher) {
+  const pending = downloads.get(store)
+  if (pending) return pending
+  const next = fetchText(store, fetcher).finally(() => downloads.delete(store))
+  downloads.set(store, next)
+  return next
+}
+
+export async function downloadRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
+  const rules = parseComprehensiveRules(await downloadText(store, fetcher))
+  if (!rules) throw new Error("Rules download could not be read")
+  loaded.set(store, { url: RULES_URL, rules })
   return rules
+}
+
+// why: media.wizards.com sends no CORS header, so web links to the official page instead.
+const canDownload = Platform.OS !== "web"
+
+export function prefetchRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
+  if (!canDownload || storedUrl(store) === RULES_URL) return
+  downloadText(store, fetcher).catch(() => {})
 }
 
 export function useComprehensiveRules() {
@@ -59,8 +86,7 @@ export function useComprehensiveRules() {
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    // why: media.wizards.com sends no CORS header, so web links to the official page instead.
-    if (Platform.OS === "web" || stored?.url === RULES_URL) return
+    if (!canDownload || stored?.url === RULES_URL) return
     let active = true
     downloadRules()
       .then((next) => {

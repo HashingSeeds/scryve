@@ -73,6 +73,7 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { prefetchRules } from "@/features/rules/rulesSource"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -617,6 +618,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [])
 
   const system = game.system
+  useEffect(() => {
+    if (system === "mtg") prefetchRules()
+  }, [system])
   const active = game.status === "active"
   const finished = game.status === "finished"
 

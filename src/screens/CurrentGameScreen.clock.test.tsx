@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
 
+jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
+
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
   getString(key: string) {

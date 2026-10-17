@@ -1,4 +1,4 @@
-import { downloadRules, loadStoredRules, RULES_URL } from "./rulesSource"
+import { downloadRules, loadStoredRules, prefetchRules, RULES_URL } from "./rulesSource"
 
 const SOURCE = [
   "These rules are effective as of September 25, 2026.",
@@ -55,4 +55,15 @@ describe("downloadRules", () => {
     ).rejects.toThrow()
     expect(loadStoredRules(store)).toBeUndefined()
   })
+})
+
+it("prefetchRules downloads once, shares the download with Rules, and skips a current copy", async () => {
+  const store = memoryStore()
+  const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
+  prefetchRules(store, fetcher)
+  prefetchRules(store, fetcher)
+  const rules = await downloadRules(store, fetcher)
+  prefetchRules(store, fetcher)
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(loadStoredRules(store)?.rules).toBe(rules)
 })
