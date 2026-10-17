@@ -80,7 +80,13 @@ export interface LanSeatPass {
 }
 
 export type LanGuestMessage =
-  | { type: "join"; protocol: number; name: string; pass?: LanSeatPass }
+  | {
+      type: "join"
+      protocol: number
+      name: string
+      pass?: LanSeatPass
+      systems?: readonly PlaySystemId[]
+    }
   | { type: "op"; event: ConnectedActionEvent }
 
 export type LanHostMessage =
@@ -141,6 +147,9 @@ const LAN_REJECTIONS: Record<(typeof LAN_REJECTION_IDS)[number], string> = {
   update: "Update Scryve to join this game.",
 }
 
+/** why: guests from before `systems` drop a lobby in a system they don't know and wait forever, so a newer system asks them to update. */
+const SYSTEMS_BEFORE_GUEST_LIST: readonly PlaySystemId[] = ["mtg", "ygo", "pokemon"]
+
 export function lanRejectionMessage(reason: string) {
   const id = LAN_REJECTION_IDS.find((candidate) => LAN_REJECTIONS[candidate] === reason)
   return id ? translate(`connected:nearby.rejected.${id}`) : reason
@@ -153,7 +162,10 @@ export function admitLanGuest(
   join: Extract<LanGuestMessage, { type: "join" }>,
   fresh: LanSeatPass,
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
-  if (join.protocol !== LAN_PROTOCOL) return { rejected: LAN_REJECTIONS.update }
+  const { system } = game.setup
+  const systems = join.systems ?? SYSTEMS_BEFORE_GUEST_LIST
+  if (join.protocol !== LAN_PROTOCOL || (system && !systems.includes(system)))
+    return { rejected: LAN_REJECTIONS.update }
   const { pass } = join
   const owned = pass && game.seats.some((seat) => seat.key === pass.key)
   if (pass && (pass.key === game.hostKey || (owned && tokens.get(pass.key) !== pass.token)))
@@ -468,6 +480,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       protocol: typeof value.protocol === "number" ? value.protocol : 1,
       name,
       ...(value.pass ? { pass: { key: value.pass.key, token: value.pass.token } } : {}),
+      ...(Array.isArray(value.systems) ? { systems: value.systems.filter(isPlaySystemId) } : {}),
     }
   if (value.type === "op") {
     const event = parseEvent(value.event)
