@@ -67,6 +67,17 @@ export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 export const MAX_PLAYER_NAME_LENGTH = 24
 
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
+
+// why: nearby hosts upload every seat's name, and Convex refuses a blank name or broken UTF-16 for the whole game.
+export const wellFormedPlayerName = (raw: string) =>
+  raw
+    .replace(LONE_SURROGATE, "")
+    .trim()
+    .slice(0, MAX_PLAYER_NAME_LENGTH)
+    .replace(LONE_SURROGATE, "")
+    .trim()
+
 export function validatePlayerNames(values: readonly string[]): {
   valid: boolean
   names: string[]

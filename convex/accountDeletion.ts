@@ -251,6 +251,7 @@ async function anonymizeMembership(
     avatarUrl: undefined,
     usernameAtJoin: undefined,
     deckVersionId: undefined,
+    seatPassHash: undefined,
     deletedAt,
     resumable: false,
   })

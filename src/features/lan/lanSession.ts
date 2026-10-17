@@ -4,12 +4,14 @@ import { ConvexError } from "convex/values"
 import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
+import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
-import { createClientId } from "@/features/game/domain"
+import { createClientId, wellFormedPlayerName } from "@/features/game/domain"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
 
+import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
 import { loadLanName } from "./lanAvailability"
 import {
   admitLanGuest,
@@ -20,6 +22,7 @@ import {
   lanLobbyOf,
   lanProjection,
   lanRejectionMessage,
+  lanRoundId,
   lanSeatsReady,
   parseGuestMessage,
   parseHostMessage,
@@ -39,6 +42,7 @@ import {
   type LanConnection,
   type LanHost,
 } from "./lanTransport"
+import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -71,7 +75,7 @@ const deviceName = () =>
       ? "Android"
       : "Player"
 
-const playerName = () => loadLanName().trim() || deviceName()
+const playerName = () => wellFormedPlayerName(loadLanName()) || deviceName()
 
 // why: a guest whose app restarts mid-game reclaims its seat with this; only the latest game's pass is worth keeping.
 function savedPass(serviceName: string): LanSeatPass | undefined {
@@ -102,6 +106,7 @@ export class LanSession {
   private server?: LanHost
   private serverClosed = false
   private tokens = new Map<string, string>()
+  private passHashes = new Map<string, Promise<string | undefined>>()
   private peers = new Map<string, LanConnection<LanHostMessage>>()
   // why: a socket that hasn't sent its join yet isn't in peers, but still has to close when the host leaves.
   private accepted = new Set<LanConnection<LanHostMessage>>()
@@ -109,6 +114,9 @@ export class LanSession {
   private hostAcks: (() => void)[] = []
   private connection?: LanConnection<LanGuestMessage>
   private pass?: LanSeatPass
+  private claimedRound?: string
+  private roundOwner?: string
+  private finishedRound?: string
   private pendingWrites = new Map<string, PendingWrite>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
   private reconnectingSince?: number
@@ -129,7 +137,7 @@ export class LanSession {
   readonly writes: ConnectedWrites = {
     send: (action) =>
       this.state.role === "host" ? this.hostWrite(action) : this.guestWrite(action),
-    finish: async () => this.finish(),
+    finish: async (result) => this.finish(result),
     abandon: async () => this.leave(),
   }
 
@@ -159,6 +167,7 @@ export class LanSession {
   async host(setup: LanSetup) {
     this.session += 1
     this.tokens.clear()
+    this.passHashes.clear()
     const name = playerName()
     const seatKey = createClientId("seat")
     const game = createLanGame(createClientId("lan"), seatKey, name, setup, Date.now())
@@ -226,6 +235,7 @@ export class LanSession {
             return peer.sendAndClose({ type: "rejected", reason: admitted.rejected })
           seatKey = admitted.pass.key
           this.tokens.set(admitted.pass.key, admitted.pass.token)
+          this.hashPass(admitted.pass)
           const previous = this.peers.get(seatKey)
           this.peers.set(seatKey, peer)
           previous?.close()
@@ -266,7 +276,10 @@ export class LanSession {
         if (!seatKey || this.peers.get(seatKey) !== peer || !game) return
         this.peers.delete(seatKey)
         this.replies.delete(seatKey)
-        if (game.status === "lobby") this.tokens.delete(seatKey)
+        if (game.status === "lobby") {
+          this.tokens.delete(seatKey)
+          this.passHashes.delete(seatKey)
+        }
         this.publish(releaseLanSeat(game, seatKey))
       },
     }
@@ -400,6 +413,19 @@ export class LanSession {
     this.reconnectingSince = undefined
     const { seatKey } = this.state
     this.set({ lobby: message.lobby, projection: message.projection, status: "connected" })
+    const round = lanRoundId(message.lobby)
+    const { status } = message.lobby
+    if (
+      (status === "active" || status === "finished") &&
+      this.pass &&
+      this.claimedRound !== round &&
+      rememberSeatClaim({ publicId: round, token: this.pass.token, savedAt: Date.now() })
+    )
+      this.claimedRound = round
+    if (status === "finished" && this.claimedRound === round && this.finishedRound !== round) {
+      this.finishedRound = round
+      retrySeatClaims()
+    }
     if (message.lobby.status === "abandoned") {
       this.leave({ keepGame: true })
       // why: the board needs the seat to stay open and tell this guest the host ended the game.
@@ -427,14 +453,33 @@ export class LanSession {
 
   start() {
     const game = this.game
-    if (this.state.role === "host" && game && game.status !== "active" && lanSeatsReady(game))
+    if (this.state.role === "host" && game && game.status !== "active" && lanSeatsReady(game)) {
+      this.roundOwner = nearbyOwner()
       this.publish(startLanRound(game, Date.now()))
+    }
   }
 
-  finish() {
+  private hashPass({ key, token }: LanSeatPass) {
+    this.passHashes.set(
+      key,
+      hashSeatPassToken(token).catch(() => undefined),
+    )
+  }
+
+  async finish(result?: ConnectedGameResult) {
+    const { game: started, session } = this
+    if (this.state.role !== "host" || started?.status !== "active") return
+    const hashes = new Map<string, string>()
+    for (const [key, hash] of this.passHashes) {
+      const value = await hash
+      if (value) hashes.set(key, value)
+    }
     const game = this.game
-    if (this.state.role === "host" && game?.status === "active")
-      this.publish(endLanRound(game, "finished", Date.now()))
+    if (session !== this.session || game?.status !== "active" || game.round !== started.round)
+      return
+    const now = Date.now()
+    archiveLanGame({ ...game, updatedAt: now }, result, hashes, this.roundOwner)
+    this.publish(endLanRound(game, "finished", now))
   }
 
   leave({ keepGame = false }: { keepGame?: boolean } = {}) {
@@ -463,6 +508,7 @@ export class LanSession {
     this.peers.clear()
     this.accepted.clear()
     this.tokens.clear()
+    this.passHashes.clear()
     this.replies.clear()
     for (const settle of this.hostAcks.splice(0)) settle()
     this.rejectPendingWrites("Left the game")

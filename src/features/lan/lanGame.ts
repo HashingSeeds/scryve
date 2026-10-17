@@ -31,6 +31,7 @@ import {
   asPlayerId,
   MAX_PLAYER_NAME_LENGTH,
   MAX_PLAYERS,
+  wellFormedPlayerName,
 } from "../game/domain"
 import { isPlaySystemId, playSystemFormats, type PlaySystemId } from "../game/playSystems"
 
@@ -69,6 +70,7 @@ export interface LanGame extends LanLobby {
   hostKey: string
   memory?: MemoryGame
   recentOperationIds: string[]
+  startedAt?: number
   updatedAt: number
 }
 
@@ -194,6 +196,7 @@ export function startLanRound(game: LanGame, now: number): LanGame {
     status: "active",
     round: game.round + 1,
     recentOperationIds: [],
+    startedAt: now,
     updatedAt: now,
     memory: {
       status: "active",
@@ -276,6 +279,11 @@ export function applyLanWrite(
   }
 }
 
+export const lanSeatAppearance = (seat: number) => ({
+  color: PLAYER_COLOR_CHOICES[(seat - 1) % PLAYER_COLOR_CHOICES.length],
+  shape: shapeForSeat(seat),
+})
+
 const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
   rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
 
@@ -335,8 +343,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       playerId: seat.key,
       seat: seat.seat,
       displayName: seat.name,
-      color: PLAYER_COLOR_CHOICES[(seat.seat - 1) % PLAYER_COLOR_CHOICES.length],
-      shape: shapeForSeat(seat.seat),
+      ...lanSeatAppearance(seat.seat),
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,
@@ -454,15 +461,12 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
 export function parseGuestMessage(line: string): LanGuestMessage | null {
   const value: unknown = JSON.parse(line)
   if (!isRecord(value)) return null
-  if (
-    value.type === "join" &&
-    typeof value.name === "string" &&
-    (value.pass === undefined || isPass(value.pass))
-  )
+  const name = typeof value.name === "string" ? wellFormedPlayerName(value.name) : ""
+  if (value.type === "join" && name && (value.pass === undefined || isPass(value.pass)))
     return {
       type: "join",
       protocol: typeof value.protocol === "number" ? value.protocol : 1,
-      name: value.name.slice(0, MAX_PLAYER_NAME_LENGTH),
+      name,
       ...(value.pass ? { pass: { key: value.pass.key, token: value.pass.token } } : {}),
     }
   if (value.type === "op") {

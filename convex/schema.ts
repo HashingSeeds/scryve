@@ -163,10 +163,12 @@ export default defineSchema({
     // why: other seats must not see a role until it is revealed or the game ends; only roleForViewer projects it.
     role: v.optional(treacheryRoleValidator),
     roleRevealed: v.optional(v.boolean()),
+    seatPassHash: v.optional(v.string()),
   })
     .index("by_game", ["gameId"])
     .index("by_game_seat", ["gameId", "seat"])
     .index("by_game_user", ["gameId", "userId"])
+    .index("by_seat_pass_hash", ["seatPassHash"])
     .index("by_user", ["userId"])
     .index("by_user_resumable", ["userId", "resumable"]),
 

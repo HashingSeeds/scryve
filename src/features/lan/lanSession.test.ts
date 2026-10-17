@@ -1,5 +1,7 @@
 import { ConvexError } from "convex/values"
 
+import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
+import { saveLanName } from "./lanAvailability"
 import {
   createLanGame,
   LAN_PROTOCOL,
@@ -11,12 +13,17 @@ import {
 } from "./lanGame"
 import { LanSession } from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
+import { onSeatClaim, pendingSeatClaims, setNearbyOwner } from "./nearbyAccount"
 import type { PendingLifeAction } from "../connected/model"
 
 jest.mock("./lanTransport", () => ({
   hostLan: jest.fn(),
   connectLan: jest.fn(),
   resolveLanService: jest.fn(),
+}))
+jest.mock("./lanArchive", () => ({
+  archiveLanGame: jest.fn(() => null),
+  hashSeatPassToken: jest.fn(async (token: string) => `hash-${token}`),
 }))
 
 type Accept = (peer: LanConnection<LanHostMessage>) => LanPeerHandlers<LanGuestMessage>
@@ -32,6 +39,7 @@ const setup: LanSetup = {
 let accept: Accept
 
 beforeEach(() => {
+  jest.clearAllMocks()
   jest.useFakeTimers()
   jest.mocked(hostLan).mockImplementation(async (name, _parse, onPeer) => {
     accept = onPeer as Accept
@@ -129,6 +137,82 @@ describe("nearby host", () => {
     expect(bob.sent.at(-1)).toMatchObject({ type: "nack", code: "rate_limited" })
   })
 
+  it("archives a finished round once, with the winner, every guest's pass, and the account that started it", async () => {
+    setNearbyOwner("host-account")
+    const { session, alice, bob } = await startedGame()
+    setNearbyOwner("switched-account")
+    const result = { kind: "win" as const, winnerPlayerIds: [alice.pass().key] }
+
+    await Promise.all([session.writes.finish(result), session.writes.finish(result)])
+    await session.writes.finish(result)
+
+    expect(archiveLanGame).toHaveBeenCalledTimes(1)
+    const [game, archivedResult, hashes, ownerId] = jest.mocked(archiveLanGame).mock.calls[0]
+    setNearbyOwner(undefined)
+    expect(ownerId).toBe("host-account")
+    expect(game.status).toBe("active")
+    expect(archivedResult).toEqual(result)
+    expect(hashes).toEqual(
+      new Map([
+        [alice.pass().key, `hash-${alice.pass().token}`],
+        [bob.pass().key, `hash-${bob.pass().token}`],
+      ]),
+    )
+  })
+
+  it("hosts under a saved name cut inside a character without the broken half", async () => {
+    saveLanName(`${"a".repeat(23)}😀`)
+    const { session, alice } = await startedGame()
+    saveLanName("")
+
+    await session.writes.finish({ kind: "win", winnerPlayerIds: [alice.pass().key] })
+
+    const [game] = jest.mocked(archiveLanGame).mock.calls[0]
+    expect(game.seats.map((seat) => seat.name)).toEqual(["a".repeat(23), "Alice", "Bob"])
+  })
+
+  it("waits for a guest's pass hash before saving the round", async () => {
+    let release = (_hash: string) => {}
+    jest
+      .mocked(hashSeatPassToken)
+      .mockImplementationOnce(() => new Promise((resolve) => (release = resolve)))
+    const { session, alice } = await startedGame()
+
+    const finished = session.writes.finish()
+    await Promise.resolve()
+    expect(archiveLanGame).not.toHaveBeenCalled()
+    release("late-hash")
+    await finished
+
+    expect(jest.mocked(archiveLanGame).mock.calls[0][2].get(alice.pass().key)).toBe("late-hash")
+  })
+
+  it("still finishes when a guest's pass can't be hashed, leaving that seat unclaimable", async () => {
+    jest.mocked(hashSeatPassToken).mockRejectedValueOnce(new Error("No digest"))
+    const { session, alice, bob } = await startedGame()
+
+    await session.writes.finish()
+
+    const hashes = jest.mocked(archiveLanGame).mock.calls[0][2]
+    expect(hashes.has(alice.pass().key)).toBe(false)
+    expect(hashes.get(bob.pass().key)).toBe(`hash-${bob.pass().token}`)
+  })
+
+  it("keeps the round open when saving it fails, so the host can finish again", async () => {
+    const { session } = await startedGame()
+    jest.mocked(archiveLanGame).mockImplementationOnce(() => {
+      throw new Error("Storage is full")
+    })
+
+    await expect(session.writes.finish()).rejects.toThrow("Storage is full")
+    jest.advanceTimersByTime(50)
+    expect(session.getState().projection?.status).toBe("active")
+
+    await session.writes.finish()
+    jest.advanceTimersByTime(50)
+    expect(session.getState().projection?.status).toBe("finished")
+  })
+
   it("turns away a socket that names another guest's seat or the host's", async () => {
     const { session, alice } = await startedGame()
     const thief = socket()
@@ -210,6 +294,33 @@ describe("nearby guest", () => {
     host()?.onClose()
 
     await expect(pending).rejects.toThrow("Lost the host")
+  })
+
+  it("keeps a claim from the round's start and asks for it once the round finishes", async () => {
+    setNearbyOwner("guest-account")
+    const nudged = jest.fn()
+    const unsubscribe = onSeatClaim(nudged)
+    const { host } = await guest()
+    const game = { ...createLanGame("game", "host", "Host", setup, 1), round: 1 }
+    const stateWith = (status: "active" | "finished") =>
+      ({
+        type: "state",
+        lobby: { ...lanLobbyOf(game), status },
+        projection: { ...lanProjection(game, "guest"), status },
+      }) as const
+
+    host()?.onMessage(stateWith("active"))
+    expect(pendingSeatClaims("guest-account")).toEqual([
+      expect.objectContaining({ publicId: "game-1", token: "token" }),
+    ])
+    expect(nudged).not.toHaveBeenCalled()
+    host()?.onMessage(stateWith("finished"))
+    host()?.onMessage(stateWith("finished"))
+
+    expect(pendingSeatClaims("guest-account")).toHaveLength(1)
+    expect(nudged).toHaveBeenCalledTimes(1)
+    unsubscribe()
+    setNearbyOwner(undefined)
   })
 
   it("keeps its seat and the last board when the host ends the game", async () => {

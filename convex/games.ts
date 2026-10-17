@@ -36,6 +36,7 @@ import {
   isSameLifeChange,
   MAX_COMMANDER_DAMAGE,
   MAX_PENDING_COMMANDER_CLAIMS,
+  MAX_SNAPSHOT_LIFE,
 } from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
@@ -65,6 +66,7 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
+import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
 import { isCounterOut, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
@@ -194,7 +196,7 @@ function assertLocalId(localId: string) {
 }
 
 function assertSnapshotLife(life: number) {
-  if (!Number.isInteger(life) || life < -1_000_000 || life > 1_000_000)
+  if (!Number.isInteger(life) || Math.abs(life) > MAX_SNAPSHOT_LIFE)
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
@@ -1266,6 +1268,7 @@ export const publishFinishedLocalGame = mutation({
       localSnapshotPlayer.extend({
         me: v.optional(v.boolean()),
         deckVersionId: v.optional(v.id("deckVersions")),
+        seatPassHash: v.optional(v.string()),
       }),
     ),
     result: v.union(
@@ -1299,6 +1302,13 @@ export const publishFinishedLocalGame = mutation({
     if (meSeats.length > 1) throw new Error("Only one seat can be yours")
     if (args.players.some((player) => player.deckVersionId && !player.me))
       throw new Error("Only your seat can record a deck")
+    const seatPassHashes = args.players.flatMap(({ seatPassHash }) => seatPassHash ?? [])
+    if (
+      args.players.some((player) => player.me && player.seatPassHash !== undefined) ||
+      !seatPassHashes.every(isSeatPassHash) ||
+      new Set(seatPassHashes).size !== seatPassHashes.length
+    )
+      throw new Error("Seat passes must be distinct hashes on other players' seats")
     if (args.result.kind === "win") {
       const winners = args.result.winnerLocalIds
       if (winners.length < 1) throw new Error("Choose at least one winner")
@@ -1307,7 +1317,16 @@ export const publishFinishedLocalGame = mutation({
       if (winners.some((localId) => !localIds.has(localId)))
         throw new Error("Winner must belong to this game")
     }
-    const existing = await findGameByPublicId(ctx, args.publicId)
+    let publicId = args.publicId
+    let existing = await findGameByPublicId(ctx, publicId)
+    if (
+      existing &&
+      seatPassHashes.length > 0 &&
+      (existing.mode !== "local" || existing.hostUserId !== user._id)
+    ) {
+      publicId = await nearbyGamePublicId(args.publicId, user._id)
+      existing = await findGameByPublicId(ctx, publicId)
+    }
     if (existing) {
       if (existing.mode !== "local" || existing.hostUserId !== user._id)
         throw new Error("Game identifier collision; retry")
@@ -1338,7 +1357,7 @@ export const publishFinishedLocalGame = mutation({
         })
     }
     const gameId = await ctx.db.insert("games", {
-      publicId: args.publicId,
+      publicId,
       hostUserId: user._id,
       mode: "local",
       status: "active",
@@ -1365,6 +1384,7 @@ export const publishFinishedLocalGame = mutation({
         seat: player.seat,
         ...(player.me ? { userId: user._id, usernameAtJoin: user.username } : {}),
         ...(player.me && player.deckVersionId ? { deckVersionId: player.deckVersionId } : {}),
+        ...(player.seatPassHash ? { seatPassHash: player.seatPassHash } : {}),
         displayName: assertDisplayName(player.displayName),
         color: player.color,
         shape: player.shape,
@@ -1419,7 +1439,75 @@ export const publishFinishedLocalGame = mutation({
         finishedAt: args.finishedAt,
         outcome: "unknown",
       })
-    return { publicId: args.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
+    return { publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
+  },
+})
+
+const seatPassInvalid = () =>
+  new ConvexError({ code: "seat_pass_invalid", message: "That seat pass is not for this game" })
+
+export const claimNearbySeat = mutation({
+  args: { publicId: v.string(), token: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    if (args.token.length < 1 || args.token.length > 128) throw seatPassInvalid()
+    assertPublicId(args.publicId)
+    const hash = await hashSeatPassToken(args.token)
+    let found: { game: Doc<"games">; seat: Doc<"gamePlayers"> } | undefined
+    for await (const candidate of ctx.db
+      .query("gamePlayers")
+      .withIndex("by_seat_pass_hash", (q) => q.eq("seatPassHash", hash))) {
+      const game = await ctx.db.get(candidate.gameId)
+      if (
+        game &&
+        (game.publicId === args.publicId ||
+          (game.hostUserId &&
+            game.publicId === (await nearbyGamePublicId(args.publicId, game.hostUserId))))
+      ) {
+        found = { game, seat: candidate }
+        break
+      }
+    }
+    const summary =
+      found &&
+      (await ctx.db
+        .query("gameSummaries")
+        .withIndex("by_game", (q) => q.eq("gameId", found.game._id))
+        .unique())
+    if (!found || !summary) return { status: "pending" as const }
+    const { game, seat } = found
+    const players = await playersForGame(ctx, game._id)
+    if (seat.userId === user._id) return { status: "claimed" as const }
+    if (seat.userId)
+      throw new ConvexError({ code: "seat_taken", message: "Another account claimed this seat" })
+    if (game.hostUserId === user._id || players.some((player) => player.userId === user._id))
+      throw new ConvexError({
+        code: "already_seated",
+        message: "You already hold a seat in this game",
+      })
+    const identity = { userId: user._id, usernameAtJoin: user.username }
+    await ctx.db.patch(seat._id, identity)
+    await ctx.db.patch(summary._id, {
+      players: summary.players.map((player) =>
+        player.playerId === seat._id
+          ? {
+              ...player,
+              ...summaryIdentitySnapshotFor({ ...seat, ...identity }, user, true),
+              userId: user._id,
+            }
+          : player,
+      ),
+    })
+    await ctx.db.insert("gameHistoryEntries", {
+      userId: user._id,
+      source: "local",
+      gameId: game._id,
+      summaryId: summary._id,
+      ...(summary.matchId ? { matchId: summary.matchId } : {}),
+      finishedAt: summary.finishedAt,
+      outcome: summary.players.find((player) => player.playerId === seat._id)?.outcome ?? "unknown",
+    })
+    return { status: "claimed" as const }
   },
 })
 
@@ -3162,8 +3250,9 @@ export const activeConnectedGames = query({
 
 // why: a published local game with no seat of the owner's has no membership row, only a host.
 async function requireSummaryAccess(ctx: QueryCtx, game: Doc<"games">) {
-  if (game.mode === "local") await requireHost(ctx, game)
-  else await requireMembership(ctx, game._id)
+  const user = await requireUser(ctx)
+  if (game.mode === "local" && game.hostUserId === user._id) return
+  await requireMembership(ctx, game._id)
 }
 
 export const connectedSummary = query({
