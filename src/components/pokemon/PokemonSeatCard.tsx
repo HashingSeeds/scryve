@@ -375,6 +375,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       openSheet({ kind: "place", slot }, from)
   }
 
+  // why: once a bench exists, the empty Active is filled by promoting from it, so no gesture places a new Pokémon there.
+  function placeActive(picksCard: boolean) {
+    placeOn("active", PLACE_ACTIVE_TRIGGER, picksCard || board.bench.length > 0)
+  }
+
   function switchIn(pokemonId: string) {
     table.switchActive(playerId, pokemonId)
     setFocus(null)
@@ -587,22 +592,16 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               controlsLive ? [{ name: "longpress", label: holdCopy.action }] : undefined
             }
             onAccessibilityAction={({ nativeEvent }) => {
-              if (nativeEvent.actionName === "longpress")
-                placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)
+              if (nativeEvent.actionName === "longpress") placeActive(!tapPicksCard)
             }}
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
             // why: React Native Web never fires long press from the keyboard, so keyboard players hold with Shift+Enter.
-            onLongPress={() => placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)}
+            onLongPress={() => placeActive(!tapPicksCard)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && event.shiftKey)
-                placeOn("active", PLACE_ACTIVE_TRIGGER, !tapPicksCard)
+              if (event.key === "Enter" && event.shiftKey) placeActive(!tapPicksCard)
             }}
-            onPress={() =>
-              board.bench.length
-                ? openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
-                : placeOn("active", PLACE_ACTIVE_TRIGGER, tapPicksCard)
-            }
+            onPress={() => placeActive(tapPicksCard)}
             style={({ pressed }) => [
               themed($placeActive),
               {

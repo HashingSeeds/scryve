@@ -155,6 +155,11 @@ describe("PokemonSeatCard", () => {
 
     fireEvent.press(screen.getByTestId("pokemon-bench-add-seat-1"))
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+
+    fireEvent(screen.getByTestId("pokemon-place-active-seat-1"), "longPress")
+    expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
+    expect(board(table).active).toBeUndefined()
   })
 
   it.each([
