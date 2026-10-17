@@ -116,7 +116,7 @@ describe("bulk card dataset sync", () => {
     expect(await storedCardIds(t)).toHaveLength(150)
   })
 
-  it("removes cards and printings the new version no longer has", async () => {
+  it("removes cards and printings the new version dropped, and only the sync writes them", async () => {
     const t = makeConvexTest()
     useDataset("v1")
     await t.action(internal.cardDatasetSync.sync, { game: "ygo" })
@@ -147,6 +147,10 @@ describe("bulk card dataset sync", () => {
     expect(printingIds).toEqual(expect.arrayContaining(["bulk-010-corrected"]))
     expect(printingIds).not.toEqual(expect.arrayContaining(["bulk-005"]))
     expect(printingIds).not.toEqual(expect.arrayContaining(["bulk-010"]))
+    await t.mutation(internal.cardCatalog.cacheMany, {
+      cards: [{ ...datasetCard(5), game: "ygo" }],
+    })
+    expect(await storedCardIds(t)).not.toContain("bulk-005")
     const state = await t.query(internal.cardCatalog.datasetSync, { game: "ygo" })
     expect(state).toMatchObject({ version: "v2" })
     expect(state).not.toHaveProperty("pending")

@@ -113,7 +113,9 @@ export const cacheMany = internalMutation({
   handler: async (ctx, args) => {
     if (args.cards.length > MAX_CATALOG_BATCH)
       throw new ConvexError({ code: "catalog_batch_too_large", message: "Card batch is too large" })
-    for (const card of args.cards) await upsertCard(ctx, card)
+    for (const card of args.cards)
+      if (!isProviderGame(card.game) || !GAME_PROVIDERS[card.game].catalog.bulk)
+        await upsertCard(ctx, card)
     return null
   },
 })
