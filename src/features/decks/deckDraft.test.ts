@@ -199,6 +199,13 @@ it("holds one Flesh and Blood hero, replacing it without the Commander picker", 
   ])
 })
 
+it("keeps the entry limit when a hero joins a full deck", () => {
+  const hero = card("Kano", { scryfallId: undefined, cardId: "Kano", section: "hero" })
+  expect(addCommanderCard(entries(MAX_DECK_CARDS), hero, () => undefined)).toEqual({
+    error: expect.any(String),
+  })
+})
+
 describe("planDeckSave", () => {
   it("queues card edits and lets the note follow whichever route it can", () => {
     expect(

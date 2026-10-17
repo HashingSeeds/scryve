@@ -70,7 +70,7 @@ export const gameContentNotices = {
         },
         {
           type: "paragraph",
-          text: "The Flesh and Blood Comprehensive Rules are downloaded from Legend Story Studios to your device when you start a Flesh and Blood game or open Rules, and shown with their original notices. Scryve does not host or distribute them. The official rules are at https://rules.fabtcg.com/en/.",
+          text: "In the iOS and Android apps, the Flesh and Blood Comprehensive Rules are downloaded from Legend Story Studios to your device when you start a Flesh and Blood game or open Rules, and shown with their original notices. On the web, Rules links to the official page instead. Scryve does not host or distribute them. The official rules are at https://rules.fabtcg.com/en/.",
         },
       ],
     },

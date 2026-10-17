@@ -152,6 +152,7 @@ export interface NewGameScreenProps {
   onAbandonLocal?: () => void
   onSavePlayers?: (players: NewPlayerInput[], account?: LocalGameAccountInput) => void
   onDeckChange?: (versionId: string | undefined) => void
+  startPending?: boolean
   onJoin?: () => void
   onResumeConnected?: (game: ResumableGame) => void
   onNearby?: (setup: LanSetup) => void
@@ -195,6 +196,7 @@ export function NewGameScreen({
   onAbandonLocal,
   onSavePlayers,
   onDeckChange,
+  startPending,
   onJoin,
   onResumeConnected,
   onNearby,
@@ -368,7 +370,7 @@ export function NewGameScreen({
   )
   const valid = connectedMode
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
-    : validLife && nameValidation.valid && !localGame
+    : validLife && nameValidation.valid && !localGame && !startPending
   const busy = connectedMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)

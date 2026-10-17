@@ -147,11 +147,15 @@ export function addCommanderCard<T extends DeckCard>(
   detailsFor: CardDetailsLookup<T>,
 ) {
   const section = cardSection(card)
-  if (section !== "commander")
-    return {
-      cards: [...cards.filter((entry) => cardSection(entry) !== section), { ...card, quantity: 1 }],
-    }
-  const result = addCommander(cards, card, detailsFor, card.commanderColor)
+  const result =
+    section === "commander"
+      ? addCommander(cards, card, detailsFor, card.commanderColor)
+      : {
+          cards: [
+            ...cards.filter((entry) => cardSection(entry) !== section),
+            { ...card, quantity: 1 },
+          ],
+        }
   if ("error" in result) return result
   if (result.cards.length > MAX_DECK_CARDS)
     return { error: translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS }) }

@@ -2,32 +2,35 @@ import { useEffect } from "react"
 import { useQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
-export type DeckStartingValue = { versionId: string; value: number }
+export type DeckStartingValue = { versionId: string; value: number | null }
 
-function StartingValueQuery({
-  versionId,
-  onChange,
-}: {
+type SourceProps = {
   versionId: string
-  onChange: (value: DeckStartingValue | undefined) => void
-}) {
+  onChange: (value: DeckStartingValue) => void
+}
+
+function StartingValueQuery({ versionId, onChange }: SourceProps) {
+  const online = useConvexOnline()
   const value = useQuery(api.decks.startingValue, { versionId: versionId as Id<"deckVersions"> })
   useEffect(() => {
-    onChange(typeof value === "number" ? { versionId, value } : undefined)
-  }, [value, versionId, onChange])
+    if (value !== undefined || !online) onChange({ versionId, value: value ?? null })
+  }, [value, versionId, online, onChange])
   return null
 }
 
-export function DeckStartingValueSource(props: {
-  versionId: string
-  onChange: (value: DeckStartingValue | undefined) => void
-}) {
+function ReportUnknown({ versionId, onChange }: SourceProps) {
+  useEffect(() => onChange({ versionId, value: null }), [versionId, onChange])
+  return null
+}
+
+export function DeckStartingValueSource(props: SourceProps) {
   return (
-    <ConvexQueryBoundary fallback={() => null}>
+    <ConvexQueryBoundary fallback={() => <ReportUnknown {...props} />}>
       <StartingValueQuery {...props} />
     </ConvexQueryBoundary>
   )

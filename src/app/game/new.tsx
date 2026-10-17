@@ -119,14 +119,15 @@ export default function NewLocalGameRoute() {
   }
 
   const connectableGame = started && mode === "local" ? activeGame : null
+  const readingDeck = ownerId && Array.isArray(decks) ? chosenDeck : undefined
   const connectAllowed = Boolean(connected?.access ?? connected?.ready)
 
   return (
     <>
       <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
       {ownerId ? <LocalDeckChoicesSource onChange={setDecks} /> : null}
-      {ownerId && Array.isArray(decks) && chosenDeck ? (
-        <DeckStartingValueSource versionId={chosenDeck} onChange={setDeckStartingValue} />
+      {readingDeck ? (
+        <DeckStartingValueSource versionId={readingDeck} onChange={setDeckStartingValue} />
       ) : null}
       {connectableGame ? (
         <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
@@ -155,10 +156,11 @@ export default function NewLocalGameRoute() {
         onModeChange={setMode}
         onBack={() => goBack({ pathname: "/", params: { destination: "play" } })}
         onDeckChange={setChosenDeck}
+        startPending={readingDeck !== undefined && deckStartingValue?.versionId !== readingDeck}
         onStartLocal={(players, startingLife, setup) => {
           const deckLife =
             deckStartingValue?.versionId === setup.account?.deckVersionId
-              ? deckStartingValue?.value
+              ? (deckStartingValue?.value ?? undefined)
               : undefined
           const seated = players.map((player, seat) =>
             seat === setup.account?.meSeat && deckLife !== undefined

@@ -1,5 +1,9 @@
+import { renderHook } from "@testing-library/react-native"
+
+import { storage } from "@/utils/storage"
+
 import { GAME_RULES } from "./gameRules"
-import { downloadRules, loadStoredRules, prefetchRules } from "./rulesSource"
+import { downloadRules, loadStoredRules, prefetchRules, useComprehensiveRules } from "./rulesSource"
 
 const MAGIC = GAME_RULES.mtg
 
@@ -77,6 +81,22 @@ it("prefetchRules downloads once, shares the download with Rules, and skips a cu
   prefetchRules(MAGIC, store, fetcher)
   expect(fetcher).toHaveBeenCalledTimes(1)
   expect(loadStoredRules(MAGIC, store)?.rules).toBe(rules)
+})
+
+it("shows rules a prefetch stored after the screen first read the cache", () => {
+  const stored = new Map([
+    ["scryve.rules.url.v1", MAGIC.url],
+    ["scryve.rules.text.v1", SOURCE],
+  ])
+  let reads = 0
+  jest
+    .spyOn(storage, "getString")
+    .mockImplementation((key) => (reads++ === 0 ? undefined : stored.get(key)))
+  const fetcher = jest.spyOn(global, "fetch")
+  const { result } = renderHook(() => useComprehensiveRules(MAGIC))
+  expect(result.current.rules?.effectiveDate).toBe("September 25, 2026")
+  expect(fetcher).not.toHaveBeenCalled()
+  jest.restoreAllMocks()
 })
 
 it("loads Magic rules cached under the keys earlier builds wrote", () => {

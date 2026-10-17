@@ -131,7 +131,12 @@ export function useComprehensiveRules(source: TextRules) {
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    if (!canDownload || isCurrent(source, storage)) return
+    if (!canDownload) return
+    if (isCurrent(source, storage)) {
+      const latest = loadStoredRules(source)?.rules
+      if (latest) setRules(latest)
+      return
+    }
     let active = true
     downloadRules(source)
       .then((next) => {
