@@ -3,86 +3,101 @@ import { Platform } from "react-native"
 
 import { storage } from "@/utils/storage"
 
-import { parseComprehensiveRules, type ComprehensiveRules } from "./comprehensiveRules"
-
-export const RULES_URL = "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
-export const RULES_PAGE_URL = "https://magic.wizards.com/en/rules"
-const URL_KEY = "scryve.rules.url.v1"
-const TEXT_KEY = "scryve.rules.text.v1"
+import type { ComprehensiveRules } from "./comprehensiveRules"
+import type { TextRules } from "./gameRules"
 
 type RulesStore = {
   getString(key: string): string | undefined
   set(key: string, value: string): void
 }
 type Fetcher = (url: string) => Promise<Pick<Response, "ok" | "status" | "text">>
+type Loaded = { url: string; rules: ComprehensiveRules }
 
-const loaded = new WeakMap<RulesStore, { url: string; rules: ComprehensiveRules }>()
-const downloads = new WeakMap<RulesStore, Promise<ComprehensiveRules>>()
+const loaded = new WeakMap<RulesStore, Map<string, Loaded>>()
+const downloads = new WeakMap<RulesStore, Map<string, Promise<ComprehensiveRules>>>()
 
-function storedUrl(store: RulesStore) {
+function entries<T>(map: WeakMap<RulesStore, Map<string, T>>, store: RulesStore) {
+  const existing = map.get(store)
+  if (existing) return existing
+  const created = new Map<string, T>()
+  map.set(store, created)
+  return created
+}
+
+function storedUrl(source: TextRules, store: RulesStore) {
   try {
-    return store.getString(URL_KEY)
+    return store.getString(`${source.cacheKey}.url.v1`)
   } catch {
     return undefined
   }
 }
 
-export function loadStoredRules(store: RulesStore = storage) {
-  const url = storedUrl(store)
-  const cached = loaded.get(store)
+export function loadStoredRules(source: TextRules, store: RulesStore = storage) {
+  const url = storedUrl(source, store)
+  const cache = entries(loaded, store)
+  const cached = cache.get(source.cacheKey)
   if (cached?.url === url) return cached
   try {
-    const text = store.getString(TEXT_KEY)
-    const rules = url && text ? parseComprehensiveRules(text) : undefined
+    const text = store.getString(`${source.cacheKey}.text.v1`)
+    const rules = url && text ? source.parse(text) : undefined
     if (!url || !rules) return undefined
-    loaded.set(store, { url, rules })
+    cache.set(source.cacheKey, { url, rules })
     return { url, rules }
   } catch {
     return undefined
   }
 }
 
-async function fetchRules(store: RulesStore, fetcher: Fetcher) {
-  const response = await fetcher(RULES_URL)
+async function fetchRules(source: TextRules, store: RulesStore, fetcher: Fetcher) {
+  const response = await fetcher(source.url)
   if (!response.ok) throw new Error(`Rules download failed with ${response.status}`)
   const text = await response.text()
-  const rules = parseComprehensiveRules(text)
-  if (!rules) throw new Error("Rules download was not the Comprehensive Rules")
+  const rules = source.parse(text)
+  if (!rules) throw new Error("Rules download was not the official rules")
   try {
-    store.set(TEXT_KEY, text)
-    store.set(URL_KEY, RULES_URL)
+    store.set(`${source.cacheKey}.text.v1`, text)
+    store.set(`${source.cacheKey}.url.v1`, source.url)
   } catch (error) {
     console.error("[rules] failed to cache the rules", error)
   }
-  loaded.set(store, { url: RULES_URL, rules })
+  entries(loaded, store).set(source.cacheKey, { url: source.url, rules })
   return rules
 }
 
-export function downloadRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
-  const pending = downloads.get(store)
-  if (pending) return pending
-  const next = fetchRules(store, fetcher).finally(() => downloads.delete(store))
-  downloads.set(store, next)
+export function downloadRules(
+  source: TextRules,
+  store: RulesStore = storage,
+  fetcher: Fetcher = fetch,
+) {
+  const pending = entries(downloads, store)
+  const existing = pending.get(source.cacheKey)
+  if (existing) return existing
+  const next = fetchRules(source, store, fetcher).finally(() => pending.delete(source.cacheKey))
+  pending.set(source.cacheKey, next)
   return next
 }
 
 // why: media.wizards.com sends no CORS header, so web links to the official page instead.
 const canDownload = Platform.OS !== "web"
 
-export function prefetchRules(store: RulesStore = storage, fetcher: Fetcher = fetch) {
-  if (!canDownload || storedUrl(store) === RULES_URL) return
-  downloadRules(store, fetcher).catch(() => {})
+export function prefetchRules(
+  source: TextRules,
+  store: RulesStore = storage,
+  fetcher: Fetcher = fetch,
+) {
+  if (!canDownload || storedUrl(source, store) === source.url) return
+  downloadRules(source, store, fetcher).catch(() => {})
 }
 
-export function useComprehensiveRules() {
-  const [stored] = useState(loadStoredRules)
+export function useComprehensiveRules(source: TextRules) {
+  const [stored] = useState(() => loadStoredRules(source))
   const [rules, setRules] = useState(stored?.rules)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    if (!canDownload || stored?.url === RULES_URL) return
+    if (!canDownload || stored?.url === source.url) return
     let active = true
-    downloadRules()
+    downloadRules(source)
       .then((next) => {
         if (active) setRules(next)
       })
@@ -92,7 +107,7 @@ export function useComprehensiveRules() {
     return () => {
       active = false
     }
-  }, [stored, attempt])
+  }, [source, stored, attempt])
   return {
     rules,
     failed,

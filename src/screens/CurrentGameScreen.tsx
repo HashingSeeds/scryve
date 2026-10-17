@@ -51,6 +51,7 @@ import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -102,9 +103,10 @@ export function CurrentGameScreen({
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const { isFoil } = useRevenueCat()
   const system = runtime.game.system
+  const rules = gameRules(system)
   useEffect(() => {
-    if (system === "mtg") prefetchRules()
-  }, [system])
+    if (rules?.kind === "text") prefetchRules(rules)
+  }, [rules])
   const [menuOpen, setMenuOpen] = useState(false)
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
@@ -319,14 +321,14 @@ export function CurrentGameScreen({
           onSetup?.()
         },
       },
-      system === "mtg"
+      rules
         ? {
             kind: "rules",
             label: translate("board:menu.rules"),
-            disabled: !onRules,
+            disabled: rules.kind === "text" && !onRules,
             onPress: () => {
               closeMenu()
-              onRules?.()
+              openRules(rules, onRules)
             },
           }
         : {
@@ -367,8 +369,8 @@ export function CurrentGameScreen({
       onHistory,
       onRules,
       onSetup,
+      rules,
       showEndConfirmation,
-      system,
     ],
   )
 

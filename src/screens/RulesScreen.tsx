@@ -15,7 +15,8 @@ import {
   type GlossaryEntry,
   type Rule,
 } from "@/features/rules/comprehensiveRules"
-import { RULES_PAGE_URL, useComprehensiveRules } from "@/features/rules/rulesSource"
+import type { TextRules } from "@/features/rules/gameRules"
+import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -29,6 +30,7 @@ type Row =
   | { kind: "all"; key: string; id: string; title: string }
 
 export interface RulesScreenProps {
+  source: TextRules
   ruleId?: string
   glossary?: boolean
   onBack: () => void
@@ -75,6 +77,7 @@ function rowsFor(
 }
 
 export function RulesScreen({
+  source,
   ruleId,
   glossary,
   onBack,
@@ -82,7 +85,7 @@ export function RulesScreen({
   onOpenGlossary,
 }: RulesScreenProps) {
   const { theme, themed } = useAppTheme()
-  const { rules, failed, retry } = useComprehensiveRules()
+  const { rules, failed, retry } = useComprehensiveRules(source)
   const [query, setQuery] = useState("")
   const rows = useMemo(
     () => (rules ? rowsFor(rules, { ruleId, glossary, query }) : []),
@@ -169,7 +172,7 @@ export function RulesScreen({
   }
 
   const officialLink = (
-    <Pressable accessibilityRole="link" onPress={() => Linking.openURL(RULES_PAGE_URL)}>
+    <Pressable accessibilityRole="link" onPress={() => Linking.openURL(source.pageUrl)}>
       <Text size="sm" style={themed($link)} tx="play:rules.official" />
     </Pressable>
   )
