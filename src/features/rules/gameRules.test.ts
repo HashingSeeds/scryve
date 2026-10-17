@@ -1,6 +1,7 @@
 import { Alert, Linking } from "react-native"
 
 import { GAME_RULES, gameRules, openRules } from "./gameRules"
+import { SYSTEMS } from "../../../convex/lib/systems"
 
 it("gameRules gives Magic its text, links Pokémon and Yu-Gi-Oh!, and skips unknown systems", () => {
   expect(gameRules("mtg")?.kind).toBe("text")
@@ -27,4 +28,13 @@ it("openRules tells the player when the official page can't open", async () => {
   openRules(GAME_RULES.ygo)
   await new Promise(process.nextTick)
   expect(alert).toHaveBeenCalledWith(expect.any(String), GAME_RULES.ygo.pageUrl)
+})
+
+it("Magic table item rules name real counters or designations and rule numbers", () => {
+  const { counters, designations } = SYSTEMS.mtg.table
+  const ids: string[] = [...counters, ...designations].map(({ id }) => id)
+  for (const [id, rule] of Object.entries(GAME_RULES.mtg.tableItemRules)) {
+    expect(ids).toContain(id)
+    expect(rule).toMatch(/^\d{3}(\.\d+[a-z]?)?$/)
+  }
 })
