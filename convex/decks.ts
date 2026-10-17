@@ -8,7 +8,7 @@ import { mutation, query } from "./_generated/server"
 import { requireSeatOwner, requireUser } from "./lib/auth"
 import {
   assertDeckGameFormat,
-  assertPlayableDeckGame,
+  assertDeckGame,
   DEFAULT_DECK_GAME,
   magicCatalogCardFields,
   defaultDeckFormat,
@@ -435,7 +435,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     await requireDeckCapacity(ctx, user)
-    const game = assertPlayableDeckGame(args.game ?? DEFAULT_DECK_GAME)
+    const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
     await requireReleasedCapability(ctx, game, "deckImport")
     const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
     const note = args.note ? assertDeckNote(args.note) : ""
@@ -477,7 +477,7 @@ export const importResolved = mutation({
         code: "empty_import",
         message: "Import at least one resolved card",
       })
-    const game = assertPlayableDeckGame(args.game ?? DEFAULT_DECK_GAME)
+    const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
     await requireReleasedCapability(ctx, game, "deckImport")
     assertDeckSize(args.cards, game)
     const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
@@ -542,7 +542,7 @@ export const importGuest = mutation({
     }
     const capacity = await deckCapacity(ctx, user)
     if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
-    const game = assertPlayableDeckGame(args.game ?? DEFAULT_DECK_GAME)
+    const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
     await requireReleasedCapability(ctx, game, "deckImport")
     assertDeckSize(args.cards, game)
     const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
@@ -579,7 +579,7 @@ export const importCatalog = mutation({
     const catalogDeck = await ctx.db.get(args.catalogDeckId)
     if (!catalogDeck)
       throw new ConvexError({ code: "catalog_deck_not_found", message: "Catalog deck not found" })
-    const game = assertPlayableDeckGame(catalogDeck.game)
+    const game = assertDeckGame(catalogDeck.game)
     await requireReleasedCapability(ctx, game, "exampleDecks")
     await requireReleasedCapability(ctx, game, "deckImport")
     const entries = await ctx.db
@@ -644,7 +644,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
     assertNotArchived(deck)
-    const game = args.game === undefined ? undefined : assertPlayableDeckGame(args.game)
+    const game = args.game === undefined ? undefined : assertDeckGame(args.game)
     const currentGame = deck.game ?? DEFAULT_DECK_GAME
     if (game !== undefined && game !== currentGame)
       throw new ConvexError({

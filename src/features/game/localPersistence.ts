@@ -30,6 +30,7 @@ import {
   type PlaySystemId,
 } from "./playSystems"
 import {
+  isSetupReplayable,
   parseRecentSetup,
   withRecentSetup,
   type NewRecentSetup,
@@ -699,17 +700,21 @@ export class LocalGameRepository {
   }
 
   loadRecentSetups(): RecentSetup[] {
-    const stored = parseJson(this.storage.getString(LOCAL_KEYS.recentSetups))
-    return Array.isArray(stored)
-      ? stored.flatMap((entry: unknown) => parseRecentSetup(entry) ?? [])
-      : []
+    return this.storedRecentSetups().filter(isSetupReplayable)
   }
 
   rememberSetup(setup: NewRecentSetup, savedAt = Date.now()): void {
     this.storage.set(
       LOCAL_KEYS.recentSetups,
-      JSON.stringify(withRecentSetup(this.loadRecentSetups(), setup, savedAt)),
+      JSON.stringify(withRecentSetup(this.storedRecentSetups(), setup, savedAt)),
     )
+  }
+
+  private storedRecentSetups(): RecentSetup[] {
+    const stored = parseJson(this.storage.getString(LOCAL_KEYS.recentSetups))
+    return Array.isArray(stored)
+      ? stored.flatMap((entry: unknown) => parseRecentSetup(entry) ?? [])
+      : []
   }
 
   saveActiveGame(game: LocalGame): void {

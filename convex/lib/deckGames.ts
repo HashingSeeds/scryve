@@ -17,14 +17,13 @@ export type DeckGame = {
   id: string
   label: string
   shortLabel: string
-  available: boolean
   defaultFormat: string
   formats: readonly DeckFormat[]
 }
 
 function deckGameFor(id: SystemId): DeckGame {
-  const { label, shortLabel, available, defaultFormat, formats } = SYSTEMS[id]
-  return { id, label, shortLabel, available, defaultFormat: defaultFormat.deck, formats }
+  const { label, shortLabel, defaultFormat, formats } = SYSTEMS[id]
+  return { id, label, shortLabel, defaultFormat: defaultFormat.deck, formats }
 }
 
 export const DECK_GAMES: Record<string, DeckGame> = Object.fromEntries(
@@ -46,18 +45,8 @@ export function assertDeckGame(game: string): DeckGameId {
   return game
 }
 
-export function assertPlayableDeckGame(game: string): DeckGameId {
-  const known = deckGame(assertDeckGame(game))!
-  if (!known.available)
-    throw new ConvexError({
-      code: "game_unavailable",
-      message: `${known.label} decks are not supported yet`,
-    })
-  return known.id
-}
-
 export function assertDeckGameFormat(game: string, format: string) {
-  const known = deckGame(assertPlayableDeckGame(game))!
+  const known = deckGame(assertDeckGame(game))!
   if (!known.formats.some((candidate) => candidate.id === format))
     throw new ConvexError({
       code: "unknown_format",

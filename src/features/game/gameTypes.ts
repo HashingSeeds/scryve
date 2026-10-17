@@ -3,12 +3,12 @@ import { translate } from "@/i18n/translate"
 import {
   counterValueLabel,
   defaultStartingLife,
-  PLAY_SYSTEM_IDS,
   playFormatLabel,
   playSystemFormats,
   playSystemShortLabel,
   type PlaySystemId,
 } from "./playSystems"
+import { isSystemVisible, VISIBLE_SYSTEM_IDS } from "./systemVisibility"
 import type { GameVariant } from "../../../convex/lib/treachery"
 
 export interface GameType {
@@ -18,7 +18,7 @@ export interface GameType {
   variant?: GameVariant
 }
 
-export const FEATURED_GAME_TYPES: readonly GameType[] = [
+const FEATURED: readonly GameType[] = [
   { id: "commander", system: "mtg", format: "commander" },
   { id: "treachery", system: "mtg", format: "commander", variant: "treachery" },
   { id: "mtg-standard", system: "mtg", format: "standard" },
@@ -28,13 +28,17 @@ export const FEATURED_GAME_TYPES: readonly GameType[] = [
   { id: "none" },
 ]
 
+export const FEATURED_GAME_TYPES = FEATURED.filter(
+  (type) => !type.system || isSystemVisible(type.system),
+)
+
 function featuredFormat(system: PlaySystemId, format: string) {
   return FEATURED_GAME_TYPES.find(
     (type) => !type.variant && type.system === system && type.format === format,
   )
 }
 
-export const MORE_GAME_TYPES: readonly GameType[] = PLAY_SYSTEM_IDS.flatMap((system) =>
+export const MORE_GAME_TYPES: readonly GameType[] = VISIBLE_SYSTEM_IDS.flatMap((system) =>
   playSystemFormats(system)
     .filter(({ id }) => !featuredFormat(system, id))
     .map(({ id }) => ({ id: `${system}-${id}`, system, format: id })),

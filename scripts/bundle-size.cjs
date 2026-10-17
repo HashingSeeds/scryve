@@ -3,7 +3,7 @@ const path = require("node:path")
 
 const MARKER = "<!-- bundle-size -->"
 const BUNDLES = { ios: "iOS", android: "Android", web: "Web" }
-const budgetFile = require.resolve("./bundle-size-budget.json")
+const { maxGrowthPercent } = require("./bundle-size-budget.json")
 
 function measure(exportDir) {
   return Object.fromEntries(
@@ -33,12 +33,14 @@ function parseReport(value) {
   return {
     head: parseSizes(value?.head, "head"),
     base: value?.base == null ? null : parseSizes(value.base, "base"),
-    limits: parseSizes(value?.limits, "limits"),
   }
 }
 
-function overBudget({ head, limits }) {
-  return Object.keys(BUNDLES).filter((platform) => head[platform] > limits[platform])
+function overBudget({ head, base }) {
+  if (!base) return []
+  return Object.keys(BUNDLES).filter(
+    (platform) => head[platform] - base[platform] > (base[platform] * maxGrowthPercent) / 100,
+  )
 }
 
 const megabytes = (bytes) => `${(bytes / 1e6).toFixed(2)} MB`
@@ -56,25 +58,20 @@ function renderComment(report) {
   const over = overBudget(report)
   const rows = Object.entries(BUNDLES).map(
     ([platform, name]) =>
-      `| ${name} | ${megabytes(report.head[platform])} | ${change(report.head[platform], report.base?.[platform])} | ${megabytes(report.limits[platform])}${over.includes(platform) ? " **over**" : ""} |`,
+      `| ${name} | ${megabytes(report.head[platform])} | ${change(report.head[platform], report.base?.[platform])}${over.includes(platform) ? " **over**" : ""} |`,
   )
   const notes = [
     report.base
-      ? "Compared with the latest main build."
-      : "No main build is recorded yet, so there is no change to show.",
+      ? `Compared with the latest main build. A bundle that grows more than ${maxGrowthPercent}% fails.`
+      : "No main build is recorded yet, so there is no change to check.",
   ]
   if (over.length > 0)
     notes.push(
-      `Over budget: ${over.map((platform) => BUNDLES[platform]).join(", ")}. Trim the bundle, or raise the limit in \`scripts/bundle-size-budget.json\` if the growth is worth it.`,
+      `Grew more than ${maxGrowthPercent}%: ${over.map((platform) => BUNDLES[platform]).join(", ")}. Trim the bundle, or if the growth is intended, say why in the PR description so a maintainer can merge past this check.`,
     )
-  return [
-    MARKER,
-    "| Bundle | Size | Change | Budget |",
-    "| --- | --- | --- | --- |",
-    ...rows,
-    "",
-    ...notes,
-  ].join("\n")
+  return [MARKER, "| Bundle | Size | Change |", "| --- | --- | --- |", ...rows, "", ...notes].join(
+    "\n",
+  )
 }
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"))
@@ -90,13 +87,12 @@ function main() {
     const report = parseReport({
       head: readJson(headFile),
       base: fs.existsSync(baseFile) ? readJson(baseFile) : null,
-      limits: readJson(budgetFile),
     })
     fs.writeFileSync(reportFile, JSON.stringify(report))
     console.log(renderComment(report))
     const over = overBudget(report)
     if (over.length > 0) {
-      console.error(`Bundle budget exceeded: ${over.join(", ")}`)
+      console.error(`Bundle grew more than ${maxGrowthPercent}%: ${over.join(", ")}`)
       process.exitCode = 1
     }
     return
