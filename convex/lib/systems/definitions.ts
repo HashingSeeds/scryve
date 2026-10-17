@@ -427,7 +427,7 @@ export const SYSTEMS = {
         basis: "fair_use",
         imageUse: "functional_card_context",
         requiredNotices: [
-          "Disney Lorcana is a trademark of Disney, published by Ravensburger. Scryve is not affiliated with either.",
+          "Disney Lorcana is a trademark of Disney and is published by Ravensburger. Card names, card artwork, characters, and related marks remain property of Disney, Ravensburger, and their respective owners. Scryve is not published, endorsed, or specifically approved by Disney or Ravensburger.",
         ],
       },
     },

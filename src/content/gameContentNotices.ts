@@ -66,9 +66,10 @@ export const gameContentNotices = {
     {
       heading: "Disney Lorcana",
       blocks: [
+        ...requiredNotices("lorcana"),
         {
           type: "paragraph",
-          text: "Disney Lorcana is a trademark of Disney and is published by Ravensburger. Card names, card artwork, characters, and related marks remain property of Disney, Ravensburger, and their respective owners. Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through LorcanaJSON, and card images load from Ravensburger. Scryve is not affiliated with or endorsed by Disney, Ravensburger, or LorcanaJSON.",
+          text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data and official starter deck lists are provided through LorcanaJSON, and card images load from Ravensburger. Scryve is not affiliated with or endorsed by LorcanaJSON.",
         },
       ],
     },
