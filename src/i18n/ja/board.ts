@@ -335,6 +335,7 @@ export default {
     addCounter: "{{label}}を追加",
     giveUp: "{{label}}を手放す",
     take: "{{label}}を得る",
+    rule: "ルール{{rule}}",
   },
   seat: {
     identity: "席{{seat}}、{{name}}",

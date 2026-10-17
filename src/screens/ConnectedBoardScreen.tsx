@@ -96,7 +96,7 @@ type ConnectedBoardScreenProps = {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (ruleId?: string) => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -251,7 +251,7 @@ type ConnectedBoardReadyProps = {
   initialInviteOpen?: boolean
   onBack?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (ruleId?: string) => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -329,7 +329,7 @@ interface ConnectedBoardRuntimeProps {
   onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
-  onRules?: () => void
+  onRules?: (ruleId?: string) => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
@@ -915,6 +915,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             seats={players}
             system={system}
             lifeStep={game.lifeStep}
+            onOpenRule={onRules}
             layoutVariant={layoutVariant}
             disabled={!active || overlayOpen}
             isPlayerDisabled={(player) => !controlled.has(player.id)}

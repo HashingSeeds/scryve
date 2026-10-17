@@ -336,6 +336,7 @@ export default {
     addCounter: "{{label}} 추가",
     giveUp: "{{label}} 포기",
     take: "{{label}} 가져오기",
+    rule: "규칙 {{rule}}",
   },
   seat: {
     identity: "{{seat}}번 자리, {{name}}",
