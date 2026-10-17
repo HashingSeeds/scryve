@@ -1,13 +1,14 @@
 import type { FunctionArgs } from "convex/server"
 import { convexTest } from "convex-test"
 
-import { api } from "./_generated/api"
+import { api, internal } from "./_generated/api"
 import { hashSeatPassToken } from "./lib/seatPass"
 import schema from "./schema"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
+  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
   "./entitlements.ts": async () => jest.requireActual("./entitlements"),
   "./games.ts": async () => jest.requireActual("./games"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
@@ -28,9 +29,9 @@ async function synced(t: ReturnType<typeof convexTest>, subject: string) {
   return actor
 }
 
-async function nearbyGame(players?: Players): Promise<PublishArgs> {
+async function nearbyGame(players?: Players, publicId = PUBLIC_ID): Promise<PublishArgs> {
   return {
-    publicId: PUBLIC_ID,
+    publicId,
     system: "mtg",
     format: "commander",
     ruleset: "commander",
@@ -81,7 +82,7 @@ describe("claimNearbySeat", () => {
     await expect(guest.mutation(api.games.claimNearbySeat, claim)).resolves.toEqual({
       status: "pending",
     })
-    await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    const { publicId } = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
     await expect(guest.mutation(api.games.claimNearbySeat, claim)).resolves.toEqual({
       status: "claimed",
     })
@@ -92,7 +93,7 @@ describe("claimNearbySeat", () => {
     const history = await historyOf(guest)
     expect(history.page).toHaveLength(1)
     expect(history.page[0]).toMatchObject({
-      publicId: PUBLIC_ID,
+      publicId,
       source: "local",
       outcome: "loss",
       finishedAt: FINISHED_AT,
@@ -101,29 +102,27 @@ describe("claimNearbySeat", () => {
     const summary = await t.run((ctx) =>
       ctx.db
         .query("gameSummaries")
-        .withIndex("by_public_id", (q) => q.eq("publicId", PUBLIC_ID))
+        .withIndex("by_public_id", (q) => q.eq("publicId", publicId))
         .unique(),
     )
     expect(summary?.players.filter((player) => player.userId).map((player) => player.seat)).toEqual(
       [1, 2],
     )
-    const opened = await guest.query(api.games.connectedSummary, { publicId: PUBLIC_ID })
-    expect(opened?.publicId).toBe(PUBLIC_ID)
-    await expect(
-      host.query(api.games.connectedSummary, { publicId: PUBLIC_ID }),
-    ).resolves.toBeTruthy()
+    const opened = await guest.query(api.games.connectedSummary, { publicId })
+    expect(opened?.publicId).toBe(publicId)
+    await expect(host.query(api.games.connectedSummary, { publicId })).resolves.toBeTruthy()
   })
 
-  it("refuses a wrong pass, a seat another account holds, and a second seat for one account", async () => {
+  it("finds no seat for a wrong pass, and refuses a held seat or a second seat for one account", async () => {
     const t = convexTest(schema, modules)
     const host = await synced(t, "host")
     const guest = await synced(t, "guest")
     const intruder = await synced(t, "intruder")
-    await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    const { publicId } = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
 
     await expect(
       guest.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: "token_guessed" }),
-    ).rejects.toThrow("not for this game")
+    ).resolves.toEqual({ status: "pending" })
     await guest.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: GUEST_TOKEN })
     await expect(
       intruder.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: GUEST_TOKEN }),
@@ -135,16 +134,16 @@ describe("claimNearbySeat", () => {
       host.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: OTHER_TOKEN }),
     ).rejects.toThrow("already hold a seat")
     expect((await historyOf(intruder)).page).toHaveLength(0)
-    await expect(
-      intruder.query(api.games.connectedSummary, { publicId: PUBLIC_ID }),
-    ).rejects.toThrow("Game membership required")
+    await expect(intruder.query(api.games.connectedSummary, { publicId })).rejects.toThrow(
+      "Game membership required",
+    )
   })
 
   it("refuses a seat to the host of a game it holds no seat in", async () => {
     const t = convexTest(schema, modules)
     const host = await synced(t, "host")
     const [mine, guest, other] = (await nearbyGame()).players
-    await host.mutation(
+    const { publicId } = await host.mutation(
       api.games.publishFinishedLocalGame,
       await nearbyGame([{ ...mine, me: undefined }, guest, other]),
     )
@@ -153,9 +152,9 @@ describe("claimNearbySeat", () => {
       host.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: GUEST_TOKEN }),
     ).rejects.toThrow("already hold a seat")
     expect((await historyOf(host)).page).toHaveLength(1)
-    await expect(
-      host.query(api.games.connectedSummary, { publicId: PUBLIC_ID }),
-    ).resolves.toMatchObject({ publicId: PUBLIC_ID })
+    await expect(host.query(api.games.connectedSummary, { publicId })).resolves.toMatchObject({
+      publicId,
+    })
   })
 
   it("rejects a pass hash on the host's own seat, a malformed hash, and a repeated hash", async () => {
@@ -173,5 +172,85 @@ describe("claimNearbySeat", () => {
       await expect(
         host.mutation(api.games.publishFinishedLocalGame, await nearbyGame(players)),
       ).rejects.toThrow("Seat passes must be distinct hashes")
+  })
+
+  it("keeps the host's upload and every claim working when a guest publishes under the round first", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host")
+    const hostile = await synced(t, "hostile")
+    const other = await synced(t, "other")
+    const [mine, guestSeat, otherSeat] = (await nearbyGame()).players
+    const plain = [
+      mine,
+      { ...guestSeat, seatPassHash: undefined },
+      { ...otherSeat, seatPassHash: undefined },
+    ]
+    await hostile.mutation(api.games.publishFinishedLocalGame, await nearbyGame(plain))
+    await hostile.mutation(
+      api.games.publishFinishedLocalGame,
+      await nearbyGame([mine, guestSeat, { ...otherSeat, seatPassHash: undefined }]),
+    )
+
+    const { publicId } = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    await expect(
+      other.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: OTHER_TOKEN }),
+    ).resolves.toEqual({ status: "claimed" })
+    expect((await historyOf(other)).page.map((entry) => entry.publicId)).toEqual([publicId])
+  })
+
+  it("files each round a pass was reused in under that round", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host")
+    const guest = await synced(t, "guest")
+    const secondRound = "lan_0123456789abcdef0123456789abcdef-2"
+    const first = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    const second = await host.mutation(
+      api.games.publishFinishedLocalGame,
+      await nearbyGame(undefined, secondRound),
+    )
+
+    for (const round of [secondRound, PUBLIC_ID])
+      await expect(
+        guest.mutation(api.games.claimNearbySeat, { publicId: round, token: GUEST_TOKEN }),
+      ).resolves.toEqual({ status: "claimed" })
+    expect((await historyOf(guest)).page.map((entry) => entry.publicId).sort()).toEqual(
+      [first.publicId, second.publicId].sort(),
+    )
+  })
+
+  it("lets no one claim a deleted guest's seat with its old pass", async () => {
+    // why: deletion phases are driven by hand here, so the scheduler must not run them after the test.
+    jest.useFakeTimers()
+    const previousClerkSecret = process.env.CLERK_SECRET_KEY
+    process.env.CLERK_SECRET_KEY = "sk_test_nearby_claim"
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host")
+    const guest = await synced(t, "guest")
+    const intruder = await synced(t, "intruder")
+    await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    const claim = { publicId: PUBLIC_ID, token: GUEST_TOKEN }
+    await guest.mutation(api.games.claimNearbySeat, claim)
+    const request = await guest.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+    await t.mutation(internal.accountDeletion.processMemberships, { requestId: request.requestId })
+
+    await expect(intruder.mutation(api.games.claimNearbySeat, claim)).resolves.toEqual({
+      status: "pending",
+    })
+    expect((await historyOf(intruder)).page).toHaveLength(0)
+    const seat = await t.run((ctx) =>
+      ctx.db
+        .query("gamePlayers")
+        .filter((q) => q.eq(q.field("seat"), 2))
+        .unique(),
+    )
+    expect(seat).not.toHaveProperty("userId")
+    expect(seat).not.toHaveProperty("seatPassHash")
+    expect(seat?.deletedAt).toEqual(expect.any(Number))
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY
+    else process.env.CLERK_SECRET_KEY = previousClerkSecret
   })
 })

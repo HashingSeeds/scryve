@@ -3,6 +3,7 @@ import { NO_PLAY_SYSTEM, supportsCommanderDamage } from "@/features/game/playSys
 import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/types"
 
 import type { Id } from "../../../convex/_generated/dataModel"
+import { MAX_SNAPSHOT_LIFE } from "../../../convex/lib/gameRules"
 import { isValidTableSnapshot, type TableState } from "../../../convex/lib/table"
 
 // why: seats rebase to 1..n like `buildLocalGameSnapshot`, and local ids double as winner references so the server needs no id translation.
@@ -30,7 +31,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
       displayName: player.name,
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
-      currentLife: player.life,
+      currentLife: Math.max(-MAX_SNAPSHOT_LIFE, Math.min(MAX_SNAPSHOT_LIFE, player.life)),
       ...(player.id === me ? { me: true } : {}),
       ...(player.id === me && deckVersionId
         ? { deckVersionId: deckVersionId as Id<"deckVersions"> }

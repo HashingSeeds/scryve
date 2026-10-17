@@ -457,18 +457,26 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
   return null
 }
 
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
+
+// why: the host uploads every guest's name, and Convex refuses a blank name or broken UTF-16 for the whole game.
+const guestName = (raw: string) =>
+  raw
+    .replace(LONE_SURROGATE, "")
+    .trim()
+    .slice(0, MAX_PLAYER_NAME_LENGTH)
+    .replace(LONE_SURROGATE, "")
+    .trim()
+
 export function parseGuestMessage(line: string): LanGuestMessage | null {
   const value: unknown = JSON.parse(line)
   if (!isRecord(value)) return null
-  if (
-    value.type === "join" &&
-    typeof value.name === "string" &&
-    (value.pass === undefined || isPass(value.pass))
-  )
+  const name = typeof value.name === "string" ? guestName(value.name) : ""
+  if (value.type === "join" && name && (value.pass === undefined || isPass(value.pass)))
     return {
       type: "join",
       protocol: typeof value.protocol === "number" ? value.protocol : 1,
-      name: value.name.slice(0, MAX_PLAYER_NAME_LENGTH),
+      name,
       ...(value.pass ? { pass: { key: value.pass.key, token: value.pass.token } } : {}),
     }
   if (value.type === "op") {

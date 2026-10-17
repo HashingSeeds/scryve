@@ -211,4 +211,25 @@ describe("buildFinishedLocalGameSnapshot", () => {
     expect(snapshot.players[1]).toMatchObject({ me: true, deckVersionId: "version-1" })
     expect(snapshot.players[2].deckVersionId).toBeUndefined()
   })
+
+  it("caps life at the server's limit, so one runaway seat can't sink the upload", () => {
+    const game = commanderGame()
+    const snapshot = buildFinishedLocalGameSnapshot({
+      schemaVersion: 1,
+      id: game.id,
+      status: "finished",
+      startingLife: 40,
+      players: [
+        { ...game.players[0], life: 1_999_998 },
+        { ...game.players[1], life: -1_999_998 },
+        game.players[2],
+      ],
+      eventCount: 2,
+      createdAt: 100,
+      finishedAt: 200,
+    })
+    expect(snapshot.players.map(({ currentLife }) => currentLife)).toEqual([
+      1_000_000, -1_000_000, 40,
+    ])
+  })
 })

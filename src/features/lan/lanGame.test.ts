@@ -261,4 +261,13 @@ describe("nearby messages", () => {
       type: "outdated",
     })
   })
+
+  it("refuses a join with no usable name, and never cuts a name inside a character", () => {
+    const join = (name: string) => parseGuestMessage(JSON.stringify({ type: "join", name }))
+
+    expect(join("   ")).toBeNull()
+    expect(join("\ud800")).toBeNull()
+    expect(join("  Ada\udc00 ")).toMatchObject({ name: "Ada" })
+    expect(join(`${"a".repeat(23)}😀`)).toMatchObject({ name: "a".repeat(23) })
+  })
 })

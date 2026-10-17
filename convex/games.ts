@@ -36,6 +36,7 @@ import {
   isSameLifeChange,
   MAX_COMMANDER_DAMAGE,
   MAX_PENDING_COMMANDER_CLAIMS,
+  MAX_SNAPSHOT_LIFE,
 } from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
@@ -65,7 +66,7 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
-import { hashSeatPassToken, isSeatPassHash } from "./lib/seatPass"
+import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
 import { isCounterOut, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
@@ -195,7 +196,7 @@ function assertLocalId(localId: string) {
 }
 
 function assertSnapshotLife(life: number) {
-  if (!Number.isInteger(life) || life < -1_000_000 || life > 1_000_000)
+  if (!Number.isInteger(life) || Math.abs(life) > MAX_SNAPSHOT_LIFE)
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
@@ -1316,7 +1317,9 @@ export const publishFinishedLocalGame = mutation({
       if (winners.some((localId) => !localIds.has(localId)))
         throw new Error("Winner must belong to this game")
     }
-    const existing = await findGameByPublicId(ctx, args.publicId)
+    const publicId =
+      seatPassHashes.length > 0 ? await nearbyGamePublicId(args.publicId, user._id) : args.publicId
+    const existing = await findGameByPublicId(ctx, publicId)
     if (existing) {
       if (existing.mode !== "local" || existing.hostUserId !== user._id)
         throw new Error("Game identifier collision; retry")
@@ -1347,7 +1350,7 @@ export const publishFinishedLocalGame = mutation({
         })
     }
     const gameId = await ctx.db.insert("games", {
-      publicId: args.publicId,
+      publicId,
       hostUserId: user._id,
       mode: "local",
       status: "active",
@@ -1429,7 +1432,7 @@ export const publishFinishedLocalGame = mutation({
         finishedAt: args.finishedAt,
         outcome: "unknown",
       })
-    return { publicId: args.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
+    return { publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
   },
 })
 
@@ -1441,18 +1444,30 @@ export const claimNearbySeat = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     if (args.token.length < 1 || args.token.length > 128) throw seatPassInvalid()
-    const game = await findGameByPublicId(ctx, args.publicId)
+    assertPublicId(args.publicId)
+    const hash = await hashSeatPassToken(args.token)
+    let found: { game: Doc<"games">; seat: Doc<"gamePlayers"> } | undefined
+    for await (const candidate of ctx.db
+      .query("gamePlayers")
+      .withIndex("by_seat_pass_hash", (q) => q.eq("seatPassHash", hash))) {
+      const game = await ctx.db.get(candidate.gameId)
+      if (
+        game?.hostUserId &&
+        game.publicId === (await nearbyGamePublicId(args.publicId, game.hostUserId))
+      ) {
+        found = { game, seat: candidate }
+        break
+      }
+    }
     const summary =
-      game &&
+      found &&
       (await ctx.db
         .query("gameSummaries")
-        .withIndex("by_game", (q) => q.eq("gameId", game._id))
+        .withIndex("by_game", (q) => q.eq("gameId", found.game._id))
         .unique())
-    if (!game || !summary) return { status: "pending" as const }
-    const hash = await hashSeatPassToken(args.token)
+    if (!found || !summary) return { status: "pending" as const }
+    const { game, seat } = found
     const players = await playersForGame(ctx, game._id)
-    const seat = players.find((player) => player.seatPassHash === hash)
-    if (!seat) throw seatPassInvalid()
     if (seat.userId === user._id) return { status: "claimed" as const }
     if (seat.userId)
       throw new ConvexError({ code: "seat_taken", message: "Another account claimed this seat" })
