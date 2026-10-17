@@ -1252,8 +1252,8 @@ figure {
 }
 
 /* Scroll sets --turn: on its side in the hero, standing up during the intro. It starts on its
-   side so a phone, whose first layout can miss the small-screen styles, never shows it standing
-   and then turns it. */
+   side because a small screen's first layout can miss its media styles, and the phone would
+   show standing and then turn. */
 .phone.main {
   --turn: -90deg;
   z-index: 1;
