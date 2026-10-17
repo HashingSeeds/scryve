@@ -1,6 +1,10 @@
 import type { GameVariant } from "../treachery"
 
-export type DeckSection = { readonly id: string; readonly label: string }
+export type DeckSection = {
+  readonly id: string
+  readonly label: string
+  readonly identity?: true
+}
 
 /** why: survive games knock a seat out at 0 or below; race games end when any seat reaches `to`, counting toward it from the default value. */
 export type CounterGoal =
@@ -22,7 +26,6 @@ export type CounterDefinition = {
   readonly maxStartingValue: number
   /** why: some games move the counter by typed amounts in the thousands; their seats open a calculator instead of the slider editor, and the running change sits above the total, where a five-digit label fits. */
   readonly calculator?: true
-  /** why: a hit past zero records only the life that was left. */
   readonly flooredAtZero?: true
 }
 
@@ -86,14 +89,12 @@ export type TableDefinition = {
   readonly pokemon?: PokemonBoardDefinition
 }
 
-/** why: some games let the roll's winner pick first or second, and some settle a two-player table with a coin flip instead of a roll. */
 export type FirstPlayerDefinition = {
   readonly die: "d6" | "d20"
   readonly winnerChooses: boolean
   readonly twoPlayerCoinFlip: boolean
 }
 
-/** why: `endOfRoundTurns` are the extra turns after time is called, `overtimeMinutes` caps them, and `slowPlayTurns` are what a judge grants for a slow play warning. */
 export type RoundClockDefinition = {
   readonly minutes: number
   readonly bestOfOneMinutes?: number
@@ -126,7 +127,13 @@ function available<const Provider extends string>(provider: Provider, note?: str
   } as const
 }
 
-const MTG_COMMAND_ZONE_SECTIONS = [
+const MTG_COMMANDER_SECTIONS = [
+  { id: "commander", label: "Commander", identity: true },
+  { id: "main", label: "Main deck" },
+  { id: "sideboard", label: "Sideboard" },
+] as const
+
+const MTG_BRAWL_SECTIONS = [
   { id: "commander", label: "Commander" },
   { id: "main", label: "Main deck" },
   { id: "sideboard", label: "Sideboard" },
@@ -173,7 +180,7 @@ export const SYSTEMS = {
         id: "commander",
         label: "Commander",
         blurb: "100 cards, singleton",
-        sections: MTG_COMMAND_ZONE_SECTIONS,
+        sections: MTG_COMMANDER_SECTIONS,
         startingValue: 40,
         hasCommanderDamage: true,
         singleton: true,
@@ -213,7 +220,7 @@ export const SYSTEMS = {
         id: "brawl",
         label: "Brawl",
         blurb: "60 cards, singleton",
-        sections: MTG_COMMAND_ZONE_SECTIONS,
+        sections: MTG_BRAWL_SECTIONS,
         startingValue: 25,
         multiplayerStartingValue: 30,
         hasCommanderDamage: false,
@@ -246,7 +253,6 @@ export const SYSTEMS = {
     },
     variants: ["treachery"],
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
-    // why: MTR 2.5 adds five turns after time, and a Slow Play warning adds two more (IPG 3.3).
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,
     integration: {
@@ -298,9 +304,7 @@ export const SYSTEMS = {
     ],
     table: { counters: [], designations: [] },
     variants: [],
-    // why: Yu-Gi-Oh! rules use a six-sided die, and the roll's winner picks whether to go first or second.
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
-    // why: Yu-Gi-Oh! shows only that time is up.
     roundClock: { minutes: 50, endOfRoundTurns: 0 },
     deckAnalysis: false,
     integration: {
@@ -350,9 +354,7 @@ export const SYSTEMS = {
     ],
     table: { counters: [], designations: [], pokemon: { benchSize: 5, damageStep: 10 } },
     variants: [],
-    // why: official Pokémon rules only cover two players; larger tables roll off like other games.
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: true },
-    // why: the Play! Pokémon handbook adds three turns after time, capped at 15 minutes for every table.
     roundClock: { minutes: 50, bestOfOneMinutes: 30, endOfRoundTurns: 3, overtimeMinutes: 15 },
     deckAnalysis: false,
     integration: {

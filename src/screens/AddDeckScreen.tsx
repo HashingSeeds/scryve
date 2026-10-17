@@ -31,8 +31,10 @@ import { cardCountLabel, deckNameWarning } from "@/features/decks/deckCopy"
 import {
   addCommanderCard,
   adjustCardQuantity,
+  canChooseCommander,
   cardLimitError,
   incrementCard,
+  isCommanderPick,
 } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckLimitDialog } from "@/features/decks/DeckLimit"
@@ -57,12 +59,20 @@ import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import {
   DECK_GAME_LIST,
+  DEFAULT_DECK_GAME,
   deckFormatLabel,
   deckFormats,
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
+import { isSystemId, type SystemId } from "../../convex/lib/systems"
+
+const DECK_LIST_HELPERS = {
+  mtg: "decks:addDeck.listHelperMtg",
+  ygo: "decks:addDeck.listHelperYgo",
+  pokemon: "decks:addDeck.listHelperPokemon",
+} as const satisfies Record<SystemId, TxKeyPath>
 
 type CreationMode = "precon" | "paste" | "blank"
 
@@ -307,7 +317,8 @@ function preconDetail(deck: PreconstructedDeck) {
 
 function catalogSourceLabel(deck: CatalogDeck) {
   return deck.kind === "official"
-    ? deck.game === "ygo"
+    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh! and Pokémon, named by publisher.
+      deck.game === "ygo"
       ? "Konami"
       : "Pokémon"
     : deck.source === "mtgo-examples"
@@ -618,6 +629,7 @@ export function AddDeckScreen({
             source: "all",
             ...(cursor ? { cursor } : {}),
           }),
+          // eslint-disable-next-line no-restricted-syntax -- preconstructed decks come from MTGJSON, which covers only Magic.
           game === "mtg" && !cursor
             ? searchPreconstructed({ query, ...(format ? { format } : {}) })
             : Promise.resolve(null),
@@ -997,7 +1009,7 @@ export function AddDeckScreen({
     const draft = latestPastedDraft.current
     if (!draft) return translate("decks:addDeck.reviewFirst")
     const cards = importableCards(draft)
-    if (game === "mtg" && format === "commander" && cardSection(card) === "commander") {
+    if (isCommanderPick({ game, format }, card)) {
       const cached = loadCardDetails()
       const result = addCommanderCard(cards, card, (entry) => cached[cardDetailsKey(entry, game)])
       if ("error" in result) return result.error
@@ -1097,9 +1109,7 @@ export function AddDeckScreen({
             onIncrement:
               busy ||
               focusedImportCard.quantity >= 999 ||
-              (game === "mtg" &&
-                format === "commander" &&
-                cardSection(focusedImportCard) === "commander")
+              isCommanderPick({ game, format }, focusedImportCard)
                 ? undefined
                 : () => changeImportQuantity(focusedImportCard, 1),
             onDecrement: busy ? undefined : () => changeImportQuantity(focusedImportCard, -1),
@@ -1204,13 +1214,7 @@ export function AddDeckScreen({
   )
 
   if (reviewingPasted && pastedDraft) {
-    const singleCommander =
-      game === "mtg" &&
-      format === "commander" &&
-      pastedCards.reduce(
-        (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
-        0,
-      ) <= 1
+    const singleCommander = canChooseCommander({ game, format }, pastedCards)
     const cachedRules = singleCommander && pastedCommanderSelected ? loadCardDetails() : {}
     const commanderWarnings =
       singleCommander && pastedCommanderSelected
@@ -2022,13 +2026,7 @@ export function AddDeckScreen({
               <TextField
                 labelTx="decks:addDeck.deckList"
                 accessibilityLabel={translate("decks:addDeck.deckList")}
-                helperTx={
-                  game === "ygo"
-                    ? "decks:addDeck.listHelperYgo"
-                    : game === "pokemon"
-                      ? "decks:addDeck.listHelperPokemon"
-                      : "decks:addDeck.listHelperMtg"
-                }
+                helperTx={DECK_LIST_HELPERS[isSystemId(game) ? game : DEFAULT_DECK_GAME]}
                 value={deckList}
                 multiline
                 numberOfLines={12}

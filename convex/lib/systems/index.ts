@@ -2,6 +2,7 @@ import {
   SYSTEM_IDS,
   SYSTEMS,
   type CounterDefinition,
+  type DeckSection,
   type FormatDefinition,
   type SystemDefinition,
   type SystemId,
@@ -18,10 +19,7 @@ export function systemDefinition(system: unknown): SystemDefinition | undefined 
   return isSystemId(system) ? SYSTEMS[system] : undefined
 }
 
-export function formatDefinition(
-  system: unknown,
-  format: string | undefined,
-): FormatDefinition | undefined {
+export function formatDefinition(system: unknown, format: unknown): FormatDefinition | undefined {
   return systemDefinition(system)?.formats.find((candidate) => candidate.id === format)
 }
 
@@ -44,6 +42,10 @@ export function tableRules(system: unknown, format: string | undefined): TableDe
   }
   tableRulesCache.set(key, rules)
   return rules
+}
+
+export function identitySection(system: unknown, format: unknown): DeckSection | undefined {
+  return formatDefinition(system, format)?.sections.find((section) => section.identity)
 }
 
 export function hasCommandZone(system: unknown, format: string | undefined): boolean {
