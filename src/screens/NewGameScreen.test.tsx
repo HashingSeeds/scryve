@@ -499,6 +499,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
 
+    fireEvent.press(view.getByTestId("game-type-all-formats"))
     fireEvent.press(view.getByTestId("game-type-pokemon-standard"))
     expect(view.getByText("2 players · 6 Prize cards")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
@@ -668,7 +669,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
     expect(view.queryByTestId("game-type-mtg-brawl")).toBeNull()
-    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent("All formats17 more")
+    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent(/^All formats\d+ more$/)
     fireEvent.press(view.getByTestId("game-type-all-formats"))
     expect(view.queryByTestId("game-type-all-formats")).toBeNull()
     fireEvent.press(view.getByTestId("game-type-mtg-brawl"))
@@ -1388,18 +1389,108 @@ describe("NewGameScreen", () => {
     expect(screen.queryByTestId("me-deck-option-none")).toBeNull()
   })
 
-  it("offers Treachery only for connected games", () => {
-    setup()
-    expect(screen.getByTestId("game-type-treachery")).toBeDisabled()
-    expect(screen.getByTestId("game-type-treachery")).toHaveTextContent("TreacheryConnected only")
+  it("keeps Treachery and Join with code on the Connected tab", () => {
+    setup({ onJoin: jest.fn() })
+    fireEvent.press(screen.getByTestId("game-type-all-formats"))
+    expect(screen.queryByTestId("game-type-treachery")).toBeNull()
+    expect(screen.queryByTestId("join-with-code-button")).toBeNull()
+
+    setup({ mode: "connected", connected: readyHost, onJoin: jest.fn() })
+    expect(screen.getByTestId("game-type-treachery")).toBeEnabled()
+    expect(screen.getByTestId("join-with-code-button")).toBeTruthy()
   })
 
-  it("shows a saved format outside the featured list as selected under All formats", () => {
+  it("suggests the format picked at onboarding first and selects it", () => {
     setup({
       defaults: { ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg", defaultFormat: "modern" },
     })
-    expect(screen.queryByTestId("game-type-all-formats")).toBeNull()
     expect(screen.getByTestId("game-type-mtg-modern").props.accessibilityState.selected).toBe(true)
+    expect(screen.getByTestId("game-type-all-formats")).toBeTruthy()
+  })
+
+  it("opens on the recent setup, and choosing it again starts over from it", () => {
+    const host = jest.fn()
+    const lobby = {
+      playerCount: 5,
+      startingLife: 40,
+      ruleset: "commander",
+      system: "mtg" as const,
+      format: "commander",
+      variant: "treachery" as const,
+      deckRequired: true,
+      layout: "auto" as const,
+      lifeStep: 1,
+    }
+    setup({
+      mode: "connected",
+      connected: { ...readyHost, host },
+      recentSetups: [{ savedAt: 1, mode: "connected", lobby }],
+    })
+    const recent = () => screen.getByTestId("recent-setup")
+    expect(recent()).toHaveTextContent("TreacheryMagic · 5 seats✓")
+    expect(recent().props.accessibilityState.selected).toBe(true)
+    expect(screen.queryByTestId("game-type-treachery")).toBeNull()
+
+    fireEvent.press(screen.getByTestId("game-type-mtg-standard"))
+    expect(recent().props.accessibilityState.selected).toBe(false)
+    fireEvent.press(recent())
+    expect(recent().props.accessibilityState.selected).toBe(true)
+    fireEvent.press(screen.getByTestId("host-connected-button"))
+    expect(host).toHaveBeenCalledWith(lobby)
+  })
+
+  it("keeps an ended game's format selected in the list, not a different recent setup", () => {
+    const game = runningLocalGame()
+    const props = {
+      defaults: DEFAULT_LOCAL_SETTINGS,
+      mode: "local" as const,
+      onModeChange: jest.fn(),
+      onBack: jest.fn(),
+      onStartLocal: jest.fn(),
+      initialGame: game,
+      recentSetups: [
+        {
+          savedAt: 1,
+          mode: "local" as const,
+          game: {
+            players: [
+              { name: "Linus", color: "#B85636" },
+              { name: "Ken", color: "#41476E" },
+            ],
+            startingLife: 20,
+            system: "mtg" as const,
+            format: "commander",
+          },
+        },
+      ],
+    }
+    const view = render(themed(<NewGameScreen {...props} localGame={game} />))
+    view.rerender(themed(<NewGameScreen {...props} />))
+
+    expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(false)
+    expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
+    expect(view.queryByTestId("game-type-mtg-modern")).toBeNull()
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(props.onStartLocal).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "Ada" }), expect.objectContaining({ name: "Grace" })],
+      20,
+      expect.objectContaining({ format: "commander" }),
+    )
+  })
+
+  it("leaves the recent setup off a running game's setup", () => {
+    setup({
+      initialGame: runningLocalGame(),
+      localGame: runningLocalGame(),
+      recentSetups: [
+        {
+          savedAt: 1,
+          mode: "local",
+          game: { players: runningLocalGame().players, startingLife: 20 },
+        },
+      ],
+    })
+    expect(screen.queryByTestId("recent-setup")).toBeNull()
   })
 
   it("summarizes the options and closes their sheet with Done", () => {

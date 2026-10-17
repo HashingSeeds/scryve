@@ -10,7 +10,6 @@ import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
-import { gameSetupHref } from "@/features/game/gameSetup"
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
 import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
@@ -215,7 +214,7 @@ export default function Index() {
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
       onRules={(system, rule) => router.push(rulesHref(system, rule))}
-      onSetup={() => router.push(gameSetupHref())}
+      onSetup={() => router.push("/game/new")}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
       onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}

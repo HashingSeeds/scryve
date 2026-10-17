@@ -29,6 +29,7 @@ import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
+  createLocalGame,
   hasLocalGameStarted,
   matchContextLabel,
   MAX_PLAYER_NAME_LENGTH,
@@ -38,12 +39,10 @@ import {
   validateStartingLife,
 } from "@/features/game/domain"
 import {
-  FEATURED_GAME_TYPES,
   gameTypeDetail,
   gameTypeId,
   gameTypeLabel,
-  isFeaturedGameType,
-  MORE_GAME_TYPES,
+  newGameTypes,
   type GameType,
 } from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
@@ -60,9 +59,14 @@ import {
   NO_PLAY_SYSTEM,
   playSystemFormat,
   playSystemRules,
+  playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { ConnectedSetup } from "@/features/game/recentSetups"
+import {
+  recentSetupLabel,
+  type ConnectedSetup,
+  type RecentSetup,
+} from "@/features/game/recentSetups"
 import {
   defaultRoundClockMinutes,
   ROUND_CLOCK_MINUTES,
@@ -145,6 +149,7 @@ export interface NewGameScreenProps {
   ) => void
   connected?: ConnectedHostFeed
   initialGame?: LocalGame
+  recentSetups?: readonly RecentSetup[]
   localGame?: LocalGame
   account?: LocalAccountSetup
   onResumeLocal?: () => void
@@ -181,7 +186,33 @@ const CLOCK_MODES = [
 ] as const
 type ClockMode = (typeof CLOCK_MODES)[number]["id"]
 
-export function NewGameScreen({
+function newestRecent(props: Pick<NewGameScreenProps, "localGame" | "recentSetups" | "mode">) {
+  return props.localGame ? undefined : props.recentSetups?.find(({ mode }) => mode === props.mode)
+}
+
+function recentSetupDetail(setup: RecentSetup) {
+  const { system } = setup.mode === "local" ? setup.game : setup.lobby
+  return [
+    ...(system ? [playSystemShortLabel(system)] : []),
+    setup.mode === "local"
+      ? setup.game.players.map((player) => player.name.trim()).join(", ")
+      : translate("play:newGame.seatsCount", { count: setup.lobby.playerCount }),
+  ].join(" · ")
+}
+
+export function NewGameScreen(props: NewGameScreenProps) {
+  const [replay, setReplay] = useState(() => ({ setup: newestRecent(props), key: 0 }))
+  return (
+    <NewGameForm
+      key={replay.key}
+      {...props}
+      replaying={replay.setup}
+      onReplay={(setup) => setReplay(({ key }) => ({ setup, key: key + 1 }))}
+    />
+  )
+}
+
+function NewGameForm({
   defaults,
   mode,
   onModeChange,
@@ -189,6 +220,9 @@ export function NewGameScreen({
   onStartLocal,
   connected,
   initialGame,
+  recentSetups,
+  replaying,
+  onReplay,
   localGame,
   account,
   onResumeLocal,
@@ -202,26 +236,39 @@ export function NewGameScreen({
   onNearby,
   localConnect,
   localMatchEnd,
-}: NewGameScreenProps) {
+}: NewGameScreenProps & {
+  replaying?: RecentSetup
+  onReplay: (setup: RecentSetup) => void
+}) {
   const {
     themed,
     theme: { colors, spacing },
   } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
   const { fontScale } = useWindowDimensions()
-  const [playerCount, setPlayerCount] = useState(
-    initialGame?.players.length ?? defaults.defaultPlayerCount,
+  const recent = newestRecent({ localGame, recentSetups, mode })
+  const [replayKept, setReplayKept] = useState(true)
+  const seededRecent = recent && recent === replaying ? recent : undefined
+  const recentSelected = Boolean(seededRecent) && replayKept
+  const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
+  const [seedGame] = useState(() =>
+    replaying?.mode === "local" ? createLocalGame(replaying.game) : initialGame,
   )
-  const [layout, setLayout] = useState<PlayerGridLayoutVariant>(initialGame?.layout ?? "auto")
+  const [playerCount, setPlayerCount] = useState(
+    lobby?.playerCount ?? seedGame?.players.length ?? defaults.defaultPlayerCount,
+  )
+  const [layout, setLayout] = useState<PlayerGridLayoutVariant>(
+    lobby?.layout ?? seedGame?.layout ?? "auto",
+  )
   const [names, setNames] = useState<string[]>(() =>
-    Array.from({ length: MAX_SEATS }, (_, index) => initialGame?.players[index]?.name ?? ""),
+    Array.from({ length: MAX_SEATS }, (_, index) => seedGame?.players[index]?.name ?? ""),
   )
   const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => ({
-      color: initialGame?.players[index]?.color ?? PLAYER_COLORS[index],
+      color: seedGame?.players[index]?.color ?? PLAYER_COLORS[index],
       shape:
-        initialGame?.players[index]?.shape ??
-        shapeForSeat(index + 1, initialGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
+        seedGame?.players[index]?.shape ??
+        shapeForSeat(index + 1, seedGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
     })),
   )
   const auth = useAuthAccess()
@@ -238,29 +285,31 @@ export function NewGameScreen({
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
-  const initialSystem = initialGame ? initialGame.system : defaults.defaultSystem
+  const seed = lobby ?? seedGame
+  const initialSystem = seed ? seed.system : defaults.defaultSystem
   const [system, setSystem] = useState<PlaySystemId | undefined>(initialSystem)
   const [format, setFormat] = useState<string | undefined>(
     () =>
-      initialGame?.format ??
+      seed?.format ??
       (initialSystem ? playSystemFormat(initialSystem, defaults.defaultFormat) : undefined),
   )
   const [startingLife, setStartingLife] = useState(
-    initialGame?.startingLife ?? defaults.defaultStartingLife,
+    seed?.startingLife ?? defaults.defaultStartingLife,
   )
-  const [deckRequired, setDeckRequired] = useState(false)
-  const [treacheryChosen, setTreacheryChosen] = useState(false)
+  const [deckRequired, setDeckRequired] = useState(lobby?.deckRequired ?? false)
+  const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
   const [lifeStep, setLifeStep] = useState(
-    initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
+    seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
+  const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
-    initialGame && (initialGame.account || hasLocalGameStarted(initialGame))
-      ? meSeatOf(initialGame)
+    claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
+      ? meSeatOf(claimedGame)
       : account?.defaultMeSeat,
   )
   const [deck, setDeck] = useState<Pick<DeckChoice, "versionId" | "name"> | undefined>(() => {
-    const chosen = initialGame?.account
+    const chosen = claimedGame?.account
     return chosen?.deckVersionId
       ? { versionId: chosen.deckVersionId, name: chosen.deckName ?? "Deck" }
       : undefined
@@ -273,12 +322,10 @@ export function NewGameScreen({
     setMeSeat(account?.defaultMeSeat)
     setDeck(undefined)
   }, [account?.defaultMeSeat, account?.ownerId])
-  const [matchOn, setMatchOn] = useState(Boolean(initialGame?.match))
-  const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(
-    initialGame?.match?.bestOf,
-  )
-  const [clockMode, setClockMode] = useState<ClockMode>(initialGame?.clock?.setup.mode ?? "off")
-  const initialClock = initialGame?.clock?.setup
+  const [matchOn, setMatchOn] = useState(Boolean(seedGame?.match))
+  const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(seedGame?.match?.bestOf)
+  const [clockMode, setClockMode] = useState<ClockMode>(seedGame?.clock?.setup.mode ?? "off")
+  const initialClock = seedGame?.clock?.setup
   const [chosenClockMinutes, setChosenClockMinutes] = useState(
     initialClock?.mode === "countdown" ? initialClock.minutes : undefined,
   )
@@ -329,7 +376,14 @@ export function NewGameScreen({
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
   const selectedTypeId = gameTypeId(system, format, treachery)
-  const allFormatsShown = showAllFormats || !isFeaturedGameType(selectedTypeId)
+  const gameTypes = newGameTypes({
+    chosen: { system: defaults.defaultSystem, format: defaults.defaultFormat },
+    recent:
+      seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
+    connected: connectedMode,
+  })
+  const allFormatsShown =
+    showAllFormats || (!recentSelected && gameTypes.more.some((type) => type.id === selectedTypeId))
   const setupSummary = [
     connectedMode
       ? translate("play:newGame.seatsCount", { count: playerCount })
@@ -471,12 +525,11 @@ export function NewGameScreen({
       setDeck(undefined)
     }
     setTreacheryChosen(nextTreachery)
+    setReplayKept(false)
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
 
   function gameTypeChoiceDetail(type: GameType) {
-    if (type.variant === "treachery" && !connectedMode)
-      return translate("play:newGame.connectedOnly")
     return gameTypeDetail(
       type,
       type.variant === "treachery" ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount,
@@ -637,23 +690,33 @@ export function NewGameScreen({
             </View>
           ) : null}
           <View style={themed($gameTypes)}>
-            {[...FEATURED_GAME_TYPES, ...(allFormatsShown ? MORE_GAME_TYPES : [])].map((type) => (
+            {recent ? (
+              <ChoiceButton
+                testID="recent-setup"
+                text={recentSetupLabel(recent)}
+                detail={recentSetupDetail(recent)}
+                detailShrinks
+                TextProps={$recentLabel}
+                selected={recentSelected}
+                onPress={() => onReplay(recent)}
+              />
+            ) : null}
+            {[...gameTypes.suggested, ...(allFormatsShown ? gameTypes.more : [])].map((type) => (
               <ChoiceButton
                 key={type.id}
                 testID={`game-type-${type.id}`}
                 text={gameTypeLabel(type)}
                 detail={gameTypeChoiceDetail(type)}
                 detailShrinks
-                selected={type.id === selectedTypeId}
-                disabled={type.variant === "treachery" && !connectedMode}
+                selected={!recentSelected && type.id === selectedTypeId}
                 onPress={() => chooseGameType(type)}
               />
             ))}
-            {allFormatsShown ? null : (
+            {allFormatsShown || gameTypes.more.length === 0 ? null : (
               <ChoiceButton
                 testID="game-type-all-formats"
                 tx="play:newGame.allFormats"
-                detail={translate("play:newGame.moreFormats", { count: MORE_GAME_TYPES.length })}
+                detail={translate("play:newGame.moreFormats", { count: gameTypes.more.length })}
                 selected={false}
                 accessibilityState={{ expanded: false }}
                 onPress={() => setShowAllFormats(true)}
@@ -1298,6 +1361,7 @@ const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $gameTypes: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $recentLabel = { style: { flexShrink: 0 } }
 const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
