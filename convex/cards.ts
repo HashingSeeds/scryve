@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- each system's card provider still branches here until it moves to convex/lib/games. */
 import { ConvexError, v, type Infer } from "convex/values"
 
 import { internal } from "./_generated/api"

@@ -1,4 +1,4 @@
-import { flooredLifeDelta } from "./systems"
+import { flooredLifeDelta, formatDefinition } from "./systems"
 
 export const MAX_LIFE_DELTA = 999_999
 export const MAX_SNAPSHOT_LIFE = 1_000_000
@@ -58,7 +58,7 @@ export function applyLifeChange(system: unknown, currentLife: number, requestedD
 export const MAX_PENDING_COMMANDER_CLAIMS = 100
 
 export const isCommanderFormat = (system: unknown, format: unknown) =>
-  system === "mtg" && format === "commander"
+  formatDefinition(system, format)?.hasCommanderDamage === true
 
 export const isCommanderLethal = (total: number) => total >= COMMANDER_LETHAL_DAMAGE
 

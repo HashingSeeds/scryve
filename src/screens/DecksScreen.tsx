@@ -36,6 +36,7 @@ import {
   deckFormats,
   DEFAULT_DECK_GAME,
 } from "../../convex/lib/deckGames"
+import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
 type ShelfDeck = {
   _id: string
@@ -78,10 +79,14 @@ function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
     .join(" · ")
 }
 
-function deckMarkerColor(game: string, colors: Theme["colors"]) {
-  if (game === "pokemon") return colors.gameMenu.actions.setup
-  if (game === "ygo") return colors.gameMenu.actions.players
-  return colors.gameMenu.actions.history
+function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"]) {
+  const markers = {
+    mtg: actions.history,
+    ygo: actions.players,
+    pokemon: actions.setup,
+    lorcana: actions.status,
+  } satisfies Record<SystemId, string>
+  return markers[isSystemId(game) ? game : DEFAULT_DECK_GAME]
 }
 
 function matchesSearch(deck: ShelfDeck, search: string) {
