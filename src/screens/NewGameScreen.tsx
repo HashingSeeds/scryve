@@ -244,14 +244,8 @@ function NewGameForm({
   const { fontScale } = useWindowDimensions()
   const recent = newestRecent({ localGame, recentSetups, mode })
   const [replayKept, setReplayKept] = useState(true)
-  const recentPlayed = recent && (recent.mode === "local" ? recent.game : recent.lobby)
-  const recentTypeId =
-    recentPlayed &&
-    gameTypeId(
-      recentPlayed.system,
-      recentPlayed.format,
-      recent?.mode === "connected" && recent.lobby.variant === "treachery",
-    )
+  const seededRecent = recent && recent === replaying ? recent : undefined
+  const recentSelected = Boolean(seededRecent) && replayKept
   const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
   const [seedGame] = useState(() =>
     replaying?.mode === "local" ? createLocalGame(replaying.game) : initialGame,
@@ -378,11 +372,10 @@ function NewGameForm({
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
   const selectedTypeId = gameTypeId(system, format, treachery)
-  const recentSelected =
-    replayKept && Boolean(recent) && (recent === replaying || selectedTypeId === recentTypeId)
   const gameTypes = newGameTypes({
     chosen: { system: defaults.defaultSystem, format: defaults.defaultFormat },
-    recent: recentPlayed,
+    recent:
+      seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
     connected: connectedMode,
   })
   const allFormatsShown =

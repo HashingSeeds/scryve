@@ -1418,7 +1418,7 @@ describe("NewGameScreen", () => {
     expect(host).toHaveBeenCalledWith(lobby)
   })
 
-  it("selects the recent setup, not the full list, once the game it came from ends", () => {
+  it("keeps an ended game's format selected in the list, not a different recent setup", () => {
     const game = runningLocalGame()
     const props = {
       defaults: DEFAULT_LOCAL_SETTINGS,
@@ -1432,7 +1432,10 @@ describe("NewGameScreen", () => {
           savedAt: 1,
           mode: "local" as const,
           game: {
-            players: game.players,
+            players: [
+              { name: "Linus", color: "#B85636" },
+              { name: "Ken", color: "#41476E" },
+            ],
             startingLife: 20,
             system: "mtg" as const,
             format: "commander",
@@ -1443,8 +1446,15 @@ describe("NewGameScreen", () => {
     const view = render(themed(<NewGameScreen {...props} localGame={game} />))
     view.rerender(themed(<NewGameScreen {...props} />))
 
-    expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(false)
+    expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
     expect(view.queryByTestId("game-type-mtg-modern")).toBeNull()
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(props.onStartLocal).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "Ada" }), expect.objectContaining({ name: "Grace" })],
+      20,
+      expect.objectContaining({ format: "commander" }),
+    )
   })
 
   it("leaves the recent setup off a running game's setup", () => {
