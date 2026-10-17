@@ -142,7 +142,8 @@ export function PokemonSheet({
   const searchField = useRef<ComponentRef<typeof TextField>>(null)
   useEffect(() => moveFocus(searchField.current ?? firstControl.current), [])
   const catalog = usePokemonCatalog(lookupOpen ? query : "")
-  const hp = parseHp(draft.hp) ?? (cardless && !draft.cardId ? editing.hp : undefined)
+  const keepsCardlessHp = cardless && !draft.cardId && !draft.hp.trim()
+  const hp = keepsCardlessHp ? editing.hp : parseHp(draft.hp)
   const card: PokemonCard | undefined = hp
     ? {
         hp,
