@@ -8,6 +8,7 @@ export default {
     mtg: "ライフ",
     ygo: "ライフポイント",
     pokemon: "サイド",
+    lorcana: "ロア",
     fab: "ライフ",
   },
   counterLabel: {
@@ -15,6 +16,7 @@ export default {
     mtg: "ライフ",
     ygo: "ライフポイント",
     pokemon: "サイド",
+    lorcana: "ロア",
     fab: "ライフ",
   },
   startingValueRange: {
@@ -22,6 +24,7 @@ export default {
     mtg: "初期ライフは1から{{max}}までの整数で入力してください。",
     ygo: "初期ライフポイントは1から{{max}}までの整数にしてください。",
     pokemon: "初期サイドは1から{{max}}までの整数にしてください。",
+    lorcana: "初期ロアは0から{{max}}までの整数にしてください。",
     fab: "初期ライフは1から{{max}}までの整数で入力してください。",
   },
   tableItem: {
@@ -41,6 +44,7 @@ export default {
       mtg: "メインデッキ",
       ygo: "メインデッキ",
       pokemon: "デッキ",
+      lorcana: "デッキ",
       fab: "デッキ",
     },
   },
@@ -70,6 +74,7 @@ export default {
     mtg_other: "ライフ {{count}}",
     ygo_other: "{{count}}ライフポイント",
     pokemon_other: "サイド {{count}}枚",
+    lorcana_other: "ロア {{count}}",
     fab_other: "ライフ {{count}}",
   },
   counterChange: {
@@ -77,6 +82,7 @@ export default {
     mtg_other: "ライフの変動 {{count}}件",
     ygo_other: "ライフポイントの変動: {{count}}",
     pokemon_other: "サイド変動{{count}}回",
+    lorcana_other: "ロア変動{{count}}回",
     fab_other: "ライフの変動 {{count}}件",
   },
   noneTaken: "なし",

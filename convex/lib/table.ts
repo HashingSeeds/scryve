@@ -438,7 +438,10 @@ export function applyTableAction(
   if (action.kind === "pokemon.updated") {
     if (!isValidCard(action.card)) return null
     if (action.card.hp <= pokemon.damage) return null
-    const evolved = action.card.cardId !== pokemon.cardId || action.card.name !== pokemon.name
+    // why: this must match CARDLESS_POKEMON in src/components/pokemon/pokemonCardLayout.ts; if that changes, a first card clears Poison and Burn again.
+    const cardless = pokemon.hp === MAX_POKEMON_HP && pokemon.cardId === undefined
+    const evolved =
+      !cardless && (action.card.cardId !== pokemon.cardId || action.card.name !== pokemon.name)
     const next = withConditions(
       { ...action.card, id: pokemon.id, damage: pokemon.damage },
       evolved ? {} : pokemon,

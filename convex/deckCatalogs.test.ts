@@ -469,7 +469,9 @@ it("provides two complete, attributed examples for every selectable format witho
   try {
     for (const game of DECK_GAME_LIST.filter(
       ({ id }) =>
-        id !== "fab" && integration(id)?.capabilities.exampleDecks.technical === "available",
+        id !== "fab" &&
+        id !== "lorcana" &&
+        integration(id)?.capabilities.exampleDecks.technical === "available",
     )) {
       for (const format of game.formats) {
         const args = { game: game.id, format: format.id, query: "", source: "examples" as const }

@@ -154,13 +154,15 @@ const YUGIOH_SECTIONS = [
 
 const POKEMON_SECTIONS = [{ id: "main", label: "Deck" }] as const
 
+const LORCANA_SECTIONS = [{ id: "main", label: "Deck" }] as const
+
 const FAB_SECTIONS = [
   { id: "hero", label: "Hero", identity: true, startingValueFacet: "health" },
   { id: "arena", label: "Arena" },
   { id: "main", label: "Deck" },
 ] as const
 
-export const SYSTEM_IDS = ["mtg", "ygo", "pokemon", "fab"] as const
+export const SYSTEM_IDS = ["mtg", "ygo", "pokemon", "lorcana", "fab"] as const
 export type SystemId = (typeof SYSTEM_IDS)[number]
 
 export const SYSTEMS = {
@@ -384,6 +386,56 @@ export const SYSTEMS = {
         imageUse: "functional_card_context",
         requiredNotices: [
           "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve is not affiliated with or endorsed by Nintendo, Creatures, GAME FREAK, or The Pokémon Company.",
+        ],
+      },
+    },
+  },
+  lorcana: {
+    label: "Disney Lorcana",
+    shortLabel: "Lorcana",
+    release: "beta",
+    defaultFormat: { deck: "core", play: "core" },
+    counter: {
+      label: "lore",
+      heading: "Lore",
+      singular: "lore",
+      plural: "lore",
+      defaultValue: 0,
+      presets: [0],
+      tapStep: 1,
+      quickAdjustments: [2, 1],
+      scrubStep: 1,
+      scrubSteps: 20,
+      goal: { kind: "race", to: 20 },
+      maxStartingValue: 19,
+      flooredAtZero: true,
+    },
+    formats: [
+      { id: "core", label: "Core Constructed", sections: LORCANA_SECTIONS },
+      { id: "infinity", label: "Infinity Constructed", sections: LORCANA_SECTIONS },
+    ],
+    table: { counters: [], designations: [] },
+    variants: [],
+    firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
+    roundClock: { minutes: 50, endOfRoundTurns: 5 },
+    deckAnalysis: false,
+    integration: {
+      identityNamespace: "lorcanajson-card",
+      capabilities: {
+        integration: available("scryve"),
+        cardCatalog: available("lorcanajson", "Synced from the LorcanaJSON dataset."),
+        deckImport: available("lorcanajson"),
+        exampleDecks: available("lorcanajson", "Official starter decks only."),
+        images: available("ravensburger", "Functional card context only."),
+        playTracking: available("scryve"),
+        aggregateMetagameStats: available("scryve"),
+      },
+      rights: {
+        review: "reviewed",
+        basis: "fair_use",
+        imageUse: "functional_card_context",
+        requiredNotices: [
+          "Disney Lorcana is a trademark of Disney and is published by Ravensburger. Card names, card artwork, characters, and related marks remain property of Disney, Ravensburger, and their respective owners. Scryve is not published, endorsed, or specifically approved by Disney or Ravensburger.",
         ],
       },
     },

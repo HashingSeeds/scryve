@@ -163,6 +163,7 @@ export default {
       mtg: "최종 라이프",
       ygo: "최종 라이프 포인트",
       pokemon: "최종 사이드 카드",
+      lorcana: "최종 로어",
       fab: "최종 라이프",
     },
     noWinner: "이 게임에는 기록된 승자가 없습니다.",
@@ -184,6 +185,7 @@ export default {
         mtg: "라이프 변경 불러오는 중",
         ygo: "라이프 포인트 변동 불러오는 중",
         pokemon: "사이드 카드 변동 불러오는 중",
+        lorcana: "로어 변동 불러오는 중",
         fab: "라이프 변경 불러오는 중",
       },
       heading: {
@@ -191,6 +193,7 @@ export default {
         mtg: "라이프 변경 · {{changes}}",
         ygo: "라이프 포인트 변동 · {{changes}}",
         pokemon: "사이드 카드 변동 · {{changes}}",
+        lorcana: "로어 변동 · {{changes}}",
         fab: "라이프 변경 · {{changes}}",
       },
       noChanges: {
@@ -198,6 +201,7 @@ export default {
         mtg: "기록된 라이프 변경이 없습니다.",
         ygo: "기록된 라이프 포인트 변동이 없습니다.",
         pokemon: "기록된 사이드 카드 변동이 없습니다.",
+        lorcana: "기록된 로어 변동이 없습니다.",
         fab: "기록된 라이프 변경이 없습니다.",
       },
       loadFailed: {
@@ -205,6 +209,7 @@ export default {
         mtg: "라이프 변경을 불러올 수 없습니다.",
         ygo: "라이프 포인트 변동을 불러오지 못했습니다.",
         pokemon: "사이드 카드 변동을 불러올 수 없습니다.",
+        lorcana: "로어 변동을 불러올 수 없습니다.",
         fab: "라이프 변경을 불러올 수 없습니다.",
       },
       detailsUnavailable: {
@@ -212,6 +217,7 @@ export default {
         mtg: "라이프 변경 상세 정보를 사용할 수 없습니다.",
         ygo: "라이프 포인트 변동 상세 정보를 사용할 수 없습니다.",
         pokemon: "사이드 카드 변동 상세 정보를 사용할 수 없습니다.",
+        lorcana: "로어 변동 상세 정보를 사용할 수 없습니다.",
         fab: "라이프 변경 상세 정보를 사용할 수 없습니다.",
       },
       noDetails: {
@@ -219,6 +225,7 @@ export default {
         mtg: "라이프 변경 상세 정보가 없습니다.",
         ygo: "라이프 포인트 변동 상세 정보를 찾지 못했습니다.",
         pokemon: "사이드 카드 변동 상세 정보를 찾을 수 없습니다.",
+        lorcana: "로어 변동 상세 정보를 찾을 수 없습니다.",
         fab: "라이프 변경 상세 정보가 없습니다.",
       },
     },

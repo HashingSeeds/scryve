@@ -34,7 +34,7 @@ it("opens a link-only system's page instead of showing Magic rules", () => {
 })
 
 it("shows Magic rules for a missing or unknown system", () => {
-  for (const system of [undefined, "lorcana"]) {
+  for (const system of [undefined, "chess"]) {
     mockParams = { system }
     render(<RulesRoute />)
     expect(mockRulesScreen).toHaveBeenLastCalledWith(

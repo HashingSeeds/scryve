@@ -670,22 +670,22 @@ describe("LocalGameRepository sign-in claims", () => {
     new LocalGameRepository(storage).archiveGame(finished(game, 2))
     const detailKey = LOCAL_KEYS.historyDetail(game.id)
     const [summary] = JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)
-    storage.set(LOCAL_KEYS.historyIndex, JSON.stringify([{ ...summary, system: "lorcana" }]))
+    storage.set(LOCAL_KEYS.historyIndex, JSON.stringify([{ ...summary, system: "not-a-system" }]))
     const detail = JSON.parse(storage.getString(detailKey)!)
     storage.set(
       detailKey,
-      JSON.stringify({ ...detail, game: { ...detail.game, system: "lorcana" } }),
+      JSON.stringify({ ...detail, game: { ...detail.game, system: "not-a-system" } }),
     )
     const repository = new LocalGameRepository(storage)
 
     repository.resolveClaims("owner-a", [{ id: game.id, claim: true }])
 
     expect(JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)[0]).toMatchObject({
-      system: "lorcana",
+      system: "not-a-system",
       account: { ownerId: "owner-a" },
     })
     expect(JSON.parse(storage.getString(detailKey)!).game).toMatchObject({
-      system: "lorcana",
+      system: "not-a-system",
       account: { ownerId: "owner-a" },
     })
     expect(repository.loadHistoryDetail(game.id)?.game.system).toBeUndefined()

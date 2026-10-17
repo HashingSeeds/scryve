@@ -44,7 +44,13 @@ const printingValidator = v.object({
 })
 
 export const normalizedCardValidator = v.object({
-  game: v.union(v.literal("mtg"), v.literal("ygo"), v.literal("pokemon"), v.literal("fab")),
+  game: v.union(
+    v.literal("mtg"),
+    v.literal("ygo"),
+    v.literal("pokemon"),
+    v.literal("lorcana"),
+    v.literal("fab"),
+  ),
   identityNamespace: v.string(),
   cardId: v.string(),
   name: v.string(),

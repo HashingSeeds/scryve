@@ -85,6 +85,7 @@ function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"
     mtg: actions.history,
     ygo: actions.players,
     pokemon: actions.setup,
+    lorcana: actions.status,
     fab: actions.rules,
   } satisfies Record<SystemId, string>
   return markers[isSystemId(game) ? game : DEFAULT_DECK_GAME]

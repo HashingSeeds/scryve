@@ -478,6 +478,7 @@ export default {
       "수량, 이름, 세트 코드, 카드 번호가 포함된 Pokémon TCG Live 리스트를 붙여넣으세요.",
     listHelperMtg:
       '"1 Sol Ring" 같은 줄을 사용하세요. Commander, Mainboard, Sideboard 제목을 지원합니다.',
+    listHelperLorcana: '"4 Aladdin - Heroic Outlaw" 같은 줄을 사용하세요.',
     listHelperFab: 'Fabrary 카드 목록이나 "3x Snatch (red)" 같은 줄을 붙여넣으세요.',
     returnToReview: "검토로 돌아가기",
     loadingDeck: "덱 불러오는 중…",

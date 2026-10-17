@@ -274,6 +274,7 @@ export default {
         mtg: "ライフの{{delta}}の変更を同期できませんでした",
         ygo: "{{delta}}のライフポイント変更を同期できませんでした",
         pokemon: "サイドの{{delta}}の変更を同期できませんでした",
+        lorcana: "ロアの{{delta}}の変更を同期できませんでした",
         fab: "ライフの{{delta}}の変更を同期できませんでした",
       },
       commanderDamage: "{{delta}} のコマンダーダメージの割り当てを同期できませんでした",

@@ -30,6 +30,7 @@ const catalogImageCandidates = {
   "tcgdex": pokemonImageCandidates,
   "ygoprodeck": ygoprodeckImageCandidates,
   "scryfall": scryfallImageCandidates,
+  "lorcanajson": syncedImageCandidates,
   "fab-cube": syncedImageCandidates,
 } satisfies Record<
   CatalogProvider,

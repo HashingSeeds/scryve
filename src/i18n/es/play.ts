@@ -173,6 +173,7 @@ export default {
       mtg: "Vida final",
       ygo: "Puntos de Vida finales",
       pokemon: "Cartas de Premio finales",
+      lorcana: "Leyenda final",
       fab: "Vida final",
     },
     noWinner: "No se registró ningún ganador en esta partida.",
@@ -194,6 +195,7 @@ export default {
         mtg: "Cargando cambios de vida",
         ygo: "Cargando cambios de Puntos de Vida",
         pokemon: "Cargando cambios de cartas de Premio",
+        lorcana: "Cargando cambios de leyenda",
         fab: "Cargando cambios de vida",
       },
       heading: {
@@ -201,6 +203,7 @@ export default {
         mtg: "Cambios de vida · {{changes}}",
         ygo: "Cambios de Puntos de Vida · {{changes}}",
         pokemon: "Cambios de cartas de Premio · {{changes}}",
+        lorcana: "Cambios de leyenda · {{changes}}",
         fab: "Cambios de vida · {{changes}}",
       },
       noChanges: {
@@ -208,6 +211,7 @@ export default {
         mtg: "No se registraron cambios de vida.",
         ygo: "No se registraron cambios de Puntos de Vida.",
         pokemon: "No se registraron cambios de cartas de Premio.",
+        lorcana: "No se registraron cambios de leyenda.",
         fab: "No se registraron cambios de vida.",
       },
       loadFailed: {
@@ -215,6 +219,7 @@ export default {
         mtg: "No se pudieron cargar los cambios de vida.",
         ygo: "No se pudieron cargar los cambios de Puntos de Vida.",
         pokemon: "No se pudieron cargar los cambios de cartas de Premio.",
+        lorcana: "No se pudieron cargar los cambios de leyenda.",
         fab: "No se pudieron cargar los cambios de vida.",
       },
       detailsUnavailable: {
@@ -222,6 +227,7 @@ export default {
         mtg: "Los detalles de los cambios de vida no están disponibles.",
         ygo: "Los detalles de los cambios de Puntos de Vida no están disponibles.",
         pokemon: "Los detalles de los cambios de cartas de Premio no están disponibles.",
+        lorcana: "Los detalles de los cambios de leyenda no están disponibles.",
         fab: "Los detalles de los cambios de vida no están disponibles.",
       },
       noDetails: {
@@ -229,6 +235,7 @@ export default {
         mtg: "No se encontraron detalles de cambios de vida.",
         ygo: "No se encontraron detalles de los cambios de Puntos de Vida.",
         pokemon: "No se encontraron detalles de los cambios de cartas de Premio.",
+        lorcana: "No se encontraron detalles de los cambios de leyenda.",
         fab: "No se encontraron detalles de cambios de vida.",
       },
     },

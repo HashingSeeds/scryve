@@ -30,9 +30,9 @@ export function assertPlayerCount(count: number) {
   }
 }
 
-export function assertStartingLife(life: number, maximum = 999) {
-  if (!Number.isInteger(life) || life < 1 || life > maximum)
-    throw new Error(`Starting value must be 1–${maximum}`)
+export function assertStartingLife(life: number, { min, max }: { min: number; max: number }) {
+  if (!Number.isInteger(life) || life < min || life > max)
+    throw new Error(`Starting value must be ${min}–${max}`)
 }
 
 export function assertInviteToken(token: string) {

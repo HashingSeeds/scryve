@@ -174,6 +174,7 @@ export default {
       mtg: "Vie finale",
       ygo: "Life Points finaux",
       pokemon: "Cartes Récompense finales",
+      lorcana: "Lore final",
       fab: "Vie finale",
     },
     noWinner: "Aucun vainqueur n'a été enregistré pour cette partie.",
@@ -195,6 +196,7 @@ export default {
         mtg: "Chargement des changements de vie",
         ygo: "Chargement des changements de Life Points",
         pokemon: "Chargement des changements de cartes Récompense",
+        lorcana: "Chargement des changements de Lore",
         fab: "Chargement des changements de vie",
       },
       heading: {
@@ -202,6 +204,7 @@ export default {
         mtg: "Changements de vie · {{changes}}",
         ygo: "Changements de Life Points · {{changes}}",
         pokemon: "Changements de cartes Récompense · {{changes}}",
+        lorcana: "Changements de Lore · {{changes}}",
         fab: "Changements de vie · {{changes}}",
       },
       noChanges: {
@@ -209,6 +212,7 @@ export default {
         mtg: "Aucun changement de vie n'a été enregistré.",
         ygo: "Aucun changement de Life Points n'a été enregistré.",
         pokemon: "Aucun changement de cartes Récompense n'a été enregistré.",
+        lorcana: "Aucun changement de Lore n'a été enregistré.",
         fab: "Aucun changement de vie n'a été enregistré.",
       },
       loadFailed: {
@@ -216,6 +220,7 @@ export default {
         mtg: "Impossible de charger les changements de vie.",
         ygo: "Impossible de charger les changements de Life Points.",
         pokemon: "Impossible de charger les changements de cartes Récompense.",
+        lorcana: "Impossible de charger les changements de Lore.",
         fab: "Impossible de charger les changements de vie.",
       },
       detailsUnavailable: {
@@ -223,6 +228,7 @@ export default {
         mtg: "Les détails des changements de vie sont indisponibles.",
         ygo: "Les détails des changements de Life Points sont indisponibles.",
         pokemon: "Les détails des changements de cartes Récompense sont indisponibles.",
+        lorcana: "Les détails des changements de Lore sont indisponibles.",
         fab: "Les détails des changements de vie sont indisponibles.",
       },
       noDetails: {
@@ -230,6 +236,7 @@ export default {
         mtg: "Aucun détail de changement de vie trouvé.",
         ygo: "Aucun détail des changements de Life Points n'a été trouvé.",
         pokemon: "Aucun détail des changements de cartes Récompense trouvé.",
+        lorcana: "Aucun détail des changements de Lore trouvé.",
         fab: "Aucun détail de changement de vie trouvé.",
       },
     },

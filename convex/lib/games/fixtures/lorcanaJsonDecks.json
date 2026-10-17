@@ -1,0 +1,39 @@
+{
+  "deckdata.S12-1.json": {
+    "name": "Core Starter",
+    "type": "Starter Deck",
+    "cards": [{ "amount": 4, "id": 25, "isFoil": false }]
+  },
+  "deckdata.S2-1.json": {
+    "name": "Rotated Starter",
+    "type": "Starter Deck",
+    "cards": [
+      { "amount": 2, "id": 5, "isFoil": false },
+      { "amount": 1, "id": 205, "isFoil": true },
+      { "amount": 2, "id": 25, "isFoil": false }
+    ]
+  },
+  "deckdata.S10-1.json": {
+    "name": "Banned Starter",
+    "type": "Starter Deck",
+    "cards": [
+      { "amount": 1, "id": 365, "isFoil": false },
+      { "amount": 3, "id": 25, "isFoil": false }
+    ]
+  },
+  "deckdata.S10-2.json": {
+    "name": "Unsynced Starter",
+    "type": "Starter Deck",
+    "cards": [{ "amount": 4, "id": 9999, "isFoil": false }]
+  },
+  "deckdata.Q1-1.json": {
+    "name": "Ursula scenario deck",
+    "type": "Quest",
+    "cards": [{ "amount": 2, "id": 25, "isFoil": false }]
+  },
+  "deckdata.G1-1.json": {
+    "name": "Gateway Starter Deck",
+    "type": "Gateway",
+    "cards": [{ "amount": 2, "id": 25, "isFoil": false }]
+  }
+}

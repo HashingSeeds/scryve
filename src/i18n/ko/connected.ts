@@ -272,6 +272,7 @@ export default {
         mtg: "{{delta}} 라이프 변경을 동기화하지 못했습니다",
         ygo: "라이프 포인트 {{delta}} 변경을 동기화하지 못했습니다",
         pokemon: "사이드 카드 {{delta}} 변경을 동기화하지 못했습니다",
+        lorcana: "로어 {{delta}} 변경을 동기화하지 못했습니다",
         fab: "{{delta}} 라이프 변경을 동기화하지 못했습니다",
       },
       commanderDamage: "{{delta}} 커맨더 피해 지정을 동기화하지 못했습니다",

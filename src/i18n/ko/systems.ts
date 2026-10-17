@@ -8,6 +8,7 @@ export default {
     mtg: "라이프",
     ygo: "라이프 포인트",
     pokemon: "사이드 카드",
+    lorcana: "로어",
     fab: "라이프",
   },
   counterLabel: {
@@ -15,6 +16,7 @@ export default {
     mtg: "라이프",
     ygo: "라이프 포인트",
     pokemon: "사이드 카드",
+    lorcana: "로어",
     fab: "라이프",
   },
   startingValueRange: {
@@ -22,6 +24,7 @@ export default {
     mtg: "시작 라이프는 1에서 {{max}} 사이의 정수여야 합니다.",
     ygo: "시작 라이프 포인트는 1에서 {{max}} 사이의 정수여야 합니다.",
     pokemon: "시작 사이드 카드는 1에서 {{max}} 사이의 정수여야 합니다.",
+    lorcana: "시작 로어는 0에서 {{max}} 사이의 정수여야 합니다.",
     fab: "시작 라이프는 1에서 {{max}} 사이의 정수여야 합니다.",
   },
   tableItem: {
@@ -41,6 +44,7 @@ export default {
       mtg: "메인 덱",
       ygo: "메인 덱",
       pokemon: "덱",
+      lorcana: "덱",
       fab: "덱",
     },
   },
@@ -70,6 +74,7 @@ export default {
     mtg_other: "라이프 {{count}}",
     ygo_other: "라이프 포인트 {{count}}",
     pokemon_other: "사이드 카드 {{count}}장",
+    lorcana_other: "로어 {{count}}",
     fab_other: "라이프 {{count}}",
   },
   counterChange: {
@@ -77,6 +82,7 @@ export default {
     mtg_other: "라이프 변경 {{count}}회",
     ygo_other: "라이프 포인트 {{count}} 변경",
     pokemon_other: "사이드 카드 변동 {{count}}회",
+    lorcana_other: "로어 변동 {{count}}회",
     fab_other: "라이프 변경 {{count}}회",
   },
   noneTaken: "가져간 카드 없음",

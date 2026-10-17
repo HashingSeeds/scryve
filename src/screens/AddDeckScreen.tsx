@@ -66,6 +66,7 @@ import {
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
+import type { ProviderGame } from "../../convex/lib/games/providers"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
 import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
@@ -73,6 +74,7 @@ const DECK_LIST_HELPERS = {
   mtg: "decks:addDeck.listHelperMtg",
   ygo: "decks:addDeck.listHelperYgo",
   pokemon: "decks:addDeck.listHelperPokemon",
+  lorcana: "decks:addDeck.listHelperLorcana",
   fab: "decks:addDeck.listHelperFab",
 } as const satisfies Record<SystemId, TxKeyPath>
 
@@ -177,7 +179,7 @@ type ImportedCard = PreviewCard & {
 }
 
 type GenericImportedCard = {
-  game: Exclude<SystemId, "mtg">
+  game: ProviderGame
   identityNamespace?: string
   cardId?: string
   providerCardId?: string
@@ -320,6 +322,7 @@ function preconDetail(deck: PreconstructedDeck) {
 const PUBLISHERS = new Map([
   ["ygo", "Konami"],
   ["pokemon", "Pokémon"],
+  ["lorcana", "Ravensburger"],
   ["fab", "Legend Story Studios"],
 ])
 

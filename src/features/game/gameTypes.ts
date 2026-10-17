@@ -24,6 +24,7 @@ const FEATURED: readonly GameType[] = [
   { id: "mtg-standard", system: "mtg", format: "standard" },
   { id: "ygo-advanced", system: "ygo", format: "advanced" },
   { id: "pokemon-standard", system: "pokemon", format: "standard" },
+  { id: "lorcana-core", system: "lorcana", format: "core" },
   { id: "fab-cc", system: "fab", format: "cc" },
   { id: "none" },
 ]

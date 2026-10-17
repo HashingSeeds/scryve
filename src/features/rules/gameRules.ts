@@ -40,6 +40,7 @@ export const GAME_RULES = {
   },
   pokemon: { kind: "link", pageUrl: "https://www.pokemon.com/us/pokemon-tcg/rules" },
   ygo: { kind: "link", pageUrl: "https://www.yugioh-card.com/en/rulebook/" },
+  lorcana: { kind: "link", pageUrl: "https://www.disneylorcana.com/en-US/resources" },
   fab: {
     kind: "text",
     url: "https://rules.fabtcg.com/txt/latest/en-fab-cr.txt",

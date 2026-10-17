@@ -64,6 +64,16 @@ export const gameContentNotices = {
       ],
     },
     {
+      heading: "Disney Lorcana",
+      blocks: [
+        ...requiredNotices("lorcana"),
+        {
+          type: "paragraph",
+          text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data and official starter deck lists are provided through LorcanaJSON, and card images load from Ravensburger. Scryve is not affiliated with or endorsed by LorcanaJSON.",
+        },
+      ],
+    },
+    {
       heading: "Flesh and Blood",
       blocks: [
         ...requiredNotices("fab"),

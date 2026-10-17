@@ -164,6 +164,7 @@ const play = {
       mtg: "Final Life",
       ygo: "Final Life Points",
       pokemon: "Final Prize cards",
+      lorcana: "Final lore",
       fab: "Final Life",
     },
     noWinner: "No winner was recorded for this game.",
@@ -185,6 +186,7 @@ const play = {
         mtg: "Loading life changes",
         ygo: "Loading Life Points changes",
         pokemon: "Loading Prize cards changes",
+        lorcana: "Loading lore changes",
         fab: "Loading life changes",
       },
       heading: {
@@ -192,6 +194,7 @@ const play = {
         mtg: "Life changes · {{changes}}",
         ygo: "Life Points changes · {{changes}}",
         pokemon: "Prize cards changes · {{changes}}",
+        lorcana: "Lore changes · {{changes}}",
         fab: "Life changes · {{changes}}",
       },
       noChanges: {
@@ -199,6 +202,7 @@ const play = {
         mtg: "No life changes were recorded.",
         ygo: "No Life Points changes were recorded.",
         pokemon: "No Prize cards changes were recorded.",
+        lorcana: "No lore changes were recorded.",
         fab: "No life changes were recorded.",
       },
       loadFailed: {
@@ -206,6 +210,7 @@ const play = {
         mtg: "Could not load life changes.",
         ygo: "Could not load Life Points changes.",
         pokemon: "Could not load Prize cards changes.",
+        lorcana: "Could not load lore changes.",
         fab: "Could not load life changes.",
       },
       detailsUnavailable: {
@@ -213,6 +218,7 @@ const play = {
         mtg: "Life change details are unavailable.",
         ygo: "Life Points change details are unavailable.",
         pokemon: "Prize cards change details are unavailable.",
+        lorcana: "Lore change details are unavailable.",
         fab: "Life change details are unavailable.",
       },
       noDetails: {
@@ -220,6 +226,7 @@ const play = {
         mtg: "No life change details were found.",
         ygo: "No Life Points change details were found.",
         pokemon: "No Prize cards change details were found.",
+        lorcana: "No lore change details were found.",
         fab: "No life change details were found.",
       },
     },
