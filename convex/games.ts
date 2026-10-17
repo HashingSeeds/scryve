@@ -2002,7 +2002,7 @@ export const startGame = mutation({
         color: player.color,
         shape: player.shape,
         ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
-        ...(deckLife === undefined ? {} : { currentLife: deckLife }),
+        ...(deckLife === undefined ? {} : { currentLife: deckLife, startingLife: deckLife }),
         ...roles?.[index],
       })
     }
@@ -2802,6 +2802,9 @@ async function startRematch(
       player.deckVersionId && (await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         ? player.deckVersionId
         : undefined
+    const deckLife = deckVersionId
+      ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
+      : undefined
     await ctx.db.insert("gamePlayers", {
       gameId,
       seat: player.seat,
@@ -2814,10 +2817,8 @@ async function startRematch(
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
       ...(await rematchProMark(ctx, player)),
-      currentLife:
-        (deckVersionId
-          ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
-          : undefined) ?? finished.startingLife,
+      ...(deckLife === undefined ? {} : { startingLife: deckLife }),
+      currentLife: deckLife ?? finished.startingLife,
       eventCount: 0,
       resumable: true,
       joinedAt: now,
@@ -3296,8 +3297,9 @@ export const connectedSummary = query({
       players: await Promise.all(
         players.map(async (player) => {
           const startingLife =
-            player.deckVersionId &&
-            (await deckStartingValue(ctx, player.deckVersionId, system, format))
+            (await ctx.db.get(player.playerId))?.startingLife ??
+            (player.deckVersionId &&
+              (await deckStartingValue(ctx, player.deckVersionId, system, format)))
           return { ...player, ...(startingLife ? { startingLife } : {}) }
         }),
       ),

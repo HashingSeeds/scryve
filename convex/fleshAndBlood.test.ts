@@ -150,6 +150,26 @@ describe("Flesh and Blood", () => {
         [1, 40],
         [2, 20],
       ])
+
+      await t.run(async (ctx) => {
+        const hero = await ctx.db
+          .query("gameCards")
+          .filter((q) => q.eq(q.field("name"), "Aurora, Shooting Star"))
+          .first()
+        if (!hero?.facets) throw new Error("No hero card")
+        await ctx.db.patch(hero._id, {
+          facets: hero.facets.map((facet) =>
+            facet.key === "health" ? { ...facet, value: "30" } : facet,
+          ),
+        })
+      })
+      await expect(host.query(api.decks.startingValue, { versionId: deckVersionId })).resolves.toBe(
+        30,
+      )
+      const corrected = await host.query(api.games.connectedSummary, {
+        publicId: created.publicId,
+      })
+      expect(corrected?.players[0]).toMatchObject({ startingLife: 40, finalLife: 40 })
     } finally {
       jest.useRealTimers()
     }
