@@ -1,9 +1,12 @@
 import { translate } from "@/i18n/translate"
 
 import {
+  counterValueLabel,
+  defaultStartingLife,
   PLAY_SYSTEM_IDS,
   playFormatLabel,
   playSystemFormats,
+  playSystemShortLabel,
   type PlaySystemId,
 } from "./playSystems"
 import type { GameVariant } from "../../../convex/lib/treachery"
@@ -50,4 +53,9 @@ export function gameTypeLabel(type: GameType) {
   if (type.variant === "treachery") return translate("connected:treachery.name")
   if (!type.system) return translate("systems:noSystem")
   return playFormatLabel(type.system, type.format)
+}
+
+export function gameTypeDetail(type: GameType, seats: number) {
+  const life = counterValueLabel(type.system, defaultStartingLife(type.system, type.format, seats))
+  return type.system ? `${playSystemShortLabel(type.system)} · ${life}` : life
 }

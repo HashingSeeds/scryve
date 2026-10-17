@@ -39,6 +39,7 @@ import {
 } from "@/features/game/domain"
 import {
   FEATURED_GAME_TYPES,
+  gameTypeDetail,
   gameTypeId,
   gameTypeLabel,
   isFeaturedGameType,
@@ -59,7 +60,6 @@ import {
   NO_PLAY_SYSTEM,
   playSystemFormat,
   playSystemRules,
-  playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type { ConnectedSetup } from "@/features/game/recentSetups"
@@ -464,16 +464,13 @@ export function NewGameScreen({
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
 
-  function gameTypeDetail(type: GameType) {
+  function gameTypeChoiceDetail(type: GameType) {
     if (type.variant === "treachery" && !connectedMode)
       return translate("play:newGame.connectedOnly")
-    const seats =
-      type.variant === "treachery" ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount
-    const life = counterValueLabel(
-      type.system,
-      defaultStartingLife(type.system, type.format, seats),
+    return gameTypeDetail(
+      type,
+      type.variant === "treachery" ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount,
     )
-    return type.system ? `${playSystemShortLabel(type.system)} · ${life}` : life
   }
 
   // why: only the seat and deck pickers may claim a game; a rename must not move it to whoever is signed in now.
@@ -635,7 +632,7 @@ export function NewGameScreen({
                 key={type.id}
                 testID={`game-type-${type.id}`}
                 text={gameTypeLabel(type)}
-                detail={gameTypeDetail(type)}
+                detail={gameTypeChoiceDetail(type)}
                 detailShrinks
                 selected={type.id === selectedTypeId}
                 disabled={type.variant === "treachery" && !connectedMode}

@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
@@ -8,10 +7,10 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import type { ConsentDocumentId } from "@/content/legal"
+import { useFirstUseSharing } from "@/features/legal/useFirstUseSharing"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { analyticsConfigured, analyticsEnabled, setAnalyticsEnabled } from "@/utils/analytics"
 
 const BRAND_EYEBROW = "SCRYVE"
 
@@ -37,8 +36,7 @@ export function LegalConsentScreen({
   onOpenPrivacy,
 }: LegalConsentScreenProps) {
   const { themed } = useAppTheme()
-  const [sharing, setSharing] = useState(analyticsEnabled)
-  const [sharingError, setSharingError] = useState(false)
+  const { configured, sharing, setSharing, saveFailed, saveSharing } = useFirstUseSharing()
   const includesTerms = documents.includes("terms")
   const includesPrivacy = documents.includes("privacy")
   const changed = includesTerms && includesPrivacy ? "both" : includesTerms ? "terms" : "privacy"
@@ -87,7 +85,7 @@ export function LegalConsentScreen({
       </View>
 
       <View style={themed($actions)}>
-        {!isReturningUser && analyticsConfigured() ? (
+        {!isReturningUser && configured ? (
           <Switch
             testID="first-use-analytics-switch"
             labelTx="account:shareUsage"
@@ -96,7 +94,7 @@ export function LegalConsentScreen({
             onValueChange={setSharing}
           />
         ) : null}
-        {sharingError ? (
+        {saveFailed ? (
           <Text accessibilityRole="alert" size="xs" tx="account:legalConsent.sharingSaveFailed" />
         ) : null}
         {error ? (
@@ -109,12 +107,7 @@ export function LegalConsentScreen({
           style={themed($primaryAction)}
           disabled={isSubmitting}
           onPress={() => {
-            if (!isReturningUser && sharing !== analyticsEnabled()) {
-              if (!setAnalyticsEnabled(sharing, "first_use")) {
-                setSharingError(true)
-                return
-              }
-            }
+            if (!isReturningUser && !saveSharing()) return
             onAccept()
           }}
         />

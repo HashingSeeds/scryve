@@ -91,6 +91,7 @@ export interface LocalSettings {
   launchDestination: LaunchDestination
   defaultSystem?: PlaySystemId
   defaultFormat?: string
+  askWhatYouPlay?: true
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -497,6 +498,7 @@ function parseSettings(value: unknown): LocalSettings | null {
       : DEFAULT_MENU_BUTTON_STYLE,
     launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
     ...systemPreference,
+    ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
   }
 }
 
@@ -653,14 +655,20 @@ export class LocalGameRepository {
   }
 
   loadSettings(): LocalSettings {
-    const stored = parseJson(this.storage.getString(LOCAL_KEYS.settings))
+    const storedText = this.storage.getString(LOCAL_KEYS.settings)
+    const stored = parseJson(storedText)
     const current = parseSettings(stored)
     if (current && isRecord(stored) && stored.brawlLifeMigrated === true) return current
-    const legacy = current
-      ? null
-      : parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.legacySettings)))
+    const legacyText = current ? undefined : this.storage.getString(LOCAL_KEYS.legacySettings)
+    const legacy = parseSettings(parseJson(legacyText))
     const found = current ?? legacy
-    const settings = found ? migrateBrawlStartingLife(found) : DEFAULT_LOCAL_SETTINGS
+    // why: every launch saves settings, so nothing stored at all means this install has never opened.
+    const freshInstall = storedText === undefined && legacyText === undefined
+    const settings: LocalSettings = found
+      ? migrateBrawlStartingLife(found)
+      : freshInstall
+        ? { ...DEFAULT_LOCAL_SETTINGS, askWhatYouPlay: true }
+        : DEFAULT_LOCAL_SETTINGS
     this.saveSettings(settings)
     if (legacy) this.storage.delete(LOCAL_KEYS.legacySettings)
     return settings

@@ -26,6 +26,14 @@ export default {
     continue: "계속",
     endGame: "게임 종료",
   },
+  whatYouPlay: {
+    heading: "어떤 게임을 하시나요?",
+    changeLater: "설정에서 변경할 수 있습니다.",
+    showMoreFormats_other: "형식 {{count}}개 더 보기",
+    play: "플레이",
+    acceptance:
+      "플레이하면 <terms>이용약관</terms> 및 <privacy>개인정보 처리방침</privacy>에 동의하는 것으로 간주됩니다.",
+  },
   recentSetups: {
     title: "최근 설정",
     newSetup: "새 설정",

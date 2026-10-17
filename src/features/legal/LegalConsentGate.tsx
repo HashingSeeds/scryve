@@ -19,8 +19,11 @@ import { privacyContent } from "@/content/privacy"
 import { termsContent } from "@/content/terms"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
+import { localGameRepository } from "@/features/game/localPersistence"
+import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { LegalConsentScreen } from "@/screens/LegalConsentScreen"
+import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
 
 import {
   accountAcceptanceCache,
@@ -471,6 +474,24 @@ function ConsentPrompt({
   isSubmitting?: boolean
   onAccept: () => void
 }) {
+  const [firstLaunchSettings] = useState(() =>
+    hasPriorAcceptance ? undefined : localGameRepository.loadSettings(),
+  )
+  if (firstLaunchSettings?.askWhatYouPlay)
+    return (
+      <WhatYouPlayScreen
+        defaultPlayerCount={firstLaunchSettings.defaultPlayerCount}
+        acceptsLegal={{
+          isSubmitting,
+          onOpenTerms: () => router.push("/terms"),
+          onOpenPrivacy: () => router.push("/privacy"),
+        }}
+        onChoose={(type) => {
+          localGameRepository.saveSettings(settingsForWhatYouPlay(firstLaunchSettings, type))
+          onAccept()
+        }}
+      />
+    )
   const changedContent =
     documents.length === 1 ? (documents[0] === "terms" ? termsContent : privacyContent) : undefined
   return (

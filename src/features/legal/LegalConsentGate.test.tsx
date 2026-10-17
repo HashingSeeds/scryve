@@ -5,6 +5,11 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { privacyContent } from "@/content/privacy"
 import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  LOCAL_KEYS,
+  localGameRepository,
+} from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { analyticsEnabled } from "@/utils/analytics"
 import { storage } from "@/utils/storage"
@@ -76,12 +81,35 @@ describe("LegalConsentGate", () => {
     storage.delete(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
     mockPush.mockClear()
     deviceAcceptanceStore.write({})
+    localGameRepository.saveSettings(DEFAULT_LOCAL_SETTINGS)
   })
 
   it("blocks the app until the current versions are accepted", () => {
     const view = renderGate()
     expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(view.getByText("Before you start")).toBeTruthy()
+  })
+
+  it("asks a fresh install what they play, and accepts with the answer", () => {
+    storage.delete(LOCAL_KEYS.settings)
+    const view = renderGate()
+    expect(view.queryByText("Before you start")).toBeNull()
+    expect(view.getByText("What do you play?")).toBeTruthy()
+
+    fireEvent.press(view.getByText("Terms of Use"))
+    expect(mockPush).toHaveBeenCalledWith("/terms")
+    expect(view.getByTestId("what-you-play-start")).toBeDisabled()
+    fireEvent.press(view.getByTestId("what-you-play-ygo-advanced"))
+    fireEvent.press(view.getByTestId("what-you-play-start"))
+
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(deviceAcceptanceStore.read()).toEqual(REQUIRED_CONSENT_VERSIONS)
+    expect(localGameRepository.loadSettings()).toMatchObject({
+      defaultSystem: "ygo",
+      defaultFormat: "advanced",
+      defaultStartingLife: 8000,
+    })
+    expect(localGameRepository.loadSettings().askWhatYouPlay).toBeUndefined()
   })
 
   it("lets the app through once accepted, and remembers it", () => {

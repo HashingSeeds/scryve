@@ -58,6 +58,7 @@ jest.mock("expo-router", () => ({
     return null
   },
 }))
+jest.mock("@/features/legal/LegalConsentGate", () => ({ useLegalConsentSettled: () => true }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, openAuth: mockOpenAuth }),
 }))
@@ -100,6 +101,28 @@ describe("shipping index route", () => {
     )
     expect(view.getByTestId("game-board")).toBeTruthy()
     expect(localGameRepository.loadActiveGame()).toBeNull()
+  })
+
+  it("asks a fresh install what they play before the first board", () => {
+    localGameRepository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, askWhatYouPlay: true })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("What do you play?")).toBeTruthy()
+    expect(view.queryByTestId("game-board")).toBeNull()
+
+    fireEvent.press(view.getByTestId("what-you-play-pokemon-standard"))
+    fireEvent.press(view.getByTestId("what-you-play-start"))
+
+    expect(view.getByTestId("game-board")).toBeTruthy()
+    expect(localGameRepository.loadSettings()).toEqual({
+      ...DEFAULT_LOCAL_SETTINGS,
+      defaultSystem: "pokemon",
+      defaultFormat: "standard",
+      defaultStartingLife: 6,
+    })
   })
 
   it.each(["Continue", "End game", "Abandon"])(

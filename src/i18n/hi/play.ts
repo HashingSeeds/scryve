@@ -26,6 +26,15 @@ export default {
     continue: "जारी रखें",
     endGame: "गेम खत्म करें",
   },
+  whatYouPlay: {
+    heading: "आप क्या खेलते हैं?",
+    changeLater: "आप इसे सेटिंग्स में बदल सकते हैं।",
+    showMoreFormats_one: "{{count}} और फ़ॉर्मैट दिखाएँ",
+    showMoreFormats_other: "{{count}} और फ़ॉर्मैट दिखाएँ",
+    play: "खेलें",
+    acceptance:
+      "खेलकर, आप <terms>उपयोग की शर्तों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत होते हैं।",
+  },
   recentSetups: {
     title: "हाल के सेटअप",
     newSetup: "नया सेटअप",
