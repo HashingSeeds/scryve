@@ -14,12 +14,14 @@ const modules = {
 
 describe("integration capability state", () => {
   it("uses the official Pokémon spelling in user-facing integration metadata", async () => {
-    expect(integration("pokemon")).toMatchObject({
-      displayName: "Pokémon TCG",
-      rights: {
-        requiredNotices: [expect.stringMatching(/^Pokémon, /)],
-      },
-    })
+    expect(integration("pokemon")).toMatchObject({ displayName: "Pokémon TCG" })
+  })
+
+  it("keeps the Pokémon owners and non-affiliation in its required notice", () => {
+    const [notice] = integration("pokemon")?.rights.requiredNotices ?? []
+    for (const owner of ["Nintendo", "Creatures", "GAME FREAK", "The Pokémon Company"])
+      expect(notice).toContain(owner)
+    expect(notice).toMatch(/not affiliated with or endorsed by/)
   })
 
   it("lists integrations with their literal registry types", () => {
