@@ -375,7 +375,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       openSheet({ kind: "place", slot }, from)
   }
 
-  // why: once a bench exists, the empty Active is filled by promoting from it, so no gesture places a new Pokémon there.
   function placeActive(picksCard: boolean) {
     placeOn("active", PLACE_ACTIVE_TRIGGER, picksCard || board.bench.length > 0)
   }

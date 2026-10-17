@@ -138,7 +138,7 @@ export function isCardless(pokemon: Pick<PokemonInPlay, "hp" | "cardId">) {
   return pokemon.hp === MAX_POKEMON_HP && pokemon.cardId === undefined
 }
 
-export function pokemonReadout(pokemon: Pick<PokemonInPlay, "hp" | "damage">) {
+export function pokemonReadout(pokemon: Pick<PokemonInPlay, "hp" | "damage" | "cardId">) {
   return isCardless(pokemon) ? pokemon.damage : remainingHp(pokemon)
 }
 
