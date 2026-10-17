@@ -610,3 +610,50 @@ describe("Limitless sourceUrl backfill", () => {
     }
   })
 })
+
+it("pruning a feed keeps its newest decks and leaves other sources alone", async () => {
+  jest.useFakeTimers()
+  try {
+    const t = convexTest(schema, modules)
+    const deck = (source: string, fetchedAt: number) => ({
+      game: "pokemon",
+      source,
+      externalId: `${source}-${fetchedAt}`,
+      kind: "tournament",
+      name: `Deck ${fetchedAt}`,
+      format: "standard",
+      fetchedAt,
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deckCatalogs", deck("curated", 0))
+      for (let fetchedAt = 1; fetchedAt <= 100; fetchedAt++) {
+        const catalogDeckId = await ctx.db.insert("deckCatalogs", deck("limitless", fetchedAt))
+        await ctx.db.insert("deckCatalogCards", {
+          catalogDeckId,
+          game: "pokemon",
+          name: "Pikachu",
+          quantity: 4,
+          section: "main",
+          entryKind: "card",
+        })
+      }
+    })
+
+    await t.mutation(internal.deckCatalogs.pruneFeed, {
+      game: "pokemon",
+      format: "standard",
+      source: "limitless",
+    })
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+
+    const { decks, cards } = await t.run(async (ctx) => ({
+      decks: await ctx.db.query("deckCatalogs").collect(),
+      cards: await ctx.db.query("deckCatalogCards").collect(),
+    }))
+    const fetched = decks.map((row) => row.fetchedAt).sort((a, b) => a - b)
+    expect(fetched).toEqual([0, ...Array.from({ length: 50 }, (_, index) => 51 + index)])
+    expect(cards).toHaveLength(50)
+  } finally {
+    jest.useRealTimers()
+  }
+})

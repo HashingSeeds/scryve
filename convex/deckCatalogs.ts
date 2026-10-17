@@ -25,6 +25,8 @@ import { MAX_DECK_CARDS } from "./lib/policy"
 import { SYSTEMS } from "./lib/systems"
 
 const FEED_TTL_MS = 24 * 60 * 60 * 1000
+export const KEPT_FEED_DECKS = 50
+const PRUNE_BATCH = 20
 
 function deckFeed(game: string) {
   if (!isProviderGame(game)) return undefined
@@ -160,6 +162,31 @@ export const upsert = internalMutation({
     for (const entry of args.entries)
       await ctx.db.insert("deckCatalogCards", { catalogDeckId, game, ...entry })
     return catalogDeckId
+  },
+})
+
+export const pruneFeed = internalMutation({
+  args: { game: v.string(), format: v.string(), source: v.string() },
+  handler: async (ctx, args) => {
+    const newest = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_format_and_fetched_at", (q) =>
+        q.eq("game", args.game).eq("format", args.format),
+      )
+      .order("desc")
+      .take(KEPT_FEED_DECKS + PRUNE_BATCH)
+    const stale = newest.filter((deck) => deck.source === args.source).slice(KEPT_FEED_DECKS)
+    for (const deck of stale) {
+      const entries = await ctx.db
+        .query("deckCatalogCards")
+        .withIndex("by_catalog_deck_id", (q) => q.eq("catalogDeckId", deck._id))
+        .take(MAX_DECK_CARDS + 1)
+      for (const entry of entries) await ctx.db.delete(entry._id)
+      await ctx.db.delete(deck._id)
+    }
+    if (stale.length > 0 && newest.length === KEPT_FEED_DECKS + PRUNE_BATCH)
+      await ctx.scheduler.runAfter(0, internal.deckCatalogs.pruneFeed, args)
+    return null
   },
 })
 
@@ -351,7 +378,6 @@ async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
       httpStatus: result.status,
       message: `${result.count} decks cached`,
     })
-    return true
   } catch (error) {
     const finishedAt = Date.now()
     await ctx.runMutation(internal.providerHealth.record, {
@@ -365,6 +391,8 @@ async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
     })
     return false
   }
+  await ctx.runMutation(internal.deckCatalogs.pruneFeed, { game, format, source: feed.source })
+  return true
 }
 
 export const refresh = internalAction({
