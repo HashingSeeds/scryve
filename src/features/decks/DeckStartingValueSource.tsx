@@ -11,14 +11,14 @@ export type DeckStartingValue = { versionId: string; value: number | null }
 
 type SourceProps = {
   versionId: string
-  onChange: (value: DeckStartingValue) => void
+  onChange: (value: DeckStartingValue | undefined) => void
 }
 
 function StartingValueQuery({ versionId, onChange }: SourceProps) {
   const online = useConvexOnline()
   const value = useQuery(api.decks.startingValue, { versionId: versionId as Id<"deckVersions"> })
   useEffect(() => {
-    if (value !== undefined || !online) onChange({ versionId, value: value ?? null })
+    onChange(value !== undefined || !online ? { versionId, value: value ?? null } : undefined)
   }, [value, versionId, online, onChange])
   return null
 }

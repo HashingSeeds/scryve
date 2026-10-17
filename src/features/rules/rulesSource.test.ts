@@ -83,6 +83,18 @@ it("prefetchRules downloads once, shares the download with Rules, and skips a cu
   expect(loadStoredRules(MAGIC, store)?.rules).toBe(rules)
 })
 
+it("prefetchRules downloads again when the stored copy has a URL but no usable text", async () => {
+  const store = memoryStore()
+  store.set("scryve.rules.url.v1", MAGIC.url)
+  store.set("scryve.rules.text.v1", "<html />")
+  const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
+  prefetchRules(MAGIC, store, fetcher)
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  await downloadRules(MAGIC, store, fetcher)
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(loadStoredRules(MAGIC, store)?.rules.effectiveDate).toBe("September 25, 2026")
+})
+
 it("shows rules a prefetch stored after the screen first read the cache", () => {
   const stored = new Map([
     ["scryve.rules.url.v1", MAGIC.url],

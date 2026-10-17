@@ -120,7 +120,7 @@ export default function NewLocalGameRoute() {
   }
 
   const connectableGame = started && mode === "local" ? activeGame : null
-  const readingDeck = ownerId && Array.isArray(decks) ? chosenDeck : undefined
+  const readingDeck = ownerId ? chosenDeck : undefined
   const connectAllowed = Boolean(connected?.access ?? connected?.ready)
 
   return (

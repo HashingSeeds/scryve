@@ -51,6 +51,11 @@ async function main() {
       id: resolve(deck, "cards", displayName(name, pitch)),
     })),
   }))
+  if (missing.length) {
+    for (const line of missing) console.log(`Not exactly one card in fab-cube ${tag}: ${line}`)
+    process.exitCode = 1
+    return
+  }
   const byName = (record) =>
     Object.fromEntries(Object.entries(record).sort(([, a], [, b]) => a.localeCompare(b)))
   fs.writeFileSync(precons, JSON.stringify(decks))
@@ -63,8 +68,6 @@ async function main() {
     ["--write", precons, path.join(games, "fixtures/fabPreconCards.json")],
     { stdio: "ignore" },
   )
-  for (const line of missing) console.log(`Not exactly one card in fab-cube ${tag}: ${line}`)
-  if (missing.length) process.exitCode = 1
 }
 
 main().catch((error) => {

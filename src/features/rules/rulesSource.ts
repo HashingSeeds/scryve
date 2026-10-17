@@ -42,7 +42,7 @@ function storedUrl(source: TextRules, store: RulesStore) {
 
 function isCurrent(source: TextRules, store: RulesStore) {
   return (
-    storedUrl(source, store) === source.url &&
+    loadStoredRules(source, store)?.url === source.url &&
     (!source.revalidate || entries(checked, store).has(source.cacheKey))
   )
 }
