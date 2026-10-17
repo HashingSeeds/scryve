@@ -37,8 +37,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-const isPositiveInteger = (value: unknown): value is number =>
-  typeof value === "number" && Number.isInteger(value) && value > 0
+const isWholeNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0
+
+const isPositiveInteger = (value: unknown): value is number => isWholeNumber(value) && value > 0
 
 function parseLocalSetup(value: unknown): LocalSetup | undefined {
   if (!isRecord(value) || !Array.isArray(value.players)) return undefined
@@ -51,7 +53,7 @@ function parseLocalSetup(value: unknown): LocalSetup | undefined {
         }
       : undefined,
   )
-  if (players.some((player) => player === undefined) || !isPositiveInteger(value.startingLife))
+  if (players.some((player) => player === undefined) || !isWholeNumber(value.startingLife))
     return undefined
   const setup: LocalSetup = {
     players: players.filter((player) => player !== undefined),
@@ -88,7 +90,7 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     !isPositiveInteger(value.playerCount) ||
     value.playerCount < 2 ||
     value.playerCount > 6 ||
-    !isPositiveInteger(value.startingLife) ||
+    !isWholeNumber(value.startingLife) ||
     typeof value.ruleset !== "string" ||
     typeof value.deckRequired !== "boolean" ||
     !isPositiveInteger(value.lifeStep)
