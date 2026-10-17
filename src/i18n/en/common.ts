@@ -23,6 +23,8 @@ const common = {
     account: "Account",
     signIn: "Sign in",
     closeMenu: "Close utility menu",
+    nearbyOnlyOn: "Nearby only: On",
+    nearbyOnlyOff: "Nearby only: Off",
   },
   appNavigation: {
     decks: "Decks",

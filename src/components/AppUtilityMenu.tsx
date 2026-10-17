@@ -8,6 +8,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { lanPlayAvailable } from "@/features/lan/lanAvailability"
+import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -26,7 +28,7 @@ export function AppUtilityMenu({
   onHistory,
   onSettings,
   onAccount,
-  onOpenChange,
+  onOpenHeightChange,
   accountEntry = "account",
 }: {
   visible?: boolean
@@ -35,21 +37,25 @@ export function AppUtilityMenu({
   onHistory: () => void
   onSettings: () => void
   onAccount: () => void
-  onOpenChange?: (open: boolean) => void
+  onOpenHeightChange?: (height: number) => void
   accountEntry?: AccountEntry
 }) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [open, setOpen] = useState(false)
   const updateReady = useAppUpdate().status === "ready"
+  const nearbyOnly = useNearbyOnly()
+  const testsNearby = lanPlayAvailable()
+  const itemCount = testsNearby ? 4 : 3
+  const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
   useEffect(() => {
     if (!visible && open) {
       setOpen(false)
-      onOpenChange?.(false)
+      onOpenHeightChange?.(0)
     }
-  }, [onOpenChange, open, visible])
+  }, [onOpenHeightChange, open, visible])
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, {
@@ -58,8 +64,8 @@ export function AppUtilityMenu({
   }, [open, progress, reducedMotion])
 
   const containerStyle = useAnimatedStyle(() => ({
-    width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, compact ? 148 : 188]),
-    height: interpolate(progress.value, [0, 1], [44, UTILITY_MENU_HEIGHT]),
+    width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, openWidth]),
+    height: interpolate(progress.value, [0, 1], [44, ITEM_HEIGHT * itemCount]),
     borderRadius: compact ? interpolate(progress.value, [0, 1], [22, 16]) : 0,
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
@@ -69,7 +75,7 @@ export function AppUtilityMenu({
 
   const close = () => {
     setOpen(false)
-    onOpenChange?.(false)
+    onOpenHeightChange?.(0)
   }
   useCloseOnBack(open, close)
 
@@ -78,7 +84,7 @@ export function AppUtilityMenu({
     close()
     action()
   }
-  const slotStyle = open ? (compact ? $expandedCompactSlot : $expandedSlot) : undefined
+  const slotStyle = open ? { width: openWidth, height: ITEM_HEIGHT * itemCount } : undefined
 
   return (
     <Animated.View
@@ -118,7 +124,7 @@ export function AppUtilityMenu({
             style={themed($trigger)}
             onPress={() => {
               setOpen(true)
-              onOpenChange?.(true)
+              onOpenHeightChange?.(ITEM_HEIGHT * itemCount)
             }}
           >
             {compact ? (
@@ -188,6 +194,22 @@ export function AppUtilityMenu({
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
             />
           </Pressable>
+          {testsNearby ? (
+            <Pressable
+              testID="utility-nearby-only-button"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: nearbyOnly }}
+              style={themed($item)}
+              onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
+            >
+              <Text
+                tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
+                weight="medium"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+              />
+            </Pressable>
+          ) : null}
         </Animated.View>
       </Animated.View>
     </Animated.View>
@@ -195,12 +217,10 @@ export function AppUtilityMenu({
 }
 
 const MENU_MAX_FONT_SCALE = 1.5
-export const UTILITY_MENU_HEIGHT = 160
+const ITEM_HEIGHT = 54
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
-const $expandedSlot: ViewStyle = { width: 188, height: UTILITY_MENU_HEIGHT }
-const $expandedCompactSlot: ViewStyle = { width: 148, height: UTILITY_MENU_HEIGHT }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,

@@ -1,7 +1,7 @@
 import { addNetworkStateListener, type NetworkState, NetworkStateType } from "expo-network"
 import { ConvexReactClient } from "convex/react"
 
-import { reconnectConvexOnNetworkReturn } from "./convexReconnect"
+import { reconnectAfterOutage, reconnectConvexOnNetworkReturn } from "./convexReconnect"
 
 const sockets: FakeSocket[] = []
 
@@ -106,5 +106,30 @@ describe("reconnectConvexOnNetworkReturn", () => {
 
     emit({ ...online, type: NetworkStateType.WIFI })
     expect(sockets).toHaveLength(2)
+  })
+})
+
+describe("reconnectAfterOutage", () => {
+  it("skips the backoff now, and once more if the attempt already in flight fails", async () => {
+    const client = new ConvexReactClient("https://example.convex.cloud", {
+      webSocketConstructor: FakeSocket as unknown as typeof WebSocket,
+      unsavedChangesWarning: false,
+      logger: false,
+    })
+    client.connectionState()
+    sockets[0].open()
+    sockets[0].drop()
+    jest.runOnlyPendingTimers()
+    expect(sockets).toHaveLength(2)
+
+    reconnectAfterOutage(client)
+    expect(sockets).toHaveLength(2)
+    sockets[1].drop()
+    await settle()
+
+    expect(sockets).toHaveLength(3)
+    sockets[2].drop()
+    await settle()
+    expect(sockets).toHaveLength(3)
   })
 })

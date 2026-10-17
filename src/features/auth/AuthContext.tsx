@@ -5,8 +5,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
+import { Platform } from "react-native"
 import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
@@ -15,9 +17,13 @@ import { APP_ROOT_URL, readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
-import { reconnectConvexOnNetworkReturn } from "@/features/connected/convexReconnect"
+import {
+  reconnectAfterOutage,
+  reconnectConvexOnNetworkReturn,
+} from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
+import { NearbyOnlyWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
@@ -91,9 +97,20 @@ export function ConfiguredAuth({
     [isLoaded, isSignedIn, user?.id, sessionHint, visible],
   )
   const client = useMemo(
-    () => new ConvexReactClient(convexUrl, { initialAuthTokenReuse: true }),
+    () =>
+      new ConvexReactClient(convexUrl, {
+        initialAuthTokenReuse: true,
+        ...(Platform.OS === "web" ? {} : { webSocketConstructor: NearbyOnlyWebSocket }),
+      }),
     [convexUrl],
   )
+  const nearbyOnly = useNearbyOnly()
+  const wasNearbyOnly = useRef(nearbyOnly)
+  useEffect(() => {
+    const switchedOff = wasNearbyOnly.current && !nearbyOnly
+    wasNearbyOnly.current = nearbyOnly
+    return switchedOff ? reconnectAfterOutage(client) : undefined
+  }, [client, nearbyOnly])
   useEffect(() => reconnectConvexOnNetworkReturn(client), [client])
   const convexUseAuth = useMemo(
     () => createConvexAuthHook(useAuth, convexAuthRetryKey),

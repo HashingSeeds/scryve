@@ -53,3 +53,18 @@ function reconnectNow(client: ConvexReactClient) {
   )
     manager.tryReconnectImmediately()
 }
+
+export function reconnectAfterOutage(client: ConvexReactClient) {
+  const { isWebSocketConnected, connectionRetries } = client.connectionState()
+  if (isWebSocketConnected) return () => undefined
+  reconnectNow(client)
+  let waiting = true
+  return client.subscribeToConnectionState((state) => {
+    if (!waiting) return
+    if (state.isWebSocketConnected) waiting = false
+    else if (state.connectionRetries > connectionRetries) {
+      waiting = false
+      reconnectNow(client)
+    }
+  })
+}

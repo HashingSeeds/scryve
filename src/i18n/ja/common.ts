@@ -26,6 +26,8 @@ export default {
     account: "アカウント",
     signIn: "ログイン",
     closeMenu: "ユーティリティメニューを閉じる",
+    nearbyOnlyOn: "ニアバイのみ: オン",
+    nearbyOnlyOff: "ニアバイのみ: オフ",
   },
   appNavigation: {
     decks: "デッキ",

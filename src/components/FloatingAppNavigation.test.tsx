@@ -6,6 +6,9 @@ import { ThemeProvider } from "@/theme/context"
 
 import { FloatingAppNavigation } from "./FloatingAppNavigation"
 
+let mockNearbyPlay = false
+jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
+
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: jest.fn(() => ({ top: 0, right: 0, bottom: 34, left: 0 })),
 }))
@@ -39,30 +42,37 @@ it.each([
 })
 
 describe("FloatingAppNavigation", () => {
-  it("expands its hit area without moving the destination button", () => {
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <FloatingAppNavigation
-          destination="returnToGame"
-          onDestination={jest.fn()}
-          onHistory={jest.fn()}
-          onSettings={jest.fn()}
-          onAccount={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
+  it.each([
+    [false, 162],
+    [true, 216],
+  ])(
+    "with nearby play %s, expands its hit area to the open menu without moving the destination button",
+    (nearbyPlay, height) => {
+      mockNearbyPlay = nearbyPlay
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <FloatingAppNavigation
+            destination="returnToGame"
+            onDestination={jest.fn()}
+            onHistory={jest.fn()}
+            onSettings={jest.fn()}
+            onAccount={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
 
-    const navigation = view.getByTestId("floating-app-navigation")
-    expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({
-      height: 48,
-      justifyContent: "flex-end",
-    })
-    expect(StyleSheet.flatten(view.getByTestId("open-decks-button").props.style)).toMatchObject({
-      marginBottom: 2,
-    })
+      const navigation = view.getByTestId("floating-app-navigation")
+      expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({
+        height: 48,
+        justifyContent: "flex-end",
+      })
+      expect(StyleSheet.flatten(view.getByTestId("open-decks-button").props.style)).toMatchObject({
+        marginBottom: 2,
+      })
 
-    fireEvent.press(view.getByTestId("utility-menu-button"))
+      fireEvent.press(view.getByTestId("utility-menu-button"))
 
-    expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({ height: 160 })
-  })
+      expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({ height })
+    },
+  )
 })

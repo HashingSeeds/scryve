@@ -1,11 +1,20 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { setNearbyOnly } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
 
 import { AppUtilityMenu } from "./AppUtilityMenu"
 import { GameMenuBackdrop } from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
+
+let mockNearbyPlay = false
+jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
+
+beforeEach(() => {
+  mockNearbyPlay = false
+  setNearbyOnly(false)
+})
 
 describe("AppUtilityMenu", () => {
   it("closes on Android Back before the game menu it opened from", () => {
@@ -103,12 +112,39 @@ describe("AppUtilityMenu", () => {
 
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
       width: 148,
-      height: 160,
+      height: 162,
+    })
+  })
+
+  it("lets a nearby tester cut this device off from Convex, and remembers it", () => {
+    mockNearbyPlay = true
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          compact
+          onHistory={jest.fn()}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      width: 176,
+      height: 216,
+    })
+
+    fireEvent.press(view.getByText("Nearby only: Off"))
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+
+    expect(view.getByText("Nearby only: On")).toBeTruthy()
+    expect(view.getByTestId("utility-nearby-only-button").props.accessibilityState).toEqual({
+      checked: true,
     })
   })
 
   it("only reports closing when a visible menu is actually open", () => {
-    const onOpenChange = jest.fn()
+    const onOpenHeightChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu
@@ -116,12 +152,12 @@ describe("AppUtilityMenu", () => {
           onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
-          onOpenChange={onOpenChange}
+          onOpenHeightChange={onOpenHeightChange}
         />
       </ThemeProvider>,
     )
 
-    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(onOpenHeightChange).not.toHaveBeenCalled()
 
     view.rerender(
       <ThemeProvider initialContext="dark">
@@ -130,12 +166,12 @@ describe("AppUtilityMenu", () => {
           onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
-          onOpenChange={onOpenChange}
+          onOpenHeightChange={onOpenHeightChange}
         />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("utility-menu-button"))
-    onOpenChange.mockClear()
+    onOpenHeightChange.mockClear()
     view.rerender(
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu
@@ -143,12 +179,12 @@ describe("AppUtilityMenu", () => {
           onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
-          onOpenChange={onOpenChange}
+          onOpenHeightChange={onOpenHeightChange}
         />
       </ThemeProvider>,
     )
 
-    expect(onOpenChange).toHaveBeenCalledTimes(1)
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(onOpenHeightChange).toHaveBeenCalledTimes(1)
+    expect(onOpenHeightChange).toHaveBeenCalledWith(0)
   })
 })

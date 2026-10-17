@@ -26,6 +26,8 @@ export default {
     account: "खाता",
     signIn: "साइन इन करें",
     closeMenu: "यूटिलिटी मेन्यू बंद करें",
+    nearbyOnlyOn: "केवल आस-पास: चालू",
+    nearbyOnlyOff: "केवल आस-पास: बंद",
   },
   appNavigation: {
     decks: "डेक",

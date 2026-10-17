@@ -1,8 +1,11 @@
 import { useEffect, type ReactNode } from "react"
 import { Pressable } from "react-native"
-import { fireEvent, render, screen } from "@testing-library/react-native"
+import { act, fireEvent, render, screen } from "@testing-library/react-native"
+import { ConvexReactClient } from "convex/react"
 
 import { Text } from "@/components/Text"
+import { reconnectAfterOutage } from "@/features/connected/convexReconnect"
+import { NearbyOnlyWebSocket, setNearbyOnly } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
 
 import { CloudProviders, useAuthAccess } from "./AuthContext"
@@ -44,9 +47,20 @@ jest.mock("@clerk/expo/native", () => {
   const NativeText = jest.requireActual("react-native").Text
   return { AuthView: () => <NativeText testID="native-auth-view">Auth</NativeText> }
 })
+jest.mock("@/features/lan/nearbyOnly", () => ({
+  ...jest.requireActual("@/features/lan/nearbyOnly"),
+  NearbyOnlyWebSocket: class {},
+}))
+jest.mock("@/features/connected/convexReconnect", () => ({
+  reconnectConvexOnNetworkReturn: () => () => undefined,
+  reconnectAfterOutage: jest.fn(() => () => undefined),
+}))
 jest.mock("convex/react", () => ({
   ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
-  ConvexReactClient: jest.fn(() => ({ subscribeToConnectionState: () => () => undefined })),
+  ConvexReactClient: jest.fn(() => ({
+    subscribeToConnectionState: () => () => undefined,
+    close: jest.fn(async () => undefined),
+  })),
   useConvex: () => mockConvexClient,
   useMutation: () => jest.fn(),
   useConvexAuth: () => ({ isAuthenticated: false, isLoading: true }),
@@ -82,6 +96,30 @@ describe("native auth experience", () => {
     expect(mockUseAuth).toHaveBeenCalledWith({ treatPendingAsSignedOut: false })
     fireEvent.press(screen.getByTestId("open-auth"))
     expect(screen.getByTestId("auth-modal").props.visible).toBe(true)
+  })
+
+  it("keeps one Convex client across nearby only, reconnecting it at once when switched off", () => {
+    jest.mocked(ConvexReactClient).mockClear()
+    render(
+      <ThemeProvider initialContext="light">
+        <CloudProviders>
+          <Harness />
+        </CloudProviders>
+      </ThemeProvider>,
+    )
+    expect(ConvexReactClient).toHaveBeenCalledTimes(1)
+    expect(ConvexReactClient).toHaveBeenCalledWith("https://example.convex.cloud", {
+      initialAuthTokenReuse: true,
+      webSocketConstructor: NearbyOnlyWebSocket,
+    })
+    expect(reconnectAfterOutage).not.toHaveBeenCalled()
+
+    act(() => setNearbyOnly(true))
+    expect(reconnectAfterOutage).not.toHaveBeenCalled()
+    act(() => setNearbyOnly(false))
+
+    expect(ConvexReactClient).toHaveBeenCalledTimes(1)
+    expect(reconnectAfterOutage).toHaveBeenCalledTimes(1)
   })
 
   it("passes the native Clerk resource cache alongside the token cache", () => {
