@@ -212,6 +212,22 @@ describe("buildFinishedLocalGameSnapshot", () => {
     expect(snapshot.players[2].deckVersionId).toBeUndefined()
   })
 
+  it("leaves out a system this app doesn't know, so the server still accepts the game", () => {
+    const game = commanderGame()
+    const snapshot = buildFinishedLocalGameSnapshot({
+      schemaVersion: 1,
+      id: game.id,
+      status: "finished",
+      system: "lorcana",
+      startingLife: 20,
+      players: game.players,
+      eventCount: 1,
+      createdAt: 100,
+      finishedAt: 200,
+    })
+    expect(snapshot).not.toHaveProperty("system")
+  })
+
   it("caps life at the server's limit, so one runaway seat can't sink the upload", () => {
     const game = commanderGame()
     const snapshot = buildFinishedLocalGameSnapshot({

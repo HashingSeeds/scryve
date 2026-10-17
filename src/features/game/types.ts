@@ -148,7 +148,7 @@ export interface LocalGameSummary {
   schemaVersion: 1
   id: GameId
   status: "finished" | "abandoned"
-  system?: PlaySystemId
+  system?: string
   format?: string
   startingLife: number
   players: GamePlayer[]
