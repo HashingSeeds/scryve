@@ -6,8 +6,6 @@ const { test } = require("node:test")
 
 const { measure, parseReport, renderComment } = require("./bundle-size.cjs")
 
-const limits = { ios: 12_650_000, android: 12_850_000, web: 6_600_000 }
-
 test("measure adds up every chunk per platform", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-bundle-size-test-"))
   try {
@@ -28,33 +26,46 @@ test("measure adds up every chunk per platform", () => {
   }
 })
 
-test("comment shows the change against main and flags bundles over budget", () => {
+test("comment shows the change against main and flags bundles that grew too much", () => {
   const comment = renderComment(
     parseReport({
       head: { ios: 12_045_032, android: 12_257_034, web: 6_700_000 },
       base: { ios: 12_060_000, android: 12_257_100, web: 6_300_000 },
-      limits,
     }),
   )
   assert.match(comment, /^<!-- bundle-size -->\n/)
-  assert.match(comment, /\| iOS \| 12\.05 MB \| -15 KB \(-0\.1%\) \| 12\.65 MB \|/)
-  assert.match(comment, /\| Android \| 12\.26 MB \| no change \| 12\.85 MB \|/)
-  assert.match(comment, /\| Web \| 6\.70 MB \| \+400 KB \(\+6\.3%\) \| 6\.60 MB \*\*over\*\* \|/)
-  assert.match(comment, /Over budget: Web\./)
+  assert.match(comment, /\| iOS \| 12\.05 MB \| -15 KB \(-0\.1%\) \|/)
+  assert.match(comment, /\| Android \| 12\.26 MB \| no change \|/)
+  assert.match(comment, /\| Web \| 6\.70 MB \| \+400 KB \(\+6\.3%\) \*\*over\*\* \|/)
+  assert.match(comment, /Grew more than 1%: Web\./)
+})
+
+test("growth up to 1% passes, past it fails, at any total size", () => {
+  const base = { ios: 50_000_000, android: 1_000_000, web: 1_000_000 }
+  const atLimit = renderComment(
+    parseReport({ head: { ios: 50_500_000, android: 1_010_000, web: 1_000_000 }, base }),
+  )
+  assert.doesNotMatch(atLimit, /over/)
+  const pastLimit = renderComment(
+    parseReport({ head: { ios: 50_500_000, android: 1_010_001, web: 1_000_000 }, base }),
+  )
+  assert.match(pastLimit, /Grew more than 1%: Android\./)
 })
 
 test("comment without a main baseline still reports sizes", () => {
-  const comment = renderComment(
-    parseReport({ head: { ios: 1, android: 2, web: 3 }, base: null, limits }),
-  )
+  const comment = renderComment(parseReport({ head: { ios: 1, android: 2, web: 3 }, base: null }))
   assert.match(comment, /no main baseline/)
-  assert.doesNotMatch(comment, /Over budget/)
+  assert.doesNotMatch(comment, /Grew more than/)
 })
 
 test("reports from a fork PR must be plain byte counts", () => {
   assert.throws(
-    () => parseReport({ head: { ios: "1 MB", android: 2, web: 3 }, base: null, limits }),
+    () => parseReport({ head: { ios: "1 MB", android: 2, web: 3 }, base: null }),
     /head\.ios must be a byte count/,
   )
-  assert.throws(() => parseReport({ head: { ios: 1, android: 2, web: 3 } }), /limits must be/)
+  assert.throws(
+    () =>
+      parseReport({ head: { ios: 1, android: 2, web: 3 }, base: { ios: -1, android: 2, web: 3 } }),
+    /base\.ios must be a byte count/,
+  )
 })
