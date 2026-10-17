@@ -685,6 +685,7 @@ function NewGameForm({
                 text={recentSetupLabel(recent)}
                 detail={recentSetupDetail(recent)}
                 detailShrinks
+                TextProps={$recentLabel}
                 selected={recentSelected}
                 onPress={() => onReplay(recent)}
               />
@@ -1349,6 +1350,7 @@ const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $gameTypes: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $recentLabel = { style: { flexShrink: 0 } }
 const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
