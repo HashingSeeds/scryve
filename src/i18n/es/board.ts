@@ -130,12 +130,14 @@ export default {
       mtg: "Empate en vida",
       ygo: "Empate en Puntos de Vida",
       pokemon: "Empate en cartas de Premio",
+      lorcana: "Empate en leyenda",
     },
     leads: {
       none: "{{name}} lidera en vida",
       mtg: "{{name}} lidera en vida",
       ygo: "{{name}} lidera en Puntos de Vida",
       pokemon: "{{name}} lidera en cartas de Premio",
+      lorcana: "{{name}} lidera en leyenda",
     },
   },
   clock: {
@@ -384,12 +386,15 @@ export default {
       ygo: "Toca para cambiar los Puntos de Vida de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
       pokemon:
         "Toca para cambiar las cartas de Premio de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
+      lorcana:
+        "Toca para cambiar la leyenda de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
     },
     moreControls: {
       none: "{{identity}}, más controles de vida",
       mtg: "{{identity}}, más controles de vida",
       ygo: "{{identity}}, más controles de Puntos de Vida",
       pokemon: "{{identity}}, más controles de cartas de Premio",
+      lorcana: "{{identity}}, más controles de leyenda",
     },
   },
   grid: {
@@ -406,6 +411,9 @@ export default {
       pokemon_one: "Cuadrícula de cartas de Premio de {{count}} jugador",
       pokemon_many: "Cuadrícula de cartas de Premio de {{count}} de jugadores",
       pokemon_other: "Cuadrícula de cartas de Premio de {{count}} jugadores",
+      lorcana_one: "Cuadrícula de leyenda de {{count}} jugador",
+      lorcana_many: "Cuadrícula de leyenda de {{count}} de jugadores",
+      lorcana_other: "Cuadrícula de leyenda de {{count}} jugadores",
     },
   },
   pokemonSheet: {
@@ -493,18 +501,21 @@ export default {
       mtg: "Cambio de vida de {{name}}",
       ygo: "Cambio de Puntos de Vida de {{name}}",
       pokemon: "Cambio de cartas de Premio de {{name}}",
+      lorcana: "Cambio de leyenda de {{name}}",
     },
     add: {
       none: "Sumar {{amount}} de vida",
       mtg: "Sumar {{amount}} de vida",
       ygo: "Sumar {{amount}} Puntos de Vida",
       pokemon: "Sumar {{amount}} cartas de Premio",
+      lorcana: "Sumar {{amount}} de leyenda",
     },
     subtract: {
       none: "Restar {{amount}} de vida",
       mtg: "Restar {{amount}} de vida",
       ygo: "Restar {{amount}} Puntos de Vida",
       pokemon: "Restar {{amount}} cartas de Premio",
+      lorcana: "Restar {{amount}} de leyenda",
     },
   },
 } satisfies LocaleNamespace

@@ -128,12 +128,14 @@ export default {
       mtg: "लाइफ में बराबरी",
       ygo: "लाइफ़ पॉइंट बराबर हैं",
       pokemon: "प्राइज़ कार्ड बराबर हैं",
+      lorcana: "लोर बराबर है",
     },
     leads: {
       none: "{{name}} लाइफ में आगे है",
       mtg: "{{name}} लाइफ में आगे है",
       ygo: "{{name}} लाइफ़ पॉइंट में आगे है",
       pokemon: "{{name}} प्राइज़ कार्ड में आगे है",
+      lorcana: "{{name}} लोर में आगे है",
     },
   },
   clock: {
@@ -370,12 +372,15 @@ export default {
       ygo: "{{identity}} के लाइफ़ पॉइंट {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
       pokemon:
         "{{identity}} के प्राइज़ कार्ड {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
+      lorcana:
+        "{{identity}} का लोर {{delta}} बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
     },
     moreControls: {
       none: "{{identity}}, और लाइफ कंट्रोल",
       mtg: "{{identity}}, और लाइफ कंट्रोल",
       ygo: "{{identity}}, लाइफ़ पॉइंट के और विकल्प",
       pokemon: "{{identity}}, प्राइज़ कार्ड के और विकल्प",
+      lorcana: "{{identity}}, लोर के और विकल्प",
     },
   },
   grid: {
@@ -388,6 +393,8 @@ export default {
       ygo_other: "{{count}} खिलाड़ियों का लाइफ़ पॉइंट ग्रिड",
       pokemon_one: "{{count}} खिलाड़ी का प्राइज़ कार्ड ग्रिड",
       pokemon_other: "{{count}} खिलाड़ियों का प्राइज़ कार्ड ग्रिड",
+      lorcana_one: "{{count}} खिलाड़ी का लोर ग्रिड",
+      lorcana_other: "{{count}} खिलाड़ियों का लोर ग्रिड",
     },
   },
   pokemonSheet: {
@@ -474,18 +481,21 @@ export default {
       mtg: "{{name}} का life बदलाव",
       ygo: "{{name}} के लाइफ़ पॉइंट में बदलाव",
       pokemon: "{{name}} के प्राइज़ कार्ड में बदलाव",
+      lorcana: "{{name}} के लोर में बदलाव",
     },
     add: {
       none: "{{amount}} life जोड़ें",
       mtg: "{{amount}} life जोड़ें",
       ygo: "{{amount}} लाइफ़ पॉइंट जोड़ें",
       pokemon: "{{amount}} प्राइज़ कार्ड जोड़ें",
+      lorcana: "{{amount}} लोर जोड़ें",
     },
     subtract: {
       none: "{{amount}} life घटाएँ",
       mtg: "{{amount}} life घटाएँ",
       ygo: "{{amount}} लाइफ़ पॉइंट घटाएँ",
       pokemon: "{{amount}} प्राइज़ कार्ड घटाएँ",
+      lorcana: "{{amount}} लोर घटाएँ",
     },
   },
 } satisfies LocaleNamespace

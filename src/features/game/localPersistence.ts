@@ -52,6 +52,7 @@ import type {
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
+import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
 
 export const MAX_HISTORY_GAMES = 30
@@ -470,15 +471,15 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
 function parseSettings(value: unknown): LocalSettings | null {
   if (!isRecord(value)) return null
   const migrated = value.schemaVersion === undefined ? { ...value, schemaVersion: 1 } : value
-  const maximumStartingValue = playSystemRules(migrated.defaultSystem).counter.maxStartingValue
+  const startingValue = startingValueRange(migrated.defaultSystem)
   if (
     migrated.schemaVersion !== 1 ||
     typeof migrated.defaultPlayerCount !== "number" ||
     migrated.defaultPlayerCount < 2 ||
     migrated.defaultPlayerCount > 6 ||
     typeof migrated.defaultStartingLife !== "number" ||
-    migrated.defaultStartingLife < 1 ||
-    migrated.defaultStartingLife > maximumStartingValue ||
+    migrated.defaultStartingLife < startingValue.min ||
+    migrated.defaultStartingLife > startingValue.max ||
     typeof migrated.hapticsEnabled !== "boolean" ||
     (migrated.themePreference !== "system" &&
       migrated.themePreference !== "light" &&

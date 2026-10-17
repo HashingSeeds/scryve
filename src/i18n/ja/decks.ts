@@ -489,6 +489,7 @@ export default {
       "枚数、名前、セットコード、カード番号を含むPokémon TCG Liveのリストを貼り付けてください。",
     listHelperMtg:
       "「1 Sol Ring」のような行を使用してください。Commander、Mainboard、Sideboardの見出しに対応しています。",
+    listHelperLorcana: "「4 Aladdin - Heroic Outlaw」のような行を使ってください。",
     returnToReview: "確認に戻る",
     loadingDeck: "デッキを読み込み中…",
     reloadSource: "ソースを再読み込み",

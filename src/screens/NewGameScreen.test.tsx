@@ -647,7 +647,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
     expect(view.queryByTestId("game-type-mtg-brawl")).toBeNull()
-    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent("All formats13 more")
+    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent("All formats14 more")
     fireEvent.press(view.getByTestId("game-type-all-formats"))
     expect(view.queryByTestId("game-type-all-formats")).toBeNull()
     fireEvent.press(view.getByTestId("game-type-mtg-brawl"))

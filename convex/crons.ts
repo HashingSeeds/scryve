@@ -2,6 +2,7 @@ import { cronJobs } from "convex/server"
 
 import { internal } from "./_generated/api"
 import { internalMutation } from "./_generated/server"
+import { GAME_PROVIDERS } from "./lib/games/providers"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -55,5 +56,10 @@ crons.interval(
 crons.interval("prune old receipts", { hours: 24 }, internal.crons.pruneOldReceipts, {})
 
 crons.interval("refresh deck catalogs", { hours: 6 }, internal.deckCatalogs.refreshScheduled, {})
+
+for (const [game, { catalog }] of Object.entries(GAME_PROVIDERS)) {
+  if (catalog.bulk)
+    crons.interval(`sync ${game} cards`, { hours: 12 }, internal.cardDatasetSync.sync, { game })
+}
 
 export default crons

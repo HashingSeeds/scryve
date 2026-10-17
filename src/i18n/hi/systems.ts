@@ -8,18 +8,21 @@ export default {
     mtg: "लाइफ",
     ygo: "लाइफ़ पॉइंट",
     pokemon: "प्राइज़ कार्ड",
+    lorcana: "लोर",
   },
   counterLabel: {
     none: "लाइफ",
     mtg: "लाइफ",
     ygo: "लाइफ़ पॉइंट",
     pokemon: "प्राइज़ कार्ड",
+    lorcana: "लोर",
   },
   startingValueRange: {
     none: "शुरुआती लाइफ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
     mtg: "शुरुआती लाइफ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
     ygo: "शुरुआती लाइफ़ पॉइंट 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
     pokemon: "शुरुआती प्राइज़ कार्ड 1 से {{max}} तक की पूर्ण संख्या होने चाहिए।",
+    lorcana: "शुरुआती लोर 0 से {{max}} तक की पूर्ण संख्या होना चाहिए।",
   },
   tableItem: {
     poison: "पॉइज़न",
@@ -36,6 +39,7 @@ export default {
       mtg: "मुख्य डेक",
       ygo: "मेन डेक",
       pokemon: "डेक",
+      lorcana: "डेक",
     },
   },
   formatBlurb: {
@@ -61,6 +65,8 @@ export default {
     ygo_other: "{{count}} लाइफ़ पॉइंट",
     pokemon_one: "{{count}} प्राइज़ कार्ड",
     pokemon_other: "{{count}} प्राइज़ कार्ड",
+    lorcana_one: "{{count}} लोर",
+    lorcana_other: "{{count}} लोर",
   },
   counterChange: {
     none_one: "{{count}} लाइफ़ बदलाव",
@@ -71,6 +77,8 @@ export default {
     ygo_other: "{{count}} लाइफ़ पॉइंट बदलाव",
     pokemon_one: "{{count}} प्राइज़ कार्ड बदलाव",
     pokemon_other: "{{count}} प्राइज़ कार्ड बदलाव",
+    lorcana_one: "{{count}} लोर बदलाव",
+    lorcana_other: "{{count}} लोर बदलाव",
   },
   noneTaken: "कोई नहीं लिया",
   taken: "{{amount}} लिए",

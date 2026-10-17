@@ -5,18 +5,21 @@ const systems = {
     mtg: "Life",
     ygo: "Life Points",
     pokemon: "Prize cards",
+    lorcana: "Lore",
   },
   counterLabel: {
     none: "life",
     mtg: "life",
     ygo: "Life Points",
     pokemon: "Prize cards",
+    lorcana: "lore",
   },
   startingValueRange: {
     none: "Starting life must be a whole number from 1 to {{max}}.",
     mtg: "Starting life must be a whole number from 1 to {{max}}.",
     ygo: "Starting Life Points must be a whole number from 1 to {{max}}.",
     pokemon: "Starting Prize cards must be a whole number from 1 to {{max}}.",
+    lorcana: "Starting lore must be a whole number from 0 to {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -33,6 +36,7 @@ const systems = {
       mtg: "Main deck",
       ygo: "Main Deck",
       pokemon: "Deck",
+      lorcana: "Deck",
     },
   },
   formatBlurb: {
@@ -58,6 +62,8 @@ const systems = {
     ygo_other: "{{count}} Life Points",
     pokemon_one: "{{count}} Prize card",
     pokemon_other: "{{count}} Prize cards",
+    lorcana_one: "{{count}} lore",
+    lorcana_other: "{{count}} lore",
   },
   counterChange: {
     none_one: "{{count}} life change",
@@ -68,6 +74,8 @@ const systems = {
     ygo_other: "{{count}} life points changes",
     pokemon_one: "{{count}} prize card change",
     pokemon_other: "{{count}} prize cards changes",
+    lorcana_one: "{{count}} lore change",
+    lorcana_other: "{{count}} lore changes",
   },
   noneTaken: "none taken",
   taken: "{{amount}} taken",

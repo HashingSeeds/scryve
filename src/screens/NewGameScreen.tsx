@@ -92,7 +92,7 @@ import {
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
-import { systemDefinition } from "../../convex/lib/systems"
+import { startingValueRange, systemDefinition } from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
@@ -943,7 +943,7 @@ export function NewGameScreen({
                 testID="starting-counter"
                 label={counterHeading(system)}
                 value={startingLife}
-                min={1}
+                min={startingValueRange(system).min}
                 max={counter.maxStartingValue}
                 longStep={counter.longPressStep}
                 step={lifeStep}

@@ -67,7 +67,7 @@ import {
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
-import { isCounterOut, systemDefinition, tableRules } from "./lib/systems"
+import { isCounterOut, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
@@ -741,10 +741,7 @@ export const createLobby = mutation({
       if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
       if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     }
-    assertStartingLife(
-      args.startingLife,
-      systemDefinition(gameSystem)?.counter.maxStartingValue ?? 999,
-    )
+    assertStartingLife(args.startingLife, startingValueRange(gameSystem))
     if (args.lifeStep !== undefined) {
       assertLifeDelta(args.lifeStep)
       if (args.lifeStep < 1) throw new Error("Life step must be positive")
@@ -1024,10 +1021,7 @@ async function resolveLocalGameSetup(
       : assertGameSystem(args.system)
   const noSystem = gameSystem === NO_GAME_SYSTEM
   if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
-  assertStartingLife(
-    args.startingLife,
-    systemDefinition(gameSystem)?.counter.maxStartingValue ?? 999,
-  )
+  assertStartingLife(args.startingLife, startingValueRange(gameSystem))
   if (args.lifeStep !== undefined) {
     assertLifeDelta(args.lifeStep)
     if (args.lifeStep < 1) throw new Error("Life step must be positive")

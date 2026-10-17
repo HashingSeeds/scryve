@@ -145,7 +145,9 @@ const YUGIOH_SECTIONS = [
 
 const POKEMON_SECTIONS = [{ id: "main", label: "Deck" }] as const
 
-export const SYSTEM_IDS = ["mtg", "ygo", "pokemon"] as const
+const LORCANA_SECTIONS = [{ id: "main", label: "Deck" }] as const
+
+export const SYSTEM_IDS = ["mtg", "ygo", "pokemon", "lorcana"] as const
 export type SystemId = (typeof SYSTEM_IDS)[number]
 
 export const SYSTEMS = {
@@ -372,6 +374,56 @@ export const SYSTEMS = {
         imageUse: "functional_card_context",
         requiredNotices: [
           "Pokémon, card artwork, and related marks remain property of their respective owners.",
+        ],
+      },
+    },
+  },
+  lorcana: {
+    label: "Disney Lorcana",
+    shortLabel: "Lorcana",
+    available: true,
+    defaultFormat: { deck: "core", play: "core" },
+    counter: {
+      label: "lore",
+      heading: "Lore",
+      singular: "lore",
+      plural: "lore",
+      defaultValue: 0,
+      presets: [0],
+      tapStep: 1,
+      quickAdjustments: [2, 1],
+      scrubStep: 1,
+      scrubSteps: 20,
+      goal: { kind: "race", to: 20 },
+      maxStartingValue: 19,
+      flooredAtZero: true,
+    },
+    formats: [
+      { id: "core", label: "Core Constructed", sections: LORCANA_SECTIONS },
+      { id: "infinity", label: "Infinity Constructed", sections: LORCANA_SECTIONS },
+    ],
+    table: { counters: [], designations: [] },
+    variants: [],
+    firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
+    roundClock: { minutes: 50, endOfRoundTurns: 5 },
+    deckAnalysis: false,
+    integration: {
+      identityNamespace: "lorcanajson-card",
+      capabilities: {
+        integration: available("scryve"),
+        cardCatalog: available("lorcanajson", "Synced from the LorcanaJSON dataset."),
+        deckImport: available("lorcanajson"),
+        exampleDecks: { technical: "unavailable", release: "disabled" },
+        images: available("ravensburger", "Functional card context only."),
+        playTracking: available("scryve"),
+        aggregateMetagameStats: available("scryve"),
+      },
+      rights: {
+        review: "reviewed",
+        basis: "fair_use",
+        imageUse: "functional_card_context",
+        requiredNotices: [
+          "Disney Lorcana is a trademark of Disney, published by Ravensburger. Scryve is not affiliated with either.",
         ],
       },
     },

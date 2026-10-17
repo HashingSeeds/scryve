@@ -62,7 +62,9 @@ import {
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
+import type { ProviderGame } from "../../convex/lib/games/providers"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
+import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
 type CreationMode = "precon" | "paste" | "blank"
 
@@ -77,6 +79,13 @@ const MODES = [
   { id: "paste", labelTx: "decks:addDeck.modeImport" },
   { id: "blank", labelTx: "decks:addDeck.modeBuild" },
 ] as const satisfies ReadonlyArray<{ id: CreationMode; labelTx: TxKeyPath }>
+
+const LIST_HELPERS = {
+  mtg: "decks:addDeck.listHelperMtg",
+  ygo: "decks:addDeck.listHelperYgo",
+  pokemon: "decks:addDeck.listHelperPokemon",
+  lorcana: "decks:addDeck.listHelperLorcana",
+} as const satisfies Record<SystemId, TxKeyPath>
 
 const SEARCH_DEBOUNCE_MS = 350
 
@@ -165,7 +174,7 @@ type ImportedCard = PreviewCard & {
 }
 
 type GenericImportedCard = {
-  game: "ygo" | "pokemon"
+  game: ProviderGame
   identityNamespace?: string
   cardId?: string
   providerCardId?: string
@@ -2022,13 +2031,7 @@ export function AddDeckScreen({
               <TextField
                 labelTx="decks:addDeck.deckList"
                 accessibilityLabel={translate("decks:addDeck.deckList")}
-                helperTx={
-                  game === "ygo"
-                    ? "decks:addDeck.listHelperYgo"
-                    : game === "pokemon"
-                      ? "decks:addDeck.listHelperPokemon"
-                      : "decks:addDeck.listHelperMtg"
-                }
+                helperTx={isSystemId(game) ? LIST_HELPERS[game] : LIST_HELPERS.mtg}
                 value={deckList}
                 multiline
                 numberOfLines={12}

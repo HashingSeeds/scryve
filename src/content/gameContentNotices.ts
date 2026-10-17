@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-10-16",
-  effectiveDate: "October 16, 2026",
+  version: "2026-10-17",
+  effectiveDate: "October 17, 2026",
   sections: [
     {
       blocks: [
@@ -54,6 +54,15 @@ export const gameContentNotices = {
         {
           type: "paragraph",
           text: "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through TCGdex, and tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by those organizations.",
+        },
+      ],
+    },
+    {
+      heading: "Disney Lorcana",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "Disney Lorcana is a trademark of Disney and is published by Ravensburger. Card names, card artwork, characters, and related marks remain property of Disney, Ravensburger, and their respective owners. Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through LorcanaJSON, and card images load from Ravensburger. Scryve is not affiliated with or endorsed by Disney, Ravensburger, or LorcanaJSON.",
         },
       ],
     },

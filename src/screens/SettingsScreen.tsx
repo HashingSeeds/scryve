@@ -48,7 +48,8 @@ import {
   setAnalyticsEnabled,
 } from "@/utils/analytics"
 
-const MIN_STARTING_LIFE = 1
+import { startingValueRange } from "../../convex/lib/systems"
+
 const BETA_UNLOCK_TAPS = 5
 const DEBUG_INFO_TITLE = "Scryve"
 const LAUNCH_DESTINATIONS = ["play", "decks"] as const
@@ -230,7 +231,7 @@ export function SettingsScreen({
               testID="default-starting-life"
               label={counterLabel(settings.defaultSystem)}
               value={settings.defaultStartingLife}
-              min={MIN_STARTING_LIFE}
+              min={startingValueRange(settings.defaultSystem).min}
               max={counter.maxStartingValue}
               step={counter.tapStep}
               longStep={counter.longPressStep ?? 10}

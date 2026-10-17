@@ -21,11 +21,21 @@ const LOCALES = {
 
 // why: without fixed terms the model mixed translated and English game terms within one language.
 const GAME_TERMS = {
-  es: { life: "vidas", lifePoints: "Puntos de Vida", prizeCards: "cartas de Premio" },
-  fr: { life: "points de vie", lifePoints: "Life Points", prizeCards: "cartes Récompense" },
-  hi: { life: "लाइफ़", lifePoints: "लाइफ़ पॉइंट", prizeCards: "प्राइज़ कार्ड" },
-  ja: { life: "ライフ", lifePoints: "ライフポイント", prizeCards: "サイド" },
-  ko: { life: "라이프", lifePoints: "라이프 포인트", prizeCards: "사이드 카드" },
+  es: {
+    life: "vidas",
+    lifePoints: "Puntos de Vida",
+    prizeCards: "cartas de Premio",
+    lore: "leyenda",
+  },
+  fr: {
+    life: "points de vie",
+    lifePoints: "Life Points",
+    prizeCards: "cartes Récompense",
+    lore: "Lore",
+  },
+  hi: { life: "लाइफ़", lifePoints: "लाइफ़ पॉइंट", prizeCards: "प्राइज़ कार्ड", lore: "लोर" },
+  ja: { life: "ライフ", lifePoints: "ライフポイント", prizeCards: "サイド", lore: "ロア" },
+  ko: { life: "라이프", lifePoints: "라이프 포인트", prizeCards: "사이드 카드", lore: "로어" },
 }
 
 const PLURAL_SUFFIX = /^(.*)_(zero|one|two|few|many|other)$/
@@ -34,13 +44,13 @@ const PLACEHOLDER = /{{\s*([\w.]+)\s*}}|<\/?([\w-]+)\s*\/?>/g
 const GENERATED_HEADER =
   "// why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.\n"
 
-const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG).
+const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana).
 
 Rules:
 - Keep each string short and natural for a phone screen. Match the English tone: plain, direct, no added enthusiasm.
 - Keep every {{placeholder}} exactly as written, including the name inside the braces, and keep every <tag>. Placeholders hold numbers, player names, deck names, or card names.
-- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon, Pokémon TCG, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, and format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel).
-- Use the publisher's official localized term where one exists: poison counters, commander damage, commander tax, the Monarch, the Initiative, HP. The request lists fixed terms for life (Magic), Life Points (Yu-Gi-Oh!) and Prize cards (Pokémon); always use exactly those, inflected as the grammar needs.
+- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon, Pokémon TCG, Disney Lorcana, Lorcana, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, and format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed).
+- Use the publisher's official localized term where one exists: poison counters, commander damage, commander tax, the Monarch, the Initiative, HP. The request lists fixed terms for life (Magic), Life Points (Yu-Gi-Oh!), Prize cards (Pokémon) and lore (Lorcana); always use exactly those, inflected as the grammar needs.
 - Product vocabulary, translate consistently: "local game" is a game on one shared device; "connected game" is players on their own phones; "cloud" means synced through Scryve's servers; "nearby" means phones on the same Wi-Fi; "seat" is a player's place at the table; "host" is the player who created a connected game.
 - Keep the " · " separator, ellipsis characters, and abbreviations like "5m ago" equally compact.
 - Each entry has a "context" key path that tells you where the string appears. Use it as context; never translate it.
@@ -298,7 +308,7 @@ async function requestTranslations(client, { units, namespace, locale, feedback 
   const payload = requestPayload(units, namespace, locale)
   const request = [
     `Translate into ${LOCALES[locale]} (${locale}).`,
-    `Fixed game terms: Magic life = "${GAME_TERMS[locale].life}"; Yu-Gi-Oh! Life Points = "${GAME_TERMS[locale].lifePoints}"; Pokémon Prize cards = "${GAME_TERMS[locale].prizeCards}".`,
+    `Fixed game terms: Magic life = "${GAME_TERMS[locale].life}"; Yu-Gi-Oh! Life Points = "${GAME_TERMS[locale].lifePoints}"; Pokémon Prize cards = "${GAME_TERMS[locale].prizeCards}"; Lorcana lore = "${GAME_TERMS[locale].lore}".`,
     JSON.stringify(payload.entries),
     ...(feedback.length
       ? [`Your previous answer had problems; fix them:\n${feedback.join("\n")}`]

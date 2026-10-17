@@ -11,6 +11,7 @@ import {
   type BulkDataset,
   type DatasetCard,
 } from "./cards"
+import type { DeckListRules } from "./decks"
 
 const LORCANA_JSON_URL = "https://lorcanajson.org/files/current/en"
 export const LORCANA_JSON_NAMESPACE = "lorcanajson-card"
@@ -111,3 +112,5 @@ export const LORCANA_JSON_DATASET = {
     return normalizeLorcanaJsonCards(allCards)
   },
 } satisfies BulkDataset
+
+export const LORCANA_DECK_LIST = { sectionHeadings: { main: ["deck"] } } satisfies DeckListRules
