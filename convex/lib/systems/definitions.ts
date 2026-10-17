@@ -278,7 +278,9 @@ export const SYSTEMS = {
         review: "reviewed",
         basis: "fan_policy",
         imageUse: "functional_card_context",
-        requiredNotices: ["Magic: The Gathering is property of Wizards of the Coast."],
+        requiredNotices: [
+          "Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.",
+        ],
       },
     },
   },
@@ -331,7 +333,7 @@ export const SYSTEMS = {
         basis: "fair_use",
         imageUse: "functional_card_context",
         requiredNotices: [
-          "Yu-Gi-Oh! and related card content remain property of their respective owners.",
+          "Yu-Gi-Oh!, card names, card artwork, and related marks remain property of their respective owners. Scryve is not affiliated with or endorsed by Konami.",
         ],
       },
     },
@@ -381,7 +383,7 @@ export const SYSTEMS = {
         basis: "fair_use",
         imageUse: "functional_card_context",
         requiredNotices: [
-          "Pokémon, card artwork, and related marks remain property of their respective owners.",
+          "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve is not affiliated with or endorsed by Nintendo, Creatures, GAME FREAK, or The Pokémon Company.",
         ],
       },
     },

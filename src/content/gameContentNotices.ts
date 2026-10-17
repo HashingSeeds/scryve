@@ -1,4 +1,11 @@
 import type { LegalDocumentContent } from "./legal"
+import { SYSTEMS, type SystemId } from "../../convex/lib/systems"
+
+const requiredNotices = (system: SystemId) =>
+  SYSTEMS[system].integration.rights.requiredNotices.map((text) => ({
+    type: "paragraph" as const,
+    text,
+  }))
 
 export const gameContentNotices = {
   id: "gameContentNotices",
@@ -25,10 +32,7 @@ export const gameContentNotices = {
     {
       heading: "Magic: The Gathering",
       blocks: [
-        {
-          type: "paragraph",
-          text: "Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.",
-        },
+        ...requiredNotices("mtg"),
         {
           type: "paragraph",
           text: "Magic: The Gathering card data and images are provided through Scryfall. Scryve is not affiliated with Wizards of the Coast or Scryfall.",
@@ -42,18 +46,20 @@ export const gameContentNotices = {
     {
       heading: "Yu-Gi-Oh!",
       blocks: [
+        ...requiredNotices("ygo"),
         {
           type: "paragraph",
-          text: "Yu-Gi-Oh!, card names, card artwork, and related marks remain property of their respective owners. Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through YGOPRODeck. Scryve is not affiliated with or endorsed by Konami or YGOPRODeck.",
+          text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through YGOPRODeck. Scryve is not affiliated with or endorsed by YGOPRODeck.",
         },
       ],
     },
     {
       heading: "Pokémon Trading Card Game",
       blocks: [
+        ...requiredNotices("pokemon"),
         {
           type: "paragraph",
-          text: "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through TCGdex, and tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by those organizations.",
+          text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data is provided through TCGdex, and tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by TCGdex or Limitless.",
         },
       ],
     },
