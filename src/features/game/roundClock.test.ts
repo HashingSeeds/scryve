@@ -10,6 +10,7 @@ import {
   startRoundClock,
   stepRoundTurn,
 } from "./roundClock"
+import { SYSTEMS } from "../../../convex/lib/systems"
 
 const MINUTE = 60_000
 const fifty = startRoundClock({ mode: "countdown", minutes: 50 }, 0)
@@ -33,12 +34,12 @@ describe("round clock", () => {
     })
   })
 
-  it("walks the end-of-round turns, including a judge's bonus turns", () => {
+  it("walks Magic's five end-of-round turns plus a Slow Play warning's two", () => {
     let clock = callRoundTime(adjustRoundClock(fifty, MINUTE), 20 * MINUTE)
     expect(roundClockText(roundClockView(clock, "mtg", 20 * MINUTE))).toBe("Finish turn")
     clock = stepRoundTurn(stepRoundTurn(clock, "mtg", 1), "mtg", 1)
     expect(roundClockText(roundClockView(clock, "mtg", 21 * MINUTE))).toBe("Turn 2 of 5")
-    clock = addRoundBonusTurns(clock, 2)
+    clock = addRoundBonusTurns(clock, SYSTEMS.mtg.roundClock.slowPlayTurns)
     expect(roundClockText(roundClockView(clock, "mtg", 21 * MINUTE))).toBe("Turn 2 of 7")
     for (let step = 0; step < 10; step++) clock = stepRoundTurn(clock, "mtg", 1)
     expect(roundClockText(roundClockView(clock, "mtg", 22 * MINUTE))).toBe("Turns done")

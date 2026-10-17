@@ -66,6 +66,7 @@ import {
   counterValueLabel,
   playFormatLabel,
   playSystemRules,
+  storedPlaySystem,
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
@@ -1087,7 +1088,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     changes: counterChangeLabel(system, game.finalEventSequence ?? 0),
                   })
                 : translate("connected:board.status.startsWith", {
-                    format: playFormatLabel(system, game.format || game.ruleset),
+                    format: storedPlaySystem(system)
+                      ? playFormatLabel(system, game.format || game.ruleset)
+                      : translate("systems:noSystem"),
                     value: counterValueLabel(system, game.startingLife),
                   })
             }

@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- each system's card provider still branches here until it moves to convex/lib/games. */
 import { ConvexError, v, type Infer } from "convex/values"
 
 import { internal } from "./_generated/api"
@@ -165,13 +166,14 @@ export const search = action({
       query,
       limit: MAX_SEARCH_RESULTS,
     })
-    if (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage)))
+    const catalog = GAME_PROVIDERS[game].catalog
+    if (catalog.bulk || (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage))))
       return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
     await limitCardLookup(ctx, args.deviceId)
     const provider = integrationFor(game).capabilities.cardCatalog.provider
     const startedAt = Date.now()
     try {
-      const result = await GAME_PROVIDERS[game].catalog.search(ctx, query, includeImages)
+      const result = await catalog.search(ctx, query, includeImages)
       if (result.cards.length > 0)
         await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
       await recordHealth(ctx, {
@@ -250,14 +252,15 @@ export const byCatalogId = action({
       game,
       cardId,
     })
+    const catalog = game === "mtg" ? undefined : GAME_PROVIDERS[game].catalog
     if (
       cached &&
-      (game === "mtg" ||
-        cachedCardUsable(GAME_PROVIDERS[game].catalog, cached, cardId, includeImages))
+      (!catalog || catalog.bulk || cachedCardUsable(catalog, cached, cardId, includeImages))
     )
       return includeImages ? cached : catalogWithoutImages(cached)
+    if (catalog?.bulk) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
     await limitCardLookup(ctx, args.deviceId)
-    if (game === "mtg") {
+    if (!catalog) {
       const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
       if (response.status === 404)
         throw new ConvexError({ code: "card_not_found", message: "Card not found" })
@@ -272,7 +275,6 @@ export const byCatalogId = action({
       await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: [card] })
       return catalogResult(card, includeImages)
     }
-    const catalog = GAME_PROVIDERS[game].catalog
     if (catalog.seeded?.owns(cardId))
       throw new ConvexError({ code: "card_not_found", message: catalog.seeded.missing })
     const provider = integrationFor(game).capabilities.cardCatalog.provider

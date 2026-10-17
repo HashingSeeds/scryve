@@ -664,6 +664,33 @@ describe("LocalGameRepository sign-in claims", () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps a system this build doesn't know when it writes history back", () => {
+    const storage = new MemoryStorage()
+    const game = makeGame(1)
+    new LocalGameRepository(storage).archiveGame(finished(game, 2))
+    const detailKey = LOCAL_KEYS.historyDetail(game.id)
+    const [summary] = JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)
+    storage.set(LOCAL_KEYS.historyIndex, JSON.stringify([{ ...summary, system: "lorcana" }]))
+    const detail = JSON.parse(storage.getString(detailKey)!)
+    storage.set(
+      detailKey,
+      JSON.stringify({ ...detail, game: { ...detail.game, system: "lorcana" } }),
+    )
+    const repository = new LocalGameRepository(storage)
+
+    repository.resolveClaims("owner-a", [{ id: game.id, claim: true }])
+
+    expect(JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)[0]).toMatchObject({
+      system: "lorcana",
+      account: { ownerId: "owner-a" },
+    })
+    expect(JSON.parse(storage.getString(detailKey)!).game).toMatchObject({
+      system: "lorcana",
+      account: { ownerId: "owner-a" },
+    })
+    expect(repository.loadHistoryDetail(game.id)?.game.system).toBeUndefined()
+  })
+
   it("notifies History on skip-only decisions and repairs a detail whose write failed", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

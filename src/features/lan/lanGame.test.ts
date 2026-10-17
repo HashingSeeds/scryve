@@ -87,6 +87,19 @@ describe("nearby lobby", () => {
     })
   })
 
+  it("asks a guest to update when its build can't play the lobby's system", () => {
+    const pokemon = lobby({ ...commander, system: "pokemon", format: "standard" })
+    const joinWith = (systems?: string[]) => {
+      const message = parseGuestMessage(JSON.stringify({ ...join("guest"), systems }))
+      if (message?.type !== "join") throw new Error("not a join")
+      return admitLanGuest(pokemon, tokens, message, unused)
+    }
+
+    expect(joinWith(["mtg", "lorcana"])).toEqual({ rejected: "Update Scryve to join this game." })
+    expect(joinWith(["mtg", "pokemon"])).not.toHaveProperty("rejected")
+    expect(joinWith()).not.toHaveProperty("rejected")
+  })
+
   it("returns a seat only to the pass it was issued with, and never hands out the host's", () => {
     const game = startLanRound(seatGuest(lobby(), "guest"), NOW)
 

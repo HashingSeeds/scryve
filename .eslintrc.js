@@ -115,6 +115,34 @@ module.exports = {
       },
     },
     {
+      files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
+      excludedFiles: [
+        "**/*.test.{ts,tsx}",
+        "convex/_generated/**",
+        "convex/lib/systems/**",
+        "convex/lib/games/**",
+        "src/devtools/seeds/**",
+        "src/app/dev/seed/**",
+        "src/features/game/localPersistence.ts",
+      ],
+      rules: {
+        "no-restricted-syntax": [
+          "error",
+          {
+            selector:
+              "BinaryExpression[operator=/^[!=]==$/]:matches([left.name=/([sS]ystem|[gG]ame)$/], [left.property.name=/([sS]ystem|[gG]ame)$/], [right.name=/([sS]ystem|[gG]ame)$/], [right.property.name=/([sS]ystem|[gG]ame)$/]):matches([left.value=/^(mtg|ygo|pokemon)$/], [right.value=/^(mtg|ygo|pokemon)$/])",
+            message:
+              "Read game rules from the system definition (convex/lib/systems) instead of comparing a game ID.",
+          },
+          {
+            selector: "SwitchCase[test.value=/^(mtg|ygo|pokemon)$/]",
+            message:
+              "Read game rules from the system definition (convex/lib/systems) instead of switching on a game ID.",
+          },
+        ],
+      },
+    },
+    {
       files: ["src/**/*.tsx"],
       excludedFiles: ["**/*.test.tsx", "src/app/dev/**"],
       plugins: ["i18next"],

@@ -1096,7 +1096,7 @@ export const publishLocalGame = mutation({
     const { localIds, seats } = assertSnapshotPlayers(args.players)
     if (!localIds.has(args.hostLocalId))
       throw new Error("Host seat must be one of the snapshot players")
-    const commanderGame = gameSystem === "mtg" && (format ?? ruleset) === "commander"
+    const commanderGame = isCommanderFormat(gameSystem, format ?? ruleset)
     const totals = args.commanderTotals ?? []
     if (totals.length > 0 && !commanderGame)
       throw new Error("Commander damage totals are only supported in Commander games")

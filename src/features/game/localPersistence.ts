@@ -551,7 +551,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         schemaVersion: 1,
         id: asGameId(value.id),
         status: value.status,
-        ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
+        ...(typeof value.system === "string" ? { system: value.system } : {}),
         ...(typeof value.format === "string" ? { format: value.format } : {}),
         startingLife: value.startingLife,
         players,
@@ -891,13 +891,16 @@ export class LocalGameRepository {
       if (game.account?.ownerId !== ownerId) continue
       const detail = this.loadHistoryDetail(game.id)
       if (!detail || detail.game.account?.ownerId === ownerId) continue
-      const record: HistoryDetail = {
-        schemaVersion: 1,
-        game: { ...detail.game, account: game.account },
-        eventsTruncated: detail.eventsTruncated,
-      }
-      this.storage.set(LOCAL_KEYS.historyDetail(game.id), JSON.stringify(record))
+      this.patchHistoryDetail(game.id, { account: game.account })
     }
+  }
+
+  /** why: patches the stored JSON, not a parsed game, so fields this build drops (a newer build's system) survive. */
+  private patchHistoryDetail(gameId: string, patch: Partial<LocalGame>): void {
+    const key = LOCAL_KEYS.historyDetail(gameId)
+    const detail = parseJson(this.storage.getString(key))
+    if (isRecord(detail) && isRecord(detail.game))
+      this.storage.set(key, JSON.stringify({ ...detail, game: { ...detail.game, ...patch } }))
   }
 
   markPublished(gameId: string): void {
@@ -979,12 +982,7 @@ export class LocalGameRepository {
     this.patchSummary(latest.id, () => summary)
     if (this.storage.getString(LOCAL_KEYS.pendingMatchEnd) === matchId)
       this.savePendingMatchEnd(undefined)
-    const detail = parseJson(this.storage.getString(LOCAL_KEYS.historyDetail(latest.id)))
-    if (isRecord(detail) && isRecord(detail.game))
-      this.storage.set(
-        LOCAL_KEYS.historyDetail(latest.id),
-        JSON.stringify({ ...detail, game: { ...detail.game, match } }),
-      )
+    this.patchHistoryDetail(latest.id, { match })
     if (summary.matchPublish) this.finishListeners.forEach((listener) => listener())
     return summary
   }

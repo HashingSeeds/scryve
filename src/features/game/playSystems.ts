@@ -188,7 +188,7 @@ export function localizedDeckSections(game: string, format: string): readonly De
   const cached = localizedSectionsCache.get(key)
   if (cached) return cached
   const sections = deckSections(game, format).map((section) => ({
-    id: section.id,
+    ...section,
     label: deckSectionLabel(game, section),
   }))
   localizedSectionsCache.set(key, sections)

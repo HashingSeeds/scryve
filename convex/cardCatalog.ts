@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- each system's card provider still branches here until it moves to convex/lib/games. */
 import { ConvexError, v } from "convex/values"
 
 import type { Doc } from "./_generated/dataModel"
@@ -7,6 +8,7 @@ import {
   MAX_CARD_FACES,
   MAX_CARD_FACETS,
   MAX_CATALOG_BATCH,
+  MAX_DATASET_BATCH,
   normalizeCardName,
   type CatalogCard,
   type NormalizedCard,
@@ -15,6 +17,8 @@ import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 import { assertGameSystem, integration, requireReleasedCapability } from "./lib/integrations"
 
 const MAX_CARD_PRINTINGS = 100
+const SWEEP_BATCH = 100
+const MAX_SWEPT_PRINTINGS = 2 * MAX_CARD_PRINTINGS
 
 const faceValidator = v.object({
   index: v.number(),
@@ -61,7 +65,7 @@ function assertNormalizedCard(card: NormalizedCard) {
   }
 }
 
-async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
+async function upsertCard(ctx: MutationCtx, card: NormalizedCard, now = Date.now()) {
   assertNormalizedCard(card)
   const existing = await ctx.db
     .query("gameCards")
@@ -72,7 +76,6 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
         .eq("cardId", card.cardId),
     )
     .unique()
-  const now = Date.now()
   const briefSearchResults =
     isProviderGame(card.game) && GAME_PROVIDERS[card.game].catalog.briefSearchResults === true
   const keepsFullCard =
@@ -111,8 +114,98 @@ export const cacheMany = internalMutation({
   handler: async (ctx, args) => {
     if (args.cards.length > MAX_CATALOG_BATCH)
       throw new ConvexError({ code: "catalog_batch_too_large", message: "Card batch is too large" })
-    for (const card of args.cards) await upsertCard(ctx, card)
+    for (const card of args.cards)
+      if (!isProviderGame(card.game) || !GAME_PROVIDERS[card.game].catalog.bulk)
+        await upsertCard(ctx, card)
     return null
+  },
+})
+
+export const datasetSync = internalQuery({
+  args: { game: v.string() },
+  handler: async (ctx, { game }) =>
+    await ctx.db
+      .query("cardDatasetSyncs")
+      .withIndex("by_game", (query) => query.eq("game", game))
+      .unique(),
+})
+
+export const writeDatasetBatch = internalMutation({
+  args: {
+    game: v.string(),
+    version: v.string(),
+    storedVersion: v.optional(v.string()),
+    offset: v.number(),
+    cards: v.array(normalizedCardValidator.omit("game")),
+  },
+  handler: async (ctx, args) => {
+    const game = assertGameSystem(args.game)
+    if (args.cards.length > MAX_DATASET_BATCH)
+      throw new ConvexError({ code: "catalog_batch_too_large", message: "Card batch is too large" })
+    const state = await ctx.db
+      .query("cardDatasetSyncs")
+      .withIndex("by_game", (query) => query.eq("game", game))
+      .unique()
+    const pending = state?.pending
+    const resume = pending?.version === args.version && args.offset === pending.nextIndex
+    const restart = args.offset === 0 && state?.version === args.storedVersion
+    if (!resume && !restart) return null
+    const startedAt = resume ? pending.startedAt : Date.now()
+    for (const card of args.cards) await upsertCard(ctx, { ...card, game }, startedAt)
+    const nextIndex = args.offset + args.cards.length
+    const value = {
+      game,
+      ...(state?.version === undefined ? {} : { version: state.version }),
+      pending: { version: args.version, nextIndex, startedAt },
+    }
+    if (state) await ctx.db.replace(state._id, value)
+    else await ctx.db.insert("cardDatasetSyncs", value)
+    return nextIndex
+  },
+})
+
+export const sweepDatasetBatch = internalMutation({
+  args: {
+    game: v.string(),
+    version: v.string(),
+    total: v.number(),
+    cursor: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const game = assertGameSystem(args.game)
+    const state = await ctx.db
+      .query("cardDatasetSyncs")
+      .withIndex("by_game", (query) => query.eq("game", game))
+      .unique()
+    const pending = state?.pending
+    if (
+      !state ||
+      pending?.version !== args.version ||
+      pending.nextIndex < args.total ||
+      (pending.sweepCursor ?? null) !== args.cursor
+    )
+      return null
+    const cards = await ctx.db
+      .query("gameCards")
+      .withIndex("by_game_and_identity_namespace_and_card_id", (query) => query.eq("game", game))
+      .paginate({ numItems: SWEEP_BATCH, cursor: args.cursor })
+    for (const card of cards.page) {
+      const cardRemoved = card.updatedAt !== pending.startedAt
+      const printings = await ctx.db
+        .query("cardPrintings")
+        .withIndex("by_game_card_id", (query) => query.eq("gameCardId", card._id))
+        .take(MAX_SWEPT_PRINTINGS)
+      for (const printing of printings)
+        if (cardRemoved || printing.updatedAt !== pending.startedAt)
+          await ctx.db.delete(printing._id)
+      if (cardRemoved) await ctx.db.delete(card._id)
+    }
+    if (cards.isDone) {
+      await ctx.db.replace(state._id, { game, version: args.version })
+      return { cursor: null }
+    }
+    await ctx.db.patch(state._id, { pending: { ...pending, sweepCursor: cards.continueCursor } })
+    return { cursor: cards.continueCursor }
   },
 })
 

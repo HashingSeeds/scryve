@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- each system's deck provider still branches here until it moves to convex/lib/games. */
 import { ConvexError, v } from "convex/values"
 
 import { internal } from "./_generated/api"
@@ -306,7 +307,9 @@ async function resolveGenericEntries(
 
     const result = lookupPrinting
       ? await lookupPrinting(ctx, includeImages)
-      : await catalog.search(ctx, entry.name, includeImages)
+      : catalog.bulk
+        ? { cards: [] }
+        : await catalog.search(ctx, entry.name, includeImages)
     const resolved = result.cards.find(
       (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
     )
