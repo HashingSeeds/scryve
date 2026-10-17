@@ -23,7 +23,7 @@ describe("AppUtilityMenu", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <GameMenuBackdrop open onClose={closeGameMenu} />
-        <AppUtilityMenu onSettings={jest.fn()} onAccount={jest.fn()} />
+        <AppUtilityMenu onHistory={jest.fn()} onSettings={jest.fn()} onAccount={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("utility-menu-button"))
@@ -41,9 +41,15 @@ describe("AppUtilityMenu", () => {
 
   it("turns the utility button into its actions, hiding the trigger from screen readers", () => {
     const onSettings = jest.fn()
+    const onHistory = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AppUtilityMenu accountEntry="signIn" onSettings={onSettings} onAccount={jest.fn()} />
+        <AppUtilityMenu
+          accountEntry="signIn"
+          onHistory={onHistory}
+          onSettings={onSettings}
+          onAccount={jest.fn()}
+        />
       </ThemeProvider>,
     )
 
@@ -58,6 +64,9 @@ describe("AppUtilityMenu", () => {
     expect(view.getByText("Sign in")).toBeTruthy()
     fireEvent.press(view.getByTestId("utility-settings-button"))
     expect(onSettings).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByTestId("utility-history-button"))
+    expect(onHistory).toHaveBeenCalledTimes(1)
   })
 
   it("supports the compact bottom-left version, hiding actions until opened", () => {
@@ -66,6 +75,7 @@ describe("AppUtilityMenu", () => {
         <AppUtilityMenu
           compact
           placement="bottomLeft"
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
         />
@@ -86,6 +96,7 @@ describe("AppUtilityMenu", () => {
         <AppUtilityMenu
           compact
           placement="bottomLeft"
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
         />
@@ -101,7 +112,7 @@ describe("AppUtilityMenu", () => {
 
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
       width: 148,
-      height: 108,
+      height: 162,
     })
   })
 
@@ -109,13 +120,18 @@ describe("AppUtilityMenu", () => {
     mockNearbyPlay = true
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AppUtilityMenu compact onSettings={jest.fn()} onAccount={jest.fn()} />
+        <AppUtilityMenu
+          compact
+          onHistory={jest.fn()}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+        />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("utility-menu-button"))
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
       width: 176,
-      height: 162,
+      height: 216,
     })
 
     fireEvent.press(view.getByText("Nearby only: Off"))
@@ -133,6 +149,7 @@ describe("AppUtilityMenu", () => {
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu
           visible={false}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
           onOpenHeightChange={onOpenHeightChange}
@@ -146,6 +163,7 @@ describe("AppUtilityMenu", () => {
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu
           visible
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
           onOpenHeightChange={onOpenHeightChange}
@@ -158,6 +176,7 @@ describe("AppUtilityMenu", () => {
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu
           visible={false}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
           onOpenHeightChange={onOpenHeightChange}

@@ -76,13 +76,35 @@ type DetailLookup = {
   catalogCardId?: string
 }
 
-function lookupFor(card: DeckCard, game: string, store: CardDetailStore): DetailLookup | undefined {
+function lookupFor(
+  card: DeckCard,
+  game: string,
+  cached: Record<string, FocusedCardDetails>,
+): DetailLookup | undefined {
   const key = cardDetailsKey(card, game)
-  if (readCardDetail(key, store)) return undefined
+  if (cached[key]) return undefined
   if (card.scryfallId) return { key, scryfallId: card.scryfallId }
   const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
   if (catalogCardId) return { key, catalogCardId }
   return undefined
+}
+
+export async function fetchCardDetails(
+  client: Pick<ConvexReactClient, "query">,
+  game: string,
+  cards: readonly DeckCard[],
+  store: CardDetailStore = storage,
+) {
+  const cached = loadCardDetails(store)
+  const items = [
+    ...new Map(
+      cards.flatMap((card) => lookupFor(card, game, cached) ?? []).map((item) => [item.key, item]),
+    ).values(),
+  ]
+  if (items.length === 0) return []
+  const found = await client.query(api.cards.detailsBatch, { game, items })
+  saveCardDetails(Object.fromEntries(found.map((entry) => [entry.key, entry.details])), store)
+  return found
 }
 
 const warmedVersions = new Set<string>()
@@ -95,11 +117,8 @@ export async function prefetchCardDetails(
   const versionKey = `${input.game}:${input.versionId}:${input.revision}`
   if (warmedVersions.has(versionKey)) return
   warmedVersions.add(versionKey)
-  const items = input.cards.flatMap((card) => lookupFor(card, input.game, store) ?? [])
-  if (items.length === 0) return
   try {
-    const found = await client.query(api.cards.detailsBatch, { game: input.game, items })
-    saveCardDetails(Object.fromEntries(found.map((entry) => [entry.key, entry.details])), store)
+    const found = await fetchCardDetails(client, input.game, input.cards, store)
     const urls = [
       ...new Set(
         found

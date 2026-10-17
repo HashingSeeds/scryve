@@ -20,6 +20,7 @@ export default {
   appMenu: {
     more: "더보기",
     moreUpdateReady: "더보기, 업데이트 준비됨",
+    history: "기록",
     settings: "설정",
     settingsUpdateReady: "설정, 업데이트 준비됨",
     account: "계정",

@@ -25,6 +25,7 @@ export function AppUtilityMenu({
   visible = true,
   compact = false,
   placement = "topRight",
+  onHistory,
   onSettings,
   onAccount,
   onOpenHeightChange,
@@ -33,6 +34,7 @@ export function AppUtilityMenu({
   visible?: boolean
   compact?: boolean
   placement?: "topRight" | "bottomLeft"
+  onHistory: () => void
   onSettings: () => void
   onAccount: () => void
   onOpenHeightChange?: (height: number) => void
@@ -44,7 +46,7 @@ export function AppUtilityMenu({
   const updateReady = useAppUpdate().status === "ready"
   const nearbyOnly = useNearbyOnly()
   const testsNearby = lanPlayAvailable()
-  const itemCount = testsNearby ? 3 : 2
+  const itemCount = testsNearby ? 4 : 3
   const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
@@ -149,6 +151,19 @@ export function AppUtilityMenu({
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           style={[$fill, themed($items), itemsStyle]}
         >
+          <Pressable
+            testID="utility-history-button"
+            accessibilityRole="button"
+            style={themed($item)}
+            onPress={() => choose(onHistory)}
+          >
+            <Text
+              tx="common:appMenu.history"
+              weight="medium"
+              numberOfLines={1}
+              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            />
+          </Pressable>
           <Pressable
             testID="utility-settings-button"
             accessibilityRole="button"

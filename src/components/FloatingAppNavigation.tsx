@@ -15,12 +15,14 @@ export type AppDestination = "decks" | "returnToGame" | "play" | "backToLobby"
 export function FloatingAppNavigation({
   destination,
   onDestination,
+  onHistory,
   onSettings,
   onAccount,
   accountEntry = "account",
 }: {
   destination: AppDestination
   onDestination: () => void
+  onHistory: () => void
   onSettings: () => void
   onAccount: () => void
   accountEntry?: AccountEntry
@@ -44,6 +46,7 @@ export function FloatingAppNavigation({
           compact
           placement="bottomLeft"
           accountEntry={accountEntry}
+          onHistory={onHistory}
           onSettings={onSettings}
           onAccount={onAccount}
           onOpenHeightChange={setUtilityHeight}

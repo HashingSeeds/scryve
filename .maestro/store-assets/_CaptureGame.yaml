@@ -12,11 +12,15 @@ appId: ${MAESTRO_APP_ID}
     when:
       true: ${PLAYER_COUNT > 2}
     commands:
+      - tapOn:
+          id: "setup-change-button"
       - repeat:
           times: ${PLAYER_COUNT - 2}
           commands:
             - tapOn:
                 id: "player-count-increment"
+      - tapOn:
+          id: "setup-options-done"
 - scrollUntilVisible:
     element:
       id: "start-game-button"

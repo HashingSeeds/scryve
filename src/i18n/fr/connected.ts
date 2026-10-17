@@ -316,6 +316,7 @@ export default {
       dice: "Dés",
       players: "Joueurs",
       history: "Historique",
+      rules: "Règles",
       end: "Fin",
       closeDice: "Fermer les dés",
       exitCommanderDamage: "Quitter les dégâts de commandant",

@@ -28,6 +28,7 @@ it.each([
         <FloatingAppNavigation
           destination="decks"
           onDestination={jest.fn()}
+          onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
         />
@@ -42,8 +43,8 @@ it.each([
 
 describe("FloatingAppNavigation", () => {
   it.each([
-    [false, 108],
-    [true, 162],
+    [false, 162],
+    [true, 216],
   ])(
     "with nearby play %s, expands its hit area to the open menu without moving the destination button",
     (nearbyPlay, height) => {
@@ -53,6 +54,7 @@ describe("FloatingAppNavigation", () => {
           <FloatingAppNavigation
             destination="returnToGame"
             onDestination={jest.fn()}
+            onHistory={jest.fn()}
             onSettings={jest.fn()}
             onAccount={jest.fn()}
           />

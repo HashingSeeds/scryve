@@ -51,6 +51,7 @@ import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { prefetchRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -62,6 +63,7 @@ export interface CurrentGameScreenProps {
   initialEndOpen?: boolean
   onDecks?: () => void
   onHistory?: () => void
+  onRules?: () => void
   onSetup?: () => void
   onConnect?: () => void
   onSettings?: () => void
@@ -79,6 +81,7 @@ export function CurrentGameScreen({
   initialEndOpen = false,
   onDecks,
   onHistory,
+  onRules,
   onSetup,
   onConnect,
   onSettings,
@@ -99,6 +102,9 @@ export function CurrentGameScreen({
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const { isFoil } = useRevenueCat()
   const system = runtime.game.system
+  useEffect(() => {
+    if (system === "mtg") prefetchRules()
+  }, [system])
   const [menuOpen, setMenuOpen] = useState(false)
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
@@ -313,15 +319,25 @@ export function CurrentGameScreen({
           onSetup?.()
         },
       },
-      {
-        kind: "history",
-        label: translate("board:menu.history"),
-        disabled: !onHistory,
-        onPress: () => {
-          closeMenu()
-          onHistory?.()
-        },
-      },
+      system === "mtg"
+        ? {
+            kind: "rules",
+            label: translate("board:menu.rules"),
+            disabled: !onRules,
+            onPress: () => {
+              closeMenu()
+              onRules?.()
+            },
+          }
+        : {
+            kind: "history",
+            label: translate("board:menu.history"),
+            disabled: !onHistory,
+            onPress: () => {
+              closeMenu()
+              onHistory?.()
+            },
+          },
       isFresh
         ? {
             kind: "connect",
@@ -349,8 +365,10 @@ export function CurrentGameScreen({
       layoutOptions.length,
       onConnect,
       onHistory,
+      onRules,
       onSetup,
       showEndConfirmation,
+      system,
     ],
   )
 
@@ -438,11 +456,12 @@ export function CurrentGameScreen({
             onClose: closeMenu,
           }}
           windowOverlay={
-            menuOpen && onDecks && onSettings && onAccount ? (
+            menuOpen && onDecks && onHistory && onSettings && onAccount ? (
               <FloatingAppNavigation
                 destination="decks"
                 accountEntry={accountEntry}
                 onDestination={onDecks}
+                onHistory={onHistory}
                 onSettings={onSettings}
                 onAccount={onAccount}
               />

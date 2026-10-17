@@ -292,6 +292,7 @@ const connected = {
       dice: "Dice",
       players: "Players",
       history: "History",
+      rules: "Rules",
       end: "End",
       closeDice: "Close dice",
       exitCommanderDamage: "Exit commander damage",

@@ -20,6 +20,7 @@ export default {
   appMenu: {
     more: "और",
     moreUpdateReady: "और, अपडेट तैयार है",
+    history: "इतिहास",
     settings: "सेटिंग",
     settingsUpdateReady: "सेटिंग, अपडेट तैयार है",
     account: "खाता",

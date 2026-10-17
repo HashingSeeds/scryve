@@ -19,7 +19,7 @@ import {
   selectCommander,
 } from "@/features/decks/commanderSelection"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
-import { DeckView } from "@/features/decks/DeckView"
+import { DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
   loadGuestDeck,
@@ -54,7 +54,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
   const baseRef = useRef(stored?.deck)
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
-  const [tab, setTab] = useState<"cards" | "notes">("cards")
+  const [tab, setTab] = useState<DeckTab>("cards")
   const [editing, setEditing] = useState(false)
   const [settings, setSettings] = useState(false)
   const [cancelling, setCancelling] = useState(false)

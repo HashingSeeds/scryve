@@ -25,6 +25,8 @@ import {
 } from "../../test/support/connectedHarness"
 import { CLAIM_ARM_MS } from "../components/CommanderClaimBanner"
 
+jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
+
 jest.mock("@/utils/useStoreReview", () => ({ useStoreReview: jest.fn() }))
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }))
 

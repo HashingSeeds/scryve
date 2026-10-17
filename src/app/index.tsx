@@ -191,6 +191,7 @@ export default function Index() {
       initialEndOpen={staleChoice === "end"}
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
+      onRules={() => router.push("/rules")}
       onSetup={() => router.push(gameSetupHref())}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}

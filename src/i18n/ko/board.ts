@@ -427,6 +427,7 @@ export default {
     dice: "주사위",
     game: "게임",
     history: "기록",
+    rules: "규칙",
     connect: "연결",
     end: "종료",
     closeDice: "주사위 닫기",

@@ -401,6 +401,7 @@ export function DecksScreen({
   hasCurrentGame = false,
   onSelect,
   onAddDeck,
+  onHistory,
   onSettings,
   onAccount,
   accountEntry = "account",
@@ -413,6 +414,7 @@ export function DecksScreen({
   hasCurrentGame?: boolean
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
+  onHistory: () => void
   onSettings: () => void
   onAccount: () => void
   accountEntry?: AccountEntry
@@ -645,6 +647,7 @@ export function DecksScreen({
         destination={onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play"}
         accountEntry={accountEntry}
         onDestination={onPlay}
+        onHistory={onHistory}
         onSettings={onSettings}
         onAccount={onAccount}
       />

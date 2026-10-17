@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
 
+jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
+
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),

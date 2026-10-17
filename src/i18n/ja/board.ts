@@ -426,6 +426,7 @@ export default {
     dice: "ダイス",
     game: "ゲーム",
     history: "履歴",
+    rules: "ルール",
     connect: "接続",
     end: "終了",
     closeDice: "ダイスを閉じる",

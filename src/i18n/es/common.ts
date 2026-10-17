@@ -20,6 +20,7 @@ export default {
   appMenu: {
     more: "Más",
     moreUpdateReady: "Más, actualización lista",
+    history: "Historial",
     settings: "Ajustes",
     settingsUpdateReady: "Ajustes, actualización lista",
     account: "Cuenta",
