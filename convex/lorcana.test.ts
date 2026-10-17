@@ -115,4 +115,28 @@ describe("Disney Lorcana", () => {
     await t.action(internal.deckCatalogs.refresh, { game: "lorcana", format: "core" })
     expect(await names("core")).toEqual([])
   })
+
+  it("keeps a listed starter deck while its cards are missing from a partial sync", async () => {
+    const t = await syncedLorcana()
+    const coreDecks = async () =>
+      (
+        await t.action(api.deckCatalogs.browse, {
+          game: "lorcana",
+          format: "core",
+          query: "",
+          source: "all",
+        })
+      ).decks.map((deck) => deck.name)
+    expect(await coreDecks()).toEqual(["Core Starter"])
+
+    const coreStarter = lorcanaJsonDecks["deckdata.S12-1.json"]
+    const partial = {
+      ...lorcanaJsonDecks,
+      "deckdata.S12-1.json": { ...coreStarter, cards: [{ amount: 4, id: 9998, isFoil: false }] },
+    }
+    jest.spyOn(global, "fetch").mockImplementation(async () => new Response(decksZip(partial)))
+    jest.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60 * 60 * 1000)
+    await t.action(internal.deckCatalogs.refresh, { game: "lorcana", format: "core" })
+    expect(await coreDecks()).toEqual(["Core Starter"])
+  })
 })

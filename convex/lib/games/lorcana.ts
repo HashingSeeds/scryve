@@ -151,6 +151,7 @@ async function refreshStarterDecks(
   if (!response.ok) throw new Error(`LorcanaJSON decks returned ${response.status}`)
   const decks = normalizeLorcanaStarterDecks(new Uint8Array(await response.arrayBuffer()))
   let resolved = 0
+  const unresolved: string[] = []
   const kept: string[] = []
   for (const deck of decks) {
     const found: Array<CatalogCard | null> = await ctx.runQuery(
@@ -161,7 +162,10 @@ async function refreshStarterDecks(
       const card = found[index]
       return card ? [{ entry, card }] : []
     })
-    if (entries.length < deck.cards.length) continue
+    if (entries.length < deck.cards.length) {
+      unresolved.push(`${format}:${deck.code}`)
+      continue
+    }
     resolved += 1
     const legal = entries.every(({ card }) =>
       card.facets.some(({ key, value }) => key === `legality:${format}` && value === "legal"),
@@ -197,7 +201,7 @@ async function refreshStarterDecks(
     game: "lorcana",
     source: STARTER_DECK_SOURCE,
     format,
-    keep: kept,
+    keep: [...kept, ...unresolved],
   })
   return { count: kept.length, status: response.status }
 }
