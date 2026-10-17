@@ -1152,7 +1152,11 @@ function useCardReveal(pokemon: PokemonInPlay) {
   useLayoutEffect(() => {
     const was = wasCardless.current
     wasCardless.current = cardless
-    if (!was || cardless || pokemon.damage === 0 || reducedMotion !== false) return
+    if (cardless) {
+      setReveal(null)
+      return
+    }
+    if (!was || pokemon.damage === 0 || reducedMotion !== false) return
     setReveal({ hp: pokemon.hp, damage: pokemon.damage })
     const timer = setTimeout(() => setReveal(null), REVEAL_MS)
     return () => clearTimeout(timer)
