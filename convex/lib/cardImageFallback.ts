@@ -23,9 +23,7 @@ async function syncedImageCandidates(
     game,
     cardId,
   })
-  return [
-    ...new Set(compact(card?.faces.flatMap((face) => [face.imageUrl, face.smallImageUrl]) ?? [])),
-  ]
+  return compact(card?.faces.flatMap((face) => [face.imageUrl, face.smallImageUrl]) ?? [])
 }
 
 const catalogImageCandidates = {

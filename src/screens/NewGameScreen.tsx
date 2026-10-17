@@ -92,7 +92,7 @@ import {
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
-import { systemDefinition } from "../../convex/lib/systems"
+import { identitySection, systemDefinition } from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
@@ -355,8 +355,10 @@ export function NewGameScreen({
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
     deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
-  const chosenDeckVersionId = deck?.versionId
-  useEffect(() => onDeckChange?.(chosenDeckVersionId), [onDeckChange, chosenDeckVersionId])
+  const startingValueDeck = identitySection(system, format)?.startingValueFacet
+    ? deck?.versionId
+    : undefined
+  useEffect(() => onDeckChange?.(startingValueDeck), [onDeckChange, startingValueDeck])
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account

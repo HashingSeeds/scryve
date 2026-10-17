@@ -59,6 +59,10 @@ export function gameRules(system: unknown): GameRules | undefined {
   return isSystemId(system) ? GAME_RULES[system] : undefined
 }
 
+export function rulesHref(system: SystemId, rule?: string) {
+  return { pathname: "/rules", params: { system, ...(rule ? { rule } : {}) } } as const
+}
+
 export function tableItemRulesOf(system: unknown) {
   const rules = gameRules(system)
   return RULES_TEXT_IN_APP && rules?.kind === "text" ? rules.tableItemRules : undefined

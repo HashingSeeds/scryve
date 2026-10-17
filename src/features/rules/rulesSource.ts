@@ -66,11 +66,13 @@ export function loadStoredRules(source: TextRules, store: RulesStore = storage) 
 function validators(source: TextRules, store: RulesStore) {
   const etag = read(store, `${source.cacheKey}.etag.v1`)
   const modified = read(store, `${source.cacheKey}.modified.v1`)
-  const headers: Record<string, string> = {
-    ...(etag ? { "If-None-Match": etag } : {}),
-    ...(modified ? { "If-Modified-Since": modified } : {}),
+  if (!etag && !modified) return undefined
+  return {
+    headers: {
+      ...(etag ? { "If-None-Match": etag } : {}),
+      ...(modified ? { "If-Modified-Since": modified } : {}),
+    },
   }
-  return Object.keys(headers).length > 0 ? { headers } : undefined
 }
 
 async function fetchRules(source: TextRules, store: RulesStore, fetcher: Fetcher) {
@@ -126,8 +128,7 @@ export function prefetchRules(
 }
 
 export function useComprehensiveRules(source: TextRules) {
-  const [stored] = useState(() => loadStoredRules(source))
-  const [rules, setRules] = useState(stored?.rules)
+  const [rules, setRules] = useState(() => loadStoredRules(source)?.rules)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
@@ -148,7 +149,7 @@ export function useComprehensiveRules(source: TextRules) {
     return () => {
       active = false
     }
-  }, [source, stored, attempt])
+  }, [source, attempt])
   return {
     rules,
     failed,

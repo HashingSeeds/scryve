@@ -4,6 +4,11 @@ const CHAPTER = /^(\d{1,2}) ([A-Z][^.]*)$/
 const SECTION = /^(\d{1,2}\.\d{1,2}) (.+)$/
 const RULE = /^(\d{1,2}\.\d{1,2}\.\d{1,3}[a-z]{0,2}) (.+)$/
 const GLOSSARY_TERM = /^1\.-1\.\d+ (.+)$/
+const CHAPTER_MODES = new Map<string, "preface" | "glossary" | "credits">([
+  ["Preface", "preface"],
+  ["Glossary", "glossary"],
+  ["Acknowledgments", "credits"],
+])
 
 export const FAB_RULE_REFERENCE = /\[(\d{1,2}\.\d{1,2}(?:\.\d{1,3}[a-z]{0,2})?)\]/g
 
@@ -21,14 +26,7 @@ export function parseFabRules(source: string): ComprehensiveRules | undefined {
     const chapter = CHAPTER.exec(line)
     if (chapter) {
       const [, id, title] = chapter
-      mode =
-        title === "Preface"
-          ? "preface"
-          : title === "Glossary"
-            ? "glossary"
-            : title === "Acknowledgments"
-              ? "credits"
-              : "rules"
+      mode = CHAPTER_MODES.get(title) ?? "rules"
       if (mode === "rules") chapters.push({ id, title, sections: [] })
       rule = undefined
       continue

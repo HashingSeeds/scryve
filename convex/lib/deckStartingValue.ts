@@ -1,4 +1,3 @@
-import { MAX_DECK_CARDS } from "./policy"
 import { identitySection, identityStartingValue } from "./systems"
 import type { Id } from "../_generated/dataModel"
 import type { QueryCtx } from "../_generated/server"
@@ -11,11 +10,11 @@ export async function deckStartingValue(
 ) {
   const section = identitySection(system, format)
   if (!section?.startingValueFacet) return undefined
-  const cards = await ctx.db
+  const identity = await ctx.db
     .query("deckCards")
     .withIndex("by_deck_version", (query) => query.eq("deckVersionId", deckVersionId))
-    .take(MAX_DECK_CARDS)
-  const identity = cards.find((card) => card.section === section.id)
+    .filter((query) => query.eq(query.field("section"), section.id))
+    .first()
   if (!identity?.cardId || !identity.identityNamespace) return undefined
   const { cardId, identityNamespace } = identity
   const card = await ctx.db
