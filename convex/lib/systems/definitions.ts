@@ -389,7 +389,7 @@ export const SYSTEMS = {
   fab: {
     label: "Flesh and Blood",
     shortLabel: "FaB",
-    available: true,
+    release: "beta",
     defaultFormat: { deck: "cc", play: "cc" },
     counter: {
       label: "life",

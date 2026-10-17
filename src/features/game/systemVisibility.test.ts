@@ -1,4 +1,5 @@
 import type * as Definitions from "../../../convex/lib/systems/definitions"
+import { SYSTEM_IDS } from "../../../convex/lib/systems/definitions"
 
 const mockEnvironment = { current: "production" }
 
@@ -43,7 +44,7 @@ describe("system visibility", () => {
   it.each(["beta", "preview", "development"])("shows beta systems on %s", async (environment) => {
     const { visibility, gameTypes } = await loadIn(environment)
 
-    expect(visibility.VISIBLE_SYSTEM_IDS).toEqual(["mtg", "ygo", "pokemon"])
-    expect(gameTypeSystems(gameTypes)).toEqual(new Set(["mtg", "ygo", "pokemon", undefined]))
+    expect(visibility.VISIBLE_SYSTEM_IDS).toEqual(SYSTEM_IDS)
+    expect(gameTypeSystems(gameTypes)).toEqual(new Set([...SYSTEM_IDS, undefined]))
   })
 })
