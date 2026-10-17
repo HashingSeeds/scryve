@@ -4,6 +4,7 @@ import { createLocalGame } from "./domain"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import { isPlaySystemId, playFormatLabel, playSystemFormat, type PlaySystemId } from "./playSystems"
 import { isRoundClockSetup } from "./roundClock"
+import { isSystemVisible } from "./systemVisibility"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf } from "../../../convex/lib/matchResults"
 import { systemDefinition } from "../../../convex/lib/systems"
@@ -161,4 +162,9 @@ export function recentSetupLabel(setup: RecentSetup) {
   if (setup.mode === "connected" && setup.lobby.variant === "treachery")
     return translate("play:recentSetups.treachery")
   return system ? playFormatLabel(system, format) : translate("play:recentSetups.noSystem")
+}
+
+export function isSetupReplayable(setup: RecentSetup) {
+  const { system } = setup.mode === "local" ? setup.game : setup.lobby
+  return !system || isSystemVisible(system)
 }

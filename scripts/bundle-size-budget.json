@@ -1,5 +1,3 @@
 {
-  "ios": 13400000,
-  "android": 13600000,
-  "web": 7550000
+  "maxGrowthPercent": 1
 }

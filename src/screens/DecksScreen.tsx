@@ -24,6 +24,7 @@ import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
+import { isSystemVisible } from "@/features/game/systemVisibility"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
@@ -670,7 +671,7 @@ export function DecksScreen({
             <FilterGroup heading={translate("decks:shelf.system")}>
               {[
                 { id: ALL_SYSTEMS, shortLabel: translate("decks:shelf.allSystems") },
-                ...DECK_GAME_LIST,
+                ...DECK_GAME_LIST.filter((game) => isSystemVisible(game.id)),
               ].map((candidate) => (
                 <FilterPill
                   key={candidate.id}

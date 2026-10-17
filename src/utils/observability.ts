@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/react-native"
 
 import { setOutboxWriter, setQuarantineReporter } from "@/features/sync/durableOutbox"
 import { analyticsEnabled, syncTimingAdapter } from "@/utils/analytics"
+import { buildEnvironment } from "@/utils/buildEnvironment"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { setTelemetryAdapter } from "@/utils/telemetry"
 import { combineTelemetryAdapters } from "@/utils/telemetryBatch"
@@ -15,16 +16,6 @@ const FALLBACK_SENTRY_DSN =
 const NATIVE_TRACES_SAMPLE_RATE = 0.2
 
 export const navigationTracing = Sentry.reactNavigationIntegration()
-
-// why: only EAS builds carry a channel, so channel-less local and perf builds stop posing as production, and store installs keep their channel even if an update ships without APP_VARIANT.
-function buildEnvironment() {
-  const webBuildEnvironment = process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT
-  if (webBuildEnvironment) return webBuildEnvironment
-  if (__DEV__) return "development"
-  const variant: unknown = Constants.expoConfig?.extra?.appVariant
-  if (typeof variant === "string" && !["", "production", "local"].includes(variant)) return variant
-  return Updates.channel || "local"
-}
 
 export function initObservability() {
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? FALLBACK_SENTRY_DSN

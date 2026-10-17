@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react"
 
+import { isSystemVisible } from "@/features/game/systemVisibility"
 import { loadString, saveString } from "@/utils/storage"
 
-import { DECK_GAMES, DEFAULT_DECK_GAME, defaultDeckFormat } from "../../../convex/lib/deckGames"
+import { DEFAULT_DECK_GAME, defaultDeckFormat } from "../../../convex/lib/deckGames"
 
 export const ALL_FORMATS = "all"
 
@@ -14,9 +15,7 @@ function formatKey(game: string) {
 
 function storedGame() {
   const saved = loadString(GAME_KEY)
-  return saved && Object.prototype.hasOwnProperty.call(DECK_GAMES, saved)
-    ? saved
-    : DEFAULT_DECK_GAME
+  return saved && isSystemVisible(saved) ? saved : DEFAULT_DECK_GAME
 }
 
 export function useDeckFilters() {

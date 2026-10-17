@@ -48,6 +48,7 @@ import { GuestDeckImportNotice } from "@/features/decks/GuestDeckImportNotice"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import { isSystemVisible } from "@/features/game/systemVisibility"
 import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -1810,10 +1811,12 @@ export function AddDeckScreen({
               label={translate("decks:shelf.system")}
               field="system"
               value={game}
-              options={DECK_GAME_LIST.map((candidate) => ({
-                id: candidate.id,
-                label: candidate.shortLabel,
-              }))}
+              options={DECK_GAME_LIST.filter((candidate) => isSystemVisible(candidate.id)).map(
+                (candidate) => ({
+                  id: candidate.id,
+                  label: candidate.shortLabel,
+                }),
+              )}
               onSelect={(next) => {
                 if (next) chooseGame(next)
               }}

@@ -106,7 +106,7 @@ export type RoundClockDefinition = {
 export type SystemDefinition = {
   readonly label: string
   readonly shortLabel: string
-  readonly available: boolean
+  readonly release: "beta" | "general"
   readonly defaultFormat: { readonly deck: string; readonly play: string }
   readonly counter: CounterDefinition
   readonly formats: readonly FormatDefinition[]
@@ -161,7 +161,7 @@ export const SYSTEMS = {
   mtg: {
     label: "Magic: The Gathering",
     shortLabel: "Magic",
-    available: true,
+    release: "general",
     defaultFormat: { deck: "commander", play: "standard" },
     counter: {
       label: "life",
@@ -279,7 +279,7 @@ export const SYSTEMS = {
   ygo: {
     label: "Yu-Gi-Oh!",
     shortLabel: "Yu-Gi-Oh!",
-    available: true,
+    release: "general",
     defaultFormat: { deck: "advanced", play: "advanced" },
     counter: {
       label: "Life Points",
@@ -333,7 +333,7 @@ export const SYSTEMS = {
   pokemon: {
     label: "Pokémon TCG",
     shortLabel: "Pokémon",
-    available: true,
+    release: "general",
     defaultFormat: { deck: "standard", play: "standard" },
     counter: {
       label: "Prize cards",
