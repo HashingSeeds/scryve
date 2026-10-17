@@ -1,5 +1,12 @@
+import { strToU8, zipSync } from "fflate"
+
 import lorcanaJson from "./fixtures/lorcanaJson.json"
-import { LORCANA_JSON_DATASET, normalizeLorcanaJsonCards } from "./lorcana"
+import lorcanaJsonDecks from "./fixtures/lorcanaJsonDecks.json"
+import {
+  LORCANA_JSON_DATASET,
+  normalizeLorcanaJsonCards,
+  normalizeLorcanaStarterDecks,
+} from "./lorcana"
 
 const cards = normalizeLorcanaJsonCards(lorcanaJson)
 
@@ -104,5 +111,30 @@ describe("LorcanaJSON normalizer", () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it("reads starter decks from the deck zip in set order, without quest or gateway decks", () => {
+    const zip = zipSync(
+      Object.fromEntries(
+        Object.entries(lorcanaJsonDecks).map(([file, deck]) => [
+          file,
+          strToU8(JSON.stringify(deck)),
+        ]),
+      ),
+    )
+    expect(normalizeLorcanaStarterDecks(zip)).toEqual([
+      {
+        code: "S2-1",
+        name: "Rotated Starter",
+        cards: [
+          { printingId: "5", quantity: 2 },
+          { printingId: "205", quantity: 1 },
+          { printingId: "25", quantity: 2 },
+        ],
+      },
+      expect.objectContaining({ code: "S10-1" }),
+      expect.objectContaining({ code: "S10-2" }),
+      expect.objectContaining({ code: "S12-1", name: "Core Starter" }),
+    ])
   })
 })

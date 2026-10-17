@@ -18,7 +18,6 @@ import {
   assertGameSystem,
   capabilityReleased,
   GAME_SYSTEM_IDS,
-  integration,
   integrationFor,
   requireReleasedCapability,
 } from "./lib/integrations"
@@ -30,8 +29,9 @@ const FEED_TTL_MS = 24 * 60 * 60 * 1000
 function deckFeed(game: string) {
   if (!isProviderGame(game)) return undefined
   const feed = GAME_PROVIDERS[game].deckFeed
-  const provider = integration(game)?.capabilities.exampleDecks.provider
-  return feed && provider ? { ...feed, game, provider } : undefined
+  return (
+    feed && { ...feed, game, provider: integrationFor(game).capabilities.exampleDecks.provider }
+  )
 }
 
 const entryValidator = v.object({
@@ -160,6 +160,28 @@ export const upsert = internalMutation({
     for (const entry of args.entries)
       await ctx.db.insert("deckCatalogCards", { catalogDeckId, game, ...entry })
     return catalogDeckId
+  },
+})
+
+export const removeStale = internalMutation({
+  args: { game: v.string(), source: v.string(), format: v.string(), keep: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_source_and_external_id", (q) =>
+        q.eq("game", args.game).eq("source", args.source),
+      )
+      .take(200)
+    for (const row of rows) {
+      if (row.format !== args.format || args.keep.includes(row.externalId)) continue
+      const entries = await ctx.db
+        .query("deckCatalogCards")
+        .withIndex("by_catalog_deck_id", (q) => q.eq("catalogDeckId", row._id))
+        .take(MAX_DECK_CARDS + 1)
+      for (const entry of entries) await ctx.db.delete(entry._id)
+      await ctx.db.delete(row._id)
+    }
+    return null
   },
 })
 
@@ -402,8 +424,6 @@ async function browseDecks(
 ): Promise<BrowseResult> {
   const game = assertGameSystem(args.game)
   const format = assertDeckGameFormat(game, args.format ?? SYSTEMS[game].defaultFormat.play)
-  if (integrationFor(game).capabilities.exampleDecks.technical === "unavailable")
-    return { decks: [], cursor: null, status: "unsupported" }
   const feed = deckFeed(game)
   await requireActionCapability(ctx, game, "exampleDecks")
   if (args.query.trim().length > 120) return { decks: [], cursor: null, status: "ready" }

@@ -415,7 +415,7 @@ export const SYSTEMS = {
         integration: available("scryve"),
         cardCatalog: available("lorcanajson", "Synced from the LorcanaJSON dataset."),
         deckImport: available("lorcanajson"),
-        exampleDecks: { technical: "unavailable", release: "disabled" },
+        exampleDecks: available("lorcanajson", "Official starter decks only."),
         images: available("ravensburger", "Functional card context only."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),

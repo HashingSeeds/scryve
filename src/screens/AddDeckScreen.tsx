@@ -320,10 +320,12 @@ function preconDetail(deck: PreconstructedDeck) {
 
 function catalogSourceLabel(deck: CatalogDeck) {
   return deck.kind === "official"
-    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh! and Pokémon, named by publisher.
+    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh!, Pokémon, and Lorcana, named by publisher.
       deck.game === "ygo"
       ? "Konami"
-      : "Pokémon"
+      : deck.game === "lorcana"
+        ? "Ravensburger"
+        : "Pokémon"
     : deck.source === "mtgo-examples"
       ? translate("decks:addDeck.sourceMtgoExample")
       : deck.source === "limitless"
