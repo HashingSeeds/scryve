@@ -1,5 +1,5 @@
 import lorcanaJson from "./fixtures/lorcanaJson.json"
-import { normalizeLorcanaJsonCards } from "./lorcana"
+import { LORCANA_JSON_DATASET, normalizeLorcanaJsonCards } from "./lorcana"
 
 const cards = normalizeLorcanaJsonCards(lorcanaJson)
 
@@ -81,5 +81,28 @@ describe("LorcanaJSON normalizer", () => {
   it("skips records without an id or name", () => {
     expect(normalizeLorcanaJsonCards({ cards: [{ fullName: "No id" }, { id: 9 }] })).toEqual([])
     expect(normalizeLorcanaJsonCards(lorcanaJson.cards)).toEqual([])
+  })
+
+  it("loads allCards only when it matches the version metadata announced", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(
+        async (url) =>
+          new Response(
+            JSON.stringify(
+              String(url).endsWith("/metadata.json") ? lorcanaJson.metadata : lorcanaJson,
+            ),
+          ),
+      )
+    try {
+      const version = await LORCANA_JSON_DATASET.version()
+      expect(version).toBe(lorcanaJson.metadata.generatedOn)
+      await expect(LORCANA_JSON_DATASET.load(version)).resolves.toHaveLength(5)
+      await expect(LORCANA_JSON_DATASET.load("2099-01-01T00:00:00")).rejects.toThrow(
+        "not 2099-01-01T00:00:00",
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

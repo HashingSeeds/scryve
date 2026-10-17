@@ -103,6 +103,11 @@ export const LORCANA_JSON_DATASET = {
     if (!generatedOn) throw new Error("LorcanaJSON metadata has no generatedOn")
     return generatedOn
   },
-  load: async () =>
-    normalizeLorcanaJsonCards(await fetchDatasetJson(`${LORCANA_JSON_URL}/allCards.json`)),
+  load: async (version) => {
+    const allCards = await fetchDatasetJson(`${LORCANA_JSON_URL}/allCards.json`)
+    const generatedOn = stringValue(objectRecord(objectRecord(allCards)?.metadata)?.generatedOn)
+    if (generatedOn !== version)
+      throw new Error(`LorcanaJSON allCards is ${generatedOn ?? "unversioned"}, not ${version}`)
+    return normalizeLorcanaJsonCards(allCards)
+  },
 } satisfies BulkDataset
