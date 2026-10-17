@@ -105,8 +105,22 @@ describe("PokemonSeatCard", () => {
 
     expect(screen.getByTestId("dice-chip-1-coin")).toHaveTextContent("Heads")
     expect(paddingTop()).toBe(before)
-    fireEvent.press(screen.getByTestId("pokemon-bench-add-seat-1"))
+    fireEvent(screen.getByTestId("pokemon-bench-add-seat-1"), "longPress")
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
+  })
+
+  it("counts damage up on an Active placed with one tap, before its card is chosen", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId("pokemon-place-active-seat-1"))
+    expect(screen.queryByTestId("pokemon-sheet-seat-1")).toBeNull()
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("0")
+
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("20")
+    expect(board(table).active).toMatchObject({ damage: 20 })
   })
 
   it.each([
@@ -415,7 +429,7 @@ describe("PokemonSeatCard", () => {
     const table = pokemonTable(["Ada", "Grace"])
     render(<Seat harness={table} seat={0} />)
 
-    fireEvent.press(screen.getByTestId("pokemon-place-active-seat-1"))
+    fireEvent(screen.getByTestId("pokemon-place-active-seat-1"), "longPress")
     fireEvent.changeText(screen.getByTestId("pokemon-name-input-seat-1"), "Pikachu")
     fireEvent.changeText(screen.getByTestId("pokemon-hp-input-seat-1"), "60")
     table.refuse(true)

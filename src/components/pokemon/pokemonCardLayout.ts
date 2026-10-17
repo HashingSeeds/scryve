@@ -3,7 +3,12 @@ import { AccessibilityInfo, Platform } from "react-native"
 
 import { translate } from "@/i18n/translate"
 
-import type { PokemonInPlay } from "../../../convex/lib/table"
+import {
+  MAX_POKEMON_HP,
+  remainingHp,
+  type PokemonCard,
+  type PokemonInPlay,
+} from "../../../convex/lib/table"
 import {
   getLifeFontSizeThatFits,
   type LifeCardContentInsets,
@@ -125,6 +130,17 @@ export function benchChipMetrics(compact: boolean, fontScale: number) {
   }
 }
 export type BenchChipMetrics = ReturnType<typeof benchChipMetrics>
+
+// why: the table requires HP that installed clients can read, and real damage never reaches max HP, so a Pokémon placed before its card is chosen stays in play.
+export const CARDLESS_POKEMON: PokemonCard = { hp: MAX_POKEMON_HP, prizes: 1 }
+
+export function isCardless(pokemon: Pick<PokemonInPlay, "hp">) {
+  return pokemon.hp === MAX_POKEMON_HP
+}
+
+export function pokemonReadout(pokemon: Pick<PokemonInPlay, "hp" | "damage">) {
+  return isCardless(pokemon) ? pokemon.damage : remainingHp(pokemon)
+}
 
 export function pokemonName(pokemon: Pick<PokemonInPlay, "name">): string {
   return pokemon.name?.trim() || translate("board:pokemon.unnamed")

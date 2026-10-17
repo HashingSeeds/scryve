@@ -24,23 +24,21 @@ import {
   type BenchChipMetrics,
   benchMenuClearance,
   CHIP_BAR_HEIGHT,
+  CARDLESS_POKEMON,
   CONTENT_EDGES,
   contentInsetsFor,
   heroFontSize,
+  isCardless,
   knockoutMessage,
   moveFocus,
   pokemonName,
+  pokemonReadout,
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
 import type { SeatDeck } from "./usePokemonDeck"
 import { shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
-import {
-  findPokemon,
-  pokemonBoardOf,
-  remainingHp,
-  type PokemonInPlay,
-} from "../../../convex/lib/table"
+import { findPokemon, pokemonBoardOf, type PokemonInPlay } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
 import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
@@ -358,7 +356,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   }
 
   const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
-  const heroDigits = shown ? String(remainingHp(shown)).length : 1
+  const heroDigits = shown ? String(pokemonReadout(shown)).length : 1
   const fontSize = heroFontSize({
     width: layer.width - padding * 2 - insets.left - insets.right,
     height:
@@ -477,7 +475,17 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   testID={`pokemon-bench-add-seat-${seatNumber}`}
                   accessibilityRole="button"
                   accessibilityLabel={translate("board:pokemon.addBench", { identity })}
-                  onPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
+                  accessibilityHint={translate("board:pokemon.holdToChooseHint")}
+                  accessibilityActions={[
+                    { name: "longpress", label: translate("board:pokemon.chooseCard") },
+                  ]}
+                  onAccessibilityAction={({ nativeEvent }) => {
+                    if (nativeEvent.actionName === "longpress")
+                      openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)
+                  }}
+                  delayLongPress={LONG_PRESS_MS}
+                  onLongPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
+                  onPress={() => table.placePokemon(playerId, "bench", CARDLESS_POKEMON)}
                   style={({ pressed }) => [
                     themed($chip),
                     $slot,
@@ -548,8 +556,24 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   : translate("board:pokemon.placeActiveHint")
                 : undefined
             }
+            accessibilityActions={
+              controlsLive
+                ? [{ name: "longpress", label: translate("board:pokemon.chooseCard") }]
+                : undefined
+            }
+            onAccessibilityAction={({ nativeEvent }) => {
+              if (nativeEvent.actionName === "longpress")
+                openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
+            }}
             disabled={!controlsLive}
-            onPress={() => openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)}
+            delayLongPress={LONG_PRESS_MS}
+            onLongPress={() => openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)}
+            // why: once a bench exists, the empty Active is a promotion from it, not a new Pokémon.
+            onPress={() =>
+              board.bench.length
+                ? openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)
+                : table.placePokemon(playerId, "active", CARDLESS_POKEMON)
+            }
             style={({ pressed }) => [
               themed($placeActive),
               {
@@ -567,8 +591,12 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               weight="medium"
               style={{ color: ink }}
             />
-            {canEdit && board.bench.length ? (
-              <Text tx="board:pokemon.orTapBench" size="xxs" style={[{ color: ink }, $dim70]} />
+            {canEdit ? (
+              <Text
+                tx={board.bench.length ? "board:pokemon.orTapBench" : "board:pokemon.holdToChoose"}
+                size="xxs"
+                style={[{ color: ink }, $dim70]}
+              />
             ) : null}
           </BoardPressable>
         )}
@@ -830,26 +858,30 @@ function PokemonHero({
   } = useAppTheme()
   const { fontScale } = useWindowDimensions()
   const [heroWidth, setHeroWidth] = useState(0)
-  const remaining = remainingHp(pokemon)
+  const cardless = isCardless(pokemon)
+  const readout = pokemonReadout(pokemon)
   const name = pokemonName(pokemon)
   const slotLabel = bench ? translate("board:pokemon.benchSlot", { name }) : name
   const onInk = accessibleForeground(ink)
   const recentDelta = useRecentDeltaValue(pokemon.damage)
   const longPressHandled = useRef<number | null>(null)
-  const previous = useRef(remaining)
+  const previous = useRef(readout)
   useEffect(() => {
-    if (previous.current === remaining) return
-    previous.current = remaining
+    if (previous.current === readout) return
+    previous.current = readout
     if (Platform.OS === "ios")
       AccessibilityInfo.announceForAccessibility(
-        translate("board:pokemon.hpLeft", { name, remaining }),
+        cardless
+          ? translate("board:pokemon.damageOn", { name, damage: readout })
+          : translate("board:pokemon.hpLeft", { name, remaining: readout }),
       )
-  }, [name, remaining])
+  }, [cardless, name, readout])
   const zones = [
     { direction: -1, glyph: "−", align: "flex-start" as const },
     { direction: 1, glyph: "+", align: "flex-end" as const },
   ]
-  const recentHp = -recentDelta
+  // why: the readout counts down HP once a card is set and counts damage up before, so + always moves the big number up.
+  const recentReadout = cardless ? recentDelta : -recentDelta
   return (
     <View
       testID={`pokemon-hero-seat-${seatNumber}`}
@@ -859,10 +891,10 @@ function PokemonHero({
       {interactive ? (
         <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, themed($zones)]}>
           {zones.map(({ direction, glyph, align }) => {
-            const delta = -direction * step
-            const showingDelta = direction * recentHp > 0
+            const delta = (cardless ? direction : -direction) * step
+            const showingDelta = direction * recentReadout > 0
             const feedback = showingDelta
-              ? `${recentHp > 0 ? "+" : "-"}${Math.abs(recentHp)}`
+              ? `${recentReadout > 0 ? "+" : "-"}${Math.abs(recentReadout)}`
               : glyph
             return (
               <BoardPressable
@@ -916,7 +948,7 @@ function PokemonHero({
                         run: heroWidth,
                         inset: spacing.xs,
                         lifeFontSize: fontSize,
-                        lifeDigits: String(remaining).length,
+                        lifeDigits: String(readout).length,
                         fontScale,
                       }),
                     },
@@ -931,15 +963,23 @@ function PokemonHero({
       <View pointerEvents="box-none" style={themed($heroReadout)}>
         <Text
           testID={`pokemon-hp-seat-${seatNumber}`}
-          text={String(remaining)}
+          text={String(readout)}
           accessible
-          accessibilityLabel={translate("board:pokemon.hpLabel", {
-            identity,
-            slot: slotLabel,
-            remaining,
-            hp: pokemon.hp,
-            damage: pokemon.damage,
-          })}
+          accessibilityLabel={
+            cardless
+              ? translate("board:pokemon.damageLabel", {
+                  identity,
+                  slot: slotLabel,
+                  damage: readout,
+                })
+              : translate("board:pokemon.hpLabel", {
+                  identity,
+                  slot: slotLabel,
+                  remaining: readout,
+                  hp: pokemon.hp,
+                  damage: pokemon.damage,
+                })
+          }
           accessibilityLiveRegion="polite"
           maxFontSizeMultiplier={1.3}
           numberOfLines={1}
@@ -964,10 +1004,14 @@ function PokemonHero({
             style={[$shrink, { color: ink }]}
           />
           <Text
-            text={translate(compact ? "board:pokemon.damageShort" : "board:pokemon.damageCaption", {
-              damage: pokemon.damage,
-              hp: pokemon.hp,
-            })}
+            text={
+              cardless
+                ? translate("board:pokemon.damageCounted")
+                : translate(compact ? "board:pokemon.damageShort" : "board:pokemon.damageCaption", {
+                    damage: pokemon.damage,
+                    hp: pokemon.hp,
+                  })
+            }
             size="xxs"
             numberOfLines={1}
             style={[{ color: ink }, $dim75]}
@@ -1085,19 +1129,24 @@ function BenchChip({
 }) {
   const { themed } = useAppTheme()
   const name = pokemonName(pokemon)
-  const remaining = remainingHp(pokemon)
+  const cardless = isCardless(pokemon)
+  const readout = pokemonReadout(pokemon)
   const longPressHandled = useRef(false)
   return (
     <BoardPressable
       ref={triggerRef}
       testID={`pokemon-bench-${pokemon.id}`}
       accessibilityRole={interactive ? "button" : undefined}
-      accessibilityLabel={translate("board:pokemon.benchChipLabel", {
-        name,
-        remaining,
-        hp: pokemon.hp,
-        damage: pokemon.damage,
-      })}
+      accessibilityLabel={
+        cardless
+          ? translate("board:pokemon.benchChipDamageLabel", { name, damage: readout })
+          : translate("board:pokemon.benchChipLabel", {
+              name,
+              remaining: readout,
+              hp: pokemon.hp,
+              damage: pokemon.damage,
+            })
+      }
       accessibilityHint={
         interactive
           ? promotes
@@ -1150,7 +1199,7 @@ function BenchChip({
       />
       <Text
         testID={`pokemon-bench-hp-${pokemon.id}`}
-        text={String(remaining)}
+        text={String(readout)}
         weight="bold"
         allowFontScaling={false}
         numberOfLines={1}
@@ -1161,13 +1210,15 @@ function BenchChip({
           <View key={index} style={[$chipPip, { backgroundColor: ink }]} />
         ))}
       </View>
-      <View
-        pointerEvents="none"
-        style={[
-          $chipBar,
-          { backgroundColor: ink, width: `${Math.round((100 * remaining) / pokemon.hp)}%` },
-        ]}
-      />
+      {cardless ? null : (
+        <View
+          pointerEvents="none"
+          style={[
+            $chipBar,
+            { backgroundColor: ink, width: `${Math.round((100 * readout) / pokemon.hp)}%` },
+          ]}
+        />
+      )}
     </BoardPressable>
   )
 }

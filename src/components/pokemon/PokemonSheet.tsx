@@ -17,6 +17,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
+  isCardless,
   moveFocus,
   parseHp,
   pokemonName,
@@ -116,15 +117,16 @@ export function PokemonSheet({
   const onInk = { color: sheetColor }
   const button = { backgroundColor: overlayTint(ink, 0.14) }
   const editing = mode.kind === "edit" ? mode.pokemon : undefined
+  const cardless = editing !== undefined && isCardless(editing)
   const [draft, setDraft] = useState(() => ({
     cardId: editing?.cardId,
     name: editing?.name ?? "",
-    hp: editing ? String(editing.hp) : "",
+    hp: editing && !cardless ? String(editing.hp) : "",
     prizes: editing?.prizes ?? 1,
-    prizesChosen: Boolean(editing),
+    prizesChosen: Boolean(editing) && !cardless,
   }))
   const [query, setQuery] = useState("")
-  const [lookupOpen, setLookupOpen] = useState(mode.kind === "place")
+  const [lookupOpen, setLookupOpen] = useState(mode.kind === "place" || cardless)
   const [picking, setPicking] = useState<string>()
   const [pickError, setPickError] = useState<string>()
   const [editError, setEditError] = useState<string>()
@@ -204,9 +206,11 @@ export function PokemonSheet({
       const picked = await catalog.pick(hit)
       if (!mounted.current) return
       const name = picked.name ?? hit.name
-      if (mode.kind === "place" && picked.hp !== undefined) {
-        place({ cardId: picked.cardId, name, hp: picked.hp, prizes: picked.prizes })
-        return
+      if (picked.hp !== undefined) {
+        const next = { cardId: picked.cardId, name, hp: picked.hp, prizes: picked.prizes }
+        if (mode.kind === "place") return place(next)
+        if (editing && cardless && next.hp > editing.damage && onUpdate(editing.id, next))
+          return onClose()
       }
       setDraft({
         cardId: picked.cardId,
@@ -579,17 +583,28 @@ export function PokemonSheet({
                     testID={`pokemon-sheet-damage-seat-${seatNumber}`}
                     text={String(editing.damage)}
                     accessibilityLiveRegion="polite"
-                    accessibilityLabel={translate("board:pokemonSheet.damageLabel", {
-                      name: pokemonName(editing),
-                      damage: editing.damage,
-                      remaining: remainingHp(editing),
-                    })}
+                    accessibilityLabel={
+                      cardless
+                        ? translate("board:pokemon.damageOn", {
+                            name: pokemonName(editing),
+                            damage: editing.damage,
+                          })
+                        : translate("board:pokemonSheet.damageLabel", {
+                            name: pokemonName(editing),
+                            damage: editing.damage,
+                            remaining: remainingHp(editing),
+                          })
+                    }
                     style={[themed(compact ? $compactBig : $big), inkStyle]}
                   />
                   <Text
-                    text={translate("board:pokemonSheet.damageCaption", {
-                      remaining: remainingHp(editing),
-                    })}
+                    text={
+                      cardless
+                        ? translate("board:pokemon.damageCounted")
+                        : translate("board:pokemonSheet.damageCaption", {
+                            remaining: remainingHp(editing),
+                          })
+                    }
                     size="xxs"
                     style={[inkStyle, $dim]}
                   />
