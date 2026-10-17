@@ -196,8 +196,8 @@ export function localizedDeckSections(game: string, format: string): readonly De
 }
 
 function formatBlurb(system: PlaySystemId, id: string, blurb: string): string {
-  return system === "mtg" && hasOwnKey(systems.formatBlurb.mtg, id)
-    ? translate(`systems:formatBlurb.mtg.${id}`)
+  return hasOwnKey(systems.formatBlurb, system) && hasOwnKey(systems.formatBlurb[system], id)
+    ? translate(`systems:formatBlurb.${system}.${id}`)
     : blurb
 }
 

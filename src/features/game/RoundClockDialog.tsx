@@ -24,11 +24,9 @@ import {
 } from "./roundClock"
 import type { GamePlayer } from "./types"
 import { useRoundClockView } from "./useRoundClockView"
-import { counterStanding } from "../../../convex/lib/systems"
+import { counterStanding, systemDefinition } from "../../../convex/lib/systems"
 
 const MINUTE_MS = 60_000
-/** why: a Magic Slow Play warning adds two turns to the end-of-round procedure (IPG 3.3). */
-const SLOW_PLAY_TURNS = 2
 
 export interface RoundClockDialogProps {
   clock: RoundClock
@@ -47,6 +45,7 @@ export function RoundClockDialog({
 }: RoundClockDialogProps) {
   const { themed } = useAppTheme()
   const view = useRoundClockView(clock, system)
+  const slowPlayTurns = systemDefinition(system)?.roundClock.slowPlayTurns
   if (!view) return null
   const paused = clock.pausedAt !== undefined
   const countdown = clock.setup.mode === "countdown"
@@ -144,13 +143,13 @@ export function RoundClockDialog({
             onPress={() => onChange((current) => callRoundTime(current))}
           />
         ) : null}
-        {system === "mtg" && view.kind === "time" ? (
+        {slowPlayTurns !== undefined && view.kind === "time" ? (
           <Button
             testID="round-clock-bonus"
             tx="board:roundClock.bonusTurns"
-            txOptions={{ count: SLOW_PLAY_TURNS }}
+            txOptions={{ count: slowPlayTurns }}
             style={themed($dialogButton)}
-            onPress={() => onChange((current) => addRoundBonusTurns(current, SLOW_PLAY_TURNS))}
+            onPress={() => onChange((current) => addRoundBonusTurns(current, slowPlayTurns))}
           />
         ) : null}
         <Button
