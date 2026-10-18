@@ -17,7 +17,6 @@ const connected = {
   waitingForPlayers_one: "Waiting for {{count}} more player",
   waitingForPlayers_other: "Waiting for {{count}} more players",
   decksRequired: "Decks required",
-  decksOptional: "Decks optional",
   yourSeat: "Your seat",
   seatNumber: "Seat {{seat}}",
   noDeckSelected: "No deck selected",

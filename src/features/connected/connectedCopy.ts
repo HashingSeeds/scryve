@@ -65,10 +65,6 @@ export function seatSummary(claimed: number, total: number) {
   return translate("connected:waitingForPlayers", { count: open })
 }
 
-export function deckRequirementLabel(required: boolean) {
-  return required ? translate("connected:decksRequired") : translate("connected:decksOptional")
-}
-
 export function lobbyDetail(
   startingLife: number,
   ruleset: string,

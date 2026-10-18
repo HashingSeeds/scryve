@@ -40,7 +40,6 @@ const treachery: NewRecentSetup = {
     system: "mtg",
     format: "commander",
     variant: "treachery",
-    deckRequired: false,
     layout: "auto",
     lifeStep: 1,
   },
@@ -62,6 +61,9 @@ describe("recent setups", () => {
   it("drops stored setups that could not start a game", () => {
     const valid = { savedAt: 1, ...treachery }
     expect(parseRecentSetup(valid)).toEqual(valid)
+    expect(parseRecentSetup({ ...valid, lobby: { ...valid.lobby, deckRequired: true } })).toEqual(
+      valid,
+    )
     expect(parseRecentSetup({ savedAt: 1, ...local(["Solo"]) })).toBeUndefined()
     expect(parseRecentSetup({ savedAt: 1, ...local(["Ada", "Ada"]) })).toBeUndefined()
     expect(

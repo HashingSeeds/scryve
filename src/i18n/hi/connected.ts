@@ -20,7 +20,6 @@ export default {
   waitingForPlayers_one: "{{count}} और खिलाड़ी का इंतज़ार",
   waitingForPlayers_other: "{{count}} और खिलाड़ियों का इंतज़ार",
   decksRequired: "डेक ज़रूरी हैं",
-  decksOptional: "डेक वैकल्पिक हैं",
   yourSeat: "आपकी सीट",
   seatNumber: "सीट {{seat}}",
   noDeckSelected: "कोई डेक चुना नहीं गया",
