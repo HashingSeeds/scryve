@@ -497,6 +497,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
 
+    fireEvent.press(view.getByTestId("game-type-more-ygo"))
     fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     openOptions()
     expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
@@ -515,8 +516,8 @@ describe("NewGameScreen", () => {
   it("follows Speed Duel to 4000 Life Points and back to 8000 for Advanced", () => {
     const view = setup()
 
-    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     fireEvent.press(view.getByTestId("game-type-more-ygo"))
+    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     fireEvent.press(view.getByTestId("game-type-ygo-speed"))
     openOptions()
     expect(view.getByLabelText("Life Points, 4000")).toBeTruthy()
@@ -703,6 +704,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
 
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     openOptions()
     expect(view.getByLabelText("Increase Life by 1")).toBeTruthy()
@@ -724,6 +726,7 @@ describe("NewGameScreen", () => {
   it("preserves custom life when changing formats", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     openOptions()
     fireEvent.press(view.getByTestId("starting-counter-increment"))
@@ -805,6 +808,7 @@ describe("NewGameScreen", () => {
     const view = setup({ mode: "connected", connected: { ...readyHost, host } })
 
     expect(view.queryByTestId("player-name-1")).toBeNull()
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     openOptions()
     fireEvent.press(view.getByTestId("player-count-increment"))
@@ -858,6 +862,7 @@ describe("NewGameScreen", () => {
         </ThemeProvider>,
       )
 
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-treachery"))
     expect(view.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
     expect(view.getByText("4 seats · 40 life · Decks optional")).toBeTruthy()
@@ -1181,6 +1186,7 @@ describe("NewGameScreen", () => {
     render(hostSetup(onLobbyCreated))
     await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
     expect(mockSyncUser).toHaveBeenCalledTimes(1)
+    fireEvent.press(screen.getByTestId("game-type-more-mtg"))
     fireEvent.press(screen.getByTestId("game-type-mtg-standard"))
     openOptions()
     fireEvent.press(screen.getByTestId("player-count-increment"))
@@ -1317,6 +1323,7 @@ describe("NewGameScreen", () => {
         />
       </ThemeProvider>,
     )
+    fireEvent.press(screen.getByTestId("game-type-more-mtg"))
     fireEvent.press(screen.getByTestId("game-type-mtg-standard"))
     fireEvent.press(screen.getByTestId("me-deck"))
     fireEvent.press(screen.getByTestId("me-deck-option-v-standard"))
@@ -1472,6 +1479,7 @@ describe("NewGameScreen", () => {
     expect(screen.queryByTestId("join-with-code-button")).toBeNull()
 
     setup({ mode: "connected", connected: readyHost, onJoin: jest.fn() })
+    fireEvent.press(screen.getByTestId("game-type-more-mtg"))
     expect(screen.getByTestId("game-type-treachery")).toBeEnabled()
     expect(screen.getByTestId("join-with-code-button")).toBeTruthy()
   })
@@ -1507,6 +1515,7 @@ describe("NewGameScreen", () => {
     expect(recent().props.accessibilityState.selected).toBe(true)
     expect(screen.queryByTestId("game-type-treachery")).toBeNull()
 
+    fireEvent.press(screen.getByTestId("game-type-more-mtg"))
     fireEvent.press(screen.getByTestId("game-type-mtg-standard"))
     expect(recent().props.accessibilityState.selected).toBe(false)
     fireEvent.press(recent())
@@ -1545,7 +1554,6 @@ describe("NewGameScreen", () => {
 
     expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(false)
     expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
-    expect(view.queryByTestId("game-type-mtg-modern")).toBeNull()
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(props.onStartLocal).toHaveBeenCalledWith(
       [expect.objectContaining({ name: "Ada" }), expect.objectContaining({ name: "Grace" })],

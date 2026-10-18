@@ -459,7 +459,7 @@ describe("SettingsScreen", () => {
 
     expect(view.getByLabelText("Game, Magic")).toBeTruthy()
     fireEvent.press(view.getByTestId("default-game"))
-    expect(view.getByTestId("game-type-mtg-standard")).toBeTruthy()
+    expect(view.getByTestId("game-type-commander")).toBeTruthy()
     expect(view.queryByTestId("game-type-mtg-pioneer")).toBeNull()
     fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-pioneer"))
@@ -479,6 +479,7 @@ describe("SettingsScreen", () => {
     )
 
     fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-more-ygo"))
     fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultSystem: "ygo", defaultStartingLife: 8000 }),
@@ -512,6 +513,7 @@ describe("SettingsScreen", () => {
 
     fireEvent.press(view.getByTestId("default-starting-life-decrement"))
     fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "standard", defaultStartingLife: 39 }),
@@ -552,6 +554,7 @@ describe("SettingsScreen", () => {
     )
 
     fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-commander"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "commander", defaultStartingLife: 40 }),
