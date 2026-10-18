@@ -23,6 +23,7 @@ export default function RulesRoute() {
   const params = system ? { system } : {}
   return (
     <RulesScreen
+      key={source.cacheKey}
       source={source}
       ruleId={rule}
       glossary={glossary !== undefined}

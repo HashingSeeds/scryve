@@ -1,5 +1,5 @@
 import { router } from "expo-router"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native"
 
 import {
   applyGameCommand,
@@ -27,27 +27,15 @@ jest.mock("@/features/auth/AuthContext", () => ({
       ? { configured: true, isLoaded: true, isSignedIn: true, userId: mockSignedInAs }
       : { configured: false, isLoaded: true, isSignedIn: false },
 }))
-let mockDecksLoad = true
 jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
   LocalDeckChoicesSource: ({ onChange }: { onChange: (decks: unknown) => void }) => {
-    jest.requireActual<typeof import("react")>("react").useEffect(() => {
-      if (mockDecksLoad)
-        onChange([{ versionId: "v-atraxa", name: "Atraxa", system: "mtg", format: "commander" }])
-    }, [onChange])
-    return null
-  },
-}))
-let mockReportStartingValue:
-  ((value: { versionId: string; value: number | null }) => void) | undefined
-jest.mock("@/features/decks/DeckStartingValueSource", () => ({
-  DeckStartingValueSource: ({
-    versionId,
-    onChange,
-  }: {
-    versionId: string
-    onChange: (value: { versionId: string; value: number | null }) => void
-  }) => {
-    mockReportStartingValue = (value) => onChange({ ...value, versionId })
+    jest
+      .requireActual<typeof import("react")>("react")
+      .useEffect(
+        () =>
+          onChange([{ versionId: "v-atraxa", name: "Atraxa", system: "mtg", format: "commander" }]),
+        [onChange],
+      )
     return null
   },
 }))
@@ -460,8 +448,6 @@ describe("new local game route while signed in", () => {
     jest.clearAllMocks()
     mockSearchParams = {}
     mockSignedInAs = "owner-a"
-    mockDecksLoad = true
-    mockReportStartingValue = undefined
   })
   afterEach(() => {
     localGameRepository.clearActiveGame()
@@ -498,37 +484,6 @@ describe("new local game route while signed in", () => {
       deckName: "Atraxa",
     })
     expect(localGameRepository.loadMeSeat()).toBe(1)
-  })
-
-  it("waits for a seeded deck's hero life before the deck picker loads", () => {
-    mockDecksLoad = false
-    storage.delete(LOCAL_KEYS.recentSetups)
-    localGameRepository.saveActiveGame(
-      createLocalGame({
-        startingLife: 40,
-        system: "fab",
-        format: "cc",
-        players: [
-          { name: "One", color: "#000" },
-          { name: "Two", color: "#111" },
-        ],
-        account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "v-hero", deckName: "Hero" },
-      }),
-    )
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <NewLocalGameRoute />
-      </ThemeProvider>,
-    )
-    expect(view.getByTestId("start-game-button")).toBeDisabled()
-    act(() => mockReportStartingValue?.({ versionId: "v-hero", value: 20 }))
-    fireEvent.press(view.getByTestId("start-game-button"))
-
-    const call = (router.dismissTo as jest.Mock).mock.calls.at(-1)?.[0] as {
-      params: { prepared: string }
-    }
-    const prepared = JSON.parse(call.params.prepared) as Parameters<typeof createLocalGame>[0]
-    expect(prepared.players[0]).toMatchObject({ startingLife: 20 })
   })
 
   it("persists seat and deck picks for a running game opened without the setup flag", () => {

@@ -139,9 +139,7 @@ describe("Flesh and Blood", () => {
         cards: imported.cards,
       })
       const deckVersionId = (await host.query(api.decks.detail, { deckId })).versions[0]._id
-      await expect(host.query(api.decks.startingValue, { versionId: deckVersionId })).resolves.toBe(
-        40,
-      )
+      expect((await host.query(api.decks.listMine, {})).decks[0].startingValue).toBe(40)
 
       const created = await host.mutation(api.games.createLobby, {
         publicId: "fab-hero-life-public-12",
@@ -204,9 +202,7 @@ describe("Flesh and Blood", () => {
           ),
         })
       })
-      await expect(host.query(api.decks.startingValue, { versionId: deckVersionId })).resolves.toBe(
-        30,
-      )
+      expect((await host.query(api.decks.listMine, {})).decks[0].startingValue).toBe(30)
       const corrected = await host.query(api.games.connectedSummary, {
         publicId: created.publicId,
       })

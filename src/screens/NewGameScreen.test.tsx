@@ -281,25 +281,61 @@ describe("NewGameScreen", () => {
     expect(onStartLocal.mock.calls[0][0]).toHaveLength(3)
   })
 
-  it("waits to start until the chosen deck's starting life has loaded", () => {
+  it("starts the account seat at its hero deck's life once the deck list loads", () => {
     const onStartLocal = jest.fn()
-    const view = setup({ onStartLocal, startPending: true })
-    expect(view.getByTestId("start-game-button")).toBeDisabled()
-    fireEvent.press(view.getByTestId("start-game-button"))
-    expect(onStartLocal).not.toHaveBeenCalled()
+    const initialGame = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 40,
+      system: "fab",
+      format: "cc",
+      account: { ownerId: "owner-a", meSeat: 1, deckVersionId: "v-hero", deckName: "Dash" },
+    })
+    const view = setup({ onStartLocal, initialGame, account: { ownerId: "owner-a" } })
+    expect(screen.getByTestId("start-game-button")).toBeDisabled()
+
     view.rerender(
-      themed(
+      <ThemeProvider initialContext="light">
         <NewGameScreen
           defaults={DEFAULT_LOCAL_SETTINGS}
           mode="local"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
           onStartLocal={onStartLocal}
-        />,
-      ),
+          initialGame={initialGame}
+          account={{
+            ownerId: "owner-a",
+            decks: [
+              { versionId: "v-hero", name: "Dash", system: "fab", format: "cc", startingValue: 36 },
+            ],
+          }}
+        />
+      </ThemeProvider>,
     )
-    fireEvent.press(view.getByTestId("start-game-button"))
-    expect(onStartLocal).toHaveBeenCalledTimes(1)
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    const [players, startingLife] = onStartLocal.mock.calls[0]
+    expect(startingLife).toBe(40)
+    expect(players[0].startingLife).toBeUndefined()
+    expect(players[1]).toMatchObject({ startingLife: 36 })
+  })
+
+  it("keeps a prepared game's hero life for its deck when the deck list is offline", () => {
+    const onStartLocal = jest.fn()
+    const initialGame = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000", startingLife: 36 },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 40,
+      system: "fab",
+      format: "cc",
+      account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "v-old", deckName: "Dash" },
+    })
+    setup({ onStartLocal, initialGame, account: { ownerId: "owner-a", decks: "unavailable" } })
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[0][0][0]).toMatchObject({ startingLife: 36 })
   })
 
   it("autosaves valid names on blur and confirmed appearances for existing players", () => {

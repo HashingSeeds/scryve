@@ -414,6 +414,14 @@ export const listMine = query({
               versionNumber: version.versionNumber,
             })),
             cardQuantity: latest?.cardQuantity,
+            startingValue: latest
+              ? await deckStartingValue(
+                  ctx,
+                  latest._id,
+                  deck.game ?? DEFAULT_DECK_GAME,
+                  deck.format,
+                )
+              : undefined,
             coverImageUrl:
               latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
             lastPlayedAt: await lastPlayedAt(ctx, deck._id),
@@ -1395,17 +1403,6 @@ export const versionCards = query({
       revision: syncedVersion(version).revision,
       cards: cards.map((card) => projectCard(deck, false, card)),
     }
-  },
-})
-
-export const startingValue = query({
-  args: { versionId: v.id("deckVersions") },
-  handler: async (ctx, args) => {
-    const { deck, version } = await ownedVersion(ctx, args.versionId)
-    return (
-      (await deckStartingValue(ctx, version._id, deck.game ?? DEFAULT_DECK_GAME, deck.format)) ??
-      null
-    )
   },
 })
 
