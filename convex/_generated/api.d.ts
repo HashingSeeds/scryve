@@ -36,6 +36,7 @@ import type * as lib_deckSources from "../lib/deckSources.js";
 import type * as lib_deckStartingValue from "../lib/deckStartingValue.js";
 import type * as lib_deckSync from "../lib/deckSync.js";
 import type * as lib_deckVersions from "../lib/deckVersions.js";
+import type * as lib_documents from "../lib/documents.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_gameEngine from "../lib/gameEngine.js";
 import type * as lib_gameEngineMemory from "../lib/gameEngineMemory.js";
@@ -54,6 +55,7 @@ import type * as lib_games_providers from "../lib/games/providers.js";
 import type * as lib_games_yugioh from "../lib/games/yugioh.js";
 import type * as lib_games_yugiohDecks from "../lib/games/yugiohDecks.js";
 import type * as lib_integrations from "../lib/integrations.js";
+import type * as lib_layouts from "../lib/layouts.js";
 import type * as lib_matchResults from "../lib/matchResults.js";
 import type * as lib_moderation from "../lib/moderation.js";
 import type * as lib_moderationRetention from "../lib/moderationRetention.js";
@@ -74,6 +76,7 @@ import type * as moderation from "../moderation.js";
 import type * as providerHealth from "../providerHealth.js";
 import type * as resultsBackfill from "../resultsBackfill.js";
 import type * as revenuecat from "../revenuecat.js";
+import type * as storeReleases from "../storeReleases.js";
 import type * as users from "../users.js";
 
 import type {
@@ -111,6 +114,7 @@ declare const fullApi: ApiFromModules<{
   "lib/deckStartingValue": typeof lib_deckStartingValue;
   "lib/deckSync": typeof lib_deckSync;
   "lib/deckVersions": typeof lib_deckVersions;
+  "lib/documents": typeof lib_documents;
   "lib/entitlements": typeof lib_entitlements;
   "lib/gameEngine": typeof lib_gameEngine;
   "lib/gameEngineMemory": typeof lib_gameEngineMemory;
@@ -129,6 +133,7 @@ declare const fullApi: ApiFromModules<{
   "lib/games/yugioh": typeof lib_games_yugioh;
   "lib/games/yugiohDecks": typeof lib_games_yugiohDecks;
   "lib/integrations": typeof lib_integrations;
+  "lib/layouts": typeof lib_layouts;
   "lib/matchResults": typeof lib_matchResults;
   "lib/moderation": typeof lib_moderation;
   "lib/moderationRetention": typeof lib_moderationRetention;
@@ -149,6 +154,7 @@ declare const fullApi: ApiFromModules<{
   providerHealth: typeof providerHealth;
   resultsBackfill: typeof resultsBackfill;
   revenuecat: typeof revenuecat;
+  storeReleases: typeof storeReleases;
   users: typeof users;
 }>;
 

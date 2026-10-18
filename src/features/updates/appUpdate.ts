@@ -71,7 +71,7 @@ const SWITCHABLE_CHANNELS = ["production", BETA_CHANNEL]
 // why: the native override persists, but `Updates.channel` only reflects it after a relaunch.
 let switchedChannel: string | undefined
 
-export function canSwitchToBeta() {
+export function isStoreBuild() {
   return (
     Platform.OS !== "web" &&
     Updates.isEnabled &&

@@ -21,6 +21,8 @@ export default {
   appMenu: {
     more: "और",
     moreUpdateReady: "और, अपडेट तैयार है",
+    moreStoreUpdate: "और, ऐप अपडेट उपलब्ध है",
+    updateApp: "ऐप अपडेट करें",
     history: "इतिहास",
     settings: "सेटिंग",
     settingsUpdateReady: "सेटिंग, अपडेट तैयार है",

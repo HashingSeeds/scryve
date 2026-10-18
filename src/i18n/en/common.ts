@@ -18,6 +18,8 @@ const common = {
   appMenu: {
     more: "More",
     moreUpdateReady: "More, update ready",
+    moreStoreUpdate: "More, app update available",
+    updateApp: "Update app",
     history: "History",
     settings: "Settings",
     settingsUpdateReady: "Settings, update ready",

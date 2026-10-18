@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
   interpolate,
@@ -11,6 +11,7 @@ import Animated, {
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
+import { openStorePage, useStoreUpdate } from "@/features/updates/storeUpdate"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -46,9 +47,11 @@ export function AppUtilityMenu({
   const reducedMotion = useReducedMotion()
   const [open, setOpen] = useState(false)
   const updateReady = useAppUpdate().status === "ready"
+  const storeUpdate = useStoreUpdate()
   const nearbyOnly = useNearbyOnly()
   const testsNearby = lanPlayAvailable()
-  const itemCount = 3 + Number(Boolean(onRules)) + Number(testsNearby)
+  const itemCount =
+    3 + Number(Boolean(onRules)) + Number(testsNearby) + Number(Boolean(storeUpdate))
   const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
@@ -120,7 +123,11 @@ export function AppUtilityMenu({
             testID="utility-menu-button"
             accessibilityRole="button"
             accessibilityLabel={translate(
-              updateReady ? "common:appMenu.moreUpdateReady" : "common:appMenu.more",
+              storeUpdate
+                ? "common:appMenu.moreStoreUpdate"
+                : updateReady
+                  ? "common:appMenu.moreUpdateReady"
+                  : "common:appMenu.more",
             )}
             accessibilityState={{ expanded: open }}
             style={themed($trigger)}
@@ -144,7 +151,9 @@ export function AppUtilityMenu({
                 maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
               />
             )}
-            {updateReady ? <View testID="utility-update-dot" style={themed($updateDot)} /> : null}
+            {updateReady || storeUpdate ? (
+              <View testID="utility-update-dot" style={themed($updateDot)} />
+            ) : null}
           </Pressable>
         </Animated.View>
         <Animated.View
@@ -153,6 +162,23 @@ export function AppUtilityMenu({
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           style={[$fill, themed($items), itemsStyle]}
         >
+          {storeUpdate ? (
+            <Pressable
+              testID="utility-store-update-button"
+              accessibilityRole="link"
+              accessibilityLabel={translate(storeUpdate.labelTx)}
+              style={themed($item)}
+              onPress={() => choose(openStorePage)}
+            >
+              <Text
+                tx="common:appMenu.updateApp"
+                weight="bold"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+                style={themed($storeUpdateText)}
+              />
+            </Pressable>
+          ) : null}
           {onRules ? (
             <Pressable
               testID="utility-rules-button"
@@ -280,6 +306,7 @@ const $item: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: StyleSheet.hairlineWidth,
   borderBottomColor: colors.separator,
 })
+const $storeUpdateText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $settingsItem: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

@@ -10,13 +10,37 @@ import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 let mockNearbyPlay = false
 jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
+let mockStoreUpdate: { labelTx: "play:launch.openAppStore"; url: string } | null = null
+const mockOpenStorePage = jest.fn()
+jest.mock("@/features/updates/storeUpdate", () => ({
+  useStoreUpdate: () => mockStoreUpdate,
+  openStorePage: () => mockOpenStorePage(),
+}))
 
 beforeEach(() => {
   mockNearbyPlay = false
+  mockStoreUpdate = null
   setNearbyOnly(false)
 })
 
 describe("AppUtilityMenu", () => {
+  it("leads with a store update once OTA updates stop reaching this install", () => {
+    mockStoreUpdate = { labelTx: "play:launch.openAppStore", url: "https://apps.example/scryve" }
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu onHistory={jest.fn()} onSettings={jest.fn()} onAccount={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByLabelText("More, app update available")).toBeTruthy()
+    expect(view.getByTestId("utility-update-dot")).toBeTruthy()
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByLabelText("Open App Store"))
+
+    expect(mockOpenStorePage).toHaveBeenCalledTimes(1)
+    expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+  })
+
   it("closes on Android Back before the game menu it opened from", () => {
     const pressBack = mockHardwareBack()
     const closeGameMenu = jest.fn()
