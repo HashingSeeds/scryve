@@ -8,9 +8,8 @@ export const current = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx)
-    const [proDecksLimit, deckAnalytics, deckVersions] = await Promise.all([
+    const [proDecksLimit, deckVersions] = await Promise.all([
       hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit),
-      hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckVersions),
     ])
     return {
@@ -18,7 +17,8 @@ export const current = query({
       fullHistory: true,
       proDecksLimit,
       unlimitedDecks: proDecksLimit,
-      deckAnalytics,
+      // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Deck stats are free; `true` keeps installed clients from showing the retired upsell.
+      deckAnalytics: true,
       deckVersions,
     }
   },

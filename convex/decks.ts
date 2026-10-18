@@ -24,8 +24,6 @@ import { DEFAULT_VERSION_NAME } from "./lib/deckVersions"
 import {
   deckCapacity,
   deckVersionCapacity,
-  hasFeature,
-  PREMIUM_FEATURES,
   requireDeckCapacity,
   requireVersionCapacity,
 } from "./lib/entitlements"
@@ -381,10 +379,7 @@ export const listMine = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx)
-    const [capacity, analytics] = await Promise.all([
-      deckCapacity(ctx, user),
-      hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics),
-    ])
+    const capacity = await deckCapacity(ctx, user)
     const active = await ctx.db
       .query("decks")
       .withIndex("by_owner_and_archived_at", (q) =>
@@ -425,11 +420,12 @@ export const listMine = query({
             coverImageUrl:
               latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
             lastPlayedAt: await lastPlayedAt(ctx, deck._id),
-            record: analytics ? await deckRecord(ctx, deck._id) : undefined,
+            record: await deckRecord(ctx, deck._id),
           }
         }),
     )
-    return { ownerId: user.clerkUserId, decks, capacity, analyticsLocked: !analytics }
+    // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Deck stats are free; installed clients still read the retired lock flag.
+    return { ownerId: user.clerkUserId, decks, capacity, analyticsLocked: false }
   },
 })
 
@@ -707,7 +703,6 @@ export const detail = query({
   args: { deckId: v.id("decks"), versionId: v.optional(v.id("deckVersions")) },
   handler: async (ctx, args) => {
     const { user, deck } = await ownedDeck(ctx, args.deckId)
-    const analytics = await hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics)
     const stored = await activeVersions(ctx, deck._id)
     const versions = await Promise.all(
       stored.map(async (version) => ({
@@ -719,7 +714,7 @@ export const detail = query({
         cardQuantity: version.cardQuantity ?? 0,
         createdAt: version.createdAt,
         updatedAt: version.updatedAt ?? version.createdAt,
-        record: analytics ? await versionRecord(ctx, version._id) : undefined,
+        record: await versionRecord(ctx, version._id),
       })),
     )
     const selected =
@@ -737,8 +732,9 @@ export const detail = query({
       version: selected ?? null,
       cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
       capacity: await deckVersionCapacity(ctx, user, stored.length),
-      record: analytics ? await deckRecord(ctx, deck._id) : undefined,
-      analyticsLocked: !analytics,
+      record: await deckRecord(ctx, deck._id),
+      // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Deck stats are free; installed clients still read the retired lock flag.
+      analyticsLocked: false,
     }
   },
 })
@@ -1457,9 +1453,7 @@ export const selectForSeat = mutation({
 export const stats = query({
   args: { deckId: v.id("decks") },
   handler: async (ctx, args) => {
-    const { user, deck } = await ownedDeck(ctx, args.deckId)
-    if (!(await hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics)))
-      return { locked: true as const }
+    const { deck } = await ownedDeck(ctx, args.deckId)
     const versions = await activeVersions(ctx, deck._id)
     return {
       locked: false as const,

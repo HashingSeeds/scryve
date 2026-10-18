@@ -247,12 +247,6 @@ describe("finishScryveMatch", () => {
     expect(stats[0].manualMatches).toBeUndefined()
     expect(history).toHaveLength(3)
 
-    await t.mutation(internal.entitlements.setUserFeature, {
-      clerkUserId: "owner",
-      feature: "deck_analytics",
-      enabled: true,
-      source: "test",
-    })
     await expect(actor.query(api.decks.stats, { deckId })).resolves.toMatchObject({
       connected: { games: { total: 3, wins: 2, losses: 1 }, matches: counted },
       manual: {},

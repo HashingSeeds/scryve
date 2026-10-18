@@ -11,6 +11,15 @@ import type { Id } from "../../../convex/_generated/dataModel"
 const deckId = "deck-1" as Id<"decks">
 const versionId = "version-1" as Id<"deckVersions">
 const provisionalId = "draft-1" as Id<"deckVersions">
+const noGames = {
+  games: 0,
+  wins: 0,
+  losses: 0,
+  draws: 0,
+  unknown: 0,
+  connected: { games: { total: 0, wins: 0, losses: 0, draws: 0, unknown: 0 } },
+  manual: {},
+}
 const card = (name: string, quantity = 1): DeckCard => ({ name, quantity, scryfallId: name })
 const row = (name: string, quantity = 1) => ({
   ...card(name, quantity),
@@ -103,7 +112,7 @@ function detail(cards = [row("Island", 2)]): NonNullable<DeckViewInput["detail"]
         cardQuantity: 2,
         createdAt: 1,
         updatedAt: 1,
-        record: undefined,
+        record: noGames,
       },
     ],
     version: {
@@ -117,8 +126,8 @@ function detail(cards = [row("Island", 2)]): NonNullable<DeckViewInput["detail"]
     },
     cards,
     capacity: { used: 1, limit: 1, premium: false, canCreate: false },
-    record: undefined,
-    analyticsLocked: true,
+    record: noGames,
+    analyticsLocked: false,
   }
 }
 

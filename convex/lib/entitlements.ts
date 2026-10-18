@@ -9,6 +9,7 @@ export const PREMIUM_FEATURES = {
   fullHistory: "full_history",
   proDecksLimit: "pro_decks_limit",
   unlimitedDecks: "unlimited_decks",
+  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Retained for installed-client compatibility; no longer gates anything server-side.
   deckAnalytics: "deck_analytics",
   deckVersions: "deck_versions",
   foil: "foil",
