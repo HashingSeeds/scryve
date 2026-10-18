@@ -1,49 +1,14 @@
 import { useEffect, useRef } from "react"
 
-import type { LobbyDeckState } from "@/features/connected/LobbySeatList"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
-import { lanCanRequireDecks, type LanSeatDeck, type LanSetup } from "./lanGame"
+import { lanCanRequireDecks } from "./lanGame"
 import { lanSession, useLanSession } from "./lanSession"
-import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
-import { identitySection } from "../../../convex/lib/systems"
+import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
-
-const listed = (decks: MyDecks) => (decks === undefined || decks === "unavailable" ? [] : decks)
-
-/** why: offline, only a deck's latest version has a known starting value, so an older one would start at the wrong life. */
-const latestVersionsOnly = (decks: MyDecks) =>
-  listed(decks).map((deck) => ({
-    ...deck,
-    versions: deck.versions.filter(({ _id }) => _id === deck.latestVersionId),
-  }))
-
-function deckStateOf(decks: MyDecks, signedIn: boolean, lifeFromDeck: boolean): LobbyDeckState {
-  if (decks === undefined && signedIn) return { status: "loading" }
-  return { status: "ready", value: lifeFromDeck ? latestVersionsOnly(decks) : [...listed(decks)] }
-}
-
-function seatDeckOf(
-  decks: MyDecks,
-  versionId: string,
-  { system, format }: Pick<LanSetup, "system" | "format">,
-): LanSeatDeck | undefined {
-  const deck = listed(decks).find((candidate) =>
-    candidate.versions.some(({ _id }) => _id === versionId),
-  )
-  if (!deck || (deck.game ?? DEFAULT_DECK_GAME) !== system || deck.format !== format)
-    return undefined
-  return {
-    versionId,
-    name: deck.name,
-    ...(deck.latestVersionId === versionId && deck.startingValue !== undefined
-      ? { startingValue: deck.startingValue }
-      : {}),
-  }
-}
 
 export function NearbyLobbyScreen({
   error: routeError,
@@ -146,19 +111,10 @@ export function NearbyLobbyScreen({
       decks={
         lobby.setup.system && lobby.status !== "active"
           ? {
-              source: (render) =>
-                render(
-                  deckStateOf(
-                    myDecks,
-                    signedIn,
-                    Boolean(
-                      identitySection(lobby.setup.system, lobby.setup.format)?.startingValueFacet,
-                    ),
-                  ),
-                ),
+              source: (render) => render(nearbyDeckState(myDecks, signedIn, lobby.setup)),
               selectingSeats: NO_SEATS_SELECTING,
               onSelect: (_seat, versionId) => {
-                const deck = versionId ? seatDeckOf(myDecks, versionId, lobby.setup) : null
+                const deck = versionId ? nearbySeatDeck(myDecks, versionId, lobby.setup) : null
                 if (deck !== undefined) void lanSession.selectDeck(deck).catch(() => undefined)
               },
               ...(signedIn && onManageDecks ? { onManage: onManageDecks } : {}),

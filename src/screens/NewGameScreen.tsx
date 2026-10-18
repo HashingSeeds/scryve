@@ -339,7 +339,7 @@ function NewGameForm({
   const connectedMode = mode === "connected"
   const nearbyMode = connectedMode && Boolean(onNearby) && hostOn === "nearby"
   const cloudMode = connectedMode && !nearbyMode
-  const decksChoosable = cloudMode || (nearbyMode && Boolean(account))
+  const decksChoosable = cloudMode || (nearbyMode && Boolean(account) && Boolean(system))
   const layout = playerGridLayoutForCount(
     playerCount,
     chosenLayout,
