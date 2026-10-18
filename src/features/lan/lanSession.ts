@@ -621,7 +621,6 @@ export class LanSession {
     const now = Date.now()
     archiveLanGame({ ...game, updatedAt: now }, result, hashes, this.roundOwner)
     this.publish(endLanRound(game, "finished", now))
-    // why: a deck picked right after the finish must not share its snapshot, or a guest's claim records the next round's deck.
     clearTimeout(this.flushTimer)
     this.flush()
   }
