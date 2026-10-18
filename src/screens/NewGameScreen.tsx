@@ -482,6 +482,7 @@ function NewGameForm({
             ? translate("play:newGame.resumeCurrentGame")
             : translate("play:newGame.gamesInProgress")
           : ""
+  const showStatusRow = connectedMode || Boolean(statusText)
 
   function submit() {
     if (!valid || busy) return
@@ -853,7 +854,18 @@ function NewGameForm({
             </View>
           ) : null}
         </Screen>
-        <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
+        <View
+          style={[
+            themed($footer),
+            {
+              // why: on iOS the status row's tap target can overlap the home indicator inset; Android's inset can be a tappable nav bar.
+              paddingBottom:
+                showStatusRow && Platform.OS === "ios"
+                  ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
+                  : Math.max(bottom, spacing.sm),
+            },
+          ]}
+        >
           <View style={themed($footerContent)}>
             <View style={themed(footerRow ? $footerActions : $footerStack)}>
               <Button
@@ -956,7 +968,7 @@ function NewGameForm({
               ) : null}
             </View>
             {/* why: connected status arrives late, so its row stays reserved; an empty local row is dead space above the home indicator. */}
-            {connectedMode || statusText ? (
+            {showStatusRow ? (
               <TouchableOpacity
                 testID="setup-status"
                 accessible={Boolean(statusText)}
@@ -1503,8 +1515,9 @@ const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   paddingVertical: spacing.xs,
 })
+const STATUS_ROW_HEIGHT = 44
 const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: 44,
+  height: STATUS_ROW_HEIGHT,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
