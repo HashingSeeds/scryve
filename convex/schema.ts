@@ -708,6 +708,13 @@ export default defineSchema({
     .index("by_clerk_user", ["clerkUserId"])
     .index("by_clerk_user_and_document", ["clerkUserId", "document"]),
 
+  storeReleases: defineTable({
+    platform: v.union(v.literal("ios"), v.literal("android")),
+    version: v.string(),
+    runtimeVersion: v.string(),
+    updatedAt: v.number(),
+  }).index("by_platform", ["platform"]),
+
   moderationReports: defineTable({
     reporterUserId: v.optional(v.id("users")),
     reportedUserId: v.optional(v.id("users")),

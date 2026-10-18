@@ -31,7 +31,7 @@ import {
   backToPreview,
   betaUpdatesChosen,
   canOpenPrPreview,
-  canSwitchToBeta,
+  isStoreBuild,
   isPrChannel,
   setBetaUpdates,
   updateChannelLabel,
@@ -438,14 +438,14 @@ export function SettingsScreen({
                 accessibilityLabel={appInfoLine(field, value)}
                 text={appInfoLine(field, shorten ? `${value.slice(0, 12)}…` : value)}
                 onPress={
-                  field === "version" && canSwitchToBeta()
+                  field === "version" && isStoreBuild()
                     ? () => setVersionTaps((taps) => taps + 1)
                     : undefined
                 }
               />
             )
           })}
-          {canSwitchToBeta() && (beta || versionTaps >= BETA_UNLOCK_TAPS) ? (
+          {isStoreBuild() && (beta || versionTaps >= BETA_UNLOCK_TAPS) ? (
             <Switch
               testID="beta-updates-switch"
               labelTx="account:settings.beta.label"

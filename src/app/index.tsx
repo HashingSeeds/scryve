@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { AppState, Linking, Platform, View, type ViewStyle } from "react-native"
+import { AppState, View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
@@ -15,7 +15,7 @@ import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { lanPlayAvailable, savedHostedGame } from "@/features/lan/lanAvailability"
 import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import { rulesHref } from "@/features/rules/gameRules"
-import type { TxKeyPath } from "@/i18n"
+import { openStorePage, STORE_PAGE } from "@/features/updates/storeUpdate"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
 import { useAppTheme } from "@/theme/context"
@@ -163,7 +163,7 @@ export default function Index() {
               tx={STORE_PAGE.labelTx}
               preset="primary"
               style={themed($primaryAction)}
-              onPress={() => void Linking.openURL(STORE_PAGE.url).catch(() => undefined)}
+              onPress={openStorePage}
             />
           ) : null}
           <Button
@@ -235,14 +235,6 @@ export default function Index() {
     />
   )
 }
-
-const STORE_PAGE = Platform.select<{ labelTx: TxKeyPath; url: string }>({
-  ios: { labelTx: "play:launch.openAppStore", url: "https://apps.apple.com/app/id6798955244" },
-  android: {
-    labelTx: "play:launch.openGooglePlay",
-    url: "https://play.google.com/store/apps/details?id=com.sowinghope.count",
-  },
-})
 
 const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,

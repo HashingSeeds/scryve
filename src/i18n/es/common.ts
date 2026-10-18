@@ -21,6 +21,8 @@ export default {
   appMenu: {
     more: "Más",
     moreUpdateReady: "Más, actualización lista",
+    moreStoreUpdate: "Más, actualización de la app disponible",
+    updateApp: "Actualizar app",
     history: "Historial",
     settings: "Ajustes",
     settingsUpdateReady: "Ajustes, actualización lista",

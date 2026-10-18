@@ -21,6 +21,8 @@ export default {
   appMenu: {
     more: "더보기",
     moreUpdateReady: "더보기, 업데이트 준비됨",
+    moreStoreUpdate: "더보기, 앱 업데이트 가능",
+    updateApp: "앱 업데이트",
     history: "기록",
     settings: "설정",
     settingsUpdateReady: "설정, 업데이트 준비됨",
