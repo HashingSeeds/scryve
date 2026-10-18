@@ -8,13 +8,15 @@ import { translate } from "@/i18n/translate"
 import { loadString, saveString } from "@/utils/storage"
 import { knownReducedMotion } from "@/utils/useReducedMotion"
 
+import { completeUpdate, useDownloadedPlayVersion } from "../../../modules/play-app-update"
+
 const FOREGROUND_CHECK_INTERVAL_MS = 60 * 60 * 1000
 const NOTICED_UPDATE_KEY = "count.local.update.noticed.v1"
 
 export type AppUpdate =
   | { status: "idle" }
   | { status: "downloading"; progress?: number }
-  | { status: "ready"; updateId: string; notes: string[] }
+  | { status: "ready"; updateId: string; notes: string[]; restart: () => void }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
@@ -37,13 +39,23 @@ function releaseNotesFromUpdateManifest(manifest: Partial<Updates.Manifest> | un
 }
 
 export function useAppUpdate(): AppUpdate {
+  const playVersion = useDownloadedPlayVersion()
   const { isDownloading, downloadProgress, isUpdatePending, downloadedUpdate } =
     Updates.useUpdates()
+  if (playVersion !== null) {
+    return {
+      status: "ready",
+      updateId: `play-${playVersion}`,
+      notes: [],
+      restart: restartIntoPlayUpdate,
+    }
+  }
   if (isUpdatePending && downloadedUpdate?.updateId) {
     return {
       status: "ready",
       updateId: downloadedUpdate.updateId,
       notes: releaseNotesFromUpdateManifest(downloadedUpdate.manifest),
+      restart: restartToUpdate,
     }
   }
   if (isDownloading) return { status: "downloading", progress: downloadProgress }
@@ -200,11 +212,17 @@ export function useRestarting() {
   return useSyncExternalStore(subscribeRestarting, restartingSnapshot, restartingSnapshot)
 }
 
-// why: expo-updates' reload screen defaults to white, which flashes between the black app and LaunchFallback.
-export function restartToUpdate() {
+function restartBehindCurtain(restart: () => Promise<unknown>) {
   if (restarting) return
   setRestarting(true)
   setTimeout(() => {
+    restart().catch(() => setRestarting(false))
+  }, RESTART_FADE_MS)
+}
+
+// why: expo-updates' reload screen defaults to white, which flashes between the black app and LaunchFallback.
+export function restartToUpdate() {
+  restartBehindCurtain(() =>
     Updates.reloadAsync({
       reloadScreenOptions: {
         backgroundColor: "#000000",
@@ -216,8 +234,12 @@ export function restartToUpdate() {
         },
         fade: knownReducedMotion() === false,
       },
-    }).catch(() => setRestarting(false))
-  }, RESTART_FADE_MS)
+    }),
+  )
+}
+
+function restartIntoPlayUpdate() {
+  restartBehindCurtain(completeUpdate)
 }
 
 export function wasUpdateNoticed(updateId: string) {

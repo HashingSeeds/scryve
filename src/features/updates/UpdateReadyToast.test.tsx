@@ -1,15 +1,25 @@
-import { act, render } from "@testing-library/react-native"
+import * as Updates from "expo-updates"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 import { storage } from "@/utils/storage"
 
+import { RESTART_FADE_MS } from "./appUpdate"
+import { RestartCurtain } from "./RestartCurtain"
 import { UpdateReadyToastWithForegroundChecks } from "./UpdateReadyToast"
 
 let mockPathname = "/"
 jest.mock("expo-router", () => ({ usePathname: () => mockPathname }))
+let mockPlayVersion: number | null = null
+const mockCompleteUpdate = jest.fn(() => Promise.resolve())
+jest.mock("../../../modules/play-app-update", () => ({
+  useDownloadedPlayVersion: () => mockPlayVersion,
+  completeUpdate: () => mockCompleteUpdate(),
+}))
 jest.mock("expo-updates", () => ({
   __esModule: true,
   isEnabled: false,
+  reloadAsync: jest.fn(() => Promise.resolve()),
   useUpdates: () => ({
     isDownloading: false,
     isUpdatePending: true,
@@ -55,5 +65,25 @@ describe("UpdateReadyToastWithForegroundChecks", () => {
     expect(view.getByTestId("update-ready-toast")).toBeTruthy()
     act(() => jest.advanceTimersByTime(8_000))
     expect(view.queryByTestId("update-ready-toast")).toBeNull()
+  })
+
+  it("restarts into a Play download behind the same curtain as an OTA update", () => {
+    jest.useFakeTimers()
+    mockPlayVersion = 42
+    mockPathname = "/history"
+    const view = render(
+      <>
+        {renderToast()}
+        <RestartCurtain />
+      </>,
+    )
+
+    fireEvent.press(view.getByTestId("update-toast-restart-button"))
+    expect(view.getByTestId("restart-curtain")).toBeTruthy()
+    expect(mockCompleteUpdate).not.toHaveBeenCalled()
+
+    act(() => jest.advanceTimersByTime(RESTART_FADE_MS))
+    expect(mockCompleteUpdate).toHaveBeenCalledTimes(1)
+    expect(Updates.reloadAsync).not.toHaveBeenCalled()
   })
 })

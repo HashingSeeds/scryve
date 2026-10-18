@@ -7,6 +7,7 @@ import type { TxKeyPath } from "@/i18n"
 
 import { isStoreBuild } from "./appUpdate"
 import { api } from "../../../convex/_generated/api"
+import { startFlexibleUpdate, useDownloadedPlayVersion } from "../../../modules/play-app-update"
 
 export const STORE_PAGE = Platform.select<{ labelTx: TxKeyPath; url: string }>({
   ios: { labelTx: "play:launch.openAppStore", url: "https://apps.apple.com/app/id6798955244" },
@@ -18,6 +19,14 @@ export const STORE_PAGE = Platform.select<{ labelTx: TxKeyPath; url: string }>({
 
 export function openStorePage() {
   if (STORE_PAGE) Linking.openURL(STORE_PAGE.url).catch(() => undefined)
+}
+
+export function updateFromStore() {
+  startFlexibleUpdate()
+    .catch(() => "unavailable" as const)
+    .then((result) => {
+      if (result === "unavailable") openStorePage()
+    })
 }
 
 type Build = { version: string; runtimeVersion: string }
@@ -43,11 +52,12 @@ export function needsStoreUpdate(installed: Build, live: Build | null | undefine
 function useLiveStoreUpdate() {
   const platform = Platform.OS === "ios" ? "ios" : "android"
   const live = useQuery(api.storeReleases.live, { platform })
+  const downloaded = useDownloadedPlayVersion() !== null
   const installed = {
     version: Application.nativeApplicationVersion ?? "",
     runtimeVersion: Updates.runtimeVersion ?? "",
   }
-  return STORE_PAGE && needsStoreUpdate(installed, live) ? STORE_PAGE : null
+  return STORE_PAGE && !downloaded && needsStoreUpdate(installed, live) ? STORE_PAGE : null
 }
 
 /** why: dev, preview, and web builds have no store runtime to fall behind, and tests render menus without Convex. */

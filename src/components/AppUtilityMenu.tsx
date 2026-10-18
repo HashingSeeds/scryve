@@ -11,7 +11,7 @@ import Animated, {
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
-import { openStorePage, useStoreUpdate } from "@/features/updates/storeUpdate"
+import { updateFromStore, useStoreUpdate } from "@/features/updates/storeUpdate"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -168,7 +168,7 @@ export function AppUtilityMenu({
               accessibilityRole="link"
               accessibilityLabel={translate(storeUpdate.labelTx)}
               style={themed($item)}
-              onPress={() => choose(openStorePage)}
+              onPress={() => choose(updateFromStore)}
             >
               <Text
                 tx="common:appMenu.updateApp"
