@@ -330,14 +330,18 @@ export class LanSession {
           return this.publish(admitted.game)
         }
         if (!seatKey) return
-        if (message.type === "reveal") return this.publish(revealLanRole(game, seatKey, Date.now()))
-        const { operationId } = message.event
         const now = Date.now()
         if (now - windowStart >= 1_000) {
           windowStart = now
           writes = 0
         }
-        if (++writes > WRITES_PER_SECOND)
+        const limited = ++writes > WRITES_PER_SECOND
+        if (message.type === "reveal") {
+          const revealed = limited ? game : revealLanRole(game, seatKey, now)
+          return revealed === game ? undefined : this.publish(revealed)
+        }
+        const { operationId } = message.event
+        if (limited)
           return peer.send({
             type: "nack",
             operationId,
@@ -552,8 +556,10 @@ export class LanSession {
   revealRole = async () => {
     const { role, seatKey, status } = this.state
     const game = this.game
-    if (role === "host" && game && seatKey)
-      return this.publish(revealLanRole(game, seatKey, Date.now()))
+    if (role === "host" && game && seatKey) {
+      const revealed = revealLanRole(game, seatKey, Date.now())
+      return revealed === game ? undefined : this.publish(revealed)
+    }
     if (!this.connection || status !== "connected") throw new Error("Not connected to the host")
     this.connection.send({ type: "reveal" })
   }

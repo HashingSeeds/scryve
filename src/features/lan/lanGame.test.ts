@@ -182,6 +182,13 @@ describe("nearby Treachery", () => {
     expect(lanProjection(game, "a").variant).toBe("treachery")
   })
 
+  it("shows every role once a round finishes, but not when the host abandons it", () => {
+    const game = startLanRound(table(), NOW, alwaysFirst)
+
+    expect(playerOf(endLanRound(game, "finished", NOW), "a", "b")?.role).toBe("assassin")
+    expect(playerOf(endLanRound(game, "abandoned", NOW), "a", "b")).not.toHaveProperty("role")
+  })
+
   it("deals again every round", () => {
     const first = startLanRound(table(), NOW, alwaysFirst)
     const next = startLanRound(endLanRound(first, "finished", NOW), NOW, neverSwap)

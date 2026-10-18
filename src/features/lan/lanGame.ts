@@ -408,7 +408,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
   const roleFor = (key: string) => {
     const dealt = game.roles?.[key]
     if (!dealt) return {}
-    return dealt.roleRevealed || key === viewerKey || game.status !== "active"
+    return dealt.roleRevealed || key === viewerKey || game.status === "finished"
       ? dealt
       : { roleRevealed: false }
   }

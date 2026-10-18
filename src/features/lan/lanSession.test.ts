@@ -178,6 +178,10 @@ describe("nearby host", () => {
 
     const aliceSeenByBob = playersSeenBy(bob).find((player) => player.playerId === alice.pass().key)
     expect(aliceSeenByBob).toMatchObject({ roleRevealed: true, role: expect.any(String) })
+    const sentToBob = bob.sent.length
+    alice.send({ type: "reveal" })
+    jest.advanceTimersByTime(50)
+    expect(bob.sent).toHaveLength(sentToBob)
   })
 
   it("refuses a write to another player's seat", async () => {
