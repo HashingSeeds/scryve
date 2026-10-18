@@ -67,4 +67,23 @@ describe("LobbyView", () => {
     await waitFor(() => expect(onExit).toHaveBeenCalledWith("abandon"))
     expect(screen.getByTestId("connected-lobby-leave-confirmation")).toBeTruthy()
   })
+
+  it("lets a nearby guest leave while it can't reach the host, but not a cloud one", async () => {
+    const onExit = jest.fn(async () => true)
+    const guest = {
+      lobby: { ...view().lobby, isHost: false },
+      online: false,
+      onExit,
+    }
+    screen.unmount()
+    view({ ...guest, exitOfflineNotice: undefined })
+    fireEvent.press(screen.getByTestId("leave-connected-lobby-button"))
+    fireEvent.press(screen.getByTestId("confirm-connected-lobby-leave-button"))
+    await waitFor(() => expect(onExit).toHaveBeenCalledWith("leave"))
+    screen.unmount()
+
+    view(guest)
+    fireEvent.press(screen.getByTestId("leave-connected-lobby-button"))
+    expect(screen.getByTestId("confirm-connected-lobby-leave-button")).toBeDisabled()
+  })
 })

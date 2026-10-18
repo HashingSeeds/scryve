@@ -69,7 +69,6 @@ export function NearbyLobbyScreen({
       }
       online={isHost || status === "connected"}
       offlineNotice={translate("connected:nearby.reconnecting")}
-      exitOfflineNotice={translate("connected:nearby.reconnecting")}
       error={error}
       starting={false}
       leaving={false}

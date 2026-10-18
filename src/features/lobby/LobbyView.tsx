@@ -66,7 +66,7 @@ export interface LobbyViewProps {
   heading?: { text: string; label: string }
   online: boolean
   offlineNotice: string
-  exitOfflineNotice: string
+  exitOfflineNotice?: string
   error?: string
   starting: boolean
   savingSettings?: boolean
@@ -403,7 +403,7 @@ export function LobbyView({
           confirmText={openExitCopy.confirmText}
           destructive={leaveAction === "abandon"}
           busy={leaving}
-          confirmDisabled={!online}
+          confirmDisabled={!online && exitOfflineNotice !== undefined}
           dialogTestID="connected-lobby-leave-confirmation"
           confirmTestID={`confirm-connected-lobby-${leaveAction}-button`}
           cancelTestID={`cancel-connected-lobby-${leaveAction}-button`}
@@ -412,7 +412,7 @@ export function LobbyView({
           notice={
             error ? (
               <AlertNote testID="connected-action-error" text={error} />
-            ) : !online ? (
+            ) : !online && exitOfflineNotice ? (
               <AlertNote testID="connected-lobby-exit-offline" text={exitOfflineNotice} />
             ) : null
           }
