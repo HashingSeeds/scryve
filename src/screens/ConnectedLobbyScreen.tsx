@@ -1,84 +1,35 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { Platform, ScrollView, Share, View } from "react-native"
+import { Share } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 
-import { AlertNote } from "@/components/AlertNote"
-import { BottomActionBar } from "@/components/BottomActionBar"
-import { Button } from "@/components/Button"
-import { useCollapsingTitle } from "@/components/CollapsingTitle"
-import { ConfirmDialog } from "@/components/ConfirmDialog"
-import {
-  $dialogActions,
-  $dialogButton,
-  DialogCard,
-  type DialogOrigin,
-} from "@/components/DialogCard"
-import { FilterChips } from "@/components/FilterChips"
-import { Header } from "@/components/Header"
-import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
-import { Switch } from "@/components/Toggle/Switch"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
-import { AppearancePicker } from "@/features/connected/AppearancePicker"
-import {
-  lobbyDetail,
-  lobbyExitCopy,
-  onlineOnlyNotice,
-  deckRequirementLabel,
-  seatSummary,
-  type LobbyExitAction,
-} from "@/features/connected/connectedCopy"
-import { InviteCard } from "@/features/connected/InviteCard"
+import { onlineOnlyNotice, type LobbyExitAction } from "@/features/connected/connectedCopy"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
-import { LobbySeatList, type LobbyDeckState } from "@/features/connected/LobbySeatList"
+import type { LobbyDeckState } from "@/features/connected/LobbySeatList"
 import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
-import { deckVersionLabel } from "@/features/decks/deckCopy"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
+import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
-import { useAppTheme } from "@/theme/context"
-import { $styles } from "@/theme/styles"
-import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics, captureGame } from "@/utils/analytics"
 import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import {
-  CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
   isProMarkShape,
-  PRO_MARK_SHAPES,
   shapeForSeat,
   shownMarkShape,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
-import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
-
-function LobbySkeleton() {
-  const { themed } = useAppTheme()
-  return (
-    <View
-      accessibilityRole="progressbar"
-      accessibilityLabel={translate("connected:lobby.loadingLabel")}
-      style={themed($skeleton)}
-    >
-      <View style={themed($skeletonInvite)} />
-      {Array.from({ length: 2 }).map((_, index) => (
-        <View key={index} testID="lobby-skeleton-seat" style={themed($skeletonSeat)} />
-      ))}
-    </View>
-  )
-}
 
 export function ConnectedLobbyScreen({
   publicId,
@@ -139,11 +90,6 @@ function ConnectedLobbyContent({
   onLeft?: () => void
   onManageDecks?: (system: string) => void
 }) {
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
-  const { titleVisible, onScroll } = useCollapsingTitle()
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
   const lobby = useQuery(api.games.lobbyProjection, {
     publicId,
@@ -160,18 +106,9 @@ function ConnectedLobbyContent({
   const selectDeck = useMutation(api.decks.selectForSeat)
   const setAppearance = useMutation(api.games.setMyAppearance)
   const billing = useRevenueCat()
-  // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
-  const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
   const [actionError, setActionError] = useState<string>()
-  const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteOrigin, setInviteOrigin] = useState<DialogOrigin>()
-  const [leaveAction, setLeaveAction] = useState<LobbyExitAction>()
   const [leaving, setLeaving] = useState(false)
-  const [exitOrigin, setExitOrigin] = useState<DialogOrigin>()
   const [playerToReport, setPlayerToReport] = useState<ReportablePlayer>()
-  const [appearanceSeat, setAppearanceSeat] = useState<number>()
-  const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
-  const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
   const [savingAppearance, setSavingAppearance] = useState(false)
   const [starting, setStarting] = useState(false)
   const [selectingDeckSeats, setSelectingDeckSeats] = useState<ReadonlySet<number>>(new Set())
@@ -297,63 +234,40 @@ function ConnectedLobbyContent({
     }
   }
 
-  async function saveAppearance() {
-    if (appearanceSeat === undefined || !appearanceDraft) return
+  async function saveAppearance(seat: number, draft: PlayerAppearance) {
     try {
       setSavingAppearance(true)
       setActionError(undefined)
-      const freeShape = lobby?.players.find((player) => player.seat === appearanceSeat)?.shape
-      const pro = isProMarkShape(appearanceDraft.shape)
+      const freeShape = lobby?.players.find((player) => player.seat === seat)?.shape
+      const pro = isProMarkShape(draft.shape)
       await setAppearance({
         publicId,
-        seat: appearanceSeat,
-        color: appearanceDraft.color,
-        shape: !pro
-          ? appearanceDraft.shape
-          : isPlayerMarkShape(freeShape)
-            ? freeShape
-            : shapeForSeat(appearanceSeat),
-        proShape: pro ? appearanceDraft.shape : null,
+        seat,
+        color: draft.color,
+        shape: !pro ? draft.shape : isPlayerMarkShape(freeShape) ? freeShape : shapeForSeat(seat),
+        proShape: pro ? draft.shape : null,
       })
-      setAppearanceSeat(undefined)
+      return true
     } catch (cause) {
       setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.appearance")))
+      return false
     } finally {
       setSavingAppearance(false)
     }
   }
 
-  async function presentPaywall() {
-    setPaywall("open")
-    await billing.presentPaywall()
-    setPaywall("closed")
-  }
-
-  function openPaywall() {
-    if (Platform.OS === "ios") setPaywall("waitingForDismiss")
-    else void presentPaywall()
-  }
-
-  function openExitDialog(action: LobbyExitAction, event?: GestureResponderEvent) {
-    setExitOrigin(
-      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
-    )
-    setLeaveAction(action)
-  }
-
-  async function confirmExit() {
-    if (!leaveAction) return
+  async function confirmExit(action: LobbyExitAction) {
     if (!isWebSocketConnected) {
       setActionError(onlineOnlyNotice("exit"))
-      return
+      return false
     }
     try {
       setLeaving(true)
       setActionError(undefined)
-      if (leaveAction === "abandon") await abandon({ publicId })
+      if (action === "abandon") await abandon({ publicId })
       else await leave({ publicId, deviceId })
-      setLeaveAction(undefined)
       onLeft?.()
+      return true
     } catch (cause) {
       setActionError(
         convexErrorMessage(
@@ -361,362 +275,71 @@ function ConnectedLobbyContent({
           cause instanceof Error ? cause.message : translate("connected:lobby.errors.leave"),
         ),
       )
+      return false
     } finally {
       setLeaving(false)
     }
   }
 
-  const startOfflineNotice = onlineOnlyNotice("start")
-
   if (lobby === undefined)
     return <LobbyStatusScreen message={translate("connected:lobby.loading")} onBack={onBack} />
 
-  if (lobby.status === "abandoned" || lobby.status === "finished") {
-    const close = onLeft ?? onBack ?? (() => undefined)
+  if (lobby.status === "abandoned" || lobby.status === "finished")
     return (
-      <Screen preset="fixed" backgroundColor={colors.surface}>
-        <DialogCard
-          visible
-          onClose={close}
-          backdropAccessibilityLabel={translate("connected:lobby.closed.close")}
-          dialogAccessibilityRole="alert"
-          accessibilityViewIsModal
-        >
-          <Text preset="subheading" tx="connected:lobby.closed.title" />
-          <Text
-            tx={
-              lobby.status === "abandoned"
-                ? "connected:lobby.closed.abandoned"
-                : "connected:lobby.closed.ended"
-            }
-          />
-          <Button tx="connected:lobby.closed.ok" onPress={close} />
-        </DialogCard>
-      </Screen>
+      <LobbyClosedScreen status={lobby.status} onClose={onLeft ?? onBack ?? (() => undefined)} />
     )
-  }
-
-  const claimedSeats = lobby.players.length
-  const openSeats = Math.max(0, lobby.playerCount - claimedSeats)
-  const everySeatClaimed = claimedSeats === lobby.playerCount
-  const missingDeck = lobby.deckRequired && lobby.players.some((player) => !player.deckVersionId)
-  const readyPlayers = lobby.players.filter(
-    (player) => !lobby.deckRequired || Boolean(player.deckVersionId),
-  ).length
-  const exitAction: LobbyExitAction = lobby.isHost ? "abandon" : "leave"
-  const exitCopy = lobbyExitCopy(exitAction)
-  const startBlocked =
-    !everySeatClaimed || missingDeck || !isWebSocketConnected || starting || savingSettings
-  const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
-  const takenAppearances = lobby.players
-    .filter((player) => player.seat !== appearanceSeat)
-    .flatMap((player) => {
-      const free = isPlayerMarkShape(player.shape) ? player.shape : shapeForSeat(player.seat)
-      // why: the server still holds a Pro player's free mark for installed clients, so both stay taken.
-      return [...new Set([shownMarkShape(player) ?? free, free])].map((shape) => ({
-        color: player.color,
-        shape,
-      }))
-    })
 
   return (
-    <Screen
-      preset="fixed"
-      safeAreaEdges={["bottom"]}
-      backgroundColor={colors.surface}
-      contentContainerStyle={themed($screen)}
+    <LobbyView
+      lobby={lobby}
+      heading={
+        manualCode ? { text: manualCode, label: translate("connected:invite.code") } : undefined
+      }
+      online={isWebSocketConnected}
+      offlineNotice={onlineOnlyNotice("start")}
+      exitOfflineNotice={onlineOnlyNotice("exit")}
+      error={actionError}
+      starting={starting}
+      savingSettings={savingSettings}
+      leaving={leaving}
+      onStart={() => void startGame()}
+      onExit={confirmExit}
+      onBack={onBack}
+      onChangePlayerCount={(playerCount) => void changeSettings({ playerCount })}
+      onChangeDeckRequired={(deckRequired) => void changeSettings({ deckRequired })}
+      invite={{
+        qrPayload: inviteQrPayload,
+        manualCode,
+        onShare: inviteUrl || manualCode ? shareInvite : undefined,
+      }}
+      decks={{
+        source: (render) => <LobbyDeckSource>{render}</LobbyDeckSource>,
+        selectingSeats: selectingDeckSeats,
+        onSelect: (seat, deckVersionId) => void chooseVersion(seat, deckVersionId),
+        onManage: onManageDecks ? () => onManageDecks(lobby.system) : undefined,
+      }}
+      appearance={{
+        saving: savingAppearance,
+        proLocked: !billing.isCountPro,
+        foil: billing.isFoil,
+        save: saveAppearance,
+        presentPaywall: async () => {
+          await billing.presentPaywall()
+        },
+      }}
+      onReport={(seat) =>
+        seat.playerId
+          ? setPlayerToReport({
+              playerId: seat.playerId,
+              seat: seat.seat,
+              displayName: seat.displayName,
+              color: seat.color,
+              ...(shownMarkShape(seat) ? { shape: shownMarkShape(seat) } : {}),
+              controlledByMe: false,
+            })
+          : undefined
+      }
     >
-      <Header
-        title={titleVisible ? translate("connected:lobby.title") : ""}
-        leftTx={onBack ? "common:back" : undefined}
-        backgroundColor={colors.surface}
-        onLeftPress={onBack}
-      />
-      <ScrollView
-        style={$styles.flex1}
-        contentContainerStyle={themed($content)}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
-        <View style={themed($hero)}>
-          <View style={themed($inviteSummary)}>
-            <View style={$styles.flex1}>
-              <Text preset="heading" text={manualCode ?? translate("connected:lobby.title")} />
-              <Text
-                size="sm"
-                style={themed($dimmed)}
-                text={
-                  manualCode
-                    ? translate("connected:invite.code")
-                    : lobbyDetail(
-                        lobby.startingLife,
-                        lobby.ruleset,
-                        lobby.system,
-                        lobby.format,
-                        lobby.variant,
-                      )
-                }
-              />
-            </View>
-            {inviteQrPayload || manualCode ? (
-              <Button
-                testID="open-invite-button"
-                tx="connected:invite.label"
-                style={themed($inviteButton)}
-                onPress={(event) => {
-                  setInviteOrigin(
-                    event?.nativeEvent
-                      ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
-                      : undefined,
-                  )
-                  setInviteOpen(true)
-                }}
-              />
-            ) : null}
-          </View>
-          {manualCode ? (
-            <Text
-              size="xs"
-              style={themed($dimmed)}
-              text={lobbyDetail(
-                lobby.startingLife,
-                lobby.ruleset,
-                lobby.system,
-                lobby.format,
-                lobby.variant,
-              )}
-            />
-          ) : null}
-        </View>
-        {lobby.isHost ? (
-          <View style={themed($section)}>
-            <Text preset="subheading" accessibilityRole="header" tx="connected:lobby.players" />
-            <FilterChips
-              testID="lobby-player-count"
-              accessibilityLabel={translate("connected:lobby.playerCount")}
-              selectedId={String(lobby.playerCount)}
-              chips={[2, 3, 4, 5, 6].map((count) => ({
-                id: String(count),
-                label: String(count),
-                disabled:
-                  !isWebSocketConnected ||
-                  savingSettings ||
-                  starting ||
-                  lobby.players.some((player) => player.seat > count) ||
-                  (lobby.variant === "treachery" && !isTreacheryPlayerCount(count)),
-              }))}
-              onSelect={(count) => void changeSettings({ playerCount: Number(count) })}
-            />
-            {lobby.system !== NO_PLAY_SYSTEM || lobby.deckRequired ? (
-              <Switch
-                testID="lobby-require-decks"
-                labelTx="connected:decksRequired"
-                value={Boolean(lobby.deckRequired)}
-                disabled={!isWebSocketConnected || savingSettings || starting}
-                onValueChange={(deckRequired) => void changeSettings({ deckRequired })}
-              />
-            ) : null}
-          </View>
-        ) : null}
-        <View style={themed($section)}>
-          <View style={themed($readinessHeading)}>
-            <Text preset="subheading" accessibilityRole="header" tx="connected:lobby.title" />
-            <Text
-              size="xs"
-              style={themed($dimmed)}
-              tx="connected:lobby.readyCount"
-              txOptions={{ ready: readyPlayers, total: lobby.playerCount }}
-            />
-          </View>
-          <View style={themed($progressTrack)}>
-            <View
-              testID="lobby-readiness-progress"
-              accessibilityRole="progressbar"
-              accessibilityValue={{ min: 0, max: lobby.playerCount, now: readyPlayers }}
-              style={[
-                themed($progressFill),
-                { width: `${(readyPlayers / lobby.playerCount) * 100}%` },
-              ]}
-            />
-          </View>
-          {!lobby.isHost ? (
-            <Text
-              size="xxs"
-              style={themed($dimmed)}
-              text={deckRequirementLabel(Boolean(lobby.deckRequired))}
-            />
-          ) : null}
-          <LobbyDeckSource>
-            {(deckState) => (
-              <LobbySeatList
-                seats={lobby.players}
-                openSeats={openSeats}
-                totalSeats={lobby.playerCount}
-                deckState={deckState}
-                system={lobby.system}
-                format={lobby.format}
-                onManageDecks={onManageDecks ? () => onManageDecks(lobby.system) : undefined}
-                versionLabel={deckVersionLabel}
-                selectingDeckSeats={selectingDeckSeats}
-                deckRequired={Boolean(lobby.deckRequired)}
-                onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}
-                onEditAppearance={(seat, event) => {
-                  setAppearanceOrigin(
-                    event?.nativeEvent
-                      ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
-                      : undefined,
-                  )
-                  setAppearanceDraft({
-                    color: seat.color,
-                    shape: shownMarkShape(seat) ?? shapeForSeat(seat.seat),
-                  })
-                  setAppearanceSeat(seat.seat)
-                }}
-                onReport={(seat) =>
-                  seat.playerId
-                    ? setPlayerToReport({
-                        playerId: seat.playerId,
-                        seat: seat.seat,
-                        displayName: seat.displayName,
-                        color: seat.color,
-                        ...(shownMarkShape(seat) ? { shape: shownMarkShape(seat) } : {}),
-                        controlledByMe: false,
-                      })
-                    : undefined
-                }
-              />
-            )}
-          </LobbyDeckSource>
-        </View>
-      </ScrollView>
-      <BottomActionBar style={themed($surface)}>
-        {actionError && !openExitCopy ? (
-          <AlertNote testID="connected-action-error" text={actionError} />
-        ) : null}
-        {lobby.isHost && !isWebSocketConnected ? (
-          <AlertNote testID="connected-start-offline" text={startOfflineNotice} />
-        ) : null}
-        {lobby.isHost ? (
-          <>
-            <Button
-              testID="start-connected-game-button"
-              tx={starting ? "connected:lobby.starting" : "play:startGame"}
-              preset="reversed"
-              style={themed($primaryAction)}
-              disabled={startBlocked}
-              onPress={() => void startGame()}
-            />
-            {!everySeatClaimed && isWebSocketConnected ? (
-              <Text
-                size="xxs"
-                style={themed($actionHint)}
-                text={seatSummary(claimedSeats, lobby.playerCount)}
-              />
-            ) : null}
-            {missingDeck && isWebSocketConnected ? (
-              <Text size="xxs" style={themed($actionHint)} tx="connected:lobby.waitingForDecks" />
-            ) : null}
-          </>
-        ) : (
-          <Text size="sm" style={themed($actionHint)} tx="connected:waitingForHost" />
-        )}
-        <Button
-          testID={`${exitAction}-connected-lobby-button`}
-          text={exitCopy.confirmText}
-          style={themed($secondaryAction)}
-          textStyle={themed($secondaryActionText)}
-          onPress={(event) => openExitDialog(exitAction, event)}
-        />
-      </BottomActionBar>
-      {inviteOpen ? (
-        <DialogCard
-          visible
-          wide
-          placement="bottom"
-          origin={inviteOrigin}
-          onClose={() => setInviteOpen(false)}
-          backdropTestID="invite-backdrop"
-          backdropAccessibilityLabel={translate("connected:invite.close")}
-          dialogTestID="invite-dialog"
-          accessibilityViewIsModal
-        >
-          <Text preset="subheading" tx="connected:invite.title" />
-          <InviteCard
-            qrPayload={inviteQrPayload}
-            manualCode={manualCode}
-            onShare={inviteUrl || manualCode ? shareInvite : undefined}
-          />
-          <Button tx="common:close" onPress={() => setInviteOpen(false)} />
-        </DialogCard>
-      ) : null}
-      {leaveAction && openExitCopy ? (
-        <ConfirmDialog
-          visible
-          origin={exitOrigin}
-          title={openExitCopy.title}
-          message={openExitCopy.message}
-          confirmText={openExitCopy.confirmText}
-          destructive={leaveAction === "abandon"}
-          busy={leaving}
-          confirmDisabled={!isWebSocketConnected}
-          dialogTestID="connected-lobby-leave-confirmation"
-          confirmTestID={`confirm-connected-lobby-${leaveAction}-button`}
-          cancelTestID={`cancel-connected-lobby-${leaveAction}-button`}
-          backdropTestID="connected-lobby-leave-backdrop"
-          backdropAccessibilityLabel={translate("connected:lobby.keepOpen")}
-          notice={
-            actionError ? (
-              <AlertNote testID="connected-action-error" text={actionError} />
-            ) : !isWebSocketConnected ? (
-              <AlertNote testID="connected-lobby-exit-offline" text={onlineOnlyNotice("exit")} />
-            ) : null
-          }
-          onConfirm={() => void confirmExit()}
-          onClose={() => setLeaveAction(undefined)}
-        />
-      ) : null}
-      {appearanceSeat !== undefined && appearanceDraft ? (
-        <DialogCard
-          visible={paywall === "closed"}
-          onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
-          onClose={() => setAppearanceSeat(undefined)}
-          closeDisabled={savingAppearance}
-          origin={appearanceOrigin}
-          backdropTestID="lobby-appearance-backdrop"
-          backdropAccessibilityLabel={translate("connected:lobby.appearance.close")}
-          dialogTestID="lobby-appearance-dialog"
-          accessibilityViewIsModal
-        >
-          <Text preset="subheading" tx="connected:lobby.appearance.title" />
-          <AppearancePicker
-            value={appearanceDraft}
-            taken={takenAppearances}
-            shapes={CONNECTED_PLAYER_MARK_SHAPES}
-            proShapes={PRO_MARK_SHAPES}
-            proLocked={!billing.isCountPro}
-            foil={billing.isFoil}
-            onLockedPress={openPaywall}
-            onChange={setAppearanceDraft}
-          />
-          <View style={themed($dialogActions)}>
-            <Button
-              testID="cancel-appearance-button"
-              tx="common:cancel"
-              style={themed($dialogButton)}
-              disabled={savingAppearance}
-              onPress={() => setAppearanceSeat(undefined)}
-            />
-            <Button
-              testID="save-appearance-button"
-              tx={savingAppearance ? "connected:saving" : "common:save"}
-              preset="reversed"
-              style={themed($dialogButton)}
-              disabled={savingAppearance}
-              onPress={() => void saveAppearance()}
-            />
-          </View>
-        </DialogCard>
-      ) : null}
       {playerToReport ? (
         <PlayerActionsDialog
           publicId={publicId}
@@ -724,7 +347,7 @@ function ConnectedLobbyContent({
           onClose={() => setPlayerToReport(undefined)}
         />
       ) : null}
-    </Screen>
+    </LobbyView>
   )
 }
 
@@ -740,125 +363,3 @@ function LobbyDeckQuery({ children }: { children: (state: LobbyDeckState) => Rea
   const result = useQuery(api.decks.listMine)
   return children(remoteValue(result?.decks))
 }
-
-function LobbyStatusScreen({
-  message,
-  error = false,
-  retry,
-  onBack,
-}: {
-  message: string
-  error?: boolean
-  retry?: () => void
-  onBack?: () => void
-}) {
-  const { themed, theme } = useAppTheme()
-  return (
-    <Screen
-      preset="fixed"
-      safeAreaEdges={["bottom"]}
-      backgroundColor={theme.colors.surface}
-      contentContainerStyle={themed($screen)}
-    >
-      <Header
-        title=""
-        leftTx={onBack ? "common:back" : undefined}
-        backgroundColor={theme.colors.surface}
-        onLeftPress={onBack}
-      />
-      <ScrollView
-        style={$styles.flex1}
-        contentContainerStyle={themed($content)}
-        scrollEnabled={false}
-      >
-        <View style={themed($hero)}>
-          <Text preset="heading" tx="connected:lobby.title" />
-          {error ? (
-            <AlertNote text={message} />
-          ) : (
-            <Text
-              accessibilityRole="progressbar"
-              accessibilityLiveRegion="polite"
-              size="sm"
-              style={themed($dimmed)}
-              text={message}
-            />
-          )}
-        </View>
-        <LobbySkeleton />
-        {error && retry ? (
-          <Button testID="retry-lobby-button" tx="common:tryAgain" onPress={retry} />
-        ) : null}
-      </ScrollView>
-      <BottomActionBar style={themed($surface)}>
-        <Button tx="play:startGame" preset="reversed" style={themed($primaryAction)} disabled />
-      </BottomActionBar>
-    </Screen>
-  )
-}
-
-const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  flex: 1,
-  backgroundColor: colors.surface,
-})
-const $surface: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
-const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexGrow: 1,
-  gap: spacing.md,
-  padding: spacing.lg,
-  paddingBottom: spacing.xl,
-})
-const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $inviteSummary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-})
-const $inviteButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  paddingVertical: spacing.xxs,
-  paddingHorizontal: spacing.md,
-})
-const $readinessHeading: ThemedStyle<ViewStyle> = () => ({
-  flexDirection: "row",
-  alignItems: "baseline",
-  justifyContent: "space-between",
-})
-const $progressTrack: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  height: 4,
-  overflow: "hidden",
-  backgroundColor: colors.separator,
-})
-const $progressFill: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  height: "100%",
-  backgroundColor: colors.tint,
-})
-const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
-const $secondaryAction: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  minHeight: 44,
-  borderWidth: 0,
-  backgroundColor: colors.transparent,
-})
-const $secondaryActionText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textDim,
-  fontSize: 15,
-})
-const $actionHint: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textDim,
-  textAlign: "center",
-})
-const $skeleton: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $skeletonInvite: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  height: 320,
-  borderRadius: spacing.md,
-  backgroundColor: colors.palette.neutral300,
-  opacity: 0.4,
-})
-const $skeletonSeat: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  height: 64,
-  borderRadius: spacing.sm,
-  backgroundColor: colors.palette.neutral300,
-  opacity: 0.4,
-})

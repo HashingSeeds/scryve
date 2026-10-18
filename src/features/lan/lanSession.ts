@@ -28,6 +28,7 @@ import {
   parseGuestMessage,
   parseHostMessage,
   releaseLanSeat,
+  setLanPlayerCount,
   startLanRound,
   type LanGame,
   type LanGuestMessage,
@@ -536,6 +537,13 @@ export class LanSession {
         if (session === this.session) this.scheduleReconnect(session)
       }
     }, RECONNECT_DELAY_MS)
+  }
+
+  updateSettings({ playerCount }: { playerCount: number }) {
+    const game = this.game
+    if (this.state.role !== "host" || !game) return
+    const next = setLanPlayerCount(game, playerCount)
+    if (next !== game) this.publish(next)
   }
 
   start() {

@@ -1,10 +1,14 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
 
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
-import { parseLanSetup, type LanSetup } from "@/features/lan/lanGame"
-import { LanLobbyScreen } from "@/screens/LanLobbyScreen"
+import { lanSeatsReady, parseLanSetup, type LanSetup } from "@/features/lan/lanGame"
+import { lanSession, useLanSession } from "@/features/lan/lanSession"
+import { checkLocalNetworkAccess } from "@/features/lan/lanTransport"
+import { NearbyLobbyScreen } from "@/features/lan/NearbyLobbyScreen"
+import { useNearbyGames } from "@/features/lan/useNearbyGames"
+import { translate } from "@/i18n/translate"
 
 function setupFromParams(params: Record<string, string | undefined>): LanSetup | undefined {
   if (params.setup) {
@@ -26,10 +30,11 @@ function setupFromParams(params: Record<string, string | undefined>): LanSetup |
   )
 }
 
+const backToPlay = () => router.dismissTo({ pathname: "/", params: { destination: "play" } })
+
 export default function LanLobbyRoute() {
   const params = useLocalSearchParams<{
     setup?: string
-    host?: string
     join?: string
     start?: string
     system?: string
@@ -39,13 +44,50 @@ export default function LanLobbyRoute() {
   }>()
   const setup = useMemo(() => setupFromParams(params), [params])
   const onPlay = useCallback(() => router.push("/lan/game"), [])
+  const [accessError, setAccessError] = useState<string>()
+  const { role, lobby } = useLanSession()
+
+  // why: hosting starts once per visit; a remount after leaving must not reopen the lobby.
+  const hosted = useRef(false)
+  useEffect(() => {
+    if (hosted.current || !setup || lanSession.getState().role || !lanPlayAvailable()) return
+    hosted.current = true
+    void checkLocalNetworkAccess()
+      .catch(() => "denied" as const)
+      .then((access) =>
+        access === "denied"
+          ? setAccessError(translate("connected:nearby.accessDenied"))
+          : lanSession.host(setup),
+      )
+  }, [setup])
+
+  // why: lets an agent drive devices it can deep link into but cannot tap.
+  const { games } = useNearbyGames(Boolean(params.join) && !role)
+  const joining = useRef(false)
+  useEffect(() => {
+    const target =
+      params.join && games.find((service) => service.name.startsWith(params.join ?? ""))
+    if (!target || joining.current) return
+    joining.current = true
+    void lanSession.join(target)
+  }, [games, params.join])
+  useEffect(() => {
+    if (
+      params.start === "1" &&
+      role === "host" &&
+      lobby?.status === "lobby" &&
+      lanSeatsReady(lobby)
+    )
+      lanSession.start()
+  }, [params.start, role, lobby])
+
   if (!lanPlayAvailable()) return <Redirect href="/" />
   return (
-    <LanLobbyScreen
-      onBack={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
+    <NearbyLobbyScreen
+      error={accessError}
+      onBack={backToPlay}
+      onLeft={backToPlay}
       onPlay={onPlay}
-      setup={setup}
-      automation={{ host: params.host === "1", join: params.join, start: params.start === "1" }}
     />
   )
 }

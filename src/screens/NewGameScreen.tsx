@@ -335,16 +335,19 @@ function NewGameForm({
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
   const [exitingGameId, setExitingGameId] = useState<string>()
   const [pickingHostSeat, setPickingHostSeat] = useState(false)
+  const [hostOn, setHostOn] = useState<"cloud" | "nearby">("cloud")
   const connectedMode = mode === "connected"
+  const nearbyMode = connectedMode && Boolean(onNearby) && hostOn === "nearby"
+  const cloudMode = connectedMode && !nearbyMode
   const layout = playerGridLayoutForCount(
     playerCount,
     chosenLayout,
     connectedMode ? defaultConnectedLayout(playerCount) : "auto",
   )
   const treacheryAvailable =
-    connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
+    cloudMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
-  const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
+  const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
   useEffect(() => {
     setShowPreparation(false)
@@ -384,14 +387,14 @@ function NewGameForm({
     recent:
       seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
     recentRow: Boolean(recent),
-    connected: connectedMode,
+    connected: cloudMode,
   })
   const setupSummary = [
     connectedMode
       ? translate("play:newGame.seatsCount", { count: playerCount })
       : translate("play:summary.playerCount", { count: playerCount }),
     counterValueLabel(system, startingLife),
-    ...(connectedMode
+    ...(cloudMode
       ? [translate(deckRequired ? "play:newGame.decksRequired" : "play:newGame.decksOptional")]
       : []),
     ...(!connectedMode && !localGame && matchBestOf
@@ -428,61 +431,63 @@ function NewGameForm({
         : undefined,
     [account, deck, effectiveMeSeat],
   )
-  const valid = connectedMode
-    ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
-    : validLife && nameValidation.valid && !localGame && !deckLifeLoading
-  const busy = connectedMode && Boolean(connected?.busy)
+  const valid = nearbyMode
+    ? validLife
+    : connectedMode
+      ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
+      : validLife && nameValidation.valid && !localGame && !deckLifeLoading
+  const busy = cloudMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
   const matchBlocks = Boolean(localGame?.match)
   const [endingMatch, setEndingMatch] = useState(false)
   const connectedBlocksLocal =
     !connectedMode && Boolean(connected?.ready) && connectedGames.length > 0
-  const hostedGame = connectedMode ? connectedGames.find((game) => game.isHost) : undefined
+  const hostedGame = cloudMode ? connectedGames.find((game) => game.isHost) : undefined
   const singleBlockingConnected =
     connectedBlocksLocal && connectedGames.length === 1 ? connectedGames[0] : undefined
   const gameBlocksStart = localGameBlocksStart || connectedBlocksLocal || Boolean(hostedGame)
-  const resumeGame = connectedMode && connectedGames.length === 1 ? hostedGame : undefined
+  const resumeGame = cloudMode && connectedGames.length === 1 ? hostedGame : undefined
   const hostedResumable =
     connectedMode || !onResumeConnected ? undefined : connectedGames.find((game) => game.isHost)
   /** Only a running local game can be handed to the server; a connected one is already there. */
   const canConnectLocal = Boolean(localConnect) && !connectedMode && localGameBlocksStart
-  const showNearby = connectedMode && Boolean(onNearby)
   const footerRow =
-    (canConnectLocal || Boolean(localMatchEnd) || showNearby) &&
-    fontScale <= FOOTER_ROW_MAX_FONT_SCALE
+    (canConnectLocal || Boolean(localMatchEnd)) && fontScale <= FOOTER_ROW_MAX_FONT_SCALE
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
-  const hasStatusDetails = connectedMode
+  const hasStatusDetails = cloudMode
     ? Boolean(connectedGames.length || connected?.blockedReason || connected?.error)
     : Boolean(localGame) || connectedBlocksLocal
-  const statusText = connectedMode
-    ? directResume
-      ? translate("play:newGame.resumeCurrentGame")
-      : (connected?.error ??
-        connected?.blockedReason ??
-        (connectedGames.length
-          ? translate("play:newGame.gamesInProgress")
-          : preparing && showPreparation
-            ? connected?.status
-            : ""))
-    : localGame?.match
-      ? translate("play:newGame.matchStatus", {
-          context: matchContextLabel(localGame),
-          bestOf: localGame.match.bestOf,
-        })
-      : localGame
+  const statusText = nearbyMode
+    ? ""
+    : connectedMode
+      ? directResume
         ? translate("play:newGame.resumeCurrentGame")
-        : connectedBlocksLocal
-          ? singleBlockingConnected
-            ? translate("play:newGame.resumeCurrentGame")
-            : translate("play:newGame.gamesInProgress")
-          : ""
+        : (connected?.error ??
+          connected?.blockedReason ??
+          (connectedGames.length
+            ? translate("play:newGame.gamesInProgress")
+            : preparing && showPreparation
+              ? connected?.status
+              : ""))
+      : localGame?.match
+        ? translate("play:newGame.matchStatus", {
+            context: matchContextLabel(localGame),
+            bestOf: localGame.match.bestOf,
+          })
+        : localGame
+          ? translate("play:newGame.resumeCurrentGame")
+          : connectedBlocksLocal
+            ? singleBlockingConnected
+              ? translate("play:newGame.resumeCurrentGame")
+              : translate("play:newGame.gamesInProgress")
+            : ""
 
   function submit() {
     if (!valid || busy) return
-    if (connectedMode && connected?.access) {
+    if (cloudMode && connected?.access) {
       connected.access.request()
       return
     }
@@ -491,7 +496,9 @@ function NewGameForm({
       lifeStep,
       ...(system && format ? { system, format } : {}),
     }
-    if (connectedMode)
+    if (nearbyMode)
+      onNearby?.({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...setup })
+    else if (connectedMode)
       connected?.host({
         playerCount,
         startingLife,
@@ -675,6 +682,18 @@ function NewGameForm({
       </View>
       <>
         <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
+          {connectedMode && onNearby ? (
+            <SegmentedControl
+              testID="host-on"
+              accessibilityLabel={translate("play:newGame.hostOn")}
+              segments={[
+                { id: "cloud", label: translate("play:newGame.cloud") },
+                { id: "nearby", label: translate("play:newGame.nearby") },
+              ]}
+              selectedId={hostOn}
+              onSelect={(value) => setHostOn(value === "nearby" ? "nearby" : "cloud")}
+            />
+          ) : null}
           {connectedMode && onJoin ? (
             <View style={themed($section)}>
               <Button
@@ -853,12 +872,14 @@ function NewGameForm({
                     ? matchBlocks
                       ? translate("play:newGame.continueMatch")
                       : translate("play:newGame.endCurrentGame")
-                    : connectedMode
-                      ? (connected?.access?.label ??
-                        (busy
-                          ? translate("play:newGame.working")
-                          : translate("play:newGame.hostLobby")))
-                      : undefined
+                    : nearbyMode
+                      ? translate("play:newGame.hostLobby")
+                      : connectedMode
+                        ? (connected?.access?.label ??
+                          (busy
+                            ? translate("play:newGame.working")
+                            : translate("play:newGame.hostLobby")))
+                        : undefined
                 }
                 tx={connectedMode || gameBlocksStart ? undefined : "play:startGame"}
                 preset="reversed"
@@ -884,9 +905,11 @@ function NewGameForm({
                     ? matchBlocks
                       ? translate("play:newGame.continueMatchHint")
                       : translate("play:newGame.endCurrentGameHint")
-                    : connectedMode
-                      ? translate("play:newGame.hostLobbyHint")
-                      : translate("play:newGame.startGameHint")
+                    : nearbyMode
+                      ? translate("play:newGame.nearbyHint")
+                      : connectedMode
+                        ? translate("play:newGame.hostLobbyHint")
+                        : translate("play:newGame.startGameHint")
                 }
                 onPress={
                   localGameBlocksStart
@@ -902,25 +925,6 @@ function NewGameForm({
                           : submit
                 }
               />
-              {showNearby ? (
-                <Button
-                  testID="nearby-game-button"
-                  tx="play:newGame.nearby"
-                  TextProps={$footerButtonText}
-                  style={footerRow ? themed($footerAction) : undefined}
-                  accessibilityHint={translate("play:newGame.nearbyHint")}
-                  onPress={() =>
-                    onNearby?.({
-                      playerCount,
-                      startingLife,
-                      lifeStep,
-                      ruleset: format ?? NO_PLAY_SYSTEM,
-                      layout,
-                      ...(system && format ? { system, format } : {}),
-                    })
-                  }
-                />
-              ) : null}
               {localMatchEnd ? (
                 <Button
                   testID="end-match-setup-button"
@@ -1030,7 +1034,7 @@ function NewGameForm({
             </View>
           </View>
 
-          {connectedMode ? (
+          {cloudMode ? (
             <View style={themed($section)}>
               <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
               <SegmentedControl

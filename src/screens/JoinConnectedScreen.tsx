@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { useUser } from "@clerk/expo"
@@ -48,8 +48,10 @@ export function JoinConnectedScreen({
   onBack,
   embedded = false,
   onCodeChange,
+  nearby,
 }: {
   embedded?: boolean
+  nearby?: ReactNode
   onCodeChange?: (code: string) => void
   inviteToken?: string
   access?: CloudAccess
@@ -228,6 +230,7 @@ export function JoinConnectedScreen({
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       >
+        {token ? null : nearby}
         <View style={themed($hero)}>
           <Text
             preset={embedded ? "subheading" : "heading"}

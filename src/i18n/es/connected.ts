@@ -470,8 +470,6 @@ export default {
   },
   nearby: {
     title: "Partidas cercanas",
-    hosting: "Anfitrión de {{name}}",
-    joined: "Te uniste a {{name}}",
     accessDenied:
       "Permite el acceso a dispositivos cercanos en Ajustes para encontrar y crear partidas.",
     connecting: "Conectando…",
@@ -480,16 +478,10 @@ export default {
     namePlaceholder: "Visible para la mesa",
     empty: "Aún no hay partidas en esta red.",
     join: "Unirse a {{name}}",
-    host: "Crear esta partida",
-    hostHint: "Para crear una, configura una partida y elige Cercana.",
-    summaryLife: "{{life}} vidas",
-    summaryPlayers: "{{players}} jugadores",
     you: "{{name}} (tú)",
     away: "Ausente",
     startAgain: "Empezar de nuevo",
     backToGame: "Volver a la partida",
-    endGame: "Terminar partida",
-    leave: "Salir",
     errors: {
       hostFailed: "No se pudo crear la partida: {{error}}",
       unreachable: "{{name}} no está accesible. Puede que la partida haya terminado.",

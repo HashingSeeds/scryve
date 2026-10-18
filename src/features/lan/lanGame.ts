@@ -191,6 +191,17 @@ export function admitLanGuest(
   return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
 }
 
+export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
+  if (
+    game.status !== "lobby" ||
+    !Number.isInteger(playerCount) ||
+    playerCount < Math.max(LAN_MIN_PLAYERS, game.seats.length) ||
+    playerCount > LAN_MAX_SEATS
+  )
+    return game
+  return { ...game, setup: { ...game.setup, playerCount } }
+}
+
 export const setLanConnected = (game: LanGame, key: string, connected: boolean) =>
   withSeat(game, key, (seat) => ({ ...seat, connected }))
 

@@ -445,8 +445,6 @@ export default {
   },
   nearby: {
     title: "近くのゲーム",
-    hosting: "{{name}}をホスト中",
-    joined: "{{name}}に参加中",
     accessDenied:
       "ゲームを探したりホストしたりするには、設定で近くのデバイスへのアクセスを許可してください。",
     connecting: "接続中…",
@@ -455,16 +453,10 @@ export default {
     namePlaceholder: "テーブルに表示されます",
     empty: "このネットワークにはまだゲームがありません。",
     join: "{{name}}に参加",
-    host: "このゲームをホスト",
-    hostHint: "ホストするには、ゲームを設定して「ニアバイ」を選んでください。",
-    summaryLife: "ライフ{{life}}",
-    summaryPlayers: "{{players}}人",
     you: "{{name}}(あなた)",
     away: "離席中",
     startAgain: "もう一度始める",
     backToGame: "ゲームに戻る",
-    endGame: "ゲームを終了",
-    leave: "退出",
     errors: {
       hostFailed: "ホストできませんでした: {{error}}",
       unreachable: "{{name}}に接続できません。ゲームが終了した可能性があります。",

@@ -92,6 +92,8 @@ export default {
     hostLobby: "로비 호스트",
     hostLobbyHint: "다른 사람이 참가할 수 있는 로비를 만듭니다",
     startGameHint: "이 로컬 게임을 현재 기기에서 시작합니다",
+    cloud: "클라우드",
+    hostOn: "호스트 위치",
     nearby: "근처",
     nearbyHint: "계정이나 클라우드 없이 같은 Wi-Fi의 휴대폰끼리 플레이합니다",
     endMatch: "매치 종료…",

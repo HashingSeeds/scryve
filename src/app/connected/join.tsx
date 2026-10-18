@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router"
 
 import { CloudScreen } from "@/features/auth/CloudScreen"
+import { NearbyGameList } from "@/features/lan/NearbyGameList"
 import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 
 export default function JoinRoute() {
@@ -11,6 +12,7 @@ export default function JoinRoute() {
         <JoinConnectedScreen
           access={access}
           initialCode={code}
+          nearby={<NearbyGameList onJoin={() => router.push("/lan")} />}
           onBack={() => router.back()}
           onScan={() => router.push("/connected/scan")}
           onJoined={(id) =>

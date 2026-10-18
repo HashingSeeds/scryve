@@ -25,6 +25,7 @@ export type LobbySeat = {
   foil?: boolean
   deckVersionId?: string
   controlledByMe: boolean
+  away?: boolean
 }
 
 export type SeatDeck = {
@@ -57,14 +58,14 @@ export function LobbySeatList({
   seats: LobbySeat[]
   openSeats: number
   totalSeats?: number
-  deckState: LobbyDeckState
+  deckState?: LobbyDeckState
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   selectingDeckSeats?: ReadonlySet<number>
   deckRequired?: boolean
   system?: string
   format?: string
-  onSelectVersion: (seat: number, deckVersionId?: string) => void
-  onReport: (seat: LobbySeat) => void
+  onSelectVersion?: (seat: number, deckVersionId?: string) => void
+  onReport?: (seat: LobbySeat) => void
   onManageDecks?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
@@ -103,7 +104,7 @@ export function LobbySeatList({
               <Text size="xxs" style={themed($seatPending)} tx="connected:seats.waiting" />
             </View>
           )
-        const decks = deckState.status === "ready" ? deckState.value : undefined
+        const decks = deckState?.status === "ready" ? deckState.value : undefined
         const usableDecks =
           decks?.filter(
             (deck) =>
@@ -118,13 +119,13 @@ export function LobbySeatList({
           (version) => version._id === seat.deckVersionId,
         )
         const deckReady = Boolean(seat.deckVersionId)
-        const ready = !deckRequired || deckReady
+        const ready = !seat.away && (!deckRequired || deckReady)
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
         const showManageDecks = Boolean(
           seat.controlledByMe && onManageDecks && system !== NO_PLAY_SYSTEM,
         )
         const onlyAddDeckAction =
-          deckState.status === "ready" &&
+          deckState?.status === "ready" &&
           system !== NO_PLAY_SYSTEM &&
           usableDecks.length === 0 &&
           showManageDecks &&
@@ -190,9 +191,11 @@ export function LobbySeatList({
                   tx={
                     ready
                       ? "connected:seats.ready"
-                      : seat.controlledByMe
-                        ? "connected:seats.chooseDeck"
-                        : "connected:seats.needsDeck"
+                      : seat.away
+                        ? "connected:nearby.away"
+                        : seat.controlledByMe
+                          ? "connected:seats.chooseDeck"
+                          : "connected:seats.needsDeck"
                   }
                 />
               </View>
@@ -209,7 +212,7 @@ export function LobbySeatList({
                   onPress={onManageDecks}
                 />
               ) : null}
-              {!seat.controlledByMe && seat.playerId ? (
+              {onReport && !seat.controlledByMe && seat.playerId ? (
                 <Button
                   testID={`lobby-report-player-seat-${seat.seat}`}
                   accessibilityLabel={translate("connected:playerActions.reportPlayer", {
@@ -222,7 +225,7 @@ export function LobbySeatList({
                 />
               ) : null}
             </View>
-            {seat.controlledByMe && !onlyAddDeckAction ? (
+            {deckState && onSelectVersion && seat.controlledByMe && !onlyAddDeckAction ? (
               <View style={themed($deckChoices)}>
                 {system === NO_PLAY_SYSTEM ? (
                   <Text size="xxs" style={themed($seatPending)} tx="connected:seats.decksNotUsed" />
