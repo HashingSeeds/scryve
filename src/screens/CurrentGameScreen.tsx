@@ -507,7 +507,7 @@ export function CurrentGameScreen({
             seatOrder={runtime.game.seatOrder}
             onChange={runtime.changeSeatOrder}
           />
-          <Button tx="common:cancel" style={themed($menuItem)} onPress={closePanel} />
+          <Button tx="common:done" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
       ) : null}
 
