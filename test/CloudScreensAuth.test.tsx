@@ -38,6 +38,7 @@ jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () =>
     jest.requireActual<typeof import("react")>("react").useContext(mockAuthContext),
 }))
+jest.mock("@/features/lan/NearbyGameList", () => ({ NearbyGameList: () => null }))
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => ({}),

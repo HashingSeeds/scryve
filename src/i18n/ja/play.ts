@@ -93,6 +93,8 @@ export default {
     hostLobby: "ロビーをホスト",
     hostLobbyHint: "他の人が参加できるロビーを作成します",
     startGameHint: "このローカルゲームをこの端末で開始します",
+    cloud: "クラウド",
+    hostOn: "ホスト先",
     nearby: "ニアバイ",
     nearbyHint: "アカウントやクラウドなしで、このWi-Fi上のスマホと対戦します",
     endMatch: "マッチを終了…",

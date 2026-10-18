@@ -97,6 +97,8 @@ export default {
     hostLobby: "Crear sala",
     hostLobbyHint: "Crea una sala a la que otros pueden unirse",
     startGameHint: "Inicia esta partida local en el dispositivo actual",
+    cloud: "Nube",
+    hostOn: "Alojar en",
     nearby: "Cercana",
     nearbyHint: "Juega con teléfonos en este Wi-Fi, sin cuentas ni la nube",
     endMatch: "Terminar encuentro…",

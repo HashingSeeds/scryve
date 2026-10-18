@@ -788,19 +788,29 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("start-game-button").props.accessibilityState.disabled).toBe(true)
   })
 
-  it("offers Nearby beside hosting only in connected mode, with the same setup", () => {
+  it("hosts nearby from the same setup without waiting on the cloud", () => {
     const onNearby = jest.fn()
-    const connected = setup({ mode: "connected", connected: readyHost, onNearby })
+    const connected = setup({
+      mode: "connected",
+      connected: { ...readyHost, ready: false, blockedReason: "Sign in to host" },
+      onNearby,
+    })
 
-    fireEvent.press(connected.getByTestId("nearby-game-button"))
-    expect(onNearby).toHaveBeenCalledWith(
-      expect.objectContaining({
-        playerCount: expect.any(Number),
-        startingLife: expect.any(Number),
-      }),
-    )
+    fireEvent.press(connected.getByTestId("game-type-commander"))
+    fireEvent.press(connected.getByTestId("host-on-nearby"))
+    fireEvent.press(connected.getByTestId("host-connected-button"))
+    expect(onNearby).toHaveBeenCalledWith({
+      playerCount: 2,
+      startingLife: 40,
+      lifeStep: 1,
+      ruleset: "commander",
+      system: "mtg",
+      format: "commander",
+      layout: "auto",
+    })
     connected.unmount()
-    expect(setup({ mode: "local", onNearby }).queryByTestId("nearby-game-button")).toBeNull()
+    expect(setup({ mode: "local", onNearby }).queryByTestId("host-on")).toBeNull()
+    expect(setup({ mode: "connected", connected: readyHost }).queryByTestId("host-on")).toBeNull()
   })
 
   it("swaps to seats, ruleset, and hosting in connected mode", () => {

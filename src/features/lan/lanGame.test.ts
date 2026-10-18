@@ -11,6 +11,7 @@ import {
   parseHostMessage,
   releaseLanSeat,
   setLanConnected,
+  setLanPlayerCount,
   startLanRound,
   type LanGame,
   type LanSeatPass,
@@ -115,6 +116,16 @@ describe("nearby lobby", () => {
     expect(
       admitLanGuest(game, tokens, join("x", { key: "host", token: "" }), unused),
     ).toHaveProperty("rejected")
+  })
+
+  it("lets the host change the seat count only in the lobby and never below the seated", () => {
+    const seated = seatGuest(seatGuest(lobby({ ...commander, playerCount: 4 }), "a"), "b")
+
+    expect(setLanPlayerCount(seated, 3).setup.playerCount).toBe(3)
+    expect(setLanPlayerCount(seated, 2)).toBe(seated)
+    expect(setLanPlayerCount(seated, 7)).toBe(seated)
+    const playing = startLanRound(setLanPlayerCount(seated, 3), NOW)
+    expect(setLanPlayerCount(playing, 4)).toBe(playing)
   })
 
   it("is ready to start only when every chosen seat is filled and present", () => {

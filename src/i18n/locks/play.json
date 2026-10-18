@@ -307,5 +307,7 @@
   "rules.webOnly": "27565e946140",
   "rules.allOf": "d86d52b22fa5",
   "rules.noResults": "3de638240022",
-  "rules.notFound": "28a6a3b84cc3"
+  "rules.notFound": "28a6a3b84cc3",
+  "newGame.cloud": "74e6e9a524ac",
+  "newGame.hostOn": "2859ca47b0d1"
 }

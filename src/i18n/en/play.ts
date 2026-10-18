@@ -91,6 +91,8 @@ const play = {
     hostLobby: "Host lobby",
     hostLobbyHint: "Creates a lobby others can join",
     startGameHint: "Starts this local game on the current device",
+    cloud: "Cloud",
+    hostOn: "Host on",
     nearby: "Nearby",
     nearbyHint: "Plays with phones on this Wi-Fi, without accounts or the cloud",
     endMatch: "End match…",

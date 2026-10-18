@@ -477,8 +477,6 @@ export default {
   },
   nearby: {
     title: "Parties à proximité",
-    hosting: "Hébergement de {{name}}",
-    joined: "{{name}} rejoint",
     accessDenied:
       "Autorisez l'accès aux appareils à proximité dans les Réglages pour trouver et héberger des parties.",
     connecting: "Connexion…",
@@ -487,16 +485,10 @@ export default {
     namePlaceholder: "Affiché à la table",
     empty: "Aucune partie sur ce réseau pour l'instant.",
     join: "Rejoindre {{name}}",
-    host: "Héberger cette partie",
-    hostHint: "Pour héberger, configurez une partie et choisissez À proximité.",
-    summaryLife: "{{life}} points de vie",
-    summaryPlayers: "{{players}} joueurs",
     you: "{{name}} (vous)",
     away: "Absent",
     startAgain: "Recommencer",
     backToGame: "Retour à la partie",
-    endGame: "Terminer la partie",
-    leave: "Quitter",
     errors: {
       hostFailed: "Impossible d'héberger : {{error}}",
       unreachable: "{{name}} est injoignable. La partie est peut-être terminée.",

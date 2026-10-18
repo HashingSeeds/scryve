@@ -97,6 +97,8 @@ export default {
     hostLobby: "Héberger un salon",
     hostLobbyHint: "Crée un salon que d'autres peuvent rejoindre",
     startGameHint: "Lance cette partie locale sur cet appareil",
+    cloud: "Cloud",
+    hostOn: "Héberger sur",
     nearby: "À proximité",
     nearbyHint: "Jouez avec les téléphones de ce Wi-Fi, sans compte ni cloud",
     endMatch: "Terminer le match…",

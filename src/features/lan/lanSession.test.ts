@@ -135,6 +135,21 @@ describe("nearby host", () => {
     expect(back.sent[0]).toEqual({ type: "welcome", pass })
   })
 
+  it("sends every guest the host's new seat count, and turns away a join past it", async () => {
+    const session = new LanSession()
+    await session.host(setup)
+    const alice = socket()
+    alice.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice" })
+
+    session.updateSettings({ playerCount: 2 })
+    jest.advanceTimersByTime(50)
+    const latest = alice.sent.findLast((message) => message.type === "state")
+    expect(latest?.type === "state" && latest.lobby.setup.playerCount).toBe(2)
+    const bob = socket()
+    bob.send({ type: "join", protocol: LAN_PROTOCOL, name: "Bob" })
+    expect(bob.sent).toEqual([{ type: "rejected", reason: "This game is full." }])
+  })
+
   it("refuses a write to another player's seat", async () => {
     const { session, alice, bob } = await startedGame()
 
