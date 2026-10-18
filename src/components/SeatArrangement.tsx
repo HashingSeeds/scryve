@@ -19,23 +19,30 @@ import { Text } from "./Text"
 export function SeatArrangement({
   players,
   layoutVariant,
+  board,
   seatOrder,
   testID = "seat-arrangement",
   onChange,
 }: {
   players: readonly Pick<GamePlayer, "id" | "name" | "color">[]
   layoutVariant: PlayerGridLayoutVariant
+  board: { width: number; height: number } | undefined
   seatOrder: SeatOrder | undefined
   testID?: string
   onChange: (seatOrder: SeatOrder) => void
 }) {
   const { themed } = useAppTheme()
-  const { width, height } = useWindowDimensions()
+  const window = useWindowDimensions()
+  const { width, height } = board ?? window
   const [pickedSlot, setPickedSlot] = useState<number>()
   const layout = getPlayerGridLayout({ playerCount: players.length, width, height, layoutVariant })
   const rows = getPlayerGridRows(players.length, layout)
   const aspectRatio = width / height
-  const mapWidth = Math.min(Math.min(260, height * 0.3) * aspectRatio, width - 96, 320)
+  const mapWidth = Math.min(
+    Math.min(260, window.height * 0.3) * aspectRatio,
+    window.width - 96,
+    320,
+  )
 
   function pressSlot(slot: number) {
     if (pickedSlot === undefined) return setPickedSlot(slot)
@@ -46,7 +53,11 @@ export function SeatArrangement({
   return (
     <View testID={testID} style={[themed($map), { width: mapWidth, aspectRatio }]}>
       {rows.map((row, rowIndex) => (
-        <View key={rowIndex} style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}>
+        <View
+          key={rowIndex}
+          testID={`${testID}-row-${rowIndex}`}
+          style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
+        >
           {row.map((slot, columnIndex) => {
             if (slot === null) return <View key={`empty-${columnIndex}`} style={$cell} />
             const player = players[seatOrder?.[slot] ?? slot]

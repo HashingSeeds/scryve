@@ -34,7 +34,7 @@ import {
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
-import { GameBoardStage } from "@/features/game/GameBoardStage"
+import { type BoardSize, GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
@@ -110,6 +110,7 @@ export function CurrentGameScreen({
     if (rules?.kind === "text") prefetchRules(rules)
   }, [rules])
   const [menuOpen, setMenuOpen] = useState(false)
+  const [boardSize, setBoardSize] = useState<BoardSize>()
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
@@ -397,6 +398,7 @@ export function CurrentGameScreen({
         <GameBoardStage
           playerCount={playerCount}
           layoutVariant={layoutVariant}
+          onBoardSizeChange={setBoardSize}
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}
@@ -501,6 +503,7 @@ export function CurrentGameScreen({
           <SeatArrangement
             players={runtime.game.players}
             layoutVariant={layoutVariant}
+            board={boardSize}
             seatOrder={runtime.game.seatOrder}
             onChange={runtime.changeSeatOrder}
           />
