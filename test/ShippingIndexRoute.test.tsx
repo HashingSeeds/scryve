@@ -113,7 +113,7 @@ describe("shipping index route", () => {
     expect(view.getByText("What do you play?")).toBeTruthy()
     expect(view.queryByTestId("game-board")).toBeNull()
 
-    fireEvent.press(view.getByTestId("what-you-play-pokemon-standard"))
+    fireEvent.press(view.getByTestId("game-type-pokemon-standard"))
     fireEvent.press(view.getByTestId("what-you-play-start"))
 
     expect(view.getByTestId("game-board")).toBeTruthy()

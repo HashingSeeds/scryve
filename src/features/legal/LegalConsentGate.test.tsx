@@ -99,7 +99,7 @@ describe("LegalConsentGate", () => {
     fireEvent.press(view.getByText("Terms of Use"))
     expect(mockPush).toHaveBeenCalledWith("/terms")
     expect(view.getByTestId("what-you-play-start")).toBeDisabled()
-    fireEvent.press(view.getByTestId("what-you-play-ygo-advanced"))
+    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     fireEvent.press(view.getByTestId("what-you-play-start"))
 
     expect(view.getByText("APP CONTENT")).toBeTruthy()

@@ -54,7 +54,7 @@ appId: ${MAESTRO_APP_ID}
       visible: "What do you play?"
     commands:
       - tapOn:
-          id: "what-you-play-none"
+          id: "game-type-none"
       - tapOn:
           id: "what-you-play-start"
       - waitForAnimationToEnd

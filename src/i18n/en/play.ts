@@ -26,8 +26,6 @@ const play = {
   whatYouPlay: {
     heading: "What do you play?",
     changeLater: "You can change this in Settings.",
-    showMoreFormats_one: "Show {{count}} more format",
-    showMoreFormats_other: "Show {{count}} more formats",
     play: "Play",
     acceptance:
       "By playing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
