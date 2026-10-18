@@ -1,6 +1,7 @@
 import type { MineDeck } from "@/features/decks/decksSync"
 
-import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
+import { createLanGame, lanLobbyOf, setLanDeckRequired } from "./lanGame"
+import { canChangeDeckRequirement, nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
 
 const hero = {
   _id: "deck-dorinthea",
@@ -31,5 +32,15 @@ describe("nearby deck choices", () => {
     expect(nearbySeatDeck([hero], "version-2", { system: "mtg", format: "commander" })).toBe(
       undefined,
     )
+  })
+
+  it("lets only a signed-in host require decks, and any host turn the requirement off", () => {
+    const setup = { playerCount: 2, startingLife: 40, lifeStep: 1, ruleset: "cc", ...fab }
+    const game = createLanGame("game", "host", "Host", setup, 0)
+    const required = lanLobbyOf(setLanDeckRequired(game, true))
+
+    expect(canChangeDeckRequirement(lanLobbyOf(game), true)).toBe(true)
+    expect(canChangeDeckRequirement(lanLobbyOf(game), false)).toBe(false)
+    expect(canChangeDeckRequirement(required, false)).toBe(true)
   })
 })

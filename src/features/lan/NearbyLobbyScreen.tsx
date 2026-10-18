@@ -4,9 +4,8 @@ import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
-import { lanCanRequireDecks } from "./lanGame"
 import { lanSession, useLanSession } from "./lanSession"
-import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
+import { canChangeDeckRequirement, nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
 
@@ -100,11 +99,7 @@ export function NearbyLobbyScreen({
           : undefined
       }
       onChangeDeckRequired={
-        isHost &&
-        signedIn &&
-        lobby.status === "lobby" &&
-        lobby.setup.system &&
-        (lobby.setup.deckRequired || lanCanRequireDecks(lobby))
+        isHost && canChangeDeckRequirement(lobby, signedIn)
           ? (deckRequired) => lanSession.updateSettings({ deckRequired })
           : undefined
       }
