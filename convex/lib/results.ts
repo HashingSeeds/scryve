@@ -99,33 +99,40 @@ export function isAbandonedSummary(summary: Pick<Doc<"gameSummaries">, "terminal
   return summary.terminalStatus === "abandoned"
 }
 
+export async function recordPlayerResult(
+  ctx: MutationCtx,
+  summary: Doc<"gameSummaries">,
+  player: Doc<"gameSummaries">["players"][number],
+  now: number,
+) {
+  if (isAbandonedSummary(summary) || !player.userId || !player.deckId || !player.deckVersionId)
+    return
+  const outcome = player.outcome ?? "unknown"
+  await ctx.db.insert("deckGameResults", {
+    deckId: player.deckId,
+    deckVersionId: player.deckVersionId,
+    gameId: summary.gameId,
+    playerId: player.playerId,
+    userId: player.userId,
+    outcome,
+    finishedAt: summary.finishedAt,
+  })
+  await applyStats(
+    ctx,
+    player.deckId,
+    player.deckVersionId,
+    { games: outcomeTally(outcome) },
+    1,
+    now,
+  )
+}
+
 export async function recordGameResults(
   ctx: MutationCtx,
   summary: Doc<"gameSummaries">,
   now: number,
 ) {
-  if (isAbandonedSummary(summary)) return
-  for (const player of summary.players) {
-    if (!player.userId || !player.deckId || !player.deckVersionId) continue
-    const outcome = player.outcome ?? "unknown"
-    await ctx.db.insert("deckGameResults", {
-      deckId: player.deckId,
-      deckVersionId: player.deckVersionId,
-      gameId: summary.gameId,
-      playerId: player.playerId,
-      userId: player.userId,
-      outcome,
-      finishedAt: summary.finishedAt,
-    })
-    await applyStats(
-      ctx,
-      player.deckId,
-      player.deckVersionId,
-      { games: outcomeTally(outcome) },
-      1,
-      now,
-    )
-  }
+  for (const player of summary.players) await recordPlayerResult(ctx, summary, player, now)
 }
 
 /** why: the abandoned-game backfill must undo exactly what recordGameResults added. */

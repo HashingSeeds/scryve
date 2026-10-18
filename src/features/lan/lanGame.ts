@@ -13,7 +13,12 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
-import { systemDefinition, tableRules } from "../../../convex/lib/systems"
+import {
+  identitySection,
+  startingValueRange,
+  systemDefinition,
+  tableRules,
+} from "../../../convex/lib/systems"
 import {
   matchesValidator,
   TABLE_VERSION,
@@ -63,11 +68,18 @@ export interface LanSetup {
   variant?: GameVariant
 }
 
+export interface LanSeatDeck {
+  versionId: string
+  name: string
+  startingValue?: number
+}
+
 export interface LanSeat {
   key: string
   seat: number
   name: string
   connected: boolean
+  deck?: LanSeatDeck
 }
 
 export type LanStatus = "lobby" | "active" | "finished" | "abandoned"
@@ -110,6 +122,7 @@ export type LanGuestMessage =
     }
   | { type: "op"; event: ConnectedActionEvent }
   | { type: "reveal" }
+  | { type: "deck"; deck: LanSeatDeck | null }
 
 export type LanHostMessage =
   | { type: "welcome"; pass: LanSeatPass }
@@ -230,6 +243,14 @@ export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
   return { ...game, setup: { ...game.setup, playerCount } }
 }
 
+const choosesDecks = (game: LanGame) =>
+  Boolean(game.setup.system) && (game.status === "lobby" || game.status === "finished")
+
+export function setLanDeck(game: LanGame, key: string, deck: LanSeatDeck | null): LanGame {
+  if (!choosesDecks(game)) return game
+  return withSeat(game, key, ({ deck: _previous, ...seat }) => (deck ? { ...seat, deck } : seat))
+}
+
 export const setLanConnected = (game: LanGame, key: string, connected: boolean) =>
   withSeat(game, key, (seat) => ({ ...seat, connected }))
 
@@ -244,7 +265,6 @@ export function releaseLanSeat(game: LanGame, key: string): LanGame {
   }
 }
 
-// why: every round is a fresh game for the shared engine, with its own id, so a change queued for the last round can never land in this one.
 function dealLanRoles(game: LanGame, random: () => number) {
   if (game.setup.variant !== "treachery") return undefined
   const roles = dealTreacheryRoles(game.seats.length, random)
@@ -254,6 +274,17 @@ function dealLanRoles(game: LanGame, random: () => number) {
       return [seat.key, { role, roleRevealed: role === "leader" }]
     }),
   )
+}
+
+export function startingLifeFor(setup: LanSetup, deck: LanSeatDeck | undefined) {
+  const value = deck?.startingValue
+  const { max } = startingValueRange(setup.system)
+  return identitySection(setup.system, setup.format)?.startingValueFacet &&
+    value !== undefined &&
+    value >= 1 &&
+    value <= max
+    ? value
+    : setup.startingLife
 }
 
 export function startLanRound(game: LanGame, now: number, random = Math.random): LanGame {
@@ -276,7 +307,12 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
       seats: new Map(
         game.seats.map((seat) => [
           seat.key,
-          { id: seat.key, userId: seat.key, currentLife: setup.startingLife, eventCount: 0 },
+          {
+            id: seat.key,
+            userId: seat.key,
+            currentLife: startingLifeFor(setup, seat.deck),
+            eventCount: 0,
+          },
         ]),
       ),
       events: new Map(),
@@ -436,6 +472,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,
+      ...(seat.deck ? { deckVersionId: seat.deck.versionId } : {}),
       ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
@@ -529,6 +566,18 @@ export function parseLanSetup(value: unknown): LanSetup | null {
   }
 }
 
+const MAX_DECK_NAME_LENGTH = 120
+
+function parseSeatDeck(value: unknown): LanSeatDeck | null {
+  if (!isRecord(value) || !isId(value.versionId) || typeof value.name !== "string") return null
+  const { startingValue } = value
+  return {
+    versionId: value.versionId,
+    name: value.name.slice(0, MAX_DECK_NAME_LENGTH),
+    ...(isCount(startingValue) ? { startingValue } : {}),
+  }
+}
+
 function parseEvent(value: unknown): ConnectedActionEvent | null {
   if (!isRecord(value)) return null
   const { operationId, gameId, actorId, deviceId, clientCreatedAt } = value
@@ -595,6 +644,10 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
         : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
+  if (value.type === "deck") {
+    const deck = value.deck === null ? null : parseSeatDeck(value.deck)
+    return value.deck === null || deck ? { type: "deck", deck } : null
+  }
   if (value.type === "op") {
     const event = parseEvent(value.event)
     return event ? { type: "op", event } : null
@@ -620,11 +673,13 @@ function parseLobby(value: unknown): LanLobby | null {
       typeof seat.connected !== "boolean"
     )
       return null
+    const deck = parseSeatDeck(seat.deck)
     seats.push({
       key: seat.key,
       seat: seat.seat as number,
       name: seat.name.slice(0, MAX_PLAYER_NAME_LENGTH),
       connected: seat.connected,
+      ...(deck ? { deck } : {}),
     })
   }
   return { id: value.id, status, round: value.round, setup, seats }

@@ -196,6 +196,21 @@ describe("nearby host", () => {
     expect(hostLan).toHaveBeenCalledTimes(1)
   })
 
+  it("puts each player's deck pick on their own seat", async () => {
+    const session = new LanSession()
+    await session.host({ ...setup, playerCount: 2 })
+    const alice = socket()
+    alice.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice" })
+    await session.selectDeck({ versionId: "version-host", name: "Host deck" })
+    alice.send({ type: "deck", deck: { versionId: "version-alice", name: "Alice deck" } })
+    jest.advanceTimersByTime(50)
+
+    expect(session.getState().lobby?.seats.map((seat) => seat.deck?.versionId)).toEqual([
+      "version-host",
+      "version-alice",
+    ])
+  })
+
   it("refuses a write to another player's seat", async () => {
     const { session, alice, bob } = await startedGame()
 
@@ -253,6 +268,16 @@ describe("nearby host", () => {
 
     const [game] = jest.mocked(archiveLanGame).mock.calls[0]
     expect(game.seats.map((seat) => seat.name)).toEqual(["a".repeat(23), "Alice", "Bob"])
+  })
+
+  it("sends the finish to guests at once, so a deck picked next can't ride along", async () => {
+    const { session, alice } = await startedGame()
+
+    await session.writes.finish()
+
+    expect(alice.sent.findLast((message) => message.type === "state")).toMatchObject({
+      lobby: { status: "finished" },
+    })
   })
 
   it("waits for a guest's pass hash before saving the round", async () => {
@@ -397,6 +422,7 @@ describe("nearby guest", () => {
     expect(pendingSeatClaims("guest-account")).toEqual([
       expect.objectContaining({ publicId: "game-1", token: "token" }),
     ])
+    expect(pendingSeatClaims("guest-account")[0]).not.toHaveProperty("deckVersionId")
     expect(nudged).not.toHaveBeenCalled()
     host()?.onMessage(stateWith("finished"))
     host()?.onMessage(stateWith("finished"))
@@ -404,6 +430,37 @@ describe("nearby guest", () => {
     expect(pendingSeatClaims("guest-account")).toHaveLength(1)
     expect(nudged).toHaveBeenCalledTimes(1)
     unsubscribe()
+    setNearbyOwner(undefined)
+  })
+
+  it("remembers the deck its own seat played, for its account's stats", async () => {
+    setNearbyOwner("deck-account")
+    const { host } = await guest()
+    const seated = { ...createLanGame("game", "host", "Host", setup, 1), round: 2 }
+    const game = {
+      ...seated,
+      status: "active" as const,
+      seats: [
+        { ...seated.seats[0], deck: { versionId: "version-host", name: "Host deck" } },
+        {
+          key: "guest",
+          seat: 2,
+          name: "Guest",
+          connected: true,
+          deck: { versionId: "version-guest", name: "Mine" },
+        },
+      ],
+    }
+
+    host()?.onMessage({
+      type: "state",
+      lobby: lanLobbyOf(game),
+      projection: lanProjection(game, "guest"),
+    })
+
+    expect(pendingSeatClaims("deck-account")).toEqual([
+      expect.objectContaining({ publicId: "game-2", deckVersionId: "version-guest" }),
+    ])
     setNearbyOwner(undefined)
   })
 

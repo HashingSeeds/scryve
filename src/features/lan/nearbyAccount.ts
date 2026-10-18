@@ -9,6 +9,7 @@ export interface SeatClaim {
   publicId: string
   token: string
   savedAt: number
+  deckVersionId?: string
 }
 
 let owner: string | undefined
@@ -23,12 +24,13 @@ export const nearbyOwner = () => owner
 
 const isClaim = (value: unknown): value is SeatClaim => {
   if (typeof value !== "object" || value === null) return false
-  const { ownerId, publicId, token, savedAt } = value as Record<string, unknown>
+  const { ownerId, publicId, token, savedAt, deckVersionId } = value as Record<string, unknown>
   return (
     typeof ownerId === "string" &&
     typeof publicId === "string" &&
     typeof token === "string" &&
-    typeof savedAt === "number"
+    typeof savedAt === "number" &&
+    (deckVersionId === undefined || typeof deckVersionId === "string")
   )
 }
 

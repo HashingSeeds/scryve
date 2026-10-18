@@ -1,20 +1,30 @@
 import { useEffect, useRef } from "react"
 
+import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
 import { lanSession, useLanSession } from "./lanSession"
+import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
+
+const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
 
 export function NearbyLobbyScreen({
   error: routeError,
+  myDecks,
+  signedIn = false,
   onBack,
   onPlay,
   onLeft,
+  onManageDecks,
 }: {
   error?: string
+  myDecks?: MyDecks
+  signedIn?: boolean
   onBack: () => void
   onPlay: () => void
   onLeft: () => void
+  onManageDecks?: () => void
 }) {
   const { lobby, projection, role, status, error, serviceName } = useLanSession()
 
@@ -86,6 +96,19 @@ export function NearbyLobbyScreen({
       onChangePlayerCount={
         isHost && lobby.status === "lobby"
           ? (playerCount) => lanSession.updateSettings({ playerCount })
+          : undefined
+      }
+      decks={
+        lobby.setup.system && lobby.status !== "active"
+          ? {
+              source: (render) => render(nearbyDeckState(myDecks, signedIn, lobby.setup)),
+              selectingSeats: NO_SEATS_SELECTING,
+              onSelect: (_seat, versionId) => {
+                const deck = versionId ? nearbySeatDeck(myDecks, versionId, lobby.setup) : null
+                if (deck !== undefined) void lanSession.selectDeck(deck).catch(() => undefined)
+              },
+              ...(signedIn && onManageDecks ? { onManage: onManageDecks } : {}),
+            }
           : undefined
       }
     />

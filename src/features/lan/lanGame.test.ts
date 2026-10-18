@@ -13,6 +13,7 @@ import {
   releaseLanSeat,
   revealLanRole,
   setLanConnected,
+  setLanDeck,
   setLanPlayerCount,
   startLanRound,
   type LanGame,
@@ -218,6 +219,56 @@ describe("nearby Treachery", () => {
       winnerPlayerIds: ["a", "b"],
     })
     expect(lanProjection(next, "a").treacheryOutcome).toBeUndefined()
+  })
+})
+
+describe("nearby decks", () => {
+  const atraxa = { versionId: "version-atraxa", name: "Atraxa" }
+
+  it("keeps a seat's deck through the lobby, lets it be cleared, and freezes it mid-round", () => {
+    const hostReady = setLanDeck(seatGuest(lobby(), "guest"), "host", atraxa)
+
+    expect(lanSeatsReady(hostReady)).toBe(true)
+    expect(setLanDeck(hostReady, "host", null).seats[0]).not.toHaveProperty("deck")
+    expect(setLanDeck(startLanRound(hostReady, NOW), "guest", atraxa).seats[1]).not.toHaveProperty(
+      "deck",
+    )
+    expect(lanProjection(hostReady, "guest").players[0]).toMatchObject({
+      deckVersionId: atraxa.versionId,
+    })
+  })
+
+  it("starts a Flesh and Blood seat on its hero's health, and only there", () => {
+    const fab = { ...commander, system: "fab", format: "cc", ruleset: "cc" } as const
+    const hero = { versionId: "version-dorinthea", name: "Dorinthea", startingValue: 20 }
+    const hostLife = (setup: LanSetup) =>
+      lanProjection(startLanRound(setLanDeck(lobby(setup), "host", hero), NOW), "host").players[0]
+        .currentLife
+
+    expect(hostLife(fab)).toBe(20)
+    expect(hostLife(commander)).toBe(40)
+  })
+
+  it("carries seat decks over the wire, and drops a malformed deck", () => {
+    const game = setLanDeck(lobby(), "host", atraxa)
+    const state = parseHostMessage(
+      JSON.stringify({
+        type: "state",
+        lobby: lanLobbyOf(game),
+        projection: lanProjection(game, "guest"),
+      }),
+    )
+
+    expect(state).toMatchObject({ lobby: { seats: [{ deck: atraxa }] } })
+    expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: atraxa }))).toEqual({
+      type: "deck",
+      deck: atraxa,
+    })
+    expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: null }))).toEqual({
+      type: "deck",
+      deck: null,
+    })
+    expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: { name: "No id" } }))).toBeNull()
   })
 })
 

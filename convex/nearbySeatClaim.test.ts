@@ -9,6 +9,8 @@ const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
+  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
+  "./decks.ts": async () => jest.requireActual("./decks"),
   "./entitlements.ts": async () => jest.requireActual("./entitlements"),
   "./games.ts": async () => jest.requireActual("./games"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
@@ -69,6 +71,12 @@ async function nearbyGame(players?: Players, publicId = PUBLIC_ID): Promise<Publ
   }
 }
 
+async function ownedDeck(actor: Awaited<ReturnType<typeof synced>>, format = "commander") {
+  const deckId = await actor.mutation(api.decks.create, { name: "Atraxa", format })
+  const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
+  return { deckId, versionId }
+}
+
 const historyOf = (actor: Awaited<ReturnType<typeof synced>>) =>
   actor.query(api.games.connectedHistory, { paginationOpts: { numItems: 10, cursor: null } })
 
@@ -112,6 +120,65 @@ describe("claimNearbySeat", () => {
     const opened = await guest.query(api.games.connectedSummary, { publicId })
     expect(opened?.publicId).toBe(publicId)
     await expect(host.query(api.games.connectedSummary, { publicId })).resolves.toBeTruthy()
+  })
+
+  it("counts the guest's own deck toward its stats once", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host")
+    const guest = await synced(t, "guest")
+    const { deckId, versionId } = await ownedDeck(guest)
+    await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+    const claim = { publicId: PUBLIC_ID, token: GUEST_TOKEN, deckVersionId: versionId }
+
+    await guest.mutation(api.games.claimNearbySeat, claim)
+    await guest.mutation(api.games.claimNearbySeat, claim)
+
+    const rows = await t.run(async (ctx) => ({
+      results: await ctx.db.query("deckGameResults").collect(),
+      stats: await ctx.db
+        .query("deckStats")
+        .withIndex("by_deck", (q) => q.eq("deckId", deckId))
+        .unique(),
+      summary: await ctx.db.query("gameSummaries").unique(),
+    }))
+    expect(rows.results).toEqual([
+      expect.objectContaining({ deckVersionId: versionId, outcome: "loss" }),
+    ])
+    expect(rows.stats).toMatchObject({ games: 1, losses: 1 })
+    expect(rows.summary?.players.find((player) => player.seat === 2)).toMatchObject({
+      deckId,
+      deckVersionId: versionId,
+      deckNameAtFinish: "Atraxa",
+    })
+  })
+
+  it("still files the seat when the deck isn't the guest's own or doesn't fit the game", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host")
+    const guest = await synced(t, "guest")
+    const other = await synced(t, "other")
+    const { versionId: hostDeck } = await ownedDeck(host)
+    const { versionId: modernDeck } = await ownedDeck(other, "modern")
+    await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+
+    await expect(
+      guest.mutation(api.games.claimNearbySeat, {
+        publicId: PUBLIC_ID,
+        token: GUEST_TOKEN,
+        deckVersionId: hostDeck,
+      }),
+    ).resolves.toEqual({ status: "claimed" })
+    await expect(
+      other.mutation(api.games.claimNearbySeat, {
+        publicId: PUBLIC_ID,
+        token: OTHER_TOKEN,
+        deckVersionId: modernDeck,
+      }),
+    ).resolves.toEqual({ status: "claimed" })
+
+    const results = await t.run((ctx) => ctx.db.query("deckGameResults").collect())
+    expect(results).toEqual([])
+    expect((await historyOf(guest)).page).toHaveLength(1)
   })
 
   it("finds no seat for a wrong pass, and refuses a held seat or a second seat for one account", async () => {

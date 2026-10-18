@@ -119,7 +119,7 @@ export default function NewLocalGameRoute() {
   return (
     <>
       <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
-      {ownerId ? <LocalDeckChoicesSource onChange={setDecks} /> : null}
+      {ownerId ? <LocalDeckChoicesSource ownerId={ownerId} onChange={setDecks} /> : null}
       {connectableGame ? (
         <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
           {(feed) => <ReportLocalConnect feed={feed} onChange={setLocalConnect} />}
