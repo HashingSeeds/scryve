@@ -482,7 +482,6 @@ function NewGameForm({
             ? translate("play:newGame.resumeCurrentGame")
             : translate("play:newGame.gamesInProgress")
           : ""
-  const showStatusRow = connectedMode || Boolean(statusText)
 
   function submit() {
     if (!valid || busy) return
@@ -864,7 +863,7 @@ function NewGameForm({
             {
               // why: on iOS the status row's tap target can overlap the home indicator inset; Android's inset can be a tappable nav bar.
               paddingBottom:
-                showStatusRow && Platform.OS === "ios"
+                statusText && Platform.OS === "ios"
                   ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
                   : Math.max(bottom, spacing.sm),
             },
@@ -971,13 +970,12 @@ function NewGameForm({
                 />
               ) : null}
             </View>
-            {/* why: connected status arrives late, so its row stays reserved; an empty local row is dead space above the home indicator. */}
-            {showStatusRow ? (
+            {/* why: an empty row is dead space above the home indicator, so a late status grows the footer once instead. */}
+            {statusText ? (
               <TouchableOpacity
                 testID="setup-status"
-                accessible={Boolean(statusText)}
                 accessibilityRole={hasStatusDetails ? "button" : "text"}
-                accessibilityLabel={statusText || translate("play:newGame.gameStatus")}
+                accessibilityLabel={statusText}
                 accessibilityHint={
                   directResume
                     ? translate("play:newGame.resumeHint")

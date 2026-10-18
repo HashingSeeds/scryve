@@ -99,7 +99,6 @@ const play = {
     endMatchHint: "Records the match result from its last finished game",
     connect: "Connect",
     connectHint: "Moves this game to the cloud so others can join it",
-    gameStatus: "Game status",
     resumeHint: "Returns to your current game",
     statusDetailsHint: "Opens game and connection details",
     retryConnection: "Retry connection",

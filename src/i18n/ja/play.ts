@@ -100,7 +100,6 @@ export default {
     endMatchHint: "最後に終了したゲームからマッチ結果を記録します",
     connect: "接続",
     connectHint: "このゲームをクラウドに移し、他の人が参加できるようにします",
-    gameStatus: "ゲームの状態",
     resumeHint: "現在のゲームに戻ります",
     statusDetailsHint: "ゲームと接続の詳細を開きます",
     retryConnection: "接続を再試行",
