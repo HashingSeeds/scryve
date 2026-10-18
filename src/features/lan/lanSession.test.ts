@@ -209,6 +209,7 @@ describe("nearby host", () => {
 
     expect(old.sent).toEqual([{ type: "rejected", reason: "Update Scryve to join this game." }])
     session.start()
+    jest.advanceTimersByTime(50)
     expect(session.getState().lobby?.status).toBe("lobby")
     alice.send({ type: "deck", deck: { versionId: "version-alice", name: "Alice deck" } })
     jest.advanceTimersByTime(50)

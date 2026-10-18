@@ -5,8 +5,9 @@ import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
-import { lanCanRequireDecks, type LanSeatDeck } from "./lanGame"
+import { lanCanRequireDecks, type LanSeatDeck, type LanSetup } from "./lanGame"
 import { lanSession, useLanSession } from "./lanSession"
+import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 import { identitySection } from "../../../convex/lib/systems"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
@@ -25,11 +26,16 @@ function deckStateOf(decks: MyDecks, signedIn: boolean, lifeFromDeck: boolean): 
   return { status: "ready", value: lifeFromDeck ? latestVersionsOnly(decks) : [...listed(decks)] }
 }
 
-function seatDeckOf(decks: MyDecks, versionId: string): LanSeatDeck | undefined {
+function seatDeckOf(
+  decks: MyDecks,
+  versionId: string,
+  { system, format }: Pick<LanSetup, "system" | "format">,
+): LanSeatDeck | undefined {
   const deck = listed(decks).find((candidate) =>
     candidate.versions.some(({ _id }) => _id === versionId),
   )
-  if (!deck) return undefined
+  if (!deck || (deck.game ?? DEFAULT_DECK_GAME) !== system || deck.format !== format)
+    return undefined
   return {
     versionId,
     name: deck.name,
@@ -152,7 +158,7 @@ export function NearbyLobbyScreen({
                 ),
               selectingSeats: NO_SEATS_SELECTING,
               onSelect: (_seat, versionId) => {
-                const deck = versionId ? seatDeckOf(myDecks, versionId) : null
+                const deck = versionId ? seatDeckOf(myDecks, versionId, lobby.setup) : null
                 if (deck !== undefined) void lanSession.selectDeck(deck).catch(() => undefined)
               },
               ...(signedIn && onManageDecks ? { onManage: onManageDecks } : {}),
