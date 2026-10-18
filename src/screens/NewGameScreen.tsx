@@ -854,10 +854,11 @@ function NewGameForm({
           style={[
             themed($footer),
             {
-              // why: the status row's tap target can overlap the home indicator inset; its text stays above it.
-              paddingBottom: showStatusRow
-                ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
-                : Math.max(bottom, spacing.sm),
+              // why: on iOS the status row's tap target can overlap the home indicator inset; Android's inset can be a tappable nav bar.
+              paddingBottom:
+                showStatusRow && Platform.OS === "ios"
+                  ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
+                  : Math.max(bottom, spacing.sm),
             },
           ]}
         >
