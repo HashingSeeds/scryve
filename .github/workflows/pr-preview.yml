@@ -173,13 +173,14 @@ jobs:
           EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.PREVIEW_EXPO_PUBLIC_CONVEX_SITE_URL }}
           EXPO_PUBLIC_POSTHOG_HOST: ${{ vars.PREVIEW_EXPO_PUBLIC_POSTHOG_HOST }}
           EXPO_PUBLIC_POSTHOG_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_POSTHOG_KEY }}
-          EXPO_PUBLIC_REVENUECAT_API_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_REVENUECAT_API_KEY }}
+          EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_REVENUECAT_IOS_API_KEY }}
+          EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY }}
           TMPDIR: ${{ runner.temp }}
         shell: bash
         run: |
           set -euo pipefail
           for name in CLERK_PUBLISHABLE_KEY CONVEX_URL CONVEX_SITE_URL POSTHOG_HOST POSTHOG_KEY \
-            REVENUECAT_API_KEY; do
+            REVENUECAT_IOS_API_KEY REVENUECAT_ANDROID_API_KEY; do
             var="EXPO_PUBLIC_$name"
             [ -n "${!var}" ] || { echo "::error::set the PREVIEW_$var repository variable"; exit 1; }
           done
