@@ -339,6 +339,7 @@ function NewGameForm({
   const connectedMode = mode === "connected"
   const nearbyMode = connectedMode && Boolean(onNearby) && hostOn === "nearby"
   const cloudMode = connectedMode && !nearbyMode
+  const decksChoosable = cloudMode || (nearbyMode && Boolean(account))
   const layout = playerGridLayoutForCount(
     playerCount,
     chosenLayout,
@@ -394,7 +395,7 @@ function NewGameForm({
       ? translate("play:newGame.seatsCount", { count: playerCount })
       : translate("play:summary.playerCount", { count: playerCount }),
     counterValueLabel(system, startingLife),
-    ...(connectedMode
+    ...(decksChoosable
       ? [translate(deckRequired ? "play:newGame.decksRequired" : "play:newGame.decksOptional")]
       : []),
     ...(!connectedMode && !localGame && matchBestOf
@@ -503,7 +504,7 @@ function NewGameForm({
         startingLife,
         ruleset: format ?? NO_PLAY_SYSTEM,
         ...setup,
-        ...(deckRequired && system ? { deckRequired } : {}),
+        ...(decksChoosable && deckRequired && system ? { deckRequired } : {}),
       })
     else if (connectedMode)
       connected?.host({
@@ -1040,7 +1041,7 @@ function NewGameForm({
             </View>
           </View>
 
-          {connectedMode ? (
+          {decksChoosable ? (
             <View style={themed($section)}>
               <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
               <SegmentedControl

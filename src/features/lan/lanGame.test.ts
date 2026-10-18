@@ -39,9 +39,9 @@ const unused = { key: "unused", token: "unused" }
 
 const lobby = (setup: LanSetup = commander) => createLanGame("game", "host", "Host", setup, NOW)
 
-function seatGuest(game: LanGame, key: string) {
+function seatGuest(game: LanGame, key: string, features: readonly "decks"[] = ["decks"]) {
   const pass = { key, token: `token-${key}` }
-  const admitted = admitLanGuest(game, tokens, join(key), pass)
+  const admitted = admitLanGuest(game, tokens, { ...join(key), features }, pass)
   if ("rejected" in admitted) throw new Error(admitted.rejected)
   tokens.set(key, pass.token)
   return admitted.game
@@ -234,6 +234,8 @@ describe("nearby decks", () => {
       rejected: "Update Scryve to join this game.",
     })
     expect(admitLanGuest(required, tokens, decksJoin("new"), unused)).toHaveProperty("game")
+    const oldGuestSeated = seatGuest(lobby(), "old", [])
+    expect(setLanDeckRequired(oldGuestSeated, true)).toBe(oldGuestSeated)
     expect(
       setLanDeckRequired(lobby({ ...commander, system: undefined }), true).setup,
     ).not.toHaveProperty("deckRequired")

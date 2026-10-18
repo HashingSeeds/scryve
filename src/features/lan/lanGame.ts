@@ -81,6 +81,7 @@ export interface LanSeat {
   name: string
   connected: boolean
   deck?: LanSeatDeck
+  cantPickDecks?: true
 }
 
 export type LanStatus = "lobby" | "active" | "finished" | "abandoned"
@@ -233,6 +234,7 @@ export function admitLanGuest(
     seat: game.seats.length + 1,
     name: join.name,
     connected: true,
+    ...(join.features?.includes("decks") ? {} : { cantPickDecks: true }),
   }
   return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
 }
@@ -249,9 +251,13 @@ export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
   return { ...game, setup: { ...game.setup, playerCount } }
 }
 
+export const lanCanRequireDecks = (game: Pick<LanLobby, "seats">) =>
+  game.seats.every((seat) => !seat.cantPickDecks)
+
 export function setLanDeckRequired(game: LanGame, deckRequired: boolean): LanGame {
   const { deckRequired: _was, ...setup } = game.setup
-  if (game.status !== "lobby" || !setup.system) return game
+  if (game.status !== "lobby" || !setup.system || (deckRequired && !lanCanRequireDecks(game)))
+    return game
   return { ...game, setup: deckRequired ? { ...setup, deckRequired } : setup }
 }
 

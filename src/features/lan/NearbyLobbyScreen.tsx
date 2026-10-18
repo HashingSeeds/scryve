@@ -5,17 +5,25 @@ import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
-import type { LanSeatDeck } from "./lanGame"
+import { lanCanRequireDecks, type LanSeatDeck } from "./lanGame"
 import { lanSession, useLanSession } from "./lanSession"
+import { identitySection } from "../../../convex/lib/systems"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
 
 const listed = (decks: MyDecks) => (decks === undefined || decks === "unavailable" ? [] : decks)
 
-const deckStateOf = (decks: MyDecks, signedIn: boolean): LobbyDeckState =>
-  decks === undefined && signedIn
-    ? { status: "loading" }
-    : { status: "ready", value: [...listed(decks)] }
+/** why: offline, only a deck's latest version has a known starting value, so an older one would start at the wrong life. */
+const latestVersionsOnly = (decks: MyDecks) =>
+  listed(decks).map((deck) => ({
+    ...deck,
+    versions: deck.versions.filter(({ _id }) => _id === deck.latestVersionId),
+  }))
+
+function deckStateOf(decks: MyDecks, signedIn: boolean, lifeFromDeck: boolean): LobbyDeckState {
+  if (decks === undefined && signedIn) return { status: "loading" }
+  return { status: "ready", value: lifeFromDeck ? latestVersionsOnly(decks) : [...listed(decks)] }
+}
 
 function seatDeckOf(decks: MyDecks, versionId: string): LanSeatDeck | undefined {
   const deck = listed(decks).find((candidate) =>
@@ -121,14 +129,27 @@ export function NearbyLobbyScreen({
           : undefined
       }
       onChangeDeckRequired={
-        isHost && lobby.status === "lobby" && lobby.setup.system
+        isHost &&
+        signedIn &&
+        lobby.status === "lobby" &&
+        lobby.setup.system &&
+        (lobby.setup.deckRequired || lanCanRequireDecks(lobby))
           ? (deckRequired) => lanSession.updateSettings({ deckRequired })
           : undefined
       }
       decks={
         lobby.setup.system && lobby.status !== "active"
           ? {
-              source: (render) => render(deckStateOf(myDecks, signedIn)),
+              source: (render) =>
+                render(
+                  deckStateOf(
+                    myDecks,
+                    signedIn,
+                    Boolean(
+                      identitySection(lobby.setup.system, lobby.setup.format)?.startingValueFacet,
+                    ),
+                  ),
+                ),
               selectingSeats: NO_SEATS_SELECTING,
               onSelect: (_seat, versionId) => {
                 const deck = versionId ? seatDeckOf(myDecks, versionId) : null
