@@ -1,4 +1,4 @@
-import { Linking, Pressable, StyleSheet } from "react-native"
+import { AppState, Linking, Pressable, StyleSheet } from "react-native"
 import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
@@ -162,6 +162,37 @@ describe("shipping index route", () => {
       }
     },
   )
+
+  it("asks about the game in play, not the one loaded at launch, when reopened a day later", () => {
+    const game = createLocalGame({
+      players: [
+        { name: "Player 1", color: PLAYER_COLORS[0] },
+        { name: "Player 2", color: PLAYER_COLORS[1] },
+      ],
+      startingLife: 20,
+    })
+    game.players[0].life = 19
+    localGameRepository.saveActiveGame(game)
+    const appState = jest.spyOn(AppState, "addEventListener")
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByLabelText("Seat 1, Player 1, subtract 1 life"))
+
+    jest.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60 * 60 * 1000)
+    act(() => appState.mock.calls.forEach(([, listener]) => listener("active")))
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByRole("button", { name: "Continue" }))
+
+    expect(view.getByText("18")).toBeTruthy()
+    jest.restoreAllMocks()
+  })
 
   it("keeps a game saved by a newer version until the player replaces it", () => {
     storage.set(

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Linking, Platform, View, type ViewStyle } from "react-native"
+import { AppState, Linking, Platform, View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
@@ -96,6 +96,13 @@ export default function Index() {
     setFreshGame(createFreshGame(prepared, nextSettings))
   }, [prepared])
   useFocusEffect(reload)
+  // why: the board saves without telling this route, so a reopened app rereads the saved game; otherwise the old-game prompt judges, continues, or ends the game this route loaded at launch.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") reload()
+    })
+    return () => subscription.remove()
+  }, [reload])
   const consentSettled = useLegalConsentSettled()
   // why: the first-launch consent screen answers "What do you play?" while this route sits hidden behind it.
   useEffect(() => {
