@@ -15,11 +15,13 @@ export function NearbyPlayersDialog({
   awayPlayerIds,
   origin,
   onClose,
+  onRole,
 }: {
   players: readonly ReportablePlayer[]
   awayPlayerIds: readonly string[]
   origin?: DialogOrigin
   onClose: () => void
+  onRole?: () => void
 }) {
   const { themed } = useAppTheme()
   return (
@@ -33,6 +35,13 @@ export function NearbyPlayersDialog({
       style={themed($dialog)}
     >
       <Text preset="subheading" tx="connected:playerActions.title" />
+      {onRole ? (
+        <Button
+          testID="role-from-players-button"
+          tx="connected:playerActions.yourRole"
+          onPress={onRole}
+        />
+      ) : null}
       {players.map((player) => (
         <View key={player.playerId} style={themed($row)}>
           <PlayerMark

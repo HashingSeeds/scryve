@@ -28,6 +28,7 @@ import {
   parseGuestMessage,
   parseHostMessage,
   releaseLanSeat,
+  revealLanRole,
   setLanPlayerCount,
   startLanRound,
   type LanGame,
@@ -329,6 +330,7 @@ export class LanSession {
           return this.publish(admitted.game)
         }
         if (!seatKey) return
+        if (message.type === "reveal") return this.publish(revealLanRole(game, seatKey, Date.now()))
         const { operationId } = message.event
         const now = Date.now()
         if (now - windowStart >= 1_000) {
@@ -470,6 +472,7 @@ export class LanSession {
       protocol: LAN_PROTOCOL,
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
+      variants: ["treachery"],
       ...(this.pass ? { pass: this.pass } : {}),
     })
   }
@@ -544,6 +547,15 @@ export class LanSession {
     if (this.state.role !== "host" || !game) return
     const next = setLanPlayerCount(game, playerCount)
     if (next !== game) this.publish(next)
+  }
+
+  revealRole = async () => {
+    const { role, seatKey, status } = this.state
+    const game = this.game
+    if (role === "host" && game && seatKey)
+      return this.publish(revealLanRole(game, seatKey, Date.now()))
+    if (!this.connection || status !== "connected") throw new Error("Not connected to the host")
+    this.connection.send({ type: "reveal" })
   }
 
   start() {

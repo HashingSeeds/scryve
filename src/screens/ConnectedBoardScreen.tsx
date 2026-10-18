@@ -13,6 +13,7 @@ import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
+import { useMutation } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -57,9 +58,11 @@ import {
 } from "@/features/connected/PlayerActionsDialog"
 import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
+import { localGameRepository } from "@/features/game/localPersistence"
 import {
   defaultConnectedLayout,
   playerGridLayoutForCount,
@@ -91,6 +94,7 @@ import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
 import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
+import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
 import type { SystemId } from "../../convex/lib/systems"
 
@@ -264,6 +268,8 @@ type ConnectedBoardReadyProps = {
   ownerId: string
   cloud: boolean
   awayPlayerIds?: readonly string[]
+  onRevealRole?: () => Promise<unknown>
+  roleRevealOnline: boolean
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -339,11 +345,27 @@ interface ConnectedBoardRuntimeProps {
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
   awayPlayerIds?: readonly string[]
+  onRevealRole?: () => Promise<unknown>
+  roleRevealOnline?: boolean
 }
 
 function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
   const runtime = useConnectedGame(props.publicId, props.ownerId)
-  return <ConnectedBoardWithRuntime {...props} runtime={runtime} />
+  const reveal = useMutation(api.games.revealMyRole)
+  const online = useConvexOnline()
+  const { publicId } = props
+  const onRevealRole = useCallback(
+    () => reveal({ publicId, deviceId: localGameRepository.getDeviceId() }),
+    [publicId, reveal],
+  )
+  return (
+    <ConnectedBoardWithRuntime
+      {...props}
+      runtime={runtime}
+      onRevealRole={onRevealRole}
+      roleRevealOnline={online}
+    />
+  )
 }
 
 export function ConnectedBoardWithRuntime({
@@ -362,6 +384,8 @@ export function ConnectedBoardWithRuntime({
   ownerId,
   cloud = true,
   awayPlayerIds,
+  onRevealRole,
+  roleRevealOnline = false,
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
@@ -518,6 +542,8 @@ export function ConnectedBoardWithRuntime({
               ownerId={ownerId}
               cloud={cloud}
               awayPlayerIds={awayPlayerIds}
+              onRevealRole={onRevealRole}
+              roleRevealOnline={roleRevealOnline}
             />
           </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
@@ -544,6 +570,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   ownerId,
   cloud,
   awayPlayerIds = [],
+  onRevealRole,
+  roleRevealOnline,
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -786,7 +814,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }
 
   const canEnd = active && game.isHost && !view.finishing
-  const myRole = cloud
+  const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
   const openGameRules = useMemo(
@@ -1173,6 +1201,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           awayPlayerIds={awayPlayerIds}
           origin={menuDialogOrigin}
           onClose={() => setPlayerActionsOpen(false)}
+          onRole={
+            myRole
+              ? () => {
+                  setPlayerActionsOpen(false)
+                  setRoleOpen(true)
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -1201,13 +1237,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {roleOpen && myRole?.role ? (
+      {roleOpen && myRole?.role && onRevealRole ? (
         <TreacheryRoleDialog
-          publicId={publicId}
           role={myRole.role}
           revealed={myRole.roleRevealed === true}
           canReveal={active}
+          online={roleRevealOnline}
           origin={menuDialogOrigin}
+          onReveal={onRevealRole}
           onClose={() => setRoleOpen(false)}
         />
       ) : null}

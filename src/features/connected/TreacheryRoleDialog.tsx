@@ -1,42 +1,38 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import { useMutation } from "convex/react"
 
 import { Button } from "@/components/Button"
 import { DialogCard, type DialogOrigin } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
-import { useConvexOnline } from "@/features/connected/useConvexOnline"
-import { localGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
-import { api } from "../../../convex/_generated/api"
 import type { TreacheryRole } from "../../../convex/lib/treachery"
 
 export const treacheryRoleLabel = (role: TreacheryRole) =>
   translate(`connected:treachery.roles.${role}`)
 
 export function TreacheryRoleDialog({
-  publicId,
   role,
   revealed,
   canReveal,
+  online,
   origin,
+  onReveal,
   onClose,
 }: {
-  publicId: string
   role: TreacheryRole
   revealed: boolean
   canReveal: boolean
+  online: boolean
   origin?: DialogOrigin
+  onReveal: () => Promise<unknown>
   onClose: () => void
 }) {
   const { themed } = useAppTheme()
-  const reveal = useMutation(api.games.revealMyRole)
-  const online = useConvexOnline()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -49,7 +45,7 @@ export function TreacheryRoleDialog({
     try {
       setBusy(true)
       setError(undefined)
-      await reveal({ publicId, deviceId: localGameRepository.getDeviceId() })
+      await onReveal()
       setConfirming(false)
     } catch (cause) {
       setError(convexErrorMessage(cause, translate("connected:treachery.revealFailed")))

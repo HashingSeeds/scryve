@@ -19,6 +19,7 @@ import {
   mockReportPlayer,
   mockResolveCommanderDamageClaim,
   mockSubmitCommanderDamage,
+  mockSyncUser,
   mockUseConnectedGame,
   resetConnectedHarness,
   themed,
@@ -1208,6 +1209,33 @@ describe("ConnectedBoardScreen", () => {
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
     expect(view.queryByTestId("back-from-connected-board-button")).toBeNull()
     expect(view.getByTestId("life-seat-2-1")).toBeTruthy()
+  })
+
+  it("opens your hidden role from the players dialog and reveals it after a confirm", async () => {
+    const { projection } = connectedHarness.runtime
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...projection,
+        players: projection.players.map((player) =>
+          player.controlledByMe ? { ...player, role: "assassin", roleRevealed: false } : player,
+        ),
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedPlayers()
+    fireEvent.press(screen.getByTestId("role-from-players-button"))
+
+    expect(screen.getByTestId("treachery-role").props.children).toBe("Assassin")
+    fireEvent.press(screen.getByTestId("reveal-role-button"))
+    expect(mockSyncUser).not.toHaveBeenCalled()
+    fireEvent.press(screen.getByTestId("reveal-role-button"))
+    await waitFor(() =>
+      expect(mockSyncUser).toHaveBeenCalledWith({
+        publicId: "game-public",
+        deviceId: expect.any(String),
+      }),
+    )
   })
 
   it("hands out the invite from the players dialog only while one is on offer", () => {

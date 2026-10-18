@@ -808,6 +808,12 @@ describe("NewGameScreen", () => {
       format: "commander",
       layout: "auto",
     })
+    fireEvent.press(connected.getByTestId("game-type-more-mtg"))
+    fireEvent.press(connected.getByTestId("game-type-treachery"))
+    fireEvent.press(connected.getByTestId("host-connected-button"))
+    expect(onNearby).toHaveBeenLastCalledWith(
+      expect.objectContaining({ playerCount: 4, variant: "treachery" }),
+    )
     connected.unmount()
     expect(setup({ mode: "local", onNearby }).queryByTestId("host-on")).toBeNull()
     expect(setup({ mode: "connected", connected: readyHost }).queryByTestId("host-on")).toBeNull()

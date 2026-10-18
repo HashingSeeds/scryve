@@ -13,7 +13,7 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
-import { tableRules } from "../../../convex/lib/systems"
+import { systemDefinition, tableRules } from "../../../convex/lib/systems"
 import {
   matchesValidator,
   TABLE_VERSION,
@@ -21,6 +21,14 @@ import {
   tableForVersion,
   type PlayerTable,
 } from "../../../convex/lib/table"
+import {
+  dealTreacheryRoles,
+  isTreacheryPlayerCount,
+  treacheryOutcome,
+  type GameVariant,
+  type TreacheryRole,
+} from "../../../convex/lib/treachery"
+import { connectedPlayerIsOut } from "../connected/boardView"
 import {
   CONNECTED_RECENT_OPERATION_LIMIT,
   toConnectedProjection,
@@ -52,6 +60,7 @@ export interface LanSetup {
   system?: PlaySystemId
   format?: string
   layout?: PlayerGridLayoutVariant
+  variant?: GameVariant
 }
 
 export interface LanSeat {
@@ -71,8 +80,14 @@ export interface LanLobby {
   seats: LanSeat[]
 }
 
+export interface LanDealtRole {
+  role: TreacheryRole
+  roleRevealed: boolean
+}
+
 export interface LanGame extends LanLobby {
   hostKey: string
+  roles?: Readonly<Record<string, LanDealtRole>>
   memory?: MemoryGame
   recentOperationIds: string[]
   startedAt?: number
@@ -91,8 +106,10 @@ export type LanGuestMessage =
       name: string
       pass?: LanSeatPass
       systems?: readonly PlaySystemId[]
+      variants?: readonly GameVariant[]
     }
   | { type: "op"; event: ConnectedActionEvent }
+  | { type: "reveal" }
 
 export type LanHostMessage =
   | { type: "welcome"; pass: LanSeatPass }
@@ -107,8 +124,13 @@ export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-
 export const connectedSeatCount = (game: Pick<LanLobby, "seats">) =>
   game.seats.filter((seat) => seat.connected).length
 
+const fitsVariant = ({ variant, playerCount }: LanSetup, count = playerCount) =>
+  variant !== "treachery" || isTreacheryPlayerCount(count)
+
 export const lanSeatsReady = (game: Pick<LanLobby, "seats" | "setup">) =>
-  game.seats.length === game.setup.playerCount && connectedSeatCount(game) === game.seats.length
+  game.seats.length === game.setup.playerCount &&
+  connectedSeatCount(game) === game.seats.length &&
+  fitsVariant(game.setup)
 
 export function createLanGame(
   id: string,
@@ -169,7 +191,12 @@ export function admitLanGuest(
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
   const { system } = game.setup
   const systems = join.systems ?? SYSTEMS_BEFORE_GUEST_LIST
-  if (join.protocol !== LAN_PROTOCOL || (system && !systems.includes(system)))
+  const { variant } = game.setup
+  if (
+    join.protocol !== LAN_PROTOCOL ||
+    (system && !systems.includes(system)) ||
+    (variant && !join.variants?.includes(variant))
+  )
     return { rejected: LAN_REJECTIONS.update }
   const { pass } = join
   const owned = pass && game.seats.some((seat) => seat.key === pass.key)
@@ -196,7 +223,8 @@ export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
     game.status !== "lobby" ||
     !Number.isInteger(playerCount) ||
     playerCount < Math.max(LAN_MIN_PLAYERS, game.seats.length) ||
-    playerCount > LAN_MAX_SEATS
+    playerCount > LAN_MAX_SEATS ||
+    !fitsVariant(game.setup, playerCount)
   )
     return game
   return { ...game, setup: { ...game.setup, playerCount } }
@@ -217,10 +245,24 @@ export function releaseLanSeat(game: LanGame, key: string): LanGame {
 }
 
 // why: every round is a fresh game for the shared engine, with its own id, so a change queued for the last round can never land in this one.
-export function startLanRound(game: LanGame, now: number): LanGame {
+function dealLanRoles(game: LanGame, random: () => number) {
+  if (game.setup.variant !== "treachery") return undefined
+  const roles = dealTreacheryRoles(game.seats.length, random)
+  return Object.fromEntries(
+    game.seats.map((seat, index) => {
+      const role = roles[index]!
+      return [seat.key, { role, roleRevealed: role === "leader" }]
+    }),
+  )
+}
+
+export function startLanRound(game: LanGame, now: number, random = Math.random): LanGame {
   const { setup } = game
+  const { roles: _lastRound, ...rest } = game
+  const roles = dealLanRoles(game, random)
   return {
-    ...game,
+    ...rest,
+    ...(roles ? { roles } : {}),
     status: "active",
     round: game.round + 1,
     recentOperationIds: [],
@@ -241,6 +283,16 @@ export function startLanRound(game: LanGame, now: number): LanGame {
       claims: new Map(),
       pairs: new Map(),
     },
+  }
+}
+
+export function revealLanRole(game: LanGame, key: string, now: number): LanGame {
+  const dealt = game.roles?.[key]
+  if (game.status !== "active" || !dealt || dealt.roleRevealed) return game
+  return {
+    ...game,
+    roles: { ...game.roles, [key]: { ...dealt, roleRevealed: true } },
+    updatedAt: now,
   }
 }
 
@@ -353,7 +405,14 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       : undefined
   const eliminated = new Set(commander?.eliminatedPlayerIds)
   const seatsOf = memory ? [...memory.seats.values()] : []
-  return {
+  const roleFor = (key: string) => {
+    const dealt = game.roles?.[key]
+    if (!dealt) return {}
+    return dealt.roleRevealed || key === viewerKey || game.status !== "active"
+      ? dealt
+      : { roleRevealed: false }
+  }
+  const projection: ConnectedProjection = {
     schemaVersion: 1,
     publicId: lanRoundId(game),
     status: game.status,
@@ -364,6 +423,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
     lifeStep: setup.lifeStep,
     ruleset: setup.ruleset,
     ...(setup.layout ? { layout: setup.layout } : {}),
+    ...(setup.variant ? { variant: setup.variant } : {}),
     isHost: viewerKey === game.hostKey,
     eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
     serverUpdatedAt: game.updatedAt,
@@ -376,6 +436,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,
+      ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
     ...(memory && tableRulesApply(rules)
@@ -390,6 +451,24 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
         }
       : {}),
   }
+  const outcome =
+    game.roles && game.status === "active" && viewerKey === game.hostKey
+      ? treacheryOutcome(
+          projection.players.flatMap((player) => {
+            const dealt = game.roles?.[player.playerId]
+            return dealt
+              ? [
+                  {
+                    playerId: player.playerId,
+                    role: dealt.role,
+                    inGame: !connectedPlayerIsOut(projection, player),
+                  },
+                ]
+              : []
+          }),
+        )
+      : undefined
+  return outcome ? { ...projection, treacheryOutcome: outcome } : projection
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -414,7 +493,7 @@ const isPass = (value: unknown): value is LanSeatPass =>
 
 export function parseLanSetup(value: unknown): LanSetup | null {
   if (!isRecord(value)) return null
-  const { playerCount, startingLife, lifeStep, ruleset, system, format, layout } = value
+  const { playerCount, startingLife, lifeStep, ruleset, system, format, layout, variant } = value
   if (
     !Number.isInteger(playerCount) ||
     (playerCount as number) < LAN_MIN_PLAYERS ||
@@ -440,7 +519,14 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     !playSystemFormats(system).some(({ id }) => id === format)
   )
     return null
-  return { ...setup, system, format }
+  return {
+    ...setup,
+    system,
+    format,
+    ...(variant === "treachery" && systemDefinition(system)?.variants.includes(variant)
+      ? { variant }
+      : {}),
+  }
 }
 
 function parseEvent(value: unknown): ConnectedActionEvent | null {
@@ -504,7 +590,11 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       name,
       ...(value.pass ? { pass: { key: value.pass.key, token: value.pass.token } } : {}),
       ...(Array.isArray(value.systems) ? { systems: value.systems.filter(isPlaySystemId) } : {}),
+      ...(Array.isArray(value.variants)
+        ? { variants: value.variants.filter((variant) => variant === "treachery") }
+        : {}),
     }
+  if (value.type === "reveal") return { type: "reveal" }
   if (value.type === "op") {
     const event = parseEvent(value.event)
     return event ? { type: "op", event } : null

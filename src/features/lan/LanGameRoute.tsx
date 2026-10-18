@@ -12,7 +12,7 @@ export default function LanGameRoute() {
   // why: resuming before useLanGame reads the session puts the saved game on the first render instead of redirecting to the lobby.
   useState(() => lanPlayAvailable() && lanSession.resumeHostedGame())
   const runtime = useLanGame()
-  const { projection, lobby } = useLanSession()
+  const { projection, lobby, role, status } = useLanSession()
   const awayPlayerIds = useMemo(
     () => lobby?.seats.filter((seat) => !seat.connected).map((seat) => seat.key) ?? [],
     [lobby?.seats],
@@ -27,6 +27,8 @@ export default function LanGameRoute() {
       runtime={runtime}
       cloud={false}
       awayPlayerIds={awayPlayerIds}
+      onRevealRole={lanSession.revealRole}
+      roleRevealOnline={role === "host" || status === "connected"}
       onGameEnded={backToLobby}
       onGameAbandoned={backToLobby}
       onBack={backToLobby}
