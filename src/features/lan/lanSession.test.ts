@@ -1,3 +1,4 @@
+import { AppState } from "react-native"
 import { ConvexError } from "convex/values"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
@@ -110,6 +111,28 @@ describe("nearby host", () => {
       "life-operation-0001",
     ])
     expect(lifeOf(session, key)).toBe(37)
+  })
+
+  it("hosts its game again after the OS ends it in the background, and a guest reclaims its seat", async () => {
+    const { session, bob } = await startedGame()
+    const pass = bob.pass()
+    bob.send({
+      type: "op",
+      event: lifeEvent("life-operation-0003", pass.key, -5, roundOf(session)),
+    })
+    jest.advanceTimersByTime(50)
+    jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]("background")
+
+    const resumed = new LanSession()
+    resumed.resumeHostedGame()
+    await jest.advanceTimersByTimeAsync(50)
+    const back = socket()
+    back.send({ type: "join", protocol: LAN_PROTOCOL, name: "Bob", pass })
+
+    expect(resumed.getState()).toMatchObject({ role: "host", status: "connected" })
+    expect(roundOf(resumed)).toBe(roundOf(session))
+    expect(lifeOf(resumed, pass.key)).toBe(35)
+    expect(back.sent[0]).toEqual({ type: "welcome", pass })
   })
 
   it("refuses a write to another player's seat", async () => {

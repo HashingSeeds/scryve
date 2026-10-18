@@ -13,7 +13,7 @@ import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
-import { loadLanName } from "./lanAvailability"
+import { HOSTED_GAME_KEY, lanPlayAvailable, loadLanName, savedHostedGame } from "./lanAvailability"
 import {
   admitLanGuest,
   applyLanWrite,
@@ -44,6 +44,7 @@ import {
   type LanHost,
 } from "./lanTransport"
 import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
+import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -95,6 +96,38 @@ const writeFailure = ({ code, message }: { code?: string; message: string }) =>
 // why: the board reads the projection in an effect after render; settling the write a moment later keeps its pending change on screen until the new total is.
 const settleAfterRender = (settle: () => void) => setTimeout(settle, FLUSH_INTERVAL_MS)
 
+const savedMemory = ({ seats, events, claims, pairs, ...memory }: MemoryGame) => ({
+  ...memory,
+  seats: [...seats],
+  events: [...events],
+  claims: [...claims],
+  pairs: [...pairs],
+})
+
+const restoredMemory = ({
+  seats,
+  events,
+  claims,
+  pairs,
+  ...memory
+}: ReturnType<typeof savedMemory>): MemoryGame => ({
+  ...memory,
+  seats: new Map(seats),
+  events: new Map(events),
+  claims: new Map(claims),
+  pairs: new Map(pairs),
+})
+
+interface HostedGame {
+  protocol: number
+  savedAt: number
+  game: Omit<LanGame, "memory"> & { memory?: ReturnType<typeof savedMemory> }
+  seatKey: string
+  serviceName: string
+  tokens: [string, string][]
+  roundOwner?: string
+}
+
 type PendingWrite = {
   resolve: (ack: OutboxAcknowledgement) => void
   reject: (cause: Error) => void
@@ -130,8 +163,10 @@ export class LanSession {
   constructor() {
     // why: iOS tears down the host's listening socket while the app is in the background.
     AppState.addEventListener("change", (appState) => {
-      if (appState === "active" && this.state.role === "host" && this.serverClosed)
-        void this.listen({ recovering: true })
+      if (appState === "background") return this.saveHostedGame()
+      if (appState !== "active" || this.state.role !== "host") return
+      remove(HOSTED_GAME_KEY)
+      if (this.serverClosed) void this.listen({ recovering: true })
     })
   }
 
@@ -216,6 +251,53 @@ export class LanSession {
     setTimeout(() => {
       if (session === this.session && this.serverClosed) void this.listen({ recovering: true })
     }, RECONNECT_DELAY_MS)
+  }
+
+  private saveHostedGame() {
+    const { game, roundOwner } = this
+    const { role, seatKey, serviceName } = this.state
+    if (role !== "host" || game?.status !== "active" || !seatKey || !serviceName)
+      return remove(HOSTED_GAME_KEY)
+    const { memory, ...rest } = game
+    const hosted: HostedGame = {
+      protocol: LAN_PROTOCOL,
+      savedAt: Date.now(),
+      game: { ...rest, ...(memory ? { memory: savedMemory(memory) } : {}) },
+      seatKey,
+      serviceName,
+      tokens: [...this.tokens],
+      ...(roundOwner ? { roundOwner } : {}),
+    }
+    save(HOSTED_GAME_KEY, hosted)
+  }
+
+  resumeHostedGame() {
+    const saved = savedHostedGame()
+    remove(HOSTED_GAME_KEY)
+    if (this.state.role || !saved || !("protocol" in saved) || saved.protocol !== LAN_PROTOCOL)
+      return
+    const { game: stored, seatKey, serviceName, tokens, roundOwner } = saved as HostedGame
+    const { memory, ...rest } = stored
+    const game: LanGame = {
+      ...rest,
+      ...(memory ? { memory: restoredMemory(memory) } : {}),
+      seats: rest.seats.map((seat) => ({ ...seat, connected: seat.key === rest.hostKey })),
+    }
+    this.session += 1
+    this.game = game
+    this.roundOwner = roundOwner
+    this.tokens = new Map(tokens)
+    this.passHashes.clear()
+    for (const [key, token] of tokens) this.hashPass({ key, token })
+    this.replace({
+      role: "host",
+      status: "connecting",
+      seatKey,
+      serviceName,
+      lobby: lanLobbyOf(game),
+      projection: lanProjection(game, seatKey),
+    })
+    void this.listen({ recovering: true })
   }
 
   private acceptPeer(peer: LanConnection<LanHostMessage>) {
@@ -516,10 +598,12 @@ export class LanSession {
     this.rejectPendingWrites("Left the game")
     this.connection?.close()
     this.connection = undefined
+    remove(HOSTED_GAME_KEY)
     this.replace(keepGame && lobby && projection ? { ...IDLE, lobby, projection } : IDLE)
   }
 }
 
 export const lanSession = new LanSession()
+if (lanPlayAvailable()) lanSession.resumeHostedGame()
 
 export const useLanSession = () => useSyncExternalStore(lanSession.subscribe, lanSession.getState)
