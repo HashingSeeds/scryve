@@ -23,14 +23,23 @@ describe("newGameTypes", () => {
     expect(moreIds(more)).not.toContain("ygo-speed")
   })
 
-  it("leaves the recent format to its own row and favors its system", () => {
+  it("leaves the recent format to its own row, which takes a slot, and favors its system", () => {
     const { suggested, more } = newGameTypes({
       recent: { system: "ygo", format: "speed" },
       connected: false,
     })
 
-    expect(ids(suggested)).toEqual(["ygo-advanced", "commander", "mtg-standard", "none"])
+    expect(ids(suggested)).toEqual(["ygo-advanced", "commander", "none"])
     expect(moreIds(more)).toContain("ygo-speed")
+    expect(moreIds(more)).toContain("mtg-standard")
+  })
+
+  it("saves a slot for a recent row the form did not open from", () => {
+    expect(ids(newGameTypes({ recentRow: true, connected: false }).suggested)).toEqual([
+      "commander",
+      "mtg-standard",
+      "none",
+    ])
   })
 
   it("groups the rest by game, each game's headline format first", () => {
@@ -56,6 +65,6 @@ describe("newGameTypes", () => {
           connected: true,
         }).suggested,
       ),
-    ).toEqual(["commander", "mtg-standard", "ygo-advanced", "none"])
+    ).toEqual(["commander", "mtg-standard", "none"])
   })
 })
