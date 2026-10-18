@@ -688,13 +688,6 @@ describe("premium deck tracking", () => {
       outcome: "win",
     })
     expect(summary?.players.find((player) => player.seat === 2)?.outcome).toBe("loss")
-    await expect(host.query(api.decks.stats, { deckId })).resolves.toEqual({ locked: true })
-    await t.mutation(internal.entitlements.setUserFeature, {
-      clerkUserId: "host",
-      feature: "deck_analytics",
-      enabled: true,
-      source: "test",
-    })
     await expect(host.query(api.decks.stats, { deckId })).resolves.toMatchObject({
       locked: false,
       games: 1,
@@ -727,15 +720,6 @@ describe("premium deck tracking", () => {
       finishedAt,
       me: { seat: 1, deckVersionId, outcome: "loss" },
       opponents: [{ seat: 2, displayName: "Cat", outcome: "win" }],
-    })
-    const locked = await owner.query(api.decks.detail, { deckId })
-    expect(locked.analyticsLocked).toBe(true)
-    expect(locked.record).toBeUndefined()
-    await t.mutation(internal.entitlements.setUserFeature, {
-      clerkUserId: "manual-owner",
-      feature: "deck_analytics",
-      enabled: true,
-      source: "test",
     })
     const manual = {
       matches: { total: 2, wins: 1, losses: 1, draws: 0, unknown: 0 },
@@ -896,12 +880,6 @@ describe("premium deck tracking", () => {
 
       const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
       expect(summary?.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
-      await t.mutation(internal.entitlements.setUserFeature, {
-        clerkUserId: "stale-host",
-        feature: "deck_analytics",
-        enabled: true,
-        source: "test",
-      })
       await expect(host.query(api.decks.stats, { deckId })).resolves.toMatchObject({
         locked: false,
         games: 0,
