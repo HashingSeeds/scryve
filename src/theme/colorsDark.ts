@@ -82,6 +82,7 @@ export const colors = {
       "status": "#7DB7E8",
       "home": palette.secondary100,
       "setup": "#D6A85F",
+      "decks": "#A9B4C2",
       "history": "#D98CB9",
       "rules": "#C3CF7E",
       "connect": "#70C7BC",

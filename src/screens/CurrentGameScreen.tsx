@@ -303,6 +303,13 @@ export function CurrentGameScreen({
     setLayoutPickerOpen(false)
   }
 
+  const openGameRules =
+    rules && (rules.kind === "link" || onRules)
+      ? () => {
+          closeMenu()
+          openRules(rules, () => system && onRules?.(system))
+        }
+      : undefined
   const radialActions: GameMenuActions = useMemo(
     () => [
       {
@@ -324,25 +331,15 @@ export function CurrentGameScreen({
           onSetup?.()
         },
       },
-      rules
-        ? {
-            kind: "rules",
-            label: translate("board:menu.rules"),
-            disabled: rules.kind === "text" && !onRules,
-            onPress: () => {
-              closeMenu()
-              openRules(rules, () => system && onRules?.(system))
-            },
-          }
-        : {
-            kind: "history",
-            label: translate("board:menu.history"),
-            disabled: !onHistory,
-            onPress: () => {
-              closeMenu()
-              onHistory?.()
-            },
-          },
+      {
+        kind: "decks",
+        label: translate("common:appNavigation.decks"),
+        disabled: !onDecks,
+        onPress: () => {
+          closeMenu()
+          onDecks?.()
+        },
+      },
       isFresh
         ? {
             kind: "connect",
@@ -368,11 +365,8 @@ export function CurrentGameScreen({
       diceTools,
       isFresh,
       onConnect,
-      onHistory,
-      onRules,
+      onDecks,
       onSetup,
-      rules,
-      system,
       showEndConfirmation,
     ],
   )
@@ -464,11 +458,10 @@ export function CurrentGameScreen({
             onClose: closeMenu,
           }}
           windowOverlay={
-            menuOpen && onDecks && onHistory && onSettings && onAccount ? (
+            menuOpen && onHistory && onSettings && onAccount ? (
               <FloatingAppNavigation
-                destination="decks"
                 accountEntry={accountEntry}
-                onDestination={onDecks}
+                onRules={openGameRules}
                 onHistory={onHistory}
                 onSettings={onSettings}
                 onAccount={onAccount}

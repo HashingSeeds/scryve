@@ -25,6 +25,7 @@ export function AppUtilityMenu({
   visible = true,
   compact = false,
   placement = "topRight",
+  onRules,
   onHistory,
   onSettings,
   onAccount,
@@ -34,6 +35,7 @@ export function AppUtilityMenu({
   visible?: boolean
   compact?: boolean
   placement?: "topRight" | "bottomLeft"
+  onRules?: () => void
   onHistory: () => void
   onSettings: () => void
   onAccount: () => void
@@ -46,7 +48,7 @@ export function AppUtilityMenu({
   const updateReady = useAppUpdate().status === "ready"
   const nearbyOnly = useNearbyOnly()
   const testsNearby = lanPlayAvailable()
-  const itemCount = testsNearby ? 4 : 3
+  const itemCount = 3 + Number(Boolean(onRules)) + Number(testsNearby)
   const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
@@ -151,6 +153,21 @@ export function AppUtilityMenu({
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           style={[$fill, themed($items), itemsStyle]}
         >
+          {onRules ? (
+            <Pressable
+              testID="utility-rules-button"
+              accessibilityRole="button"
+              style={themed($item)}
+              onPress={() => choose(onRules)}
+            >
+              <Text
+                tx="board:menu.rules"
+                weight="medium"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+              />
+            </Pressable>
+          ) : null}
           <Pressable
             testID="utility-history-button"
             accessibilityRole="button"
@@ -159,6 +176,35 @@ export function AppUtilityMenu({
           >
             <Text
               tx="common:appMenu.history"
+              weight="medium"
+              numberOfLines={1}
+              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            />
+          </Pressable>
+          {testsNearby ? (
+            <Pressable
+              testID="utility-nearby-only-button"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: nearbyOnly }}
+              style={themed($item)}
+              onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
+            >
+              <Text
+                tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
+                weight="medium"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+              />
+            </Pressable>
+          ) : null}
+          <Pressable
+            testID="utility-account-button"
+            accessibilityRole="button"
+            style={themed($item)}
+            onPress={() => choose(onAccount)}
+          >
+            <Text
+              tx={`common:appMenu.${accountEntry}`}
               weight="medium"
               numberOfLines={1}
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
@@ -181,35 +227,6 @@ export function AppUtilityMenu({
             />
             {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
           </Pressable>
-          <Pressable
-            testID="utility-account-button"
-            accessibilityRole="button"
-            style={themed($item)}
-            onPress={() => choose(onAccount)}
-          >
-            <Text
-              tx={`common:appMenu.${accountEntry}`}
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-          </Pressable>
-          {testsNearby ? (
-            <Pressable
-              testID="utility-nearby-only-button"
-              accessibilityRole="switch"
-              accessibilityState={{ checked: nearbyOnly }}
-              style={themed($item)}
-              onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
-            >
-              <Text
-                tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
-          ) : null}
         </Animated.View>
       </Animated.View>
     </Animated.View>

@@ -158,13 +158,13 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
     expect(view.getByTestId("dice-coin")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
-    expect(view.getByTestId("history-button")).toBeTruthy()
+    expect(view.getByTestId("decks-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
-    expect(view.getByTestId("open-decks-button")).toBeTruthy()
+    expect(view.queryByTestId("open-decks-button")).toBeNull()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
-  it("gives Magic games a Rules action where History sits, keeping History in More", () => {
+  it("puts Magic rules in More, leaving the game menu's fourth action to Decks", () => {
     jest.mocked(prefetchRules).mockClear()
     const onRules = jest.fn()
     const view = render(
@@ -192,8 +192,9 @@ describe("CurrentGameScreen", () => {
 
     expect(prefetchRules).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("history-button")).toBeNull()
-    fireEvent.press(view.getByTestId("rules-button"))
+    expect(view.queryByTestId("rules-button")).toBeNull()
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByTestId("utility-rules-button"))
     expect(onRules).toHaveBeenCalledTimes(1)
   })
 

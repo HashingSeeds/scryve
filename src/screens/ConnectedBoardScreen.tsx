@@ -787,6 +787,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const myRole = cloud
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
+  const openGameRules =
+    rules && (rules.kind === "link" || onRules)
+      ? () => {
+          setMenuOpen(false)
+          openRules(rules, () => system && onRules?.(system))
+        }
+      : undefined
   const radialActions: GameMenuActions = useMemo(
     () => [
       {
@@ -809,25 +816,15 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           setPlayerActionsOpen(true)
         },
       },
-      rules
-        ? {
-            kind: "rules",
-            label: translate("connected:board.menu.rules"),
-            disabled: rules.kind === "text" && !onRules,
-            onPress: () => {
-              setMenuOpen(false)
-              openRules(rules, () => system && onRules?.(system))
-            },
-          }
-        : {
-            kind: "history",
-            label: translate("connected:board.menu.history"),
-            disabled: !onHistory,
-            onPress: () => {
-              setMenuOpen(false)
-              onHistory?.()
-            },
-          },
+      {
+        kind: "decks",
+        label: translate("common:appNavigation.decks"),
+        disabled: !onDecks,
+        onPress: () => {
+          setMenuOpen(false)
+          onDecks?.()
+        },
+      },
       {
         kind: "end-game",
         label: translate("connected:board.menu.end"),
@@ -860,10 +857,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       diceTools,
       finishBlocker,
       layoutOptions.length,
-      onHistory,
-      onRules,
-      rules,
-      system,
+      onDecks,
     ],
   )
   const seatColors = useSeatColors(players)
@@ -991,11 +985,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onClose: closeMenu,
         }}
         windowOverlay={
-          menuOpen && onDecks && onHistory && onSettings && onAccount ? (
+          menuOpen && onHistory && onSettings && onAccount ? (
             <FloatingAppNavigation
-              destination="decks"
               accountEntry={accountEntry}
-              onDestination={onDecks}
+              onRules={openGameRules}
               onHistory={onHistory}
               onSettings={onSettings}
               onAccount={onAccount}
