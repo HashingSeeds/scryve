@@ -793,7 +793,6 @@ describe("NewGameScreen", () => {
     const connected = setup({
       mode: "connected",
       connected: { ...readyHost, ready: false, blockedReason: "Sign in to host" },
-      account: { ownerId: "owner-a" },
       onNearby,
     })
 
@@ -815,16 +814,7 @@ describe("NewGameScreen", () => {
     expect(onNearby).toHaveBeenLastCalledWith(
       expect.objectContaining({ playerCount: 4, variant: "treachery" }),
     )
-    openOptions()
-    fireEvent.press(connected.getByTestId("deck-requirement-required"))
-    fireEvent.press(connected.getByTestId("host-connected-button"))
-    expect(onNearby).toHaveBeenLastCalledWith(expect.objectContaining({ deckRequired: true }))
     connected.unmount()
-    const signedOut = setup({ mode: "connected", connected: readyHost, onNearby })
-    fireEvent.press(signedOut.getByTestId("host-on-nearby"))
-    openOptions()
-    expect(signedOut.queryByTestId("deck-requirement")).toBeNull()
-    signedOut.unmount()
     expect(setup({ mode: "local", onNearby }).queryByTestId("host-on")).toBeNull()
     expect(setup({ mode: "connected", connected: readyHost }).queryByTestId("host-on")).toBeNull()
   })

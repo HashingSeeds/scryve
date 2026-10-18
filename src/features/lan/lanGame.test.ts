@@ -14,7 +14,6 @@ import {
   revealLanRole,
   setLanConnected,
   setLanDeck,
-  setLanDeckRequired,
   setLanPlayerCount,
   startLanRound,
   type LanGame,
@@ -39,9 +38,9 @@ const unused = { key: "unused", token: "unused" }
 
 const lobby = (setup: LanSetup = commander) => createLanGame("game", "host", "Host", setup, NOW)
 
-function seatGuest(game: LanGame, key: string, features: readonly "decks"[] = ["decks"]) {
+function seatGuest(game: LanGame, key: string) {
   const pass = { key, token: `token-${key}` }
-  const admitted = admitLanGuest(game, tokens, { ...join(key), features }, pass)
+  const admitted = admitLanGuest(game, tokens, join(key), pass)
   if ("rejected" in admitted) throw new Error(admitted.rejected)
   tokens.set(key, pass.token)
   return admitted.game
@@ -225,29 +224,12 @@ describe("nearby Treachery", () => {
 
 describe("nearby decks", () => {
   const atraxa = { versionId: "version-atraxa", name: "Atraxa" }
-  const decksJoin = (name: string) => ({ ...join(name), features: ["decks"] as const })
 
-  it("turns away a guest whose build can't pick decks once the host requires them", () => {
-    const required = setLanDeckRequired(lobby(), true)
+  it("keeps a seat's deck through the lobby, lets it be cleared, and freezes it mid-round", () => {
+    const hostReady = setLanDeck(seatGuest(lobby(), "guest"), "host", atraxa)
 
-    expect(admitLanGuest(required, tokens, join("old"), unused)).toEqual({
-      rejected: "Update Scryve to join this game.",
-    })
-    expect(admitLanGuest(required, tokens, decksJoin("new"), unused)).toHaveProperty("game")
-    const oldGuestSeated = seatGuest(lobby(), "old", [])
-    expect(setLanDeckRequired(oldGuestSeated, true)).toBe(oldGuestSeated)
-    expect(
-      setLanDeckRequired(lobby({ ...commander, system: undefined }), true).setup,
-    ).not.toHaveProperty("deckRequired")
-  })
-
-  it("holds the start until every seat has a deck, and won't drop one the lobby requires", () => {
-    const required = setLanDeckRequired(seatGuest(lobby(), "guest"), true)
-    const hostReady = setLanDeck(required, "host", atraxa)
-
-    expect(lanSeatsReady(hostReady)).toBe(false)
-    expect(lanSeatsReady(setLanDeck(hostReady, "guest", atraxa))).toBe(true)
-    expect(setLanDeck(hostReady, "host", null)).toBe(hostReady)
+    expect(lanSeatsReady(hostReady)).toBe(true)
+    expect(setLanDeck(hostReady, "host", null).seats[0]).not.toHaveProperty("deck")
     expect(setLanDeck(startLanRound(hostReady, NOW), "guest", atraxa).seats[1]).not.toHaveProperty(
       "deck",
     )
@@ -267,8 +249,8 @@ describe("nearby decks", () => {
     expect(hostLife(commander)).toBe(40)
   })
 
-  it("carries seat decks and the requirement over the wire, and drops a malformed deck", () => {
-    const game = setLanDeck(setLanDeckRequired(lobby(), true), "host", atraxa)
+  it("carries seat decks over the wire, and drops a malformed deck", () => {
+    const game = setLanDeck(lobby(), "host", atraxa)
     const state = parseHostMessage(
       JSON.stringify({
         type: "state",
@@ -277,10 +259,7 @@ describe("nearby decks", () => {
       }),
     )
 
-    expect(state).toMatchObject({
-      lobby: { setup: { deckRequired: true }, seats: [{ deck: atraxa }] },
-      projection: { deckRequired: true },
-    })
+    expect(state).toMatchObject({ lobby: { seats: [{ deck: atraxa }] } })
     expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: atraxa }))).toEqual({
       type: "deck",
       deck: atraxa,

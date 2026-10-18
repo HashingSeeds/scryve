@@ -1,7 +1,7 @@
 import type { LobbyDeckState } from "@/features/connected/LobbySeatList"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 
-import { lanCanRequireDecks, type LanLobby, type LanSeatDeck, type LanSetup } from "./lanGame"
+import type { LanSeatDeck, LanSetup } from "./lanGame"
 import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 import { identitySection } from "../../../convex/lib/systems"
 
@@ -41,8 +41,3 @@ export function nearbySeatDeck(
       : {}),
   }
 }
-
-export const canChangeDeckRequirement = (lobby: LanLobby, signedIn: boolean) =>
-  lobby.status === "lobby" &&
-  Boolean(lobby.setup.system) &&
-  (Boolean(lobby.setup.deckRequired) || (signedIn && lanCanRequireDecks(lobby)))

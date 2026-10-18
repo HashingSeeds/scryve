@@ -196,26 +196,19 @@ describe("nearby host", () => {
     expect(hostLan).toHaveBeenCalledTimes(1)
   })
 
-  it("starts a deck-required round only once every guest has sent its deck", async () => {
+  it("puts each player's deck pick on their own seat", async () => {
     const session = new LanSession()
     await session.host({ ...setup, playerCount: 2 })
-    session.updateSettings({ deckRequired: true })
-    const old = socket()
-    old.send({ type: "join", protocol: LAN_PROTOCOL, name: "Old" })
     const alice = socket()
-    alice.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice", features: ["decks"] })
+    alice.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice" })
     await session.selectDeck({ versionId: "version-host", name: "Host deck" })
-    jest.advanceTimersByTime(50)
-
-    expect(old.sent).toEqual([{ type: "rejected", reason: "Update Scryve to join this game." }])
-    session.start()
-    jest.advanceTimersByTime(50)
-    expect(session.getState().lobby?.status).toBe("lobby")
     alice.send({ type: "deck", deck: { versionId: "version-alice", name: "Alice deck" } })
     jest.advanceTimersByTime(50)
-    session.start()
-    jest.advanceTimersByTime(50)
-    expect(session.getState().lobby?.status).toBe("active")
+
+    expect(session.getState().lobby?.seats.map((seat) => seat.deck?.versionId)).toEqual([
+      "version-host",
+      "version-alice",
+    ])
   })
 
   it("refuses a write to another player's seat", async () => {

@@ -5,7 +5,7 @@ import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobb
 import { translate } from "@/i18n/translate"
 
 import { lanSession, useLanSession } from "./lanSession"
-import { canChangeDeckRequirement, nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
+import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
 
@@ -96,11 +96,6 @@ export function NearbyLobbyScreen({
       onChangePlayerCount={
         isHost && lobby.status === "lobby"
           ? (playerCount) => lanSession.updateSettings({ playerCount })
-          : undefined
-      }
-      onChangeDeckRequired={
-        isHost && canChangeDeckRequirement(lobby, signedIn)
-          ? (deckRequired) => lanSession.updateSettings({ deckRequired })
           : undefined
       }
       decks={

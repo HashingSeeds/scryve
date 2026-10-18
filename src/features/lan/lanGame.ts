@@ -66,7 +66,6 @@ export interface LanSetup {
   format?: string
   layout?: PlayerGridLayoutVariant
   variant?: GameVariant
-  deckRequired?: boolean
 }
 
 export interface LanSeatDeck {
@@ -81,7 +80,6 @@ export interface LanSeat {
   name: string
   connected: boolean
   deck?: LanSeatDeck
-  cantPickDecks?: true
 }
 
 export type LanStatus = "lobby" | "active" | "finished" | "abandoned"
@@ -121,13 +119,10 @@ export type LanGuestMessage =
       pass?: LanSeatPass
       systems?: readonly PlaySystemId[]
       variants?: readonly GameVariant[]
-      features?: readonly LanFeature[]
     }
   | { type: "op"; event: ConnectedActionEvent }
   | { type: "reveal" }
   | { type: "deck"; deck: LanSeatDeck | null }
-
-export type LanFeature = "decks"
 
 export type LanHostMessage =
   | { type: "welcome"; pass: LanSeatPass }
@@ -148,8 +143,7 @@ const fitsVariant = ({ variant, playerCount }: LanSetup, count = playerCount) =>
 export const lanSeatsReady = (game: Pick<LanLobby, "seats" | "setup">) =>
   game.seats.length === game.setup.playerCount &&
   connectedSeatCount(game) === game.seats.length &&
-  fitsVariant(game.setup) &&
-  (!game.setup.deckRequired || game.seats.every((seat) => seat.deck))
+  fitsVariant(game.setup)
 
 export function createLanGame(
   id: string,
@@ -210,12 +204,11 @@ export function admitLanGuest(
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
   const { system } = game.setup
   const systems = join.systems ?? SYSTEMS_BEFORE_GUEST_LIST
-  const { variant, deckRequired } = game.setup
+  const { variant } = game.setup
   if (
     join.protocol !== LAN_PROTOCOL ||
     (system && !systems.includes(system)) ||
-    (variant && !join.variants?.includes(variant)) ||
-    (deckRequired && !join.features?.includes("decks"))
+    (variant && !join.variants?.includes(variant))
   )
     return { rejected: LAN_REJECTIONS.update }
   const { pass } = join
@@ -234,7 +227,6 @@ export function admitLanGuest(
     seat: game.seats.length + 1,
     name: join.name,
     connected: true,
-    ...(join.features?.includes("decks") ? {} : { cantPickDecks: true }),
   }
   return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
 }
@@ -251,21 +243,11 @@ export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
   return { ...game, setup: { ...game.setup, playerCount } }
 }
 
-export const lanCanRequireDecks = (game: Pick<LanLobby, "seats">) =>
-  game.seats.every((seat) => !seat.cantPickDecks)
-
-export function setLanDeckRequired(game: LanGame, deckRequired: boolean): LanGame {
-  const { deckRequired: _was, ...setup } = game.setup
-  if (game.status !== "lobby" || !setup.system || (deckRequired && !lanCanRequireDecks(game)))
-    return game
-  return { ...game, setup: deckRequired ? { ...setup, deckRequired } : setup }
-}
-
 const choosesDecks = (game: LanGame) =>
   Boolean(game.setup.system) && (game.status === "lobby" || game.status === "finished")
 
 export function setLanDeck(game: LanGame, key: string, deck: LanSeatDeck | null): LanGame {
-  if (!choosesDecks(game) || (!deck && game.setup.deckRequired)) return game
+  if (!choosesDecks(game)) return game
   return withSeat(game, key, ({ deck: _previous, ...seat }) => (deck ? { ...seat, deck } : seat))
 }
 
@@ -479,7 +461,6 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
     ruleset: setup.ruleset,
     ...(setup.layout ? { layout: setup.layout } : {}),
     ...(setup.variant ? { variant: setup.variant } : {}),
-    ...(setup.deckRequired ? { deckRequired: true } : {}),
     isHost: viewerKey === game.hostKey,
     eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
     serverUpdatedAt: game.updatedAt,
@@ -551,7 +532,6 @@ const isPass = (value: unknown): value is LanSeatPass =>
 export function parseLanSetup(value: unknown): LanSetup | null {
   if (!isRecord(value)) return null
   const { playerCount, startingLife, lifeStep, ruleset, system, format, layout, variant } = value
-  const { deckRequired } = value
   if (
     !Number.isInteger(playerCount) ||
     (playerCount as number) < LAN_MIN_PLAYERS ||
@@ -584,7 +564,6 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     ...(variant === "treachery" && systemDefinition(system)?.variants.includes(variant)
       ? { variant }
       : {}),
-    ...(deckRequired === true ? { deckRequired } : {}),
   }
 }
 
@@ -663,9 +642,6 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(Array.isArray(value.systems) ? { systems: value.systems.filter(isPlaySystemId) } : {}),
       ...(Array.isArray(value.variants)
         ? { variants: value.variants.filter((variant) => variant === "treachery") }
-        : {}),
-      ...(Array.isArray(value.features)
-        ? { features: value.features.filter((feature) => feature === "decks") }
         : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }

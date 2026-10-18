@@ -30,7 +30,6 @@ import {
   releaseLanSeat,
   revealLanRole,
   setLanDeck,
-  setLanDeckRequired,
   setLanPlayerCount,
   startLanRound,
   type LanGame,
@@ -487,7 +486,6 @@ export class LanSession {
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
       variants: ["treachery"],
-      features: ["decks"],
       ...(this.pass ? { pass: this.pass } : {}),
     })
   }
@@ -565,11 +563,10 @@ export class LanSession {
     }, RECONNECT_DELAY_MS)
   }
 
-  updateSettings({ playerCount, deckRequired }: { playerCount?: number; deckRequired?: boolean }) {
+  updateSettings({ playerCount }: { playerCount: number }) {
     const game = this.game
     if (this.state.role !== "host" || !game) return
-    const counted = playerCount === undefined ? game : setLanPlayerCount(game, playerCount)
-    const next = deckRequired === undefined ? counted : setLanDeckRequired(counted, deckRequired)
+    const next = setLanPlayerCount(game, playerCount)
     if (next !== game) this.publish(next)
   }
 
