@@ -90,6 +90,7 @@ export const colors = {
       "status": palette.info500,
       "home": "#356A86",
       "setup": "#80602A",
+      "decks": "#4E5B6B",
       "history": "#6B4A63",
       "rules": "#5E6A2E",
       "connect": "#236B63",

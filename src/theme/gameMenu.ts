@@ -5,6 +5,7 @@ export type GameMenuActionKind =
   | "status"
   | "home"
   | "setup"
+  | "decks"
   | "history"
   | "rules"
   | "connect"

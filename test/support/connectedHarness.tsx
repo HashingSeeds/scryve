@@ -87,6 +87,7 @@ export type MockConnectedRuntime = TableRuntime & {
     playerCount: number
     startingLife: number
     ruleset: string
+    system?: LobbyProjection["system"]
     isHost: boolean
     rematchPublicId?: string
     eventSequence: number

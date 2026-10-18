@@ -651,9 +651,11 @@ export function DecksScreen({
         )}
       </View>
       <FloatingAppNavigation
-        destination={onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play"}
+        destination={{
+          kind: onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play",
+          onPress: onPlay,
+        }}
         accountEntry={accountEntry}
-        onDestination={onPlay}
         onHistory={onHistory}
         onSettings={onSettings}
         onAccount={onAccount}

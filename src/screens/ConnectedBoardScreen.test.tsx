@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet } from "react-native"
+import { Dimensions, Linking, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
@@ -395,6 +395,29 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-status-seat-1")).toHaveTextContent(/Updated 0:0\d ago/)
     expect(screen.getByTestId("life-status-seat-2")).not.toHaveTextContent(/Updated/)
     jest.useRealTimers()
+  })
+
+  it("keeps Rules in the game menu on boards without a Decks route, like Nearby", () => {
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, system: "pokemon" },
+    }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} />))
+    openConnectedMenu()
+    expect(screen.queryByTestId("decks-button")).toBeNull()
+    fireEvent.press(screen.getByTestId("rules-button"))
+    expect(openURL).toHaveBeenCalledTimes(1)
+
+    view.rerender(
+      themed(
+        <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onDecks={jest.fn()} />,
+      ),
+    )
+    openConnectedMenu()
+    expect(screen.queryByTestId("rules-button")).toBeNull()
+    expect(screen.getByTestId("decks-button")).toBeTruthy()
+    openURL.mockRestore()
   })
 
   it("renders a resumed finished summary read-only with the shared menu actions disabled", () => {

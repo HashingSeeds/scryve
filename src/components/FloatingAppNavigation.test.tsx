@@ -26,8 +26,7 @@ it.each([
     const view = render(
       <ThemeProvider initialContext="dark">
         <FloatingAppNavigation
-          destination="decks"
-          onDestination={jest.fn()}
+          destination={{ kind: "decks", onPress: jest.fn() }}
           onHistory={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
@@ -52,8 +51,7 @@ describe("FloatingAppNavigation", () => {
       const view = render(
         <ThemeProvider initialContext="dark">
           <FloatingAppNavigation
-            destination="returnToGame"
-            onDestination={jest.fn()}
+            destination={{ kind: "returnToGame", onPress: jest.fn() }}
             onHistory={jest.fn()}
             onSettings={jest.fn()}
             onAccount={jest.fn()}
@@ -65,9 +63,6 @@ describe("FloatingAppNavigation", () => {
       expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({
         height: 48,
         justifyContent: "flex-end",
-      })
-      expect(StyleSheet.flatten(view.getByTestId("open-decks-button").props.style)).toMatchObject({
-        marginBottom: 2,
       })
 
       fireEvent.press(view.getByTestId("utility-menu-button"))

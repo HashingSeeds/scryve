@@ -14,14 +14,14 @@ export type AppDestination = "decks" | "returnToGame" | "play" | "backToLobby"
 
 export function FloatingAppNavigation({
   destination,
-  onDestination,
+  onRules,
   onHistory,
   onSettings,
   onAccount,
   accountEntry = "account",
 }: {
-  destination: AppDestination
-  onDestination: () => void
+  destination?: { kind: AppDestination; onPress: () => void }
+  onRules?: () => void
   onHistory: () => void
   onSettings: () => void
   onAccount: () => void
@@ -46,27 +46,30 @@ export function FloatingAppNavigation({
           compact
           placement="bottomLeft"
           accountEntry={accountEntry}
+          onRules={onRules}
           onHistory={onHistory}
           onSettings={onSettings}
           onAccount={onAccount}
           onOpenHeightChange={setUtilityHeight}
         />
       </View>
-      <Pressable
-        testID="open-decks-button"
-        accessibilityRole="button"
-        accessibilityLabel={translate(`common:appNavigation.${destination}`)}
-        style={themed($destination)}
-        onPress={onDestination}
-      >
-        <Text
-          tx={`common:appNavigation.${destination}`}
-          weight="bold"
-          size="xs"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.5}
-        />
-      </Pressable>
+      {destination ? (
+        <Pressable
+          testID="open-decks-button"
+          accessibilityRole="button"
+          accessibilityLabel={translate(`common:appNavigation.${destination.kind}`)}
+          style={themed($destination)}
+          onPress={destination.onPress}
+        >
+          <Text
+            tx={`common:appNavigation.${destination.kind}`}
+            weight="bold"
+            size="xs"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.5}
+          />
+        </Pressable>
+      ) : null}
     </View>
   )
 }
@@ -84,7 +87,6 @@ const $utilityAboveDestination: ViewStyle = { position: "absolute", left: 0, bot
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 92,
   height: 44,
-  marginBottom: 2,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
