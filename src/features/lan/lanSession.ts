@@ -13,7 +13,7 @@ import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
-import { HOSTED_GAME_KEY, lanPlayAvailable, loadLanName, savedHostedGame } from "./lanAvailability"
+import { HOSTED_GAME_KEY, loadLanName, savedHostedGame } from "./lanAvailability"
 import {
   admitLanGuest,
   applyLanWrite,
@@ -604,6 +604,5 @@ export class LanSession {
 }
 
 export const lanSession = new LanSession()
-if (lanPlayAvailable()) lanSession.resumeHostedGame()
 
 export const useLanSession = () => useSyncExternalStore(lanSession.subscribe, lanSession.getState)
