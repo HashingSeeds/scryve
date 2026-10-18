@@ -379,7 +379,6 @@ export default {
     subtract: "{{identity}}, retirer {{step}} {{label}}",
     remove: "Retirer {{label}}",
     editWithValue: "Modifier {{label}}, {{value}}",
-    addCounter: "Ajouter {{label}}",
     giveUp: "Abandonner {{label}}",
     take: "Prendre {{label}}",
     rule: "Règle {{rule}}",

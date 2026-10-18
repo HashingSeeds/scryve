@@ -329,7 +329,6 @@ const board = {
     subtract: "{{identity}}, subtract {{step}} {{label}}",
     remove: "Remove {{label}}",
     editWithValue: "Edit {{label}}, {{value}}",
-    addCounter: "Add {{label}}",
     giveUp: "Give up {{label}}",
     take: "Take {{label}}",
     rule: "Rule {{rule}}",
