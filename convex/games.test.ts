@@ -18,6 +18,7 @@ async function lobby(
   options: {
     deckRequired?: boolean
     playerCount?: number
+    layout?: "tabletop"
     system?: { system: string; ruleset: string; startingLife: number }
   } = {},
 ) {
@@ -29,6 +30,7 @@ async function lobby(
     ruleset: "commander",
     ...options.system,
     ...(options.deckRequired === undefined ? {} : { deckRequired: options.deckRequired }),
+    ...(options.layout ? { layout: options.layout } : {}),
     inviteToken: token,
     manualCodeCandidates: ["ABC234", "DEF567"],
     hostDisplayName: "Host",
@@ -2485,6 +2487,28 @@ describe("connected rematch", () => {
       paginationOpts: { numItems: 10, cursor: null },
     })
     expect(history.page.map(({ publicId }) => publicId)).toEqual([game.publicId])
+  })
+
+  it("opens every board, and the rematch's, on the host's layout", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t, { layout: "tabletop" })
+    const joiner = await synced(t, "active-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    const projection = await joiner.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+    })
+    expect(projection.layout).toBe("tabletop")
+
+    await host.mutation(api.games.finishGame, {
+      publicId: created.publicId,
+      result: { kind: "win", winnerPlayerIds: [projection.players[0].playerId] },
+      rematch,
+    })
+
+    expect(
+      (await joiner.query(api.games.lobbyProjection, { publicId: rematch.publicId })).layout,
+    ).toBe("tabletop")
   })
 
   it("finishes without a rematch when players at the table have blocked each other", async () => {

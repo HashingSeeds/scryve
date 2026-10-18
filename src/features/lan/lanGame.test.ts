@@ -7,6 +7,7 @@ import {
   lanProjection,
   lanSeatsReady,
   parseGuestMessage,
+  parseLanSetup,
   parseHostMessage,
   releaseLanSeat,
   setLanConnected,
@@ -282,5 +283,16 @@ describe("nearby messages", () => {
     expect(join("\ud800")).toBeNull()
     expect(join("  Ada\udc00 ")).toMatchObject({ name: "Ada" })
     expect(join(`${"a".repeat(23)}😀`)).toMatchObject({ name: "a".repeat(23) })
+  })
+
+  it("carries the host's layout to every board and drops one it doesn't know", () => {
+    const tabletop = { ...commander, playerCount: 4, layout: "tabletop" } as const
+
+    expect(parseLanSetup(tabletop)).toEqual(tabletop)
+    expect(parseLanSetup({ ...tabletop, layout: "spiral" })).toEqual({
+      ...commander,
+      playerCount: 4,
+    })
+    expect(lanProjection(lobby(tabletop), "guest").layout).toBe("tabletop")
   })
 })

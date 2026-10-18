@@ -24,6 +24,7 @@ import {
   themed,
 } from "../../test/support/connectedHarness"
 import { CLAIM_ARM_MS } from "../components/CommanderClaimBanner"
+import type { PlayerGridLayoutVariant } from "../features/game/playerLayouts"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
 
@@ -157,6 +158,36 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-card-seat-4").props.accessibilityLabel).toContain("Your seat")
     openConnectedMenu()
     expect(screen.getByTestId("layout-button")).toBeTruthy()
+  })
+
+  it("opens on the host's layout, or the table default when it doesn't fit the seats", () => {
+    const players = Array.from({ length: 4 }, (_, index) => ({
+      playerId: `player-${index + 1}`,
+      seat: index + 1,
+      displayName: `Player ${index + 1}`,
+      color: "#7C3AED",
+      currentLife: 40,
+      pendingDelta: 0,
+      controlledByMe: index === 0,
+    }))
+    const selectedLayout = (layout: PlayerGridLayoutVariant) => {
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, playerCount: 4, players, layout },
+      }
+      render(themed(<ConnectedBoardScreen publicId="game-public" />))
+      openConnectedMenu()
+      fireEvent.press(screen.getByTestId("layout-button"))
+      const selected = ["auto", "tabletop"].find(
+        (variant) =>
+          screen.getByTestId(`connected-layout-${variant}`).props.accessibilityState.selected,
+      )
+      screen.unmount()
+      return selected
+    }
+
+    expect(selectedLayout("auto")).toBe("auto")
+    expect(selectedLayout("featured-last")).toBe("tabletop")
   })
 
   it("lets the attacking seat stage commander damage against several defenders", async () => {

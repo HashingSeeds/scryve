@@ -21,11 +21,7 @@ import {
   validatePlayerNames,
 } from "./domain"
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
-import {
-  isSeatOrder,
-  playerGridLayoutForCount,
-  type PlayerGridLayoutVariant,
-} from "./playerLayouts"
+import { isSeatOrder, playerGridLayoutForCount } from "./playerLayouts"
 import {
   defaultStartingLife,
   isPlaySystemId,
@@ -72,7 +68,6 @@ export const LOCAL_KEYS = {
   settings: "count.local.settings.v1",
   legacySettings: "count.local.settings",
   active: "count.local.active.v1",
-  layouts: "count.local.layouts.v1",
   historyIndex: "count.local.history.index.v1",
   noSystemHistoryRepaired: "count.local.history.noSystemRepaired.v1",
   meSeat: "count.local.meSeat.v1",
@@ -688,21 +683,6 @@ export class LocalGameRepository {
     const valid = parseSettings(settings) ?? DEFAULT_LOCAL_SETTINGS
     // why: anything this build saves is past the one-time Brawl fix, so a 20 chosen afterward is never migrated again.
     this.storage.set(LOCAL_KEYS.settings, JSON.stringify({ ...valid, brawlLifeMigrated: true }))
-  }
-
-  loadLayoutPreference(playerCount: number): PlayerGridLayoutVariant {
-    const layouts = parseJson(this.storage.getString(LOCAL_KEYS.layouts))
-    if (!isRecord(layouts)) return "auto"
-    return playerGridLayoutForCount(playerCount, layouts[String(playerCount)])
-  }
-
-  saveLayoutPreference(playerCount: number, layout: PlayerGridLayoutVariant): void {
-    const current = parseJson(this.storage.getString(LOCAL_KEYS.layouts))
-    const layouts = isRecord(current) ? current : {}
-    this.storage.set(
-      LOCAL_KEYS.layouts,
-      JSON.stringify({ ...layouts, [playerCount]: playerGridLayoutForCount(playerCount, layout) }),
-    )
   }
 
   loadRecentSetups(): RecentSetup[] {

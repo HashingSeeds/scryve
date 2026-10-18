@@ -4,6 +4,7 @@ import type { ConnectedGameStatus } from "@/features/connected/model"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 
+import type { PlayerGridLayoutVariant } from "../../convex/lib/layouts"
 import type { TableState } from "../../convex/lib/table"
 
 type ActiveConnectedGame = {
@@ -88,6 +89,7 @@ export type MockConnectedRuntime = TableRuntime & {
     startingLife: number
     ruleset: string
     isHost: boolean
+    layout?: PlayerGridLayoutVariant
     rematchPublicId?: string
     eventSequence: number
     serverUpdatedAt: number

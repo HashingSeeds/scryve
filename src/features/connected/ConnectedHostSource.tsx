@@ -168,7 +168,7 @@ function ConnectedHostQuerySource({
       setBusy(true)
       setHostError(undefined)
       const ids = await createLobbyIdentifiers()
-      const { layout, system, ...lobbySetup } = setup
+      const { system, ...lobbySetup } = setup
       const lobby = await createLobby({
         ...ids,
         ...lobbySetup,
@@ -179,7 +179,6 @@ function ConnectedHostQuerySource({
       })
       requestSucceeded = true
       captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })
-      localRepository.saveLayoutPreference(setup.playerCount, layout)
       localRepository.rememberSetup({ mode: "connected", lobby: setup })
       onLobbyCreated(lobby)
     } catch (cause) {

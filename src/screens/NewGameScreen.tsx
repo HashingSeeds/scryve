@@ -44,6 +44,7 @@ import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
 import {
+  defaultConnectedLayout,
   playerGridLayoutForCount,
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
@@ -249,8 +250,9 @@ function NewGameForm({
   const [playerCount, setPlayerCount] = useState(
     lobby?.playerCount ?? seedGame?.players.length ?? defaults.defaultPlayerCount,
   )
-  const [layout, setLayout] = useState<PlayerGridLayoutVariant>(
-    lobby?.layout ?? seedGame?.layout ?? "auto",
+  // why: connected setups saved "auto" before the host's layout reached any board, so there it was never a choice.
+  const [chosenLayout, setChosenLayout] = useState<PlayerGridLayoutVariant | undefined>(
+    (lobby?.layout === "auto" ? undefined : lobby?.layout) ?? seedGame?.layout,
   )
   const [names, setNames] = useState<string[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => seedGame?.players[index]?.name ?? ""),
@@ -335,6 +337,11 @@ function NewGameForm({
   const [exitingGameId, setExitingGameId] = useState<string>()
   const [pickingHostSeat, setPickingHostSeat] = useState(false)
   const connectedMode = mode === "connected"
+  const layout = playerGridLayoutForCount(
+    playerCount,
+    chosenLayout,
+    connectedMode ? defaultConnectedLayout(playerCount) : "auto",
+  )
   const treacheryAvailable =
     connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
@@ -608,7 +615,6 @@ function NewGameForm({
         return next
       })
     setPlayerCount(value)
-    setLayout((current) => playerGridLayoutForCount(value, current))
   }
 
   function openAppearancePicker(index: number, event?: GestureResponderEvent) {
@@ -911,6 +917,7 @@ function NewGameForm({
                       startingLife,
                       lifeStep,
                       ruleset: format ?? NO_PLAY_SYSTEM,
+                      layout,
                       ...(system && format ? { system, format } : {}),
                     })
                   }
@@ -1121,7 +1128,11 @@ function NewGameForm({
 
           <View style={themed($section)}>
             <Text tx="play:newGame.layout" preset="subheading" accessibilityRole="header" />
-            <PlayerLayoutPicker playerCount={playerCount} value={layout} onChange={setLayout} />
+            <PlayerLayoutPicker
+              playerCount={playerCount}
+              value={layout}
+              onChange={setChosenLayout}
+            />
           </View>
         </ScrollView>
         <Button

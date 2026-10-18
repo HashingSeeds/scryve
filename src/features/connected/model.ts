@@ -8,6 +8,10 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 
+import {
+  isPlayerGridLayoutVariant,
+  type PlayerGridLayoutVariant,
+} from "../../../convex/lib/layouts"
 import { parseTableState, type TableAction, type TableState } from "../../../convex/lib/table"
 import {
   isTreacheryRole,
@@ -110,6 +114,7 @@ export interface ConnectedProjection {
   system?: PlaySystemId
   format?: string
   variant?: GameVariant
+  layout?: PlayerGridLayoutVariant
   deckRequired?: boolean
   startingLife: number
   lifeStep?: number
@@ -317,6 +322,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
         }
       : {}),
     ...(value.variant === "treachery" ? { variant: value.variant } : {}),
+    ...(isPlayerGridLayoutVariant(value.layout) ? { layout: value.layout } : {}),
     deckRequired: value.deckRequired ?? false,
     startingLife: value.startingLife,
     ...(typeof value.lifeStep === "number" && Number.isInteger(value.lifeStep) && value.lifeStep > 0
