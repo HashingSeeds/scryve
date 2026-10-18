@@ -289,7 +289,6 @@ function NewGameForm({
   const [startingLife, setStartingLife] = useState(
     seed?.startingLife ?? defaults.defaultStartingLife,
   )
-  const [deckRequired, setDeckRequired] = useState(lobby?.deckRequired ?? false)
   const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
@@ -394,9 +393,6 @@ function NewGameForm({
       ? translate("play:newGame.seatsCount", { count: playerCount })
       : translate("play:summary.playerCount", { count: playerCount }),
     counterValueLabel(system, startingLife),
-    ...(cloudMode
-      ? [translate(deckRequired ? "play:newGame.decksRequired" : "play:newGame.decksOptional")]
-      : []),
     ...(!connectedMode && !localGame && matchBestOf
       ? [translate("play:newGame.bestOfCount", { bestOf: matchBestOf })]
       : []),
@@ -504,7 +500,6 @@ function NewGameForm({
         playerCount,
         startingLife,
         ruleset: format ?? NO_PLAY_SYSTEM,
-        deckRequired,
         ...setup,
       })
     else
@@ -1033,22 +1028,6 @@ function NewGameForm({
               />
             </View>
           </View>
-
-          {cloudMode ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="deck-requirement"
-                accessibilityLabel={translate("play:newGame.deckRequirement")}
-                segments={[
-                  { id: "optional", label: translate("play:newGame.optional") },
-                  { id: "required", label: translate("play:newGame.required") },
-                ]}
-                selectedId={deckRequired ? "required" : "optional"}
-                onSelect={(value) => setDeckRequired(value === "required")}
-              />
-            </View>
-          ) : null}
 
           {!connectedMode && !localGame ? (
             <View style={themed($section)}>

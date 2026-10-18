@@ -22,7 +22,6 @@ export default {
   waitingForPlayers_many: "Esperando a {{count}} de jugadores más",
   waitingForPlayers_other: "Esperando a {{count}} jugadores más",
   decksRequired: "Mazos obligatorios",
-  decksOptional: "Mazos opcionales",
   yourSeat: "Tu asiento",
   seatNumber: "Asiento {{seat}}",
   noDeckSelected: "Ningún mazo seleccionado",

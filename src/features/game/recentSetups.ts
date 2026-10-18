@@ -21,7 +21,6 @@ export interface ConnectedSetup {
   system?: PlaySystemId
   format?: string
   variant?: GameVariant
-  deckRequired: boolean
   layout: PlayerGridLayoutVariant
   lifeStep: number
 }
@@ -92,7 +91,6 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     value.playerCount > 6 ||
     !isWholeNumber(value.startingLife) ||
     typeof value.ruleset !== "string" ||
-    typeof value.deckRequired !== "boolean" ||
     !isPositiveInteger(value.lifeStep)
   )
     return undefined
@@ -116,7 +114,6 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     ruleset: value.ruleset,
     ...(system && typeof value.format === "string" ? { system, format: value.format } : {}),
     ...(value.variant === "treachery" ? { variant: value.variant } : {}),
-    deckRequired: value.deckRequired,
     layout: playerGridLayoutForCount(value.playerCount, value.layout),
     lifeStep: value.lifeStep,
   }

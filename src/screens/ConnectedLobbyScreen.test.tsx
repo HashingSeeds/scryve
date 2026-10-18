@@ -74,7 +74,7 @@ describe("ConnectedLobbyScreen", () => {
   beforeEach(resetConnectedHarness)
   afterEach(() => jest.restoreAllMocks())
 
-  it("lets the host correct six players to two and require decks", async () => {
+  it("lets the host correct six players to two, with no deck requirement to set", async () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
       status: "lobby",
@@ -87,10 +87,21 @@ describe("ConnectedLobbyScreen", () => {
       publicId: "game-public",
       playerCount: 2,
     })
+    expect(screen.queryByTestId("lobby-require-decks")).toBeNull()
+  })
+
+  it("lets the host of an older lobby that requires decks turn the requirement off", async () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      deckRequired: true,
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
     await act(async () => fireEvent.press(screen.getByTestId("lobby-require-decks")))
     expect(mockUpdateLobbySettings).toHaveBeenLastCalledWith({
       publicId: "game-public",
-      deckRequired: true,
+      deckRequired: false,
     })
   })
 
@@ -113,8 +124,6 @@ describe("ConnectedLobbyScreen", () => {
     connectedHarness.socketConnected = false
     view.rerender(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
     expect(screen.getByTestId("lobby-player-count-4")).toBeDisabled()
-    fireEvent.press(screen.getByTestId("lobby-require-decks"))
-    expect(mockUpdateLobbySettings).not.toHaveBeenCalled()
   })
 
   it("opens deck management for the joining player's game system", () => {

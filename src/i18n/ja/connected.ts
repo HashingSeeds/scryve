@@ -18,7 +18,6 @@ export default {
   allSeatsClaimed: "全席が確保済み",
   waitingForPlayers_other: "あと{{count}}人待っています",
   decksRequired: "デッキ必須",
-  decksOptional: "デッキは任意",
   yourSeat: "あなたの席",
   seatNumber: "席{{seat}}",
   noDeckSelected: "デッキ未選択",

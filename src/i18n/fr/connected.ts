@@ -22,7 +22,6 @@ export default {
   waitingForPlayers_many: "En attente de {{count}} joueurs de plus",
   waitingForPlayers_other: "En attente de {{count}} joueurs de plus",
   decksRequired: "Decks obligatoires",
-  decksOptional: "Decks facultatifs",
   yourSeat: "Votre place",
   seatNumber: "Place {{seat}}",
   noDeckSelected: "Aucun deck sélectionné",

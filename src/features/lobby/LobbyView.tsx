@@ -20,7 +20,6 @@ import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
-  deckRequirementLabel,
   lobbyDetail,
   lobbyExitCopy,
   seatSummary,
@@ -33,7 +32,6 @@ import {
   type LobbySeat,
 } from "@/features/connected/LobbySeatList"
 import { deckVersionLabel } from "@/features/decks/deckCopy"
-import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -258,7 +256,7 @@ export function LobbyView({
           </View>
           {heading ? <Text size="xs" style={themed($dimmed)} text={detail} /> : null}
         </View>
-        {lobby.isHost && (onChangePlayerCount || onChangeDeckRequired) ? (
+        {lobby.isHost && (onChangePlayerCount || (onChangeDeckRequired && lobby.deckRequired)) ? (
           <View style={themed($section)}>
             <Text preset="subheading" accessibilityRole="header" tx="connected:lobby.players" />
             {onChangePlayerCount ? (
@@ -279,7 +277,7 @@ export function LobbyView({
                 onSelect={(count) => onChangePlayerCount(Number(count))}
               />
             ) : null}
-            {onChangeDeckRequired && (lobby.system !== NO_PLAY_SYSTEM || lobby.deckRequired) ? (
+            {onChangeDeckRequired && lobby.deckRequired ? (
               <Switch
                 testID="lobby-require-decks"
                 labelTx="connected:decksRequired"
@@ -311,12 +309,8 @@ export function LobbyView({
               ]}
             />
           </View>
-          {!lobby.isHost && decks ? (
-            <Text
-              size="xxs"
-              style={themed($dimmed)}
-              text={deckRequirementLabel(Boolean(lobby.deckRequired))}
-            />
+          {!lobby.isHost && decks && lobby.deckRequired ? (
+            <Text size="xxs" style={themed($dimmed)} tx="connected:decksRequired" />
           ) : null}
           {decks ? decks.source(seatList) : seatList()}
         </View>

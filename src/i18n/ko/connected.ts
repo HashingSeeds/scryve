@@ -18,7 +18,6 @@ export default {
   allSeatsClaimed: "모든 좌석 선택됨",
   waitingForPlayers_other: "플레이어 {{count}}명 더 기다리는 중",
   decksRequired: "덱 필수",
-  decksOptional: "덱 선택 사항",
   yourSeat: "내 좌석",
   seatNumber: "{{seat}}번 좌석",
   noDeckSelected: "선택한 덱 없음",

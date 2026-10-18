@@ -155,7 +155,7 @@ describe("NewGameScreen", () => {
       ),
     )
     expect(view.queryByTestId("resume-connected-arriving")).toBeNull()
-    expect(within(form).getByText("3 seats · 20 life · Decks optional")).toBeTruthy()
+    expect(within(form).getByText("3 seats · 20 life")).toBeTruthy()
     expect(within(form).queryByText("Games in progress")).toBeNull()
     fireEvent.press(view.getByTestId("setup-status"))
     expect(props.onResumeConnected).toHaveBeenCalledWith(
@@ -839,24 +839,21 @@ describe("NewGameScreen", () => {
       ruleset: "commander",
       system: "mtg",
       format: "commander",
-      deckRequired: false,
       layout: "tabletop",
       lifeStep: 1,
     })
   })
 
-  it("lets connected hosts require a deck while leaving local setup unchanged", () => {
+  it("hosts connected games with decks optional, and no requirement to set", () => {
     const host = jest.fn()
     const view = setup({ mode: "connected", connected: { ...readyHost, host } })
 
     openOptions()
-    expect(view.getByTestId("deck-requirement-optional").props.accessibilityState.selected).toBe(
-      true,
-    )
-    fireEvent.press(view.getByTestId("deck-requirement-required"))
+    expect(view.queryByTestId("deck-requirement")).toBeNull()
+    closeOptions()
     fireEvent.press(view.getByTestId("host-connected-button"))
 
-    expect(host).toHaveBeenCalledWith(expect.objectContaining({ deckRequired: true }))
+    expect(host.mock.calls[0][0]).not.toHaveProperty("deckRequired")
     expect(view.queryByTestId("player-name-1")).toBeNull()
   })
 
@@ -881,7 +878,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("game-type-more-mtg"))
     fireEvent.press(view.getByTestId("game-type-treachery"))
     expect(view.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("4 seats · 40 life · Decks optional")).toBeTruthy()
+    expect(view.getByText("4 seats · 40 life")).toBeTruthy()
     fireEvent.press(view.getByTestId("host-connected-button"))
     expect(host).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -927,7 +924,7 @@ describe("NewGameScreen", () => {
     closeOptions()
     fireEvent.press(view.getByTestId("join-with-code-button"))
     expect(onJoin).toHaveBeenCalledTimes(1)
-    expect(view.getByText("3 seats · 20 life · Decks optional")).toBeTruthy()
+    expect(view.getByText("3 seats · 20 life")).toBeTruthy()
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("resume-connected-resume-game"))
 
@@ -1064,7 +1061,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("end-connected-hosted-game"))
     expect(view.getByText("End this game?")).toBeTruthy()
     fireEvent.press(view.getByTestId("cancel-connected-game-exit"))
-    expect(view.getByText("3 seats · 20 life · Decks optional")).toBeTruthy()
+    expect(view.getByText("3 seats · 20 life")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("leave-connected-joined-game"))
@@ -1517,7 +1514,6 @@ describe("NewGameScreen", () => {
       system: "mtg" as const,
       format: "commander",
       variant: "treachery" as const,
-      deckRequired: true,
       layout: "auto" as const,
       lifeStep: 1,
     }
@@ -1597,10 +1593,9 @@ describe("NewGameScreen", () => {
     setup({ mode: "connected", connected: readyHost })
     fireEvent.press(screen.getByTestId("game-type-commander"))
     openOptions()
-    fireEvent.press(screen.getByTestId("deck-requirement-required"))
     closeOptions()
     expect(screen.queryByTestId("setup-options-dialog")).toBeNull()
-    expect(screen.getByText("2 seats · 40 life · Decks required")).toBeTruthy()
+    expect(screen.getByText("2 seats · 40 life")).toBeTruthy()
 
     setup()
     openOptions()

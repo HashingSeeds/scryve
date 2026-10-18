@@ -120,7 +120,6 @@ describe("new local game route", () => {
           system: "mtg",
           format: "commander",
           variant: "treachery",
-          deckRequired: false,
           layout: "auto",
           lifeStep: 1,
         },
