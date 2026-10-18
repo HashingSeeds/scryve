@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Redirect, router } from "expo-router"
 
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
@@ -8,6 +9,8 @@ import { ConnectedBoardWithRuntime } from "@/screens/ConnectedBoardScreen"
 const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("/lan"))
 
 export default function LanGameRoute() {
+  // why: resuming before useLanGame reads the session puts the saved game on the first render instead of redirecting to the lobby.
+  useState(() => lanPlayAvailable() && lanSession.resumeHostedGame())
   const runtime = useLanGame()
   const { projection } = useLanSession()
   if (!lanPlayAvailable()) return <Redirect href="/" />

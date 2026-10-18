@@ -12,6 +12,7 @@ import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
 import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
+import { lanPlayAvailable, savedHostedGame } from "@/features/lan/lanAvailability"
 import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import { rulesHref } from "@/features/rules/gameRules"
 import type { TxKeyPath } from "@/i18n"
@@ -86,6 +87,7 @@ export default function Index() {
   const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
   const [newerGame, setNewerGame] = useState(() => localGameRepository.hasNewerActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
+  const [resumingNearbyGame] = useState(() => lanPlayAvailable() && Boolean(savedHostedGame()))
   const reload = useCallback(() => {
     const nextSettings = localGameRepository.loadSettings()
     setSettings(nextSettings)
@@ -113,6 +115,7 @@ export default function Index() {
   const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
   const staleChoice = oldGameChoice?.gameId === activeGame?.id ? oldGameChoice?.choice : undefined
 
+  if (resumingNearbyGame) return <Redirect href="/lan/game" />
   if (resumeRedirect) return <Redirect href={resumeRedirect} />
   if (restoringAccount) return null
 
