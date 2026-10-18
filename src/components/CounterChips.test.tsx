@@ -64,7 +64,10 @@ describe("CounterChips", () => {
     const view = chips(table)
 
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
-    fireEvent.press(view.getByTestId("counter-option-1-commanderTax"))
+    const tax = view.getByTestId("counter-option-1-commanderTax")
+    expect(tax).toHaveTextContent("Commander tax+2")
+    expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
+    fireEvent.press(tax)
     expect(table.adjustCounter).toHaveBeenCalledWith("commanderTax", 2)
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
 
@@ -96,6 +99,7 @@ describe("CounterChips", () => {
     const view = chips(table)
 
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    expect(view.getByTestId("counter-option-1-poison")).toHaveTextContent("Poison10")
     fireEvent.press(view.getByLabelText("Edit Poison, 10"))
     expect(table.adjustCounter).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("counter-edit-1-poison-minus"))

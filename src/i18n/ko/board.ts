@@ -354,7 +354,6 @@ export default {
     subtract: "{{identity}}, {{label}} {{step}} 감소",
     remove: "{{label}} 제거",
     editWithValue: "{{label}} 수정, {{value}}",
-    addCounter: "{{label}} 추가",
     giveUp: "{{label}} 포기",
     take: "{{label}} 가져오기",
     rule: "규칙 {{rule}}",

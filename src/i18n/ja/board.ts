@@ -353,7 +353,6 @@ export default {
     subtract: "{{identity}}、{{label}}を{{step}}減らす",
     remove: "{{label}}を削除",
     editWithValue: "{{label}}を編集、{{value}}",
-    addCounter: "{{label}}を追加",
     giveUp: "{{label}}を手放す",
     take: "{{label}}を得る",
     rule: "ルール{{rule}}",

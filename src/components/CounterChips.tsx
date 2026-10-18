@@ -609,13 +609,18 @@ function CounterSheet({
                   id={option.id}
                   label={optionLabel}
                   value={current > 0 ? current : undefined}
+                  step={option.step}
                   accessibilityLabel={
                     current > 0
                       ? translate("board:counters.editWithValue", {
                           label: optionLabel,
                           value: current,
                         })
-                      : translate("board:counters.addCounter", { label: optionLabel })
+                      : translate("board:counters.add", {
+                          identity,
+                          step: option.step,
+                          label: optionLabel,
+                        })
                   }
                   ink={ink}
                   onPress={() => {
@@ -702,6 +707,7 @@ function SheetOption({
   id,
   label,
   value,
+  step,
   accessibilityLabel,
   selected,
   ink,
@@ -712,6 +718,7 @@ function SheetOption({
   id: string
   label: string
   value?: number
+  step?: number
   accessibilityLabel: string
   selected?: boolean
   ink: string
@@ -745,6 +752,13 @@ function SheetOption({
           weight="bold"
           size="xs"
           style={[themed($optionValue), { color: ink }]}
+        />
+      ) : step !== undefined ? (
+        <Text
+          text={`+${step}`}
+          weight="medium"
+          size="xs"
+          style={[themed($optionValue), { color: ink }, $muted]}
         />
       ) : null}
       {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}

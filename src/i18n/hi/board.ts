@@ -366,7 +366,6 @@ export default {
     subtract: "{{identity}}, {{step}} {{label}} घटाएं",
     remove: "{{label}} हटाएं",
     editWithValue: "{{label}} बदलें, {{value}}",
-    addCounter: "{{label}} जोड़ें",
     giveUp: "{{label}} छोड़ें",
     take: "{{label}} लें",
     rule: "नियम {{rule}}",
