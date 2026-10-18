@@ -92,7 +92,7 @@ export interface GameRadialMenuProps {
   boardAnchor?: { x: number; y: number }
   nativeFrame?: ReturnType<typeof useGameBoardOrientation>["nativeFrame"]
   compact?: boolean
-  actions: readonly RadialMenuAction[]
+  actions: GameMenuActions
   onToggle: () => void
   onClose: () => void
   variant?: MenuButtonStyle
@@ -103,6 +103,15 @@ export interface GameRadialMenuProps {
   heldAction?: GameMenuActionKind
   badge?: GameMenuBadge
 }
+
+/** why: the pentagon has five sides and the fan is laid out for exactly one action per side. */
+export type GameMenuActions = readonly [
+  RadialMenuAction,
+  RadialMenuAction,
+  RadialMenuAction,
+  RadialMenuAction,
+  RadialMenuAction,
+]
 
 export interface RadialActionPose {
   x: number
@@ -195,8 +204,6 @@ const CENTER_ACTION_POSES: readonly RadialActionPose[] =
   CENTER_ACTION_SIDE_STEPS.map(rotateBasePoseToSide)
 const EDGE_POSE_DISTANCE = 112
 const LEFT_EDGE_POSE_ANGLES = [0, 45, 90, 135, 180] as const
-const FOUR_CENTER_POSE_ANGLES = [-54, 54, -126, 126] as const
-const FOUR_LEFT_EDGE_POSE_ANGLES = [0, 60, 120, 180] as const
 
 function poseAlongAngle(angleDeg: number, order: number): RadialActionPose {
   const angleRad = (angleDeg * Math.PI) / 180
@@ -212,16 +219,14 @@ function mirrorPose(pose: RadialActionPose): RadialActionPose {
   return { ...pose, x: -pose.x, rotationDeg: -pose.rotationDeg }
 }
 
-export function getRadialActionPoses(
-  anchor: { x: number; y: number },
-  actionCount = 5,
-): readonly RadialActionPose[] {
+export function getRadialActionPoses(anchor: {
+  x: number
+  y: number
+}): readonly RadialActionPose[] {
   const anchorNearLeftEdge = anchor.x < 0.25
   const anchorNearRightEdge = anchor.x > 0.75
-  const edgeAngles = actionCount === 4 ? FOUR_LEFT_EDGE_POSE_ANGLES : LEFT_EDGE_POSE_ANGLES
-  if (anchorNearLeftEdge) return edgeAngles.map(poseAlongAngle)
-  if (anchorNearRightEdge) return edgeAngles.map(poseAlongAngle).map(mirrorPose)
-  if (actionCount === 4) return FOUR_CENTER_POSE_ANGLES.map(poseAlongAngle)
+  if (anchorNearLeftEdge) return LEFT_EDGE_POSE_ANGLES.map(poseAlongAngle)
+  if (anchorNearRightEdge) return LEFT_EDGE_POSE_ANGLES.map(poseAlongAngle).map(mirrorPose)
   return CENTER_ACTION_POSES
 }
 
@@ -385,14 +390,14 @@ function GameRadialFan({
   heldAction?: GameMenuActionKind
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
-  actions: readonly RadialMenuAction[]
+  actions: GameMenuActions
   poseTurnMs?: number
 }) {
   const reducedMotion = useReducedMotion()
-  const poses = getRadialActionPoses(anchor, actions.length)
+  const poses = getRadialActionPoses(anchor)
   return (
     <>
-      {actions.slice(0, poses.length).map((action, index) => (
+      {actions.map((action, index) => (
         <RadialAction
           key={action.kind}
           action={action}
@@ -436,7 +441,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   holderAnchor: { x: number; y: number }
   holderHeight: number
   facingAngle: number
-  actions: readonly RadialMenuAction[]
+  actions: GameMenuActions
   statusLine?: GameMenuStatusLine
   heldAction?: GameMenuActionKind
 }) {

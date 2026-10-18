@@ -10,14 +10,14 @@ import {
   GameRadialMenu,
   getRadialActionPoses,
   getRadialToolOffsets,
-  type RadialMenuAction,
+  type GameMenuActions,
   type RadialMenuTool,
 } from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
-  const actions: RadialMenuAction[] = [
+  const actions: GameMenuActions = [
     { kind: "layout", label: "Layout", onPress: callbacks[0] },
     { kind: "dice", label: "Dice", onPress: callbacks[1] },
     { kind: "status", label: "Status", onPress: callbacks[2] },
@@ -30,9 +30,14 @@ describe("GameRadialMenu", () => {
     accessibilityLabel: key,
     onPress: jest.fn(),
   }))
-  const actionsWithDiceTools: RadialMenuAction[] = actions.map((action) =>
-    action.kind === "dice" ? { kind: "dice", label: "Dice", tools } : action,
-  )
+  const [layout, dice, status, home, endGame] = actions
+  const actionsWithDiceTools: GameMenuActions = [
+    layout,
+    { kind: "dice", label: "Dice", tools },
+    status,
+    home,
+    endGame,
+  ]
 
   function menu(
     open: boolean,
@@ -219,17 +224,19 @@ describe("GameRadialMenu", () => {
   it("offers the sync status line only while open and keeps a blocked action pressable", () => {
     const onStatus = jest.fn()
     const onEnd = jest.fn()
-    const blockedActions: RadialMenuAction[] = actions.map((action) =>
-      action.kind === "end-game"
-        ? {
-            kind: "end-game",
-            label: "End game",
-            detail: "needs connection",
-            blocked: true,
-            onPress: onEnd,
-          }
-        : action,
-    )
+    const blockedActions: GameMenuActions = [
+      layout,
+      dice,
+      status,
+      home,
+      {
+        kind: "end-game",
+        label: "End game",
+        detail: "needs connection",
+        blocked: true,
+        onPress: onEnd,
+      },
+    ]
     const statusLine = {
       text: "Offline · 3 changes saved",
       tone: "offline",
@@ -370,7 +377,6 @@ describe("GameRadialMenu", () => {
     expect(getRadialActionPoses({ x: 2 / 3, y: 0.5 })).toEqual(
       getRadialActionPoses({ x: 0.5, y: 0.5 }),
     )
-    expect(getRadialActionPoses({ x: 0.5, y: 0.5 }, 4)).toHaveLength(4)
     expect(getRadialActionPoses({ x: 0.5, y: 0.5 })).toHaveLength(5)
   })
 })
