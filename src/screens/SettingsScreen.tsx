@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Platform, View } from "react-native"
+import { Platform, ScrollView, View } from "react-native"
 import * as Application from "expo-application"
 import * as Clipboard from "expo-clipboard"
 import Constants from "expo-constants"
@@ -8,26 +8,25 @@ import * as Updates from "expo-updates"
 
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
+import { DialogCard } from "@/components/DialogCard"
 import { MENU_BUTTON_STYLE_LABELS, MENU_BUTTON_STYLES } from "@/components/GameMenuButtonShape"
+import { Icon } from "@/components/Icon"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
-import { SegmentedControl } from "@/components/SegmentedControl"
-import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import { ValueField } from "@/components/ValueField"
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/features/game/domain"
+import { GameTypeList } from "@/features/game/GameTypeList"
+import { gameTypeDetail, gameTypeId, newGameTypes, type GameType } from "@/features/game/gameTypes"
 import type { LocalSettings, ThemePreference } from "@/features/game/localPersistence"
 import {
   counterLabel,
-  isPlaySystemId,
-  NO_PLAY_SYSTEM,
   defaultStartingLife,
-  playFormatOptions,
+  playFormatLabel,
   playSystemRules,
-  type PlaySystemId,
+  playSystemShortLabel,
 } from "@/features/game/playSystems"
-import { playSystemChoices } from "@/features/game/systemVisibility"
 import {
   backToPreview,
   betaUpdatesChosen,
@@ -63,6 +62,12 @@ function appInfoLine(field: AppInfoField, value: string) {
   return translate(`account:settings.appInfo.${field}`, { value })
 }
 
+function defaultGameLabel({ defaultSystem, defaultFormat }: LocalSettings) {
+  if (!defaultSystem) return translate("systems:noSystem")
+  const system = playSystemShortLabel(defaultSystem)
+  return defaultFormat ? `${playFormatLabel(defaultSystem, defaultFormat)} · ${system}` : system
+}
+
 export interface SettingsScreenProps {
   initialSettings: LocalSettings
   onBack: () => void
@@ -92,8 +97,12 @@ export function SettingsScreen({
   BlockedPlayers,
   AppIcon,
 }: SettingsScreenProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
+  const [choosingGame, setChoosingGame] = useState(false)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle")
   const [sharing, setSharing] = useState(analyticsEnabled)
   const [analyticsError, setAnalyticsError] = useState("")
@@ -128,9 +137,7 @@ export function SettingsScreen({
   const currentAnalyticsId = analyticsId()
   const copy = {
     players: translate("account:settings.players"),
-    defaultGameSystem: translate("account:settings.defaultGameSystem"),
-    format: translate("account:settings.format"),
-    noDefault: translate("account:settings.noDefault"),
+    game: translate("account:settings.game"),
     requestDeletionHint: translate("account:settings.accountData.requestDeletionHint"),
     licenseAgreementHint: translate("account:legal.licenseAgreementHint"),
     analyticsId: translate("account:settings.appInfo.analyticsId", { id: currentAnalyticsId }),
@@ -155,27 +162,18 @@ export function SettingsScreen({
     setSettings(next)
     onSettingsChange(next)
   }
-  const selectSystem = (system?: PlaySystemId) => {
+  const selectGameType = ({ system, format }: GameType) => {
+    setChoosingGame(false)
     const { defaultSystem: _system, defaultFormat: _format, ...rest } = settings
     const next: LocalSettings = {
       ...rest,
-      defaultStartingLife: defaultStartingLife(system, undefined, settings.defaultPlayerCount),
-      ...(system
-        ? {
-            defaultSystem: system,
-          }
-        : {}),
-    }
-    setSettings(next)
-    onSettingsChange(next)
-  }
-  const selectFormat = (format?: string) => {
-    if (!settings.defaultSystem) return
-    const { defaultFormat: _format, ...rest } = settings
-    const next: LocalSettings = {
-      ...rest,
+      ...(system ? { defaultSystem: system } : {}),
       ...(format ? { defaultFormat: format } : {}),
-      ...followDefaultLife({ defaultFormat: format }),
+      ...(system === settings.defaultSystem
+        ? followDefaultLife({ defaultFormat: format })
+        : {
+            defaultStartingLife: defaultStartingLife(system, format, settings.defaultPlayerCount),
+          }),
     }
     setSettings(next)
     onSettingsChange(next)
@@ -200,7 +198,14 @@ export function SettingsScreen({
       : {}
   }
   const themes: ThemePreference[] = ["system", "light", "dark"]
-  const formats = settings.defaultSystem ? playFormatOptions(settings.defaultSystem) : []
+  const gameLabel = defaultGameLabel(settings)
+  const gameTypes = newGameTypes({
+    chosen: { system: settings.defaultSystem, format: settings.defaultFormat },
+    connected: false,
+  })
+  const selectedGameTypeId = settings.defaultSystem
+    ? settings.defaultFormat && gameTypeId(settings.defaultSystem, settings.defaultFormat)
+    : gameTypeId(undefined)
   const counter = playSystemRules(settings.defaultSystem).counter
   return (
     <Screen
@@ -213,6 +218,20 @@ export function SettingsScreen({
       <View style={themed($content)}>
         <Text tx="account:settings.title" preset="heading" accessibilityRole="header" />
         <Text tx="account:settings.localDefaults" preset="subheading" accessibilityRole="header" />
+        <ListItem
+          testID="default-game"
+          tx="account:settings.game"
+          accessibilityLabel={`${copy.game}, ${gameLabel}`}
+          topSeparator
+          bottomSeparator
+          RightComponent={
+            <View style={themed($gameValue)}>
+              <Text text={gameLabel} numberOfLines={1} style={themed($muted)} />
+              <Icon icon="caretRight" size={20} color={colors.textDim} />
+            </View>
+          }
+          onPress={() => setChoosingGame(true)}
+        />
         <View style={themed($valueGrid)}>
           <View style={themed($playerValue)}>
             <ValueField
@@ -239,6 +258,7 @@ export function SettingsScreen({
             />
           </View>
         </View>
+        <Text tx="account:settings.defaultsHint" size="xs" style={themed($muted)} />
         <Text tx="account:settings.openScryveTo" style={themed($label)} />
         <View style={themed($row)}>
           {LAUNCH_DESTINATIONS.map((destination) => (
@@ -254,27 +274,6 @@ export function SettingsScreen({
           ))}
         </View>
         <Text tx="account:settings.launchDestinationHint" size="xs" style={themed($muted)} />
-        <Text tx="account:settings.gameSystem" style={themed($label)} />
-        <SegmentedControl
-          testID="default-system"
-          accessibilityLabel={copy.defaultGameSystem}
-          selectedId={settings.defaultSystem ?? NO_PLAY_SYSTEM}
-          segments={playSystemChoices()}
-          onSelect={(id) => selectSystem(isPlaySystemId(id) ? id : undefined)}
-        />
-        {formats.length > 0 ? (
-          <SelectField
-            testID="default-format"
-            label={copy.format}
-            field="format"
-            placeholder={copy.noDefault}
-            clearLabel={copy.noDefault}
-            value={settings.defaultFormat}
-            options={formats}
-            onSelect={selectFormat}
-          />
-        ) : null}
-        <Text tx="account:settings.defaultsHint" size="xs" style={themed($muted)} />
         <Switch
           testID="haptics-switch"
           labelTx="account:settings.haptics.label"
@@ -486,6 +485,26 @@ export function SettingsScreen({
           ) : null}
         </View>
       </View>
+      <DialogCard
+        visible={choosingGame}
+        onClose={() => setChoosingGame(false)}
+        placement="bottom"
+        wide
+        backdropTestID="default-game-backdrop"
+        backdropAccessibilityLabel={translate("account:settings.closeGameChoices")}
+        dialogTestID="default-game-dialog"
+        accessibilityViewIsModal
+      >
+        <ScrollView contentContainerStyle={themed($gameChoices)}>
+          <Text tx="account:settings.chooseGame" preset="subheading" accessibilityRole="header" />
+          <GameTypeList
+            types={gameTypes}
+            selectedId={selectedGameTypeId}
+            detail={(type) => gameTypeDetail(type, settings.defaultPlayerCount)}
+            onChoose={selectGameType}
+          />
+        </ScrollView>
+      </DialogCard>
     </Screen>
   )
 }
@@ -515,6 +534,15 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $choice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, minWidth: 56 })
 const $label: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $gameValue: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexShrink: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "center",
+  gap: spacing.xxs,
+  marginStart: spacing.md,
+})
+const $gameChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $accountSection: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
 })

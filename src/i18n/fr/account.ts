@@ -31,10 +31,9 @@ export default {
       decks: "Decks",
     },
     launchDestinationHint: "Jouer reprend une partie en cours ou ouvre un nouveau plateau.",
-    gameSystem: "Jeu",
-    defaultGameSystem: "Jeu par défaut",
-    format: "Format",
-    noDefault: "Aucun par défaut",
+    game: "Jeu",
+    chooseGame: "Lancer les nouvelles parties en",
+    closeGameChoices: "Fermer le choix du jeu",
     defaultsHint:
       "À définir seulement si vous voulez que les nouvelles parties commencent avec le même jeu et le même format.",
     haptics: {

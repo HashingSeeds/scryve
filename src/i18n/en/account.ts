@@ -28,10 +28,9 @@ const account = {
       decks: "Decks",
     },
     launchDestinationHint: "Play resumes a current game or opens a fresh board.",
-    gameSystem: "Game system",
-    defaultGameSystem: "Default game system",
-    format: "Format",
-    noDefault: "No default",
+    game: "Game",
+    chooseGame: "Start new games as",
+    closeGameChoices: "Close game choices",
     defaultsHint:
       "Set these only when you want new games to start with the same system and format.",
     haptics: {

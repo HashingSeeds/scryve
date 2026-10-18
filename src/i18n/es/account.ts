@@ -31,10 +31,9 @@ export default {
       decks: "Mazos",
     },
     launchDestinationHint: "Jugar retoma la partida actual o abre un tablero nuevo.",
-    gameSystem: "Sistema de juego",
-    defaultGameSystem: "Sistema de juego predeterminado",
-    format: "Formato",
-    noDefault: "Sin predeterminado",
+    game: "Juego",
+    chooseGame: "Iniciar partidas nuevas como",
+    closeGameChoices: "Cerrar opciones de juego",
     defaultsHint:
       "Configúralo solo si quieres que las partidas nuevas empiecen con el mismo sistema y formato.",
     haptics: {
