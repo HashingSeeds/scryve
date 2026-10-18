@@ -49,7 +49,6 @@ export default {
     connected: "Conectada",
     joinWithCode: "Unirse con código",
     resumeHostedGame: "Reanudar partida creada",
-    allFormats: "Todos los formatos",
     moreFormats_one: "{{count}} más",
     moreFormats_many: "{{count}} más",
     moreFormats_other: "{{count}} más",

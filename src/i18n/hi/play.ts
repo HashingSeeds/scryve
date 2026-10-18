@@ -47,7 +47,6 @@ export default {
     connected: "कनेक्टेड",
     joinWithCode: "कोड से शामिल हों",
     resumeHostedGame: "होस्ट किया गेम फिर शुरू करें",
-    allFormats: "सभी फ़ॉर्मैट",
     moreFormats_one: "{{count}} और",
     moreFormats_other: "{{count}} और",
     change: "बदलें",

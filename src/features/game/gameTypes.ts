@@ -82,7 +82,14 @@ export function newGameTypes({
     ...[...ranked].slice(0, SUGGESTED_COUNT),
     ...candidates.filter((type) => !type.system),
   ]
-  return { suggested, more: offered.filter((type) => !suggested.includes(type)) }
+  const more = offered.filter((type) => !suggested.includes(type))
+  return {
+    suggested,
+    more: VISIBLE_SYSTEM_IDS.map((system) => ({
+      system,
+      types: more.filter((type) => type.system === system),
+    })).filter(({ types }) => types.length > 0),
+  }
 }
 
 export function gameTypeLabel(type: GameType) {

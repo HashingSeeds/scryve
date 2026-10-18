@@ -44,7 +44,6 @@ const play = {
     connected: "Connected",
     joinWithCode: "Join with code",
     resumeHostedGame: "Resume hosted game",
-    allFormats: "All formats",
     moreFormats_one: "{{count}} more",
     moreFormats_other: "{{count}} more",
     change: "Change",
