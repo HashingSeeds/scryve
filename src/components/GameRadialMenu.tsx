@@ -178,24 +178,31 @@ const PENTAGON_SPIN_SPRING = {
 
 const BASE_ACTION_POSE = { x: -30, y: -86, rotationDeg: 22 } as const
 const CENTER_ACTION_SIDE_STEPS = [-1, 0, 1, -2, 2] as const
+// why: with four actions, each keeps the side nearest its five-action slot so the menu does not reshuffle between games.
+const FOUR_CENTER_ACTION_SIDE_STEPS = [-1, 0, 2, 1] as const
 
-function rotateBasePoseToSide(stepsFromTopSide: number): RadialActionPose {
-  const angleDeg = stepsFromTopSide * (360 / PENTAGON_SIDES)
-  const angleRad = (angleDeg * Math.PI) / 180
-  const clockwiseRank = ((stepsFromTopSide % PENTAGON_SIDES) + PENTAGON_SIDES) % PENTAGON_SIDES
-  return {
-    x: BASE_ACTION_POSE.x * Math.cos(angleRad) - BASE_ACTION_POSE.y * Math.sin(angleRad),
-    y: BASE_ACTION_POSE.x * Math.sin(angleRad) + BASE_ACTION_POSE.y * Math.cos(angleRad),
-    rotationDeg: BASE_ACTION_POSE.rotationDeg + angleDeg,
-    delayMs: clockwiseRank * ACTION_STAGGER_MS,
+function rotateBasePose(sideCount: number) {
+  return (stepsFromTopSide: number): RadialActionPose => {
+    const angleDeg = stepsFromTopSide * (360 / sideCount)
+    const angleRad = (angleDeg * Math.PI) / 180
+    const clockwiseRank = ((stepsFromTopSide % sideCount) + sideCount) % sideCount
+    return {
+      x: BASE_ACTION_POSE.x * Math.cos(angleRad) - BASE_ACTION_POSE.y * Math.sin(angleRad),
+      y: BASE_ACTION_POSE.x * Math.sin(angleRad) + BASE_ACTION_POSE.y * Math.cos(angleRad),
+      rotationDeg: BASE_ACTION_POSE.rotationDeg + angleDeg,
+      delayMs: clockwiseRank * ACTION_STAGGER_MS,
+    }
   }
 }
 
-const CENTER_ACTION_POSES: readonly RadialActionPose[] =
-  CENTER_ACTION_SIDE_STEPS.map(rotateBasePoseToSide)
+const CENTER_ACTION_POSES: readonly RadialActionPose[] = CENTER_ACTION_SIDE_STEPS.map(
+  rotateBasePose(PENTAGON_SIDES),
+)
+const FOUR_CENTER_ACTION_POSES: readonly RadialActionPose[] = FOUR_CENTER_ACTION_SIDE_STEPS.map(
+  rotateBasePose(4),
+)
 const EDGE_POSE_DISTANCE = 112
 const LEFT_EDGE_POSE_ANGLES = [0, 45, 90, 135, 180] as const
-const FOUR_CENTER_POSE_ANGLES = [-54, 54, -126, 126] as const
 const FOUR_LEFT_EDGE_POSE_ANGLES = [0, 60, 120, 180] as const
 
 function poseAlongAngle(angleDeg: number, order: number): RadialActionPose {
@@ -221,7 +228,7 @@ export function getRadialActionPoses(
   const edgeAngles = actionCount === 4 ? FOUR_LEFT_EDGE_POSE_ANGLES : LEFT_EDGE_POSE_ANGLES
   if (anchorNearLeftEdge) return edgeAngles.map(poseAlongAngle)
   if (anchorNearRightEdge) return edgeAngles.map(poseAlongAngle).map(mirrorPose)
-  if (actionCount === 4) return FOUR_CENTER_POSE_ANGLES.map(poseAlongAngle)
+  if (actionCount === 4) return FOUR_CENTER_ACTION_POSES
   return CENTER_ACTION_POSES
 }
 
