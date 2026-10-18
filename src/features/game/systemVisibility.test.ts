@@ -43,7 +43,11 @@ describe("system visibility", () => {
       chosen: { system: "pokemon", format: "standard" },
       connected: false,
     })
-    expect([...suggested, ...more].some((type) => type.system === "pokemon")).toBe(false)
+    expect(
+      [...suggested, ...more.flatMap(({ types }) => types)].some(
+        (type) => type.system === "pokemon",
+      ),
+    ).toBe(false)
   })
 
   it.each(["beta", "preview", "development"])("shows beta systems on %s", async (environment) => {

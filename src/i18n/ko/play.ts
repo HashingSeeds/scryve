@@ -46,7 +46,6 @@ export default {
     connected: "연결",
     joinWithCode: "코드로 참가",
     resumeHostedGame: "호스트 게임 이어하기",
-    allFormats: "모든 포맷",
     moreFormats_other: "{{count}}개 더",
     change: "변경",
     closeOptions: "게임 옵션 닫기",

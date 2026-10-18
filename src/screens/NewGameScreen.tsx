@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import type { GestureResponderEvent, ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -14,6 +14,7 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
+import { Icon } from "@/components/Icon"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -333,7 +334,7 @@ function NewGameForm({
     initialClock?.mode === "countdown" ? initialClock.minutes : undefined,
   )
   const [optionsOpen, setOptionsOpen] = useState(false)
-  const [showAllFormats, setShowAllFormats] = useState(false)
+  const [openSystems, setOpenSystems] = useState<readonly PlaySystemId[]>([])
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
   const [playerSaveError, setPlayerSaveError] = useState<string>()
@@ -385,8 +386,9 @@ function NewGameForm({
       seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
     connected: connectedMode,
   })
-  const allFormatsShown =
-    showAllFormats || (!recentSelected && gameTypes.more.some((type) => type.id === selectedTypeId))
+  const groupOpen = ({ system, types }: (typeof gameTypes.more)[number]) =>
+    openSystems.includes(system) ||
+    (!recentSelected && types.some((type) => type.id === selectedTypeId))
   const setupSummary = [
     connectedMode
       ? translate("play:newGame.seatsCount", { count: playerCount })
@@ -542,10 +544,20 @@ function NewGameForm({
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
 
-  function gameTypeChoiceDetail(type: GameType) {
-    return gameTypeDetail(
-      type,
-      type.variant === "treachery" ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount,
+  function gameTypeChoice(type: GameType) {
+    return (
+      <ChoiceButton
+        key={type.id}
+        testID={`game-type-${type.id}`}
+        text={gameTypeLabel(type)}
+        detail={gameTypeDetail(
+          type,
+          type.variant === "treachery" ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount,
+        )}
+        detailShrinks
+        selected={!recentSelected && type.id === selectedTypeId}
+        onPress={() => chooseGameType(type)}
+      />
     )
   }
 
@@ -714,26 +726,18 @@ function NewGameForm({
                 onPress={() => onReplay(recent)}
               />
             ) : null}
-            {[...gameTypes.suggested, ...(allFormatsShown ? gameTypes.more : [])].map((type) => (
-              <ChoiceButton
-                key={type.id}
-                testID={`game-type-${type.id}`}
-                text={gameTypeLabel(type)}
-                detail={gameTypeChoiceDetail(type)}
-                detailShrinks
-                selected={!recentSelected && type.id === selectedTypeId}
-                onPress={() => chooseGameType(type)}
-              />
-            ))}
-            {allFormatsShown || gameTypes.more.length === 0 ? null : (
-              <ChoiceButton
-                testID="game-type-all-formats"
-                tx="play:newGame.allFormats"
-                detail={translate("play:newGame.moreFormats", { count: gameTypes.more.length })}
-                selected={false}
-                accessibilityState={{ expanded: false }}
-                onPress={() => setShowAllFormats(true)}
-              />
+            {gameTypes.suggested.map(gameTypeChoice)}
+            {gameTypes.more.map((group) =>
+              groupOpen(group) ? (
+                group.types.map(gameTypeChoice)
+              ) : (
+                <FormatsDisclosure
+                  key={group.system}
+                  system={group.system}
+                  count={group.types.length}
+                  onPress={() => setOpenSystems((open) => [...open, group.system])}
+                />
+              ),
             )}
           </View>
 
@@ -1360,6 +1364,41 @@ function NewGameForm({
   )
 }
 
+// why: tint text and a caret, not a choice row, so opening a game's formats never reads as picking one.
+function FormatsDisclosure({
+  system,
+  count,
+  onPress,
+}: {
+  system: PlaySystemId
+  count: number
+  onPress: () => void
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const label = playSystemShortLabel(system)
+  const more = translate("play:newGame.moreFormats", { count })
+  return (
+    <Button
+      testID={`game-type-more-${system}`}
+      text={label}
+      accessibilityLabel={`${label}, ${more}`}
+      accessibilityState={{ expanded: false }}
+      style={themed($disclosure)}
+      textStyle={themed($disclosureText)}
+      RightAccessory={({ style }) => (
+        <View style={[style, themed($disclosureDetail)]}>
+          <Text size="xs" text={more} style={themed($disclosureText)} />
+          <Icon icon="caretRight" size={14} color={colors.tint} style={$caretDown} />
+        </View>
+      )}
+      onPress={onPress}
+    />
+  )
+}
+
 function defaultName(index: number) {
   return `Player ${index + 1}`
 }
@@ -1375,6 +1414,20 @@ const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $gameTypes: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $recentLabel = { style: { flexShrink: 0 } }
+const $disclosure: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  justifyContent: "flex-start",
+  paddingHorizontal: spacing.sm,
+  borderWidth: 0,
+  backgroundColor: "transparent",
+})
+const $disclosureText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
+const $disclosureDetail: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+const $caretDown: ImageStyle = { transform: [{ rotate: "90deg" }] }
 const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

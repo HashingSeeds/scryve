@@ -518,7 +518,7 @@ describe("NewGameScreen", () => {
     const view = setup()
 
     fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
-    fireEvent.press(view.getByTestId("game-type-all-formats"))
+    fireEvent.press(view.getByTestId("game-type-more-ygo"))
     fireEvent.press(view.getByTestId("game-type-ygo-speed"))
     openOptions()
     expect(view.getByLabelText("Life Points, 4000")).toBeTruthy()
@@ -573,7 +573,7 @@ describe("NewGameScreen", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
 
-    fireEvent.press(view.getByTestId("game-type-all-formats"))
+    fireEvent.press(view.getByTestId("game-type-more-pokemon"))
     fireEvent.press(view.getByTestId("game-type-pokemon-standard"))
     expect(view.getByText("2 players · 6 Prize cards")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
@@ -739,13 +739,14 @@ describe("NewGameScreen", () => {
     )
   })
 
-  it("reveals Brawl under All formats and follows its life from two players to multiplayer", () => {
+  it("reveals Brawl under Magic's formats and follows its life from two players to multiplayer", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
     expect(view.queryByTestId("game-type-mtg-brawl")).toBeNull()
-    expect(view.getByTestId("game-type-all-formats")).toHaveTextContent(/^All formats\d+ more$/)
-    fireEvent.press(view.getByTestId("game-type-all-formats"))
-    expect(view.queryByTestId("game-type-all-formats")).toBeNull()
+    expect(view.getByTestId("game-type-more-mtg")).toHaveTextContent(/^Magic\d+ more$/)
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
+    expect(view.queryByTestId("game-type-more-mtg")).toBeNull()
+    expect(view.queryByTestId("game-type-ygo-speed")).toBeNull()
     fireEvent.press(view.getByTestId("game-type-mtg-brawl"))
     expect(view.getByText("2 players · 25 life")).toBeTruthy()
     openOptions()
@@ -1465,7 +1466,7 @@ describe("NewGameScreen", () => {
 
   it("keeps Treachery and Join with code on the Connected tab", () => {
     setup({ onJoin: jest.fn() })
-    fireEvent.press(screen.getByTestId("game-type-all-formats"))
+    fireEvent.press(screen.getByTestId("game-type-more-mtg"))
     expect(screen.queryByTestId("game-type-treachery")).toBeNull()
     expect(screen.queryByTestId("join-with-code-button")).toBeNull()
 
@@ -1479,7 +1480,7 @@ describe("NewGameScreen", () => {
       defaults: { ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg", defaultFormat: "modern" },
     })
     expect(screen.getByTestId("game-type-mtg-modern").props.accessibilityState.selected).toBe(true)
-    expect(screen.getByTestId("game-type-all-formats")).toBeTruthy()
+    expect(screen.getByTestId("game-type-more-mtg")).toBeTruthy()
   })
 
   it("opens on the recent setup, and choosing it again starts over from it", () => {

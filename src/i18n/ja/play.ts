@@ -47,7 +47,6 @@ export default {
     connected: "接続",
     joinWithCode: "コードで参加",
     resumeHostedGame: "ホストしたゲームを再開",
-    allFormats: "すべてのフォーマット",
     moreFormats_other: "他{{count}}件",
     change: "変更",
     closeOptions: "ゲームオプションを閉じる",
