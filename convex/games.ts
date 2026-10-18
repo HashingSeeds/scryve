@@ -41,6 +41,7 @@ import {
 } from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
+import { playerGridLayoutValidator } from "./lib/layouts"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
@@ -722,6 +723,7 @@ export const createLobby = mutation({
     system: v.optional(v.string()),
     format: v.optional(v.string()),
     variant: v.optional(gameVariantValidator),
+    layout: v.optional(playerGridLayoutValidator),
     inviteToken: v.string(),
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
@@ -790,6 +792,7 @@ export const createLobby = mutation({
       system: gameSystem,
       ...(format ? { format } : {}),
       ...(args.variant ? { variant: args.variant } : {}),
+      ...(args.layout ? { layout: args.layout } : {}),
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -1083,6 +1086,7 @@ export const publishLocalGame = mutation({
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
     table: v.optional(tableStateValidator),
+    layout: v.optional(playerGridLayoutValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1136,6 +1140,7 @@ export const publishLocalGame = mutation({
       args.commanderTotals ?? null,
       // why: appended only when sent, so receipts written before tables existed keep their key.
       ...(args.table ? [canonicalJson(args.table)] : []),
+      ...(args.layout ? [args.layout] : []),
     ])
     const receipt = await ctx.db
       .query("gamePublishReceipts")
@@ -1177,6 +1182,7 @@ export const publishLocalGame = mutation({
       game: gameSystem,
       system: gameSystem,
       ...(format ? { format } : {}),
+      ...(args.layout ? { layout: args.layout } : {}),
       createdAt: now,
       startedAt: now,
       updatedAt: now,
@@ -1653,6 +1659,7 @@ export const lobbyProjection = query({
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
       ...(game.variant ? { variant: game.variant } : {}),
+      ...(game.layout ? { layout: game.layout } : {}),
       isHost,
       ...(game.rematchPublicId ? { rematchPublicId: game.rematchPublicId } : {}),
       eventSequence: eventCount,
@@ -2783,6 +2790,7 @@ async function startRematch(
     ...(finished.system === undefined ? {} : { system: finished.system }),
     ...(finished.format === undefined ? {} : { format: finished.format }),
     ...(finished.variant === undefined ? {} : { variant: finished.variant }),
+    ...(finished.layout === undefined ? {} : { layout: finished.layout }),
     rematchOfGameId: finished._id,
     createdAt: now,
     startedAt: now,

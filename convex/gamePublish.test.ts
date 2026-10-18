@@ -54,6 +54,18 @@ async function published(t: ConvexTestHarness, overrides: Partial<typeof baseSna
 }
 
 describe("publishLocalGame", () => {
+  it("opens every board on the layout the local game was using", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host-subject", "Host")
+    const created = await host.mutation(api.games.publishLocalGame, {
+      ...snapshotArgs(),
+      layout: "even-grid",
+    })
+
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    expect(projection.layout).toBe("even-grid")
+  })
+
   it("requires authentication", async () => {
     const t = makeConvexTest()
     await expect(t.mutation(api.games.publishLocalGame, snapshotArgs())).rejects.toThrow(

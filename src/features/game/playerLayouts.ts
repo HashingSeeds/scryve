@@ -1,15 +1,12 @@
 import type { Translations } from "@/i18n/en"
 import { translate } from "@/i18n/translate"
 
-export const PLAYER_GRID_LAYOUT_VARIANTS = [
-  "auto",
-  "featured-first",
-  "featured-last",
-  "even-grid",
-  "tabletop",
-] as const
+import {
+  isPlayerGridLayoutVariant,
+  type PlayerGridLayoutVariant,
+} from "../../../convex/lib/layouts"
 
-export type PlayerGridLayoutVariant = (typeof PLAYER_GRID_LAYOUT_VARIANTS)[number]
+export type { PlayerGridLayoutVariant }
 
 type PlayerGridLayoutLabel = keyof Translations["board"]["layout"]
 
@@ -57,10 +54,18 @@ export function playerGridLayoutAccessibilityLabel(
 export function playerGridLayoutForCount(
   playerCount: number,
   value: unknown,
+  fallback: PlayerGridLayoutVariant = "auto",
 ): PlayerGridLayoutVariant {
-  return getPlayerGridLayoutOptions(playerCount).some(({ variant }) => variant === value)
-    ? (value as PlayerGridLayoutVariant)
-    : "auto"
+  return isPlayerGridLayoutVariant(value) &&
+    layoutLabels(playerCount).some(([variant]) => variant === value)
+    ? value
+    : fallback
+}
+
+export function defaultConnectedLayout(playerCount: number): PlayerGridLayoutVariant {
+  if (playerCount === 3) return "featured-last"
+  if (playerCount === 4 || playerCount >= 6) return "tabletop"
+  return "auto"
 }
 
 export type SeatOrder = readonly number[]

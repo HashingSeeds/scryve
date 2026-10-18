@@ -9,6 +9,10 @@ import {
   type MemoryWriteResult,
 } from "../../../convex/lib/gameEngineMemory"
 import { isCommanderFormat, isCommanderLethal } from "../../../convex/lib/gameRules"
+import {
+  isPlayerGridLayoutVariant,
+  type PlayerGridLayoutVariant,
+} from "../../../convex/lib/layouts"
 import { tableRules } from "../../../convex/lib/systems"
 import {
   matchesValidator,
@@ -47,6 +51,7 @@ export interface LanSetup {
   ruleset: string
   system?: PlaySystemId
   format?: string
+  layout?: PlayerGridLayoutVariant
 }
 
 export interface LanSeat {
@@ -347,6 +352,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
     startingLife: setup.startingLife,
     lifeStep: setup.lifeStep,
     ruleset: setup.ruleset,
+    ...(setup.layout ? { layout: setup.layout } : {}),
     isHost: viewerKey === game.hostKey,
     eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
     serverUpdatedAt: game.updatedAt,
@@ -397,7 +403,7 @@ const isPass = (value: unknown): value is LanSeatPass =>
 
 export function parseLanSetup(value: unknown): LanSetup | null {
   if (!isRecord(value)) return null
-  const { playerCount, startingLife, lifeStep, ruleset, system, format } = value
+  const { playerCount, startingLife, lifeStep, ruleset, system, format, layout } = value
   if (
     !Number.isInteger(playerCount) ||
     (playerCount as number) < LAN_MIN_PLAYERS ||
@@ -409,15 +415,21 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     ruleset.length > 64
   )
     return null
-  if (system === undefined)
-    return { playerCount: playerCount as number, startingLife, lifeStep, ruleset }
+  const setup = {
+    playerCount: playerCount as number,
+    startingLife,
+    lifeStep,
+    ruleset,
+    ...(isPlayerGridLayoutVariant(layout) ? { layout } : {}),
+  }
+  if (system === undefined) return setup
   if (
     !isPlaySystemId(system) ||
     typeof format !== "string" ||
     !playSystemFormats(system).some(({ id }) => id === format)
   )
     return null
-  return { playerCount: playerCount as number, startingLife, lifeStep, ruleset, system, format }
+  return { ...setup, system, format }
 }
 
 function parseEvent(value: unknown): ConnectedActionEvent | null {

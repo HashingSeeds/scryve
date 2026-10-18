@@ -4,6 +4,7 @@ import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/type
 
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_SNAPSHOT_LIFE } from "../../../convex/lib/gameRules"
+import type { PlayerGridLayoutVariant } from "../../../convex/lib/layouts"
 import { isSystemId } from "../../../convex/lib/systems"
 import { isValidTableSnapshot, type TableState } from "../../../convex/lib/table"
 
@@ -99,6 +100,7 @@ export interface LocalGameSnapshot {
   }[]
   commanderTotals?: { fromSeat: number; toSeat: number; total: number }[]
   table?: TableState
+  layout?: PlayerGridLayoutVariant
 }
 
 export interface LocalGameSnapshotInput {
@@ -172,6 +174,7 @@ export function buildLocalGameSnapshot({
     })),
     ...(commanderTotals ? { commanderTotals } : {}),
     ...(table ? { table } : {}),
+    ...(game.layout ? { layout: game.layout } : {}),
   }
 }
 

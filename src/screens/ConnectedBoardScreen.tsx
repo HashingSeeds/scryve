@@ -60,7 +60,11 @@ import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connecte
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
-import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
+import {
+  defaultConnectedLayout,
+  playerGridLayoutForCount,
+  type PlayerGridLayoutVariant,
+} from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
   counterValueLabel,
@@ -240,12 +244,6 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
       <ConvexConnectedBoard key={runtimeKey} {...props} ownerId={ownerId} />
     </ConvexQueryBoundary>
   )
-}
-
-export function connectedBoardLayoutVariant(playerCount: number): PlayerGridLayoutVariant {
-  if (playerCount === 3) return "featured-last"
-  if (playerCount === 4 || playerCount >= 6) return "tabletop"
-  return "auto"
 }
 
 type ConnectedBoardReadyProps = {
@@ -664,7 +662,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const layoutVariant =
     layoutSelection?.playerCount === players.length
       ? layoutSelection.layout
-      : connectedBoardLayoutVariant(players.length)
+      : playerGridLayoutForCount(
+          players.length,
+          game.layout,
+          defaultConnectedLayout(players.length),
+        )
   const commanderDamageEnabled =
     supportsCommanderDamage(system, game.format || game.ruleset) &&
     game.commanderDamage !== undefined

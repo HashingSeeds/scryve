@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
+import { playerGridLayoutValidator } from "./lib/layouts"
 import { pokemonBoardValidator } from "./lib/table"
 import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
 
@@ -119,6 +120,7 @@ export default defineSchema({
     system: v.optional(v.string()),
     format: v.optional(v.string()),
     variant: v.optional(gameVariantValidator),
+    layout: v.optional(playerGridLayoutValidator),
     createdAt: v.number(),
     startedAt: v.optional(v.number()),
     updatedAt: v.number(),

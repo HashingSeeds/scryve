@@ -50,7 +50,6 @@ jest.mock("../../../convex/_generated/api", () => ({
 jest.mock("@/features/game/localPersistence", () => ({
   LocalGameRepository: jest.fn(() => ({
     getDeviceId: () => "device-test-0001",
-    saveLayoutPreference: jest.fn(),
   })),
 }))
 jest.mock("convex/react", () => ({

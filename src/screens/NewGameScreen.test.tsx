@@ -820,7 +820,7 @@ describe("NewGameScreen", () => {
       system: "mtg",
       format: "commander",
       deckRequired: false,
-      layout: "auto",
+      layout: "tabletop",
       lifeStep: 1,
     })
   })
