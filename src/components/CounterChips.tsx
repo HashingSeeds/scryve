@@ -701,7 +701,6 @@ function SheetTextButton({
   )
 }
 
-// why: a counter not in play shows the step one tap adds, so a Commander tax that starts at 2 is no surprise.
 function SheetOption({
   ref,
   testID,
