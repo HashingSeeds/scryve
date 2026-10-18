@@ -19,6 +19,7 @@ import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
+import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
@@ -304,7 +305,6 @@ export function CurrentGameScreen({
       {
         kind: "layout",
         label: translate("board:menu.layout"),
-        disabled: layoutOptions.length < 2,
         onPress: (event) => {
           captureMenuDialogOrigin(event)
           setMenuOpen(false)
@@ -364,7 +364,6 @@ export function CurrentGameScreen({
       closeMenu,
       diceTools,
       isFresh,
-      layoutOptions.length,
       onConnect,
       onHistory,
       onRules,
@@ -406,6 +405,7 @@ export function CurrentGameScreen({
               lifeStep={runtime.game.lifeStep}
               onOpenRule={onRules}
               layoutVariant={layoutVariant}
+              seatOrder={runtime.game.seatOrder}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               isPlayerEliminated={
@@ -486,14 +486,23 @@ export function CurrentGameScreen({
           wide
         >
           <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
-          <PlayerLayoutPicker
-            playerCount={playerCount}
-            value={layoutVariant}
-            testID="layout"
-            onChange={(layout) => {
-              runtime.changeLayout(layout)
-              closePanel()
-            }}
+          {layoutOptions.length > 1 ? (
+            <PlayerLayoutPicker
+              playerCount={playerCount}
+              value={layoutVariant}
+              testID="layout"
+              onChange={(layout) => {
+                runtime.changeLayout(layout)
+                closePanel()
+              }}
+            />
+          ) : null}
+          <Text tx="board:seats.title" preset="subheading" style={themed($dialogText)} />
+          <SeatArrangement
+            players={runtime.game.players}
+            layoutVariant={layoutVariant}
+            seatOrder={runtime.game.seatOrder}
+            onChange={runtime.changeSeatOrder}
           />
           <Button tx="common:cancel" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>

@@ -100,6 +100,10 @@ export default {
     evenGrid: "Cuadrícula uniforme",
     table: "Mesa",
   },
+  seats: {
+    title: "Cambiar asientos",
+    seat: "Asiento de {{name}}",
+  },
   layoutOption: {
     balanced: "Diseño equilibrado",
     topFocus: "Diseño con foco arriba",

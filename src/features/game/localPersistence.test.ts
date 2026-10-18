@@ -51,6 +51,16 @@ function tap(game: LocalGame) {
 }
 
 describe("LocalGameRepository", () => {
+  it("keeps a swapped seat order and drops one that does not cover every player", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = makeGame()
+    repository.saveActiveGame({ ...game, seatOrder: [1, 0] })
+    expect(repository.loadActiveGame()?.seatOrder).toEqual([1, 0])
+
+    repository.saveActiveGame({ ...game, seatOrder: [1, 1] })
+    expect(repository.loadActiveGame()).not.toHaveProperty("seatOrder")
+  })
+
   it("updates players on the latest board and keeps events and commander damage", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const original = makeGame()

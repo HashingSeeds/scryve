@@ -62,3 +62,24 @@ export function playerGridLayoutForCount(
     ? (value as PlayerGridLayoutVariant)
     : "auto"
 }
+
+export type SeatOrder = readonly number[]
+
+export function isSeatOrder(value: unknown, playerCount: number): value is SeatOrder {
+  return (
+    Array.isArray(value) &&
+    value.length === playerCount &&
+    Array.from({ length: playerCount }, (_, index) => index).every((index) => value.includes(index))
+  )
+}
+
+export function swapSeats(
+  order: SeatOrder | undefined,
+  playerCount: number,
+  first: number,
+  second: number,
+): number[] {
+  const next = order ? [...order] : Array.from({ length: playerCount }, (_, index) => index)
+  ;[next[first], next[second]] = [next[second], next[first]]
+  return next
+}

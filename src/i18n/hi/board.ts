@@ -99,6 +99,10 @@ export default {
     evenGrid: "समान ग्रिड",
     table: "टेबल",
   },
+  seats: {
+    title: "सीटें बदलें",
+    seat: "{{name}} की सीट",
+  },
   layoutOption: {
     balanced: "संतुलित लेआउट",
     topFocus: "ऊपर फोकस लेआउट",

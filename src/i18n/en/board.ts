@@ -80,6 +80,10 @@ const board = {
     evenGrid: "Even grid",
     table: "Table",
   },
+  seats: {
+    title: "Swap seats",
+    seat: "{{name}}'s seat",
+  },
   layoutOption: {
     balanced: "Balanced layout",
     topFocus: "Top focus layout",

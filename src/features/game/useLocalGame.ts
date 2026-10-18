@@ -20,7 +20,7 @@ import {
   withFirstChooser,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
-import type { PlayerGridLayoutVariant } from "./playerLayouts"
+import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
 import type { RoundClock } from "./roundClock"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
@@ -88,16 +88,25 @@ export function useLocalGame(
     [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
-  const changeLayout = useCallback(
-    (layout: PlayerGridLayoutVariant) => {
+  const changeBoard = useCallback(
+    (board: { layout?: PlayerGridLayoutVariant; seatOrder?: SeatOrder }) => {
       const current = gameRef.current
-      if (current.layout === layout) return
-      const next = { ...current, layout, updatedAt: Date.now() }
+      const next = { ...current, ...board, updatedAt: Date.now() }
       repository.saveActiveGame(next)
       gameRef.current = next
       setGame(next)
     },
     [repository],
+  )
+  const changeLayout = useCallback(
+    (layout: PlayerGridLayoutVariant) => {
+      if (gameRef.current.layout !== layout) changeBoard({ layout })
+    },
+    [changeBoard],
+  )
+  const changeSeatOrder = useCallback(
+    (seatOrder: SeatOrder) => changeBoard({ seatOrder }),
+    [changeBoard],
   )
 
   // why: a round clock runs before the first tap, so an unsaved timed board would restart its clock when the route rebuilds it.
@@ -227,6 +236,7 @@ export function useLocalGame(
     changeLife,
     assignCommanderDamage,
     changeLayout,
+    changeSeatOrder,
     changeClock,
     undo: () => dispatch({ type: "life.undo" }),
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>

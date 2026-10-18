@@ -2,7 +2,12 @@ import { randomUUID as secureRandomUUID } from "expo-crypto"
 
 import { translate } from "@/i18n/translate"
 
-import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
+import {
+  isSeatOrder,
+  playerGridLayoutForCount,
+  type PlayerGridLayoutVariant,
+  type SeatOrder,
+} from "./playerLayouts"
 import {
   isPlaySystemId,
   playSystemFormat,
@@ -132,6 +137,7 @@ export function createLocalGame(input: {
   system?: PlaySystemId
   format?: string
   layout?: PlayerGridLayoutVariant
+  seatOrder?: SeatOrder
   lifeStep?: number
   now?: number
   gameId?: GameId
@@ -173,6 +179,7 @@ export function createLocalGame(input: {
     status: "active",
     ...(system ? { system, format } : {}),
     layout: playerGridLayoutForCount(input.players.length, input.layout),
+    ...(isSeatOrder(input.seatOrder, players.length) ? { seatOrder: input.seatOrder } : {}),
     lifeStep,
     startingLife: input.startingLife,
     players,
@@ -319,6 +326,7 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
     system: game.system,
     format: game.format,
     layout: game.layout,
+    seatOrder: game.seatOrder,
     lifeStep: game.lifeStep,
     now,
     ...(game.account ? { account: { ...game.account, meSeat: meSeatOf(game) } } : {}),

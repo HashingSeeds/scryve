@@ -99,6 +99,10 @@ export default {
     evenGrid: "均等グリッド",
     table: "テーブル",
   },
+  seats: {
+    title: "席を入れ替える",
+    seat: "{{name}}の席",
+  },
   layoutOption: {
     balanced: "バランスレイアウト",
     topFocus: "上重視レイアウト",

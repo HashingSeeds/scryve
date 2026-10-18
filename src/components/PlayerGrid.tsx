@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { DiceSeatChip } from "@/features/game/dice"
-import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
+import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
@@ -120,6 +120,7 @@ export interface PlayerGridProps {
   system?: PlaySystemId
   lifeStep?: number
   layoutVariant?: PlayerGridLayoutVariant
+  seatOrder?: SeatOrder
   disabled?: boolean
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
@@ -142,6 +143,7 @@ export function PlayerGrid({
   system,
   lifeStep,
   layoutVariant = "auto",
+  seatOrder,
   disabled,
   isPlayerDisabled,
   isPlayerOwned,
@@ -243,11 +245,14 @@ export function PlayerGrid({
   }
 
   const rows = getPlayerGridRows(players.length, layout)
+  const seatedRows = rows.map((row) =>
+    row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
+  )
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const boardSeats = commanderDamage
     ? commanderBoardSeats(
-        rows,
+        seatedRows,
         players.map(({ id }) => id),
       )
     : null
@@ -289,8 +294,9 @@ export function PlayerGrid({
             testID={`player-grid-row-${rowIndex}`}
             style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
           >
-            {row.map((index, columnIndex) => {
-              if (index === null) {
+            {row.map((slot, columnIndex) => {
+              const index = seatedRows[rowIndex][columnIndex]
+              if (slot === null || index === null) {
                 return (
                   <View
                     key={`empty-${rowIndex}-${columnIndex}`}
@@ -308,7 +314,7 @@ export function PlayerGrid({
                 row,
                 rowIndex,
                 columnIndex,
-                playerIndex: index,
+                slot,
               })
               const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
               const screenEdges = {
