@@ -1,18 +1,37 @@
+import { useEffect } from "react"
 import { router, useLocalSearchParams } from "expo-router"
 
-import { GAME_RULES } from "@/features/rules/gameRules"
+import { GAME_RULES, gameRules, openRules } from "@/features/rules/gameRules"
 import { RulesScreen } from "@/screens/RulesScreen"
 
+const leave = () => (router.canGoBack() ? router.back() : router.replace("/"))
+
 export default function RulesRoute() {
-  const { rule, glossary } = useLocalSearchParams<{ rule?: string; glossary?: string }>()
+  const { system, rule, glossary } = useLocalSearchParams<{
+    system?: string
+    rule?: string
+    glossary?: string
+  }>()
+  const rules = gameRules(system)
+  useEffect(() => {
+    if (rules?.kind !== "link") return
+    openRules(rules)
+    leave()
+  }, [rules])
+  if (rules?.kind === "link") return null
+  const source = rules ?? GAME_RULES.mtg
+  const params = system ? { system } : {}
   return (
     <RulesScreen
-      source={GAME_RULES.mtg}
+      key={source.cacheKey}
+      source={source}
       ruleId={rule}
       glossary={glossary !== undefined}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-      onOpenRule={(id) => router.push({ pathname: "/rules", params: { rule: id } })}
-      onOpenGlossary={() => router.push({ pathname: "/rules", params: { glossary: "1" } })}
+      onBack={leave}
+      onOpenRule={(id) => router.push({ pathname: "/rules", params: { ...params, rule: id } })}
+      onOpenGlossary={() =>
+        router.push({ pathname: "/rules", params: { ...params, glossary: "1" } })
+      }
     />
   )
 }

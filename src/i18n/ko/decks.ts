@@ -479,6 +479,7 @@ export default {
     listHelperMtg:
       '"1 Sol Ring" 같은 줄을 사용하세요. Commander, Mainboard, Sideboard 제목을 지원합니다.',
     listHelperLorcana: '"4 Aladdin - Heroic Outlaw" 같은 줄을 사용하세요.',
+    listHelperFab: 'Fabrary 카드 목록이나 "3x Snatch (red)" 같은 줄을 붙여넣으세요.',
     returnToReview: "검토로 돌아가기",
     loadingDeck: "덱 불러오는 중…",
     reloadSource: "소스 다시 불러오기",

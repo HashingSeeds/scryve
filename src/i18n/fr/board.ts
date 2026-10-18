@@ -131,6 +131,7 @@ export default {
       ygo: "Égalité de Life Points",
       pokemon: "Égalité de cartes Récompense",
       lorcana: "Égalité de Lore",
+      fab: "Égalité de points de vie",
     },
     leads: {
       none: "{{name}} mène aux points de vie",
@@ -138,6 +139,7 @@ export default {
       ygo: "{{name}} mène aux Life Points",
       pokemon: "{{name}} mène aux cartes Récompense",
       lorcana: "{{name}} mène au Lore",
+      fab: "{{name}} mène aux points de vie",
     },
   },
   clock: {
@@ -273,7 +275,10 @@ export default {
     holdToCount: "appui long pour compter les dégâts",
     holdToCountHint: "Appui long pour compter les dégâts sans carte",
     countDamage: "Compter les dégâts sans carte",
-    unit: { hp: "PV", damage: "DÉG" },
+    unit: {
+      hp: "PV",
+      damage: "DÉG",
+    },
     prizesHint: "Touchez pour prendre une Récompense. Appui long pour en reposer une.",
     putPrizeBack: "Reposer une Récompense",
     whoTakes_one: "{{name}} est K.O. Qui prend {{count}} carte Récompense ?",
@@ -401,6 +406,7 @@ export default {
         "Touchez pour modifier les cartes Récompense de {{identity}} de {{delta}}. Appui long pour plus d'options.",
       lorcana:
         "Touchez pour modifier le Lore de {{identity}} de {{delta}}. Appui long pour plus d'options.",
+      fab: "Touchez pour changer les points de vie de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
     },
     moreControls: {
       none: "{{identity}}, plus de commandes de points de vie",
@@ -408,6 +414,7 @@ export default {
       ygo: "{{identity}}, plus de commandes de Life Points",
       pokemon: "{{identity}}, plus d'options de cartes Récompense",
       lorcana: "{{identity}}, plus d'options de Lore",
+      fab: "{{identity}}, plus de commandes de points de vie",
     },
   },
   grid: {
@@ -427,6 +434,9 @@ export default {
       lorcana_one: "Grille de Lore de {{count}} joueur",
       lorcana_many: "Grille de Lore de {{count}} de joueurs",
       lorcana_other: "Grille de Lore de {{count}} joueurs",
+      fab_one: "Grille de points de vie pour {{count}} joueur",
+      fab_many: "Grille de points de vie pour {{count}} de joueurs",
+      fab_other: "Grille de points de vie pour {{count}} joueurs",
     },
   },
   pokemonSheet: {
@@ -515,6 +525,7 @@ export default {
       ygo: "Modification des Life Points de {{name}}",
       pokemon: "Modification des cartes Récompense de {{name}}",
       lorcana: "Modification du Lore de {{name}}",
+      fab: "Changement de vie de {{name}}",
     },
     add: {
       none: "Ajouter {{amount}} de vie",
@@ -522,6 +533,7 @@ export default {
       ygo: "Ajouter {{amount}} Life Points",
       pokemon: "Ajouter {{amount}} cartes Récompense",
       lorcana: "Ajouter {{amount}} éclats de Lore",
+      fab: "Ajouter {{amount}} de vie",
     },
     subtract: {
       none: "Retirer {{amount}} de vie",
@@ -529,6 +541,7 @@ export default {
       ygo: "Retirer {{amount}} Life Points",
       pokemon: "Retirer {{amount}} cartes Récompense",
       lorcana: "Retirer {{amount}} éclats de Lore",
+      fab: "Retirer {{amount}} de vie",
     },
   },
 } satisfies LocaleNamespace

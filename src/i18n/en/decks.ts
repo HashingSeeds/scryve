@@ -487,6 +487,7 @@ const decks = {
     listHelperMtg:
       'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.',
     listHelperLorcana: 'Use lines like "4 Aladdin - Heroic Outlaw".',
+    listHelperFab: 'Paste a Fabrary card list or lines like "3x Snatch (red)".',
     returnToReview: "Return to review",
     loadingDeck: "Loading deck…",
     reloadSource: "Reload source",

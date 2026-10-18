@@ -27,10 +27,11 @@ async function syncedImageCandidates(
 }
 
 const catalogImageCandidates = {
-  tcgdex: pokemonImageCandidates,
-  ygoprodeck: ygoprodeckImageCandidates,
-  scryfall: scryfallImageCandidates,
-  lorcanajson: syncedImageCandidates,
+  "tcgdex": pokemonImageCandidates,
+  "ygoprodeck": ygoprodeckImageCandidates,
+  "scryfall": scryfallImageCandidates,
+  "lorcanajson": syncedImageCandidates,
+  "fab-cube": syncedImageCandidates,
 } satisfies Record<
   CatalogProvider,
   (ctx: ActionCtx, cardId: string, game: SystemId) => Promise<string[]>

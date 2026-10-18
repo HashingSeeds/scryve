@@ -110,6 +110,7 @@ const board = {
       ygo: "Tied on life points",
       pokemon: "Tied on prize cards",
       lorcana: "Tied on lore",
+      fab: "Tied on life",
     },
     leads: {
       none: "{{name}} leads on life",
@@ -117,6 +118,7 @@ const board = {
       ygo: "{{name}} leads on life points",
       pokemon: "{{name}} leads on prize cards",
       lorcana: "{{name}} leads on lore",
+      fab: "{{name}} leads on life",
     },
   },
   clock: {
@@ -353,6 +355,7 @@ const board = {
       pokemon:
         "Tap to change {{identity}}'s Prize cards by {{delta}}. Long press for more controls.",
       lorcana: "Tap to change {{identity}}'s lore by {{delta}}. Long press for more controls.",
+      fab: "Tap to change {{identity}}'s life by {{delta}}. Long press for more controls.",
     },
     moreControls: {
       none: "{{identity}}, more life controls",
@@ -360,6 +363,7 @@ const board = {
       ygo: "{{identity}}, more Life Points controls",
       pokemon: "{{identity}}, more Prize cards controls",
       lorcana: "{{identity}}, more lore controls",
+      fab: "{{identity}}, more life controls",
     },
   },
   grid: {
@@ -374,6 +378,8 @@ const board = {
       pokemon_other: "{{count}} player Prize cards grid",
       lorcana_one: "{{count}} player lore grid",
       lorcana_other: "{{count}} player lore grid",
+      fab_one: "{{count}} player life grid",
+      fab_other: "{{count}} player life grid",
     },
   },
   pokemonSheet: {
@@ -455,6 +461,7 @@ const board = {
       ygo: "{{name}} Life Points change",
       pokemon: "{{name}} Prize cards change",
       lorcana: "{{name}} lore change",
+      fab: "{{name}} life change",
     },
     add: {
       none: "Add {{amount}} life",
@@ -462,6 +469,7 @@ const board = {
       ygo: "Add {{amount}} Life Points",
       pokemon: "Add {{amount}} Prize cards",
       lorcana: "Add {{amount}} lore",
+      fab: "Add {{amount}} life",
     },
     subtract: {
       none: "Subtract {{amount}} life",
@@ -469,6 +477,7 @@ const board = {
       ygo: "Subtract {{amount}} Life Points",
       pokemon: "Subtract {{amount}} Prize cards",
       lorcana: "Subtract {{amount}} lore",
+      fab: "Subtract {{amount}} life",
     },
   },
 }

@@ -490,6 +490,8 @@ export default {
     listHelperMtg:
       "「1 Sol Ring」のような行を使用してください。Commander、Mainboard、Sideboardの見出しに対応しています。",
     listHelperLorcana: "「4 Aladdin - Heroic Outlaw」のような行を使ってください。",
+    listHelperFab:
+      "Fabraryのカードリスト、または「3x Snatch (red)」のような行を貼り付けてください。",
     returnToReview: "確認に戻る",
     loadingDeck: "デッキを読み込み中…",
     reloadSource: "ソースを再読み込み",

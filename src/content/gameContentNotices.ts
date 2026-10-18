@@ -74,6 +74,20 @@ export const gameContentNotices = {
       ],
     },
     {
+      heading: "Flesh and Blood",
+      blocks: [
+        ...requiredNotices("fab"),
+        {
+          type: "paragraph",
+          text: "Card data is provided through the fab-cube dataset, and card images load from Legend Story Studios. Card images © Legend Story Studios. Official precon lists come from Legend Story Studios. Scryve uses these materials for card identification, deck management, play tracking, and reference.",
+        },
+        {
+          type: "paragraph",
+          text: "In the iOS and Android apps, the Flesh and Blood Comprehensive Rules are downloaded from Legend Story Studios to your device when you start a Flesh and Blood game or open Rules, and shown with their original notices. On the web, Rules links to the official page instead. Scryve does not host or distribute them. The official rules are at https://rules.fabtcg.com/en/.",
+        },
+      ],
+    },
+    {
       heading: "Open source",
       blocks: [
         {

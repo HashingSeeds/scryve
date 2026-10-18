@@ -165,6 +165,7 @@ const play = {
       ygo: "Final Life Points",
       pokemon: "Final Prize cards",
       lorcana: "Final lore",
+      fab: "Final Life",
     },
     noWinner: "No winner was recorded for this game.",
     reportPlayer: "Report or block a player",
@@ -186,6 +187,7 @@ const play = {
         ygo: "Loading Life Points changes",
         pokemon: "Loading Prize cards changes",
         lorcana: "Loading lore changes",
+        fab: "Loading life changes",
       },
       heading: {
         none: "Life changes · {{changes}}",
@@ -193,6 +195,7 @@ const play = {
         ygo: "Life Points changes · {{changes}}",
         pokemon: "Prize cards changes · {{changes}}",
         lorcana: "Lore changes · {{changes}}",
+        fab: "Life changes · {{changes}}",
       },
       noChanges: {
         none: "No life changes were recorded.",
@@ -200,6 +203,7 @@ const play = {
         ygo: "No Life Points changes were recorded.",
         pokemon: "No Prize cards changes were recorded.",
         lorcana: "No lore changes were recorded.",
+        fab: "No life changes were recorded.",
       },
       loadFailed: {
         none: "Could not load life changes.",
@@ -207,6 +211,7 @@ const play = {
         ygo: "Could not load Life Points changes.",
         pokemon: "Could not load Prize cards changes.",
         lorcana: "Could not load lore changes.",
+        fab: "Could not load life changes.",
       },
       detailsUnavailable: {
         none: "Life change details are unavailable.",
@@ -214,6 +219,7 @@ const play = {
         ygo: "Life Points change details are unavailable.",
         pokemon: "Prize cards change details are unavailable.",
         lorcana: "Lore change details are unavailable.",
+        fab: "Life change details are unavailable.",
       },
       noDetails: {
         none: "No life change details were found.",
@@ -221,6 +227,7 @@ const play = {
         ygo: "No Life Points change details were found.",
         pokemon: "No Prize cards change details were found.",
         lorcana: "No lore change details were found.",
+        fab: "No life change details were found.",
       },
     },
   },
@@ -359,9 +366,9 @@ const play = {
     effective: "Comprehensive Rules, effective {{date}}",
     official: "Official rules",
     openFailed: "Couldn't open the official rules",
-    downloading: "Downloading the Comprehensive Rules from Wizards of the Coast.",
+    downloading: "Downloading the Comprehensive Rules from {{publisher}}.",
     failed: "Couldn't download the rules.",
-    webOnly: "The Comprehensive Rules are on the Wizards of the Coast site.",
+    webOnly: "The Comprehensive Rules are on the {{publisher}} site.",
     allOf: "All of {{section}}",
     noResults: "No rules match.",
     notFound: "This rule isn't in this version of the rules.",

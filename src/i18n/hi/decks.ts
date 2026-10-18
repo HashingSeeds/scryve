@@ -492,6 +492,7 @@ export default {
     listHelperMtg:
       '"1 Sol Ring" जैसी पंक्तियाँ इस्तेमाल करें। Commander, Mainboard और Sideboard हेडिंग समर्थित हैं।',
     listHelperLorcana: '"4 Aladdin - Heroic Outlaw" जैसी लाइनें इस्तेमाल करें।',
+    listHelperFab: 'Fabrary कार्ड सूची या "3x Snatch (red)" जैसी पंक्तियाँ पेस्ट करें।',
     returnToReview: "समीक्षा पर लौटें",
     loadingDeck: "डेक लोड हो रहा है…",
     reloadSource: "स्रोत फिर लोड करें",

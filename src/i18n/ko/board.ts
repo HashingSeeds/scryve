@@ -127,6 +127,7 @@ export default {
       ygo: "라이프 포인트 동점",
       pokemon: "사이드 카드 동률",
       lorcana: "로어 동률",
+      fab: "라이프 동점",
     },
     leads: {
       none: "{{name}} 라이프 우세",
@@ -134,6 +135,7 @@ export default {
       ygo: "{{name}}님이 라이프 포인트 앞서는 중",
       pokemon: "{{name}}님이 사이드 카드 앞서는 중",
       lorcana: "{{name}}님이 로어 앞서는 중",
+      fab: "{{name}} 라이프 우세",
     },
   },
   clock: {
@@ -255,7 +257,10 @@ export default {
     holdToCount: "길게 눌러 데미지 계산",
     holdToCountHint: "길게 눌러 카드 없이 데미지 계산",
     countDamage: "카드 없이 데미지 계산",
-    unit: { hp: "HP", damage: "데미지" },
+    unit: {
+      hp: "HP",
+      damage: "데미지",
+    },
     prizesHint: "탭하여 사이드 카드를 가져옵니다. 길게 눌러 되돌립니다.",
     putPrizeBack: "사이드 카드 되돌리기",
     whoTakes_other: "{{name}} 기절. 누가 사이드 카드 {{count}}장을 가져가나요?",
@@ -376,6 +381,7 @@ export default {
         "탭하여 {{identity}}의 사이드 카드를 {{delta}}만큼 변경합니다. 길게 누르면 더 많은 조작이 나옵니다.",
       lorcana:
         "탭하여 {{identity}}의 로어를 {{delta}}만큼 변경합니다. 길게 누르면 추가 조작이 열립니다.",
+      fab: "탭하면 {{identity}}의 라이프가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
     },
     moreControls: {
       none: "{{identity}}, 라이프 추가 조작",
@@ -383,6 +389,7 @@ export default {
       ygo: "{{identity}}, 라이프 포인트 조작 더 보기",
       pokemon: "{{identity}}, 사이드 카드 추가 조작",
       lorcana: "{{identity}}, 로어 추가 조작",
+      fab: "{{identity}}, 라이프 추가 조작",
     },
   },
   grid: {
@@ -392,6 +399,7 @@ export default {
       ygo_other: "플레이어 {{count}}명 라이프 포인트 격자",
       pokemon_other: "{{count}}인 사이드 카드 그리드",
       lorcana_other: "{{count}}인 로어 그리드",
+      fab_other: "플레이어 {{count}}명 라이프 표",
     },
   },
   pokemonSheet: {
@@ -478,6 +486,7 @@ export default {
       ygo: "{{name}} 라이프 포인트 변경",
       pokemon: "{{name}}의 사이드 카드 변경",
       lorcana: "{{name}}의 로어 변경",
+      fab: "{{name}} 라이프 변경",
     },
     add: {
       none: "라이프 {{amount}} 더하기",
@@ -485,6 +494,7 @@ export default {
       ygo: "라이프 포인트 {{amount}} 추가",
       pokemon: "사이드 카드 {{amount}}장 추가",
       lorcana: "로어 {{amount}} 추가",
+      fab: "라이프 {{amount}} 더하기",
     },
     subtract: {
       none: "라이프 {{amount}} 빼기",
@@ -492,6 +502,7 @@ export default {
       ygo: "라이프 포인트 {{amount}} 차감",
       pokemon: "사이드 카드 {{amount}}장 차감",
       lorcana: "로어 {{amount}} 차감",
+      fab: "라이프 {{amount}} 빼기",
     },
   },
 } satisfies LocaleNamespace

@@ -9,6 +9,7 @@ export default {
     ygo: "लाइफ़ पॉइंट",
     pokemon: "प्राइज़ कार्ड",
     lorcana: "लोर",
+    fab: "लाइफ",
   },
   counterLabel: {
     none: "लाइफ",
@@ -16,6 +17,7 @@ export default {
     ygo: "लाइफ़ पॉइंट",
     pokemon: "प्राइज़ कार्ड",
     lorcana: "लोर",
+    fab: "लाइफ",
   },
   startingValueRange: {
     none: "शुरुआती लाइफ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
@@ -23,6 +25,7 @@ export default {
     ygo: "शुरुआती लाइफ़ पॉइंट 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
     pokemon: "शुरुआती प्राइज़ कार्ड 1 से {{max}} तक की पूर्ण संख्या होने चाहिए।",
     lorcana: "शुरुआती लोर 0 से {{max}} तक की पूर्ण संख्या होना चाहिए।",
+    fab: "शुरुआती लाइफ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
   },
   tableItem: {
     poison: "पॉइज़न",
@@ -35,11 +38,14 @@ export default {
     sideboard: "साइडबोर्ड",
     extra: "एक्स्ट्रा डेक",
     side: "साइड डेक",
+    hero: "हीरो",
+    arena: "एरीना",
     main: {
       mtg: "मुख्य डेक",
       ygo: "मेन डेक",
       pokemon: "डेक",
       lorcana: "डेक",
+      fab: "डेक",
     },
   },
   formatBlurb: {
@@ -55,6 +61,13 @@ export default {
       limited: "ड्राफ़्ट और सील्ड",
       constructed: "बाकी सब",
     },
+    fab: {
+      cc: "60+ कार्ड, 3 प्रतियाँ",
+      blitz: "यंग हीरो, 40 कार्ड",
+      silverAge: "कॉमन और रेयर",
+      ll: "लेजेंड की अनुमति",
+      upf: "मल्टीप्लेयर",
+    },
   },
   counterValue: {
     none_one: "{{count}} लाइफ़",
@@ -67,6 +80,8 @@ export default {
     pokemon_other: "{{count}} प्राइज़ कार्ड",
     lorcana_one: "{{count}} लोर",
     lorcana_other: "{{count}} लोर",
+    fab_one: "{{count}} लाइफ़",
+    fab_other: "{{count}} लाइफ़",
   },
   counterChange: {
     none_one: "{{count}} लाइफ़ बदलाव",
@@ -79,6 +94,8 @@ export default {
     pokemon_other: "{{count}} प्राइज़ कार्ड बदलाव",
     lorcana_one: "{{count}} लोर बदलाव",
     lorcana_other: "{{count}} लोर बदलाव",
+    fab_one: "{{count}} लाइफ़ बदलाव",
+    fab_other: "{{count}} लाइफ़ बदलाव",
   },
   noneTaken: "कोई नहीं लिया",
   taken: "{{amount}} लिए",

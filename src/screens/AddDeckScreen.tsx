@@ -75,6 +75,7 @@ const DECK_LIST_HELPERS = {
   ygo: "decks:addDeck.listHelperYgo",
   pokemon: "decks:addDeck.listHelperPokemon",
   lorcana: "decks:addDeck.listHelperLorcana",
+  fab: "decks:addDeck.listHelperFab",
 } as const satisfies Record<SystemId, TxKeyPath>
 
 type CreationMode = "precon" | "paste" | "blank"
@@ -318,14 +319,16 @@ function preconDetail(deck: PreconstructedDeck) {
     .join(" · ")
 }
 
+const PUBLISHERS = new Map([
+  ["ygo", "Konami"],
+  ["pokemon", "Pokémon"],
+  ["lorcana", "Ravensburger"],
+  ["fab", "Legend Story Studios"],
+])
+
 function catalogSourceLabel(deck: CatalogDeck) {
   return deck.kind === "official"
-    ? // eslint-disable-next-line no-restricted-syntax -- official catalog decks are only Yu-Gi-Oh!, Pokémon, and Lorcana, named by publisher.
-      deck.game === "ygo"
-      ? "Konami"
-      : deck.game === "lorcana"
-        ? "Ravensburger"
-        : "Pokémon"
+    ? PUBLISHERS.get(deck.game)
     : deck.source === "mtgo-examples"
       ? translate("decks:addDeck.sourceMtgoExample")
       : deck.source === "limitless"

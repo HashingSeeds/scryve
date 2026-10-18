@@ -5,6 +5,8 @@ const SECTION = /^(\d{3})\. (.+)$/
 const RULE = /^(\d{3}\.\d+[a-z]{0,2})\.? (.+)$/
 const EFFECTIVE = /^These rules are effective as of (.+)\.$/
 
+export const MAGIC_RULE_REFERENCE = /\b(\d{3}\.\d+[a-z]{0,2})\b|\brules? (\d{3})\b(?!\.\d)/g
+
 function paragraphs(lines: string[]) {
   const groups: string[][] = [[]]
   for (const line of lines) {

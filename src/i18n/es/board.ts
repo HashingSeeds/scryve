@@ -131,6 +131,7 @@ export default {
       ygo: "Empate en Puntos de Vida",
       pokemon: "Empate en cartas de Premio",
       lorcana: "Empate en leyenda",
+      fab: "Empate en vida",
     },
     leads: {
       none: "{{name}} lidera en vida",
@@ -138,6 +139,7 @@ export default {
       ygo: "{{name}} lidera en Puntos de Vida",
       pokemon: "{{name}} lidera en cartas de Premio",
       lorcana: "{{name}} lidera en leyenda",
+      fab: "{{name}} lidera en vida",
     },
   },
   clock: {
@@ -275,7 +277,10 @@ export default {
     holdToCount: "mantén pulsado para contar daño",
     holdToCountHint: "Mantén pulsado para contar daño sin carta",
     countDamage: "Contar daño sin carta",
-    unit: { hp: "PS", damage: "DAÑO" },
+    unit: {
+      hp: "PS",
+      damage: "DAÑO",
+    },
     prizesHint: "Toca para tomar una carta de premio. Mantén pulsado para devolver una.",
     putPrizeBack: "Devolver una carta de premio",
     whoTakes_one: "{{name}} fue derrotado. ¿Quién toma {{count}} carta de premio?",
@@ -402,6 +407,7 @@ export default {
         "Toca para cambiar las cartas de Premio de {{identity}} en {{delta}}. Mantén pulsado para ver más controles.",
       lorcana:
         "Toca para cambiar la leyenda de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
+      fab: "Toca para cambiar la vida de {{identity}} en {{delta}}. Mantén pulsado para más controles.",
     },
     moreControls: {
       none: "{{identity}}, más controles de vida",
@@ -409,6 +415,7 @@ export default {
       ygo: "{{identity}}, más controles de Puntos de Vida",
       pokemon: "{{identity}}, más controles de cartas de Premio",
       lorcana: "{{identity}}, más controles de leyenda",
+      fab: "{{identity}}, más controles de vida",
     },
   },
   grid: {
@@ -428,6 +435,9 @@ export default {
       lorcana_one: "Cuadrícula de leyenda de {{count}} jugador",
       lorcana_many: "Cuadrícula de leyenda de {{count}} de jugadores",
       lorcana_other: "Cuadrícula de leyenda de {{count}} jugadores",
+      fab_one: "Cuadrícula de vida de {{count}} jugador",
+      fab_many: "Cuadrícula de vida de {{count}} de jugadores",
+      fab_other: "Cuadrícula de vida de {{count}} jugadores",
     },
   },
   pokemonSheet: {
@@ -516,6 +526,7 @@ export default {
       ygo: "Cambio de Puntos de Vida de {{name}}",
       pokemon: "Cambio de cartas de Premio de {{name}}",
       lorcana: "Cambio de leyenda de {{name}}",
+      fab: "Cambio de vida de {{name}}",
     },
     add: {
       none: "Sumar {{amount}} de vida",
@@ -523,6 +534,7 @@ export default {
       ygo: "Sumar {{amount}} Puntos de Vida",
       pokemon: "Sumar {{amount}} cartas de Premio",
       lorcana: "Sumar {{amount}} puntos de leyenda",
+      fab: "Sumar {{amount}} de vida",
     },
     subtract: {
       none: "Restar {{amount}} de vida",
@@ -530,6 +542,7 @@ export default {
       ygo: "Restar {{amount}} Puntos de Vida",
       pokemon: "Restar {{amount}} cartas de Premio",
       lorcana: "Restar {{amount}} puntos de leyenda",
+      fab: "Restar {{amount}} de vida",
     },
   },
 } satisfies LocaleNamespace

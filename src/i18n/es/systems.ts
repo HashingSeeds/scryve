@@ -9,6 +9,7 @@ export default {
     ygo: "Puntos de Vida",
     pokemon: "Cartas de Premio",
     lorcana: "Leyenda",
+    fab: "Vidas",
   },
   counterLabel: {
     none: "vidas",
@@ -16,6 +17,7 @@ export default {
     ygo: "Puntos de Vida",
     pokemon: "Cartas de Premio",
     lorcana: "leyenda",
+    fab: "vidas",
   },
   startingValueRange: {
     none: "Las vidas iniciales deben ser un número entero de 1 a {{max}}.",
@@ -23,6 +25,7 @@ export default {
     ygo: "Los Puntos de Vida iniciales deben ser un número entero del 1 al {{max}}.",
     pokemon: "Las cartas de Premio iniciales deben ser un número entero del 1 al {{max}}.",
     lorcana: "La leyenda inicial debe ser un número entero del 0 al {{max}}.",
+    fab: "Las vidas iniciales deben ser un número entero de 1 a {{max}}.",
   },
   tableItem: {
     poison: "Veneno",
@@ -35,11 +38,14 @@ export default {
     sideboard: "Banquillo",
     extra: "Extra Deck",
     side: "Side Deck",
+    hero: "Héroe",
+    arena: "Arena",
     main: {
       mtg: "Mazo principal",
       ygo: "Main Deck",
       pokemon: "Mazo",
       lorcana: "Mazo",
+      fab: "Mazo",
     },
   },
   formatBlurb: {
@@ -54,6 +60,13 @@ export default {
       brawl: "60 cartas, singleton",
       limited: "Draft y sellado",
       constructed: "Todo lo demás",
+    },
+    fab: {
+      cc: "60+ cartas, 3 copias",
+      blitz: "Héroe joven, 40 cartas",
+      silverAge: "Comunes y raras",
+      ll: "Leyendas permitidas",
+      upf: "Multijugador",
     },
   },
   counterValue: {
@@ -72,6 +85,9 @@ export default {
     lorcana_one: "{{count}} punto de leyenda",
     lorcana_many: "{{count}} de puntos de leyenda",
     lorcana_other: "{{count}} puntos de leyenda",
+    fab_one: "{{count}} vida",
+    fab_many: "{{count}} de vidas",
+    fab_other: "{{count}} vidas",
   },
   counterChange: {
     none_one: "{{count}} cambio de vidas",
@@ -89,6 +105,9 @@ export default {
     lorcana_one: "{{count}} cambio de leyenda",
     lorcana_many: "{{count}} de cambios de leyenda",
     lorcana_other: "{{count}} cambios de leyenda",
+    fab_one: "{{count}} cambio de vidas",
+    fab_many: "{{count}} de cambios de vidas",
+    fab_other: "{{count}} cambios de vidas",
   },
   noneTaken: "ninguna perdida",
   taken: "{{amount}} perdidas",

@@ -380,14 +380,21 @@ export const feedState = internalQuery({
   },
 })
 
+function feedFresh(health: Doc<"providerHealth"> | null, fetchedAt: number | undefined) {
+  return (
+    health?.status !== "unavailable" &&
+    fetchedAt !== undefined &&
+    Date.now() - fetchedAt < FEED_TTL_MS
+  )
+}
+
 async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
   assertDeckGameFormat(game, format)
   const feed = deckFeed(game)
   if (!feed?.formats.includes(format)) return false
   const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
   const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
-  const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
-  if (fetchedAt !== undefined && Date.now() - fetchedAt < FEED_TTL_MS) return true
+  if (feedFresh(health, health?.lastSuccessAt ?? latest?.fetchedAt)) return true
   const startedAt = Date.now()
   try {
     await requireActionCapability(ctx, feed.game, "exampleDecks")
@@ -486,8 +493,7 @@ async function browseDecks(
   const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
   const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
   const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
-  if (fetchedAt !== undefined && Date.now() - fetchedAt < FEED_TTL_MS)
-    return { ...cached, status: health?.status === "unavailable" ? "unavailable" : "ready" }
+  if (feedFresh(health, fetchedAt)) return { ...cached, status: "ready" }
   const background = fetchedAt !== undefined
   const result = await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
     game,
@@ -541,7 +547,7 @@ export const refreshScheduled = internalAction({
       for (const format of GAME_PROVIDERS[game].deckFeed?.formats ?? []) {
         if (!(await actionCapabilityEnabled(ctx, game, "exampleDecks"))) continue
         const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
-        if (health?.lastSuccessAt && Date.now() - health.lastSuccessAt < FEED_TTL_MS) continue
+        if (feedFresh(health, health?.lastSuccessAt)) continue
         await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
           game,
           format,

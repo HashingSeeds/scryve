@@ -129,6 +129,7 @@ export default {
       ygo: "लाइफ़ पॉइंट बराबर हैं",
       pokemon: "प्राइज़ कार्ड बराबर हैं",
       lorcana: "लोर बराबर है",
+      fab: "लाइफ में बराबरी",
     },
     leads: {
       none: "{{name}} लाइफ में आगे है",
@@ -136,6 +137,7 @@ export default {
       ygo: "{{name}} लाइफ़ पॉइंट में आगे है",
       pokemon: "{{name}} प्राइज़ कार्ड में आगे है",
       lorcana: "{{name}} लोर में आगे है",
+      fab: "{{name}} लाइफ में आगे है",
     },
   },
   clock: {
@@ -264,7 +266,10 @@ export default {
     holdToCount: "डैमेज गिनने के लिए देर तक दबाएँ",
     holdToCountHint: "बिना कार्ड के डैमेज गिनने के लिए देर तक दबाएँ",
     countDamage: "बिना कार्ड के डैमेज गिनें",
-    unit: { hp: "HP", damage: "डैमेज" },
+    unit: {
+      hp: "HP",
+      damage: "डैमेज",
+    },
     prizesHint: "प्राइज़ कार्ड लेने के लिए टैप करें। वापस रखने के लिए देर तक दबाएँ।",
     putPrizeBack: "प्राइज़ कार्ड वापस रखें",
     whoTakes_one: "{{name}} नॉक आउट हुआ। {{count}} प्राइज़ कार्ड कौन लेगा?",
@@ -388,6 +393,7 @@ export default {
         "{{identity}} के प्राइज़ कार्ड {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
       lorcana:
         "{{identity}} का लोर {{delta}} बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
+      fab: "{{identity}} का लाइफ {{delta}} से बदलने के लिए टैप करें। और कंट्रोल के लिए देर तक दबाएं।",
     },
     moreControls: {
       none: "{{identity}}, और लाइफ कंट्रोल",
@@ -395,6 +401,7 @@ export default {
       ygo: "{{identity}}, लाइफ़ पॉइंट के और विकल्प",
       pokemon: "{{identity}}, प्राइज़ कार्ड के और विकल्प",
       lorcana: "{{identity}}, लोर के और विकल्प",
+      fab: "{{identity}}, और लाइफ कंट्रोल",
     },
   },
   grid: {
@@ -409,6 +416,8 @@ export default {
       pokemon_other: "{{count}} खिलाड़ियों का प्राइज़ कार्ड ग्रिड",
       lorcana_one: "{{count}} खिलाड़ी का लोर ग्रिड",
       lorcana_other: "{{count}} खिलाड़ियों का लोर ग्रिड",
+      fab_one: "{{count}} खिलाड़ी का लाइफ ग्रिड",
+      fab_other: "{{count}} खिलाड़ियों का लाइफ ग्रिड",
     },
   },
   pokemonSheet: {
@@ -496,6 +505,7 @@ export default {
       ygo: "{{name}} के लाइफ़ पॉइंट में बदलाव",
       pokemon: "{{name}} के प्राइज़ कार्ड में बदलाव",
       lorcana: "{{name}} के लोर में बदलाव",
+      fab: "{{name}} का life बदलाव",
     },
     add: {
       none: "{{amount}} life जोड़ें",
@@ -503,6 +513,7 @@ export default {
       ygo: "{{amount}} लाइफ़ पॉइंट जोड़ें",
       pokemon: "{{amount}} प्राइज़ कार्ड जोड़ें",
       lorcana: "{{amount}} लोर जोड़ें",
+      fab: "{{amount}} life जोड़ें",
     },
     subtract: {
       none: "{{amount}} life घटाएँ",
@@ -510,6 +521,7 @@ export default {
       ygo: "{{amount}} लाइफ़ पॉइंट घटाएँ",
       pokemon: "{{amount}} प्राइज़ कार्ड घटाएँ",
       lorcana: "{{amount}} लोर घटाएँ",
+      fab: "{{amount}} life घटाएँ",
     },
   },
 } satisfies LocaleNamespace

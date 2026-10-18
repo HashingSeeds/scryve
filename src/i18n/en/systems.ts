@@ -6,6 +6,7 @@ const systems = {
     ygo: "Life Points",
     pokemon: "Prize cards",
     lorcana: "Lore",
+    fab: "Life",
   },
   counterLabel: {
     none: "life",
@@ -13,6 +14,7 @@ const systems = {
     ygo: "Life Points",
     pokemon: "Prize cards",
     lorcana: "lore",
+    fab: "life",
   },
   startingValueRange: {
     none: "Starting life must be a whole number from 1 to {{max}}.",
@@ -20,6 +22,7 @@ const systems = {
     ygo: "Starting Life Points must be a whole number from 1 to {{max}}.",
     pokemon: "Starting Prize cards must be a whole number from 1 to {{max}}.",
     lorcana: "Starting lore must be a whole number from 0 to {{max}}.",
+    fab: "Starting life must be a whole number from 1 to {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -32,11 +35,14 @@ const systems = {
     sideboard: "Sideboard",
     extra: "Extra Deck",
     side: "Side Deck",
+    hero: "Hero",
+    arena: "Arena",
     main: {
       mtg: "Main deck",
       ygo: "Main Deck",
       pokemon: "Deck",
       lorcana: "Deck",
+      fab: "Deck",
     },
   },
   formatBlurb: {
@@ -52,6 +58,13 @@ const systems = {
       limited: "Draft and sealed",
       constructed: "Anything else",
     },
+    fab: {
+      cc: "60+ cards, 3 copies",
+      blitz: "Young hero, 40 cards",
+      silverAge: "Commons and rares",
+      ll: "Legends allowed",
+      upf: "Multiplayer",
+    },
   },
   counterValue: {
     none_one: "{{count}} life",
@@ -64,6 +77,8 @@ const systems = {
     pokemon_other: "{{count}} Prize cards",
     lorcana_one: "{{count}} lore",
     lorcana_other: "{{count}} lore",
+    fab_one: "{{count}} life",
+    fab_other: "{{count}} life",
   },
   counterChange: {
     none_one: "{{count}} life change",
@@ -76,6 +91,8 @@ const systems = {
     pokemon_other: "{{count}} prize cards changes",
     lorcana_one: "{{count}} lore change",
     lorcana_other: "{{count}} lore changes",
+    fab_one: "{{count}} life change",
+    fab_other: "{{count}} life changes",
   },
   noneTaken: "none taken",
   taken: "{{amount}} taken",

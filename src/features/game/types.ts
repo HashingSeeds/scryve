@@ -23,6 +23,7 @@ export interface GamePlayer {
   shape?: PlayerMarkShape
   life: number
   seat: number
+  startingLife?: number
 }
 
 export type CommanderBoardPlayer = Pick<GamePlayer, "id" | "name" | "color" | "shape">
@@ -121,6 +122,7 @@ export interface NewPlayerInput {
   name: string
   color: string
   shape?: PlayerMarkShape
+  startingLife?: number
 }
 
 export type GameCommand =

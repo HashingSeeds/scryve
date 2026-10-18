@@ -1,5 +1,5 @@
 import { findRules, ruleReferences, searchRules } from "./comprehensiveRules"
-import { parseMagicRules } from "./magicRules"
+import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 
 const SOURCE = [
   "﻿Magic: The Gathering Comprehensive Rules",
@@ -96,7 +96,12 @@ describe("parseMagicRules", () => {
 })
 
 it("ruleReferences links rule numbers and bare sections named as rules", () => {
-  expect(ruleReferences("See rule 103.8a and rules 601.2a–f. See rule 903, “Commander.”")).toEqual([
+  expect(
+    ruleReferences(
+      "See rule 103.8a and rules 601.2a–f. See rule 903, “Commander.”",
+      MAGIC_RULE_REFERENCE,
+    ),
+  ).toEqual([
     "See rule ",
     { id: "103.8a" },
     " and rules ",
@@ -105,5 +110,7 @@ it("ruleReferences links rule numbers and bare sections named as rules", () => {
     { id: "903" },
     ", “Commander.”",
   ])
-  expect(ruleReferences("A starting life total of 100.")).toEqual(["A starting life total of 100."])
+  expect(ruleReferences("A starting life total of 100.", MAGIC_RULE_REFERENCE)).toEqual([
+    "A starting life total of 100.",
+  ])
 })

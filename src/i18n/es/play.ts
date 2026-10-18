@@ -174,6 +174,7 @@ export default {
       ygo: "Puntos de Vida finales",
       pokemon: "Cartas de Premio finales",
       lorcana: "Leyenda final",
+      fab: "Vida final",
     },
     noWinner: "No se registró ningún ganador en esta partida.",
     reportPlayer: "Denunciar o bloquear a un jugador",
@@ -195,6 +196,7 @@ export default {
         ygo: "Cargando cambios de Puntos de Vida",
         pokemon: "Cargando cambios de cartas de Premio",
         lorcana: "Cargando cambios de leyenda",
+        fab: "Cargando cambios de vida",
       },
       heading: {
         none: "Cambios de vida · {{changes}}",
@@ -202,6 +204,7 @@ export default {
         ygo: "Cambios de Puntos de Vida · {{changes}}",
         pokemon: "Cambios de cartas de Premio · {{changes}}",
         lorcana: "Cambios de leyenda · {{changes}}",
+        fab: "Cambios de vida · {{changes}}",
       },
       noChanges: {
         none: "No se registraron cambios de vida.",
@@ -209,6 +212,7 @@ export default {
         ygo: "No se registraron cambios de Puntos de Vida.",
         pokemon: "No se registraron cambios de cartas de Premio.",
         lorcana: "No se registraron cambios de leyenda.",
+        fab: "No se registraron cambios de vida.",
       },
       loadFailed: {
         none: "No se pudieron cargar los cambios de vida.",
@@ -216,6 +220,7 @@ export default {
         ygo: "No se pudieron cargar los cambios de Puntos de Vida.",
         pokemon: "No se pudieron cargar los cambios de cartas de Premio.",
         lorcana: "No se pudieron cargar los cambios de leyenda.",
+        fab: "No se pudieron cargar los cambios de vida.",
       },
       detailsUnavailable: {
         none: "Los detalles de los cambios de vida no están disponibles.",
@@ -223,6 +228,7 @@ export default {
         ygo: "Los detalles de los cambios de Puntos de Vida no están disponibles.",
         pokemon: "Los detalles de los cambios de cartas de Premio no están disponibles.",
         lorcana: "Los detalles de los cambios de leyenda no están disponibles.",
+        fab: "Los detalles de los cambios de vida no están disponibles.",
       },
       noDetails: {
         none: "No se encontraron detalles de cambios de vida.",
@@ -230,6 +236,7 @@ export default {
         ygo: "No se encontraron detalles de los cambios de Puntos de Vida.",
         pokemon: "No se encontraron detalles de los cambios de cartas de Premio.",
         lorcana: "No se encontraron detalles de los cambios de leyenda.",
+        fab: "No se encontraron detalles de cambios de vida.",
       },
     },
   },
@@ -381,9 +388,9 @@ export default {
     effective: "Reglas completas, en vigor desde el {{date}}",
     official: "Reglas oficiales",
     openFailed: "No se pudieron abrir las reglas oficiales",
-    downloading: "Descargando las Reglas completas de Wizards of the Coast.",
+    downloading: "Descargando las Reglas completas de {{publisher}}.",
     failed: "No se pudieron descargar las reglas.",
-    webOnly: "Las Reglas completas están en el sitio de Wizards of the Coast.",
+    webOnly: "Las Reglas completas están en el sitio de {{publisher}}.",
     allOf: "Todo {{section}}",
     noResults: "Ninguna regla coincide.",
     notFound: "Esta regla no está en esta versión de las reglas.",

@@ -44,12 +44,12 @@ const PLACEHOLDER = /{{\s*([\w.]+)\s*}}|<\/?([\w-]+)\s*\/?>/g
 const GENERATED_HEADER =
   "// why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.\n"
 
-const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana).
+const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Flesh and Blood).
 
 Rules:
 - Keep each string short and natural for a phone screen. Match the English tone: plain, direct, no added enthusiasm.
 - Keep every {{placeholder}} exactly as written, including the name inside the braces, and keep every <tag>. Placeholders hold numbers, player names, deck names, or card names.
-- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon, Pokémon TCG, Disney Lorcana, Lorcana, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, and format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed).
+- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon, Pokémon TCG, Disney Lorcana, Lorcana, Flesh and Blood, FaB, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, Fabrary, and format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed, Classic Constructed, Blitz, Silver Age, Living Legend, Ultimate Pit Fight).
 - Use the publisher's official localized term where one exists: poison counters, commander damage, commander tax, the Monarch, the Initiative, HP. The request lists fixed terms for life (Magic), Life Points (Yu-Gi-Oh!), Prize cards (Pokémon) and lore (Lorcana); always use exactly those, inflected as the grammar needs.
 - In French, a counted amount of Lorcana lore is "éclats de Lore" ("20 éclats de Lore"); use "Lore" alone when nothing is counted.
 - In Spanish, a counted amount of Lorcana lore is "puntos de leyenda" ("20 puntos de leyenda", singular "1 punto de leyenda"); use "leyenda" alone when nothing is counted.

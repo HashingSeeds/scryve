@@ -9,6 +9,7 @@ export default {
     ygo: "Life Points",
     pokemon: "Cartes Récompense",
     lorcana: "Lore",
+    fab: "Points de vie",
   },
   counterLabel: {
     none: "vie",
@@ -16,6 +17,7 @@ export default {
     ygo: "Life Points",
     pokemon: "Cartes Récompense",
     lorcana: "Lore",
+    fab: "vie",
   },
   startingValueRange: {
     none: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
@@ -23,6 +25,7 @@ export default {
     ygo: "Les Life Points de départ doivent être un nombre entier de 1 à {{max}}.",
     pokemon: "Le nombre de cartes Récompense de départ doit être un nombre entier de 1 à {{max}}.",
     lorcana: "Le Lore de départ doit être un nombre entier de 0 à {{max}}.",
+    fab: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -35,11 +38,14 @@ export default {
     sideboard: "Réserve",
     extra: "Extra Deck",
     side: "Side Deck",
+    hero: "Héros",
+    arena: "Arène",
     main: {
       mtg: "Deck principal",
       ygo: "Main Deck",
       pokemon: "Deck",
       lorcana: "Deck",
+      fab: "Deck",
     },
   },
   formatBlurb: {
@@ -54,6 +60,13 @@ export default {
       brawl: "60 cartes, singleton",
       limited: "Draft et scellé",
       constructed: "Tout le reste",
+    },
+    fab: {
+      cc: "60+ cartes, 3 exemplaires",
+      blitz: "Héros jeune, 40 cartes",
+      silverAge: "Communes et rares",
+      ll: "Légendes autorisées",
+      upf: "Multijoueur",
     },
   },
   counterValue: {
@@ -72,6 +85,9 @@ export default {
     lorcana_one: "{{count}} Lore",
     lorcana_many: "{{count}} de Lore",
     lorcana_other: "{{count}} Lore",
+    fab_one: "{{count}} point de vie",
+    fab_many: "{{count}} de points de vie",
+    fab_other: "{{count}} points de vie",
   },
   counterChange: {
     none_one: "{{count}} changement de points de vie",
@@ -89,6 +105,9 @@ export default {
     lorcana_one: "{{count}} changement de Lore",
     lorcana_many: "{{count}} de changements de Lore",
     lorcana_other: "{{count}} changements de Lore",
+    fab_one: "{{count}} changement de points de vie",
+    fab_many: "{{count}} de changements de points de vie",
+    fab_other: "{{count}} changements de points de vie",
   },
   noneTaken: "aucun subi",
   taken: "{{amount}} subi",

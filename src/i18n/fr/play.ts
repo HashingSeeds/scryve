@@ -175,6 +175,7 @@ export default {
       ygo: "Life Points finaux",
       pokemon: "Cartes Récompense finales",
       lorcana: "Lore final",
+      fab: "Vie finale",
     },
     noWinner: "Aucun vainqueur n'a été enregistré pour cette partie.",
     reportPlayer: "Signaler ou bloquer un joueur",
@@ -196,6 +197,7 @@ export default {
         ygo: "Chargement des changements de Life Points",
         pokemon: "Chargement des changements de cartes Récompense",
         lorcana: "Chargement des changements de Lore",
+        fab: "Chargement des changements de vie",
       },
       heading: {
         none: "Changements de vie · {{changes}}",
@@ -203,6 +205,7 @@ export default {
         ygo: "Changements de Life Points · {{changes}}",
         pokemon: "Changements de cartes Récompense · {{changes}}",
         lorcana: "Changements de Lore · {{changes}}",
+        fab: "Changements de vie · {{changes}}",
       },
       noChanges: {
         none: "Aucun changement de vie n'a été enregistré.",
@@ -210,6 +213,7 @@ export default {
         ygo: "Aucun changement de Life Points n'a été enregistré.",
         pokemon: "Aucun changement de cartes Récompense n'a été enregistré.",
         lorcana: "Aucun changement de Lore n'a été enregistré.",
+        fab: "Aucun changement de vie n'a été enregistré.",
       },
       loadFailed: {
         none: "Impossible de charger les changements de vie.",
@@ -217,6 +221,7 @@ export default {
         ygo: "Impossible de charger les changements de Life Points.",
         pokemon: "Impossible de charger les changements de cartes Récompense.",
         lorcana: "Impossible de charger les changements de Lore.",
+        fab: "Impossible de charger les changements de vie.",
       },
       detailsUnavailable: {
         none: "Les détails des changements de vie sont indisponibles.",
@@ -224,6 +229,7 @@ export default {
         ygo: "Les détails des changements de Life Points sont indisponibles.",
         pokemon: "Les détails des changements de cartes Récompense sont indisponibles.",
         lorcana: "Les détails des changements de Lore sont indisponibles.",
+        fab: "Les détails des changements de vie sont indisponibles.",
       },
       noDetails: {
         none: "Aucun détail de changement de vie trouvé.",
@@ -231,6 +237,7 @@ export default {
         ygo: "Aucun détail des changements de Life Points n'a été trouvé.",
         pokemon: "Aucun détail des changements de cartes Récompense trouvé.",
         lorcana: "Aucun détail des changements de Lore trouvé.",
+        fab: "Aucun détail de changement de vie trouvé.",
       },
     },
   },
@@ -376,9 +383,9 @@ export default {
     effective: "Règles complètes, en vigueur le {{date}}",
     official: "Règles officielles",
     openFailed: "Impossible d'ouvrir les règles officielles",
-    downloading: "Téléchargement des règles complètes depuis Wizards of the Coast.",
+    downloading: "Téléchargement des règles complètes depuis {{publisher}}.",
     failed: "Impossible de télécharger les règles.",
-    webOnly: "Les règles complètes sont disponibles sur le site de Wizards of the Coast.",
+    webOnly: "Les règles complètes sont disponibles sur le site de {{publisher}}.",
     allOf: "Tout {{section}}",
     noResults: "Aucune règle ne correspond.",
     notFound: "Cette règle n'existe pas dans cette version des règles.",

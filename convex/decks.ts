@@ -13,6 +13,7 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
+import { deckStartingValue } from "./lib/deckStartingValue"
 import {
   syncedDeck,
   syncedDeckValidator,
@@ -413,6 +414,14 @@ export const listMine = query({
               versionNumber: version.versionNumber,
             })),
             cardQuantity: latest?.cardQuantity,
+            startingValue: latest
+              ? await deckStartingValue(
+                  ctx,
+                  latest._id,
+                  deck.game ?? DEFAULT_DECK_GAME,
+                  deck.format,
+                )
+              : undefined,
             coverImageUrl:
               latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
             lastPlayedAt: await lastPlayedAt(ctx, deck._id),

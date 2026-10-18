@@ -44,7 +44,13 @@ const printingValidator = v.object({
 })
 
 export const normalizedCardValidator = v.object({
-  game: v.union(v.literal("mtg"), v.literal("ygo"), v.literal("pokemon"), v.literal("lorcana")),
+  game: v.union(
+    v.literal("mtg"),
+    v.literal("ygo"),
+    v.literal("pokemon"),
+    v.literal("lorcana"),
+    v.literal("fab"),
+  ),
   identityNamespace: v.string(),
   cardId: v.string(),
   name: v.string(),
@@ -293,6 +299,19 @@ async function lookupCard(ctx: QueryCtx, game: string, cardId: string) {
   const card = printing ? await ctx.db.get(printing.gameCardId) : null
   return card ? await projectedCard(ctx, card, printing ?? undefined) : null
 }
+
+export const cachedByName = internalQuery({
+  args: { game: v.string(), name: v.string() },
+  handler: async (ctx, args) => {
+    const card = await ctx.db
+      .query("gameCards")
+      .withIndex("by_game_and_name_normalized", (query) =>
+        query.eq("game", args.game).eq("nameNormalized", normalizeCardName(args.name)),
+      )
+      .first()
+    return card ? await projectedCard(ctx, card) : null
+  },
+})
 
 export const lookupCached = internalQuery({
   args: { game: v.string(), cardId: v.string() },

@@ -304,6 +304,7 @@ export default {
         ygo: "Impossible de synchroniser la modification de {{delta}} Life Points",
         pokemon: "Une modification de {{delta}} cartes Récompense n'a pas pu être synchronisée",
         lorcana: "Une modification de {{delta}} éclats de Lore n'a pas pu être synchronisée",
+        fab: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
       },
       commanderDamage:
         "Une attribution de {{delta}} dégâts de commandant n'a pas pu être synchronisée",

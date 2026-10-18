@@ -96,7 +96,7 @@ import {
 } from "../../convex/lib/appearance"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
-import { startingValueRange, systemDefinition } from "../../convex/lib/systems"
+import { identitySection, startingValueRange, systemDefinition } from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
@@ -121,6 +121,7 @@ export interface DeckChoice {
   name: string
   system: string
   format: string
+  startingValue?: number
 }
 
 export interface LocalAccountSetup {
@@ -304,11 +305,17 @@ function NewGameForm({
       ? meSeatOf(claimedGame)
       : account?.defaultMeSeat,
   )
-  const [deck, setDeck] = useState<Pick<DeckChoice, "versionId" | "name"> | undefined>(() => {
+  const [deck, setDeck] = useState<
+    Pick<DeckChoice, "versionId" | "name" | "startingValue"> | undefined
+  >(() => {
     const chosen = claimedGame?.account
-    return chosen?.deckVersionId
-      ? { versionId: chosen.deckVersionId, name: chosen.deckName ?? "Deck" }
-      : undefined
+    if (!claimedGame || !chosen?.deckVersionId) return undefined
+    const seat = meSeatOf(claimedGame)
+    return {
+      versionId: chosen.deckVersionId,
+      name: chosen.deckName ?? "Deck",
+      startingValue: seat === undefined ? undefined : claimedGame.players[seat]?.startingLife,
+    }
   })
   // why: a sign-out or account switch while this screen stays mounted must not hand the previous account's seat and deck to the new one.
   const seenOwnerId = useRef(account?.ownerId)
@@ -405,6 +412,12 @@ function NewGameForm({
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
     deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
+  const deckSetsLife = Boolean(deck && identitySection(system, format)?.startingValueFacet)
+  const deckLife = deckSetsLife
+    ? (deck?.startingValue ??
+      deckChoices.find((choice) => choice.versionId === deck?.versionId)?.startingValue)
+    : undefined
+  const deckLifeLoading = deckSetsLife && deckLife === undefined && account?.decks === undefined
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account
@@ -418,7 +431,7 @@ function NewGameForm({
   )
   const valid = connectedMode
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
-    : validLife && nameValidation.valid && !localGame
+    : validLife && nameValidation.valid && !localGame && !deckLifeLoading
   const busy = connectedMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
@@ -489,12 +502,20 @@ function NewGameForm({
         ...setup,
       })
     else
-      onStartLocal(players, startingLife, {
-        ...setup,
-        account: accountInput,
-        ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
-        ...(clockSetup ? { clock: clockSetup } : {}),
-      })
+      onStartLocal(
+        deckLife === undefined
+          ? players
+          : players.map((player, seat) =>
+              seat === effectiveMeSeat ? { ...player, startingLife: deckLife } : player,
+            ),
+        startingLife,
+        {
+          ...setup,
+          account: accountInput,
+          ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
+          ...(clockSetup ? { clock: clockSetup } : {}),
+        },
+      )
   }
 
   function toggleMatch(on: boolean) {
@@ -562,7 +583,7 @@ function NewGameForm({
 
   function chooseDeck(versionId: string | undefined) {
     const choice = deckChoices.find((candidate) => candidate.versionId === versionId)
-    setDeck(choice)
+    setDeck(choice && { versionId: choice.versionId, name: choice.name })
     if (accountInput)
       savePlayers(seatAppearances, {
         ...accountInput,

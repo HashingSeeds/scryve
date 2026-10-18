@@ -30,6 +30,7 @@ function DeckChoicesQuery({ onChange }: { onChange: (decks: DeckChoices) => void
                 name: deck.name,
                 system: deck.game,
                 format: deck.format,
+                startingValue: deck.startingValue,
               },
             ]
           : [],

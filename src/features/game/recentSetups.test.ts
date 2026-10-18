@@ -1,3 +1,4 @@
+import { createLocalGame } from "./domain"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import {
   MAX_RECENT_SETUPS,
@@ -70,6 +71,26 @@ describe("recent setups", () => {
       parseRecentSetup({ ...valid, lobby: { ...valid.lobby, format: "jumpstart" } }),
     ).toBeUndefined()
     expect(parseRecentSetup({ ...valid, mode: "lan" })).toBeUndefined()
+  })
+
+  it("replays a hero's game at the format's life, since the deck is not remembered", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const players = [
+      { name: "Hero", color: "#B85636", startingLife: 38 },
+      { name: "Other", color: "#41476E" },
+    ]
+    repository.rememberSetup({
+      mode: "local",
+      game: { players, startingLife: 40, system: "fab", format: "cc" },
+    })
+    expect(repository.loadRecentSetups()[0]).toMatchObject({
+      game: { startingLife: 40, players: [{ name: "Hero" }, { name: "Other" }] },
+    })
+    expect(repository.loadRecentSetups()[0]).not.toHaveProperty("game.players.0.startingLife")
+
+    repository.saveActiveGame(createLocalGame({ players, startingLife: 40, system: "fab" }))
+    expect(repository.loadActiveGame()?.players.map(({ life }) => life)).toEqual([38, 40])
+    expect(repository.loadActiveGame()?.players[0].startingLife).toBe(38)
   })
 
   it("names a setup by its game type", () => {

@@ -152,6 +152,7 @@ export default defineSchema({
     proShape: v.optional(v.string()),
     foil: v.optional(v.boolean()),
     currentLife: v.number(),
+    startingLife: v.optional(v.number()),
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
@@ -411,7 +412,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_game_and_identity_namespace_and_card_id", ["game", "identityNamespace", "cardId"])
-    .index("by_game_and_name_normalized", { fields: ["game", "nameNormalized"], staged: true })
+    .index("by_game_and_name_normalized", ["game", "nameNormalized"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["game"] }),
 
   cardPrintings: defineTable({

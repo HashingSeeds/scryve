@@ -157,10 +157,12 @@ export function parseGenericDeckList(list: string, game: ProviderGame): ParsedDe
     }
     if (rules.skipsLine?.(line)) continue
 
+    const header = rules.headerCard?.(line)
     const bareCardId = rules.bareCardId?.(line)
     const quantityMatch = line.match(/^(\d{1,3})\s*x?\s+(.+)$/i)
-    const quantity = bareCardId ? 1 : quantityMatch ? Number(quantityMatch[1]) : 0
-    const originalReference = bareCardId ?? quantityMatch?.[2]?.trim() ?? ""
+    const quantity = header || bareCardId ? 1 : quantityMatch ? Number(quantityMatch[1]) : 0
+    const originalReference = header?.reference ?? bareCardId ?? quantityMatch?.[2]?.trim() ?? ""
+    const entrySection = header?.section ?? section
     const reference =
       originalReference && quantity >= 1 && quantity <= 999
         ? parseReference(originalReference)
@@ -169,15 +171,15 @@ export function parseGenericDeckList(list: string, game: ProviderGame): ParsedDe
       invalidLines.push(sourceLine)
       continue
     }
-    const key = `${section}:${reference.key}`
+    const key = `${entrySection}:${reference.key}`
     const current = entries.get(key)
     entries.set(key, {
       name: reference.name,
       quantity: (current?.quantity ?? 0) + quantity,
-      section,
+      section: entrySection,
       originalReference,
       ...(reference.providerCardId ? { providerCardId: reference.providerCardId } : {}),
-      sectionExplicit,
+      sectionExplicit: sectionExplicit || header !== undefined,
     })
   }
   return { entries: [...entries.values()], invalidLines }
@@ -290,6 +292,14 @@ async function resolveGenericEntries(
     }
 
     const lookupPrinting = deckList.printingLookup?.(entry)
+    const named: CatalogCard | null =
+      catalog.bulk && !lookupPrinting
+        ? await ctx.runQuery(internal.cardCatalog.cachedByName, { game, name: entry.name })
+        : null
+    if (named) {
+      resolutions.set(key, { source: "cache", card: named })
+      continue
+    }
     const cached: CatalogCard[] = lookupPrinting
       ? []
       : await ctx.runQuery(internal.cardCatalog.searchCached, {

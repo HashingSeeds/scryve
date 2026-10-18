@@ -531,6 +531,7 @@ export default {
     listHelperMtg:
       "Utilisez des lignes comme « 1 Sol Ring ». Les titres Commander, Mainboard et Sideboard sont pris en charge.",
     listHelperLorcana: "Utilisez des lignes comme « 4 Aladdin - Heroic Outlaw ».",
+    listHelperFab: "Collez une liste de cartes Fabrary ou des lignes comme « 3x Snatch (red) ».",
     returnToReview: "Retour à la vérification",
     loadingDeck: "Chargement du deck…",
     reloadSource: "Recharger la source",

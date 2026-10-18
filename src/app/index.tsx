@@ -13,6 +13,7 @@ import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
 import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
+import { rulesHref } from "@/features/rules/gameRules"
 import type { TxKeyPath } from "@/i18n"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
@@ -212,7 +213,7 @@ export default function Index() {
       initialEndOpen={staleChoice === "end"}
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
-      onRules={(rule) => router.push({ pathname: "/rules", params: rule ? { rule } : {} })}
+      onRules={(system, rule) => router.push(rulesHref(system, rule))}
       onSetup={() => router.push("/game/new")}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}

@@ -164,6 +164,7 @@ export default {
       ygo: "最終ライフポイント",
       pokemon: "最終サイド",
       lorcana: "最終ロア",
+      fab: "最終ライフ",
     },
     noWinner: "このゲームの勝者は記録されていません。",
     reportPlayer: "プレイヤーを報告またはブロック",
@@ -185,6 +186,7 @@ export default {
         ygo: "ライフポイントの変動を読み込み中",
         pokemon: "サイドの変化を読み込み中",
         lorcana: "ロアの変化を読み込み中",
+        fab: "ライフの変更を読み込み中",
       },
       heading: {
         none: "ライフの変更 · {{changes}}",
@@ -192,6 +194,7 @@ export default {
         ygo: "ライフポイントの変動 · {{changes}}",
         pokemon: "サイドの変化 · {{changes}}",
         lorcana: "ロアの変化 · {{changes}}",
+        fab: "ライフの変更 · {{changes}}",
       },
       noChanges: {
         none: "ライフの変更は記録されていません。",
@@ -199,6 +202,7 @@ export default {
         ygo: "ライフポイントの変動は記録されていません。",
         pokemon: "サイドの変化は記録されていません。",
         lorcana: "ロアの変化は記録されていません。",
+        fab: "ライフの変更は記録されていません。",
       },
       loadFailed: {
         none: "ライフの変更を読み込めませんでした。",
@@ -206,6 +210,7 @@ export default {
         ygo: "ライフポイントの変動を読み込めませんでした。",
         pokemon: "サイドの変化を読み込めませんでした。",
         lorcana: "ロアの変化を読み込めませんでした。",
+        fab: "ライフの変更を読み込めませんでした。",
       },
       detailsUnavailable: {
         none: "ライフの変更の詳細は利用できません。",
@@ -213,6 +218,7 @@ export default {
         ygo: "ライフポイント変動の詳細を表示できません。",
         pokemon: "サイドの変化の詳細は利用できません。",
         lorcana: "ロアの変化の詳細は利用できません。",
+        fab: "ライフの変更の詳細は利用できません。",
       },
       noDetails: {
         none: "ライフの変更の詳細が見つかりませんでした。",
@@ -220,6 +226,7 @@ export default {
         ygo: "ライフポイント変動の詳細が見つかりませんでした。",
         pokemon: "サイドの変化の詳細が見つかりませんでした。",
         lorcana: "ロアの変化の詳細が見つかりませんでした。",
+        fab: "ライフの変更の詳細が見つかりませんでした。",
       },
     },
   },
@@ -353,9 +360,9 @@ export default {
     effective: "総合ルール、{{date}}施行",
     official: "公式ルール",
     openFailed: "公式ルールを開けませんでした",
-    downloading: "Wizards of the Coastから総合ルールをダウンロードしています。",
+    downloading: "{{publisher}}から総合ルールをダウンロードしています。",
     failed: "ルールをダウンロードできませんでした。",
-    webOnly: "総合ルールはWizards of the Coastのサイトにあります。",
+    webOnly: "総合ルールは{{publisher}}のサイトにあります。",
     allOf: "{{section}}のすべて",
     noResults: "一致するルールはありません。",
     notFound: "このルールは、このバージョンのルールにはありません。",

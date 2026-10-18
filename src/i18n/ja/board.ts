@@ -128,6 +128,7 @@ export default {
       ygo: "ライフポイントが同点",
       pokemon: "サイドの枚数が同じ",
       lorcana: "ロアが同じ",
+      fab: "ライフが同点",
     },
     leads: {
       none: "{{name}}がライフでリード",
@@ -135,6 +136,7 @@ export default {
       ygo: "{{name}}がライフポイントでリード",
       pokemon: "{{name}}がサイドでリード",
       lorcana: "{{name}}がロアでリード",
+      fab: "{{name}}がライフでリード",
     },
   },
   clock: {
@@ -254,7 +256,10 @@ export default {
     holdToCount: "長押しでダメージを数える",
     holdToCountHint: "長押しでカードなしでダメージを数える",
     countDamage: "カードなしでダメージを数える",
-    unit: { hp: "HP", damage: "ダメ" },
+    unit: {
+      hp: "HP",
+      damage: "ダメ",
+    },
     prizesHint: "タップでサイドを取る。長押しで1枚戻す。",
     putPrizeBack: "サイドを1枚戻す",
     whoTakes_other: "{{name}}がきぜつしました。サイドを{{count}}枚取るのは誰?",
@@ -374,6 +379,7 @@ export default {
       pokemon:
         "タップで{{identity}}のサイドを{{delta}}変更します。長押しでその他の操作ができます。",
       lorcana: "タップで{{identity}}のロアを{{delta}}変更。長押しでその他の操作。",
+      fab: "タップで{{identity}}のライフを{{delta}}変更。長押しでその他の操作。",
     },
     moreControls: {
       none: "{{identity}}、ライフのその他の操作",
@@ -381,6 +387,7 @@ export default {
       ygo: "{{identity}}、ライフポイントのその他の操作",
       pokemon: "{{identity}}、サイドのその他の操作",
       lorcana: "{{identity}}、ロアのその他の操作",
+      fab: "{{identity}}、ライフのその他の操作",
     },
   },
   grid: {
@@ -390,6 +397,7 @@ export default {
       ygo_other: "{{count}}人のライフポイント一覧",
       pokemon_other: "{{count}}人のサイド一覧",
       lorcana_other: "{{count}}人のロア一覧",
+      fab_other: "{{count}}人のライフ一覧",
     },
   },
   pokemonSheet: {
@@ -476,6 +484,7 @@ export default {
       ygo: "{{name}}のライフポイント変更",
       pokemon: "{{name}}のサイド変更",
       lorcana: "{{name}}のロア変更",
+      fab: "{{name}}のライフ変更",
     },
     add: {
       none: "ライフを{{amount}}増やす",
@@ -483,6 +492,7 @@ export default {
       ygo: "ライフポイントを{{amount}}加算",
       pokemon: "サイドを{{amount}}増やす",
       lorcana: "ロアを{{amount}}増やす",
+      fab: "ライフを{{amount}}増やす",
     },
     subtract: {
       none: "ライフを{{amount}}減らす",
@@ -490,6 +500,7 @@ export default {
       ygo: "ライフポイントを{{amount}}減算",
       pokemon: "サイドを{{amount}}減らす",
       lorcana: "ロアを{{amount}}減らす",
+      fab: "ライフを{{amount}}減らす",
     },
   },
 } satisfies LocaleNamespace

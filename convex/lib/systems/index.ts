@@ -48,6 +48,21 @@ export function identitySection(system: unknown, format: unknown): DeckSection |
   return formatDefinition(system, format)?.sections.find((section) => section.identity)
 }
 
+export function picksCommander(system: unknown, format: unknown): boolean {
+  return identitySection(system, format)?.id === "commander"
+}
+
+export function identityStartingValue(
+  system: unknown,
+  format: unknown,
+  facets: readonly { key: string; value: string }[] | undefined,
+): number | undefined {
+  const facet = identitySection(system, format)?.startingValueFacet
+  const value = Number(facets?.find(({ key }) => key === facet)?.value)
+  const max = systemDefinition(system)?.counter.maxStartingValue ?? 0
+  return Number.isInteger(value) && value >= 1 && value <= max ? value : undefined
+}
+
 export function hasCommandZone(system: unknown, format: string | undefined): boolean {
   return (
     formatDefinition(system, format)?.sections.some((section) => section.id === "commander") ??

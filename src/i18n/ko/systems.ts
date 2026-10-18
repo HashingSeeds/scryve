@@ -9,6 +9,7 @@ export default {
     ygo: "라이프 포인트",
     pokemon: "사이드 카드",
     lorcana: "로어",
+    fab: "라이프",
   },
   counterLabel: {
     none: "라이프",
@@ -16,6 +17,7 @@ export default {
     ygo: "라이프 포인트",
     pokemon: "사이드 카드",
     lorcana: "로어",
+    fab: "라이프",
   },
   startingValueRange: {
     none: "시작 라이프는 1에서 {{max}} 사이의 정수여야 합니다.",
@@ -23,6 +25,7 @@ export default {
     ygo: "시작 라이프 포인트는 1에서 {{max}} 사이의 정수여야 합니다.",
     pokemon: "시작 사이드 카드는 1에서 {{max}} 사이의 정수여야 합니다.",
     lorcana: "시작 로어는 0에서 {{max}} 사이의 정수여야 합니다.",
+    fab: "시작 라이프는 1에서 {{max}} 사이의 정수여야 합니다.",
   },
   tableItem: {
     poison: "독",
@@ -35,11 +38,14 @@ export default {
     sideboard: "사이드보드",
     extra: "엑스트라 덱",
     side: "사이드 덱",
+    hero: "영웅",
+    arena: "아레나",
     main: {
       mtg: "메인 덱",
       ygo: "메인 덱",
       pokemon: "덱",
       lorcana: "덱",
+      fab: "덱",
     },
   },
   formatBlurb: {
@@ -55,6 +61,13 @@ export default {
       limited: "드래프트와 실드",
       constructed: "그 외 전부",
     },
+    fab: {
+      cc: "60장 이상, 3장까지",
+      blitz: "젊은 영웅, 40장",
+      silverAge: "커먼과 레어",
+      ll: "레전드 허용",
+      upf: "멀티플레이",
+    },
   },
   counterValue: {
     none_other: "라이프 {{count}}",
@@ -62,6 +75,7 @@ export default {
     ygo_other: "라이프 포인트 {{count}}",
     pokemon_other: "사이드 카드 {{count}}장",
     lorcana_other: "로어 {{count}}",
+    fab_other: "라이프 {{count}}",
   },
   counterChange: {
     none_other: "라이프 변경 {{count}}회",
@@ -69,6 +83,7 @@ export default {
     ygo_other: "라이프 포인트 {{count}} 변경",
     pokemon_other: "사이드 카드 변동 {{count}}회",
     lorcana_other: "로어 변동 {{count}}회",
+    fab_other: "라이프 변경 {{count}}회",
   },
   noneTaken: "가져간 카드 없음",
   taken: "{{amount}} 가져감",

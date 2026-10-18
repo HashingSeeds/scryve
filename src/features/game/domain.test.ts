@@ -67,6 +67,36 @@ describe("local game domain", () => {
     expect(hasLocalGameStarted(undone)).toBe(true)
   })
 
+  it("starts a seat at its hero's life without counting as started, and keeps it for the rematch", () => {
+    const game = createLocalGame({
+      gameId: asGameId("hero-game"),
+      now: 1,
+      startingLife: 40,
+      system: "fab",
+      format: "cc",
+      players: [
+        { name: "Hero", color: "#000", startingLife: 38 },
+        { name: "Other", color: "#111", startingLife: 40 },
+      ],
+    })
+    expect(game.players.map(({ life, startingLife }) => [life, startingLife])).toEqual([
+      [38, 38],
+      [40, undefined],
+    ])
+    expect(hasLocalGameStarted(game)).toBe(false)
+    expect(createRematch(game).players.map(({ life }) => life)).toEqual([38, 40])
+    expect(() =>
+      createLocalGame({
+        startingLife: 40,
+        system: "fab",
+        players: [
+          { name: "A", color: "#000", startingLife: 0 },
+          { name: "B", color: "#111" },
+        ],
+      }),
+    ).toThrow()
+  })
+
   it("uses independent secure UUID entropy even at the same timestamp", () => {
     const first = createClientId("operation", 123, () => "00000000-0000-4000-8000-000000000001")
     const second = createClientId("operation", 123, () => "00000000-0000-4000-8000-000000000002")

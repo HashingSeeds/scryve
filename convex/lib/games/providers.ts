@@ -1,5 +1,6 @@
 import type { CardCatalog } from "./cards"
 import type { DeckFeed, DeckLinkSource, DeckListRules } from "./decks"
+import { FAB_CUBE_DATASET, FAB_DECK_LIST, FAB_PRECON_FEED } from "./fleshAndBlood"
 import { LIMITLESS_FEED, LIMITLESS_LINK } from "./limitless"
 import { LORCANA_DECK_LIST, LORCANA_JSON_DATASET, LORCANA_STARTER_DECKS } from "./lorcana"
 import { POKEMON_DECK_LIST, TCGDEX_CATALOG } from "./pokemon"
@@ -34,6 +35,12 @@ export const GAME_PROVIDERS: Readonly<Record<ProviderGame, GameProvider>> = {
     deckList: LORCANA_DECK_LIST,
     deckLink: null,
     deckFeed: LORCANA_STARTER_DECKS,
+  },
+  fab: {
+    catalog: { bulk: FAB_CUBE_DATASET },
+    deckList: FAB_DECK_LIST,
+    deckLink: null,
+    deckFeed: FAB_PRECON_FEED,
   },
 }
 

@@ -148,6 +148,7 @@ describe("deck sync reads", () => {
         lastPlayedAt: undefined,
         favoritedAt: undefined,
         record: undefined,
+        startingValue: undefined,
         versionCount: 2,
         cardQuantity: 100,
       },

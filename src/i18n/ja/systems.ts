@@ -9,6 +9,7 @@ export default {
     ygo: "ライフポイント",
     pokemon: "サイド",
     lorcana: "ロア",
+    fab: "ライフ",
   },
   counterLabel: {
     none: "ライフ",
@@ -16,6 +17,7 @@ export default {
     ygo: "ライフポイント",
     pokemon: "サイド",
     lorcana: "ロア",
+    fab: "ライフ",
   },
   startingValueRange: {
     none: "初期ライフは1から{{max}}までの整数で入力してください。",
@@ -23,6 +25,7 @@ export default {
     ygo: "初期ライフポイントは1から{{max}}までの整数にしてください。",
     pokemon: "初期サイドは1から{{max}}までの整数にしてください。",
     lorcana: "初期ロアは0から{{max}}までの整数にしてください。",
+    fab: "初期ライフは1から{{max}}までの整数で入力してください。",
   },
   tableItem: {
     poison: "毒",
@@ -35,11 +38,14 @@ export default {
     sideboard: "サイドボード",
     extra: "エクストラデッキ",
     side: "サイドデッキ",
+    hero: "ヒーロー",
+    arena: "アリーナ",
     main: {
       mtg: "メインデッキ",
       ygo: "メインデッキ",
       pokemon: "デッキ",
       lorcana: "デッキ",
+      fab: "デッキ",
     },
   },
   formatBlurb: {
@@ -55,6 +61,13 @@ export default {
       limited: "ドラフトとシールド",
       constructed: "その他すべて",
     },
+    fab: {
+      cc: "60枚以上、各3枚まで",
+      blitz: "ヤングヒーロー、40枚",
+      silverAge: "コモンとレアのみ",
+      ll: "リビングレジェンド可",
+      upf: "多人数戦",
+    },
   },
   counterValue: {
     none_other: "ライフ {{count}}",
@@ -62,6 +75,7 @@ export default {
     ygo_other: "{{count}}ライフポイント",
     pokemon_other: "サイド {{count}}枚",
     lorcana_other: "ロア {{count}}",
+    fab_other: "ライフ {{count}}",
   },
   counterChange: {
     none_other: "ライフの変動 {{count}}件",
@@ -69,6 +83,7 @@ export default {
     ygo_other: "ライフポイントの変動: {{count}}",
     pokemon_other: "サイド変動{{count}}回",
     lorcana_other: "ロア変動{{count}}回",
+    fab_other: "ライフの変動 {{count}}件",
   },
   noneTaken: "なし",
   taken: "{{amount}}受けた",
