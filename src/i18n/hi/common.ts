@@ -4,6 +4,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   back: "वापस",
   cancel: "रद्द करें",
+  clear: "साफ़ करें",
   close: "बंद करें",
   delete: "हटाएँ",
   done: "हो गया",

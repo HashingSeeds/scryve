@@ -246,6 +246,7 @@ export function RulesScreen({
                 autoCorrect={false}
                 autoCapitalize="none"
                 returnKeyType="search"
+                clearable
               />
             ) : null
           }
