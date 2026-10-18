@@ -14,7 +14,7 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { type GameMenuBadge, type RadialMenuAction } from "@/components/GameRadialMenu"
+import { type GameMenuActions, type GameMenuBadge } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
@@ -301,7 +301,7 @@ export function CurrentGameScreen({
     setLayoutPickerOpen(false)
   }
 
-  const radialActions: readonly RadialMenuAction[] = useMemo(
+  const radialActions: GameMenuActions = useMemo(
     () => [
       {
         kind: "layout",

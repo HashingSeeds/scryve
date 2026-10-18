@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Redirect, router } from "expo-router"
 
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
@@ -12,7 +12,11 @@ export default function LanGameRoute() {
   // why: resuming before useLanGame reads the session puts the saved game on the first render instead of redirecting to the lobby.
   useState(() => lanPlayAvailable() && lanSession.resumeHostedGame())
   const runtime = useLanGame()
-  const { projection } = useLanSession()
+  const { projection, lobby } = useLanSession()
+  const awayPlayerIds = useMemo(
+    () => lobby?.seats.filter((seat) => !seat.connected).map((seat) => seat.key) ?? [],
+    [lobby?.seats],
+  )
   if (!lanPlayAvailable()) return <Redirect href="/" />
   if (!projection) return <Redirect href="/lan" />
   if (runtime.status !== "ready") return null
@@ -22,6 +26,7 @@ export default function LanGameRoute() {
       ownerId={lanSession.getState().seatKey ?? "nearby"}
       runtime={runtime}
       cloud={false}
+      awayPlayerIds={awayPlayerIds}
       onGameEnded={backToLobby}
       onGameAbandoned={backToLobby}
       onBack={backToLobby}

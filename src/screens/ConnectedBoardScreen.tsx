@@ -20,7 +20,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import type { RadialMenuAction } from "@/components/GameRadialMenu"
+import type { GameMenuActions } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayoutOptions,
   PlayerGrid,
@@ -74,6 +74,7 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
 import type { TxKeyPath } from "@/i18n"
@@ -264,6 +265,7 @@ type ConnectedBoardReadyProps = {
   controls: ConnectedBoardControls
   ownerId: string
   cloud: boolean
+  awayPlayerIds?: readonly string[]
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -338,6 +340,7 @@ interface ConnectedBoardRuntimeProps {
   ownerId: string
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
+  awayPlayerIds?: readonly string[]
 }
 
 function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
@@ -360,6 +363,7 @@ export function ConnectedBoardWithRuntime({
   accountEntry,
   ownerId,
   cloud = true,
+  awayPlayerIds,
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
@@ -515,6 +519,7 @@ export function ConnectedBoardWithRuntime({
               controls={controls}
               ownerId={ownerId}
               cloud={cloud}
+              awayPlayerIds={awayPlayerIds}
             />
           </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
@@ -540,6 +545,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   controls,
   ownerId,
   cloud,
+  awayPlayerIds = [],
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -781,7 +787,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const myRole = cloud
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
-  const radialActions: RadialMenuAction[] = useMemo(
+  const radialActions: GameMenuActions = useMemo(
     () => [
       {
         kind: "layout",
@@ -794,19 +800,15 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         },
       },
       { kind: "dice", label: translate("connected:board.menu.dice"), tools: diceTools },
-      ...(cloud
-        ? [
-            {
-              kind: "players",
-              label: translate("connected:board.menu.players"),
-              onPress: (event?: GestureResponderEvent) => {
-                captureMenuDialogOrigin(event)
-                setMenuOpen(false)
-                setPlayerActionsOpen(true)
-              },
-            } satisfies RadialMenuAction,
-          ]
-        : []),
+      {
+        kind: "players",
+        label: translate("connected:board.menu.players"),
+        onPress: (event) => {
+          captureMenuDialogOrigin(event)
+          setMenuOpen(false)
+          setPlayerActionsOpen(true)
+        },
+      },
       rules
         ? {
             kind: "rules",
@@ -858,7 +860,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       diceTools,
       finishBlocker,
       layoutOptions.length,
-      cloud,
       onHistory,
       onRules,
       rules,
@@ -1160,7 +1161,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         </DialogCard>
       ) : null}
 
-      {playerActionsOpen ? (
+      {playerActionsOpen && !cloud ? (
+        <NearbyPlayersDialog
+          players={reportablePlayers}
+          awayPlayerIds={awayPlayerIds}
+          origin={menuDialogOrigin}
+          onClose={() => setPlayerActionsOpen(false)}
+        />
+      ) : null}
+
+      {playerActionsOpen && cloud ? (
         <PlayerActionsDialog
           publicId={publicId}
           players={reportablePlayers}

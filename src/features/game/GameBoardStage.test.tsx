@@ -1,6 +1,7 @@
 import { StyleSheet, View, type ViewProps } from "react-native"
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
+import type { GameMenuActions, RadialMenuAction } from "@/components/GameRadialMenu"
 import type { PlayerGridProps } from "@/components/PlayerGrid"
 import { ThemeProvider } from "@/theme/context"
 
@@ -23,6 +24,18 @@ jest.mock("../../../modules/screen-pinned-view", () => {
   }
 })
 
+function menuActions(
+  dice: RadialMenuAction = { kind: "dice", label: "Dice", onPress: jest.fn() },
+): GameMenuActions {
+  return [
+    { kind: "layout", label: "Layout", onPress: jest.fn() },
+    dice,
+    { kind: "players", label: "Players", onPress: jest.fn() },
+    { kind: "rules", label: "Rules", onPress: jest.fn() },
+    { kind: "end-game", label: "End", onPress: jest.fn() },
+  ]
+}
+
 describe("GameBoardStage on a pinned screen", () => {
   it("lays the board out at the reported hardware size and turns the menu to face the holder", () => {
     const renderGrid = jest.fn((_orientation: PlayerGridProps["boardOrientation"]) => (
@@ -34,7 +47,7 @@ describe("GameBoardStage on a pinned screen", () => {
           playerCount={4}
           layoutVariant="auto"
           renderGrid={renderGrid}
-          menu={{ open: false, actions: [], onToggle: jest.fn(), onClose: jest.fn() }}
+          menu={{ open: false, actions: menuActions(), onToggle: jest.fn(), onClose: jest.fn() }}
         />
       </ThemeProvider>,
     )
@@ -68,15 +81,13 @@ describe("GameBoardStage on a pinned screen", () => {
           renderGrid={() => <View testID="grid" />}
           menu={{
             open: false,
-            actions: [
-              {
-                kind: "dice",
-                label: "Dice",
-                tools: [
-                  { key: "first", label: "First", accessibilityLabel: "First", onPress: onFirst },
-                ],
-              },
-            ],
+            actions: menuActions({
+              kind: "dice",
+              label: "Dice",
+              tools: [
+                { key: "first", label: "First", accessibilityLabel: "First", onPress: onFirst },
+              ],
+            }),
             heldAction: "dice",
             exitAction: { label: "Close dice", onPress: jest.fn() },
             onToggle: jest.fn(),
@@ -101,7 +112,7 @@ describe("GameBoardStage on a pinned screen", () => {
           renderGrid={() => <View testID="grid" />}
           menu={{
             open: true,
-            actions: [],
+            actions: menuActions(),
             statusLine: { text: "Offline for 2m", tone: "offline", onPress },
             onToggle: jest.fn(),
             onClose: jest.fn(),
