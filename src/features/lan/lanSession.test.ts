@@ -150,6 +150,40 @@ describe("nearby host", () => {
     expect(bob.sent).toEqual([{ type: "rejected", reason: "This game is full." }])
   })
 
+  it("sends each Treachery guest only roles it may see, and shares one once its owner reveals it", async () => {
+    const session = new LanSession()
+    await session.host({ ...setup, playerCount: 4, variant: "treachery" })
+    const guests = ["Alice", "Bob", "Cy"].map((name) => {
+      const guest = socket()
+      guest.send({ type: "join", protocol: LAN_PROTOCOL, name, variants: ["treachery"] })
+      return guest
+    })
+    jest.advanceTimersByTime(50)
+    session.start()
+    jest.advanceTimersByTime(50)
+    const [alice, bob] = guests
+    const playersSeenBy = (guest: (typeof guests)[number]) => {
+      const state = guest.sent.findLast((message) => message.type === "state")
+      return state?.type === "state" ? state.projection.players : []
+    }
+
+    for (const guest of guests)
+      expect(
+        playersSeenBy(guest).filter(
+          (player) => !player.controlledByMe && !player.roleRevealed && player.role,
+        ),
+      ).toEqual([])
+    alice.send({ type: "reveal" })
+    jest.advanceTimersByTime(50)
+
+    const aliceSeenByBob = playersSeenBy(bob).find((player) => player.playerId === alice.pass().key)
+    expect(aliceSeenByBob).toMatchObject({ roleRevealed: true, role: expect.any(String) })
+    const sentToBob = bob.sent.length
+    alice.send({ type: "reveal" })
+    jest.advanceTimersByTime(50)
+    expect(bob.sent).toHaveLength(sentToBob)
+  })
+
   it("refuses a write to another player's seat", async () => {
     const { session, alice, bob } = await startedGame()
 

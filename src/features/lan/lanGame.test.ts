@@ -4,12 +4,14 @@ import {
   createLanGame,
   endLanRound,
   LAN_PROTOCOL,
+  lanLobbyOf,
   lanProjection,
   lanSeatsReady,
   parseGuestMessage,
   parseLanSetup,
   parseHostMessage,
   releaseLanSeat,
+  revealLanRole,
   setLanConnected,
   setLanPlayerCount,
   startLanRound,
@@ -135,6 +137,87 @@ describe("nearby lobby", () => {
     expect(lanSeatsReady(full)).toBe(true)
     expect(lanSeatsReady(setLanConnected(full, "guest", false))).toBe(false)
     expect(releaseLanSeat(full, "guest").seats.map((seat) => seat.key)).toEqual(["host"])
+  })
+})
+
+describe("nearby Treachery", () => {
+  const treachery: LanSetup = { ...commander, playerCount: 4, variant: "treachery" }
+  const joinWithRoles = (name: string) => ({ ...join(name), variants: ["treachery"] }) as const
+  // why: with a shuffle that always draws 0 the deal is host Traitor, a and b Assassins, c Leader.
+  const alwaysFirst = () => 0
+  const neverSwap = () => 0.99
+
+  function table() {
+    let game = lobby(treachery)
+    for (const key of ["a", "b", "c"]) {
+      const admitted = admitLanGuest(game, tokens, joinWithRoles(key), { key, token: key })
+      if ("rejected" in admitted) throw new Error(admitted.rejected)
+      game = admitted.game
+    }
+    return game
+  }
+  const playerOf = (game: LanGame, viewer: string, key: string) =>
+    lanProjection(game, viewer).players.find((player) => player.playerId === key)
+
+  it("turns away a guest whose build has no hidden roles, and keeps its seats in range", () => {
+    expect(admitLanGuest(lobby(treachery), tokens, join("old"), unused)).toEqual({
+      rejected: "Update Scryve to join this game.",
+    })
+    expect(setLanPlayerCount(lobby(treachery), 3).setup.playerCount).toBe(4)
+    expect(lanSeatsReady({ ...table(), setup: { ...treachery, playerCount: 3 } })).toBe(false)
+    expect(parseLanSetup({ ...treachery, variant: "chaos" })).not.toHaveProperty("variant")
+    expect(parseLanSetup({ ...treachery, system: "lorcana", format: "core" })).not.toHaveProperty(
+      "variant",
+    )
+  })
+
+  it("shows each guest only its own role and the face-up Leader, never on the wire lobby", () => {
+    const game = startLanRound(table(), NOW, alwaysFirst)
+
+    expect(playerOf(game, "a", "a")).toMatchObject({ role: "assassin", roleRevealed: false })
+    expect(playerOf(game, "a", "c")).toMatchObject({ role: "leader", roleRevealed: true })
+    expect(playerOf(game, "a", "host")).not.toHaveProperty("role")
+    expect(playerOf(game, "a", "b")).not.toHaveProperty("role")
+    expect(JSON.stringify(lanLobbyOf(game))).not.toMatch(/assassin|traitor|leader/)
+    expect(lanProjection(game, "a").variant).toBe("treachery")
+  })
+
+  it("shows every role once a round finishes, but not when the host abandons it", () => {
+    const game = startLanRound(table(), NOW, alwaysFirst)
+
+    expect(playerOf(endLanRound(game, "finished", NOW), "a", "b")?.role).toBe("assassin")
+    expect(playerOf(endLanRound(game, "abandoned", NOW), "a", "b")).not.toHaveProperty("role")
+  })
+
+  it("deals again every round", () => {
+    const first = startLanRound(table(), NOW, alwaysFirst)
+    const next = startLanRound(endLanRound(first, "finished", NOW), NOW, neverSwap)
+
+    expect(playerOf(next, "host", "host")?.role).toBe("leader")
+    expect(playerOf(next, "a", "host")).toMatchObject({ role: "leader", roleRevealed: true })
+  })
+
+  it("reveals only the sender's own role, and only while the round is on", () => {
+    const game = startLanRound(table(), NOW, alwaysFirst)
+    const revealed = revealLanRole(game, "a", NOW)
+
+    expect(parseGuestMessage(JSON.stringify({ type: "reveal" }))).toEqual({ type: "reveal" })
+    expect(playerOf(revealed, "b", "a")).toMatchObject({ role: "assassin", roleRevealed: true })
+    expect(playerOf(revealed, "b", "host")).not.toHaveProperty("role")
+    expect(revealLanRole(table(), "a", NOW)).toEqual(table())
+  })
+
+  it("tells only the host who won once the rules decide it", () => {
+    const game = startLanRound(table(), NOW, alwaysFirst)
+    expect(lanProjection(game, "host").treacheryOutcome).toBeUndefined()
+
+    const { next } = write(game, "c", life("life-operation-0003", "c", -40))
+
+    expect(lanProjection(next, "host").treacheryOutcome).toEqual({
+      kind: "win",
+      winnerPlayerIds: ["a", "b"],
+    })
+    expect(lanProjection(next, "a").treacheryOutcome).toBeUndefined()
   })
 })
 

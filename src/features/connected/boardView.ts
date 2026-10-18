@@ -43,18 +43,23 @@ export function connectedLives(
   )
 }
 
-export function connectedLastStanding(projection: ConnectedDisplayProjection): string | undefined {
-  const { players, system, format, table } = projection
-  const rules = playTableRules(system, format)
-  const { counter } = playSystemRules(system)
-  const isOut = (player: ConnectedPlayerProjection) =>
+export function connectedPlayerIsOut(
+  { players, system, format, table }: ConnectedProjection,
+  player: ConnectedPlayerProjection,
+) {
+  return (
     isCounterOut(
-      counter,
+      playSystemRules(system).counter,
       player.currentLife,
       players.filter((other) => other !== player).map((other) => other.currentLife),
     ) ||
     player.eliminatedByCommanderDamage === true ||
-    isOutByTableCounters(table, player.playerId, rules)
-  const standing = players.filter((player) => !isOut(player))
+    (table !== undefined &&
+      isOutByTableCounters(table, player.playerId, playTableRules(system, format)))
+  )
+}
+
+export function connectedLastStanding(projection: ConnectedDisplayProjection): string | undefined {
+  const standing = projection.players.filter((player) => !connectedPlayerIsOut(projection, player))
   return standing.length === 1 ? standing[0].playerId : undefined
 }

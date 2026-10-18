@@ -345,7 +345,7 @@ function NewGameForm({
     connectedMode ? defaultConnectedLayout(playerCount) : "auto",
   )
   const treacheryAvailable =
-    cloudMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
+    connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
@@ -387,7 +387,7 @@ function NewGameForm({
     recent:
       seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
     recentRow: Boolean(recent),
-    connected: cloudMode,
+    connected: connectedMode,
   })
   const setupSummary = [
     connectedMode
@@ -495,6 +495,7 @@ function NewGameForm({
       layout,
       lifeStep,
       ...(system && format ? { system, format } : {}),
+      ...(treachery ? { variant: "treachery" as const } : {}),
     }
     if (nearbyMode)
       onNearby?.({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...setup })
@@ -504,7 +505,6 @@ function NewGameForm({
         startingLife,
         ruleset: format ?? NO_PLAY_SYSTEM,
         deckRequired,
-        ...(treachery ? { variant: "treachery" as const } : {}),
         ...setup,
       })
     else
