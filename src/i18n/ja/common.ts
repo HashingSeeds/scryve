@@ -4,6 +4,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   back: "戻る",
   cancel: "キャンセル",
+  clear: "クリア",
   close: "閉じる",
   delete: "削除",
   done: "完了",

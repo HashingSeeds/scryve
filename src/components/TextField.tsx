@@ -18,6 +18,7 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
 
+import { PressableIcon } from "./Icon"
 import { Text, TextProps } from "./Text"
 
 export interface TextFieldAccessoryProps {
@@ -55,6 +56,7 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
    * Note: It is a good idea to memoize this.
    */
   LeftAccessory?: ComponentType<TextFieldAccessoryProps>
+  clearable?: boolean
 }
 
 export const TextField = forwardRef(function TextField(props: TextFieldProps, ref: Ref<TextInput>) {
@@ -71,6 +73,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     status,
     RightAccessory,
     LeftAccessory,
+    clearable,
     HelperTextProps,
     LabelTextProps,
     style: $inputStyleOverride,
@@ -127,6 +130,11 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     input.current?.focus()
   }
 
+  function clearInput() {
+    TextInputProps.onChangeText?.("")
+    input.current?.focus()
+  }
+
   useImperativeHandle(ref, () => input.current as TextInput)
 
   return (
@@ -167,6 +175,20 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           editable={!disabled}
           style={themed($inputStyles)}
         />
+
+        {clearable && !disabled && !!TextInputProps.value && (
+          <PressableIcon
+            testID={TextInputProps.testID && `${TextInputProps.testID}-clear`}
+            icon="x"
+            size={16}
+            color={colors.textDim}
+            accessibilityRole="button"
+            accessibilityLabel={translate("common:clear")}
+            hitSlop={8}
+            containerStyle={themed($rightAccessoryStyle)}
+            onPress={clearInput}
+          />
+        )}
 
         {!!RightAccessory && (
           <RightAccessory

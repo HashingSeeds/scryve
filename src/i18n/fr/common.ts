@@ -4,6 +4,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   back: "Retour",
   cancel: "Annuler",
+  clear: "Effacer",
   close: "Fermer",
   delete: "Supprimer",
   done: "Terminé",

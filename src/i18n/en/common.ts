@@ -1,6 +1,7 @@
 const common = {
   back: "Back",
   cancel: "Cancel",
+  clear: "Clear",
   close: "Close",
   delete: "Delete",
   done: "Done",

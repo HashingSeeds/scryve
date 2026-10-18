@@ -1873,7 +1873,7 @@ export function AddDeckScreen({
               value={preconQuery}
               maxLength={120}
               autoCorrect={false}
-              clearButtonMode="while-editing"
+              clearable
               onChangeText={setPreconQuery}
             />
             {browseOffline ? (

@@ -4,6 +4,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   back: "뒤로",
   cancel: "취소",
+  clear: "지우기",
   close: "닫기",
   delete: "삭제",
   done: "완료",

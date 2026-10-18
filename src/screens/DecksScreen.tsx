@@ -544,7 +544,7 @@ export function DecksScreen({
           value={search}
           maxLength={80}
           autoCorrect={false}
-          clearButtonMode="while-editing"
+          clearable
           containerStyle={themed($searchField)}
           onChangeText={setSearch}
         />
