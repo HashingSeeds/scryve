@@ -33,6 +33,11 @@ function setupFromParams(params: Record<string, string | undefined>): LanSetup |
 const backToPlay = () => router.dismissTo({ pathname: "/", params: { destination: "play" } })
 
 export default function LanLobbyRoute() {
+  if (!lanPlayAvailable()) return <Redirect href="/" />
+  return <LanLobby />
+}
+
+function LanLobby() {
   const params = useLocalSearchParams<{
     setup?: string
     join?: string
@@ -50,7 +55,7 @@ export default function LanLobbyRoute() {
   // why: hosting starts once per visit; a remount after leaving must not reopen the lobby.
   const hosted = useRef(false)
   useEffect(() => {
-    if (hosted.current || !setup || lanSession.getState().role || !lanPlayAvailable()) return
+    if (hosted.current || !setup || lanSession.getState().role) return
     hosted.current = true
     void checkLocalNetworkAccess()
       .catch(() => "denied" as const)
@@ -81,7 +86,6 @@ export default function LanLobbyRoute() {
       lanSession.start()
   }, [params.start, role, lobby])
 
-  if (!lanPlayAvailable()) return <Redirect href="/" />
   return (
     <NearbyLobbyScreen
       error={accessError}

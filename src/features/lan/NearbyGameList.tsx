@@ -11,11 +11,14 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { LAN_NAME_MAX_LENGTH, lanPlayAvailable, loadLanName, saveLanName } from "./lanAvailability"
-import { lanSession } from "./lanSession"
+import { lanSession, useLanSession } from "./lanSession"
 import { useNearbyGames } from "./useNearbyGames"
 
 export function NearbyGameList({ onJoin }: { onJoin: () => void }) {
+  const { role } = useLanSession()
   if (!lanPlayAvailable()) return null
+  if (role)
+    return <Button testID="back-to-nearby-game" tx="connected:nearby.backToGame" onPress={onJoin} />
   return <NearbyGames onJoin={onJoin} />
 }
 
