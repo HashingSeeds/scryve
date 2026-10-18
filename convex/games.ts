@@ -1086,6 +1086,7 @@ export const publishLocalGame = mutation({
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
     table: v.optional(tableStateValidator),
+    layout: v.optional(playerGridLayoutValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1139,6 +1140,7 @@ export const publishLocalGame = mutation({
       args.commanderTotals ?? null,
       // why: appended only when sent, so receipts written before tables existed keep their key.
       ...(args.table ? [canonicalJson(args.table)] : []),
+      ...(args.layout ? [args.layout] : []),
     ])
     const receipt = await ctx.db
       .query("gamePublishReceipts")
@@ -1180,6 +1182,7 @@ export const publishLocalGame = mutation({
       game: gameSystem,
       system: gameSystem,
       ...(format ? { format } : {}),
+      ...(args.layout ? { layout: args.layout } : {}),
       createdAt: now,
       startedAt: now,
       updatedAt: now,

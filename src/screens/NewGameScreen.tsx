@@ -250,9 +250,8 @@ function NewGameForm({
   const [playerCount, setPlayerCount] = useState(
     lobby?.playerCount ?? seedGame?.players.length ?? defaults.defaultPlayerCount,
   )
-  // why: connected setups saved "auto" before the host's layout reached any board, so there it was never a choice.
   const [chosenLayout, setChosenLayout] = useState<PlayerGridLayoutVariant | undefined>(
-    (lobby?.layout === "auto" ? undefined : lobby?.layout) ?? seedGame?.layout,
+    lobby?.layout ?? seedGame?.layout,
   )
   const [names, setNames] = useState<string[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => seedGame?.players[index]?.name ?? ""),
