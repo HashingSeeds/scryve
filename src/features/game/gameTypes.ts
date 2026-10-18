@@ -58,11 +58,11 @@ export function gameTypesBySystem(types: readonly GameType[]) {
   })).filter((group) => group.types.length > 0)
 }
 
-const SUGGESTED_COUNT = 3
+const SUGGESTED_COUNT = 1
 
 type Played = Pick<GameType, "system" | "format" | "variant">
 
-// why: the recent row takes one of the suggestion slots, even when the form did not open from it.
+// why: one suggestion keeps setup in view; a recent row takes it even when the form did not open from it.
 export function newGameTypes({
   chosen,
   recent,

@@ -5,41 +5,36 @@ const moreIds = (more: ReturnType<typeof newGameTypes>["more"]) =>
   ids(more.flatMap(({ types }) => types))
 
 describe("newGameTypes", () => {
-  it("falls back to the featured order, capped, with No system last", () => {
+  it("suggests the first featured format, then No system", () => {
     const { suggested, more } = newGameTypes({ connected: false })
 
-    expect(ids(suggested)).toEqual(["commander", "mtg-standard", "ygo-advanced", "none"])
-    expect(moreIds(more)).toContain("pokemon-standard")
+    expect(ids(suggested)).toEqual(["commander", "none"])
+    expect(moreIds(more)).toContain("mtg-standard")
     expect(moreIds(more)).not.toContain("treachery")
   })
 
-  it("leads with the format picked at onboarding, then that system's featured formats", () => {
+  it("suggests the format picked at onboarding", () => {
     const { suggested, more } = newGameTypes({
       chosen: { system: "ygo", format: "speed" },
       connected: false,
     })
 
-    expect(ids(suggested)).toEqual(["ygo-speed", "ygo-advanced", "commander", "none"])
+    expect(ids(suggested)).toEqual(["ygo-speed", "none"])
     expect(moreIds(more)).not.toContain("ygo-speed")
   })
 
-  it("leaves the recent format to its own row, which takes a slot, and favors its system", () => {
+  it("gives the only slot to the recent row", () => {
     const { suggested, more } = newGameTypes({
       recent: { system: "ygo", format: "speed" },
       connected: false,
     })
 
-    expect(ids(suggested)).toEqual(["ygo-advanced", "commander", "none"])
+    expect(ids(suggested)).toEqual(["none"])
     expect(moreIds(more)).toContain("ygo-speed")
-    expect(moreIds(more)).toContain("mtg-standard")
   })
 
-  it("saves a slot for a recent row the form did not open from", () => {
-    expect(ids(newGameTypes({ recentRow: true, connected: false }).suggested)).toEqual([
-      "commander",
-      "mtg-standard",
-      "none",
-    ])
+  it("saves the slot for a recent row the form did not open from", () => {
+    expect(ids(newGameTypes({ recentRow: true, connected: false }).suggested)).toEqual(["none"])
   })
 
   it("groups the rest by game, each game's headline format first", () => {
@@ -47,6 +42,7 @@ describe("newGameTypes", () => {
 
     expect(more.map(({ system }) => system)).toEqual(["mtg", "ygo", "pokemon", "lorcana", "fab"])
     expect(ids(more.find(({ system }) => system === "ygo")?.types ?? [])).toEqual([
+      "ygo-advanced",
       "ygo-traditional",
       "ygo-rush",
       "ygo-speed",
@@ -57,7 +53,7 @@ describe("newGameTypes", () => {
   })
 
   it("offers Treachery on the Connected tab only", () => {
-    expect(ids(newGameTypes({ connected: true }).suggested)).toContain("treachery")
+    expect(moreIds(newGameTypes({ connected: true }).more)).toContain("treachery")
     expect(
       ids(
         newGameTypes({
@@ -65,6 +61,6 @@ describe("newGameTypes", () => {
           connected: true,
         }).suggested,
       ),
-    ).toEqual(["commander", "mtg-standard", "none"])
+    ).toEqual(["none"])
   })
 })
