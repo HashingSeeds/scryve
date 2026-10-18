@@ -62,7 +62,6 @@ const SUGGESTED_COUNT = 1
 
 type Played = Pick<GameType, "system" | "format" | "variant">
 
-// why: one suggestion keeps setup in view; a recent row takes it even when the form did not open from it.
 export function newGameTypes({
   chosen,
   recent,
