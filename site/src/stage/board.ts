@@ -274,7 +274,7 @@ function phoneRows(game: DemoGame) {
                 row,
                 rowIndex,
                 columnIndex,
-                playerIndex: seat,
+                slot: seat,
               }),
               rowLength: row.length,
               menu: menuSpotAt(rows, layout, rowIndex, columnIndex),
