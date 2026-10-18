@@ -30,7 +30,6 @@ export default {
   whatYouPlay: {
     heading: "何をプレイしますか?",
     changeLater: "設定でいつでも変更できます。",
-    showMoreFormats_other: "他の{{count}}個のフォーマットを表示",
     play: "プレイ",
     acceptance:
       "プレイすると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",

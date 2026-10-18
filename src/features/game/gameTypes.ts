@@ -51,6 +51,13 @@ export function gameTypeId(system: PlaySystemId | undefined, format?: string, tr
   return featuredFormat(system, format)?.id ?? `${system}-${format}`
 }
 
+export function gameTypesBySystem(types: readonly GameType[]) {
+  return VISIBLE_SYSTEM_IDS.map((system) => ({
+    system,
+    types: types.filter((type) => type.system === system),
+  })).filter((group) => group.types.length > 0)
+}
+
 const SUGGESTED_COUNT = 3
 
 type Played = Pick<GameType, "system" | "format" | "variant">
@@ -88,10 +95,7 @@ export function newGameTypes({
   const more = offered.filter((type) => !suggested.includes(type))
   return {
     suggested,
-    more: VISIBLE_SYSTEM_IDS.map((system) => ({
-      system,
-      types: more.filter((type) => type.system === system),
-    })).filter(({ types }) => types.length > 0),
+    more: gameTypesBySystem(more),
   }
 }
 

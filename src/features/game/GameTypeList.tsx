@@ -10,11 +10,11 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { gameTypeLabel, type GameType, type newGameTypes } from "./gameTypes"
+import { gameTypeLabel, type GameType, type gameTypesBySystem } from "./gameTypes"
 import { playSystemShortLabel, type PlaySystemId } from "./playSystems"
 
 export interface GameTypeListProps {
-  types: ReturnType<typeof newGameTypes>
+  types: { suggested: readonly GameType[]; more: ReturnType<typeof gameTypesBySystem> }
   selectedId?: string
   detail: (type: GameType) => string
   onChoose: (type: GameType) => void

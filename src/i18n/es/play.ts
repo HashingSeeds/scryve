@@ -30,9 +30,6 @@ export default {
   whatYouPlay: {
     heading: "¿A qué juegas?",
     changeLater: "Puedes cambiarlo en Ajustes.",
-    showMoreFormats_one: "Mostrar {{count}} formato más",
-    showMoreFormats_many: "Mostrar {{count}} de formatos más",
-    showMoreFormats_other: "Mostrar {{count}} formatos más",
     play: "Jugar",
     acceptance:
       "Al jugar, aceptas los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
