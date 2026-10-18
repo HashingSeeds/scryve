@@ -583,7 +583,7 @@ function NewGameForm({
 
   function chooseDeck(versionId: string | undefined) {
     const choice = deckChoices.find((candidate) => candidate.versionId === versionId)
-    setDeck(choice)
+    setDeck(choice && { versionId: choice.versionId, name: choice.name })
     if (accountInput)
       savePlayers(seatAppearances, {
         ...accountInput,

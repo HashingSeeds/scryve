@@ -321,6 +321,44 @@ describe("NewGameScreen", () => {
     expect(players[1]).toMatchObject({ startingLife: 36 })
   })
 
+  it("starts a picked hero deck at its latest life after the deck list refreshes", () => {
+    const onStartLocal = jest.fn()
+    const initialGame = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 40,
+      system: "fab",
+      format: "cc",
+      account: { ownerId: "owner-a", meSeat: 0 },
+    })
+    const screenWith = (startingValue: number) => (
+      <ThemeProvider initialContext="light">
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+          initialGame={initialGame}
+          account={{
+            ownerId: "owner-a",
+            decks: [
+              { versionId: "v-hero", name: "Dash", system: "fab", format: "cc", startingValue },
+            ],
+          }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screenWith(36))
+    fireEvent.press(screen.getByTestId("me-deck"))
+    fireEvent.press(screen.getByTestId("me-deck-option-v-hero"))
+    view.rerender(screenWith(30))
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[0][0][0]).toMatchObject({ startingLife: 30 })
+  })
+
   it("keeps a prepared game's hero life for its deck when the deck list is offline", () => {
     const onStartLocal = jest.fn()
     const initialGame = createLocalGame({
