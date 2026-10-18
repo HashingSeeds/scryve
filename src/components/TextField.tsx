@@ -140,7 +140,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   return (
     <TouchableOpacity
       activeOpacity={1}
-      accessible={false}
+      accessible={!clearable}
       style={$containerStyles}
       onPress={focusInput}
       accessibilityState={{ disabled }}
