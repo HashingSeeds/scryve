@@ -137,7 +137,11 @@ function ActivePublish({
       for (const claim of pendingSeatClaims(ownerId)) {
         if (cancelled) return
         try {
-          const { status } = await claimSeat({ publicId: claim.publicId, token: claim.token })
+          const { status } = await claimSeat({
+            publicId: claim.publicId,
+            token: claim.token,
+            ...(claim.deckVersionId ? { deckVersionId: claim.deckVersionId } : {}),
+          })
           if (status === "claimed") settleSeatClaim(claim.publicId)
           else waiting = true
         } catch (cause) {

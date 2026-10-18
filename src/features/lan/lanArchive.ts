@@ -5,7 +5,13 @@ import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "@/fe
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { GameEvent, LocalGame, SeatPassHashes } from "@/features/game/types"
 
-import { lanProjection, lanRoundId, lanSeatAppearance, type LanGame } from "./lanGame"
+import {
+  lanProjection,
+  lanRoundId,
+  lanSeatAppearance,
+  startingLifeFor,
+  type LanGame,
+} from "./lanGame"
 import { commanderTotals } from "../../../convex/lib/gameEngineMemory"
 
 /** why: must match `convex/lib/seatPass.ts`, which checks each guest's claim; no test runs both sides. */
@@ -52,6 +58,7 @@ export function lanLocalGame(
       .map(({ fromPlayerId, toPlayerId, total }) => [`${fromPlayerId}>${toPlayerId}`, total]),
   )
   const { table } = lanProjection(game, game.hostKey)
+  const hostDeck = game.seats.find((seat) => seat.key === game.hostKey)?.deck
   return {
     schemaVersion: 1,
     id,
@@ -60,13 +67,17 @@ export function lanLocalGame(
     ...(setup.format ? { format: setup.format } : {}),
     lifeStep: setup.lifeStep,
     startingLife: setup.startingLife,
-    players: game.seats.map((seat) => ({
-      id: asPlayerId(seat.key),
-      name: seat.name,
-      ...lanSeatAppearance(seat.seat),
-      life: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
-      seat: seat.seat - 1,
-    })),
+    players: game.seats.map((seat) => {
+      const startingLife = startingLifeFor(setup, seat.deck)
+      return {
+        id: asPlayerId(seat.key),
+        name: seat.name,
+        ...lanSeatAppearance(seat.seat),
+        life: memory?.seats.get(seat.key)?.currentLife ?? startingLife,
+        seat: seat.seat - 1,
+        ...(startingLife === setup.startingLife ? {} : { startingLife }),
+      }
+    }),
     events,
     ...(Object.keys(commanderDamage).length > 0 ? { commanderDamage } : {}),
     ...(table ? { table } : {}),
@@ -78,7 +89,15 @@ export function lanLocalGame(
       : result?.kind === "draw"
         ? { result: { kind: "draw" } }
         : {}),
-    ...(ownerId ? { account: { ownerId, mePlayerId: asPlayerId(game.hostKey) } } : {}),
+    ...(ownerId
+      ? {
+          account: {
+            ownerId,
+            mePlayerId: asPlayerId(game.hostKey),
+            ...(hostDeck ? { deckVersionId: hostDeck.versionId, deckName: hostDeck.name } : {}),
+          },
+        }
+      : {}),
     ...(seatPassHashes && Object.keys(seatPassHashes).length > 0 ? { seatPassHashes } : {}),
   }
 }

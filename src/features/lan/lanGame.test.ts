@@ -13,6 +13,8 @@ import {
   releaseLanSeat,
   revealLanRole,
   setLanConnected,
+  setLanDeck,
+  setLanDeckRequired,
   setLanPlayerCount,
   startLanRound,
   type LanGame,
@@ -218,6 +220,74 @@ describe("nearby Treachery", () => {
       winnerPlayerIds: ["a", "b"],
     })
     expect(lanProjection(next, "a").treacheryOutcome).toBeUndefined()
+  })
+})
+
+describe("nearby decks", () => {
+  const atraxa = { versionId: "version-atraxa", name: "Atraxa" }
+  const decksJoin = (name: string) => ({ ...join(name), features: ["decks"] as const })
+
+  it("turns away a guest whose build can't pick decks once the host requires them", () => {
+    const required = setLanDeckRequired(lobby(), true)
+
+    expect(admitLanGuest(required, tokens, join("old"), unused)).toEqual({
+      rejected: "Update Scryve to join this game.",
+    })
+    expect(admitLanGuest(required, tokens, decksJoin("new"), unused)).toHaveProperty("game")
+    expect(
+      setLanDeckRequired(lobby({ ...commander, system: undefined }), true).setup,
+    ).not.toHaveProperty("deckRequired")
+  })
+
+  it("holds the start until every seat has a deck, and won't drop one the lobby requires", () => {
+    const required = setLanDeckRequired(seatGuest(lobby(), "guest"), true)
+    const hostReady = setLanDeck(required, "host", atraxa)
+
+    expect(lanSeatsReady(hostReady)).toBe(false)
+    expect(lanSeatsReady(setLanDeck(hostReady, "guest", atraxa))).toBe(true)
+    expect(setLanDeck(hostReady, "host", null)).toBe(hostReady)
+    expect(setLanDeck(startLanRound(hostReady, NOW), "guest", atraxa).seats[1]).not.toHaveProperty(
+      "deck",
+    )
+    expect(lanProjection(hostReady, "guest").players[0]).toMatchObject({
+      deckVersionId: atraxa.versionId,
+    })
+  })
+
+  it("starts a Flesh and Blood seat on its hero's health, and only there", () => {
+    const fab = { ...commander, system: "fab", format: "cc", ruleset: "cc" } as const
+    const hero = { versionId: "version-dorinthea", name: "Dorinthea", startingValue: 20 }
+    const hostLife = (setup: LanSetup) =>
+      lanProjection(startLanRound(setLanDeck(lobby(setup), "host", hero), NOW), "host").players[0]
+        .currentLife
+
+    expect(hostLife(fab)).toBe(20)
+    expect(hostLife(commander)).toBe(40)
+  })
+
+  it("carries seat decks and the requirement over the wire, and drops a malformed deck", () => {
+    const game = setLanDeck(setLanDeckRequired(lobby(), true), "host", atraxa)
+    const state = parseHostMessage(
+      JSON.stringify({
+        type: "state",
+        lobby: lanLobbyOf(game),
+        projection: lanProjection(game, "guest"),
+      }),
+    )
+
+    expect(state).toMatchObject({
+      lobby: { setup: { deckRequired: true }, seats: [{ deck: atraxa }] },
+      projection: { deckRequired: true },
+    })
+    expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: atraxa }))).toEqual({
+      type: "deck",
+      deck: atraxa,
+    })
+    expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: null }))).toEqual({
+      type: "deck",
+      deck: null,
+    })
+    expect(parseGuestMessage(JSON.stringify({ type: "deck", deck: { name: "No id" } }))).toBeNull()
   })
 })
 

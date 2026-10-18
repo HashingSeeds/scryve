@@ -814,6 +814,10 @@ describe("NewGameScreen", () => {
     expect(onNearby).toHaveBeenLastCalledWith(
       expect.objectContaining({ playerCount: 4, variant: "treachery" }),
     )
+    openOptions()
+    fireEvent.press(connected.getByTestId("deck-requirement-required"))
+    fireEvent.press(connected.getByTestId("host-connected-button"))
+    expect(onNearby).toHaveBeenLastCalledWith(expect.objectContaining({ deckRequired: true }))
     connected.unmount()
     expect(setup({ mode: "local", onNearby }).queryByTestId("host-on")).toBeNull()
     expect(setup({ mode: "connected", connected: readyHost }).queryByTestId("host-on")).toBeNull()

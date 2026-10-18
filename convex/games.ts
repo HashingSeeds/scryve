@@ -67,7 +67,7 @@ import {
   STALE_GAME_INACTIVITY_MS,
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
-import { recordGameResults } from "./lib/results"
+import { recordGameResults, recordPlayerResult } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
 import { isCounterOut, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
 import {
@@ -1453,8 +1453,28 @@ export const publishFinishedLocalGame = mutation({
 const seatPassInvalid = () =>
   new ConvexError({ code: "seat_pass_invalid", message: "That seat pass is not for this game" })
 
+async function claimableDeck(
+  ctx: QueryCtx,
+  deckVersionId: string | undefined,
+  userId: Id<"users">,
+  game: Doc<"games">,
+) {
+  const versionId = deckVersionId && ctx.db.normalizeId("deckVersions", deckVersionId)
+  const version = versionId ? await ctx.db.get(versionId) : null
+  const deck = version && version.archivedAt === undefined ? await ctx.db.get(version.deckId) : null
+  const [system, format] = gameDeckRules(game)
+  return version &&
+    deck &&
+    deck.ownerUserId === userId &&
+    deck.archivedAt === undefined &&
+    (deck.game ?? DEFAULT_DECK_GAME) === system &&
+    deck.format === format
+    ? { version, deck }
+    : undefined
+}
+
 export const claimNearbySeat = mutation({
-  args: { publicId: v.string(), token: v.string() },
+  args: { publicId: v.string(), token: v.string(), deckVersionId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     if (args.token.length < 1 || args.token.length > 128) throw seatPassInvalid()
@@ -1493,18 +1513,31 @@ export const claimNearbySeat = mutation({
         message: "You already hold a seat in this game",
       })
     const identity = { userId: user._id, usernameAtJoin: user.username }
-    await ctx.db.patch(seat._id, identity)
+    const chosen = await claimableDeck(ctx, args.deckVersionId, user._id, game)
+    await ctx.db.patch(seat._id, {
+      ...identity,
+      ...(chosen ? { deckVersionId: chosen.version._id } : {}),
+    })
+    const claimed = summary.players.find((player) => player.playerId === seat._id)
+    const claimedPlayer = claimed && {
+      ...claimed,
+      ...summaryIdentitySnapshotFor({ ...seat, ...identity }, user, true),
+      userId: user._id,
+      ...(chosen
+        ? {
+            deckId: chosen.deck._id,
+            deckNameAtFinish: chosen.deck.name,
+            deckVersionId: chosen.version._id,
+            deckVersionNumber: chosen.version.versionNumber,
+          }
+        : {}),
+    }
     await ctx.db.patch(summary._id, {
       players: summary.players.map((player) =>
-        player.playerId === seat._id
-          ? {
-              ...player,
-              ...summaryIdentitySnapshotFor({ ...seat, ...identity }, user, true),
-              userId: user._id,
-            }
-          : player,
+        claimedPlayer && player.playerId === seat._id ? claimedPlayer : player,
       ),
     })
+    if (claimedPlayer && chosen) await recordPlayerResult(ctx, summary, claimedPlayer, Date.now())
     await ctx.db.insert("gameHistoryEntries", {
       userId: user._id,
       source: "local",

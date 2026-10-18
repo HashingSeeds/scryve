@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
 
+import { useAuthAccess } from "@/features/auth/AuthContext"
+import { MyDecksSource, type MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { lanSeatsReady, parseLanSetup, type LanSetup } from "@/features/lan/lanGame"
@@ -51,6 +53,9 @@ function LanLobby() {
   const onPlay = useCallback(() => router.push("/lan/game"), [])
   const [accessError, setAccessError] = useState<string>()
   const { role, lobby } = useLanSession()
+  const auth = useAuthAccess()
+  const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
+  const [myDecks, setMyDecks] = useState<MyDecks>()
 
   // why: hosting starts once per visit; a remount after leaving must not reopen the lobby.
   const hosted = useRef(false)
@@ -87,11 +92,19 @@ function LanLobby() {
   }, [params.start, role, lobby])
 
   return (
-    <NearbyLobbyScreen
-      error={accessError}
-      onBack={backToPlay}
-      onLeft={backToPlay}
-      onPlay={onPlay}
-    />
+    <>
+      {ownerId && lobby?.setup.system ? (
+        <MyDecksSource ownerId={ownerId} onChange={setMyDecks} />
+      ) : null}
+      <NearbyLobbyScreen
+        error={accessError}
+        myDecks={ownerId ? myDecks : undefined}
+        signedIn={Boolean(ownerId)}
+        onBack={backToPlay}
+        onLeft={backToPlay}
+        onPlay={onPlay}
+        onManageDecks={() => router.push("/connected/decks")}
+      />
+    </>
   )
 }

@@ -1,20 +1,52 @@
 import { useEffect, useRef } from "react"
 
+import type { LobbyDeckState } from "@/features/connected/LobbySeatList"
+import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
+import type { LanSeatDeck } from "./lanGame"
 import { lanSession, useLanSession } from "./lanSession"
+
+const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
+
+const listed = (decks: MyDecks) => (decks === undefined || decks === "unavailable" ? [] : decks)
+
+const deckStateOf = (decks: MyDecks, signedIn: boolean): LobbyDeckState =>
+  decks === undefined && signedIn
+    ? { status: "loading" }
+    : { status: "ready", value: [...listed(decks)] }
+
+function seatDeckOf(decks: MyDecks, versionId: string): LanSeatDeck | undefined {
+  const deck = listed(decks).find((candidate) =>
+    candidate.versions.some(({ _id }) => _id === versionId),
+  )
+  if (!deck) return undefined
+  return {
+    versionId,
+    name: deck.name,
+    ...(deck.latestVersionId === versionId && deck.startingValue !== undefined
+      ? { startingValue: deck.startingValue }
+      : {}),
+  }
+}
 
 export function NearbyLobbyScreen({
   error: routeError,
+  myDecks,
+  signedIn = false,
   onBack,
   onPlay,
   onLeft,
+  onManageDecks,
 }: {
   error?: string
+  myDecks?: MyDecks
+  signedIn?: boolean
   onBack: () => void
   onPlay: () => void
   onLeft: () => void
+  onManageDecks?: () => void
 }) {
   const { lobby, projection, role, status, error, serviceName } = useLanSession()
 
@@ -86,6 +118,24 @@ export function NearbyLobbyScreen({
       onChangePlayerCount={
         isHost && lobby.status === "lobby"
           ? (playerCount) => lanSession.updateSettings({ playerCount })
+          : undefined
+      }
+      onChangeDeckRequired={
+        isHost && lobby.status === "lobby" && lobby.setup.system
+          ? (deckRequired) => lanSession.updateSettings({ deckRequired })
+          : undefined
+      }
+      decks={
+        lobby.setup.system && lobby.status !== "active"
+          ? {
+              source: (render) => render(deckStateOf(myDecks, signedIn)),
+              selectingSeats: NO_SEATS_SELECTING,
+              onSelect: (_seat, versionId) => {
+                const deck = versionId ? seatDeckOf(myDecks, versionId) : null
+                if (deck !== undefined) void lanSession.selectDeck(deck).catch(() => undefined)
+              },
+              ...(signedIn && onManageDecks ? { onManage: onManageDecks } : {}),
+            }
           : undefined
       }
     />

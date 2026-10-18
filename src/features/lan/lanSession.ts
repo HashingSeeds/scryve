@@ -29,12 +29,15 @@ import {
   parseHostMessage,
   releaseLanSeat,
   revealLanRole,
+  setLanDeck,
+  setLanDeckRequired,
   setLanPlayerCount,
   startLanRound,
   type LanGame,
   type LanGuestMessage,
   type LanHostMessage,
   type LanLobby,
+  type LanSeatDeck,
   type LanSeatPass,
   type LanSetup,
 } from "./lanGame"
@@ -339,9 +342,13 @@ export class LanSession {
           writes = 0
         }
         const limited = ++writes > WRITES_PER_SECOND
-        if (message.type === "reveal") {
-          const revealed = limited ? game : revealLanRole(game, seatKey, now)
-          return revealed === game ? undefined : this.publish(revealed)
+        if (message.type !== "op") {
+          const changed = limited
+            ? game
+            : message.type === "reveal"
+              ? revealLanRole(game, seatKey, now)
+              : setLanDeck(game, seatKey, message.deck)
+          return changed === game ? undefined : this.publish(changed)
         }
         const { operationId } = message.event
         if (limited)
@@ -480,6 +487,7 @@ export class LanSession {
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
       variants: ["treachery"],
+      features: ["decks"],
       ...(this.pass ? { pass: this.pass } : {}),
     })
   }
@@ -513,11 +521,19 @@ export class LanSession {
     this.set({ lobby: message.lobby, projection: message.projection, status: "connected" })
     const round = lanRoundId(message.lobby)
     const { status } = message.lobby
+    const { pass } = this
+    const deckVersionId = message.lobby.seats.find((seat) => seat.key === pass?.key)?.deck
+      ?.versionId
     if (
       (status === "active" || status === "finished") &&
-      this.pass &&
+      pass &&
       this.claimedRound !== round &&
-      rememberSeatClaim({ publicId: round, token: this.pass.token, savedAt: Date.now() })
+      rememberSeatClaim({
+        publicId: round,
+        token: pass.token,
+        savedAt: Date.now(),
+        ...(deckVersionId ? { deckVersionId } : {}),
+      })
     )
       this.claimedRound = round
     if (status === "finished" && this.claimedRound === round && this.finishedRound !== round) {
@@ -549,11 +565,20 @@ export class LanSession {
     }, RECONNECT_DELAY_MS)
   }
 
-  updateSettings({ playerCount }: { playerCount: number }) {
+  updateSettings({ playerCount, deckRequired }: { playerCount?: number; deckRequired?: boolean }) {
     const game = this.game
     if (this.state.role !== "host" || !game) return
-    const next = setLanPlayerCount(game, playerCount)
+    const counted = playerCount === undefined ? game : setLanPlayerCount(game, playerCount)
+    const next = deckRequired === undefined ? counted : setLanDeckRequired(counted, deckRequired)
     if (next !== game) this.publish(next)
+  }
+
+  selectDeck = async (deck: LanSeatDeck | null) => {
+    const { role, seatKey, status } = this.state
+    const game = this.game
+    if (role === "host" && game && seatKey) return this.publish(setLanDeck(game, seatKey, deck))
+    if (!this.connection || status !== "connected") throw new Error("Not connected to the host")
+    this.connection.send({ type: "deck", deck })
   }
 
   revealRole = async () => {

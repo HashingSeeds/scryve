@@ -394,7 +394,7 @@ function NewGameForm({
       ? translate("play:newGame.seatsCount", { count: playerCount })
       : translate("play:summary.playerCount", { count: playerCount }),
     counterValueLabel(system, startingLife),
-    ...(cloudMode
+    ...(connectedMode
       ? [translate(deckRequired ? "play:newGame.decksRequired" : "play:newGame.decksOptional")]
       : []),
     ...(!connectedMode && !localGame && matchBestOf
@@ -498,7 +498,13 @@ function NewGameForm({
       ...(treachery ? { variant: "treachery" as const } : {}),
     }
     if (nearbyMode)
-      onNearby?.({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...setup })
+      onNearby?.({
+        playerCount,
+        startingLife,
+        ruleset: format ?? NO_PLAY_SYSTEM,
+        ...setup,
+        ...(deckRequired && system ? { deckRequired } : {}),
+      })
     else if (connectedMode)
       connected?.host({
         playerCount,
@@ -1034,7 +1040,7 @@ function NewGameForm({
             </View>
           </View>
 
-          {cloudMode ? (
+          {connectedMode ? (
             <View style={themed($section)}>
               <Text tx="play:newGame.decks" preset="subheading" accessibilityRole="header" />
               <SegmentedControl

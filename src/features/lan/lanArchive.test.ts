@@ -10,6 +10,7 @@ import {
   endLanRound,
   LAN_PROTOCOL,
   lanRoundId,
+  setLanDeck,
   startLanRound,
 } from "./lanGame"
 
@@ -29,7 +30,7 @@ class MemoryStorage implements StringStorage {
   }
 }
 
-function finishedRound() {
+function finishedRound(hostDeck?: Parameters<typeof setLanDeck>[2]) {
   const lobby = createLanGame(
     "lan_game",
     "host",
@@ -51,7 +52,10 @@ function finishedRound() {
     { key: "guest", token: "token" },
   )
   if ("rejected" in admitted) throw new Error(admitted.rejected)
-  const started = startLanRound(admitted.game, NOW + 1)
+  const started = startLanRound(
+    hostDeck ? setLanDeck(admitted.game, "host", hostDeck) : admitted.game,
+    NOW + 1,
+  )
   const sent = { gameId: lanRoundId(started), deviceId: "device-0001", clientCreatedAt: NOW + 2 }
   const writes: [string, Record<string, unknown>][] = [
     [
@@ -133,6 +137,22 @@ describe("lanLocalGame", () => {
       expect.objectContaining({ localId: "guest", seatPassHash: HASH }),
     ])
     expect(buildFinishedLocalGameSnapshot(pending).players[0]).toMatchObject({ me: true })
+  })
+
+  it("uploads the host's deck with its own seat only", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(
+      lanLocalGame(finishedRound({ versionId: "version-atraxa", name: "Atraxa" }), {
+        ownerId: "host-account",
+        seatPassHashes: { ["guest" as PlayerId]: HASH },
+      }),
+    )
+    const [pending] = repository.pendingPublishes("host-account")
+
+    expect(pending.account).toMatchObject({ deckVersionId: "version-atraxa", deckName: "Atraxa" })
+    expect(
+      buildFinishedLocalGameSnapshot(pending).players.map((player) => player.deckVersionId),
+    ).toEqual(["version-atraxa", undefined])
   })
 
   it("keeps a signed-out host's round on the device without uploading it", () => {

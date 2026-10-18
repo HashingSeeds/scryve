@@ -10,7 +10,7 @@ import { api } from "../../../convex/_generated/api"
 
 type SyncPage = FunctionReturnType<typeof api.decks.syncPage>
 export type SyncedDeck = SyncPage["page"][number]
-type MineDeck = FunctionReturnType<typeof api.decks.listMine>["decks"][number]
+export type MineDeck = FunctionReturnType<typeof api.decks.listMine>["decks"][number]
 export type DeckShelfItem = Pick<MineDeck, "_id" | "name" | "format"> & Partial<MineDeck>
 
 export interface DeckSyncStorage {
