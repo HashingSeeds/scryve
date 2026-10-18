@@ -31,10 +31,9 @@ export default {
       decks: "डेक",
     },
     launchDestinationHint: "खेलें में चल रहा गेम फिर शुरू होता है या नया बोर्ड खुलता है।",
-    gameSystem: "गेम सिस्टम",
-    defaultGameSystem: "डिफ़ॉल्ट गेम सिस्टम",
-    format: "फ़ॉर्मैट",
-    noDefault: "कोई डिफ़ॉल्ट नहीं",
+    game: "गेम",
+    chooseGame: "नए गेम इस रूप में शुरू करें",
+    closeGameChoices: "गेम विकल्प बंद करें",
     defaultsHint: "इन्हें तभी सेट करें जब आप चाहें कि नए गेम एक ही सिस्टम और फ़ॉर्मैट से शुरू हों।",
     haptics: {
       label: "हैप्टिक फ़ीडबैक",

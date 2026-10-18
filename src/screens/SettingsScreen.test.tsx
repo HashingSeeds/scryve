@@ -411,7 +411,7 @@ describe("SettingsScreen", () => {
     )
   })
 
-  it("leaves the default system and format unset until they are chosen", () => {
+  it("leaves the default game unset until one is chosen", () => {
     const onSettingsChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -425,27 +425,45 @@ describe("SettingsScreen", () => {
 
     expect(DEFAULT_LOCAL_SETTINGS.defaultSystem).toBeUndefined()
     expect(DEFAULT_LOCAL_SETTINGS.defaultFormat).toBeUndefined()
-    expect(view.queryByTestId("default-format")).toBeNull()
+    expect(view.getByLabelText("Game, No system")).toBeTruthy()
 
-    fireEvent.press(view.getByTestId("default-system-mtg"))
+    fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-commander"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ defaultSystem: "mtg" }),
+      expect.objectContaining({
+        defaultSystem: "mtg",
+        defaultFormat: "commander",
+        defaultStartingLife: 40,
+      }),
     )
-    expect(onSettingsChange.mock.calls[0][0].defaultFormat).toBeUndefined()
+    expect(view.getByLabelText("Game, Commander · Magic")).toBeTruthy()
 
-    fireEvent.press(view.getByTestId("default-format"))
-    fireEvent.press(view.getByTestId("default-format-option-commander"))
-    expect(onSettingsChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ defaultSystem: "mtg", defaultFormat: "commander" }),
-    )
-    expect(view.getByLabelText("Format, Commander")).toBeTruthy()
-
-    fireEvent.press(view.getByTestId("default-system-none"))
+    fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-none"))
     const last = onSettingsChange.mock.calls.at(-1)?.[0]
     expect(last.defaultSystem).toBeUndefined()
     expect(last.defaultFormat).toBeUndefined()
     expect(last.defaultStartingLife).toBe(20)
-    expect(view.queryByTestId("default-format")).toBeNull()
+  })
+
+  it("opens a stored format's game in the picker", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg" }}
+          onBack={jest.fn()}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByLabelText("Game, Magic")).toBeTruthy()
+    fireEvent.press(view.getByTestId("default-game"))
+    expect(view.getByTestId("game-type-mtg-standard")).toBeTruthy()
+    expect(view.queryByTestId("game-type-mtg-pioneer")).toBeNull()
+    fireEvent.press(view.getByTestId("game-type-more-mtg"))
+    fireEvent.press(view.getByTestId("game-type-mtg-pioneer"))
+    expect(view.getByLabelText("Game, Pioneer · Magic")).toBeTruthy()
   })
 
   it("uses the selected system's starting value and counter steps", () => {
@@ -460,7 +478,8 @@ describe("SettingsScreen", () => {
       </ThemeProvider>,
     )
 
-    fireEvent.press(view.getByTestId("default-system-ygo"))
+    fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultSystem: "ygo", defaultStartingLife: 8000 }),
     )
@@ -485,15 +504,15 @@ describe("SettingsScreen", () => {
       </ThemeProvider>,
     )
 
-    fireEvent.press(view.getByTestId("default-format"))
-    fireEvent.press(view.getByTestId("default-format-option-commander"))
+    fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-commander"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "commander", defaultStartingLife: 40 }),
     )
 
     fireEvent.press(view.getByTestId("default-starting-life-decrement"))
-    fireEvent.press(view.getByTestId("default-format"))
-    fireEvent.press(view.getByTestId("default-format-option-standard"))
+    fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "standard", defaultStartingLife: 39 }),
     )
@@ -532,8 +551,8 @@ describe("SettingsScreen", () => {
       expect.objectContaining({ defaultPlayerCount: 3, defaultStartingLife: 30 }),
     )
 
-    fireEvent.press(view.getByTestId("default-format"))
-    fireEvent.press(view.getByTestId("default-format-option-commander"))
+    fireEvent.press(view.getByTestId("default-game"))
+    fireEvent.press(view.getByTestId("game-type-commander"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "commander", defaultStartingLife: 40 }),
     )

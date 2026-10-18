@@ -31,10 +31,9 @@ export default {
       decks: "덱",
     },
     launchDestinationHint: "플레이를 선택하면 진행 중인 게임을 이어가거나 새 보드를 엽니다.",
-    gameSystem: "게임 시스템",
-    defaultGameSystem: "기본 게임 시스템",
-    format: "포맷",
-    noDefault: "기본값 없음",
+    game: "게임",
+    chooseGame: "새 게임 시작 유형",
+    closeGameChoices: "게임 선택 닫기",
     defaultsHint: "새 게임을 항상 같은 시스템과 포맷으로 시작하고 싶을 때만 설정하세요.",
     haptics: {
       label: "햅틱 피드백",
