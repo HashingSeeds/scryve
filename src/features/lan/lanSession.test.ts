@@ -113,15 +113,15 @@ describe("nearby host", () => {
     expect(lifeOf(session, key)).toBe(37)
   })
 
-  it("hosts its game again after the OS ends it in the background, and a guest reclaims its seat", async () => {
+  it("hosts its game again after the OS ends it in the background, with changes from after it left, and a guest reclaims its seat", async () => {
     const { session, bob } = await startedGame()
     const pass = bob.pass()
+    jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]("background")
     bob.send({
       type: "op",
       event: lifeEvent("life-operation-0003", pass.key, -5, roundOf(session)),
     })
     jest.advanceTimersByTime(50)
-    jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]("background")
 
     const resumed = new LanSession()
     resumed.resumeHostedGame()

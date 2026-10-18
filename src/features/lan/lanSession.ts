@@ -159,11 +159,13 @@ export class LanSession {
   private flushedAt = 0
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
   private session = 0
+  private backgrounded = false
 
   constructor() {
     // why: iOS tears down the host's listening socket while the app is in the background.
     AppState.addEventListener("change", (appState) => {
-      if (appState === "background") return this.saveHostedGame()
+      this.backgrounded = appState === "background"
+      if (this.backgrounded) return this.saveHostedGame()
       if (appState !== "active" || this.state.role !== "host") return
       remove(HOSTED_GAME_KEY)
       if (this.serverClosed) void this.listen({ recovering: true })
@@ -393,6 +395,7 @@ export class LanSession {
       for (const reply of this.replies.get(key) ?? []) peer.send(reply)
     }
     this.replies.clear()
+    if (this.backgrounded) this.saveHostedGame()
   }
 
   private hostWrite({ event }: PendingLifeAction): Promise<OutboxAcknowledgement> {
