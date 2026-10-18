@@ -787,13 +787,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const myRole = cloud
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
-  const openGameRules =
-    rules && (rules.kind === "link" || onRules)
-      ? () => {
-          setMenuOpen(false)
-          openRules(rules, () => system && onRules?.(system))
-        }
-      : undefined
+  const openGameRules = useMemo(
+    () =>
+      rules && (rules.kind === "link" || onRules)
+        ? () => {
+            setMenuOpen(false)
+            openRules(rules, () => system && onRules?.(system))
+          }
+        : undefined,
+    [onRules, rules, system],
+  )
   const radialActions: GameMenuActions = useMemo(
     () => [
       {
@@ -816,15 +819,22 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           setPlayerActionsOpen(true)
         },
       },
-      {
-        kind: "decks",
-        label: translate("common:appNavigation.decks"),
-        disabled: !onDecks,
-        onPress: () => {
-          setMenuOpen(false)
-          onDecks?.()
-        },
-      },
+      // why: Nearby boards have no Decks route or More menu, so Rules keeps this slot there.
+      !onDecks && openGameRules
+        ? {
+            kind: "rules",
+            label: translate("connected:board.menu.rules"),
+            onPress: openGameRules,
+          }
+        : {
+            kind: "decks",
+            label: translate("common:appNavigation.decks"),
+            disabled: !onDecks,
+            onPress: () => {
+              setMenuOpen(false)
+              onDecks?.()
+            },
+          },
       {
         kind: "end-game",
         label: translate("connected:board.menu.end"),
@@ -858,6 +868,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       finishBlocker,
       layoutOptions.length,
       onDecks,
+      openGameRules,
     ],
   )
   const seatColors = useSeatColors(players)
