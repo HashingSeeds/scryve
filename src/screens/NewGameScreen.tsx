@@ -309,7 +309,7 @@ function NewGameForm({
     Pick<DeckChoice, "versionId" | "name" | "startingValue"> | undefined
   >(() => {
     const chosen = claimedGame?.account
-    if (!chosen?.deckVersionId) return undefined
+    if (!claimedGame || !chosen?.deckVersionId) return undefined
     const seat = meSeatOf(claimedGame)
     return {
       versionId: chosen.deckVersionId,
