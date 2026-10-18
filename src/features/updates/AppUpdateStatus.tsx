@@ -8,7 +8,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { restartToUpdate, useAppUpdate } from "./appUpdate"
+import { useAppUpdate } from "./appUpdate"
 import { UpdateDetailsDialog, UpdateInfoButton } from "./UpdateDetails"
 
 export function AppUpdateStatus() {
@@ -43,11 +43,12 @@ export function AppUpdateStatus() {
         tx="account:updates.restart"
         style={themed($restart)}
         textStyle={themed($restartText)}
-        onPress={restartToUpdate}
+        onPress={update.restart}
       />
       <UpdateDetailsDialog
         visible={detailsOpen}
         notes={update.notes}
+        onRestart={update.restart}
         onClose={() => setDetailsOpen(false)}
       />
     </View>

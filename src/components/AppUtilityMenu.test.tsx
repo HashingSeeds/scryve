@@ -1,5 +1,5 @@
-import { StyleSheet } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { Linking, StyleSheet } from "react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { setNearbyOnly } from "@/features/lan/nearbyOnly"
 import { ThemeProvider } from "@/theme/context"
@@ -11,10 +11,14 @@ import { mockHardwareBack } from "../../test/support/hardwareBack"
 let mockNearbyPlay = false
 jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
 let mockStoreUpdate: { labelTx: "play:launch.openAppStore"; url: string } | null = null
-const mockOpenStorePage = jest.fn()
 jest.mock("@/features/updates/storeUpdate", () => ({
+  ...jest.requireActual("@/features/updates/storeUpdate"),
   useStoreUpdate: () => mockStoreUpdate,
-  openStorePage: () => mockOpenStorePage(),
+}))
+const mockStartFlexibleUpdate = jest.fn()
+jest.mock("../../modules/play-app-update", () => ({
+  useDownloadedPlayVersion: () => null,
+  startFlexibleUpdate: () => mockStartFlexibleUpdate(),
 }))
 
 beforeEach(() => {
@@ -24,8 +28,10 @@ beforeEach(() => {
 })
 
 describe("AppUtilityMenu", () => {
-  it("leads with a store update once OTA updates stop reaching this install", () => {
+  it("leads with a store update that downloads inside the app where Play allows it", async () => {
     mockStoreUpdate = { labelTx: "play:launch.openAppStore", url: "https://apps.example/scryve" }
+    mockStartFlexibleUpdate.mockResolvedValue("started")
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
     const view = render(
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu onHistory={jest.fn()} onSettings={jest.fn()} onAccount={jest.fn()} />
@@ -36,9 +42,18 @@ describe("AppUtilityMenu", () => {
     expect(view.getByTestId("utility-update-dot")).toBeTruthy()
     fireEvent.press(view.getByTestId("utility-menu-button"))
     fireEvent.press(view.getByLabelText("Open App Store"))
+    await act(() => Promise.resolve())
 
-    expect(mockOpenStorePage).toHaveBeenCalledTimes(1)
+    expect(mockStartFlexibleUpdate).toHaveBeenCalledTimes(1)
+    expect(openURL).not.toHaveBeenCalled()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+
+    mockStartFlexibleUpdate.mockRejectedValue(new Error("ERROR_APP_NOT_OWNED"))
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByLabelText("Open App Store"))
+
+    await waitFor(() => expect(openURL).toHaveBeenCalledTimes(1))
+    openURL.mockRestore()
   })
 
   it("closes on Android Back before the game menu it opened from", () => {

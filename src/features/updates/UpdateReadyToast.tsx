@@ -12,7 +12,6 @@ import type { ThemedStyle } from "@/theme/types"
 
 import {
   markUpdateNoticed,
-  restartToUpdate,
   useAppUpdate,
   useForegroundUpdateChecks,
   wasUpdateNoticed,
@@ -78,7 +77,7 @@ export function UpdateReadyToastWithForegroundChecks() {
               tx="account:updates.restart"
               style={themed($restart)}
               textStyle={themed($restartText)}
-              onPress={restartToUpdate}
+              onPress={update.restart}
             />
           </View>
         </View>
@@ -86,6 +85,7 @@ export function UpdateReadyToastWithForegroundChecks() {
       <UpdateDetailsDialog
         visible={detailsOpen}
         notes={update.notes}
+        onRestart={update.restart}
         onClose={() => setDetailsOpen(false)}
       />
     </>

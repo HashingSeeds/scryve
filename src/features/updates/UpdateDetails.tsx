@@ -7,8 +7,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { restartToUpdate } from "./appUpdate"
-
 const INFO_GLYPH = "i"
 const NOTE_BULLET = "• "
 
@@ -32,10 +30,12 @@ export function UpdateInfoButton({ onPress }: { onPress: () => void }) {
 export function UpdateDetailsDialog({
   visible,
   notes,
+  onRestart,
   onClose,
 }: {
   visible: boolean
   notes: string[]
+  onRestart: () => void
   onClose: () => void
 }) {
   const { themed } = useAppTheme()
@@ -66,7 +66,7 @@ export function UpdateDetailsDialog({
       }
       onConfirm={() => {
         onClose()
-        restartToUpdate()
+        onRestart()
       }}
       onClose={onClose}
     />
