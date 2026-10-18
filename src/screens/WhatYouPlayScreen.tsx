@@ -1,10 +1,11 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { Trans } from "react-i18next"
 
 import { Button } from "@/components/Button"
 import { CHOICE_RADIUS, ChoiceButton } from "@/components/ChoiceButton"
+import { Icon } from "@/components/Icon"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
@@ -46,7 +47,10 @@ export function WhatYouPlayScreen({
   acceptsLegal,
   onChoose,
 }: WhatYouPlayScreenProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const [chosen, setChosen] = useState<GameType>()
   const [allFormatsShown, setAllFormatsShown] = useState(false)
   const { configured, sharing, setSharing, saveFailed, saveSharing } = useFirstUseSharing()
@@ -84,6 +88,15 @@ export function WhatYouPlayScreen({
             accessibilityState={{ expanded: false }}
             style={themed($showMore)}
             textStyle={themed($showMoreText)}
+            RightAccessory={({ style }) => (
+              <Icon
+                icon="caretRight"
+                size={14}
+                color={colors.tint}
+                containerStyle={style}
+                style={$caretDown}
+              />
+            )}
             onPress={() => setAllFormatsShown(true)}
           />
         )}
@@ -159,12 +172,13 @@ const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $list: ViewStyle = { flex: 1 }
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $showMore: ThemedStyle<ViewStyle> = () => ({
-  alignSelf: "flex-start",
+  alignSelf: "center",
   borderWidth: 0,
   paddingHorizontal: 0,
   backgroundColor: "transparent",
 })
 const $showMoreText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
+const $caretDown: ImageStyle = { transform: [{ rotate: "90deg" }] }
 const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ borderRadius: CHOICE_RADIUS })
 const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
