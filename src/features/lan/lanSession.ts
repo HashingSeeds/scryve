@@ -164,10 +164,13 @@ export class LanSession {
   private backgrounded = false
 
   constructor() {
-    // why: iOS tears down the host's listening socket while the app is in the background.
+    // why: iOS reclaims the host's listening socket while the app is in the background, without a close event, so guests are refused until the host listens again.
     AppState.addEventListener("change", (appState) => {
       this.backgrounded = appState === "background"
-      if (this.backgrounded) return this.saveHostedGame()
+      if (this.backgrounded) {
+        if (this.state.role === "host") this.serverClosed = true
+        return this.saveHostedGame()
+      }
       if (appState !== "active" || this.state.role !== "host") return
       remove(HOSTED_GAME_KEY)
       if (this.serverClosed) void this.listen({ recovering: true })

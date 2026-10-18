@@ -184,6 +184,18 @@ describe("nearby host", () => {
     expect(bob.sent).toHaveLength(sentToBob)
   })
 
+  it("listens again on returning from the background, since iOS reclaims the listener without closing it", async () => {
+    await startedGame()
+    const onAppState = jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]
+    jest.mocked(hostLan).mockClear()
+
+    onAppState?.("background")
+    onAppState?.("active")
+    await jest.advanceTimersByTimeAsync(50)
+
+    expect(hostLan).toHaveBeenCalledTimes(1)
+  })
+
   it("refuses a write to another player's seat", async () => {
     const { session, alice, bob } = await startedGame()
 

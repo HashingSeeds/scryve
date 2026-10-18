@@ -20,6 +20,9 @@ patchedDependencies:
   # react-native-screens 4.26.2 misses the screens stack when expo-dev-launcher wraps it, so
   # statusBarHidden is ignored in iOS dev builds.
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
+  # react-native-tcp-socket 6.4.3 crashes iOS when a peer leaves before its connection is reported,
+  # as guests do while a nearby host is in the background. Upstream fix: Rapsssito/react-native-tcp-socket#245.
+  react-native-tcp-socket@6.4.3: patches/react-native-tcp-socket@6.4.3.patch
   # react-native 0.86.3 spreads BridgelessUIManager into UIManager, which builds constants for
   # every native view manager at launch (~30ms on a Pixel 6a). JS-only patches live in js-patches/
   # because the native fingerprint hashes patches/, which would block OTA updates.

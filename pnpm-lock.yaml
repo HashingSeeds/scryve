@@ -14,6 +14,9 @@ patchedDependencies:
   react-native-screens@4.26.2:
     hash: e416589d8837665cf8bac9988610f5d20a8c8859ca3f51ff2830c008ff57cbdd
     path: patches/react-native-screens@4.26.2.patch
+  react-native-tcp-socket@6.4.3:
+    hash: 441ec9a6742d829aef45f6c438ca273290e145ddff74e2a5965d14df0f9536c4
+    path: patches/react-native-tcp-socket@6.4.3.patch
   react-native@0.86.3:
     hash: d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab
     path: js-patches/react-native@0.86.3.patch
@@ -189,7 +192,7 @@ importers:
         version: 15.15.4(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       react-native-tcp-socket:
         specifier: 6.4.3
-        version: 6.4.3(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
+        version: 6.4.3(patch_hash=441ec9a6742d829aef45f6c438ca273290e145ddff74e2a5965d14df0f9536c4)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
       react-native-url-polyfill:
         specifier: 2.0.0
         version: 2.0.0(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
@@ -14779,7 +14782,7 @@ snapshots:
       react-native: 0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
       warn-once: 0.1.1
 
-  react-native-tcp-socket@6.4.3(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)):
+  react-native-tcp-socket@6.4.3(patch_hash=441ec9a6742d829aef45f6c438ca273290e145ddff74e2a5965d14df0f9536c4)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)):
     dependencies:
       buffer: 5.7.1
       eventemitter3: 4.0.7
