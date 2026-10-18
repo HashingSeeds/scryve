@@ -287,7 +287,6 @@ export function startingLifeFor(setup: LanSetup, deck: LanSeatDeck | undefined) 
     : setup.startingLife
 }
 
-// why: every round is a fresh game for the shared engine, with its own id, so a change queued for the last round can never land in this one.
 export function startLanRound(game: LanGame, now: number, random = Math.random): LanGame {
   const { setup } = game
   const { roles: _lastRound, ...rest } = game
