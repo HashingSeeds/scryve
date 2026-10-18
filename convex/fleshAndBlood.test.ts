@@ -211,6 +211,20 @@ describe("Flesh and Blood", () => {
         publicId: created.publicId,
       })
       expect(corrected?.players[0]).toMatchObject({ startingLife: 40, finalLife: 40 })
+
+      await t.run(async (ctx) => {
+        await ctx.db.patch(deckVersionId, { archivedAt: Date.now() })
+      })
+      const second = {
+        publicId: "fab-hero-life-rematch-2",
+        inviteToken: "h".repeat(43),
+        manualCodeCandidates: ["FAB456"],
+      }
+      await host.mutation(api.games.finishGame, { publicId: rematch.publicId, rematch: second })
+      expect(await lives(second.publicId)).toEqual([
+        [1, 40],
+        [2, 20],
+      ])
     } finally {
       jest.useRealTimers()
     }

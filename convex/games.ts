@@ -2796,9 +2796,10 @@ async function startRematch(
       player.deckVersionId && (await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         ? player.deckVersionId
         : undefined
-    const deckLife = deckVersionId
-      ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
-      : undefined
+    const deckLife =
+      (deckVersionId
+        ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
+        : undefined) ?? player.startingLife
     await ctx.db.insert("gamePlayers", {
       gameId,
       seat: player.seat,
