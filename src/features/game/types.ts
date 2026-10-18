@@ -1,4 +1,4 @@
-import type { PlayerGridLayoutVariant } from "./playerLayouts"
+import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
 import type { PlaySystemId } from "./playSystems"
 import type { RoundClock } from "./roundClock"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
@@ -98,6 +98,7 @@ export interface LocalGame {
   system?: PlaySystemId
   format?: string
   layout?: PlayerGridLayoutVariant
+  seatOrder?: SeatOrder
   lifeStep?: number
   startingLife: number
   players: GamePlayer[]

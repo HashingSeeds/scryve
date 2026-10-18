@@ -100,6 +100,10 @@ export default {
     evenGrid: "Grille égale",
     table: "Table",
   },
+  seats: {
+    title: "Échanger les places",
+    seat: "Place de {{name}}",
+  },
   layoutOption: {
     balanced: "Disposition équilibrée",
     topFocus: "Disposition focus haut",

@@ -1,7 +1,8 @@
 import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
+import { swapSeats } from "@/features/game/playerLayouts"
 import { playTableRules } from "@/features/game/playSystems"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
@@ -517,6 +518,40 @@ describe("PlayerGrid", () => {
     expect(getPlayerGridRows(6, layout)).toEqual([[0], [1, 2], [3, 4], [5]])
     expect(layout).toMatchObject({ columnCount: 2, rowCount: 4, variant: "tabletop" })
     expect(getPlayerGridLayoutOptions(6)).toContainEqual({ variant: "tabletop", label: "Table" })
+  })
+
+  it("moves swapped players and their commander board cells together", () => {
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid
+          players={players(4)}
+          seatOrder={swapSeats(undefined, 4, 0, 3)}
+          commanderDamage={{
+            incomingFor: () => ({}),
+            armedPlayerId: null,
+            onPressSword: jest.fn(),
+            onStage: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(
+      within(view.getByTestId("player-grid-row-0")).getByTestId("player-cell-seat-4"),
+    ).toBeTruthy()
+    expect(
+      within(view.getByTestId("player-grid-row-1")).getByTestId("player-cell-seat-1"),
+    ).toBeTruthy()
+    const firstCard = view.UNSAFE_getAllByType(LifeCard)[0].props
+    expect(firstCard.playerId).toBe("player-3")
+    expect(firstCard.seatNumber).toBe(4)
+    expect(firstCard.commanderDamage.seats).toEqual(
+      expect.arrayContaining([
+        { playerId: "player-3", row: 0, column: 0 },
+        { playerId: "player-0", row: 1, column: 1 },
+      ]),
+    )
   })
 
   it("gives a full-width odd player less height than paired player rows", () => {

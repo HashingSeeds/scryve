@@ -21,7 +21,11 @@ import {
   validatePlayerNames,
 } from "./domain"
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
-import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
+import {
+  isSeatOrder,
+  playerGridLayoutForCount,
+  type PlayerGridLayoutVariant,
+} from "./playerLayouts"
 import {
   defaultStartingLife,
   isPlaySystemId,
@@ -446,6 +450,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
     layout: playerGridLayoutForCount(players.length, value.layout),
+    ...(isSeatOrder(value.seatOrder, players.length) ? { seatOrder: value.seatOrder } : {}),
     lifeStep:
       isLifeDelta(value.lifeStep) && value.lifeStep > 0
         ? value.lifeStep

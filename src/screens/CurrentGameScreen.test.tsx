@@ -155,7 +155,7 @@ describe("CurrentGameScreen", () => {
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.queryByTestId("home-button")).toBeNull()
-    expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
     expect(view.getByTestId("dice-coin")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("history-button")).toBeTruthy()

@@ -19,6 +19,7 @@ import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
+import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
@@ -33,7 +34,7 @@ import {
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
-import { GameBoardStage } from "@/features/game/GameBoardStage"
+import { type BoardSize, GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
@@ -111,6 +112,7 @@ export function CurrentGameScreen({
     if (rules?.kind === "text") prefetchRules(rules)
   }, [rules])
   const [menuOpen, setMenuOpen] = useState(false)
+  const [boardSize, setBoardSize] = useState<BoardSize>()
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
@@ -306,7 +308,6 @@ export function CurrentGameScreen({
       {
         kind: "layout",
         label: translate("board:menu.layout"),
-        disabled: layoutOptions.length < 2,
         onPress: (event) => {
           captureMenuDialogOrigin(event)
           setMenuOpen(false)
@@ -366,7 +367,6 @@ export function CurrentGameScreen({
       closeMenu,
       diceTools,
       isFresh,
-      layoutOptions.length,
       onConnect,
       onHistory,
       onRules,
@@ -401,6 +401,7 @@ export function CurrentGameScreen({
         <GameBoardStage
           playerCount={playerCount}
           layoutVariant={layoutVariant}
+          onBoardSizeChange={setBoardSize}
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}
@@ -409,6 +410,7 @@ export function CurrentGameScreen({
               lifeStep={runtime.game.lifeStep}
               onOpenRule={(ruleId) => system && onRules?.(system, ruleId)}
               layoutVariant={layoutVariant}
+              seatOrder={runtime.game.seatOrder}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               isPlayerEliminated={
@@ -489,16 +491,26 @@ export function CurrentGameScreen({
           wide
         >
           <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
-          <PlayerLayoutPicker
-            playerCount={playerCount}
-            value={layoutVariant}
-            testID="layout"
-            onChange={(layout) => {
-              runtime.changeLayout(layout)
-              closePanel()
-            }}
+          {layoutOptions.length > 1 ? (
+            <PlayerLayoutPicker
+              playerCount={playerCount}
+              value={layoutVariant}
+              testID="layout"
+              onChange={(layout) => {
+                runtime.changeLayout(layout)
+                closePanel()
+              }}
+            />
+          ) : null}
+          <Text tx="board:seats.title" preset="subheading" style={themed($dialogText)} />
+          <SeatArrangement
+            players={runtime.game.players}
+            layoutVariant={layoutVariant}
+            board={boardSize}
+            seatOrder={runtime.game.seatOrder}
+            onChange={runtime.changeSeatOrder}
           />
-          <Button tx="common:cancel" style={themed($menuItem)} onPress={closePanel} />
+          <Button tx="common:done" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
       ) : null}
 

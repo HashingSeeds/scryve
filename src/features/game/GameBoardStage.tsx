@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native"
 import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -32,7 +32,13 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   windowOverlay?: ReactNode
+  onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
+}
+
+export interface BoardSize {
+  width: number
+  height: number
 }
 
 export const GameBoardStage = SCREEN_PINNING_AVAILABLE ? PinnedGameBoardStage : LegacyGameBoardStage
@@ -43,6 +49,7 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   windowOverlay,
+  onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
   const window = useWindowDimensions()
@@ -67,6 +74,7 @@ function PinnedGameBoardStage({
     () => getPlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant }),
     [playerCount, width, height, fontScale, layoutVariant],
   )
+  useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
     [playerCount, gridLayout],
@@ -131,6 +139,7 @@ function LegacyGameBoardStage({
   renderGrid,
   menu,
   windowOverlay,
+  onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
   const boardOrientation = useGameBoardOrientation()
@@ -139,6 +148,7 @@ function LegacyGameBoardStage({
     () => getPlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant }),
     [playerCount, width, height, fontScale, layoutVariant],
   )
+  useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const topEdgeBand = useTopEdgeBand()
   const menuAnchor = useMemo(
     () =>

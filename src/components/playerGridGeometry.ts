@@ -95,10 +95,10 @@ export function getPlayerContentRotation(input: {
   row: (number | null)[]
   rowIndex: number
   columnIndex: number
-  playerIndex: number
+  slot: number
 }): LifeCardContentRotation {
   if (input.playerCount === 2 && input.layout.layout === "two-stacked")
-    return input.playerIndex === 0 ? 180 : 0
+    return input.slot === 0 ? 180 : 0
 
   const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
   if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0

@@ -98,6 +98,10 @@ export default {
     evenGrid: "균등 격자",
     table: "테이블",
   },
+  seats: {
+    title: "자리 바꾸기",
+    seat: "{{name}}의 자리",
+  },
   layoutOption: {
     balanced: "균형 레이아웃",
     topFocus: "상단 강조 레이아웃",
