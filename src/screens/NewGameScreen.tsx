@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -334,7 +334,7 @@ function NewGameForm({
     initialClock?.mode === "countdown" ? initialClock.minutes : undefined,
   )
   const [optionsOpen, setOptionsOpen] = useState(false)
-  const [openSystems, setOpenSystems] = useState<readonly PlaySystemId[]>([])
+  const [toggledSystems, setToggledSystems] = useState<Partial<Record<PlaySystemId, boolean>>>({})
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
   const [playerSaveError, setPlayerSaveError] = useState<string>()
@@ -384,11 +384,11 @@ function NewGameForm({
     chosen: { system: defaults.defaultSystem, format: defaults.defaultFormat },
     recent:
       seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
+    recentRow: Boolean(recent),
     connected: connectedMode,
   })
   const groupOpen = ({ system, types }: (typeof gameTypes.more)[number]) =>
-    openSystems.includes(system) ||
-    (!recentSelected && types.some((type) => type.id === selectedTypeId))
+    toggledSystems[system] ?? (!recentSelected && types.some((type) => type.id === selectedTypeId))
   const setupSummary = [
     connectedMode
       ? translate("play:newGame.seatsCount", { count: playerCount })
@@ -728,18 +728,22 @@ function NewGameForm({
               />
             ) : null}
             {gameTypes.suggested.map(gameTypeChoice)}
-            {gameTypes.more.map((group) =>
-              groupOpen(group) ? (
-                group.types.map(gameTypeChoice)
-              ) : (
-                <FormatsDisclosure
-                  key={group.system}
-                  system={group.system}
-                  count={group.types.length}
-                  onPress={() => setOpenSystems((open) => [...open, group.system])}
-                />
-              ),
-            )}
+            {gameTypes.more.map((group) => {
+              const open = groupOpen(group)
+              return (
+                <Fragment key={group.system}>
+                  <FormatsDisclosure
+                    system={group.system}
+                    count={group.types.length}
+                    expanded={open}
+                    onPress={() =>
+                      setToggledSystems((toggled) => ({ ...toggled, [group.system]: !open }))
+                    }
+                  />
+                  {open ? group.types.map(gameTypeChoice) : null}
+                </Fragment>
+              )
+            })}
           </View>
 
           <View style={themed($summaryRow)}>
@@ -1380,10 +1384,12 @@ function NewGameForm({
 function FormatsDisclosure({
   system,
   count,
+  expanded,
   onPress,
 }: {
   system: PlaySystemId
   count: number
+  expanded: boolean
   onPress: () => void
 }) {
   const {
@@ -1397,13 +1403,18 @@ function FormatsDisclosure({
       testID={`game-type-more-${system}`}
       text={label}
       accessibilityLabel={`${label}, ${more}`}
-      accessibilityState={{ expanded: false }}
+      accessibilityState={{ expanded }}
       style={themed($disclosure)}
       textStyle={themed($disclosureText)}
       RightAccessory={({ style }) => (
         <View style={[style, themed($disclosureDetail)]}>
           <Text size="xs" text={more} style={themed($disclosureText)} />
-          <Icon icon="caretRight" size={14} color={colors.tint} style={$caretDown} />
+          <Icon
+            icon="caretRight"
+            size={14}
+            color={colors.tint}
+            style={expanded ? $caretUp : $caretDown}
+          />
         </View>
       )}
       onPress={onPress}
@@ -1440,6 +1451,7 @@ const $disclosureDetail: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $caretDown: ImageStyle = { transform: [{ rotate: "90deg" }] }
+const $caretUp: ImageStyle = { transform: [{ rotate: "-90deg" }] }
 const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

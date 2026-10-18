@@ -55,13 +55,16 @@ const SUGGESTED_COUNT = 3
 
 type Played = Pick<GameType, "system" | "format" | "variant">
 
+// why: the recent row takes one of the suggestion slots, even when the form did not open from it.
 export function newGameTypes({
   chosen,
   recent,
+  recentRow = Boolean(recent),
   connected,
 }: {
   chosen?: Played
   recent?: Played
+  recentRow?: boolean
   connected: boolean
 }) {
   const offered = [...FEATURED_GAME_TYPES, ...MORE_GAME_TYPES].filter(
@@ -79,7 +82,7 @@ export function newGameTypes({
     ...featured,
   ])
   const suggested = [
-    ...[...ranked].slice(0, SUGGESTED_COUNT),
+    ...[...ranked].slice(0, SUGGESTED_COUNT - (recentRow ? 1 : 0)),
     ...candidates.filter((type) => !type.system),
   ]
   const more = offered.filter((type) => !suggested.includes(type))
