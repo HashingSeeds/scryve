@@ -100,7 +100,6 @@ export default {
     endMatchHint: "आखिरी पूरे हुए गेम से मैच का नतीजा दर्ज करता है",
     connect: "कनेक्ट करें",
     connectHint: "इस गेम को क्लाउड पर ले जाता है ताकि दूसरे जुड़ सकें",
-    gameStatus: "गेम की स्थिति",
     resumeHint: "आपके मौजूदा गेम पर वापस ले जाता है",
     statusDetailsHint: "गेम और कनेक्शन का विवरण खोलता है",
     retryConnection: "कनेक्शन फिर आज़माएँ",

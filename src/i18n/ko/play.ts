@@ -98,7 +98,6 @@ export default {
     endMatchHint: "마지막으로 끝난 게임의 결과를 매치 결과로 기록합니다",
     connect: "연결",
     connectHint: "이 게임을 클라우드로 옮겨 다른 사람이 참가할 수 있게 합니다",
-    gameStatus: "게임 상태",
     resumeHint: "현재 게임으로 돌아갑니다",
     statusDetailsHint: "게임 및 연결 세부정보를 엽니다",
     retryConnection: "연결 다시 시도",

@@ -103,7 +103,6 @@ export default {
     endMatchHint: "Enregistre le résultat du match à partir de sa dernière partie terminée",
     connect: "Connecter",
     connectHint: "Déplace cette partie vers le cloud pour que d'autres puissent la rejoindre",
-    gameStatus: "État de la partie",
     resumeHint: "Retourne à votre partie en cours",
     statusDetailsHint: "Ouvre les détails de la partie et de la connexion",
     retryConnection: "Réessayer la connexion",

@@ -130,7 +130,7 @@ describe("NewGameScreen", () => {
     }
     const view = render(themed(<NewGameScreen {...props} connected={readyHost} />))
     const form = view.UNSAFE_getByType(Screen)
-    const statusStyle = StyleSheet.flatten(view.getByTestId("setup-status").props.style)
+    expect(view.queryByTestId("setup-status")).toBeNull()
     openOptions()
     fireEvent.press(view.getByTestId("player-count-increment"))
     closeOptions()
@@ -155,9 +155,6 @@ describe("NewGameScreen", () => {
       ),
     )
     expect(view.queryByTestId("resume-connected-arriving")).toBeNull()
-    expect(StyleSheet.flatten(view.getByTestId("setup-status").props.style).height).toBe(
-      statusStyle.height,
-    )
     expect(within(form).getByText("3 seats · 20 life · Decks optional")).toBeTruthy()
     expect(within(form).queryByText("Games in progress")).toBeNull()
     fireEvent.press(view.getByTestId("setup-status"))
@@ -201,8 +198,9 @@ describe("NewGameScreen", () => {
     ).toBeNull()
   })
 
-  it("drops the empty status row from a fresh local setup", () => {
+  it("drops the empty status row from a fresh setup", () => {
     expect(setup().queryByTestId("setup-status")).toBeNull()
+    expect(setup({ mode: "connected" }).queryByTestId("setup-status")).toBeNull()
     expect(setup({ localGame: runningLocalGame() }).getByTestId("setup-status")).toBeTruthy()
   })
 
