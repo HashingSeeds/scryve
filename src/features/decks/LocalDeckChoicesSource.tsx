@@ -19,7 +19,6 @@ import { api } from "../../../convex/_generated/api"
 export type MyDecks = readonly MineDeck[] | "unavailable" | undefined
 export type DeckChoices = DeckChoice[] | "unavailable" | undefined
 
-// why: nearby games run with Convex cut off, so an unreachable account falls back to the decks this device last saw.
 function MyDecksQuery({
   ownerId,
   onChange,

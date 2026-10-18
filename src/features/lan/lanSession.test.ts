@@ -276,6 +276,16 @@ describe("nearby host", () => {
     expect(game.seats.map((seat) => seat.name)).toEqual(["a".repeat(23), "Alice", "Bob"])
   })
 
+  it("sends the finish to guests at once, so a deck picked next can't ride along", async () => {
+    const { session, alice } = await startedGame()
+
+    await session.writes.finish()
+
+    expect(alice.sent.findLast((message) => message.type === "state")).toMatchObject({
+      lobby: { status: "finished" },
+    })
+  })
+
   it("waits for a guest's pass hash before saving the round", async () => {
     let release = (_hash: string) => {}
     jest
