@@ -856,7 +856,7 @@ function NewGameForm({
             {
               // why: the status row's tap target can overlap the home indicator inset; its text stays above it.
               paddingBottom: showStatusRow
-                ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, 0)
+                ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
                 : Math.max(bottom, spacing.sm),
             },
           ]}
