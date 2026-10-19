@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { ScrollView, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
@@ -128,7 +128,7 @@ export function LocalMatchEndDialog({
       wide
     >
       <Text tx="board:matchEnd.title" preset="subheading" />
-      <View style={themed($seats)}>
+      <ScrollView style={$seatsScroll} contentContainerStyle={themed($seats)}>
         {game.players.map((player, seat) => (
           <View key={player.id} style={themed($seat)}>
             <View style={themed($seatName)}>
@@ -155,7 +155,7 @@ export function LocalMatchEndDialog({
             </View>
           </View>
         ))}
-      </View>
+      </ScrollView>
       <Button
         testID="match-draw-remaining"
         tx="board:matchEnd.drawRemaining"
@@ -177,6 +177,7 @@ export function LocalMatchEndDialog({
   )
 }
 
+const $seatsScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $seats: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $seat: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
