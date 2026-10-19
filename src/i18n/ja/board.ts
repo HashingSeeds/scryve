@@ -213,6 +213,10 @@ export default {
     flame: "炎",
     bolt: "稲妻",
     eye: "目",
+    skull: "ドクロ",
+    spade: "スペード",
+    gem: "宝石",
+    tower: "塔",
   },
   savedToast: {
     gameSaved: "ゲームを保存しました",

@@ -165,6 +165,10 @@ export default {
       flame: "लौ",
       bolt: "बिजली",
       eye: "आँख",
+      skull: "खोपड़ी",
+      spade: "हुकुम",
+      gem: "रत्न",
+      tower: "मीनार",
     },
   },
   blockedPlayers: {

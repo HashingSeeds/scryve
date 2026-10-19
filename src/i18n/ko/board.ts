@@ -212,6 +212,10 @@ export default {
     flame: "불꽃",
     bolt: "번개",
     eye: "눈",
+    skull: "해골",
+    spade: "스페이드",
+    gem: "보석",
+    tower: "탑",
   },
   savedToast: {
     gameSaved: "게임 저장됨",
