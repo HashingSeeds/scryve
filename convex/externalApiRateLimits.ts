@@ -106,14 +106,13 @@ export const acquireScryfall = internalMutation({
     const endpoint = scryfallEndpoint(path)
     const endpointRow = await bucketRow(ctx, endpoint.bucket)
     const earliest = Math.max(now, endpointRow?.nextRequestAt ?? now)
-    for (let slot = Math.floor(earliest / GLOBAL_SLOT_MS); ; slot += 1) {
-      const slotStart = slot * GLOBAL_SLOT_MS
-      const requestAt = Math.max(earliest, slotStart)
+    for (let slot = Math.ceil(earliest / GLOBAL_SLOT_MS); ; slot += 1) {
+      const requestAt = slot * GLOBAL_SLOT_MS
       if (requestAt - now > SCRYFALL_MAX_WAIT_MS) return { waitMs: requestAt - now, blocked: true }
       const slotBucket = `scryfall:slot:${slot % GLOBAL_SLOTS}`
       const slotRow = await bucketRow(ctx, slotBucket)
-      if (slotRow?.nextRequestAt === slotStart) continue
-      await writeBucket(ctx, slotRow, { bucket: slotBucket, nextRequestAt: slotStart })
+      if (slotRow?.nextRequestAt === requestAt) continue
+      await writeBucket(ctx, slotRow, { bucket: slotBucket, nextRequestAt: requestAt })
       await writeBucket(ctx, endpointRow, {
         bucket: endpoint.bucket,
         nextRequestAt: requestAt + endpoint.intervalMs,

@@ -1204,6 +1204,20 @@ describe("Scryfall request pacing", () => {
     }
   })
 
+  it("spaces requests a full slot apart when the clock is between slots", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_124)
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const acquire = (path: string) =>
+        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 1, blocked: false })
+      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 126, blocked: false })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it("refuses slots past the wait limit without reserving them", async () => {
     const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
