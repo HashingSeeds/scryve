@@ -1,4 +1,5 @@
 import { AppState } from "react-native"
+import { act, renderHook } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
@@ -12,7 +13,13 @@ import {
   type LanHostMessage,
   type LanSetup,
 } from "./lanGame"
-import { LanSession } from "./lanSession"
+import {
+  LanSession,
+  lanSession,
+  useLanSession,
+  useLanSessionSlice,
+  type LanSessionState,
+} from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
 import { onSeatClaim, pendingSeatClaims, setNearbyOwner } from "./nearbyAccount"
 import type { PendingLifeAction } from "../connected/model"
@@ -349,7 +356,7 @@ describe("nearby host", () => {
 })
 
 describe("nearby guest", () => {
-  async function guest() {
+  async function guest(session = new LanSession()) {
     const sent: unknown[] = []
     let host: LanPeerHandlers<LanHostMessage> | undefined
     jest.mocked(connectLan).mockImplementation(async (_service, _parse, handlers) => {
@@ -360,7 +367,6 @@ describe("nearby guest", () => {
         close: jest.fn(),
       }
     })
-    const session = new LanSession()
     await session.join({ name: "Host game" } as Parameters<LanSession["join"]>[0])
     host?.onMessage({ type: "welcome", pass: { key: "guest", token: "token" } })
     const game = createLanGame("game", "host", "Host", setup, 1)
@@ -371,6 +377,36 @@ describe("nearby guest", () => {
     })
     return { session, sent, host: () => host }
   }
+
+  it("re-renders a lobby reader for a seat change but not for a life change", async () => {
+    const { host } = await guest(lanSession)
+    const game = createLanGame("game", "host", "Host", setup, 1)
+    const lobby = lanLobbyOf(game)
+    const projection = lanProjection(game, "guest")
+    const selectLobby = ({ role, lobby }: LanSessionState) => ({ role, lobby })
+    const lobbyReader = jest.fn(() => useLanSessionSlice(selectLobby))
+    const wholeReader = jest.fn(() => useLanSession())
+    renderHook(lobbyReader)
+    renderHook(wholeReader)
+    const receive = (next: { lobby: typeof lobby; projection: typeof projection }) =>
+      act(() => host()?.onMessage({ type: "state", ...next }))
+
+    receive({
+      lobby: structuredClone(lobby),
+      projection: {
+        ...projection,
+        players: projection.players.map((player) => ({ ...player, currentLife: 39 })),
+      },
+    })
+
+    expect(wholeReader).toHaveBeenCalledTimes(2)
+    expect(lobbyReader).toHaveBeenCalledTimes(1)
+
+    receive({ lobby: { ...lobby, seats: [] }, projection })
+
+    expect(lobbyReader).toHaveBeenCalledTimes(2)
+    act(() => lanSession.leave())
+  })
 
   it("settles a write on the host's reply, refused or not", async () => {
     const { session, host } = await guest()
