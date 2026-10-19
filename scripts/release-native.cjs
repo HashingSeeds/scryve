@@ -148,8 +148,9 @@ function settleVersion() {
   return plan.version
 }
 
+// why: a version's builds come from its tagged commit, so differing runtimes mean the store build is ambiguous.
 function storeRuntime(platform, version) {
-  const [build] = JSON.parse(
+  const builds = JSON.parse(
     execFileSync(
       "npx",
       [
@@ -165,13 +166,18 @@ function storeRuntime(platform, version) {
         "--app-version",
         version,
         "--limit",
-        "1",
+        "50",
         "--json",
       ],
       { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
     ),
   )
-  return build?.runtime?.version ?? null
+  const runtimes = [...new Set(builds.map((build) => build.runtime?.version).filter(Boolean))]
+  if (runtimes.length > 1)
+    throw new Error(
+      `${platform} builds of ${version} have different runtimes (${runtimes.join(", ")}). Record the store build's runtime with storeReleases:setLive by hand.`,
+    )
+  return runtimes[0] ?? null
 }
 
 function recordLive(args) {
