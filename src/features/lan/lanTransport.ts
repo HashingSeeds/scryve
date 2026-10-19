@@ -15,8 +15,35 @@ const SILENCE_LIMIT_MS = 4_000
 
 type Socket = ReturnType<typeof TcpSocket.createConnection>
 
+const NON_ASCII = /[^\x00-\x7f]/g
+
+// why: btoa takes one byte per char, and peers on any version parse the \u escapes back to the same text.
+const asciiLine = (message: unknown) =>
+  `${JSON.stringify(message).replace(NON_ASCII, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)}\n`
+
+// why: tcp-socket base64-encodes each write with its JS Buffer polyfill, the host's biggest JS cost. It only reads byteLength and toString("base64") from a Buffer, so this one hands native Hermes' btoa output as-is.
+function wire(text: string) {
+  const base64 = btoa(text)
+  return Object.defineProperties(Buffer.alloc(0), {
+    byteLength: { value: text.length },
+    toString: { value: () => base64 },
+  })
+}
+
+// why: apply copies a typed array natively on Hermes, where spreading one or Buffer#toString runs 10x slower in JS; past 64 KB apply overflows the native stack.
+const APPLY_BYTES = 32 * 1024
+function binaryString(bytes: Uint8Array) {
+  let text = ""
+  for (let start = 0; start < bytes.length; start += APPLY_BYTES)
+    text += String.fromCharCode.apply(
+      null,
+      bytes.subarray(start, start + APPLY_BYTES) as unknown as number[],
+    )
+  return text
+}
+
 export interface LanConnection<Out> {
-  send: (message: Out) => void
+  send: (...messages: Out[]) => void
   sendAndClose: (message: Out) => void
   close: () => void
 }
@@ -86,12 +113,12 @@ function wrapSocket<In, Out>(
   // why: empty lines double as heartbeats, which the line reader already skips.
   const heartbeat = setInterval(() => {
     if (Date.now() - lastHeard > SILENCE_LIMIT_MS) shutdown()
-    else socket.write("\n")
+    else socket.write(wire("\n"))
   }, HEARTBEAT_MS)
   socket.on("data", (data) => {
     lastHeard = Date.now()
     try {
-      read(typeof data === "string" ? Buffer.from(data) : data)
+      read(binaryString(typeof data === "string" ? Buffer.from(data) : data))
     } catch {
       shutdown()
     }
@@ -100,13 +127,13 @@ function wrapSocket<In, Out>(
   socket.on("close", shutdown)
   let ending = false
   return {
-    send: (message) => {
-      if (!closed && !ending) socket.write(`${JSON.stringify(message)}\n`)
+    send: (...messages) => {
+      if (!closed && !ending) socket.write(wire(messages.map(asciiLine).join("")))
     },
     sendAndClose: (message) => {
       if (closed || ending) return
       ending = true
-      socket.end(`${JSON.stringify(message)}\n`)
+      socket.end(wire(asciiLine(message)))
       setTimeout(shutdown, SILENCE_LIMIT_MS)
     },
     close: shutdown,

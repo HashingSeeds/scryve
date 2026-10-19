@@ -3,24 +3,24 @@ import { Buffer } from "buffer"
 import { createLineReader, MAX_LINE_BYTES } from "./lineReader"
 
 describe("createLineReader", () => {
-  it("rebuilds a character split across chunks and skips heartbeat lines", () => {
+  it("rebuilds characters split across chunks and skips heartbeat lines", () => {
     const lines: string[] = []
     const read = createLineReader((line) => lines.push(line))
-    const bytes = Buffer.from('{"name":"José"}\n\n{"name":"Zoë"}\n')
-    const splitInsideE = bytes.indexOf(0xc3) + 1
+    const bytes = Buffer.from('{"name":"José"}\n\n{"name":"Zoë 🐉"}\n').toString("latin1")
+    const insideDragon = bytes.indexOf("\xf0") + 2
 
-    read(bytes.subarray(0, splitInsideE))
-    read(bytes.subarray(splitInsideE))
+    read(bytes.slice(0, insideDragon))
+    read(bytes.slice(insideDragon))
 
-    expect(lines).toEqual(['{"name":"José"}', '{"name":"Zoë"}'])
+    expect(lines).toEqual(['{"name":"José"}', '{"name":"Zoë 🐉"}'])
   })
 
   it("refuses an oversized line whether or not it has ended", () => {
     const read = createLineReader(() => {})
 
-    const oversized = new Uint8Array(MAX_LINE_BYTES + 1).fill(0x61)
+    const oversized = "a".repeat(MAX_LINE_BYTES + 1)
 
     expect(() => createLineReader(() => {})(oversized)).toThrow("too long")
-    expect(() => read(Buffer.concat([oversized, Buffer.from("\n")]))).toThrow("too long")
+    expect(() => read(`${oversized}\n`)).toThrow("too long")
   })
 })
