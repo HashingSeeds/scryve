@@ -23,7 +23,7 @@ const MANA_DOT: Record<ManaColor, string> = {
 
 const CURVE_HEIGHT = 72
 
-export function DeckAnalysis({
+export function DeckAnalysisTab({
   game,
   format,
   cards,

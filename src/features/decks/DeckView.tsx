@@ -12,7 +12,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { DeckAnalysis } from "./DeckAnalysis"
+import { DeckAnalysisTab } from "./DeckAnalysisTab"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
@@ -223,7 +223,7 @@ export function DeckView({
               ) : cards.length === 0 ? (
                 <Text style={themed($notes)} tx="decks:deckView.noCards" />
               ) : (
-                <DeckAnalysis game={game} format={format} cards={cards} />
+                <DeckAnalysisTab game={game} format={format} cards={cards} />
               )
             ) : tab === "notes" ? (
               <View style={themed($notes)}>
