@@ -1168,27 +1168,56 @@ describe("preconstructed catalog caching", () => {
 })
 
 describe("Scryfall request pacing", () => {
-  it("enforces endpoint and shared quotas, then stops queued work during a global cooldown", async () => {
+  it("gives concurrent requests distinct slots instead of asking them to retry", async () => {
     const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
       const t = convexTest(schema, modules)
       registerRateLimiter(t)
       const acquire = (path: string) =>
         t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
-      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 0, blocked: false })
-      expect(await acquire("/cards/collection")).toEqual({ waitMs: 125, blocked: false })
-      now.mockReturnValue(1_000_125)
-      expect(await acquire("/cards/collection")).toEqual({ waitMs: 0, blocked: false })
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 375, blocked: false })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 0, blocked: false })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
+      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 250, blocked: false })
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 500, blocked: false })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  it("refuses slots past the wait limit without reserving them", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const acquire = (path: string) =>
+        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
+      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 0, blocked: false })
+      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 6000, blocked: false })
+      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 12_000, blocked: true })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 250, blocked: false })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  it("stops new and queued requests during a 429 cooldown", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const acquire = (path: string) =>
+        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
       await t.mutation(internal.externalApiRateLimits.block, {
         bucket: "scryfall:cooldown",
         durationMs: 30_000,
       })
       now.mockReturnValue(1_000_500)
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 29_625, blocked: true })
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 29_625, blocked: true })
-      now.mockReturnValue(1_030_125)
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 0, blocked: false })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 29_500, blocked: true })
+      await expect(t.query(internal.externalApiRateLimits.scryfallCooldownUntil, {})).resolves.toBe(
+        1_030_000,
+      )
+      now.mockReturnValue(1_030_000)
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 0, blocked: false })
     } finally {
       now.mockRestore()
     }
