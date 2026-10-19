@@ -1178,7 +1178,7 @@ describe("Scryfall request pacing", () => {
       expect(await acquire("/cards/example")).toEqual({ waitMs: 0, blocked: false })
       expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
       expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 250, blocked: false })
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 750, blocked: false })
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 875, blocked: false })
     } finally {
       now.mockRestore()
     }
@@ -1198,7 +1198,7 @@ describe("Scryfall request pacing", () => {
           blocked: false,
         })
       expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 1000, blocked: false })
-      expect(await acquire("/cards/search?q=third")).toEqual({ waitMs: 1500, blocked: false })
+      expect(await acquire("/cards/search?q=third")).toEqual({ waitMs: 1625, blocked: false })
     } finally {
       now.mockRestore()
     }
@@ -1226,8 +1226,8 @@ describe("Scryfall request pacing", () => {
       const acquire = (path: string) =>
         t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
       expect(await acquire("/cards/manifest")).toEqual({ waitMs: 0, blocked: false })
-      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 6000, blocked: false })
-      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 12_000, blocked: true })
+      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 6125, blocked: false })
+      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 12_250, blocked: true })
       expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
     } finally {
       now.mockRestore()
@@ -1258,9 +1258,9 @@ describe("Scryfall request pacing", () => {
   })
 
   it.each([
-    ["/cards/named?exact=Forest", 500],
-    ["/cards/random", 500],
-    ["/cards/manifest", 6000],
+    ["/cards/named?exact=Forest", 625],
+    ["/cards/random", 625],
+    ["/cards/manifest", 6125],
   ])("paces %s without a burst allowance", async (path, interval) => {
     const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {

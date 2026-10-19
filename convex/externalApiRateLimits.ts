@@ -61,12 +61,15 @@ const GLOBAL_SLOT_MS = 125
 /** why: slot rows are reused each lap; one more lap than a wait window spans keeps a held slot from reading as free. */
 const GLOBAL_SLOTS = SCRYFALL_MAX_WAIT_MS / GLOBAL_SLOT_MS + 2
 
+/** why: requests leave on different servers after timers, so spacing exactly at Scryfall's per-endpoint limit drew a 429 under load. */
+const SEND_JITTER_MARGIN_MS = 50
+
 function scryfallEndpoint(path: string) {
   const endpoint = path.split("?")[0]
   if (["/cards/search", "/cards/named", "/cards/random", "/cards/collection"].includes(endpoint))
-    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 500 }
+    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 500 + SEND_JITTER_MARGIN_MS }
   if (endpoint === "/cards/manifest")
-    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 6000 }
+    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 6000 + SEND_JITTER_MARGIN_MS }
   return { bucket: "scryfall:endpoint:default", intervalMs: 100 }
 }
 

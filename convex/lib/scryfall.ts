@@ -29,15 +29,26 @@ function scryfallRateLimited(retryAfterMs: number): never {
   })
 }
 
+const ACQUIRE_ATTEMPTS = 5
+
+async function acquireScryfallSlot(ctx: ActionCtx, path: string) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await ctx.runMutation(internal.externalApiRateLimits.acquireScryfall, { path })
+    } catch (error) {
+      /** why: every request writes the shared schedule, so a burst can outlast Convex's own write-conflict retries; acquireScryfall throws nothing else. */
+      if (error instanceof ConvexError || attempt === ACQUIRE_ATTEMPTS) throw error
+      await wait(Math.random() * 100 * attempt)
+    }
+  }
+}
+
 export async function fetchScryfall(
   ctx: ActionCtx,
   path: string,
   options: ScryfallRequestOptions = {},
 ) {
-  const { waitMs, blocked } = await ctx.runMutation(
-    internal.externalApiRateLimits.acquireScryfall,
-    { path },
-  )
+  const { waitMs, blocked } = await acquireScryfallSlot(ctx, path)
   if (blocked) scryfallRateLimited(waitMs)
   if (waitMs > 0) {
     await wait(waitMs)
