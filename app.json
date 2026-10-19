@@ -26,7 +26,7 @@
     "permissions": ["android.permission.CAMERA"]
   },
   "ios": {
-    "icon": "./assets/images/app-icon-ios.png",
+    "icon": "./assets/images/AppIcon.icon",
     "supportsTablet": true,
     "infoPlist": {
       "UIViewControllerBasedStatusBarAppearance": true,
