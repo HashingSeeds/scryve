@@ -1077,14 +1077,15 @@ figure {
 }
 
 .demo-replay {
-  min-height: 44px;
+  height: 38px;
   align-self: flex-start;
   padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: var(--tint);
   cursor: pointer;
+  font-size: 14px;
 }
 
 /* The details step swaps its heading and copy with the demo it shows. */
