@@ -30,18 +30,6 @@ function wire(text: string) {
   })
 }
 
-// why: apply copies a typed array natively on Hermes, where spreading one or Buffer#toString runs 10x slower in JS; past 64 KB apply overflows the native stack.
-const APPLY_BYTES = 32 * 1024
-function binaryString(bytes: Uint8Array) {
-  let text = ""
-  for (let start = 0; start < bytes.length; start += APPLY_BYTES)
-    text += String.fromCharCode.apply(
-      null,
-      bytes.subarray(start, start + APPLY_BYTES) as unknown as number[],
-    )
-  return text
-}
-
 export interface LanConnection<Out> {
   send: (...messages: Out[]) => void
   sendAndClose: (message: Out) => void
@@ -92,6 +80,8 @@ function wrapSocket<In, Out>(
   handlers: LanPeerHandlers<In>,
 ): LanConnection<Out> {
   socket.setNoDelay(true)
+  // why: our tcp-socket patch hands base64 data straight from native, so Hermes' atob decodes it instead of the JS Buffer polyfill.
+  socket.setEncoding("base64")
   let lastHeard = Date.now()
   let closed = false
   // why: tcp-socket throws on writes after destroy, and its close event can arrive well after, so shut down at once.
@@ -118,7 +108,7 @@ function wrapSocket<In, Out>(
   socket.on("data", (data) => {
     lastHeard = Date.now()
     try {
-      read(binaryString(typeof data === "string" ? Buffer.from(data) : data))
+      read(atob(typeof data === "string" ? data : data.toString("base64")))
     } catch {
       shutdown()
     }
