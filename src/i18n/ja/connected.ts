@@ -455,6 +455,8 @@ export default {
     nameLabel: "名前",
     namePlaceholder: "テーブルに表示されます",
     empty: "このネットワークにはまだゲームがありません。",
+    notFound:
+      "ゲームが見つかりません。ホストと同じWi-Fiに接続しているか確認してください。ゲスト用や公共のWi-Fiではブロックされることがよくあります。",
     join: "{{name}}に参加",
     you: "{{name}}(あなた)",
     away: "離席中",
@@ -462,7 +464,8 @@ export default {
     backToGame: "ゲームに戻る",
     errors: {
       hostFailed: "ホストできませんでした: {{error}}",
-      unreachable: "{{name}}に接続できません。ゲームが終了した可能性があります。",
+      unreachable:
+        "{{name}}に接続できませんでした。ゲームが終了したか、このWi-Fiでデバイス同士の接続がブロックされている可能性があります。",
       lostHost: "ホストとの接続が切れました。ゲームが終了した可能性があります。",
     },
     rejected: {

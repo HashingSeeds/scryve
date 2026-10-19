@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
@@ -14,6 +14,9 @@ import { LAN_NAME_MAX_LENGTH, lanPlayAvailable, loadLanName, saveLanName } from 
 import { lanSession, useLanSession } from "./lanSession"
 import { useNearbyGames } from "./useNearbyGames"
 
+// why: networks that isolate devices look identical to an empty one, so after a short wait the empty list says how to fix it.
+const NOT_FOUND_AFTER_MS = 10_000
+
 export function NearbyGameList({ onJoin }: { onJoin: () => void }) {
   const { role } = useLanSession()
   if (!lanPlayAvailable()) return null
@@ -26,6 +29,11 @@ function NearbyGames({ onJoin }: { onJoin: () => void }) {
   const { themed } = useAppTheme()
   const { denied, games } = useNearbyGames(true)
   const [name, setName] = useState(loadLanName)
+  const [waited, setWaited] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setWaited(true), NOT_FOUND_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [])
   return (
     <View testID="nearby-games" style={themed($section)}>
       <Text preset="subheading" accessibilityRole="header" tx="connected:nearby.title" />
@@ -41,7 +49,12 @@ function NearbyGames({ onJoin }: { onJoin: () => void }) {
           saveLanName(next)
         }}
       />
-      {games.length === 0 ? <Text style={themed($dimmed)} tx="connected:nearby.empty" /> : null}
+      {games.length === 0 ? (
+        <Text
+          style={themed($dimmed)}
+          tx={waited ? "connected:nearby.notFound" : "connected:nearby.empty"}
+        />
+      ) : null}
       {games.map((service) => (
         <Button
           key={service.name}
