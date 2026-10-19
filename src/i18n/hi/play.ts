@@ -33,16 +33,14 @@ export default {
     acceptance:
       "खेलकर, आप <terms>उपयोग की शर्तों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत होते हैं।",
   },
-  recentSetups: {
-    noSystem: "कोई सिस्टम नहीं",
-    treachery: "Treachery",
-  },
   newGame: {
     setupTitle: "गेम सेटअप",
     newTitle: "नया गेम",
     connectionLabel: "गेम कनेक्शन",
     onThisDevice: "इस डिवाइस पर",
     connected: "कनेक्टेड",
+    gameLabel: "गेम",
+    formatLabel: "फ़ॉर्मैट",
     joinWithCode: "कोड से शामिल हों",
     resumeHostedGame: "होस्ट किया गेम फिर शुरू करें",
     moreFormats_one: "{{count}} और",

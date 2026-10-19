@@ -34,16 +34,14 @@ export default {
     acceptance:
       "プレイすると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
   },
-  recentSetups: {
-    noSystem: "システムなし",
-    treachery: "Treachery",
-  },
   newGame: {
     setupTitle: "ゲーム設定",
     newTitle: "新しいゲーム",
     connectionLabel: "ゲームの接続",
     onThisDevice: "この端末",
     connected: "接続",
+    gameLabel: "ゲーム",
+    formatLabel: "フォーマット",
     joinWithCode: "コードで参加",
     resumeHostedGame: "ホストしたゲームを再開",
     moreFormats_other: "他{{count}}件",

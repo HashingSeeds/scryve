@@ -23,13 +23,13 @@
   "whatYouPlay.changeLater": "a547cfddab73",
   "whatYouPlay.play": "548c11c25e0f",
   "whatYouPlay.acceptance": "07e47563fd5f",
-  "recentSetups.noSystem": "545ff3f640f2",
-  "recentSetups.treachery": "bbd99535e780",
   "newGame.setupTitle": "831294660fc0",
   "newGame.newTitle": "8d516b82951c",
   "newGame.connectionLabel": "8ae4a92cc4e2",
   "newGame.onThisDevice": "3e1ad9a8332f",
   "newGame.connected": "c67b4795a634",
+  "newGame.gameLabel": "36fe17ec542e",
+  "newGame.formatLabel": "49f7cbb9df71",
   "newGame.joinWithCode": "d4b43659ef81",
   "newGame.resumeHostedGame": "6902f59010fd",
   "newGame.moreFormats": "961accdce012",
@@ -73,6 +73,8 @@
   "newGame.hostLobby": "a8aed8e6eae6",
   "newGame.hostLobbyHint": "eb6b952f5354",
   "newGame.startGameHint": "a8fa24e5e710",
+  "newGame.cloud": "74e6e9a524ac",
+  "newGame.hostOn": "2859ca47b0d1",
   "newGame.nearby": "097ff05b800f",
   "newGame.nearbyHint": "936fa026c6f0",
   "newGame.endMatch": "a2d65b535824",
@@ -301,7 +303,5 @@
   "rules.webOnly": "27565e946140",
   "rules.allOf": "d86d52b22fa5",
   "rules.noResults": "3de638240022",
-  "rules.notFound": "28a6a3b84cc3",
-  "newGame.cloud": "74e6e9a524ac",
-  "newGame.hostOn": "2859ca47b0d1"
+  "rules.notFound": "28a6a3b84cc3"
 }

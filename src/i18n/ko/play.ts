@@ -33,16 +33,14 @@ export default {
     acceptance:
       "플레이하면 <terms>이용약관</terms> 및 <privacy>개인정보 처리방침</privacy>에 동의하는 것으로 간주됩니다.",
   },
-  recentSetups: {
-    noSystem: "시스템 없음",
-    treachery: "Treachery",
-  },
   newGame: {
     setupTitle: "게임 설정",
     newTitle: "새 게임",
     connectionLabel: "게임 연결",
     onThisDevice: "이 기기",
     connected: "연결",
+    gameLabel: "게임",
+    formatLabel: "포맷",
     joinWithCode: "코드로 참가",
     resumeHostedGame: "호스트 게임 이어하기",
     moreFormats_other: "{{count}}개 더",

@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from "react"
+import { Fragment, useState } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
@@ -18,16 +18,9 @@ export interface GameTypeListProps {
   selectedId?: string
   detail: (type: GameType) => string
   onChoose: (type: GameType) => void
-  leadingRow?: ReactNode
 }
 
-export function GameTypeList({
-  types,
-  selectedId,
-  detail,
-  onChoose,
-  leadingRow,
-}: GameTypeListProps) {
+export function GameTypeList({ types, selectedId, detail, onChoose }: GameTypeListProps) {
   const { themed } = useAppTheme()
   const [toggledSystems, setToggledSystems] = useState<Partial<Record<PlaySystemId, boolean>>>({})
   const choice = (type: GameType) => (
@@ -43,7 +36,6 @@ export function GameTypeList({
   )
   return (
     <View style={themed($list)}>
-      {leadingRow}
       {types.suggested.map(choice)}
       {types.more.map((group) => {
         const open =

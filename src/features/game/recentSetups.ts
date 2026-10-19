@@ -1,8 +1,6 @@
-import { translate } from "@/i18n/translate"
-
 import { createLocalGame } from "./domain"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
-import { isPlaySystemId, playFormatLabel, playSystemFormat, type PlaySystemId } from "./playSystems"
+import { isPlaySystemId, playSystemFormat, type PlaySystemId } from "./playSystems"
 import { isRoundClockSetup } from "./roundClock"
 import { isSystemVisible } from "./systemVisibility"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
@@ -154,13 +152,6 @@ export function withRecentSetup(
     0,
     MAX_RECENT_SETUPS,
   )
-}
-
-export function recentSetupLabel(setup: RecentSetup) {
-  const { system, format } = setup.mode === "local" ? setup.game : setup.lobby
-  if (setup.mode === "connected" && setup.lobby.variant === "treachery")
-    return translate("play:recentSetups.treachery")
-  return system ? playFormatLabel(system, format) : translate("play:recentSetups.noSystem")
 }
 
 export function isSetupReplayable(setup: RecentSetup) {
