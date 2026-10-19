@@ -30,16 +30,14 @@ const play = {
     acceptance:
       "By playing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
   },
-  recentSetups: {
-    noSystem: "No system",
-    treachery: "Treachery",
-  },
   newGame: {
     setupTitle: "Game setup",
     newTitle: "New game",
     connectionLabel: "Game connection",
     onThisDevice: "On this device",
     connected: "Connected",
+    gameLabel: "Game",
+    formatLabel: "Format",
     joinWithCode: "Join with code",
     resumeHostedGame: "Resume hosted game",
     moreFormats_one: "{{count}} more",

@@ -34,16 +34,14 @@ export default {
     acceptance:
       "Al jugar, aceptas los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
   },
-  recentSetups: {
-    noSystem: "Sin sistema",
-    treachery: "Treachery",
-  },
   newGame: {
     setupTitle: "Configuración de la partida",
     newTitle: "Nueva partida",
     connectionLabel: "Conexión de la partida",
     onThisDevice: "En este dispositivo",
     connected: "Conectada",
+    gameLabel: "Juego",
+    formatLabel: "Formato",
     joinWithCode: "Unirse con código",
     resumeHostedGame: "Reanudar partida creada",
     moreFormats_one: "{{count}} más",

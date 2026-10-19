@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import {
   $dialogActions,
@@ -38,8 +37,8 @@ import {
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
-import { GameTypeList } from "@/features/game/GameTypeList"
-import { gameTypeDetail, gameTypeId, newGameTypes, type GameType } from "@/features/game/gameTypes"
+import { GameTabs } from "@/features/game/GameTabs"
+import { gameTypeDetail, gameTypeId, newGameTabs, type GameType } from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
@@ -55,14 +54,9 @@ import {
   NO_PLAY_SYSTEM,
   playSystemFormat,
   playSystemRules,
-  playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import {
-  recentSetupLabel,
-  type ConnectedSetup,
-  type RecentSetup,
-} from "@/features/game/recentSetups"
+import type { ConnectedSetup, RecentSetup } from "@/features/game/recentSetups"
 import {
   defaultRoundClockMinutes,
   ROUND_CLOCK_MINUTES,
@@ -185,16 +179,6 @@ function newestRecent(props: Pick<NewGameScreenProps, "localGame" | "recentSetup
   return props.localGame ? undefined : props.recentSetups?.find(({ mode }) => mode === props.mode)
 }
 
-function recentSetupDetail(setup: RecentSetup) {
-  const { system } = setup.mode === "local" ? setup.game : setup.lobby
-  return [
-    ...(system ? [playSystemShortLabel(system)] : []),
-    setup.mode === "local"
-      ? setup.game.players.map((player) => player.name.trim()).join(", ")
-      : translate("play:newGame.seatsCount", { count: setup.lobby.playerCount }),
-  ].join(" · ")
-}
-
 export function NewGameScreen(props: NewGameScreenProps) {
   const [replay, setReplay] = useState(() => ({ setup: newestRecent(props), key: 0 }))
   return (
@@ -239,10 +223,8 @@ function NewGameForm({
   } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
   const { fontScale } = useWindowDimensions()
-  const recent = newestRecent({ localGame, recentSetups, mode })
-  const [replayKept, setReplayKept] = useState(true)
-  const seededRecent = recent && recent === replaying ? recent : undefined
-  const recentSelected = Boolean(seededRecent) && replayKept
+  // why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over.
+  const [formatPicked, setFormatPicked] = useState(false)
   const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
   const [seedGame] = useState(() =>
     replaying?.mode === "local" ? createLocalGame(replaying.game) : initialGame,
@@ -381,13 +363,19 @@ function NewGameForm({
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
   const selectedTypeId = gameTypeId(system, format, treachery)
-  const gameTypes = newGameTypes({
-    chosen: { system: defaults.defaultSystem, format: defaults.defaultFormat },
-    recent:
-      seededRecent && (seededRecent.mode === "local" ? seededRecent.game : seededRecent.lobby),
-    recentRow: Boolean(recent),
-    connected: connectedMode,
-  })
+  const gameTabs = useMemo(
+    () =>
+      newGameTabs({
+        chosen: defaults.defaultSystem
+          ? { system: defaults.defaultSystem, format: defaults.defaultFormat }
+          : undefined,
+        recent: (recentSetups ?? []).map((recent) =>
+          recent.mode === "local" ? recent.game : recent.lobby,
+        ),
+        connected: connectedMode,
+      }),
+    [connectedMode, defaults.defaultFormat, defaults.defaultSystem, recentSetups],
+  )
   const setupSummary = [
     connectedMode
       ? translate("play:newGame.seatsCount", { count: playerCount })
@@ -450,6 +438,7 @@ function NewGameForm({
   const canConnectLocal = Boolean(localConnect) && !connectedMode && localGameBlocksStart
   const footerRow =
     (canConnectLocal || Boolean(localMatchEnd)) && fontScale <= FOOTER_ROW_MAX_FONT_SCALE
+  const joinInFooter = connectedMode && Boolean(onJoin)
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
@@ -519,6 +508,12 @@ function NewGameForm({
       )
   }
 
+  function changeMode(next: NewGameMode) {
+    onModeChange(next)
+    const nextRecent = newestRecent({ localGame, recentSetups, mode: next })
+    if (nextRecent && !formatPicked) onReplay(nextRecent)
+  }
+
   function toggleMatch(on: boolean) {
     setMatchOn(on)
     setChosenBestOf(undefined)
@@ -539,7 +534,7 @@ function NewGameForm({
       setDeck(undefined)
     }
     setTreacheryChosen(nextTreachery)
-    setReplayKept(false)
+    setFormatPicked(true)
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
 
@@ -672,44 +667,14 @@ function NewGameForm({
             { id: "connected", label: translate("play:newGame.connected") },
           ]}
           selectedId={mode}
-          onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
+          onSelect={(value) => changeMode(value === "connected" ? "connected" : "local")}
         />
       </View>
       <>
         <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
-          {connectedMode && onNearby ? (
-            <SegmentedControl
-              testID="host-on"
-              accessibilityLabel={translate("play:newGame.hostOn")}
-              segments={[
-                { id: "cloud", label: translate("play:newGame.cloud") },
-                { id: "nearby", label: translate("play:newGame.nearby") },
-              ]}
-              selectedId={hostOn}
-              onSelect={(value) => setHostOn(value === "nearby" ? "nearby" : "cloud")}
-            />
-          ) : null}
-          {connectedMode && onJoin ? (
-            <View style={themed($section)}>
-              <Button
-                testID="join-with-code-button"
-                tx="play:newGame.joinWithCode"
-                onPress={onJoin}
-              />
-            </View>
-          ) : null}
-          {hostedResumable ? (
-            <View style={themed($section)}>
-              <Button
-                testID="resume-hosted-connected-button"
-                tx="play:newGame.resumeHostedGame"
-                onPress={() => onResumeConnected?.(hostedResumable)}
-              />
-            </View>
-          ) : null}
-          <GameTypeList
-            types={gameTypes}
-            selectedId={recentSelected ? undefined : selectedTypeId}
+          <GameTabs
+            tabs={gameTabs}
+            selectedId={selectedTypeId}
             detail={(type) =>
               gameTypeDetail(
                 type,
@@ -719,19 +684,6 @@ function NewGameForm({
               )
             }
             onChoose={chooseGameType}
-            leadingRow={
-              recent ? (
-                <ChoiceButton
-                  testID="recent-setup"
-                  text={recentSetupLabel(recent)}
-                  detail={recentSetupDetail(recent)}
-                  detailShrinks
-                  TextProps={$recentLabel}
-                  selected={recentSelected}
-                  onPress={() => onReplay(recent)}
-                />
-              ) : null
-            }
           />
 
           <View style={themed($summaryRow)}>
@@ -744,6 +696,31 @@ function NewGameForm({
               onPress={() => setOptionsOpen(true)}
             />
           </View>
+
+          {connectedMode && onNearby ? (
+            <View style={themed($section)}>
+              <Text tx="play:newGame.hostOn" preset="subheading" accessibilityRole="header" />
+              <SegmentedControl
+                testID="host-on"
+                accessibilityLabel={translate("play:newGame.hostOn")}
+                segments={[
+                  { id: "cloud", label: translate("play:newGame.cloud") },
+                  { id: "nearby", label: translate("play:newGame.nearby") },
+                ]}
+                selectedId={hostOn}
+                onSelect={(value) => setHostOn(value === "nearby" ? "nearby" : "cloud")}
+              />
+            </View>
+          ) : null}
+          {hostedResumable ? (
+            <View style={themed($section)}>
+              <Button
+                testID="resume-hosted-connected-button"
+                tx="play:newGame.resumeHostedGame"
+                onPress={() => onResumeConnected?.(hostedResumable)}
+              />
+            </View>
+          ) : null}
 
           {!connectedMode ? (
             <View style={themed($section)}>
@@ -852,7 +829,7 @@ function NewGameForm({
             {
               // why: on iOS the status row's tap target can overlap the home indicator inset; Android's inset can be a tappable nav bar.
               paddingBottom:
-                statusText && Platform.OS === "ios"
+                (statusText || joinInFooter) && Platform.OS === "ios"
                   ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
                   : Math.max(bottom, spacing.sm),
             },
@@ -945,6 +922,22 @@ function NewGameForm({
                 />
               ) : null}
             </View>
+            {joinInFooter ? (
+              <TouchableOpacity
+                testID="join-with-code-button"
+                accessibilityRole="button"
+                style={[themed($statusRow), themed($resumeAction)]}
+                onPress={onJoin}
+              >
+                <Text
+                  tx="play:newGame.joinWithCode"
+                  size="xs"
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
+                  style={themed($resumeText)}
+                />
+              </TouchableOpacity>
+            ) : null}
             {/* why: an empty row is dead space above the home indicator, so a late status grows the footer once instead. */}
             {statusText ? (
               <TouchableOpacity
@@ -1354,7 +1347,6 @@ const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.surface,
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $recentLabel = { style: { flexShrink: 0 } }
 const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

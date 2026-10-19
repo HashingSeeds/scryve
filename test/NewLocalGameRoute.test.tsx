@@ -97,7 +97,7 @@ describe("new local game route", () => {
   })
   afterEach(() => localGameRepository.clearActiveGame())
 
-  it("opens on the newest setup for the tab, so Start replays it", () => {
+  it("opens on the newest setup for the tab and swaps in the other tab's, so Start replays it", () => {
     const game = {
       players: [
         { name: "Ada", color: "#B85636" },
@@ -132,11 +132,42 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getByTestId("recent-setup")).toHaveTextContent("CommanderMagic · Ada, Grace✓")
-    expect(view.getByTestId("recent-setup").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(view.getByTestId("mode-connected"))
+    expect(view.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
+    expect(view.getByText("5 seats · 40 life")).toBeTruthy()
+    fireEvent.press(view.getByTestId("mode-local"))
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(router.dismissTo).toHaveBeenCalled()
     expect(localGameRepository.loadRecentSetups()[0]).toMatchObject({ mode: "local", game })
+  })
+
+  it("keeps a picked format instead of the other tab's setup when switching tabs", () => {
+    localGameRepository.rememberSetup(
+      {
+        mode: "connected",
+        lobby: {
+          playerCount: 5,
+          startingLife: 40,
+          ruleset: "commander",
+          system: "mtg",
+          format: "commander",
+          layout: "auto",
+          lifeStep: 1,
+        },
+      },
+      1,
+    )
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-tab-ygo"))
+    fireEvent.press(view.getByTestId("mode-connected"))
+    expect(view.getByTestId("game-type-ygo-advanced").props.accessibilityState.selected).toBe(true)
+    expect(view.getByText("2 seats · 8000 Life Points")).toBeTruthy()
   })
 
   it("connects setup to persisted current-game navigation", () => {
@@ -459,6 +490,7 @@ describe("new local game route while signed in", () => {
         <NewLocalGameRoute />
       </ThemeProvider>,
     )
+    fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-commander"))
     fireEvent.press(view.getByTestId("me-seat"))
     fireEvent.press(view.getByTestId("me-seat-option-1"))

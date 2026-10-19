@@ -3,7 +3,6 @@ import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import {
   MAX_RECENT_SETUPS,
   parseRecentSetup,
-  recentSetupLabel,
   withRecentSetup,
   type NewRecentSetup,
 } from "./recentSetups"
@@ -93,11 +92,6 @@ describe("recent setups", () => {
     repository.saveActiveGame(createLocalGame({ players, startingLife: 40, system: "fab" }))
     expect(repository.loadActiveGame()?.players.map(({ life }) => life)).toEqual([38, 40])
     expect(repository.loadActiveGame()?.players[0].startingLife).toBe(38)
-  })
-
-  it("names a setup by its game type", () => {
-    expect(recentSetupLabel({ savedAt: 1, ...treachery })).toBe("Treachery")
-    expect(recentSetupLabel({ savedAt: 1, ...local(["Ada", "Grace"]) })).toBe("Commander")
   })
 
   it("keeps a Lorcana setup that starts at 0 lore", () => {

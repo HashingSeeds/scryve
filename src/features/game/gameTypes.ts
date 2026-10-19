@@ -98,6 +98,40 @@ export function newGameTypes({
   }
 }
 
+export interface GameTab {
+  system?: PlaySystemId
+  types: readonly GameType[]
+}
+
+// why: ranking only by what was played, never by the current pick, keeps tabs from moving under a player's taps.
+export function newGameTabs({
+  chosen,
+  recent,
+  connected,
+}: {
+  chosen?: Played
+  recent: readonly Played[]
+  connected: boolean
+}): GameTab[] {
+  const offered = [...FEATURED_GAME_TYPES, ...MORE_GAME_TYPES].filter(
+    (type) => connected || type.variant !== "treachery",
+  )
+  const playedIds = [...recent, ...(chosen ? [chosen] : [])].map((played) =>
+    gameTypeId(played.system, played.format, played.variant === "treachery"),
+  )
+  const systems = [
+    ...new Set([chosen?.system, ...recent.map((played) => played.system), ...VISIBLE_SYSTEM_IDS]),
+  ].filter((system): system is PlaySystemId => system !== undefined && isSystemVisible(system))
+  return [
+    ...systems.map((system) => {
+      const types = offered.filter((type) => type.system === system)
+      const played = [...new Set(playedIds)].flatMap((id) => types.filter((type) => type.id === id))
+      return { system, types: [...played, ...types.filter((type) => !played.includes(type))] }
+    }),
+    { types: offered.filter((type) => !type.system) },
+  ]
+}
+
 export function gameTypeLabel(type: GameType) {
   if (type.variant === "treachery") return translate("connected:treachery.name")
   if (!type.system) return translate("systems:noSystem")
