@@ -21,25 +21,42 @@ function wait(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 }
 
+function scryfallRateLimited(retryAfterMs: number): never {
+  throw new ConvexError({
+    code: "scryfall_rate_limited",
+    message: "Scryfall requests are paused. Try again shortly.",
+    retryAfterMs,
+  })
+}
+
+const ACQUIRE_ATTEMPTS = 5
+
+async function acquireScryfallSlot(ctx: ActionCtx, path: string) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await ctx.runMutation(internal.externalApiRateLimits.acquireScryfall, { path })
+    } catch (error) {
+      /** why: every request writes the shared schedule, so a burst can outlast Convex's own write-conflict retries; acquireScryfall throws nothing else. */
+      if (error instanceof ConvexError || attempt === ACQUIRE_ATTEMPTS) throw error
+      await wait(Math.random() * 100 * attempt)
+    }
+  }
+}
+
 export async function fetchScryfall(
   ctx: ActionCtx,
   path: string,
   options: ScryfallRequestOptions = {},
 ) {
-  const deadline = Date.now() + 10_000
-  while (true) {
-    const { waitMs, blocked } = await ctx.runMutation(
-      internal.externalApiRateLimits.acquireScryfall,
-      { path },
-    )
-    if (blocked || (waitMs > 0 && Date.now() + waitMs > deadline))
-      throw new ConvexError({
-        code: "scryfall_rate_limited",
-        message: "Scryfall requests are paused. Try again shortly.",
-        retryAfterMs: waitMs,
-      })
-    if (waitMs === 0) break
+  const { waitMs, blocked } = await acquireScryfallSlot(ctx, path)
+  if (blocked) scryfallRateLimited(waitMs)
+  if (waitMs > 0) {
     await wait(waitMs)
+    const cooldownUntil = await ctx.runQuery(
+      internal.externalApiRateLimits.scryfallCooldownUntil,
+      {},
+    )
+    if (cooldownUntil > Date.now()) scryfallRateLimited(cooldownUntil - Date.now())
   }
   const response = await fetch(`${SCRYFALL_BASE_URL}${path}`, {
     method: options.method,

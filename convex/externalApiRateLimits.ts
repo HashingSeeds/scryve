@@ -1,8 +1,12 @@
-import { RateLimiter } from "@convex-dev/rate-limiter"
 import { ConvexError, v } from "convex/values"
 
-import { components } from "./_generated/api"
-import { internalMutation } from "./_generated/server"
+import type { Doc } from "./_generated/dataModel"
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server"
 
 const MAX_INTERVAL_MS = 60_000
 
@@ -51,41 +55,72 @@ export const block = internalMutation({
   },
 })
 
-const scryfallLimiter = new RateLimiter(components.rateLimiter, {
-  scryfallGlobal: { kind: "token bucket", rate: 1, period: 125, capacity: 1 },
+/** why: a request may queue at most this long; later slots are refused instead of held. */
+const SCRYFALL_MAX_WAIT_MS = 10_000
+const GLOBAL_SLOT_MS = 125
+/** why: slot rows are reused each lap; one more lap than a wait window spans keeps a held slot from reading as free. */
+const GLOBAL_SLOTS = SCRYFALL_MAX_WAIT_MS / GLOBAL_SLOT_MS + 2
+
+/** why: requests leave on different servers after timers, so spacing exactly at Scryfall's per-endpoint limit drew a 429 under load. */
+const SEND_JITTER_MARGIN_MS = 50
+
+function scryfallEndpoint(path: string) {
+  const endpoint = path.split("?")[0]
+  if (["/cards/search", "/cards/named", "/cards/random", "/cards/collection"].includes(endpoint))
+    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 500 + SEND_JITTER_MARGIN_MS }
+  if (endpoint === "/cards/manifest")
+    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 6000 + SEND_JITTER_MARGIN_MS }
+  return { bucket: "scryfall:endpoint:default", intervalMs: 100 }
+}
+
+async function bucketRow(ctx: QueryCtx, bucket: string) {
+  return await ctx.db
+    .query("externalApiRateLimits")
+    .withIndex("by_bucket", (q) => q.eq("bucket", bucket))
+    .unique()
+}
+
+async function writeBucket(
+  ctx: MutationCtx,
+  existing: Doc<"externalApiRateLimits"> | null,
+  value: { bucket: string; nextRequestAt: number },
+) {
+  if (existing) await ctx.db.replace(existing._id, value)
+  else await ctx.db.insert("externalApiRateLimits", value)
+}
+
+/** why: a query, so requests already holding a slot check for a 429 cooldown without write conflicts. */
+export const scryfallCooldownUntil = internalQuery({
+  args: {},
+  handler: async (ctx) => (await bucketRow(ctx, "scryfall:cooldown"))?.nextRequestAt ?? 0,
 })
 
+/**
+ * why: one request time must satisfy both the shared and the endpoint quota. Reserving each
+ * separately and waiting for the later one lets two searches fire 125 ms apart.
+ */
 export const acquireScryfall = internalMutation({
   args: { path: v.string() },
   handler: async (ctx, { path }) => {
-    const cooldown = await ctx.db
-      .query("externalApiRateLimits")
-      .withIndex("by_bucket", (q) => q.eq("bucket", "scryfall:cooldown"))
-      .unique()
-    const cooldownMs = Math.max(0, (cooldown?.nextRequestAt ?? 0) - Date.now())
-    if (cooldownMs > 0) return { waitMs: cooldownMs, blocked: true }
+    const now = Date.now()
+    const cooldownUntil = (await bucketRow(ctx, "scryfall:cooldown"))?.nextRequestAt ?? 0
+    if (cooldownUntil > now) return { waitMs: cooldownUntil - now, blocked: true }
 
-    const endpoint = path.split("?")[0]
-    const period = ["/cards/search", "/cards/named", "/cards/random", "/cards/collection"].includes(
-      endpoint,
-    )
-      ? 500
-      : endpoint === "/cards/manifest"
-        ? 6000
-        : 100
-    const options = {
-      key: period === 100 ? "default" : endpoint,
-      config: { kind: "token bucket" as const, rate: 1, period, capacity: 1 },
+    const endpoint = scryfallEndpoint(path)
+    const endpointRow = await bucketRow(ctx, endpoint.bucket)
+    const earliest = Math.max(now, endpointRow?.nextRequestAt ?? now)
+    for (let slot = Math.ceil(earliest / GLOBAL_SLOT_MS); ; slot += 1) {
+      const requestAt = slot * GLOBAL_SLOT_MS
+      if (requestAt - now > SCRYFALL_MAX_WAIT_MS) return { waitMs: requestAt - now, blocked: true }
+      const slotBucket = `scryfall:slot:${slot % GLOBAL_SLOTS}`
+      const slotRow = await bucketRow(ctx, slotBucket)
+      if (slotRow?.nextRequestAt === requestAt) continue
+      await writeBucket(ctx, slotRow, { bucket: slotBucket, nextRequestAt: requestAt })
+      await writeBucket(ctx, endpointRow, {
+        bucket: endpoint.bucket,
+        nextRequestAt: requestAt + endpoint.intervalMs,
+      })
+      return { waitMs: requestAt - now, blocked: false }
     }
-    const global = await scryfallLimiter.check(ctx, "scryfallGlobal")
-    const specific = await scryfallLimiter.check(ctx, "scryfallEndpoint", options)
-    const waitMs = Math.max(
-      global.ok ? 0 : global.retryAfter,
-      specific.ok ? 0 : specific.retryAfter,
-    )
-    if (waitMs > 0) return { waitMs, blocked: false }
-    await scryfallLimiter.limit(ctx, "scryfallGlobal")
-    await scryfallLimiter.limit(ctx, "scryfallEndpoint", options)
-    return { waitMs: 0, blocked: false }
   },
 })
