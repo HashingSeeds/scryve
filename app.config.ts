@@ -156,8 +156,12 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
       const assets = appIconAssets(name)
       return {
         name,
-        ios: assets.ios,
-        android: { foregroundImage: assets.androidForeground, backgroundColor: background },
+        ios: { light: assets.ios, dark: assets.iosDark, tinted: assets.iosTinted },
+        android: {
+          foregroundImage: assets.androidForeground,
+          monochromeImage: assets.androidMonochrome,
+          backgroundColor: background,
+        },
       }
     }),
   ])

@@ -50,7 +50,6 @@ export default {
       heading: "アプリアイコン",
       changeFailed: "アプリアイコンを変更できませんでした。もう一度お試しください。",
       lockedPro: "{{name}}、Scryve Pro",
-      lockedFoil: "{{name}}、Scryve Foil",
       opensPro: "Scryve Proを開きます",
       opensSignIn: "サインインを開きます",
       names: {

@@ -8,18 +8,43 @@ const MARK_CENTER = 22
 const SWORD_GLYPH_BOUNDS = { left: 6.8, right: 17.2, top: 2.5, bottom: 21.5 }
 
 describe("PlayerMark", () => {
-  it.each(["heart", "plus", "shield", "crown", "flame", "bolt", "eye"] as const)(
-    "renders the new %s mark and its sword",
-    (shape) => {
-      const view = render(
-        <PlayerMark seatNumber={1} color="#FFFFFF" shape={shape} insetSwordColor="#117B9C" />,
+  it.each([
+    "heart",
+    "plus",
+    "shield",
+    "crown",
+    "flame",
+    "bolt",
+    "eye",
+    "skull",
+    "spade",
+    "gem",
+    "tower",
+  ] as const)("renders the new %s mark and its sword", (shape) => {
+    const view = render(
+      <PlayerMark seatNumber={1} color="#FFFFFF" shape={shape} insetSwordColor="#117B9C" />,
+    )
+    expect(
+      view.getByTestId(`player-mark-shape-${shape}`, { includeHiddenElements: true }),
+    ).toBeTruthy()
+    expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
+  })
+  it.each(["skull", "gem"] as const)("drops the %s's cut-outs behind a sword", (shape) => {
+    const subpaths = (insetSwordColor?: string) =>
+      render(
+        <PlayerMark
+          seatNumber={1}
+          color="#FFFFFF"
+          shape={shape}
+          insetSwordColor={insetSwordColor}
+        />,
       )
-      expect(
-        view.getByTestId(`player-mark-shape-${shape}`, { includeHiddenElements: true }),
-      ).toBeTruthy()
-      expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
-    },
-  )
+        .getByTestId(`player-mark-shape-${shape}`, { includeHiddenElements: true })
+        .props.d.split("Z")
+        .filter(Boolean).length
+    expect(subpaths("#117B9C")).toBeLessThan(subpaths())
+  })
+
   it.each([
     [1, "heart"],
     [2, "triangle"],

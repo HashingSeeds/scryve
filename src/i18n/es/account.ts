@@ -52,7 +52,6 @@ export default {
       heading: "Icono de la app",
       changeFailed: "No se pudo cambiar el icono de la app. Inténtalo de nuevo.",
       lockedPro: "{{name}}, Scryve Pro",
-      lockedFoil: "{{name}}, Scryve Foil",
       opensPro: "Abre Scryve Pro",
       opensSignIn: "Abre el inicio de sesión",
       names: {

@@ -192,6 +192,10 @@ const board = {
     flame: "flame",
     bolt: "bolt",
     eye: "eye",
+    skull: "skull",
+    spade: "spade",
+    gem: "gem",
+    tower: "tower",
   },
   savedToast: {
     gameSaved: "Game saved",

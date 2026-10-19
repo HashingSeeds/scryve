@@ -8,6 +8,7 @@ import {
   APP_ICON_VARIANTS,
   appIconAssets,
   type AppIconSpec,
+  type Paint,
 } from "../src/features/appIcon/appIconVariants"
 
 const PENTAGON =
@@ -40,53 +41,168 @@ const SHEEN_STOPS = [
   [1, 0.18],
 ] as const
 
-function tiles(variant: AppIconSpec) {
+// why: each icon collects its own gradients, patterns, and clips while drawing, so specs only name colors.
+function defsFor(boardRadius: number) {
+  const defs = new Map<string, string>()
+  const add = (id: string, markup: string) => {
+    if (!defs.has(id)) defs.set(id, markup)
+    return `url(#${id})`
+  }
+  return {
+    markup: () => [...defs.values()].join("\n    "),
+    paint: (value: Paint) =>
+      typeof value === "string"
+        ? value
+        : add(
+            `paint-${value.join("-").replaceAll("#", "")}`,
+            `<linearGradient id="paint-${value.join("-").replaceAll("#", "")}" x1="54" y1="54" x2="458" y2="458" gradientUnits="userSpaceOnUse">${value
+              .map(
+                (color, index) =>
+                  `<stop offset="${index / (value.length - 1)}" stop-color="${color}"/>`,
+              )
+              .join("")}</linearGradient>`,
+          ),
+    // why: a ring cut at an inset follows the board corner shrunk by that inset, so on Android's rounder board every ring stays parallel to the outer one.
+    clip: (inset: number) =>
+      add(
+        `board-${inset}`,
+        `<clipPath id="board-${inset}"><rect x="${54 + inset}" y="${54 + inset}" width="${404 - 2 * inset}" height="${404 - 2 * inset}" rx="${boardRadius - inset}"/></clipPath>`,
+      ),
+    button: () => add("button", `<clipPath id="button"><path d="${PENTAGON}"/></clipPath>`),
+    stripes: (index: number, color: string, y: number) =>
+      add(
+        `stripes-${index}-${color.replace("#", "")}`,
+        `<pattern id="stripes-${index}-${color.replace("#", "")}" y="${y}" width="512" height="26" patternUnits="userSpaceOnUse"><rect width="512" height="13" fill="${color}"/></pattern>`,
+      ),
+    glow: () =>
+      add(
+        "glow",
+        `<filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>`,
+      ),
+    grayscale: () =>
+      add(
+        "grayscale",
+        `<filter id="grayscale"><feColorMatrix type="saturate" values="0"/></filter>`,
+      ),
+    mask: (id: string, content: string) =>
+      add(
+        id,
+        `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#000000"/>${content}</mask>`,
+      ),
+    grid: () =>
+      add(
+        "grid",
+        `<pattern id="grid" x="54" y="54" width="21" height="21" patternUnits="userSpaceOnUse"><path d="M21 0H0V21" fill="none" stroke="#FFFFFF" stroke-opacity="0.13" stroke-width="2"/></pattern>`,
+      ),
+  }
+}
+
+type Defs = ReturnType<typeof defsFor>
+type IconArt = Omit<AppIconSpec, "tier">
+type Look = keyof ReturnType<typeof appIconAssets>
+
+// why: white wherever the icon paints anything but its own background, so masking with it turns the painted-over holes and button gap into real transparency. A monochrome layer is one flat shape, so it also cuts the menu lines out of a filled button and drops soft effects.
+function silhouette(variant: IconArt, monochrome: boolean): IconArt {
+  const filledButton = (variant.button ?? "#36333D") !== variant.background
+  return {
+    ...variant,
+    background: "#000000",
+    tiles: variant.tiles.map(() => "#FFFFFF"),
+    innerRing: variant.innerRing ? "#FFFFFF" : undefined,
+    button: filledButton ? "#FFFFFF" : "#000000",
+    buttonRing: variant.buttonRing ? "#FFFFFF" : undefined,
+    lines: monochrome && filledButton ? "#000000" : "#FFFFFF",
+    sheen: false,
+    glow: variant.glow && !monochrome,
+    grid: variant.grid && !monochrome,
+  }
+}
+
+// why: tinted icons are colored by brightness alone, so seats go full bright to stay readable against the darker button.
+function tintable(variant: IconArt): IconArt {
+  return {
+    ...variant,
+    tiles: variant.tiles.map(() => "#FFFFFF"),
+    innerRing: variant.innerRing ? "#8A8A8E" : undefined,
+    buttonRing: variant.buttonRing ? "#FFFFFF" : undefined,
+    sheen: false,
+  }
+}
+
+// why: an icon drawn for a light background, like Pencil, loses its dark lines on the system's dark background, so it borrows its dark sibling's art there.
+function onDarkBackground(variant: IconArt): IconArt {
+  if (!variant.darkTwin) return variant
+  const twin = APP_ICON_VARIANTS.find(({ name }) => name === variant.darkTwin)
+  if (!twin) throw new Error(`${variant.name}: no icon named ${variant.darkTwin}`)
+  return twin
+}
+
+function tiles(variant: IconArt, defs: Defs) {
   const layout = LAYOUTS[variant.tiles.length]
   if (!layout) throw new Error(`${variant.name}: no board layout for ${variant.tiles.length} tiles`)
   return layout.flatMap(([x, y, width, height], index) => {
     const radius = Math.min(54, Math.round(height * 0.36))
-    const shape = `x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}"`
-    const color = variant.tiles[index]
-    const tile = `<rect ${shape} fill="${color}"/>`
-    // why: a stroked outline gets its outer corners cut off by Android's rounder board clip, so the hole is painted over inside an inset board clip instead.
-    if (variant.outline) {
-      const hole = `<rect x="${x + 10}" y="${y + 10}" width="${width - 20}" height="${height - 20}" rx="${radius - 10}" fill="${variant.background}" clip-path="url(#inner)"/>`
-      return [tile, hole]
-    }
-    return variant.sheen ? [tile, `<rect ${shape} fill="url(#sheen)"/>`] : [tile]
+    const box = (inset: number, fill: string) =>
+      `<rect x="${x + inset}" y="${y + inset}" width="${width - 2 * inset}" height="${height - 2 * inset}" rx="${radius - inset}" fill="${fill}"${inset ? ` clip-path="${defs.clip(inset)}"` : ""}/>`
+    const tile = variant.tiles[index]
+    const color =
+      variant.stripes && typeof tile === "string" ? defs.stripes(index, tile, y) : defs.paint(tile)
+    // why: a stroked outline gets its outer corners cut off by Android's rounder board clip so rings are holes painted over inside inset board clips instead.
+    const rings = [box(0, color)]
+    if (variant.outline) rings.push(box(variant.outline, variant.background))
+    if (variant.innerRing) rings.push(box(22, variant.innerRing), box(31, variant.background))
+    if (variant.sheen) rings.push(box(0, "url(#sheen)"))
+    return rings
   })
 }
 
-function mark(variant: AppIconSpec) {
+function mark(variant: IconArt, defs: Defs) {
   const sheen = variant.sheen
     ? `<defs><linearGradient id="sheen" x1="54" y1="54" x2="458" y2="458" gradientUnits="userSpaceOnUse">${SHEEN_STOPS.map(
         ([offset, opacity]) =>
           `<stop offset="${offset}" stop-color="#FFFFFF" stop-opacity="${opacity}"/>`,
       ).join("")}</linearGradient></defs>`
     : ""
+  const board = tiles(variant, defs).join("\n      ")
+  const ring = variant.buttonRing
+    ? `<path d="${PENTAGON}" fill="none" stroke="${defs.paint(variant.buttonRing)}" stroke-width="16" stroke-linejoin="round" clip-path="${defs.button()}"/>`
+    : ""
   return `${sheen}
-    <g clip-path="url(#board)">
-      ${tiles(variant).join("\n      ")}
+    <g clip-path="${defs.clip(0)}">
+      ${variant.glow ? `<g filter="${defs.glow()}" opacity="0.9">${board}</g>` : ""}
+      ${board}
+      ${variant.grid ? `<rect x="54" y="54" width="404" height="404" fill="${defs.grid()}"/>` : ""}
     </g>
-    <path d="${PENTAGON}" fill="${variant.button ?? "#36333D"}" stroke="${variant.background}" stroke-width="20" stroke-linejoin="round" paint-order="stroke"/>
-    <g fill="${variant.lines ?? "#F4F2F1"}">
+    <path d="${PENTAGON}" fill="${defs.paint(variant.button ?? "#36333D")}" stroke="${variant.background}" stroke-width="20" stroke-linejoin="round" paint-order="stroke"/>
+    ${ring}
+    <g fill="${defs.paint(variant.lines ?? "#F4F2F1")}">
       <rect x="221" y="225" width="70" height="10" rx="5"/>
       <rect x="221" y="251" width="70" height="10" rx="5"/>
       <rect x="221" y="277" width="70" height="10" rx="5"/>
     </g>`
 }
 
-// why: iOS fills the whole square; Android draws only the foreground layer, shrunk into the adaptive icon safe zone with rounder board corners so circle masks keep the whole mark.
-function svg(variant: AppIconSpec, platform: "ios" | "android") {
-  const ios = platform === "ios"
+// why: iOS fills the whole square; Android draws only the foreground layer, shrunk into the adaptive icon safe zone with rounder board corners so circle masks keep the whole mark. iOS dark and tinted icons and Android's monochrome layer sit on a system background, so theirs is left transparent.
+function svg(icon: IconArt, look: Look) {
+  const ios = look.startsWith("ios")
+  const onDark = look === "iosDark" || look === "iosTinted" ? onDarkBackground(icon) : icon
+  const variant = look === "iosTinted" ? tintable(onDark) : onDark
+  const defs = defsFor(ios ? 54 : 120)
+  const shape = () =>
+    defs.mask(`shape-${look}`, mark(silhouette(variant, look === "androidMonochrome"), defs))
+  const art =
+    look === "ios" || look === "androidForeground"
+      ? mark(variant, defs)
+      : look === "androidMonochrome"
+        ? `<rect width="512" height="512" fill="#FFFFFF" mask="${shape()}"/>`
+        : `<g mask="${shape()}"${look === "iosTinted" ? ` filter="${defs.grayscale()}"` : ""}>${mark(variant, defs)}</g>`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
   <defs>
-    <clipPath id="board"><rect x="54" y="54" width="404" height="404" rx="${ios ? 54 : 120}"/></clipPath>
-    <clipPath id="inner"><rect x="64" y="64" width="384" height="384" rx="${ios ? 44 : 110}"/></clipPath>
+    ${defs.markup()}
   </defs>
-  ${ios ? `<rect width="512" height="512" fill="${variant.background}"/>` : ""}
+  ${look === "ios" ? `<rect width="512" height="512" fill="${variant.background}"/>` : ""}
   <g transform="${ios ? "" : "translate(256 256) scale(0.633) translate(-256 -256)"}">
-    ${mark(variant)}
+    ${art}
   </g>
 </svg>
 `
@@ -94,17 +210,15 @@ function svg(variant: AppIconSpec, platform: "ios" | "android") {
 
 const root = path.resolve(import.meta.dirname, "..")
 const scratch = mkdtempSync(path.join(tmpdir(), "scryve-app-icons-"))
-mkdirSync(path.join(root, "assets/images/app-icons"), { recursive: true })
-for (const variant of APP_ICON_VARIANTS) {
-  const assets = appIconAssets(variant.name)
-  for (const [platform, output] of [
-    ["ios", assets.ios],
-    ["android", assets.androidForeground],
-  ] as const) {
-    const source = path.join(scratch, `${variant.name}-${platform}.svg`)
-    writeFileSync(source, svg(variant, platform))
+function render(variant: IconArt, outputs: Partial<Record<Look, string>>) {
+  for (const [look, output] of Object.entries(outputs) as [Look, string][]) {
+    const source = path.join(scratch, `${variant.name}-${look}.svg`)
+    writeFileSync(source, svg(variant, look))
     execFileSync("inkscape", [source, "-o", path.join(root, output), "-w", "1024", "-h", "1024"], {
       stdio: "ignore",
     })
   }
 }
+
+mkdirSync(path.join(root, "assets/images/app-icons"), { recursive: true })
+for (const variant of APP_ICON_VARIANTS) render(variant, appIconAssets(variant.name))

@@ -39,6 +39,10 @@ export const MARK_ART_BOUNDS: Record<
   flame: { top: 8, bottom: 36, left: 11, right: 33 },
   bolt: { top: 7.75, bottom: 36.25, left: 10.25, right: 33.75 },
   eye: { top: 11.5, bottom: 32.5, left: 7.5, right: 36.5 },
+  skull: { top: 8, bottom: 35.5, left: 9, right: 35 },
+  spade: { top: 8, bottom: 36, left: 9, right: 35 },
+  gem: { top: 10, bottom: 34.96, left: 8.45, right: 35.55 },
+  tower: { top: 9, bottom: 36, left: 10.5, right: 33.5 },
 }
 export const MARK_VIEW_BOX = 44
 
@@ -199,6 +203,10 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   flame: { centerX: 22, centerY: 27, size: 12 },
   bolt: { centerX: 22, centerY: 22.5, size: 9 },
   eye: { centerX: 22, centerY: 22, size: 13 },
+  skull: { centerX: 22, centerY: 27.2, size: 14 },
+  spade: { centerX: 22, centerY: 22, size: 12 },
+  gem: { centerX: 22, centerY: 19.5, size: 13 },
+  tower: { centerX: 22, centerY: 24.5, size: 13 },
 }
 
 function CloseIconOverlay({
@@ -254,7 +262,18 @@ function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string })
 
 const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const
 
-/** why: a sword inset over the eye's hole would vanish into the card, so `solid` fills it. */
+const SKULL =
+  "M22 8C14.3 8 9 13.3 9 20.5c0 4 1.8 7 4.5 8.8V33.5a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-4.2C33.2 27.5 35 24.5 35 20.5 35 13.3 29.7 8 22 8Z"
+const SKULL_FACE =
+  "M20 20.5a3.6 3.6 0 1 1-7.2 0 3.6 3.6 0 1 1 7.2 0ZM31.2 20.5a3.6 3.6 0 1 1-7.2 0 3.6 3.6 0 1 1 7.2 0ZM22 24.6l1.9 3.4h-3.8ZM18.5 31.2V35.6H20.3V31.2ZM23.7 31.2V35.6H25.5V31.2Z"
+const SKULL_EYES_OVER_SWORD =
+  "M20 18.5a3.4 3.4 0 1 1-6.8 0 3.4 3.4 0 1 1 6.8 0ZM30.8 18.5a3.4 3.4 0 1 1-6.8 0 3.4 3.4 0 1 1 6.8 0Z"
+const GEM =
+  "M15.2 10H28.8A1.5 1.5 0 0 1 29.95 10.53L35.2 16.9A1.5 1.5 0 0 1 35.23 18.8L23.17 34.4A1.5 1.5 0 0 1 20.83 34.4L8.77 18.8A1.5 1.5 0 0 1 8.8 16.9L14.05 10.53A1.5 1.5 0 0 1 15.2 10Z"
+const GEM_FACETS =
+  "M9.4 19.15H34.6V17.25H9.4ZM17.5 10.61 14.8 17.91 16.4 18.49 19.1 11.19ZM24.9 11.19 27.6 18.49 29.2 17.91 26.5 10.61ZM14.82 18.53 20.42 31.83 21.98 31.17 16.38 17.87ZM27.62 17.87 22.02 31.17 23.58 31.83 29.18 18.53Z"
+
+/** why: a sword inset over the eye's hole or the gem's facets would get lost in the cut-outs, so `solid` draws the plain silhouette; the skull keeps raised eyes and lets the sword stand in for its nose and teeth. */
 function MarkShape({
   shape,
   color,
@@ -358,6 +377,30 @@ function MarkShape({
               ? ""
               : "M28.2 22A6.2 6.2 0 1 1 15.8 22 6.2 6.2 0 1 1 28.2 22ZM24.7 22A2.7 2.7 0 1 1 19.3 22 2.7 2.7 0 1 1 24.7 22Z"
           }`}
+        />
+      )
+    case "skull":
+      return (
+        <Path
+          {...common}
+          fillRule="evenodd"
+          d={SKULL + (solid ? SKULL_EYES_OVER_SWORD : SKULL_FACE)}
+        />
+      )
+    case "spade":
+      return (
+        <Path
+          {...common}
+          d="M22 8C26 13 35 17.5 35 24.2 35 28 32.2 30.6 28.8 30.6 26.6 30.6 24.6 29.6 23.5 28L25.4 34.8A1 1 0 0 1 24.4 36H19.6A1 1 0 0 1 18.6 34.8L20.5 28C19.4 29.6 17.4 30.6 15.2 30.6 11.8 30.6 9 28 9 24.2 9 17.5 18 13 22 8Z"
+        />
+      )
+    case "gem":
+      return <Path {...common} fillRule="evenodd" d={solid ? GEM : GEM + GEM_FACETS} />
+    case "tower":
+      return (
+        <Path
+          {...common}
+          d="M10.5 10A1 1 0 0 1 11.5 9H15A1 1 0 0 1 16 10V13H19.5V10A1 1 0 0 1 20.5 9H23.5A1 1 0 0 1 24.5 10V13H28V10A1 1 0 0 1 29 9H32.5A1 1 0 0 1 33.5 10V17L30.5 20V30.5L33 33V35A1 1 0 0 1 32 36H12A1 1 0 0 1 11 35V33L13.5 30.5V20L10.5 17Z"
         />
       )
   }

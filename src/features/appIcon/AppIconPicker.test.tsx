@@ -52,14 +52,22 @@ describe("AppIconPicker", () => {
     expect(setAlternateAppIcon).not.toHaveBeenCalled()
   })
 
-  it("lets Pro pick variants but keeps the Foil icon for Foil supporters", async () => {
+  it("lets Pro pick variants", async () => {
     const view = renderFor({ isSignedIn: true, isCountPro: true, isFoil: false })
-    fireEvent.press(view.getByTestId("app-icon-foil"))
-    expect(mockPresentPaywall).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("app-icon-midnight"))
     await waitFor(() =>
       expect(view.getByTestId("app-icon-midnight").props.accessibilityState.selected).toBe(true),
     )
     expect(setAlternateAppIcon).toHaveBeenCalledWith("Midnight")
+  })
+
+  it("shows the Foil icons to Foil supporters alone", () => {
+    const pro = renderFor({ isSignedIn: true, isCountPro: true, isFoil: false })
+    expect(pro.queryByTestId("app-icon-foil")).toBeNull()
+    expect(pro.queryByTestId("app-icon-gilded")).toBeNull()
+    pro.unmount()
+    const foil = renderFor({ isSignedIn: true, isCountPro: true, isFoil: true })
+    fireEvent.press(foil.getByTestId("app-icon-gilded"))
+    expect(setAlternateAppIcon).toHaveBeenCalledWith("Gilded")
   })
 })

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { ImageSourcePropType, ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { Image, Platform, TouchableOpacity, View } from "react-native"
+import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native"
 import {
   getAppIconName,
   setAlternateAppIcon,
@@ -47,9 +47,49 @@ const PREVIEWS: Record<AppIconName, Preview> = {
     ios: require("@assets/images/app-icons/bone-ios.png"),
     android: require("@assets/images/app-icons/bone-android-foreground.png"),
   },
+  Paper: {
+    ios: require("@assets/images/app-icons/paper-ios.png"),
+    android: require("@assets/images/app-icons/paper-android-foreground.png"),
+  },
+  Ash: {
+    ios: require("@assets/images/app-icons/ash-ios.png"),
+    android: require("@assets/images/app-icons/ash-android-foreground.png"),
+  },
+  Pencil: {
+    ios: require("@assets/images/app-icons/pencil-ios.png"),
+    android: require("@assets/images/app-icons/pencil-android-foreground.png"),
+  },
   Foil: {
     ios: require("@assets/images/app-icons/foil-ios.png"),
     android: require("@assets/images/app-icons/foil-android-foreground.png"),
+  },
+  Contour: {
+    ios: require("@assets/images/app-icons/contour-ios.png"),
+    android: require("@assets/images/app-icons/contour-android-foreground.png"),
+  },
+  Stripes: {
+    ios: require("@assets/images/app-icons/stripes-ios.png"),
+    android: require("@assets/images/app-icons/stripes-android-foreground.png"),
+  },
+  Neon: {
+    ios: require("@assets/images/app-icons/neon-ios.png"),
+    android: require("@assets/images/app-icons/neon-android-foreground.png"),
+  },
+  Blueprint: {
+    ios: require("@assets/images/app-icons/blueprint-ios.png"),
+    android: require("@assets/images/app-icons/blueprint-android-foreground.png"),
+  },
+  Gilded: {
+    ios: require("@assets/images/app-icons/gilded-ios.png"),
+    android: require("@assets/images/app-icons/gilded-android-foreground.png"),
+  },
+  Prism: {
+    ios: require("@assets/images/app-icons/prism-ios.png"),
+    android: require("@assets/images/app-icons/prism-android-foreground.png"),
+  },
+  Holo: {
+    ios: require("@assets/images/app-icons/holo-ios.png"),
+    android: require("@assets/images/app-icons/holo-android-foreground.png"),
   },
 }
 const DEFAULT_PREVIEW: Preview = {
@@ -76,6 +116,14 @@ export function AppIconPicker() {
     }
   }
 
+  const variantOption = ({ name, tier, background }: (typeof APP_ICON_VARIANTS)[number]) => ({
+    name,
+    id: name.toLowerCase(),
+    label: translate(`account:settings.appIcon.names.${name}`),
+    preview: PREVIEWS[name],
+    background,
+    locked: tier === "pro" && !billing.isCountPro,
+  })
   const options = [
     {
       name: null,
@@ -85,69 +133,73 @@ export function AppIconPicker() {
       background: "#000000",
       locked: false,
     },
-    ...APP_ICON_VARIANTS.map(({ name, tier, background }) => ({
-      name,
-      id: name.toLowerCase(),
-      label: translate(`account:settings.appIcon.names.${name}`),
-      preview: PREVIEWS[name],
-      background,
-      locked: tier === "foil" ? !billing.isFoil : !billing.isCountPro,
-    })),
+    ...APP_ICON_VARIANTS.filter(({ tier }) => tier === "pro").map(variantOption),
   ]
+  const foilOptions = billing.isFoil
+    ? APP_ICON_VARIANTS.filter(({ tier }) => tier === "foil").map(variantOption)
+    : []
+
+  const renderOption = ({
+    name,
+    id,
+    label,
+    preview,
+    background,
+    locked,
+  }: (typeof options)[number]) => {
+    const selected = name === current
+    return (
+      <TouchableOpacity
+        key={id}
+        testID={`app-icon-${id}`}
+        accessibilityRole="radio"
+        accessibilityLabel={
+          locked ? translate("account:settings.appIcon.lockedPro", { name: label }) : label
+        }
+        accessibilityHint={
+          locked
+            ? translate(
+                auth.isSignedIn
+                  ? "account:settings.appIcon.opensPro"
+                  : "account:settings.appIcon.opensSignIn",
+              )
+            : undefined
+        }
+        accessibilityState={{ selected, disabled: locked && planLoading }}
+        disabled={locked && planLoading}
+        activeOpacity={0.75}
+        style={[$option, locked && $locked]}
+        onPress={() => {
+          if (!locked) void choose(name)
+          else if (auth.isSignedIn) void billing.presentPaywall()
+          else auth.openAuth()
+        }}
+      >
+        <View style={[themed($frame), selected && themed($selectedFrame)]}>
+          <View style={[$mask, { backgroundColor: background }]}>
+            <Image
+              source={ANDROID ? preview.android : preview.ios}
+              style={ANDROID ? $androidForeground : $preview}
+            />
+            <View pointerEvents="none" style={themed($edge)} />
+          </View>
+        </View>
+        <Text size="xxs" text={label} style={themed($label)} />
+      </TouchableOpacity>
+    )
+  }
 
   return (
     <View style={themed($picker)}>
       <Text tx="account:settings.appIcon.heading" preset="subheading" accessibilityRole="header" />
-      <View accessibilityRole="radiogroup" style={themed($row)}>
-        {options.map(({ name, id, label, preview, background, locked }) => {
-          const selected = name === current
-          return (
-            <TouchableOpacity
-              key={id}
-              testID={`app-icon-${id}`}
-              accessibilityRole="radio"
-              accessibilityLabel={
-                locked
-                  ? translate(
-                      name === "Foil"
-                        ? "account:settings.appIcon.lockedFoil"
-                        : "account:settings.appIcon.lockedPro",
-                      { name: label },
-                    )
-                  : label
-              }
-              accessibilityHint={
-                locked
-                  ? translate(
-                      auth.isSignedIn
-                        ? "account:settings.appIcon.opensPro"
-                        : "account:settings.appIcon.opensSignIn",
-                    )
-                  : undefined
-              }
-              accessibilityState={{ selected, disabled: locked && planLoading }}
-              disabled={locked && planLoading}
-              activeOpacity={0.75}
-              style={[$option, locked && $locked]}
-              onPress={() => {
-                if (!locked) void choose(name)
-                else if (auth.isSignedIn) void billing.presentPaywall()
-                else auth.openAuth()
-              }}
-            >
-              <View style={[themed($frame), selected && themed($selectedFrame)]}>
-                {ANDROID ? (
-                  <View style={[$androidMask, { backgroundColor: background }]}>
-                    <Image source={preview.android} style={$androidForeground} />
-                  </View>
-                ) : (
-                  <Image source={preview.ios} style={$preview} />
-                )}
-              </View>
-              <Text size="xxs" text={label} style={themed($label)} />
-            </TouchableOpacity>
-          )
-        })}
+      <View accessibilityRole="radiogroup" style={themed($picker)}>
+        <View style={themed($row)}>{options.map(renderOption)}</View>
+        {foilOptions.length > 0 ? (
+          <>
+            <Text tx="account:settings.appIcon.foilHeading" size="xs" weight="medium" />
+            <View style={themed($row)}>{foilOptions.map(renderOption)}</View>
+          </>
+        ) : null}
       </View>
       {error ? <Text accessibilityRole="alert" size="xs" text={error} /> : null}
     </View>
@@ -169,8 +221,20 @@ const $frame: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.transparent,
 })
 const $selectedFrame: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
-const $preview: ImageStyle = { width: 56, height: 56, borderRadius: 13 }
+const $preview: ImageStyle = { width: 56, height: 56 }
 // why: an adaptive foreground is a 108dp canvas whose launcher mask shows only the middle 72dp, so the image is drawn at 1.5x and centered under a circle.
-const $androidMask: ViewStyle = { width: 56, height: 56, borderRadius: 28, overflow: "hidden" }
 const $androidForeground: ImageStyle = { width: 84, height: 84, margin: -14 }
+const $mask: ViewStyle = {
+  width: 56,
+  height: 56,
+  borderRadius: ANDROID ? 28 : 13,
+  overflow: "hidden",
+}
+// why: an icon whose background matches the page would lose its edge without this outline.
+const $edge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  ...StyleSheet.absoluteFill,
+  borderRadius: ANDROID ? 28 : 13,
+  borderWidth: 1,
+  borderColor: colors.border,
+})
 const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

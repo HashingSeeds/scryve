@@ -62,7 +62,10 @@
         "image": "./assets/images/app-icon-android-adaptive-foreground.png",
         "imageWidth": 300,
         "resizeMode": "contain",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#000000",
+        "ios": {
+          "image": "./assets/images/splash-ios.png"
+        }
       }
     ],
     [

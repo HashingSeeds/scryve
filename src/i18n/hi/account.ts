@@ -50,7 +50,6 @@ export default {
       heading: "ऐप आइकन",
       changeFailed: "ऐप आइकन नहीं बदला जा सका। कृपया फिर से कोशिश करें।",
       lockedPro: "{{name}}, Scryve Pro",
-      lockedFoil: "{{name}}, Scryve Foil",
       opensPro: "Scryve Pro खोलता है",
       opensSignIn: "साइन इन खोलता है",
       names: {

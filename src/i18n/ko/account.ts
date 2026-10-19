@@ -50,7 +50,6 @@ export default {
       heading: "앱 아이콘",
       changeFailed: "앱 아이콘을 변경할 수 없습니다. 다시 시도하세요.",
       lockedPro: "{{name}}, Scryve Pro",
-      lockedFoil: "{{name}}, Scryve Foil",
       opensPro: "Scryve Pro 열기",
       opensSignIn: "로그인 열기",
       names: {

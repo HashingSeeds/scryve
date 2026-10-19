@@ -160,6 +160,10 @@ const connected = {
       flame: "flame",
       bolt: "bolt",
       eye: "eye",
+      skull: "skull",
+      spade: "spade",
+      gem: "gem",
+      tower: "tower",
     },
   },
   blockedPlayers: {
