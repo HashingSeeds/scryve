@@ -68,7 +68,8 @@
     "android:production": "node scripts/native.cjs android:production",
     "ota:preview": "env APP_VARIANT=preview npx eas-cli@$npm_package_config_easCli update --channel preview --environment preview",
     "release:promote": "node scripts/release-train.cjs promote",
-    "release:native": "node scripts/release-native.cjs cloud"
+    "release:native": "node scripts/release-native.cjs cloud",
+    "release:live": "node scripts/release-native.cjs live"
   },
   "dependencies": {
     "@clerk/expo": "4.10.1",

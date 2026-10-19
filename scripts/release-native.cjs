@@ -148,9 +148,64 @@ function settleVersion() {
   return plan.version
 }
 
+function storeRuntime(platform, version) {
+  const [build] = JSON.parse(
+    execFileSync(
+      "npx",
+      [
+        "--yes",
+        easCli,
+        "build:list",
+        "--platform",
+        platform,
+        "--build-profile",
+        "production",
+        "--status",
+        "finished",
+        "--app-version",
+        version,
+        "--limit",
+        "1",
+        "--json",
+      ],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+    ),
+  )
+  return build?.runtime?.version ?? null
+}
+
+function recordLive(args) {
+  const version = args.find((arg) => /^\d/.test(arg)) ?? readVersion()
+  const platforms = args.filter((arg) => arg === "android" || arg === "ios")
+  // why: recording mid-rollout sends players to a store page with no update for them, so it previews by default.
+  const write = args.includes("--yes")
+  let previewed = false
+  for (const platform of platforms.length ? platforms : ["android", "ios"]) {
+    const runtimeVersion = storeRuntime(platform, version)
+    if (!runtimeVersion) {
+      console.log(`${platform}: no finished production build of ${version} on EAS, skipped.`)
+      continue
+    }
+    const record = JSON.stringify({ platform, version, runtimeVersion })
+    if (!write) {
+      console.log(`${platform}: would record ${record}`)
+      previewed = true
+      continue
+    }
+    execFileSync("npx", ["convex", "run", "--prod", "storeReleases:setLive", record], {
+      cwd: root,
+      stdio: "inherit",
+    })
+    console.log(`${platform}: recorded ${record}`)
+  }
+  if (previewed)
+    console.log("Once the rollout reaches everyone, run again with --yes to record it.")
+}
+
 function main() {
-  const [command] = process.argv.slice(2)
+  const [command, ...args] = process.argv.slice(2)
   if (command === "version") return void settleVersion()
+  if (command === "live") return recordLive(args)
   if (command === "cloud") {
     const version = settleVersion()
     console.log(`Building ${version} for iOS and Android on EAS.`)
@@ -161,7 +216,9 @@ function main() {
     )
     return
   }
-  throw new Error("Usage: release-native.cjs version | cloud")
+  throw new Error(
+    "Usage: release-native.cjs version | cloud | live [version] [android|ios] [--yes]",
+  )
 }
 
 if (require.main === module) {
