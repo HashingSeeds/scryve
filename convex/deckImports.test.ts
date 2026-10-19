@@ -1178,7 +1178,27 @@ describe("Scryfall request pacing", () => {
       expect(await acquire("/cards/example")).toEqual({ waitMs: 0, blocked: false })
       expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
       expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 250, blocked: false })
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 500, blocked: false })
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 750, blocked: false })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  it("keeps endpoint spacing while the shared queue is busy", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const acquire = (path: string) =>
+        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
+      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 0, blocked: false })
+      for (let request = 1; request <= 7; request += 1)
+        expect(await acquire(`/cards/example-${request}`)).toEqual({
+          waitMs: request * 125,
+          blocked: false,
+        })
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 1000, blocked: false })
+      expect(await acquire("/cards/search?q=third")).toEqual({ waitMs: 1500, blocked: false })
     } finally {
       now.mockRestore()
     }
@@ -1194,7 +1214,7 @@ describe("Scryfall request pacing", () => {
       expect(await acquire("/cards/manifest")).toEqual({ waitMs: 0, blocked: false })
       expect(await acquire("/cards/manifest")).toEqual({ waitMs: 6000, blocked: false })
       expect(await acquire("/cards/manifest")).toEqual({ waitMs: 12_000, blocked: true })
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 250, blocked: false })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
     } finally {
       now.mockRestore()
     }
