@@ -487,6 +487,8 @@ export default {
     nameLabel: "Votre nom",
     namePlaceholder: "Affiché à la table",
     empty: "Aucune partie sur ce réseau pour l'instant.",
+    notFound:
+      "Aucune partie trouvée. Vérifiez que vous êtes sur le même Wi-Fi que l'hôte. Les Wi-Fi invités et publics bloquent souvent cette connexion.",
     join: "Rejoindre {{name}}",
     you: "{{name}} (vous)",
     away: "Absent",
@@ -494,7 +496,8 @@ export default {
     backToGame: "Retour à la partie",
     errors: {
       hostFailed: "Impossible d'héberger : {{error}}",
-      unreachable: "{{name}} est injoignable. La partie est peut-être terminée.",
+      unreachable:
+        "Impossible de joindre {{name}}. La partie est peut-être terminée, ou ce Wi-Fi empêche les appareils de se connecter.",
       lostHost: "Hôte perdu. La partie est peut-être terminée.",
     },
     rejected: {

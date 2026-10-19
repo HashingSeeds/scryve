@@ -24,7 +24,7 @@ export function NearbyGameList({ onJoin }: { onJoin: () => void }) {
 
 function NearbyGames({ onJoin }: { onJoin: () => void }) {
   const { themed } = useAppTheme()
-  const { denied, games } = useNearbyGames(true)
+  const { denied, games, scannedLong } = useNearbyGames(true)
   const [name, setName] = useState(loadLanName)
   return (
     <View testID="nearby-games" style={themed($section)}>
@@ -41,7 +41,12 @@ function NearbyGames({ onJoin }: { onJoin: () => void }) {
           saveLanName(next)
         }}
       />
-      {games.length === 0 ? <Text style={themed($dimmed)} tx="connected:nearby.empty" /> : null}
+      {games.length === 0 ? (
+        <Text
+          style={themed($dimmed)}
+          tx={scannedLong ? "connected:nearby.notFound" : "connected:nearby.empty"}
+        />
+      ) : null}
       {games.map((service) => (
         <Button
           key={service.name}
