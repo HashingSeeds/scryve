@@ -26,7 +26,7 @@
     "permissions": ["android.permission.CAMERA"]
   },
   "ios": {
-    "icon": "./assets/images/app-icon-ios.png",
+    "icon": "./assets/images/AppIcon.icon",
     "supportsTablet": true,
     "infoPlist": {
       "UIViewControllerBasedStatusBarAppearance": true,
@@ -62,7 +62,10 @@
         "image": "./assets/images/app-icon-android-adaptive-foreground.png",
         "imageWidth": 300,
         "resizeMode": "contain",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#000000",
+        "ios": {
+          "image": "./assets/images/splash-ios.png"
+        }
       }
     ],
     [

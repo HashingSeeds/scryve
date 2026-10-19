@@ -180,6 +180,10 @@ export default {
       flame: "flamme",
       bolt: "éclair",
       eye: "œil",
+      skull: "crâne",
+      spade: "pique",
+      gem: "gemme",
+      tower: "tour",
     },
   },
   blockedPlayers: {

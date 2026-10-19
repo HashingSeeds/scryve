@@ -25,7 +25,16 @@ export const PLAYER_MARK_SHAPES = [
 ] as const
 
 /** why: Pro marks render only in builds that know them, so they never join the seat-default or connected lists that every installed client must draw. */
-export const PRO_MARK_SHAPES = ["crown", "flame", "bolt", "eye"] as const
+export const PRO_MARK_SHAPES = [
+  "crown",
+  "flame",
+  "bolt",
+  "eye",
+  "skull",
+  "spade",
+  "gem",
+  "tower",
+] as const
 
 export type ProMarkShape = (typeof PRO_MARK_SHAPES)[number]
 

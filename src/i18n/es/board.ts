@@ -221,6 +221,10 @@ export default {
     flame: "llama",
     bolt: "rayo",
     eye: "ojo",
+    skull: "calavera",
+    spade: "pica",
+    gem: "gema",
+    tower: "torre",
   },
   savedToast: {
     gameSaved: "Partida guardada",

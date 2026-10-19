@@ -2,9 +2,14 @@ import type { ConfigContext, ExpoConfig } from "expo/config"
 import {
   AndroidConfig,
   CodeGenerator,
+  IOSConfig,
   withAndroidManifest,
+  withDangerousMod,
   withMainActivity,
+  withXcodeProject,
 } from "expo/config-plugins"
+import { cpSync, existsSync } from "node:fs"
+import path from "node:path"
 
 import { APP_ICON_VARIANTS, appIconAssets } from "./src/features/appIcon/appIconVariants.ts"
 
@@ -82,7 +87,44 @@ const getLegacyAppScheme = () => {
   return "count"
 }
 
-export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
+/**
+ * why: expo-alternate-app-icons writes only PNG icon sets. Xcode uses an Icon Composer file named
+ * like an alternate icon in place of its PNG set, and renders it for iOS releases before Liquid Glass.
+ */
+function withLiquidGlassAlternateIcons(config: ExpoConfig, projectRoot: string): ExpoConfig {
+  const glassIcons = APP_ICON_VARIANTS.map(({ name }) => ({
+    name,
+    source: path.join(projectRoot, "assets/images/app-icons", `${name.toLowerCase()}.icon`),
+  })).filter(({ source }) => existsSync(source))
+  if (glassIcons.length === 0) return config
+
+  const withCopiedIcons = withDangerousMod(config, [
+    "ios",
+    (config) => {
+      const { platformProjectRoot, projectName = "" } = config.modRequest
+      for (const { name, source } of glassIcons) {
+        cpSync(source, path.join(platformProjectRoot, projectName, `${name}.icon`), {
+          recursive: true,
+        })
+      }
+      return config
+    },
+  ])
+  return withXcodeProject(withCopiedIcons, (config) => {
+    const { projectName = "" } = config.modRequest
+    for (const { name } of glassIcons) {
+      IOSConfig.XcodeUtils.addResourceFileToGroup({
+        filepath: `${projectName}/${name}.icon`,
+        groupName: projectName,
+        project: config.modResults,
+        isBuildFile: true,
+      })
+    }
+    return config
+  })
+}
+
+export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => {
   const existingPlugins = config.plugins ?? []
 
   const requiredPlugins = ["@clerk/expo", "expo-secure-store", "expo-image"]
@@ -114,8 +156,12 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       const assets = appIconAssets(name)
       return {
         name,
-        ios: assets.ios,
-        android: { foregroundImage: assets.androidForeground, backgroundColor: background },
+        ios: { light: assets.ios, dark: assets.iosDark, tinted: assets.iosTinted },
+        android: {
+          foregroundImage: assets.androidForeground,
+          monochromeImage: assets.androidMonochrome,
+          backgroundColor: background,
+        },
       }
     }),
   ])
@@ -188,7 +234,8 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     },
   }
 
-  const withRotation = withMainActivity(expoConfig, (config) => {
+  const withGlassIcons = withLiquidGlassAlternateIcons(expoConfig, projectRoot)
+  const withRotation = withMainActivity(withGlassIcons, (config) => {
     const { modResults } = config
     modResults.contents = CodeGenerator.mergeContents({
       src: modResults.contents,
