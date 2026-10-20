@@ -590,6 +590,36 @@ export const cacheMany = internalMutation({
   },
 })
 
+export const cachedImageFallbacks = internalQuery({
+  args: { scryfallId: v.string() },
+  handler: async (ctx, { scryfallId }) => {
+    const reference = await ctx.db
+      .query("cardReferences")
+      .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", scryfallId))
+      .unique()
+    if (!reference) return null
+    const fallbacks = await ctx.db
+      .query("scryfallImageFallbacks")
+      .withIndex("by_oracle_id", (q) => q.eq("oracleId", reference.oracleId))
+      .unique()
+    return { oracleId: reference.oracleId, fallbacks }
+  },
+})
+
+export const cacheImageFallbacks = internalMutation({
+  args: { oracleId: v.string(), urls: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("scryfallImageFallbacks")
+      .withIndex("by_oracle_id", (q) => q.eq("oracleId", args.oracleId))
+      .unique()
+    const value = { ...args, fetchedAt: Date.now() }
+    if (existing) await ctx.db.replace(existing._id, value)
+    else await ctx.db.insert("scryfallImageFallbacks", value)
+    return null
+  },
+})
+
 export const imageFallbacks = action({
   args: { game: v.string(), cardId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, { game: gameId, cardId, deviceId }) => {

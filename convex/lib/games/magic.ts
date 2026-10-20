@@ -9,6 +9,8 @@ import {
   type CardFace,
   type NormalizedCard,
 } from "./cards"
+import { internal } from "../../_generated/api"
+import type { Doc } from "../../_generated/dataModel"
 import type { ActionCtx } from "../../_generated/server"
 import { SCRYFALL_RATE_LIMIT_BLOCK_MS, fetchScryfall, normalizeScryfallCard } from "../scryfall"
 
@@ -90,12 +92,36 @@ function scryfallLookupError(status: number, cardId: string, lookup: "Card" | "P
   })
 }
 
-export async function scryfallImageCandidates(ctx: ActionCtx, cardId: string) {
+const IMAGE_FALLBACK_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+async function scryfallOracleId(ctx: ActionCtx, cardId: string) {
   const original = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
   if (!original.ok) scryfallLookupError(original.status, cardId, "Card")
-  const card = objectRecord(await original.json())
-  const oracleId = stringValue(card?.oracle_id)
+  const value: unknown = await original.json()
+  const reference = normalizeScryfallCard(value)
+  /** why: concurrent first lookups of one card write the same row, and a write conflict that outlasts Convex's retries must not drop a lookup that already succeeded. */
+  if (reference) await ctx.runMutation(internal.cards.cache, reference).catch(() => null)
+  return stringValue(objectRecord(value)?.oracle_id)
+}
+
+export async function scryfallImageCandidates(ctx: ActionCtx, cardId: string): Promise<string[]> {
+  const cached: {
+    oracleId: string
+    fallbacks: Doc<"scryfallImageFallbacks"> | null
+  } | null = await ctx.runQuery(internal.cards.cachedImageFallbacks, { scryfallId: cardId })
+  const fallbacks = cached?.fallbacks
+  if (fallbacks && fallbacks.fetchedAt > Date.now() - IMAGE_FALLBACK_TTL_MS) return fallbacks.urls
+  const storedOracleId = cached?.oracleId === cardId ? undefined : cached?.oracleId
+  const oracleId = storedOracleId ?? (await scryfallOracleId(ctx, cardId))
   if (!oracleId || !/^[\da-f-]{36}$/i.test(oracleId)) return []
+  const urls = await scryfallPrintingImages(ctx, cardId, oracleId)
+  /** why: same write race as scryfallOracleId; the artwork is already fetched. */
+  if (urls.length > 0)
+    await ctx.runMutation(internal.cards.cacheImageFallbacks, { oracleId, urls }).catch(() => null)
+  return urls
+}
+
+async function scryfallPrintingImages(ctx: ActionCtx, cardId: string, oracleId: string) {
   const response = await fetchScryfall(
     ctx,
     `/cards/search?${new URLSearchParams({ q: `oracleid:${oracleId} lang:en`, unique: "prints", order: "released" })}`,

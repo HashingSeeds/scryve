@@ -413,6 +413,34 @@ describe("image fallback candidates", () => {
     await t.run(async (ctx) => expect(await ctx.db.query("cardPrintings").take(1)).toEqual([]))
   })
 
+  it("reuses Magic artwork for every printing of a known card without asking Scryfall again", async () => {
+    const oracleId = "22222222-2222-2222-2222-222222222222"
+    const printings = [
+      "33333333-3333-3333-3333-333333333333",
+      "44444444-4444-4444-4444-444444444444",
+    ]
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() =>
+      response({
+        data: [
+          {
+            id: printings[1],
+            oracle_id: oracleId,
+            name: "Same card",
+            image_uris: { normal: "art" },
+          },
+        ],
+      }),
+    )
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cacheMany, {
+      cards: printings.map((scryfallId) => ({ scryfallId, oracleId, name: "Same card" })),
+    })
+    for (const cardId of [...printings, printings[0]])
+      expect(await t.action(api.cards.imageFallbacks, { game: "mtg", cardId })).toEqual(["art"])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/cards/search")
+  })
+
   it("uses Yu-Gi-Oh alternate artwork through the existing mirror", async () => {
     jest
       .spyOn(global, "fetch")
