@@ -95,12 +95,12 @@ export default {
       failed: "Impossible de terminer la partie",
     },
     abandon: {
-      signIn: "Connectez-vous avant d'annuler cette partie.",
+      signIn: "Connectez-vous avant de terminer cette partie sans résultat.",
       pendingChanges:
-        "Attendez la synchronisation des changements de points de vie en attente avant d'annuler cette partie.",
+        "Attendez la synchronisation des changements de points de vie en attente avant de terminer cette partie sans résultat.",
       failedChanges:
-        "Vérifiez les changements de points de vie échoués avant d'annuler cette partie.",
-      failed: "Impossible d'annuler la partie",
+        "Vérifiez les changements de points de vie échoués avant de terminer cette partie sans résultat.",
+      failed: "Impossible de terminer la partie sans résultat",
     },
   },
   username: {
@@ -442,7 +442,7 @@ export default {
     codeBody: "Saisissez le code à 6 caractères de l'hôte.",
     invalidInvite: "L’invitation est invalide, expirée ou révoquée",
     localGameActive:
-      "Terminez ou annulez votre partie locale en cours avant de rejoindre une partie connectée.",
+      "Terminez votre partie locale en cours, avec ou sans résultat, avant de rejoindre une partie connectée.",
     invalidCode: "Saisissez un code d'invitation valide.",
     invalidManualCode: "Saisissez un code d'invitation valide à 6 caractères.",
     seatTaken: "Cette place vient d'être prise. Choisissez-en une autre.",
