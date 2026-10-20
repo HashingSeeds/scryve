@@ -1348,7 +1348,6 @@ export const publishFinishedLocalGame = mutation({
     const me = meSeats[0]
     let myDeck: Doc<"decks"> | undefined
     if (me?.deckVersionId) {
-      // why: a deck unsynced or deleted after play started still gets this result; rejecting would drop a finished game from history.
       const version = await ctx.db.get(me.deckVersionId)
       const deck = version ? await ctx.db.get(version.deckId) : null
       if (!version || !deck || deck.ownerUserId !== user._id)

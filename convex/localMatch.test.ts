@@ -443,3 +443,15 @@ describe("account deletion", () => {
     expect(matches[0].ownerUserId).not.toBe(bobUserId)
   })
 })
+
+describe("unsynced decks", () => {
+  it("records a finished local game for a deck unsynced after play started", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckId, versionId } = await owner(t)
+    await actor.mutation(api.decks.unsync, { deckId })
+
+    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me", versionId, 1))
+
+    expect((await rows(t)).versionStats).toMatchObject([{ deckVersionId: versionId, wins: 1 }])
+  })
+})

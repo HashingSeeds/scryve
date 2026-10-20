@@ -938,7 +938,6 @@ async function deckMatchesCopy(
   )
 }
 
-// why: unsync keeps the row instead of deleting it so resync brings back its versions and stats.
 export const unsync = mutation({
   args: { deckId: v.id("decks") },
   handler: async (ctx, args) => {
@@ -953,7 +952,6 @@ export const unsync = mutation({
           .withIndex("by_deck_version", (q) => q.eq("deckVersionId", latest._id))
           .take(MAX_DECK_CARDS)
       : []
-    // why: a retry after a lost response must return the same copy, so an unsynced deck is not an error.
     let expectedRevision = deck.syncRevision ?? 0
     if (deck.unsyncedAt === undefined) {
       const now = Date.now()
@@ -1000,7 +998,6 @@ export const resync = mutation({
         message: "Create a new deck to change game systems",
       })
     if (deck.unsyncedAt === undefined) {
-      // why: two devices can hold copies of one unsync, so a retry only succeeds when the deck already matches this copy.
       if (revision === args.expectedRevision + 1 && (await deckMatchesCopy(ctx, deck, args)))
         return { deckId: deck._id }
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
