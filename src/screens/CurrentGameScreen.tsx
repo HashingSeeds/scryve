@@ -51,8 +51,6 @@ import type {
 } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
-import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
-import { useSeatColors } from "@/features/game/useSeatColors"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
@@ -98,7 +96,6 @@ export function CurrentGameScreen({
   ownerId,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
-  const menuButtonStyle = useMenuButtonStyle()
   const {
     themed,
     theme: { colors },
@@ -371,7 +368,6 @@ export function CurrentGameScreen({
     ],
   )
 
-  const seatColors = useSeatColors(runtime.game.players)
   const diceOpen = dice.open
   const closeDice = dice.close
   const exitAction = useMemo(
@@ -437,8 +433,6 @@ export function CurrentGameScreen({
           menu={{
             open: menuOpen,
             actions: radialActions,
-            variant: menuButtonStyle,
-            seatColors,
             exitAction,
             ...(match
               ? {

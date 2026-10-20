@@ -35,9 +35,7 @@ import {
 import { BoardPressable } from "./BoardPressable"
 import { DiceGlyph } from "./DiceGlyph"
 import {
-  DEFAULT_MENU_BUTTON_STYLE,
   GameMenuButtonShape,
-  type MenuButtonStyle,
   mixColorsInLinearLight,
   PENTAGON_BADGE_ANCHOR,
 } from "./GameMenuButtonShape"
@@ -95,8 +93,6 @@ export interface GameRadialMenuProps {
   actions: GameMenuActions
   onToggle: () => void
   onClose: () => void
-  variant?: MenuButtonStyle
-  seatColors?: readonly string[]
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
@@ -261,8 +257,6 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   actions,
   onToggle,
   onClose,
-  variant = DEFAULT_MENU_BUTTON_STYLE,
-  seatColors,
   exitAction,
   signal,
   statusLine,
@@ -296,8 +290,6 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         anchor={anchor}
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         compact={compact}
-        variant={variant}
-        seatColors={seatColors}
         exitAction={exitAction}
         signal={signal}
         badge={badge}
@@ -420,8 +412,6 @@ type GameMenuAnchorProps = {
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   compact?: boolean
-  variant?: MenuButtonStyle
-  seatColors?: readonly string[]
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
   badge?: GameMenuBadge
@@ -493,8 +483,6 @@ function GameMenuAnchor({
   anchor,
   anchorStyle = percentAnchorStyle(anchor),
   compact,
-  variant = DEFAULT_MENU_BUTTON_STYLE,
-  seatColors,
   exitAction,
   signal,
   badge,
@@ -590,9 +578,7 @@ function GameMenuAnchor({
       >
         <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
           <SignalledMenuButtonShape
-            variant={variant}
             isDark={isDark}
-            seatColors={seatColors}
             tone={signal?.tone}
             reducedMotion={reducedMotion}
           />
@@ -671,15 +657,11 @@ function GameMenuAnchor({
 }
 
 function SignalledMenuButtonShape({
-  variant,
   isDark,
-  seatColors,
   tone,
   reducedMotion,
 }: {
-  variant: MenuButtonStyle
   isDark: boolean
-  seatColors?: readonly string[]
   tone?: GameMenuSignalTone
   reducedMotion: ReducedMotionPreference
 }) {
@@ -688,7 +670,6 @@ function SignalledMenuButtonShape({
   } = useAppTheme()
   return (
     <GameMenuButtonShape
-      variant={variant}
       isDark={isDark}
       boardBackgroundColor={colors.gameMenu.anchorBorder}
       signal={
@@ -700,7 +681,6 @@ function SignalledMenuButtonShape({
           : undefined
       }
       animateSignal={reducedMotion === false}
-      seatColors={seatColors}
     />
   )
 }

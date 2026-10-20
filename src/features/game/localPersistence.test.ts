@@ -303,7 +303,6 @@ describe("LocalGameRepository", () => {
       defaultStartingLife: 30,
       hapticsEnabled: false,
       themePreference: "dark",
-      menuButtonStyle: "keystoneIIFlat",
       launchDestination: "play",
     })
   })
@@ -408,18 +407,6 @@ describe("LocalGameRepository", () => {
     )
 
     expect(new LocalGameRepository(storage).loadSettings()).toEqual(DEFAULT_LOCAL_SETTINGS)
-  })
-
-  it("round-trips a chosen menu button style and ignores an unknown one", () => {
-    const storage = new MemoryStorage()
-    const repository = new LocalGameRepository(storage)
-    repository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, menuButtonStyle: "prismFlat" })
-    expect(repository.loadSettings().menuButtonStyle).toBe("prismFlat")
-    storage.set(
-      LOCAL_KEYS.settings,
-      JSON.stringify({ ...DEFAULT_LOCAL_SETTINGS, menuButtonStyle: "hologram" }),
-    )
-    expect(repository.loadSettings().menuButtonStyle).toBe("keystoneIIFlat")
   })
 
   it("archives finish/abandon once, removes the matching active game, and loads detail", () => {

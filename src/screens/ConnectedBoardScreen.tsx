@@ -79,8 +79,6 @@ import {
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useDice } from "@/features/game/useDice"
-import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
-import { useSeatColors } from "@/features/game/useSeatColors"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
@@ -573,7 +571,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onRevealRole,
   roleRevealOnline,
 }: ConnectedBoardReadyProps) {
-  const menuButtonStyle = useMenuButtonStyle()
   const {
     themed,
     theme: { colors },
@@ -901,7 +898,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       openGameRules,
     ],
   )
-  const seatColors = useSeatColors(players)
   const diceOpen = dice.open
   const closeDice = dice.close
   const exitAction = useMemo(
@@ -1013,8 +1009,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         menu={{
           open: menuOpen,
           actions: radialActions,
-          variant: menuButtonStyle,
-          seatColors,
           exitAction,
           signal: boardSyncMenuSignal(syncSignal),
           statusLine:

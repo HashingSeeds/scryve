@@ -77,10 +77,6 @@ export default {
         Holo: "Holo",
       },
     },
-    menuButton: {
-      heading: "Botón del menú de partida",
-      hint: "Cambia la forma en el centro del tablero. Prisma tiñe el botón con los colores de todos en la mesa.",
-    },
     privacy: {
       heading: "Privacidad",
       shareUsageHelper:

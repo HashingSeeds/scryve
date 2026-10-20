@@ -81,7 +81,7 @@ describe("GameRadialMenu", () => {
     expect(pentagon!.props.d.match(/Q/g)).toHaveLength(5)
   })
 
-  it("uses the flat Keystone II treatment by default in dark mode", () => {
+  it("uses the flat Keystone II treatment in dark mode", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <GameRadialMenu

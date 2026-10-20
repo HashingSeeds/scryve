@@ -116,8 +116,6 @@ function PinnedGameBoardStage({
               facingAngle={holderAngle}
               actions={menu.actions}
               compact={playerCount > 2}
-              variant={menu.variant}
-              seatColors={menu.seatColors}
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
