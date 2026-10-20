@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type {
   LayoutChangeEvent,
   LayoutRectangle,
@@ -23,6 +23,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
+import { startTapTiming } from "@/utils/tapTiming"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
@@ -163,6 +164,15 @@ export const LifeCard = memo(function LifeCard({
   const identity = seatIdentityLabel(seatNumber, playerName)
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const [preview, setPreview] = useState(0)
+  const stopTapTiming = useRef<() => void>(undefined)
+  const showPreview = useCallback((delta: number) => {
+    stopTapTiming.current = delta === 0 ? undefined : startTapTiming()
+    setPreview(delta)
+  }, [])
+  useLayoutEffect(() => {
+    stopTapTiming.current?.()
+    stopTapTiming.current = undefined
+  }, [preview])
   const shownLife = life + preview
   const shownDigits = String(shownLife).length
   const resolvedLifeFontSize =
@@ -608,7 +618,7 @@ export const LifeCard = memo(function LifeCard({
           lifeFontSize={resolvedLifeFontSize}
           lifeDigits={shownDigits}
           onChange={onChange}
-          onPreview={setPreview}
+          onPreview={showPreview}
           onLongChange={() => setEditorOpen(true)}
         />
       ) : null}
