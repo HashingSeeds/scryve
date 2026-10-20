@@ -356,7 +356,6 @@ export default defineSchema({
     favoritedAt: v.optional(v.number()),
     // why: archivedAt means deleted. The name predates unsynced decks and stays for installed clients.
     archivedAt: v.optional(v.number()),
-    // why: an unsynced deck keeps its versions and stats but frees a synced deck spot until it is resynced.
     unsyncedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
