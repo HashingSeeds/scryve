@@ -52,3 +52,21 @@ index a5553c66c659a8f582e1e7b1aded0fad87e399c5..47437a5e19d0b2e089ee18b9742b79fe
                                     @"remotePort" : [NSNumber
                                         numberWithInt:[socket connectedPort]],
                                     @"remoteFamily" : [socket isIPv4] ? @"IPv4"
+diff --git a/src/Socket.js b/src/Socket.js
+index 9913e5aad9047866b6083ca1217a53df29b5312e..80bbb9221e72abce91c8d1f32bacf0e101e671af 100644
+--- a/src/Socket.js
++++ b/src/Socket.js
+@@ -443,7 +443,12 @@ export default class Socket extends EventEmitter {
+     _onDeviceDataEvt = (/** @type {{ id: number; data: string; }} */ evt) => {
+         if (evt.id !== this._id) return;
+         this._resetTimeout();
+-        if (!this._paused) {
++        if (!this._paused && this._encoding === 'base64') {
++            // Native already sends base64, so skip decoding and re-encoding it in JS.
++            const padding = evt.data.endsWith('==') ? 2 : evt.data.endsWith('=') ? 1 : 0;
++            this._bytesRead += (evt.data.length / 4) * 3 - padding;
++            this.emit('data', evt.data);
++        } else if (!this._paused) {
+             const bufferData = Buffer.from(evt.data, 'base64');
+             this._bytesRead += bufferData.byteLength;
+             const finalData = this._encoding ? bufferData.toString(this._encoding) : bufferData;
