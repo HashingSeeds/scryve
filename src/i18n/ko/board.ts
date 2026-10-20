@@ -91,9 +91,9 @@ export default {
     flip: "코인을 던져 선공 정하기",
     roll: "주사위를 굴려 선공 정하기",
     chip: {
-      roll: "주사위로 선공 정하기",
-      flip: "동전으로 선공 정하기",
-      loserChooses: "{{name}}님이 선공을 정합니다",
+      roll: "선공 주사위",
+      flip: "선공 동전 던지기",
+      loserChooses: "{{name}} 선공 선택",
     },
   },
   layout: {

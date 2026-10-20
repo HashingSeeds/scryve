@@ -93,9 +93,9 @@ export default {
     flip: "Pile ou face pour jouer en premier",
     roll: "Lancer pour jouer en premier",
     chip: {
-      roll: "Lancer pour jouer en premier",
-      flip: "Pile ou face pour commencer",
-      loserChooses: "{{name}} choisit qui commence",
+      roll: "Lancer pour jouer",
+      flip: "Pile ou face",
+      loserChooses: "{{name}} choisit",
     },
   },
   layout: {
