@@ -15,7 +15,8 @@ onlyBuiltDependencies:
 patchedDependencies:
   convex-test@0.0.54: js-patches/convex-test@0.0.54.patch
   # expo-alternate-app-icons 8.0.0 reads the current Android icon from the launching activity, so
-  # switching twice left both icons enabled and a reset to the default did nothing.
+  # switching twice left both icons enabled and a reset to the default did nothing. It also switched
+  # at once, which closed the app; the patch waits until the app is in the background.
   expo-alternate-app-icons@8.0.0: patches/expo-alternate-app-icons@8.0.0.patch
   # react-native-screens 4.26.2 misses the screens stack when expo-dev-launcher wraps it, so
   # statusBarHidden is ignored in iOS dev builds.

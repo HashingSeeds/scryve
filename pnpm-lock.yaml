@@ -9,7 +9,7 @@ patchedDependencies:
     hash: ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3
     path: js-patches/convex-test@0.0.54.patch
   expo-alternate-app-icons@8.0.0:
-    hash: 436515d492105d8d4445187a5de0297b92e85c5fdd449f839892860dfc196ad7
+    hash: f82ba6a0bcd315746f2bf8330f2d500ee2d7ee894aa2c7549e886e205a27143c
     path: patches/expo-alternate-app-icons@8.0.0.patch
   react-native-screens@4.26.2:
     hash: e416589d8837665cf8bac9988610f5d20a8c8859ca3f51ff2830c008ff57cbdd
@@ -54,7 +54,7 @@ importers:
         version: 57.0.28(6c219434f8e2b5aec8e04aaa8afa6c5f)
       expo-alternate-app-icons:
         specifier: ^8.0.0
-        version: 8.0.0(patch_hash=436515d492105d8d4445187a5de0297b92e85c5fdd449f839892860dfc196ad7)(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+        version: 8.0.0(patch_hash=f82ba6a0bcd315746f2bf8330f2d500ee2d7ee894aa2c7549e886e205a27143c)(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       expo-application:
         specifier: ~57.0.3
         version: 57.0.3(expo@57.0.28)
@@ -12305,7 +12305,7 @@ snapshots:
       jest-message-util: 29.7.0
       jest-util: 29.7.0
 
-  expo-alternate-app-icons@8.0.0(patch_hash=436515d492105d8d4445187a5de0297b92e85c5fdd449f839892860dfc196ad7)(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3):
+  expo-alternate-app-icons@8.0.0(patch_hash=f82ba6a0bcd315746f2bf8330f2d500ee2d7ee894aa2c7549e886e205a27143c)(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3):
     dependencies:
       expo: 57.0.28(6c219434f8e2b5aec8e04aaa8afa6c5f)
       react: 19.2.3
