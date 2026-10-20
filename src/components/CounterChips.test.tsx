@@ -65,7 +65,6 @@ describe("CounterChips", () => {
 
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
     const tax = view.getByTestId("counter-option-1-commanderTax")
-    expect(tax).toHaveTextContent("Commander tax+2")
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
     fireEvent.press(tax)
     expect(table.adjustCounter).toHaveBeenCalledWith("commanderTax", 2)
@@ -78,6 +77,32 @@ describe("CounterChips", () => {
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
     fireEvent.press(view.getByLabelText("Give up Initiative"))
     expect(table.releaseDesignation).toHaveBeenCalledWith("initiative")
+  })
+
+  it("shortens Commander tax only when the sheet's columns are too narrow for it", () => {
+    const wide = chips(seat(), { cardSize: { width: 460, height: 400 } })
+    fireEvent.press(wide.getByTestId("counter-add-seat-1"))
+    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("+2Commander tax")
+    wide.unmount()
+
+    const narrow = chips(seat(), { cardSize: { width: 320, height: 400 } })
+    fireEvent.press(narrow.getByTestId("counter-add-seat-1"))
+    const tax = narrow.getByTestId("counter-option-1-commanderTax")
+    expect(tax).toHaveTextContent("+2Tax")
+    expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
+  })
+
+  it("closes the sheet from the spot the plus opened it", () => {
+    const view = chips(seat())
+    const plus = view.getByTestId("counter-add-seat-1")
+    fireEvent(plus, "layout", { nativeEvent: { layout: { x: 142, y: 0, width: 36, height: 36 } } })
+    const rowTop = StyleSheet.flatten(view.getByTestId("counter-chips-seat-1").props.style).top
+
+    fireEvent.press(plus)
+    const close = view.getByTestId("counter-close-1")
+    expect(StyleSheet.flatten(close.props.style)).toMatchObject({ left: 8 + 142, top: rowTop })
+    fireEvent.press(close)
+    expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
   })
 
   it("edits from a held chip: steps never go below zero and remove clears the count", () => {
@@ -99,7 +124,7 @@ describe("CounterChips", () => {
     const view = chips(table)
 
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
-    expect(view.getByTestId("counter-option-1-poison")).toHaveTextContent("Poison10")
+    expect(view.getByTestId("counter-option-1-poison")).toHaveTextContent("10Poison")
     fireEvent.press(view.getByLabelText("Edit Poison, 10"))
     expect(table.adjustCounter).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("counter-edit-1-poison-minus"))
@@ -118,7 +143,7 @@ describe("CounterChips", () => {
     fireEvent(view.getByTestId("counter-chip-1-poison"), "longPress")
     fireEvent.press(view.getByLabelText("Rule 104.3d"))
     expect(openRule).toHaveBeenCalledWith("104.3d")
-    fireEvent.press(view.getByTestId("counter-done-1"))
+    fireEvent.press(view.getByTestId("counter-close-1"))
     fireEvent(view.getByTestId("counter-chip-1-experience"), "longPress")
     expect(view.queryByTestId("counter-rule-1")).toBeNull()
   })
@@ -171,7 +196,7 @@ describe("CounterChips", () => {
 
     fireEvent(view.getByTestId("counter-chip-1-poison"), "longPress")
     expect(focus).toHaveBeenCalledTimes(1)
-    fireEvent.press(view.getByTestId("counter-done-1"))
+    fireEvent.press(view.getByTestId("counter-close-1"))
     expect(focus).toHaveBeenCalledTimes(2)
     expect(focus).toHaveBeenLastCalledWith(expect.anything(), "focus")
 
@@ -199,6 +224,7 @@ describe("CounterChips", () => {
   })
 
   it("takes the card's own controls out of reach while a sheet covers it", () => {
+    const onTableSheetOpenChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard
@@ -207,6 +233,7 @@ describe("CounterChips", () => {
           life={40}
           color="#41476E"
           seatTable={seat({ counters: { poison: 2 } })}
+          onTableSheetOpenChange={onTableSheetOpenChange}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -220,8 +247,10 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("life-seat-1-1")).toBeNull()
     expect(view.queryByTestId("counter-chips-seat-1")).toBeNull()
     expect(view.getByTestId("life-total-seat-1", { includeHiddenElements: true })).not.toBeVisible()
+    expect(onTableSheetOpenChange).toHaveBeenLastCalledWith(true)
 
-    fireEvent.press(view.getByTestId("counter-done-1"))
+    fireEvent.press(view.getByTestId("counter-close-1"))
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(onTableSheetOpenChange).toHaveBeenLastCalledWith(false)
   })
 })

@@ -31,6 +31,10 @@ const systems = {
     monarch: "Monarch",
     initiative: "Initiative",
   },
+  // Shorter name shown where the full name does not fit, such as narrow counter menus.
+  tableItemShort: {
+    commanderTax: "Tax",
+  },
   section: {
     // Deck section holding the commander card, not the format.
     commander: "Commander",

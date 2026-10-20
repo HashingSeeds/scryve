@@ -33,6 +33,9 @@ export default {
     monarch: "統治者",
     initiative: "イニシアチブ",
   },
+  tableItemShort: {
+    commanderTax: "税",
+  },
   section: {
     commander: "統率者",
     sideboard: "サイドボード",

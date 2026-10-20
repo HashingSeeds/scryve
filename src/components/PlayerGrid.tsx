@@ -136,6 +136,8 @@ export interface PlayerGridProps {
   table?: TableRuntime
   dice?: DiceGridBinding
   onOpenRule?: (ruleId: string) => void
+  /** why: each seat reports its counter sheet opening and closing, so the board can hide what the sheet would sit under. */
+  onTableSheetOpenChange?: (open: boolean) => void
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -158,6 +160,7 @@ export function PlayerGrid({
   table,
   dice,
   onOpenRule,
+  onTableSheetOpenChange,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -488,6 +491,9 @@ export function PlayerGrid({
                         : undefined
                     }
                     dice={seatDice}
+                    onTableSheetOpenChange={
+                      onTableSheetOpenChange && stable("tableSheet", onTableSheetOpenChange)
+                    }
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
                     )}
