@@ -3,6 +3,7 @@ import TcpSocket from "react-native-tcp-socket"
 import Zeroconf, { type Service } from "react-native-zeroconf"
 
 import { createLineReader } from "./lineReader"
+import { holdLowLatencyWifi } from "../../../modules/low-latency-wifi"
 
 // why: iOS only browses Bonjour types listed in NSBonjourServices, so renaming this needs app.config.ts too.
 export const LAN_SERVICE_TYPE = "scryve"
@@ -83,6 +84,7 @@ function wrapSocket<In, Out>(
   socket.setNoDelay(true)
   // why: our tcp-socket patch hands base64 data straight from native, so Hermes' atob decodes it instead of the JS Buffer polyfill.
   socket.setEncoding("base64")
+  const releaseWifi = holdLowLatencyWifi()
   let lastHeard = Date.now()
   let closed = false
   // why: tcp-socket throws on writes after destroy, and its close event can arrive well after, so shut down at once.
@@ -90,6 +92,7 @@ function wrapSocket<In, Out>(
     if (closed) return
     closed = true
     clearInterval(heartbeat)
+    releaseWifi()
     socket.destroy()
     handlers.onClose()
   }
