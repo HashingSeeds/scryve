@@ -609,6 +609,12 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_scryfall_id", ["scryfallId"]),
 
+  scryfallImageFallbacks: defineTable({
+    oracleId: v.string(),
+    urls: v.array(v.string()),
+    fetchedAt: v.number(),
+  }).index("by_oracle_id", ["oracleId"]),
+
   preconCatalogs: defineTable({
     fetchedAt: v.number(),
     refreshRequestedAt: v.optional(v.number()),
