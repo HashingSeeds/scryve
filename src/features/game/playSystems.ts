@@ -174,6 +174,12 @@ export function tableItemLabel({ id, label }: { id: string; label: string }): st
   return hasOwnKey(systems.tableItem, id) ? translate(`systems:tableItem.${id}`) : label
 }
 
+export function tableItemShortLabel(item: { id: string; label: string }): string {
+  return hasOwnKey(systems.tableItemShort, item.id)
+    ? translate(`systems:tableItemShort.${item.id}`)
+    : tableItemLabel(item)
+}
+
 export function deckSectionLabel(game: string, { id, label }: DeckSection): string {
   if (id === "main") return isPlaySystemId(game) ? translate(`systems:section.main.${game}`) : label
   return hasOwnKey(systems.section, id) ? translate(`systems:section.${id}`) : label

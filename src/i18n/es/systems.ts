@@ -33,6 +33,9 @@ export default {
     monarch: "Monarca",
     initiative: "Iniciativa",
   },
+  tableItemShort: {
+    commanderTax: "Impuesto",
+  },
   section: {
     commander: "Comandante",
     sideboard: "Sideboard",

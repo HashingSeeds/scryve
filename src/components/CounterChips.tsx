@@ -1,9 +1,9 @@
 import { memo, useEffect, useRef, useState, type Ref } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
 import Svg, { Circle, Path } from "react-native-svg"
 
-import { tableItemLabel, type TableRules } from "@/features/game/playSystems"
+import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
 import { translate } from "@/i18n/translate"
@@ -75,6 +75,7 @@ const GLYPHS: Record<string, string> = {
   monarch: "M3 19h18M4.5 15.5 3 7l5 4 4-6 4 6 5-4-1.5 8.5z",
   initiative: "M6 21V10a6 6 0 0 1 12 0v11M3 21h18M12 13v4",
   plus: "M12 5v14M5 12h14",
+  close: "M6 6l12 12M18 6 6 18",
 }
 const RINGED = new Set(["poison"])
 
@@ -130,6 +131,10 @@ export function contentInset(
 
 const MENU_CLEARANCE = 42
 const COMPACT_MENU_CLEARANCE = 37
+const CHIP_SIZE = 36
+const COMPACT_CHIP_SIZE = 32
+/** why: below this column width "+2 Commander tax" no longer fits on one line, so items with a short label use it. */
+const SHORT_LABEL_COLUMN = 180
 
 type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
 
@@ -174,7 +179,6 @@ export function chipRowOrigin(input: {
   return {
     top: gap + contentInset(contentRotation, contentInsets, "top") + menuClearance,
     left: gap + contentInset(contentRotation, contentInsets, "left"),
-    menuClearance,
   }
 }
 
@@ -196,6 +200,9 @@ export const CounterChips = memo(function CounterChips({
     theme: { spacing },
   } = useAppTheme()
   const [sheet, setSheet] = useState<Sheet | null>(null)
+  const [addTrigger, setAddTrigger] = useState<{ at: LayoutRectangle; frameKey: string } | null>(
+    null,
+  )
   const longPressed = useRef(false)
   const triggers = useRef(new Map<string, View>()).current
   const returnFocusTo = useRef<string | null>(null)
@@ -234,8 +241,13 @@ export const CounterChips = memo(function CounterChips({
 
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
+  const frameWidth = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
+  const frameKey = `${cardSize.width}x${cardSize.height}@${contentRotation}`
+  // why: the chip row unmounts under the sheet, so a card resized while it is open keeps a stale add button position; Close then centers.
+  const addAt = addTrigger?.frameKey === frameKey ? addTrigger.at : undefined
+  const closeSize = addAt?.height ?? (compact ? COMPACT_CHIP_SIZE : CHIP_SIZE)
   const glyphSize = compact ? 13 : 15
-  const { top, menuClearance } = chipRowOrigin({
+  const { top } = chipRowOrigin({
     compact,
     contentRotation,
     contentInsets,
@@ -382,6 +394,7 @@ export const CounterChips = memo(function CounterChips({
                 accessibilityRole="button"
                 accessibilityLabel={translate("board:counters.addLabel", { identity })}
                 hitSlop={{ top: 6, bottom: 6 }}
+                onLayout={({ nativeEvent }) => setAddTrigger({ at: nativeEvent.layout, frameKey })}
                 onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
                 style={({ pressed }) => [
                   themed(compact ? $compactChip : $chip),
@@ -404,9 +417,17 @@ export const CounterChips = memo(function CounterChips({
           color={color}
           compact={compact}
           frame={frame}
+          width={frameWidth}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
-          menuClearance={menuClearance}
+          closeButton={{
+            left: addAt
+              ? (compact ? spacing.xxs : spacing.xs) + addAt.x
+              : (frameWidth - closeSize) / 2,
+            top: top + (addAt?.y ?? 0),
+            size: closeSize,
+            width: addAt?.width,
+          }}
           onEdit={(counterId) => setSheet({ kind: "edit", counterId })}
           onClose={() => setSheet(null)}
         />
@@ -461,9 +482,10 @@ function CounterSheet({
   color,
   compact,
   frame,
+  width,
   contentRotation,
   contentInsets,
-  menuClearance,
+  closeButton,
   onEdit,
   onClose,
 }: {
@@ -474,9 +496,11 @@ function CounterSheet({
   color: string
   compact?: boolean
   frame: ViewStyle
+  width: number
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
-  menuClearance: number
+  /** why: Close sits exactly where the chip row's add button was, so the same tap opens and closes the sheet. */
+  closeButton: { left: number; top: number; size: number; width?: number }
   onEdit: (counterId: string) => void
   onClose: () => void
 }) {
@@ -488,11 +512,12 @@ function CounterSheet({
   const ink = accessibleForeground(sheetColor)
   const gap = compact ? spacing.xxs : spacing.xs
   const padding = {
-    paddingTop: gap + contentInset(contentRotation, contentInsets, "top") + menuClearance,
+    paddingTop: closeButton.top + closeButton.size + gap,
     paddingBottom: gap + contentInset(contentRotation, contentInsets, "bottom"),
     paddingLeft: gap + contentInset(contentRotation, contentInsets, "left"),
     paddingRight: gap + contentInset(contentRotation, contentInsets, "right"),
   }
+  const shortLabels = (width - padding.paddingLeft - padding.paddingRight) / 2 < SHORT_LABEL_COLUMN
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
@@ -583,12 +608,6 @@ function CounterSheet({
                 onClose()
               }}
             />
-            <SheetTextButton
-              testID={`counter-done-${seatNumber}`}
-              text={translate("common:done")}
-              ink={ink}
-              onPress={onClose}
-            />
           </View>
         </>
       ) : (
@@ -607,7 +626,7 @@ function CounterSheet({
                   ref={index === 0 ? firstControl : undefined}
                   testID={`counter-option-${seatNumber}-${option.id}`}
                   id={option.id}
-                  label={optionLabel}
+                  label={shortLabels ? tableItemShortLabel(option) : optionLabel}
                   value={current > 0 ? current : undefined}
                   step={option.step}
                   accessibilityLabel={
@@ -656,16 +675,28 @@ function CounterSheet({
               )
             })}
           </ScrollView>
-          <View pointerEvents="box-none" style={themed($sheetFooter)}>
-            <SheetTextButton
-              testID={`counter-close-${seatNumber}`}
-              text={translate("common:close")}
-              ink={ink}
-              onPress={onClose}
-            />
-          </View>
         </>
       )}
+      <BoardPressable
+        testID={`counter-close-${seatNumber}`}
+        accessibilityRole="button"
+        accessibilityLabel={translate("common:close")}
+        hitSlop={{ top: 6, bottom: 6 }}
+        onPress={onClose}
+        style={({ pressed }) => [
+          themed(compact ? $compactChip : $chip),
+          {
+            position: "absolute",
+            left: closeButton.left,
+            top: closeButton.top,
+            minHeight: closeButton.size,
+            minWidth: closeButton.width ?? closeButton.size,
+          },
+          pressed && { backgroundColor: overlayTint(ink, 0.14) },
+        ]}
+      >
+        <TableGlyph id="close" size={compact ? 13 : 15} color={ink} />
+      </BoardPressable>
     </View>
   )
 }
@@ -739,13 +770,6 @@ function SheetOption({
       ]}
     >
       <TableGlyph id={id} size={16} color={ink} />
-      <Text
-        text={label}
-        weight={selected ? "bold" : "medium"}
-        size="xs"
-        numberOfLines={1}
-        style={[themed($optionLabel), { color: ink }, !selected && $muted]}
-      />
       {value !== undefined ? (
         <Text
           text={String(value)}
@@ -761,6 +785,13 @@ function SheetOption({
           style={[themed($optionValue), { color: ink }, $muted]}
         />
       ) : null}
+      <Text
+        text={label}
+        weight={selected ? "bold" : "medium"}
+        size="xs"
+        numberOfLines={1}
+        style={[themed($optionLabel), { color: ink }, !selected && $muted]}
+      />
       {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
     </BoardPressable>
   )
@@ -793,8 +824,8 @@ const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxs,
-  minHeight: 36,
-  minWidth: 36,
+  minHeight: CHIP_SIZE,
+  minWidth: CHIP_SIZE,
   justifyContent: "center",
   paddingHorizontal: spacing.xs,
   borderRadius: spacing.xs,
@@ -806,7 +837,7 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxxs,
-  minHeight: 32,
+  minHeight: COMPACT_CHIP_SIZE,
   minWidth: 28,
   justifyContent: "center",
   paddingHorizontal: spacing.xxs,
@@ -892,7 +923,7 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   alignContent: "center",
-  gap: spacing.xxxs,
+  rowGap: spacing.xxxs,
 })
 
 const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -900,8 +931,7 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xs,
   minHeight: 40,
-  minWidth: "45%",
-  flexGrow: 1,
+  width: "50%",
   paddingHorizontal: spacing.xs,
   borderRadius: spacing.xs,
 })
@@ -911,7 +941,6 @@ const $optionLabel: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
 const $muted: TextStyle = { opacity: 0.78 }
 
 const $optionValue: ThemedStyle<TextStyle> = () => ({
-  marginLeft: "auto",
   fontVariant: ["tabular-nums"],
 })
 

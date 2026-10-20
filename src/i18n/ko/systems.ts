@@ -33,6 +33,9 @@ export default {
     monarch: "모나크",
     initiative: "이니셔티브",
   },
+  tableItemShort: {
+    commanderTax: "세금",
+  },
   section: {
     commander: "커맨더",
     sideboard: "사이드보드",

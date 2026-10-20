@@ -111,6 +111,11 @@ export function CurrentGameScreen({
   }, [rules])
   const [menuOpen, setMenuOpen] = useState(false)
   const [boardSize, setBoardSize] = useState<BoardSize>()
+  const [openTableSheets, setOpenTableSheets] = useState(0)
+  const trackTableSheet = useCallback(
+    (open: boolean) => setOpenTableSheets((count) => count + (open ? 1 : -1)),
+    [],
+  )
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
@@ -396,7 +401,7 @@ export function CurrentGameScreen({
           playerCount={playerCount}
           layoutVariant={layoutVariant}
           onBoardSizeChange={setBoardSize}
-          firstPlayer={firstPlayer}
+          firstPlayer={openTableSheets > 0 ? undefined : firstPlayer}
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}
@@ -404,6 +409,7 @@ export function CurrentGameScreen({
               system={system}
               lifeStep={runtime.game.lifeStep}
               onOpenRule={(ruleId) => system && onRules?.(system, ruleId)}
+              onTableSheetOpenChange={trackTableSheet}
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
               disabled={menuOpen}
