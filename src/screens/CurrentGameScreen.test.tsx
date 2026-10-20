@@ -240,6 +240,9 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
       "Roll for who goes first",
     )
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    fireEvent.press(view.getByTestId("game-menu-button"))
 
     fireEvent.press(view.getByTestId("first-player-badge"))
     expect(view.queryByTestId("first-player-badge")).toBeNull()
