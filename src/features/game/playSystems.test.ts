@@ -41,7 +41,7 @@ describe("play system defaults", () => {
   })
 
   it("reports prizes taken for down counters", () => {
-    expect(counterDeltaFromStartLabel("pokemon", 4, 6)).toBe("2 taken")
+    expect(counterDeltaFromStartLabel("pokemon", 4, 6)).toBe("2 prizes taken")
     expect(counterDeltaFromStartLabel("mtg", 18, 20)).toBe("-2 from start")
   })
 

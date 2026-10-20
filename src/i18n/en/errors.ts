@@ -39,6 +39,7 @@ const errors = {
   queryTooLong: "Choose fewer filters or shorten your search.",
   scryfallRateLimited: "Scryfall requests are paused. Try again shortly.",
   syncOwnerChanged: "The signed-in account changed",
+  // Attempts to join a connected game, not to sign in.
   tooManyJoinAttempts: "Too many join attempts; wait a minute and try again",
   unauthenticated: "Authentication required",
   updateRequired: "Update Scryve to join this game",

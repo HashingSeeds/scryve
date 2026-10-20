@@ -327,7 +327,7 @@ describe("unified history screen", () => {
     fireEvent.press(screen.getByTestId("history-outcome-draw"))
     fireEvent.press(screen.getByTestId("history-filters-button"))
 
-    expect(screen.getByText("No matches in loaded games")).toBeTruthy()
+    expect(screen.getByText("No results in loaded games")).toBeTruthy()
     fireEvent.press(screen.getByRole("button", { name: "Load older games" }))
     expect(load).toHaveBeenCalledTimes(1)
   })

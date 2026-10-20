@@ -1389,7 +1389,7 @@ describe("DeckDetailScreen", () => {
     expect(mockVersionCardDiscard).toHaveBeenCalledWith("card-conflict")
   })
 
-  it("shows authoritative or explicit-uncached state after Keep account and restart", () => {
+  it("shows authoritative or explicit-uncached state after Keep account copy and restart", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
@@ -1457,7 +1457,7 @@ describe("DeckDetailScreen", () => {
     expect(sheet.getByText("Existing Deck")).toBeTruthy()
     expect(sheet.queryByText("Format")).toBeNull()
     expect(sheet.queryByText("Notes")).toBeNull()
-    fireEvent.press(sheet.getByText("Keep account"))
+    fireEvent.press(sheet.getByText("Keep account copy"))
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("rename-conflict")
   })
 

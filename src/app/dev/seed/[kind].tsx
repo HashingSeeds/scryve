@@ -36,7 +36,7 @@ export default function DevSeedRoute() {
       <EmptyState
         heading="Seed failed"
         content={error}
-        button="Open Play"
+        button="Go to Play"
         buttonOnPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
       />
     </Screen>

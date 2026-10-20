@@ -92,6 +92,8 @@ Drop:
 - `/** why: Poisoned and Burned only ever sit on the Active. Absent means neither, so boards stored before conditions existed need no backfill. */` (the optional field already says it)
 - `// why: undefined means the deck list is still loading, which keeps the picker closed.` (put that state in the type)
 
+One exception: in `src/i18n/en`, a comment above a key or group is a note for translators. `pnpm i18n:translate` sends it with the string, and adding or editing one retranslates that key. Write one when the English is ambiguous out of context: `// Pokémon only: Prize cards the player has taken so far. Not damage.` Per-language terms live in `src/i18n/glossary.json`.
+
 ## Additional tips
 
 - Don't verify with browsers or computer use unless the user explicitly agrees or requests it.

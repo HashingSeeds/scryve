@@ -108,6 +108,11 @@ module.exports = {
   },
   overrides: [
     {
+      // why: comments in English copy are translator notes that `pnpm i18n:translate` sends to the model.
+      files: ["src/i18n/en/*.ts"],
+      rules: { "self-explanatory-code/prefer-self-explanatory-code": 0 },
+    },
+    {
       files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
       excludedFiles: ["**/*.test.{ts,tsx}", "convex/_generated/**"],
       rules: {

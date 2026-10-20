@@ -868,7 +868,7 @@ describe("LifeCard", () => {
       const first = claim("claim-1", "Grace")
       const view = renderClaims([first, claim("claim-2", "Linus")], onChange)
 
-      expect(view.getByText("Grace dealt 4")).toBeTruthy()
+      expect(view.getByText("Grace: 4 commander damage")).toBeTruthy()
       expect(view.getByText("1 more")).toBeTruthy()
       fireEvent.press(view.getByTestId(lifeControlTestId(1, -1)))
       fireEvent.press(view.getByTestId(lifeControlTestId(1, 1)))

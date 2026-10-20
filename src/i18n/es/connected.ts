@@ -27,22 +27,22 @@ export default {
   noDeckSelected: "Ningún mazo seleccionado",
   lobbyExit: {
     abandon: {
-      title: "¿Abandonar esta sala?",
+      title: "¿Anular esta sala?",
       message: "Esto cierra la sala para todos y guarda un resumen final. No se puede deshacer.",
-      confirmText: "Abandonar sala",
+      confirmText: "Anular sala",
     },
     leave: {
       title: "¿Salir de esta sala?",
       message:
-        "La sala desaparece de tu lista de partidas por reanudar. Los demás jugadores y su historial no cambian.",
+        "La sala desaparece de tu lista para reanudar. Los demás jugadores y su historial no cambian.",
       confirmText: "Salir de la sala",
     },
   },
   onlineOnly: {
     start:
       "Reconéctate para empezar la partida. Empezar solo funciona con conexión y nunca se pone en cola.",
-    exit: "Reconéctate para salir de esta sala o abandonarla. Estas acciones solo funcionan con conexión y nunca se ponen en cola.",
-    join: "Reconéctate para ocupar un asiento. Ocupar un asiento solo funciona con conexión y nunca se pone en cola.",
+    exit: "Vuelve a conectarte para salir de esta sala o anularla. Estas acciones solo funcionan con conexión y nunca se ponen en cola.",
+    join: "Vuelve a conectarte para ocupar un asiento. Ocupar un asiento solo funciona con conexión y nunca se pone en cola.",
     deck: "Reconéctate para cambiar de mazo. La elección de mazo solo funciona con conexión y nunca se pone en cola.",
   },
   gameGone: "Esta partida ya no existe.",
@@ -65,15 +65,15 @@ export default {
       slow_one: "Conexión lenta, enviando {{count}} cambio",
       slow_many: "Conexión lenta, enviando {{count}} de cambios",
       slow_other: "Conexión lenta, enviando {{count}} cambios",
-      offlineSaved_one: "Sin conexión, {{count}} cambio guardado en este dispositivo",
-      offlineSaved_many: "Sin conexión, {{count}} de cambios guardados en este dispositivo",
-      offlineSaved_other: "Sin conexión, {{count}} cambios guardados en este dispositivo",
+      offlineSaved_one: "Sin conexión, {{count}} cambio guardado en este teléfono",
+      offlineSaved_many: "Sin conexión, {{count}} de cambios guardados en este teléfono",
+      offlineSaved_other: "Sin conexión, {{count}} cambios guardados en este teléfono",
       catchingUp_one: "De nuevo en línea, enviando {{count}} cambio",
       catchingUp_many: "De nuevo en línea, enviando {{count}} de cambios",
       catchingUp_other: "De nuevo en línea, enviando {{count}} cambios",
     },
     announcement: {
-      offline: "Sin conexión. Los cambios se guardan en este dispositivo.",
+      offline: "Sin conexión. Los cambios se guardan en este teléfono.",
       attention: "Un cambio requiere atención.",
     },
   },
@@ -87,16 +87,16 @@ export default {
     finish: {
       signIn: "Conéctate e inicia sesión antes de terminar esta partida.",
       pendingChanges:
-        "Espera a que se sincronicen los cambios de vida pendientes antes de terminar esta partida.",
-      failedChanges: "Revisa los cambios de vida fallidos antes de terminar esta partida.",
+        "Espera a que se sincronicen los cambios de vidas pendientes antes de terminar esta partida.",
+      failedChanges: "Revisa los cambios de vidas fallidos antes de terminar esta partida.",
       failed: "No se pudo terminar la partida",
     },
     abandon: {
-      signIn: "Conéctate e inicia sesión antes de abandonar esta partida.",
+      signIn: "Conéctate e inicia sesión antes de anular esta partida.",
       pendingChanges:
-        "Espera a que se sincronicen los cambios de vida pendientes antes de abandonar esta partida.",
-      failedChanges: "Revisa los cambios de vida fallidos antes de abandonar esta partida.",
-      failed: "No se pudo abandonar la partida",
+        "Espera a que se sincronicen los cambios de vidas pendientes antes de anular esta partida.",
+      failedChanges: "Revisa los cambios de vidas fallidos antes de anular esta partida.",
+      failed: "No se pudo anular la partida",
     },
   },
   username: {
@@ -121,7 +121,7 @@ export default {
   },
   profile: {
     prepareFailed: "No se pudo preparar el juego conectado",
-    signedOut: "Has cerrado sesión o tu sesión expiró.",
+    signedOut: "Cerraste sesión o tu sesión expiró.",
     sessionRejected: "Convex rechazó esta sesión iniciada.",
   },
   gate: {
@@ -130,7 +130,7 @@ export default {
     signInPrompt:
       "Inicia sesión para jugar entre dispositivos. Las partidas locales siguen disponibles.",
     signIn: "Iniciar sesión",
-    signInAgain: "Iniciar sesión de nuevo",
+    signInAgain: "Inicia sesión de nuevo",
     username: {
       title: "Elige tu nombre de usuario de jugador",
       description: "Tu @usuario único te identifica en el historial de partidas conectadas.",
@@ -138,7 +138,7 @@ export default {
       suggest: "Sugerir un nombre de usuario",
       save: "Guardar nombre de usuario",
       notAllowed:
-        "Ese nombre de usuario no está permitido. Otros jugadores verán este nombre, así que elige otro.",
+        "Ese nombre de usuario no está permitido. Los demás jugadores verán este nombre, así que elige otro.",
     },
     offline: "El juego conectado está sin conexión. El juego local sigue disponible.",
     connecting: "Conectando… El juego local sigue disponible.",
@@ -197,21 +197,20 @@ export default {
   },
   setup: {
     connecting: "Conectando… Puedes seguir editando.",
-    signInToHost: "Inicia sesión para ser anfitrión",
+    signInToHost: "Inicia sesión para crear",
     chooseUsername: "Elegir nombre de usuario",
     unavailable: "El juego conectado no está disponible.",
   },
   host: {
-    checkFailed: "No se pudo comprobar si ya tienes una partida como anfitrión.",
+    checkFailed: "No se pudo comprobar si ya tienes una partida creada.",
     checkingGames: "Comprobando tus partidas…",
-    reconnectToHost:
-      "Vuelve a conectarte antes de ser anfitrión; la creación de salas no se pone en cola.",
+    reconnectToHost: "Vuelve a conectarte antes de crear; la creación de salas no se pone en cola.",
     profileNotReady: "El perfil conectado aún no está listo.",
     createFailed: "No se pudo crear la sala",
     reconnectToExit: "Vuelve a conectarte antes de salir de una partida o terminarla.",
     exitFailed: "No se pudo actualizar esta partida.",
     offline: "Estás sin conexión. Tu configuración se conserva.",
-    alreadyHosting: "Termina tu partida como anfitrión antes de crear otra.",
+    alreadyHosting: "Termina tu partida creada antes de crear otra.",
   },
   publish: {
     failed: "No se pudo conectar esta partida.",
@@ -231,9 +230,9 @@ export default {
     header: "Invitación",
     title: "Invitación no válida",
     message:
-      "Esta invitación de Scryve está mal formada o incompleta. Pide un enlace nuevo al anfitrión o introduce el código de 6 caracteres.",
+      "Esta invitación de Scryve está mal formada o incompleta. Pide al anfitrión un enlace nuevo o escribe el código de 6 caracteres.",
     enterCode: "Introducir un código manualmente",
-    openPlay: "Abrir Jugar",
+    openPlay: "Ir a Jugar",
   },
   seats: {
     openSeat: "Asiento libre",
@@ -261,13 +260,13 @@ export default {
   playerActions: {
     title: "Jugadores",
     description:
-      "Denuncia un nombre que te parezca ofensivo o bloquea a un jugador para no coincidir con él en la mesa.",
+      "Reporta un nombre que te parezca ofensivo o bloquea a un jugador para dejar de coincidir con él en una partida.",
     yourRole: "Tu rol",
-    close: "Cerrar acciones de jugadores",
-    thanks: "Gracias, ha quedado registrado",
-    reportPlayer: "Denunciar a {{name}}",
+    close: "Cerrar acciones de jugador",
+    thanks: "Gracias, ya quedó registrado",
+    reportPlayer: "Reportar a {{name}}",
     reportExplanation:
-      "Al denunciar, también bloqueas de inmediato a este jugador. Dejarás de ver su nombre de usuario y no volverás a coincidir con él en la mesa. Revisamos cada denuncia en un plazo de 24 horas.",
+      "Al denunciar, también bloqueas de inmediato a este jugador. Dejarás de ver su nombre de usuario y no volverás a compartir partida con él. Revisamos cada denuncia en un plazo de 24 horas.",
     reasons: {
       offensiveUsername: "Nombre de usuario ofensivo",
       harassment: "Acoso o abuso",
@@ -276,33 +275,33 @@ export default {
     },
     noteLabel: "¿Algo más que debamos saber? (opcional)",
     sending: "Enviando…",
-    sendReport: "Enviar denuncia",
+    sendReport: "Enviar reporte",
     reportConfirmation:
-      "Hemos recibido tu denuncia sobre {{name}} y lo hemos bloqueado. No volverás a coincidir con él en la mesa.",
+      "Recibimos tu reporte sobre {{name}} y lo bloqueamos por ti. No volverás a coincidir con este jugador en una partida.",
     blockConfirmation:
-      "{{name}} está bloqueado. No volverás a coincidir con él en la mesa y su nombre queda oculto para ti.",
+      "{{name}} está bloqueado. No volverás a coincidir con este jugador en una partida y su nombre queda oculto para ti.",
     requestFailed: "No se pudo completar la solicitud",
     noOtherPlayers: "No hay otros jugadores en esta partida.",
-    report: "Denunciar",
+    report: "Reportar",
     block: "Bloquear",
   },
   board: {
-    checkingSession: "Comprobando la sesión conectada…",
+    checkingSession: "Comprobando sesión conectada…",
     sessionUnavailable: "Sesión conectada no disponible",
     unavailable: "Tablero conectado no disponible",
     loading: "Cargando tablero conectado…",
     notCached:
-      "Este tablero no está guardado en este dispositivo. Vuelve a conectarte para cargar la partida aquí.",
+      "Este tablero no está guardado en este teléfono. Vuelve a conectarte para cargar la partida aquí.",
     anotherSeat: "Otro asiento",
-    closeLayout: "Cerrar selector de disposición",
+    closeLayout: "Cerrar selector de diseño",
     failedAction: {
       life: {
-        none: "No se pudo sincronizar un cambio de vida de {{delta}}",
-        mtg: "No se pudo sincronizar un cambio de vida de {{delta}}",
-        ygo: "No se pudo sincronizar un cambio de {{delta}} Puntos de Vida",
+        none: "No se pudo sincronizar un cambio de {{delta}} vidas",
+        mtg: "No se pudo sincronizar un cambio de {{delta}} vidas",
+        ygo: "No se pudo sincronizar un cambio de {{delta}} LP",
         pokemon: "No se pudo sincronizar un cambio de {{delta}} cartas de Premio",
         lorcana: "No se pudo sincronizar un cambio de {{delta}} puntos de leyenda",
-        fab: "No se pudo sincronizar un cambio de vida de {{delta}}",
+        fab: "No se pudo sincronizar un cambio de {{delta}} vidas",
       },
       commanderDamage: "No se pudo sincronizar una asignación de {{delta}} de daño de comandante",
       table: "No se pudo sincronizar un cambio en la mesa",
@@ -310,7 +309,7 @@ export default {
       declineCommanderDamage: "No se pudo sincronizar el rechazo del daño de comandante",
     },
     menu: {
-      layout: "Disposición",
+      layout: "Diseño",
       dice: "Dados",
       players: "Jugadores",
       history: "Historial",
@@ -321,7 +320,7 @@ export default {
     },
     status: {
       close: "Cerrar estado de la partida conectada",
-      summary: "Resumen de conexión",
+      summary: "Partida terminada",
       offlineFor: "Sin conexión desde hace {{elapsed}}",
       slow: "Conexión lenta",
       backOnline: "De nuevo en línea",
@@ -335,13 +334,13 @@ export default {
       live: "En vivo",
       yourChanges: "Tus cambios",
       allSent: "Todo enviado",
-      savedOffline: "{{unsent}} guardados en este dispositivo. Se envían cuando te reconectes.",
+      savedOffline: "{{unsent}} guardados en este teléfono. Se envían cuando te reconectes.",
       sending: "Enviando {{unsent}}",
       finishGame: "Terminar partida",
       finishAvailable: "Disponible",
       dismissFailure: "Descartar tras revisar",
-      readOnlyLobby: "Esta partida está en la sala de espera y es de solo lectura en el tablero.",
-      readOnlyAbandoned: "Esta partida está abandonada y es de solo lectura en el tablero.",
+      readOnlyLobby: "Esta partida está en la sala y es de solo lectura en el tablero.",
+      readOnlyAbandoned: "Esta partida está anulada y es de solo lectura en el tablero.",
     },
     finishBlocker: {
       offline: {
@@ -360,7 +359,7 @@ export default {
     abandoned: {
       dismiss: "Descartar aviso de partida terminada",
       title: "Partida terminada",
-      message: "El anfitrión terminó esta partida. Su tablero queda en solo lectura.",
+      message: "El anfitrión terminó esta partida. Su tablero queda de solo lectura.",
       leave: "Salir",
     },
     finish: {
@@ -383,7 +382,7 @@ export default {
     readyCount: "{{ready}} de {{total}} listos",
     starting: "Iniciando…",
     waitingForDecks: "Esperando los mazos",
-    keepOpen: "Mantén esta sala abierta",
+    keepOpen: "Mantener esta sala abierta",
     errors: {
       selectDeck: "No se pudo seleccionar el mazo",
       updateSettings: "No se pudo actualizar la configuración de la sala",
@@ -394,7 +393,7 @@ export default {
     closed: {
       close: "Cerrar sala",
       title: "Sala cerrada",
-      abandoned: "Esta partida fue abandonada. Puedes iniciar o unirte a otra partida.",
+      abandoned: "Esta partida fue anulada. Puedes iniciar otra o unirte a otra partida.",
       ended: "Esta partida terminó. Puedes iniciar o unirte a otra partida.",
       ok: "Aceptar",
     },
@@ -405,15 +404,15 @@ export default {
   },
   scanner: {
     title: "Escanear invitación",
-    body: "Usa el escáner del dispositivo para encontrar un QR de invitación de Scryve de confianza. El reconocimiento se hace en el dispositivo y no se guarda ninguna imagen.",
+    body: "Usa el escáner del teléfono para encontrar un código QR de invitación de Scryve de confianza. El reconocimiento se hace en el teléfono y no se guarda ninguna imagen.",
     webUnavailable:
       "El escaneo de QR con la cámara está disponible en la app de iOS y Android. Introduce el código de 6 caracteres.",
     nativeUnavailable:
-      "El escáner de QR nativo no está disponible en este dispositivo. Introduce el código de invitación manualmente.",
+      "El escáner QR nativo no está disponible en este teléfono. Escribe el código de invitación manualmente.",
     untrusted:
       "Ese QR no es una invitación de Scryve de confianza. Prueba con otro código o introdúcelo manualmente.",
     openFailed:
-      "No se pudo abrir el escáner de QR en este dispositivo. Inténtalo de nuevo o introduce el código.",
+      "No se pudo abrir el escáner QR en este teléfono. Inténtalo de nuevo o escribe el código.",
     enterManually: "Introducir código manualmente",
     open: "Abrir escáner de QR",
     opening: "Abriendo escáner…",
@@ -428,23 +427,23 @@ export default {
     },
   },
   join: {
-    invitedTitle: "Unirse a la sala invitada",
+    invitedTitle: "Unirse a la sala de la invitación",
     codeTitle: "Unirse con código",
     invitedBody: "Únete a tus amigos con esta invitación.",
-    codeBody: "Introduce el código de 6 caracteres del anfitrión.",
-    invalidInvite: "La invitación no es válida, ha caducado o fue revocada",
+    codeBody: "Escribe el código de 6 caracteres del anfitrión.",
+    invalidInvite: "La invitación no es válida, expiró o fue revocada",
     localGameActive:
-      "Termina o abandona tu partida local activa antes de unirte a una partida conectada.",
+      "Termina o anula tu partida local activa antes de unirte a una partida conectada.",
     invalidCode: "Introduce un código de invitación válido.",
     invalidManualCode: "Introduce un código de invitación válido de 6 caracteres.",
-    seatTaken: "Ese asiento acaba de ocuparse. Elige otro asiento.",
+    seatTaken: "Acaban de ocupar ese asiento. Elige otro asiento.",
     failed: "No se pudo unir a la sala",
     scan: "Escanear código QR",
     differentInvitation: "Usar otra invitación",
     joiningAs: "Te unes como @{{username}}",
     pickSeat: "Elige tu asiento",
     pickSeatBody: "Cada asiento libre conserva sus propios contadores de la partida ya en curso.",
-    joining: "Uniéndose…",
+    joining: "Entrando…",
     join: "Unirse a la partida",
   },
   treachery: {
@@ -457,7 +456,7 @@ export default {
     },
     goals: {
       leader: "Gana cuando todos los Asesinos y Traidores estén fuera.",
-      guardian: "Mantén vivo al Líder. Ganas con él.",
+      guardian: "Mantén con vida al Líder. Ganas con él.",
       assassin: "Gana cuando el Líder esté fuera.",
       traitor: "Sé el último jugador en pie.",
     },
@@ -481,16 +480,16 @@ export default {
     namePlaceholder: "Visible para la mesa",
     empty: "Aún no hay partidas en esta red.",
     notFound:
-      "No se encontraron partidas. Comprueba que estás en el mismo Wi-Fi que el anfitrión. Los Wi-Fi de invitados y públicos suelen bloquearlo.",
+      "No se encontraron partidas. Comprueba que estás en la misma red Wi-Fi que el anfitrión. Las redes Wi-Fi de invitados y públicas suelen bloquearlo.",
     join: "Unirse a {{name}}",
     you: "{{name}} (tú)",
     away: "Ausente",
     startAgain: "Empezar de nuevo",
     backToGame: "Volver a la partida",
     errors: {
-      hostFailed: "No se pudo crear la partida: {{error}}",
+      hostFailed: "No se pudo crear: {{error}}",
       unreachable:
-        "No se pudo conectar con {{name}}. Puede que la partida haya terminado o que este Wi-Fi impida que los dispositivos se conecten.",
+        "No se pudo conectar con {{name}}. Puede que la partida haya terminado o que esta red Wi-Fi bloquee la conexión entre dispositivos.",
       lostHost: "Se perdió la conexión con el anfitrión. Puede que la partida haya terminado.",
     },
     rejected: {
@@ -498,7 +497,7 @@ export default {
       started: "Esta partida ya ha empezado.",
       full: "Esta partida está llena.",
       update: "Actualiza Scryve para unirte a esta partida.",
-      hostOutdated: "El anfitrión tiene que actualizar Scryve primero.",
+      hostOutdated: "El anfitrión debe actualizar Scryve primero.",
     },
   },
 } satisfies LocaleNamespace

@@ -18,14 +18,14 @@ export default {
   accountData: {
     label: "Compte et données",
     accessibilityLabel: "Compte et données",
-    accessibilityHint: "Ouvre les détails sur la suppression du compte et les données",
+    accessibilityHint: "Ouvre la suppression du compte et les détails des données",
   },
   shareUsage: "Partager l'utilisation avec Scryve",
   settings: {
     title: "Réglages",
     localDefaults: "Paramètres par défaut des parties locales",
     players: "joueurs",
-    openScryveTo: "Ouvrir Scryve sur",
+    openScryveTo: "À l'ouverture de Scryve, afficher",
     launchDestination: {
       play: "Jouer",
       decks: "Decks",
@@ -35,11 +35,11 @@ export default {
     chooseGame: "Lancer les nouvelles parties en",
     closeGameChoices: "Fermer le choix du jeu",
     defaultsHint:
-      "À définir seulement si vous voulez que les nouvelles parties commencent avec le même jeu et le même format.",
+      "Ne les définissez que si vous voulez que les nouvelles parties démarrent avec le même système et le même format.",
     haptics: {
       label: "Retour haptique",
       helper:
-        "Une légère vibration après chaque changement de vie. Un échec ne bloque jamais la partie.",
+        "Un léger retour tactile après les changements de points de vie. Les échecs ne bloquent jamais la partie.",
     },
     theme: {
       heading: "Thème",
@@ -84,7 +84,7 @@ export default {
     privacy: {
       heading: "Confidentialité",
       shareUsageHelper:
-        "Désactivé par défaut. Partage l'utilisation avec un identifiant aléatoire non lié à votre compte. Détails dans la Politique de confidentialité.",
+        "Désactivé par défaut. Partage l'usage avec un identifiant aléatoire non lié à votre compte. Détails dans la Politique de confidentialité.",
       saveFailed: "Impossible d'enregistrer votre choix. Veuillez réessayer.",
       unavailable:
         "Le partage d'utilisation n'est pas disponible dans cette version. Aucun événement PostHog ne sera envoyé.",
@@ -132,7 +132,7 @@ export default {
       "Découvrez comment démarrer avec Scryve, trouvez des réponses aux questions courantes ou contactez l'assistance.",
     title: "Aide",
     subtitle:
-      "Réponses sur les parties, les comptes et Scryve Pro. Écrivez-nous si vous avez besoin d'aide.",
+      "Réponses sur les parties, les comptes et Scryve Pro. Envoyez-nous un message si vous avez besoin d'aide.",
     contactUs: "Nous contacter",
     contactReason: "Motif du contact",
     kind: {
@@ -157,7 +157,7 @@ export default {
     removeScreenshot: "Supprimer la capture d'écran",
     addScreenshot: "Ajouter une capture d'écran",
     disclosure:
-      "Envoie à Sentry votre message, votre e-mail s'il est fourni, la version de l'app, le build, la plateforme et toute capture d'écran ajoutée.",
+      "Envoie à Sentry votre message, votre e-mail si fourni, la version de l'app, le build, la plateforme et toute capture d'écran ajoutée.",
     send: "Envoyer",
     preferEmail: "Vous préférez l'e-mail ?",
     emailSupport: "Assistance par e-mail",
@@ -174,11 +174,11 @@ export default {
       },
       choosePlay: {
         title: "Choisir comment jouer",
-        body: "Jouez ensemble sur un appareil, ou choisissez Connectée pour jouer sur des appareils séparés.",
+        body: "Jouez ensemble sur un seul appareil, ou choisissez Connecté pour jouer sur des appareils séparés.",
       },
       setUpTable: {
         title: "Préparer la table",
-        body: "Sélectionnez le nombre de joueurs et la vie de départ, puis lancez la partie.",
+        body: "Sélectionnez le nombre de joueurs et les points de vie de départ, puis lancez la partie.",
       },
     },
     faq: {
@@ -186,7 +186,7 @@ export default {
       restorePro: {
         question: "Restaurer Scryve Pro",
         answer:
-          "Ouvrez Scryve, allez dans votre compte, choisissez Scryve Pro, puis touchez Restaurer les achats. Utilisez le même compte Apple ou Google que celui de l’achat initial.",
+          "Ouvrez Scryve, allez dans votre compte, choisissez Scryve Pro, puis touchez Restaurer les achats. Utilisez le même compte Apple ou Google que pour l'achat initial.",
       },
       manageSubscription: {
         question: "Gérer ou résilier un abonnement",
@@ -201,7 +201,7 @@ export default {
       accountPrivacy: {
         question: "Questions sur le compte ou la confidentialité",
         answer:
-          "Vous pouvez gérer votre compte depuis l’écran de compte de Scryve. Contactez-nous si vous avez besoin d’aide pour accéder à votre compte ou le supprimer.",
+          "Vous pouvez gérer votre compte depuis l'écran de compte de Scryve. Contactez-nous si vous avez besoin d'aide pour accéder à votre compte ou le supprimer.",
       },
     },
     appVersion: "Scryve {{version}}",
@@ -218,9 +218,9 @@ export default {
       "Scryve est indépendant et n’est ni affilié ni approuvé par les éditeurs de jeux, les détenteurs de droits ou les fournisseurs de données cités dans notre avis sur le contenu des jeux.",
     signingOut: "Déconnexion…",
     signOut: "Se déconnecter",
-    signOutFailed: "Impossible de se déconnecter. Réessayez.",
-    signOutFailedShort: "Impossible de se déconnecter",
-    signInPrompt: "Connectez-vous avant d’ouvrir votre profil.",
+    signOutFailed: "Déconnexion impossible. Réessayez.",
+    signOutFailedShort: "Déconnexion impossible",
+    signInPrompt: "Connectez-vous avant d'ouvrir votre profil.",
     reauthenticate: "Se réauthentifier",
   },
   deleteAccount: {
@@ -234,19 +234,19 @@ export default {
     },
     checkingStatus: "Vérification de l’état de la suppression…",
     intro:
-      "Cela supprime définitivement votre compte Scryve et anonymise votre historique de parties connectées. Lisez d’abord ce qui va se passer.",
+      "Cela supprime définitivement votre compte Scryve et anonymise votre historique de parties connectées. Vérifiez d'abord ce qui se passe.",
     steps: {
       cloud: {
         title: "Votre compte cloud est supprimé",
         body: "Votre profil, votre avatar, votre connexion, vos invitations et les données connectées liées au compte sont supprimés.",
       },
       history: {
-        title: "L’historique partagé des parties est anonymisé",
-        body: "Les autres joueurs conservent le résultat de la partie, mais vos places deviennent des entrées « Joueur supprimé » non liées, avec un avatar neutre.",
+        title: "L'historique des matchs partagés est anonymisé",
+        body: "Les autres joueurs conservent le résultat du match, mais vos places deviennent des entrées « Joueur supprimé » non liées, avec un avatar neutre.",
       },
       local: {
         title: "Les parties locales restent sur cet appareil",
-        body: "L’historique des parties hors ligne est stocké uniquement sur cet appareil. Il n’est pas lié à votre compte et n’est pas effacé à distance.",
+        body: "L'historique des parties hors ligne est stocké uniquement sur cet appareil. Il n'est pas lié à votre compte et n'est pas effacé à distance.",
       },
       signOut: {
         title: "Tous les appareils sont déconnectés",
@@ -255,7 +255,7 @@ export default {
     },
     subscription: {
       heading: "Vous avez un abonnement Scryve Pro ?",
-      body: "Supprimer votre compte ne le résiliera pas. Vous pourriez continuer à être facturé tant que vous ne résiliez pas via Apple ou Google Play. Vous pouvez quand même supprimer maintenant, mais vous perdrez l’accès à la durée payée restante.",
+      body: "Supprimer votre compte ne l'annulera pas. Vous pourriez continuer à être facturé tant que vous n'annulez pas via Apple ou Google Play. Vous pouvez quand même supprimer maintenant, mais vous perdrez l'accès au temps payé restant.",
       manageApple: "Gérer les abonnements Apple",
       manageGoogle: "Gérer les abonnements Google Play",
     },
@@ -278,12 +278,12 @@ export default {
       identityPending:
         "Vos données connectées sont anonymisées. Scryve supprime maintenant votre identité de connexion.",
       processing:
-        "Scryve anonymise l’historique connecté et supprime les données liées au compte. Vous pouvez fermer cette page sans risque.",
+        "Scryve anonymise l'historique connecté et supprime les données liées au compte. Vous pouvez fermer cette page sans risque.",
     },
     panel: {
       failed: {
         title: "La suppression requiert votre attention",
-        body: "Aucune donnée du compte ne sera restaurée. Saisissez {{word}} et renvoyez la demande pour réessayer le travail restant.",
+        body: "Aucune donnée du compte ne sera restaurée. Saisissez {{word}} et validez à nouveau pour réessayer le reste du traitement.",
       },
       completed: {
         title: "Suppression terminée",
@@ -301,7 +301,7 @@ export default {
       lastUpdated: "Dernière mise à jour le {{day}} à {{time}}",
       next: {
         completed: "Aucune autre action n’est nécessaire.",
-        failed: "Reconnectez-vous, revenez sur cette page et réessayez la demande.",
+        failed: "Connectez-vous à nouveau, revenez sur cette page et relancez la demande.",
         pending: "Vous pouvez fermer Scryve. Cette page continuera à vérifier à votre retour.",
       },
       signInToRetry: "Se connecter pour réessayer",
@@ -309,7 +309,7 @@ export default {
     },
     route: {
       statusCheckFailed:
-        "Scryve n’a pas pu vérifier l’état de votre suppression. La suppression du compte reste indisponible tant que la vérification n’a pas réussi.",
+        "Scryve n'a pas pu vérifier l'état de votre suppression. La suppression du compte reste indisponible tant que la vérification n'a pas réussi.",
       signInPrompt: "Connectez-vous pour demander la suppression de votre compte Scryve.",
       checkingReceipt: "Vérification de votre reçu de suppression…",
       checkingAccount: "Vérification de votre compte…",
@@ -319,9 +319,9 @@ export default {
   },
   cloud: {
     signInToContinue: "Connectez-vous pour continuer.",
-    chooseUsername: "Choisissez votre nom d’utilisateur de joueur.",
+    chooseUsername: "Choisissez votre nom d'utilisateur de joueur.",
     reconnect: "Reconnectez-vous pour continuer.",
-    chooseUsernameAction: "Choisir un nom d’utilisateur",
+    chooseUsernameAction: "Choisir un nom d'utilisateur",
     unavailableHeading: "Fonctions connectées indisponibles",
     localPlayAvailable: "Le jeu local reste disponible.",
     notConfigured:
@@ -440,7 +440,7 @@ export default {
     downloading: "Téléchargement de la mise à jour…",
     downloadingProgress: "Téléchargement de la mise à jour {{percent}} %",
     ready: "Mise à jour prête",
-    cancelReady: "Annuler la mise à jour prête",
+    cancelReady: "Fermer",
     restart: "Redémarrer",
     whatsNew: "Contenu de cette mise à jour",
     dialogMessage:

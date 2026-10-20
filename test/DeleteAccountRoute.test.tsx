@@ -93,7 +93,7 @@ describe("delete account route", () => {
     expect(view.queryByTestId("confirm-account-deletion-button")).toBeNull()
     fireEvent.press(view.getByText("Try again"))
     expect(retry).toHaveBeenCalledTimes(1)
-    fireEvent.press(view.getByText("Open Play"))
+    fireEvent.press(view.getByText("Go to Play"))
     expect(router.dismissTo).toHaveBeenCalledWith({
       pathname: "/",
       params: { destination: "play" },

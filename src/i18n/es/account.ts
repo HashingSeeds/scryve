@@ -10,7 +10,7 @@ export default {
     privacyPolicy: "Política de privacidad",
     termsOfUse: "Términos de uso",
     licenseAgreement: "Contrato de licencia",
-    licenseAgreementHint: "Abre el contrato de licencia estándar de Apple en el navegador",
+    licenseAgreementHint: "Abre el contrato de licencia estándar de Apple en tu navegador",
     cookiePolicy: "Política de cookies",
     gameContent: "Contenido de juegos de terceros",
     licenseOpenFailed: "No se pudo abrir el contrato de licencia",
@@ -18,28 +18,28 @@ export default {
   accountData: {
     label: "Cuenta y datos",
     accessibilityLabel: "Cuenta y datos",
-    accessibilityHint: "Abre la eliminación de la cuenta y los detalles de los datos",
+    accessibilityHint: "Abre los detalles de datos y de eliminación de la cuenta",
   },
   shareUsage: "Compartir uso con Scryve",
   settings: {
     title: "Ajustes",
     localDefaults: "Valores predeterminados de partidas locales",
     players: "jugadores",
-    openScryveTo: "Abrir Scryve en",
+    openScryveTo: "Al abrir Scryve, mostrar",
     launchDestination: {
       play: "Jugar",
       decks: "Mazos",
     },
     launchDestinationHint: "Jugar retoma la partida actual o abre un tablero nuevo.",
     game: "Juego",
-    chooseGame: "Iniciar partidas nuevas como",
+    chooseGame: "Empezar partidas nuevas como",
     closeGameChoices: "Cerrar opciones de juego",
     defaultsHint:
-      "Configúralo solo si quieres que las partidas nuevas empiecen con el mismo sistema y formato.",
+      "Configura esto solo si quieres que las partidas nuevas empiecen con el mismo juego y formato.",
     haptics: {
       label: "Respuesta háptica",
       helper:
-        "Una vibración sutil tras los cambios de vida. Si falla, nunca interrumpe la partida.",
+        "Una vibración sutil después de cambiar las vidas. Si falla, nunca bloquea la partida.",
     },
     theme: {
       heading: "Tema",
@@ -156,7 +156,7 @@ export default {
     removeScreenshot: "Quitar captura",
     addScreenshot: "Añadir captura",
     disclosure:
-      "Envía a Sentry tu mensaje, el correo si lo indicas, la versión de la app, la compilación, la plataforma y la captura que añadas.",
+      "Envía a Sentry tu mensaje, el correo si lo indicas, la versión de la app, la compilación, la plataforma y cualquier captura de pantalla que añadas.",
     send: "Enviar",
     preferEmail: "¿Prefieres el correo?",
     emailSupport: "Escribir a soporte",
@@ -173,11 +173,11 @@ export default {
       },
       choosePlay: {
         title: "Elige cómo jugar",
-        body: "Juega en un solo dispositivo o elige Conectada para jugar en dispositivos separados.",
+        body: "Jugad juntos en un dispositivo, o elige Conectada para jugar en dispositivos separados.",
       },
       setUpTable: {
         title: "Prepara la mesa",
-        body: "Selecciona el número de jugadores y la vida inicial, y empieza la partida.",
+        body: "Selecciona el número de jugadores y las vidas iniciales, y empieza la partida.",
       },
     },
     faq: {
@@ -200,7 +200,7 @@ export default {
       accountPrivacy: {
         question: "Preguntas sobre la cuenta o la privacidad",
         answer:
-          "Puedes administrar tu cuenta desde la pantalla de cuenta de Scryve. Contáctanos si necesitas ayuda para acceder a tu cuenta o eliminarla.",
+          "Puedes gestionar tu cuenta desde la pantalla de cuenta de Scryve. Contáctanos si necesitas ayuda para acceder a tu cuenta o eliminarla.",
       },
     },
     appVersion: "Scryve {{version}}",
@@ -233,28 +233,28 @@ export default {
     },
     checkingStatus: "Comprobando el estado de la eliminación…",
     intro:
-      "Esto elimina permanentemente tu cuenta de Scryve y anonimiza tu historial de juego conectado. Revisa primero qué ocurre.",
+      "Esto elimina de forma permanente tu cuenta de Scryve y anonimiza tu historial de partidas conectadas. Primero revisa lo que ocurre.",
     steps: {
       cloud: {
         title: "Se elimina tu cuenta en la nube",
-        body: "Se eliminan tu perfil, avatar, inicio de sesión, invitaciones y los datos conectados vinculados a tu cuenta.",
+        body: "Se eliminan tu perfil, avatar, inicio de sesión, invitaciones y los datos conectados vinculados a la cuenta.",
       },
       history: {
-        title: "El historial de partidas compartidas se anonimiza",
-        body: "Los demás jugadores conservan el resultado de la partida, pero tus asientos pasan a ser entradas sin vincular de «Jugador eliminado» con un avatar neutro.",
+        title: "El historial de encuentros compartidos se anonimiza",
+        body: "Los demás jugadores conservan el resultado del encuentro, pero tus asientos pasan a ser entradas sin vincular de «Jugador eliminado» con un avatar neutro.",
       },
       local: {
         title: "Las partidas locales se quedan en este dispositivo",
         body: "El historial de partidas sin conexión se guarda solo en este dispositivo. No está vinculado a tu cuenta y no se borra de forma remota.",
       },
       signOut: {
-        title: "Se cierra sesión en todos los dispositivos",
-        body: "Se cierra sesión automáticamente en este dispositivo y en cualquier otro donde hayas iniciado sesión.",
+        title: "Se cierra la sesión en todos los dispositivos",
+        body: "La sesión se cierra automáticamente en este dispositivo y en cualquier otro donde la tengas iniciada.",
       },
     },
     subscription: {
       heading: "¿Tienes una suscripción a Scryve Pro?",
-      body: "Eliminar tu cuenta no la cancela. Es posible que se te siga cobrando hasta que la canceles a través de Apple o Google Play. Aún puedes eliminarla ahora, pero perderás el acceso al tiempo pagado que te quede.",
+      body: "Eliminar tu cuenta no la cancelará. Puede que se te siga cobrando hasta que la canceles en Apple o Google Play. Aún puedes eliminarla ahora, pero perderás el acceso al tiempo pagado que te quede.",
       manageApple: "Administrar suscripciones de Apple",
       manageGoogle: "Administrar suscripciones de Google Play",
     },
@@ -262,8 +262,8 @@ export default {
     confirmLabel: "Escribe {{word}} para continuar",
     submit: {
       submitting: "Enviando solicitud…",
-      retry: "Reintentar eliminación de cuenta",
-      delete: "Eliminar cuenta permanentemente",
+      retry: "Reintentar la eliminación de la cuenta",
+      delete: "Eliminar cuenta de forma permanente",
     },
     footnote: {
       retry:
@@ -282,7 +282,7 @@ export default {
     panel: {
       failed: {
         title: "La eliminación requiere atención",
-        body: "No se restaurará ningún dato de la cuenta. Escribe {{word}} y envía de nuevo para reintentar el trabajo restante.",
+        body: "No se restaurará ningún dato de la cuenta. Escribe {{word}} y envía de nuevo para reintentar lo que falta.",
       },
       completed: {
         title: "Eliminación completada",
@@ -295,7 +295,7 @@ export default {
     },
     receipt: {
       completedBody:
-        "Scryve eliminó tu cuenta de inicio de sesión y anonimizó tu historial de juego conectado.",
+        "Scryve eliminó tu cuenta de inicio de sesión y anonimizó tu historial de partidas conectadas.",
       failedBody: "Scryve no pudo terminar automáticamente el trabajo de eliminación restante.",
       lastUpdated: "Última actualización: {{day}} a las {{time}}",
       next: {
@@ -332,7 +332,7 @@ export default {
       checking: "Comprobando acceso…",
       renews: "Se renueva el {{date}}",
       availableUntil: "Disponible hasta el {{date}}",
-      active: "Acceso {{plan}} activo",
+      active: "Acceso a {{plan}} activo",
       unavailable: "Estado no disponible",
       free: "Plan gratuito",
     },
@@ -353,7 +353,7 @@ export default {
       pending: "La tienda sigue procesando esta compra. El acceso se actualizará cuando termine.",
       misconfigured: "Scryve Pro no está configurado correctamente para esta versión.",
       failed: "No se pudo completar la compra.",
-      waitForBilling: "Espera a que la facturación se conecte a tu cuenta y vuelve a intentarlo.",
+      waitForBilling: "Espera a que la facturación se conecte a tu cuenta e inténtalo de nuevo.",
       foilWebOnly: "Las compras de Foil solo están disponibles en la web.",
       manageBeforeFoil: "Gestiona tu suscripción actual antes de cambiar a Foil.",
       productNotInStore: "{{productId}} no está disponible en la tienda actual.",
@@ -435,7 +435,7 @@ export default {
     downloading: "Descargando actualización…",
     downloadingProgress: "Descargando actualización {{percent}}%",
     ready: "Actualización lista",
-    cancelReady: "Cancelar actualización lista",
+    cancelReady: "Cerrar",
     restart: "Reiniciar",
     whatsNew: "Novedades de esta actualización",
     dialogMessage:

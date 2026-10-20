@@ -2,6 +2,7 @@ const play = {
   playerNames: "Player names",
   startGame: "Start game",
   finish: "Finish",
+  // Ends the game for everyone and records it as abandoned, with no result.
   abandon: "Abandon",
   ending: "Ending…",
   gameSummary: "Game summary",
@@ -10,7 +11,8 @@ const play = {
   currentGame: {
     emptyHeading: "No active local game",
     emptyContent: "Your next game is ready on Play.",
-    openPlay: "Open Play",
+    // Button that goes to the Play tab.
+    openPlay: "Go to Play",
   },
   launch: {
     updateTitle: "Update Scryve",
@@ -51,6 +53,7 @@ const play = {
     players: "Players",
     match: "Match",
     singleGame: "Single game",
+    // Label for the match length choice: best of 1, 3 or 5 games.
     bestOf: "Best of",
     bestOfCount: "Best of {{bestOf}}",
     clock: "Clock",
@@ -58,7 +61,8 @@ const play = {
     clockCountdown: "Countdown",
     clockStopwatch: "Stopwatch",
     minutesLeft: "Minutes left",
-    changeBy: "Change by",
+    // Label next to the starting value: how much one tap changes it (1, 5 or 10).
+    changeBy: "Per tap",
     layout: "Layout",
     changeAppearance: "Change appearance for {{name}}",
     nameForPlayer: "Name for player {{seat}}",
@@ -80,11 +84,13 @@ const play = {
     endCurrentGame: "End current game…",
     endCurrentGameHint: "Opens the end-game prompt before you can start another game",
     working: "Working…",
+    // Button: create a lobby that you host.
     hostLobby: "Host lobby",
     hostLobbyHint: "Creates a lobby others can join",
     startGameHint: "Starts this local game on the current device",
     cloud: "Cloud",
-    hostOn: "Host on",
+    // Heading above a choice of Cloud or Nearby: where the connected game runs.
+    hostOn: "Run game on",
     nearby: "Nearby",
     nearbyHint: "Plays with phones on this Wi-Fi, without accounts or the cloud",
     endMatch: "End match…",
@@ -123,6 +129,7 @@ const play = {
     hoursMinutes: "{{hours}}h {{minutes}}m",
     playerCount_one: "{{count}} player",
     playerCount_other: "{{count}} players",
+    // One-letter badges for a win, loss or draw.
     badge: {
       win: "W",
       loss: "L",
@@ -250,7 +257,8 @@ const play = {
     formatWithSystem: "{{format}} ({{system}})",
     today: "Today",
     yesterday: "Yesterday",
-    badgeAbandoned: "A",
+    // Badge for an abandoned game. A symbol; keep it exactly.
+    badgeAbandoned: "⊘",
     inProgress: "In progress",
     versus: "vs {{opponents}}",
     bestOfShort: "Bo{{bestOf}}",
@@ -273,7 +281,7 @@ const play = {
       loadingMore_one: "{{count}} loaded game · Loading more connected history",
       loadingMore_other: "{{count}} loaded games · Loading more connected history",
     },
-    noLoadedMatchesHeading: "No matches in loaded games",
+    noLoadedMatchesHeading: "No results in loaded games",
     noLoadedMatchesContent: "Load older games to search further back.",
     loadOlderGames: "Load older games",
     noFilterMatchesHeading: "No games match these filters",
@@ -359,6 +367,7 @@ const play = {
     downloading: "Downloading the Comprehensive Rules from {{publisher}}.",
     failed: "Couldn't download the rules.",
     webOnly: "The Comprehensive Rules are on the {{publisher}} site.",
+    // {{section}} is a numbered rules section such as "1. Game Concepts"; this shows every rule in it.
     allOf: "All of {{section}}",
     noResults: "No rules match.",
     notFound: "This rule isn't in this version of the rules.",

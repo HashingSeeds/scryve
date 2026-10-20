@@ -29,8 +29,8 @@ export default {
     account: "계정",
     signIn: "로그인",
     closeMenu: "유틸리티 메뉴 닫기",
-    nearbyOnlyOn: "근처 전용: 켜짐",
-    nearbyOnlyOff: "근처 전용: 꺼짐",
+    nearbyOnlyOn: "근처만: 켬",
+    nearbyOnlyOff: "근처만: 끔",
   },
   appNavigation: {
     decks: "덱",
@@ -46,7 +46,7 @@ export default {
     triggerLabel: "{{label}}, {{value}}",
     openHint: {
       format: "포맷 선택지를 엽니다",
-      commanderColor: "커맨더 색상 선택지를 엽니다",
+      commanderColor: "커맨더 색 선택지를 엽니다",
       addTo: "추가 대상 선택지를 엽니다",
       changeBy: "변경 수치 선택지를 엽니다",
       thisIsMe: "나예요 선택지를 엽니다",
@@ -55,7 +55,7 @@ export default {
     },
     closeLabel: {
       format: "포맷 선택지 닫기",
-      commanderColor: "커맨더 색상 선택지 닫기",
+      commanderColor: "커맨더 색 선택지 닫기",
       addTo: "추가 대상 선택지 닫기",
       changeBy: "변경 수치 선택지 닫기",
       thisIsMe: "나예요 선택지 닫기",

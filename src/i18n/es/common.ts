@@ -29,8 +29,8 @@ export default {
     account: "Cuenta",
     signIn: "Iniciar sesión",
     closeMenu: "Cerrar menú de utilidades",
-    nearbyOnlyOn: "Solo cercana: activado",
-    nearbyOnlyOff: "Solo cercana: desactivado",
+    nearbyOnlyOn: "Solo cercanas: Sí",
+    nearbyOnlyOff: "Solo cercanas: No",
   },
   appNavigation: {
     decks: "Mazos",

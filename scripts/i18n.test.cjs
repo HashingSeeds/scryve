@@ -2,6 +2,7 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 
 const {
+  englishNotes,
   flatten,
   prototypeKeys,
   unflatten,
@@ -95,4 +96,48 @@ test("flags keys that i18next would resolve to built-in object properties", () =
     prototypeKeys({ "life.valueOf": "x", "life.valueOutOf": "y", "toString": "z" }),
     ["life.valueOf", "toString"],
   )
+})
+
+test("sends comments above English keys as notes, and a changed note retranslates the key", () => {
+  const source = `const ns = {
+  // Pokémon only.
+  prizes: {
+    // Prize cards the player has taken.
+    taken: "{{amount}} taken",
+    left_one: "{{count}} left",
+    left_other: "{{count}} left",
+  },
+  back: "Back",
+}`
+  const notes = englishNotes(source)
+  assert.deepEqual(notes, {
+    "prizes.taken": "Pokémon only. Prize cards the player has taken.",
+    "prizes.left_one": "Pokémon only.",
+    "prizes.left_other": "Pokémon only.",
+  })
+
+  const flat = { "prizes.taken": "{{amount}} taken", "back": "Back" }
+  const before = translationUnits(flat)
+  const after = translationUnits(flat, notes)
+  assert.equal(after.get("prizes.taken").note, "Pokémon only. Prize cards the player has taken.")
+  assert.notEqual(after.get("prizes.taken").hash, before.get("prizes.taken").hash)
+  assert.equal(after.get("back").hash, before.get("back").hash)
+})
+
+test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quotes", () => {
+  const unit = translationUnits({ label: "Monarch {{name}}" }).get("label")
+  assert.deepEqual(validateUnit(unit, { label: "monarch {{name}}" }, "ja"), [
+    'label: left "monarch" in Latin script',
+  ])
+  assert.deepEqual(validateUnit(unit, { label: "모나크 없ANC수 {{name}}" }, "ko"), [
+    "label: has Latin letters inside a word",
+  ])
+  assert.deepEqual(
+    validateUnit(unit, { label: "統治者 Scryve「3 Ash Blossom」{{name}}" }, "ja"),
+    [],
+  )
+  assert.deepEqual(validateUnit(unit, { label: "monarca {{name}}" }, "es"), [])
+  assert.deepEqual(validateUnit(unit, { label: 'Monarca {{name}}"' }, "es"), [
+    "label: has an unmatched quote",
+  ])
 })

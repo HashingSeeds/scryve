@@ -177,7 +177,7 @@ describe("game summary", () => {
 
     expect(screen.getByText("3")).toBeTruthy()
     expect(screen.getByText("-17 from start")).toBeTruthy()
-    expect(screen.getByText("even")).toBeTruthy()
+    expect(screen.getByText("unchanged")).toBeTruthy()
   })
 
   it("keeps the life-change timeline collapsed until asked for", () => {
@@ -294,7 +294,7 @@ describe("game summary", () => {
       )
 
     render36(36)
-    expect(screen.getAllByText("even")).toHaveLength(2)
+    expect(screen.getAllByText("unchanged")).toHaveLength(2)
     screen.unmount()
     render36(33)
     expect(screen.getByText("-3 from start")).toBeTruthy()
