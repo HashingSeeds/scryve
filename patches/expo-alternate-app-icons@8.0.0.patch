@@ -1,28 +1,84 @@
 diff --git a/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt b/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
-index 9c3ba02686d8d2d41e900f5483b4d06df4c1d22e..92be2db1ec6283953c34b93a0c798ac470fe5809 100644
+index 9c3ba02..87b501e 100644
 --- a/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
 +++ b/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
-@@ -10,6 +10,9 @@ import kotlinx.coroutines.withContext
+@@ -1,7 +1,10 @@
+ package expo.modules.alternateappicons
+ 
++import android.app.Activity
++import android.app.Application
+ import android.content.ComponentName
+ import android.content.pm.PackageManager
++import android.os.Bundle
+ import expo.modules.kotlin.functions.Coroutine
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
+@@ -10,7 +13,35 @@ import kotlinx.coroutines.withContext
  
  const val MAIN_ACTIVITY_NAME = "MainActivity"
  
 +// Scryve patch: the running activity keeps the component it launched with, so reading the current
 +// icon from it enabled every alias picked in one session and made a reset to the default a no-op.
 +// Icons are now read from, and switched by, the launcher components' enabled state.
++// Disabling the component the app launched from makes Android close it, so a picked icon waits
++// until no activity of the app is started, and reads back as picked in the meantime.
  class ExpoAlternateAppIconsModule : Module() {
++  private data class Pending(val icon: String?)
++
++  @Volatile private var pending: Pending? = null
++  private val startedActivities = mutableSetOf<Activity>()
++
++  private val lifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
++    override fun onActivityStarted(activity: Activity) {
++      startedActivities.add(activity)
++    }
++
++    override fun onActivityStopped(activity: Activity) {
++      startedActivities.remove(activity)
++      // A rotation stops the old activity before the new one starts.
++      if (startedActivities.isEmpty() && !activity.isChangingConfigurations) applyPending()
++    }
++
++    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
++    override fun onActivityResumed(activity: Activity) = Unit
++    override fun onActivityPaused(activity: Activity) = Unit
++    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
++    override fun onActivityDestroyed(activity: Activity) = Unit
++  }
++
    override fun definition() = ModuleDefinition {
      Name("ExpoAlternateAppIcons")
-@@ -23,50 +26,51 @@ class ExpoAlternateAppIconsModule : Module() {
+ 
+@@ -18,55 +49,77 @@ class ExpoAlternateAppIconsModule : Module() {
+       "supportsAlternateIcons" to true
+     )
+ 
++    OnCreate {
++      application()?.registerActivityLifecycleCallbacks(lifecycleCallbacks)
++    }
++
++    OnDestroy {
++      application()?.unregisterActivityLifecycleCallbacks(lifecycleCallbacks)
++    }
++
+     Function("getAppIconName", this@ExpoAlternateAppIconsModule::getAppIconName)
+     AsyncFunction("setAlternateAppIcon").Coroutine(this@ExpoAlternateAppIconsModule::setAlternateAppIcon)
    }
  
++  private fun application(): Application? = appContext.reactContext?.applicationContext as? Application
++
    private fun getAppIconName(): String? {
 -    val currentActivityComponent = appContext.activityProvider?.currentActivity?.componentName ?: return null
--
++    pending?.let { return it.icon }
++    return enabledIconName()
++  }
+ 
 -    return try {
 -      retrieveIconNameFromComponent(currentActivityComponent)
 -    } catch (error: PackageManager.NameNotFoundException) {
 -      null
 -    }
++  private fun enabledIconName(): String? {
 +    val packageManager = appContext.reactContext?.packageManager ?: return null
 +    return launcherComponents()
 +      .firstOrNull {
@@ -40,14 +96,21 @@ index 9c3ba02686d8d2d41e900f5483b4d06df4c1d22e..92be2db1ec6283953c34b93a0c798ac4
 -    if (currentIconName == icon) return@withContext icon
 -
 -    val newActivityComponent = replaceMainActivitySimpleName(currentActivityComponent, icon)
--
++    if (launcherComponents().none { retrieveIconNameFromComponent(it) == icon })
++      throw IllegalArgumentException("Unknown app icon: $icon")
++    pending = if (icon == enabledIconName()) null else Pending(icon)
++    return@withContext icon
++  }
+ 
 -    appContext.reactContext?.packageManager?.run {
 -      setComponentEnabledSetting(newActivityComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
 -      setComponentEnabledSetting(currentActivityComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
-+    val packageManager = appContext.reactContext!!.packageManager
++  private fun applyPending() {
++    val icon = pending ?: return
++    pending = null
++    val packageManager = appContext.reactContext?.packageManager ?: return
 +    val components = launcherComponents()
-+    val target = components.firstOrNull { retrieveIconNameFromComponent(it) == icon }
-+      ?: throw IllegalArgumentException("Unknown app icon: $icon")
++    val target = components.firstOrNull { retrieveIconNameFromComponent(it) == icon.icon } ?: return
 +
 +    packageManager.setComponentEnabledSetting(target, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
 +    for (component in components) {
@@ -55,10 +118,9 @@ index 9c3ba02686d8d2d41e900f5483b4d06df4c1d22e..92be2db1ec6283953c34b93a0c798ac4
 +        packageManager.setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
 +      }
      }
++  }
  
-     return@withContext icon
-   }
- 
+-    return@withContext icon
 +  @Suppress("DEPRECATION")
 +  private fun launcherComponents(): List<ComponentName> {
 +    val context = appContext.reactContext ?: return emptyList()
@@ -69,8 +131,8 @@ index 9c3ba02686d8d2d41e900f5483b4d06df4c1d22e..92be2db1ec6283953c34b93a0c798ac4
 +    return packageInfo.activities.orEmpty()
 +      .map { ComponentName(context.packageName, it.name) }
 +      .filter { getSimpleName(it).startsWith(MAIN_ACTIVITY_NAME) }
-+  }
-+
+   }
+ 
    private fun getSimpleName(component: ComponentName): String = component.className.split('.').last()
  
    private fun retrieveIconNameFromComponent(component: ComponentName): String? =
