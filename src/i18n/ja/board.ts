@@ -93,8 +93,8 @@ export default {
     roll: "ダイスで先攻を決める",
     chip: {
       roll: "ダイスで先攻決め",
-      flip: "コイントスで先攻決め",
-      loserChooses: "{{name}}さんが先攻を選ぶ",
+      flip: "コインで先攻決め",
+      loserChooses: "{{name}}が先攻・後攻を選びます",
     },
   },
   layout: {

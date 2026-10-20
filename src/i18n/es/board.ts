@@ -93,9 +93,9 @@ export default {
     flip: "Lanzar moneda para decidir quién juega primero",
     roll: "Tirar dado para decidir quién juega primero",
     chip: {
-      roll: "Tirar para empezar",
-      flip: "Moneda para empezar",
-      loserChooses: "{{name}} elige quién empieza",
+      roll: "Tirar dado para jugar primero",
+      flip: "Lanzar moneda para jugar primero",
+      loserChooses: "{{name}} elige quién juega primero",
     },
   },
   layout: {
