@@ -590,7 +590,6 @@ export const cacheMany = internalMutation({
   },
 })
 
-/** why: one read gives a Scryfall printing's oracle identity and its cached artwork, so a repeat fallback needs no Scryfall request. */
 export const cachedImageFallbacks = internalQuery({
   args: { scryfallId: v.string() },
   handler: async (ctx, { scryfallId }) => {

@@ -92,7 +92,6 @@ function scryfallLookupError(status: number, cardId: string, lookup: "Card" | "P
   })
 }
 
-/** why: new printings of a card are rare, so a week of reuse costs little artwork and saves two Scryfall requests per view. */
 const IMAGE_FALLBACK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 async function scryfallOracleId(ctx: ActionCtx, cardId: string) {
@@ -111,15 +110,11 @@ export async function scryfallImageCandidates(ctx: ActionCtx, cardId: string): P
   } | null = await ctx.runQuery(internal.cards.cachedImageFallbacks, { scryfallId: cardId })
   const fallbacks = cached?.fallbacks
   if (fallbacks && fallbacks.fetchedAt > Date.now() - IMAGE_FALLBACK_TTL_MS) return fallbacks.urls
-  /** why: a stored reference uses its own printing ID when Scryfall gave it no oracle identity. */
-  const oracleId = cached
-    ? cached.oracleId === cardId
-      ? undefined
-      : cached.oracleId
-    : await scryfallOracleId(ctx, cardId)
+  const storedOracleId = cached?.oracleId === cardId ? undefined : cached?.oracleId
+  const oracleId = storedOracleId ?? (await scryfallOracleId(ctx, cardId))
   if (!oracleId || !/^[\da-f-]{36}$/i.test(oracleId)) return []
   const urls = await scryfallPrintingImages(ctx, cardId, oracleId)
-  await ctx.runMutation(internal.cards.cacheImageFallbacks, { oracleId, urls })
+  if (urls.length > 0) await ctx.runMutation(internal.cards.cacheImageFallbacks, { oracleId, urls })
   return urls
 }
 
