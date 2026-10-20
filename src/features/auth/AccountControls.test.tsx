@@ -4,13 +4,19 @@ import { ThemeProvider } from "@/theme/context"
 
 import { AccountProfile } from "./AccountControls"
 
-const mockSignOut = jest.fn(async () => undefined)
+const mockSignOut = jest.fn<Promise<void>, []>(async () => undefined)
+const mockReportCrash = jest.fn()
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: (...args: unknown[]) => mockReportCrash(...args),
+}))
 const mockWriteSessionHint = jest.fn()
 jest.mock("./sessionHint", () => ({
   writeSessionHint: (hint: unknown) => mockWriteSessionHint(hint),
 }))
 
 jest.mock("@clerk/expo", () => ({
+  isClerkAPIResponseError: (error: { clerkError?: boolean }) => error.clerkError === true,
   useClerk: () => ({ signOut: mockSignOut }),
   useUser: () => ({
     user: {
@@ -86,5 +92,27 @@ describe("AccountControls", () => {
     expect(mockWriteSessionHint.mock.invocationCallOrder[0]).toBeLessThan(
       mockSignOut.mock.invocationCallOrder[0],
     )
+  })
+
+  it("sends a failed sign out to Sentry with Clerk's error codes", async () => {
+    const failure = Object.assign(new Error("Unauthorized"), {
+      clerkError: true,
+      errors: [{ code: "authentication_invalid" }, { code: "session_not_found" }],
+    })
+    mockSignOut.mockRejectedValueOnce(failure)
+    const onSignedOut = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AccountProfile onSignedOut={onSignedOut} {...legalProps} />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("sign-out-button"))
+
+    await waitFor(() => expect(view.getByText("Could not sign out. Try again.")).toBeTruthy())
+    expect(onSignedOut).not.toHaveBeenCalled()
+    expect(mockReportCrash).toHaveBeenCalledWith(failure, "Handled", {
+      tags: { area: "auth.signOut", clerkCodes: "authentication_invalid,session_not_found" },
+    })
   })
 })
