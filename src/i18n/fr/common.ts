@@ -28,7 +28,7 @@ export default {
     settingsUpdateReady: "Réglages, mise à jour prête",
     account: "Compte",
     signIn: "Se connecter",
-    closeMenu: "Fermer le menu",
+    closeMenu: "Fermer le menu des utilitaires",
     nearbyOnlyOn: "À proximité uniquement : activé",
     nearbyOnlyOff: "À proximité uniquement : désactivé",
   },
@@ -36,7 +36,7 @@ export default {
     decks: "Decks",
     returnToGame: "Retour à la partie",
     play: "Jouer",
-    backToLobby: "Retour au lobby",
+    backToLobby: "Retour au salon",
   },
   retryableError: {
     retryingIn: "Nouvel essai dans {{seconds}} s",

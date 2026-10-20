@@ -8,6 +8,7 @@ const systems = {
     lorcana: "Lore",
     fab: "Life",
   },
+  // Lowercase noun that follows a number in other strings, as in "add 5 life".
   counterLabel: {
     none: "life",
     mtg: "life",
@@ -31,6 +32,7 @@ const systems = {
     initiative: "Initiative",
   },
   section: {
+    // Deck section holding the commander card, not the format.
     commander: "Commander",
     sideboard: "Sideboard",
     extra: "Extra Deck",
@@ -94,9 +96,12 @@ const systems = {
     fab_one: "{{count}} life change",
     fab_other: "{{count}} life changes",
   },
-  noneTaken: "none taken",
-  taken: "{{amount}} taken",
-  even: "even",
+  // Pokémon only: no Prize cards taken yet.
+  noneTaken: "no prizes taken",
+  // Pokémon only: Prize cards the player has taken so far. Not damage.
+  taken: "{{amount}} prizes taken",
+  // A counter back at its starting value: unchanged, not a tie.
+  even: "unchanged",
   fromStart: "{{delta}} from start",
 }
 

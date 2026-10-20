@@ -19,27 +19,18 @@ const LOCALES = {
   ko: "Korean",
 }
 
-// why: without fixed terms the model mixed translated and English game terms within one language.
-const GAME_TERMS = {
-  es: {
-    life: "vidas",
-    lifePoints: "Puntos de Vida",
-    prizeCards: "cartas de Premio",
-    lore: "leyenda",
-  },
-  fr: {
-    life: "points de vie",
-    lifePoints: "Life Points",
-    prizeCards: "cartes Récompense",
-    lore: "Lore",
-  },
-  hi: { life: "लाइफ़", lifePoints: "लाइफ़ पॉइंट", prizeCards: "प्राइज़ कार्ड", lore: "लोर" },
-  ja: { life: "ライフ", lifePoints: "ライフポイント", prizeCards: "サイド", lore: "ロア" },
-  ko: { life: "라이프", lifePoints: "라이프 포인트", prizeCards: "사이드 카드", lore: "로어" },
-}
+const GLOSSARY_PATH = path.join(I18N_DIR, "glossary.json")
 
 const PLURAL_SUFFIX = /^(.*)_(zero|one|two|few|many|other)$/
 const PLACEHOLDER = /{{\s*([\w.]+)\s*}}|<\/?([\w-]+)\s*\/?>/g
+
+const NON_LATIN_LOCALES = new Set(["hi", "ja", "ko"])
+const LITERAL_TEXT = /{{[^}]*}}|<[^>]*>|https?:\/\/\S+|\S+@\S+|@\w+|「[^」]*」|"[^"]*"|“[^”]*”/g
+const LATIN_WORD = /[\p{Script=Latin}\d]+/gu
+const LATIN_INSIDE_WORD =
+  /[\p{Script=Hangul}\p{Script=Devanagari}]\p{Script=Latin}+[\p{Script=Hangul}\p{Script=Devanagari}]/u
+// why: the English carries these lowercase words into every script ("v2", "vs", "Return to Ravnica").
+const LOWERCASE_LATIN_ALLOWED = new Set(["v", "vs", "to"])
 
 const GENERATED_HEADER =
   "// why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.\n"
@@ -49,13 +40,14 @@ const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter fo
 Rules:
 - Keep each string short and natural for a phone screen. Match the English tone: plain, direct, no added enthusiasm.
 - Keep every {{placeholder}} exactly as written, including the name inside the braces, and keep every <tag>. Placeholders hold numbers, player names, deck names, or card names.
-- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon, Pokémon TCG, Disney Lorcana, Lorcana, Flesh and Blood, FaB, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, Fabrary, and format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed, Classic Constructed, Blitz, Silver Age, Living Legend, Ultimate Pit Fight).
-- Use the publisher's official localized term where one exists: poison counters, commander damage, commander tax, the Monarch, the Initiative, HP. The request lists fixed terms for life (Magic), Life Points (Yu-Gi-Oh!), Prize cards (Pokémon) and lore (Lorcana); always use exactly those, inflected as the grammar needs.
-- In French, a counted amount of Lorcana lore is "éclats de Lore" ("20 éclats de Lore"); use "Lore" alone when nothing is counted.
-- In Spanish, a counted amount of Lorcana lore is "puntos de leyenda" ("20 puntos de leyenda", singular "1 punto de leyenda"); use "leyenda" alone when nothing is counted.
+- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Lorcana, Flesh and Blood, FaB, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, Fabrary. Keep format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed, Classic Constructed, Blitz, Silver Age, Living Legend, Ultimate Pit Fight) and the word Pokémon in English unless the glossary says otherwise.
+- The request includes a glossary of the publishers' official terms and the app's fixed vocabulary for the target language, plus language rules. Always use those terms, inflected as the grammar needs, and follow the rules.
 - Product vocabulary, translate consistently: "local game" is a game on one shared device; "connected game" is players on their own phones; "cloud" means synced through Scryve's servers; "nearby" means phones on the same Wi-Fi; "seat" is a player's place at the table; "host" is the player who created a connected game.
+- A "match" is a best-of-N set of games; a "game" is one game. {{bestOf}} is the total number of games (3 means best of three), never the wins needed.
+- "Abandon" ends a game or lobby for everyone with no result. "Leave" removes only you. "End game" finishes with a result. "Cancel" closes a dialog. Never give two of these the same word.
 - Keep the " · " separator, ellipsis characters, and abbreviations like "5m ago" equally compact.
 - Each entry has a "context" key path that tells you where the string appears. Use it as context; never translate it.
+- Some entries have a "note" from the English author about meaning or where the string appears. Follow it; never translate it.
 - Each entry lists "slots". Return one translation per slot id. A slot with a "form" is a CLDR plural category: write the grammatically correct form for it, using the English plural forms as reference.
 
 Return a translation for every slot and nothing else.`
@@ -111,18 +103,58 @@ function hashText(text) {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 12)
 }
 
-function translationUnits(englishFlat) {
+function englishNotes(source) {
+  const ts = require("typescript")
+  const file = ts.createSourceFile("notes.ts", source, ts.ScriptTarget.Latest, true)
+  const notes = {}
+  const commentText = (range) =>
+    source
+      .slice(range.pos, range.end)
+      .replace(/^\/\/\s?|^\/\*+|\*+\/$|^\s*\*\s?/gm, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  const visit = (object, prefix, inherited) => {
+    for (const property of object.properties) {
+      if (!ts.isPropertyAssignment(property)) continue
+      const keyPath = prefix ? `${prefix}.${property.name.text}` : property.name.text
+      const own = (ts.getLeadingCommentRanges(source, property.getFullStart()) ?? []).map(
+        commentText,
+      )
+      const note = [...inherited, ...own]
+      if (ts.isObjectLiteralExpression(property.initializer))
+        visit(property.initializer, keyPath, note)
+      else if (note.length) notes[keyPath] = note.join(" ")
+    }
+  }
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const { initializer } of statement.declarationList.declarations)
+      if (initializer && ts.isObjectLiteralExpression(initializer)) visit(initializer, "", [])
+  }
+  return notes
+}
+
+function translationUnits(englishFlat, notes = {}) {
   const units = new Map()
   for (const [key, text] of Object.entries(englishFlat)) {
     const match = PLURAL_SUFFIX.exec(key)
     const isPlural = match && `${match[1]}_other` in englishFlat
     const id = isPlural ? match[1] : key
-    const unit = units.get(id) ?? { id, plural: Boolean(isPlural), english: {} }
+    const unit = units.get(id) ?? { id, plural: Boolean(isPlural), english: {}, notes: new Set() }
     unit.english[key] = text
+    if (notes[key]) unit.notes.add(notes[key])
     units.set(id, unit)
   }
-  for (const unit of units.values()) unit.hash = hashText(JSON.stringify(unit.english))
+  for (const unit of units.values()) {
+    unit.note = [...unit.notes].join(" ") || undefined
+    unit.hash = hashText(JSON.stringify(unit.note ? [unit.english, unit.note] : unit.english))
+  }
   return units
+}
+
+function namespaceUnits(english, namespace) {
+  const source = fs.readFileSync(path.join(I18N_DIR, SOURCE_LOCALE, `${namespace}.ts`), "utf8")
+  return translationUnits(flatten(english[namespace]), englishNotes(source))
 }
 
 function pluralCategories(locale) {
@@ -136,9 +168,7 @@ function requiredKeys(unit, locale) {
 
 function staleUnits({ units, lock, localeFlat, locale }) {
   return [...units.values()].filter(
-    (unit) =>
-      lock[unit.id] !== unit.hash ||
-      requiredKeys(unit, locale).some((key) => typeof localeFlat[key] !== "string"),
+    (unit) => lock[unit.id] !== unit.hash || validateUnit(unit, localeFlat, locale).length > 0,
   )
 }
 
@@ -163,8 +193,21 @@ function validateUnit(unit, translatedFlat, locale) {
     return [
       ...missing.map((token) => `${key}: dropped ${token}`),
       ...unknown.map((token) => `${key}: introduced ${token}`),
+      ...((text.match(/"/g) ?? []).length % 2 ? [`${key}: has an unmatched quote`] : []),
+      ...scriptProblems(text, locale).map((problem) => `${key}: ${problem}`),
     ]
   })
+}
+
+function scriptProblems(text, locale) {
+  if (!NON_LATIN_LOCALES.has(locale)) return []
+  const stray = (text.replace(LITERAL_TEXT, " ").match(LATIN_WORD) ?? []).filter(
+    (word) => /^\p{Ll}+$/u.test(word) && !LOWERCASE_LATIN_ALLOWED.has(word),
+  )
+  return [
+    ...stray.map((word) => `left "${word}" in Latin script`),
+    ...(LATIN_INSIDE_WORD.test(text) ? ["has Latin letters inside a word"] : []),
+  ]
 }
 
 function orderLikeEnglish(units, localeFlat, locale) {
@@ -251,12 +294,16 @@ async function check() {
     const englishFlat = flatten(english[namespace])
     for (const key of prototypeKeys(englishFlat))
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
-    const units = translationUnits(englishFlat)
+    const units = namespaceUnits(english, namespace)
     const lock = readJson(lockPath(namespace), {})
     for (const locale of Object.keys(LOCALES)) {
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
-      for (const unit of staleUnits({ units, lock, localeFlat, locale }))
-        problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
+      for (const unit of staleUnits({ units, lock, localeFlat, locale })) {
+        const invalid = validateUnit(unit, localeFlat, locale)
+        if (invalid.length === 0)
+          problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
+        for (const problem of invalid) problems.push(`${locale}/${namespace}: ${problem}`)
+      }
       for (const key of orphanKeys({ units, localeFlat, locale }))
         problems.push(`${locale}/${namespace}: ${key} no longer exists in English`)
     }
@@ -283,6 +330,7 @@ function requestPayload(units, namespace, locale) {
   const slotKeys = new Map()
   const entries = units.map((unit) => ({
     context: `${namespace}:${unit.id}`,
+    ...(unit.note ? { note: unit.note } : {}),
     english: unit.plural
       ? Object.fromEntries(
           Object.entries(unit.english).map(([key, text]) => [key.slice(unit.id.length + 1), text]),
@@ -306,11 +354,21 @@ function usageSummary() {
   return `${usage.input} input + ${usage.output} output tokens, about $${cost.toFixed(2)}`
 }
 
+function glossaryText(locale) {
+  const { rules, terms } = readJson(GLOSSARY_PATH, {})[locale]
+  return [
+    `Rules for ${locale}:\n${rules.map((rule) => `- ${rule}`).join("\n")}`,
+    `Glossary for ${locale}:\n${Object.entries(terms)
+      .map(([concept, term]) => `- ${concept}: ${term}`)
+      .join("\n")}`,
+  ].join("\n\n")
+}
+
 async function requestTranslations(client, { units, namespace, locale, feedback }) {
   const payload = requestPayload(units, namespace, locale)
   const request = [
     `Translate into ${LOCALES[locale]} (${locale}).`,
-    `Fixed game terms: Magic life = "${GAME_TERMS[locale].life}"; Yu-Gi-Oh! Life Points = "${GAME_TERMS[locale].lifePoints}"; Pokémon Prize cards = "${GAME_TERMS[locale].prizeCards}"; Lorcana lore = "${GAME_TERMS[locale].lore}".`,
+    glossaryText(locale),
     JSON.stringify(payload.entries),
     ...(feedback.length
       ? [`Your previous answer had problems; fix them:\n${feedback.join("\n")}`]
@@ -370,7 +428,8 @@ function parseArgs(argv) {
 async function translate({ onlyNamespace, retranslate }) {
   loadApiKey()
   const { default: Anthropic } = require("@anthropic-ai/sdk")
-  const client = new Anthropic()
+  // why: agent shells set ANTHROPIC_BASE_URL to a proxy that rejects Console keys with a 401.
+  const client = new Anthropic({ baseURL: "https://api.anthropic.com" })
   const english = loadEnglish()
   const namespaces = Object.keys(english)
   if (onlyNamespace && !namespaces.includes(onlyNamespace))
@@ -379,7 +438,7 @@ async function translate({ onlyNamespace, retranslate }) {
   for (const [file, source] of scaffoldFiles(namespaces)) await writeTs(file, source)
 
   for (const namespace of namespaces.filter((ns) => !onlyNamespace || ns === onlyNamespace)) {
-    const units = translationUnits(flatten(english[namespace]))
+    const units = namespaceUnits(english, namespace)
     const lock = readJson(lockPath(namespace), {})
 
     // why: one namespace per call keeps requests small and parallel by locale.
@@ -430,6 +489,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  englishNotes,
   flatten,
   prototypeKeys,
   unflatten,

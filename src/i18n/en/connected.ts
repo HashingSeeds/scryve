@@ -21,12 +21,14 @@ const connected = {
   seatNumber: "Seat {{seat}}",
   noDeckSelected: "No deck selected",
   lobbyExit: {
+    // Host only: closes the lobby for everyone.
     abandon: {
       title: "Abandon this lobby?",
       message:
         "This closes the lobby for everyone and saves a terminal summary. It cannot be undone.",
       confirmText: "Abandon lobby",
     },
+    // Only you leave; the lobby stays open for the others.
     leave: {
       title: "Leave this lobby?",
       message:
@@ -217,7 +219,8 @@ const connected = {
     message:
       "This Scryve invitation is malformed or incomplete. Ask the host for a new link or enter the 6-character code.",
     enterCode: "Enter a manual code",
-    openPlay: "Open Play",
+    // Button that goes to the Play tab.
+    openPlay: "Go to Play",
   },
   seats: {
     openSeat: "Open seat",
@@ -242,6 +245,7 @@ const connected = {
     deckVersion: "Deck version",
     selectingDeck: "Selecting deck…",
   },
+  // "Seated with them" means put in the same game as them.
   playerActions: {
     title: "Players",
     description:
@@ -304,7 +308,8 @@ const connected = {
     },
     status: {
       close: "Close connected-game status",
-      summary: "Connected summary",
+      // Title for the summary of a finished connected game.
+      summary: "Game over",
       offlineFor: "Offline for {{elapsed}}",
       slow: "Slow connection",
       backOnline: "Back online",
@@ -414,6 +419,7 @@ const connected = {
     joiningAs: "Joining as @{{username}}",
     pickSeat: "Pick your seat",
     pickSeatBody: "Each open seat carries its own counters from the game already in progress.",
+    // Joining a connected game, not signing in.
     joining: "Joining…",
     join: "Join game",
   },

@@ -501,7 +501,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
     openOptions()
     expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
-    expect(view.getByLabelText("Change by, 1000")).toBeTruthy()
+    expect(view.getByLabelText("Per tap, 1000")).toBeTruthy()
     closeOptions()
     fireEvent.press(view.getByTestId("start-game-button"))
 

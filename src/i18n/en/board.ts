@@ -16,6 +16,7 @@ const board = {
     dieArmed: "{{die}} armed, tap a seat",
     rollDieForSeat: "Roll a {{die}} for a seat",
     clearsResult: "Clears this result",
+    // Tiny badge on the player who goes first.
     firstShort: "1st",
     settlesResult: "Settles this result",
     goesFirstQuestion: "Goes first?",
@@ -144,6 +145,7 @@ const board = {
     playerResult: "{{name}} match result",
     drawRemaining: "Draw for remaining",
     drawRemainingHint: "Draws every seat still playing and gives eliminated seats a loss",
+    // Ends the whole best-of-N match, not one game.
     end: "End match",
     scoreErrors: {
       gamesWonRange: "Games won must be 0–{{max}} in a best of {{bestOf}}",
@@ -210,6 +212,7 @@ const board = {
     player: "{{name}}, {{value}}",
     playerWinner: "{{name}}, {{value}}, winner",
     draw: "Draw",
+    // Ends this local game with no winner recorded. Not a concession.
     abandon: "Abandon",
     end: "End game",
   },
@@ -246,12 +249,14 @@ const board = {
     holdToCount: "hold to count damage",
     holdToCountHint: "Long press to count damage without a card",
     countDamage: "Count damage without a card",
+    // Short labels for Pokémon HP and damage.
     unit: { hp: "HP", damage: "DMG" },
     prizesHint: "Tap to take a prize. Long press to put one back.",
     putPrizeBack: "Put a prize back",
     whoTakes_one: "{{name}} knocked out. Who takes {{count}} prize?",
     whoTakes_other: "{{name}} knocked out. Who takes {{count}} prizes?",
     takesPrizes: "{{name}} takes the prizes",
+    // Undo marking this Pokémon Knocked Out.
     cancelKnockout: "Cancel knockout",
     undoKnockout: "Undo, {{name}} returns",
     noRoomToUndo: "No room to undo",
@@ -279,7 +284,7 @@ const board = {
     benchFocusHint: "Tap to count damage on it or switch it in, or edit.",
   },
   commanderClaim: {
-    dealt: "{{name}} dealt {{damage}}",
+    dealt: "{{name}}: {{damage}} commander damage",
     more_one: "{{count}} more",
     more_other: "{{count}} more",
     morePending_one: "{{count}} more pending",
@@ -290,6 +295,7 @@ const board = {
       confirm: "Confirm {{damage}} commander damage from {{name}}",
     },
   },
+  // Magic Commander damage: damage a commander card dealt to a player. {{seat}} is a seat number.
   commander: {
     takenBySeat: "Commander damage taken by seat {{seat}}",
     ownCommander: "{{name}}, own commander",
@@ -333,6 +339,7 @@ const board = {
     subtract: "{{identity}}, subtract {{step}} {{label}}",
     remove: "Remove {{label}}",
     editWithValue: "Edit {{label}}, {{value}}",
+    // {{label}} is a Magic designation such as the Monarch or the Initiative; the player stops holding it.
     giveUp: "Give up {{label}}",
     take: "Take {{label}}",
     rule: "Rule {{rule}}",
@@ -343,6 +350,7 @@ const board = {
     updatedAgo: "Updated {{elapsed}} ago",
     ownership: {
       owned: "Your seat",
+      // Seat status: you can see this seat but not change it.
       unowned: "View only",
       disabled: "Controls unavailable",
     },
@@ -437,6 +445,7 @@ const board = {
     game: "Game",
     history: "History",
     rules: "Rules",
+    // Turns this local game into a connected game. Not sign in.
     connect: "Connect",
     end: "End",
     closeDice: "Close dice",
@@ -457,6 +466,7 @@ const board = {
     addTo: "Add {{amount}} to {{name}}",
     typeAmount: "Type an amount",
     close: "Close {{name}}'s calculator",
+    // One step of the life history: the change, then the total it led to, as in "-3 to 17".
     logStep: "{{delta}} to {{life}}",
     log: "{{name}}'s life log: {{steps}}",
   },

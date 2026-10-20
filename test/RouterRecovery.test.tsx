@@ -94,7 +94,7 @@ describe("Router recovery fallbacks", () => {
   it("offers re-authentication and home recovery from a rejected account route", () => {
     const view = render(themed(<AccountRoute />))
     fireEvent.press(view.getByText("Re-authenticate"))
-    fireEvent.press(view.getByText("Open Play"))
+    fireEvent.press(view.getByText("Go to Play"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
     expect(jest.requireMock("expo-router").router.dismissTo).toHaveBeenCalledWith({
       pathname: "/",
@@ -105,7 +105,7 @@ describe("Router recovery fallbacks", () => {
   it("offers manual-code and home recovery for an invalid deep link", () => {
     const view = render(themed(<InviteRoute />))
     fireEvent.press(view.getByText("Enter a manual code"))
-    fireEvent.press(view.getByText("Open Play"))
+    fireEvent.press(view.getByText("Go to Play"))
     const { router } = jest.requireMock("expo-router")
     expect(router.replace).toHaveBeenCalledWith("/connected/join")
     expect(router.dismissTo).toHaveBeenCalledWith({

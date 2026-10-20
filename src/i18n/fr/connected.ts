@@ -27,28 +27,28 @@ export default {
   noDeckSelected: "Aucun deck sélectionné",
   lobbyExit: {
     abandon: {
-      title: "Abandonner ce lobby ?",
+      title: "Dissoudre ce salon ?",
       message:
-        "Cela ferme le lobby pour tout le monde et enregistre un résumé final. Action irréversible.",
-      confirmText: "Abandonner le lobby",
+        "Cela ferme le salon pour tout le monde et enregistre un résumé final. Cette action est irréversible.",
+      confirmText: "Dissoudre le salon",
     },
     leave: {
-      title: "Quitter ce lobby ?",
+      title: "Quitter ce salon ?",
       message:
-        "Le lobby disparaît de votre liste de reprise. Les autres joueurs et leur historique ne changent pas.",
-      confirmText: "Quitter le lobby",
+        "Le salon disparaît de votre liste de reprise. Les autres joueurs et leur historique restent inchangés.",
+      confirmText: "Quitter le salon",
     },
   },
   onlineOnly: {
     start:
       "Reconnectez-vous pour lancer la partie. Le lancement exige d'être en ligne et n'est jamais mis en file d'attente.",
-    exit: "Reconnectez-vous pour quitter ou abandonner ce lobby. Ces actions exigent d'être en ligne et ne sont jamais mises en file d'attente.",
-    join: "Reconnectez-vous pour prendre une place. Cette action exige d'être en ligne et n'est jamais mise en file d'attente.",
+    exit: "Reconnectez-vous pour quitter ou dissoudre ce salon. Ces actions nécessitent une connexion et ne sont jamais mises en file d'attente.",
+    join: "Reconnectez-vous pour prendre une place. Les demandes de place nécessitent une connexion et ne sont jamais mises en file d'attente.",
     deck: "Reconnectez-vous pour changer de deck. Le choix du deck exige d'être en ligne et n'est jamais mis en file d'attente.",
   },
   gameGone: "Cette partie n’existe plus.",
   saving: "Enregistrement…",
-  waitingForHost: "En attente du lancement par l’hôte.",
+  waitingForHost: "En attente du démarrage par l'hôte.",
   sync: {
     offline: "Hors ligne",
     status: {
@@ -67,7 +67,7 @@ export default {
       slow_many: "Connexion lente, {{count}} de modifications en cours d’envoi",
       slow_other: "Connexion lente, {{count}} modifications en cours d’envoi",
       offlineSaved_one: "Hors ligne, {{count}} modification enregistrée sur cet appareil",
-      offlineSaved_many: "Hors ligne, {{count}} de modifications enregistrées sur cet appareil",
+      offlineSaved_many: "Hors ligne, {{count}} modifications enregistrées sur cet appareil",
       offlineSaved_other: "Hors ligne, {{count}} modifications enregistrées sur cet appareil",
       catchingUp_one: "De nouveau en ligne, envoi de {{count}} modification",
       catchingUp_many: "De nouveau en ligne, envoi de {{count}} de modifications",
@@ -82,7 +82,7 @@ export default {
     queueFull:
       "La file hors ligne des modifications en attente est pleine. Reconnectez-vous et synchronisez avant de faire d’autres modifications.",
     commanderDamageRange:
-      "Les modifications de dégâts de commandant doivent être comprises entre 1 et {{max}}.",
+      "Les modifications de blessures de commandant doivent être comprises entre 1 et {{max}}.",
     commanderSelfDamage: "Un commandant ne peut pas se blesser lui-même",
     failureCapacity:
       "Les modifications échouées doivent être examinées avant de pouvoir conserver d’autres modifications rejetées. Ignorez les échecs examinés, puis relancez la synchronisation.",
@@ -91,16 +91,16 @@ export default {
       pendingChanges:
         "Attendez la synchronisation des changements de points de vie en attente avant de terminer cette partie.",
       failedChanges:
-        "Examinez les changements de points de vie échoués avant de terminer cette partie.",
+        "Vérifiez les changements de points de vie échoués avant de terminer cette partie.",
       failed: "Impossible de terminer la partie",
     },
     abandon: {
-      signIn: "Connectez-vous avant d’abandonner cette partie.",
+      signIn: "Connectez-vous avant d'annuler cette partie.",
       pendingChanges:
-        "Attendez la synchronisation des changements de points de vie en attente avant d’abandonner cette partie.",
+        "Attendez la synchronisation des changements de points de vie en attente avant d'annuler cette partie.",
       failedChanges:
-        "Examinez les changements de points de vie échoués avant d’abandonner cette partie.",
-      failed: "Impossible d’abandonner la partie",
+        "Vérifiez les changements de points de vie échoués avant d'annuler cette partie.",
+      failed: "Impossible d'annuler la partie",
     },
   },
   username: {
@@ -119,12 +119,12 @@ export default {
     errors: {
       disabled:
         "Les noms d’utilisateur sont désactivés pour cette application pour le moment, nous n’avons donc pas pu enregistrer le vôtre. Réessayez plus tard ou contactez l’assistance.",
-      taken: "Ce nom d’utilisateur est déjà pris. Essayez-en un autre.",
-      saveFailed: "Impossible d’enregistrer le nom d’utilisateur",
+      taken: "Ce nom d'utilisateur est déjà pris. Essayez-en un autre.",
+      saveFailed: "Impossible d'enregistrer le nom d'utilisateur",
     },
   },
   profile: {
-    prepareFailed: "Impossible de préparer le jeu connecté",
+    prepareFailed: "Impossible de préparer la partie connectée",
     signedOut: "Vous êtes déconnecté ou votre session a expiré.",
     sessionRejected: "Convex a rejeté cette session connectée.",
   },
@@ -136,18 +136,18 @@ export default {
     signIn: "Se connecter",
     signInAgain: "Se reconnecter",
     username: {
-      title: "Choisissez votre nom d’utilisateur",
+      title: "Choisissez votre nom d'utilisateur",
       description:
-        "Votre @nom d’utilisateur unique vous identifie dans l’historique des parties connectées.",
-      label: "Nom d’utilisateur",
-      suggest: "Suggérer un nom d’utilisateur",
-      save: "Enregistrer le nom d’utilisateur",
+        "Votre @nom d'utilisateur unique vous identifie dans l'historique des parties connectées.",
+      label: "Nom d'utilisateur",
+      suggest: "Suggérer un nom d'utilisateur",
+      save: "Enregistrer le nom d'utilisateur",
       notAllowed:
-        "Ce nom d’utilisateur n’est pas autorisé. Les autres joueurs verront ce nom, veuillez en choisir un autre.",
+        "Ce nom d'utilisateur n'est pas autorisé. Les autres joueurs verront ce nom, veuillez en choisir un autre.",
     },
     offline: "Le jeu connecté est hors ligne. Le jeu local reste disponible.",
     connecting: "Connexion… Le jeu local reste disponible.",
-    authFailed: "Impossible de connecter votre compte. Essayez de vous reconnecter.",
+    authFailed: "Impossible de connecter votre compte. Essayez de vous connecter à nouveau.",
     retrySetup: "Réessayer la configuration connectée",
     preparingProfile: "Préparation de votre profil de jeu…",
   },
@@ -203,20 +203,20 @@ export default {
   setup: {
     connecting: "Connexion… Vous pouvez continuer à modifier.",
     signInToHost: "Se connecter pour héberger",
-    chooseUsername: "Choisir un nom d’utilisateur",
+    chooseUsername: "Choisir un nom d'utilisateur",
     unavailable: "Le jeu connecté est indisponible.",
   },
   host: {
-    checkFailed: "Impossible de vérifier s’il existe déjà une partie hébergée.",
+    checkFailed: "Impossible de vérifier l'existence d'une partie hébergée.",
     checkingGames: "Vérification de vos parties…",
     reconnectToHost:
-      "Reconnectez-vous avant d’héberger ; la création de salon n’est pas mise en file d’attente.",
-    profileNotReady: "Le profil connecté n’est pas encore prêt.",
+      "Reconnectez-vous avant d'héberger ; la création de salon n'est pas mise en file d'attente.",
+    profileNotReady: "Le profil connecté n'est pas encore prêt.",
     createFailed: "Impossible de créer le salon",
     reconnectToExit: "Reconnectez-vous avant de quitter ou de terminer une partie.",
     exitFailed: "Impossible de mettre à jour cette partie.",
     offline: "Vous êtes hors ligne. Votre configuration est conservée.",
-    alreadyHosting: "Terminez votre partie hébergée avant d’en héberger une autre.",
+    alreadyHosting: "Terminez votre partie hébergée avant d'en héberger une autre.",
   },
   publish: {
     failed: "Impossible de connecter cette partie.",
@@ -225,9 +225,9 @@ export default {
     label: "Inviter",
     title: "Inviter des joueurs",
     close: "Fermer l’invitation",
-    code: "Code d'invitation",
+    code: "Code d’invitation",
     scanOrEnter: "Scannez pour rejoindre ou saisissez le code {{code}}.",
-    share: "Partager l'invitation",
+    share: "Partager l’invitation",
     shareMessage: "Rejoins ma partie Scryve : {{url}}",
     shareMessageCode: "Rejoins ma partie Scryve avec le code {{code}}",
     shareFailed: "Impossible d'ouvrir le partage",
@@ -238,7 +238,7 @@ export default {
     message:
       "Cette invitation Scryve est mal formée ou incomplète. Demandez un nouveau lien à l'hôte ou saisissez le code à 6 caractères.",
     enterCode: "Saisir un code manuellement",
-    openPlay: "Ouvrir Jouer",
+    openPlay: "Aller à Jouer",
   },
   seats: {
     openSeat: "Place libre",
@@ -266,15 +266,15 @@ export default {
   playerActions: {
     title: "Joueurs",
     description:
-      "Signalez un nom que vous jugez offensant, ou bloquez un joueur pour ne plus être placé avec lui.",
+      "Signalez un nom que vous jugez offensant, ou bloquez un joueur pour ne plus être placé dans la même partie que lui.",
     yourRole: "Votre rôle",
-    close: "Fermer les actions sur les joueurs",
+    close: "Fermer les actions du joueur",
     thanks: "Merci, c'est enregistré",
     reportPlayer: "Signaler {{name}}",
     reportExplanation:
-      "Signaler bloque aussi ce joueur pour vous immédiatement. Vous ne verrez plus son pseudo et ne serez plus placé avec lui. Nous examinons chaque signalement sous 24 heures.",
+      "Le signalement bloque aussi immédiatement ce joueur pour vous. Vous ne verrez plus son nom d'utilisateur et ne serez plus placé dans une partie avec lui. Nous examinons chaque signalement sous 24 heures.",
     reasons: {
-      offensiveUsername: "Pseudo offensant",
+      offensiveUsername: "Nom d'utilisateur offensant",
       harassment: "Harcèlement ou abus",
       impersonation: "Usurpation d'identité",
       other: "Autre chose",
@@ -283,9 +283,9 @@ export default {
     sending: "Envoi…",
     sendReport: "Envoyer le signalement",
     reportConfirmation:
-      "Nous avons reçu votre signalement concernant {{name}} et l'avons bloqué pour vous. Vous ne serez plus placé avec ce joueur.",
+      "Nous avons reçu votre signalement concernant {{name}} et l'avons bloqué pour vous. Vous ne serez plus placé dans la même partie que ce joueur.",
     blockConfirmation:
-      "{{name}} est bloqué. Vous ne serez plus placé avec ce joueur et son nom vous est masqué.",
+      "{{name}} est bloqué. Vous ne serez plus placé dans la même partie que ce joueur, et son nom vous est masqué.",
     requestFailed: "Impossible d'effectuer cette demande",
     noOtherPlayers: "Aucun autre joueur dans cette partie.",
     report: "Signaler",
@@ -297,24 +297,24 @@ export default {
     unavailable: "Plateau connecté indisponible",
     loading: "Chargement du plateau connecté…",
     notCached:
-      "Ce plateau n'est pas enregistré sur cet appareil. Reconnectez-vous pour charger la partie ici.",
+      "Ce plateau n'est pas enregistré sur cet appareil. Reconnectez-vous pour y charger la partie.",
     anotherSeat: "Autre place",
     closeLayout: "Fermer le choix de disposition",
     failedAction: {
       life: {
-        none: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
-        mtg: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
-        ygo: "Impossible de synchroniser la modification de {{delta}} Life Points",
-        pokemon: "Une modification de {{delta}} cartes Récompense n'a pas pu être synchronisée",
-        lorcana: "Une modification de {{delta}} éclats de Lore n'a pas pu être synchronisée",
-        fab: "Une modification de {{delta}} points de vie n'a pas pu être synchronisée",
+        none: "Un changement de {{delta}} point de vie n'a pas pu être synchronisé",
+        mtg: "Un changement de {{delta}} point de vie n'a pas pu être synchronisé",
+        ygo: "Un changement de {{delta}} Life Points n'a pas pu être synchronisé",
+        pokemon: "Un changement de {{delta}} cartes Récompense n'a pas pu être synchronisé",
+        lorcana: "Un changement de {{delta}} Lore n'a pas pu être synchronisé",
+        fab: "Un changement de {{delta}} point de vie n'a pas pu être synchronisé",
       },
       commanderDamage:
-        "Une attribution de {{delta}} dégâts de commandant n'a pas pu être synchronisée",
+        "Une attribution de {{delta}} blessures de commandant n'a pas pu être synchronisée",
       table: "Un changement de table n'a pas pu être synchronisé",
       confirmCommanderDamage:
-        "La confirmation des dégâts de commandant n'a pas pu être synchronisée",
-      declineCommanderDamage: "Le refus des dégâts de commandant n'a pas pu être synchronisé",
+        "La confirmation des blessures de commandant n'a pas pu être synchronisée",
+      declineCommanderDamage: "Le refus des blessures de commandant n'a pas pu être synchronisé",
     },
     menu: {
       layout: "Disposition",
@@ -324,31 +324,32 @@ export default {
       rules: "Règles",
       end: "Fin",
       closeDice: "Fermer les dés",
-      exitCommanderDamage: "Quitter les dégâts de commandant",
+      exitCommanderDamage: "Quitter les blessures de commandant",
     },
     status: {
-      close: "Fermer l'état de la partie connectée",
-      summary: "Résumé de la connexion",
+      close: "Fermer le statut de la partie connectée",
+      summary: "Partie terminée",
       offlineFor: "Hors ligne depuis {{elapsed}}",
       slow: "Connexion lente",
       backOnline: "De nouveau en ligne",
       connectedGame: "Partie connectée",
       connected: "Connecté",
       finalChanges: "{{changes}} acceptés · définitif",
-      startsWith: "{{format}} · commence à {{value}}",
+      startsWith: "{{format}} · commence par {{value}}",
       otherPlayers: "Autres joueurs",
       updatedAgo: "Mis à jour il y a {{elapsed}}",
       mayArriveLate: "Peut arriver en retard",
       live: "En direct",
       yourChanges: "Vos changements",
       allSent: "Tout est envoyé",
-      savedOffline: "{{unsent}} enregistrés sur cet appareil. Ils seront envoyés à la reconnexion.",
+      savedOffline:
+        "{{unsent}} enregistré(s) sur cet appareil. Ils seront envoyés à votre reconnexion.",
       sending: "Envoi de {{unsent}}",
       finishGame: "Terminer la partie",
       finishAvailable: "Disponible",
       dismissFailure: "Ignorer après examen",
-      readOnlyLobby: "Cette partie est dans le lobby et en lecture seule sur le plateau.",
-      readOnlyAbandoned: "Cette partie est abandonnée et en lecture seule sur le plateau.",
+      readOnlyLobby: "Cette partie est dans le salon et en lecture seule sur le plateau.",
+      readOnlyAbandoned: "Cette partie est annulée et en lecture seule sur le plateau.",
     },
     finishBlocker: {
       offline: {
@@ -360,8 +361,8 @@ export default {
         detail: "Après l'envoi de vos changements",
       },
       rejected: {
-        petal: "à examiner d'abord",
-        detail: "Examinez d'abord les changements ci-dessous",
+        petal: "à vérifier",
+        detail: "Vérifiez d'abord les changements ci-dessous",
       },
     },
     abandoned: {
@@ -377,14 +378,14 @@ export default {
         "Passer à la fin sans enregistrer de résultat. Le résumé est définitif pour tout le monde.",
       draw: "Égalité",
       playerOption: "{{name}}, {{life}}",
-      winnerOption: "{{name}}, {{life}}, gagnant",
+      winnerOption: "{{name}}, {{life}}, vainqueur",
     },
   },
   lobby: {
     title: "Salon",
     loadingLabel: "Chargement du salon",
     loading: "Chargement du salon…",
-    unavailable: "Ce salon n'est pas disponible.",
+    unavailable: "Ce salon est indisponible.",
     players: "Joueurs",
     playerCount: "Nombre de joueurs",
     readyCount: "{{ready}} sur {{total}} prêts",
@@ -393,7 +394,7 @@ export default {
     keepOpen: "Garder ce salon ouvert",
     errors: {
       selectDeck: "Impossible de sélectionner le deck",
-      updateSettings: "Impossible de mettre à jour les réglages du salon",
+      updateSettings: "Impossible de mettre à jour les paramètres du salon",
       start: "Impossible de lancer la partie",
       appearance: "Impossible de mettre à jour votre couleur et votre symbole",
       leave: "Impossible de quitter le salon",
@@ -401,7 +402,7 @@ export default {
     closed: {
       close: "Fermer le salon",
       title: "Salon fermé",
-      abandoned: "Cette partie a été abandonnée. Vous pouvez en lancer ou en rejoindre une autre.",
+      abandoned: "Cette partie a été annulée. Vous pouvez lancer ou rejoindre une autre partie.",
       ended: "Cette partie est terminée. Vous pouvez en lancer ou en rejoindre une autre.",
       ok: "OK",
     },
@@ -412,15 +413,15 @@ export default {
   },
   scanner: {
     title: "Scanner une invitation",
-    body: "Utilisez le scanner de l'appareil pour trouver un QR d'invitation Scryve fiable. La reconnaissance reste sur l'appareil et aucune image n'est enregistrée.",
+    body: "Utilisez le scanner de l’appareil pour trouver un QR d’invitation Scryve fiable. La reconnaissance reste sur l’appareil et aucune image n’est enregistrée.",
     webUnavailable:
       "Le scan de QR par caméra est disponible dans l'app iOS et Android. Saisissez plutôt le code à 6 caractères.",
     nativeUnavailable:
-      "Le scanner QR natif n'est pas disponible sur cet appareil. Saisissez le code d'invitation manuellement.",
+      "Le scanner QR natif est indisponible sur cet appareil. Saisissez le code d'invitation manuellement.",
     untrusted:
       "Ce QR n'est pas une invitation Scryve fiable. Essayez un autre code ou saisissez-le manuellement.",
     openFailed:
-      "Le scanner QR n'a pas pu s'ouvrir sur cet appareil. Réessayez ou saisissez le code.",
+      "Le scanner QR n'a pas pu s'ouvrir sur cet appareil. Réessayez ou saisissez plutôt le code.",
     enterManually: "Saisir le code manuellement",
     open: "Ouvrir le scanner QR",
     opening: "Ouverture du scanner…",
@@ -435,23 +436,23 @@ export default {
     },
   },
   join: {
-    invitedTitle: "Rejoindre le salon invité",
+    invitedTitle: "Rejoindre le salon sur invitation",
     codeTitle: "Rejoindre avec un code",
     invitedBody: "Rejoignez vos amis grâce à cette invitation.",
     codeBody: "Saisissez le code à 6 caractères de l'hôte.",
-    invalidInvite: "L'invitation est invalide, expirée ou révoquée",
+    invalidInvite: "L’invitation est invalide, expirée ou révoquée",
     localGameActive:
-      "Terminez ou abandonnez votre partie locale en cours avant de rejoindre une partie connectée.",
+      "Terminez ou annulez votre partie locale en cours avant de rejoindre une partie connectée.",
     invalidCode: "Saisissez un code d'invitation valide.",
     invalidManualCode: "Saisissez un code d'invitation valide à 6 caractères.",
     seatTaken: "Cette place vient d'être prise. Choisissez-en une autre.",
     failed: "Impossible de rejoindre le salon",
     scan: "Scanner le QR code",
     differentInvitation: "Utiliser une autre invitation",
-    joiningAs: "Vous rejoignez en tant que @{{username}}",
+    joiningAs: "Connexion en tant que @{{username}}",
     pickSeat: "Choisissez votre place",
-    pickSeatBody: "Chaque place libre conserve ses propres compteurs de la partie déjà en cours.",
-    joining: "Connexion…",
+    pickSeatBody: "Chaque place libre conserve ses propres marqueurs de la partie en cours.",
+    joining: "Connexion à la partie…",
     join: "Rejoindre la partie",
   },
   treachery: {
@@ -463,7 +464,7 @@ export default {
       traitor: "Traître",
     },
     goals: {
-      leader: "Gagnez une fois tous les Assassins et Traîtres éliminés.",
+      leader: "Gagnez quand tous les Assassins et Traîtres sont éliminés.",
       guardian: "Gardez le Chef en vie. Vous gagnez avec lui.",
       assassin: "Gagnez quand le Chef est éliminé.",
       traitor: "Soyez le dernier joueur en lice.",
@@ -505,7 +506,7 @@ export default {
       started: "Cette partie a déjà commencé.",
       full: "Cette partie est complète.",
       update: "Mettez à jour Scryve pour rejoindre cette partie.",
-      hostOutdated: "L’hôte doit d’abord mettre à jour Scryve.",
+      hostOutdated: "L'hôte doit d'abord mettre à jour Scryve.",
     },
   },
 } satisfies LocaleNamespace

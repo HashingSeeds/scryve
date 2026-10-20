@@ -27,10 +27,10 @@ export default {
     settings: "設定",
     settingsUpdateReady: "設定、アップデートあり",
     account: "アカウント",
-    signIn: "ログイン",
+    signIn: "サインイン",
     closeMenu: "ユーティリティメニューを閉じる",
-    nearbyOnlyOn: "ニアバイのみ: オン",
-    nearbyOnlyOff: "ニアバイのみ: オフ",
+    nearbyOnlyOn: "近くのみ: オン",
+    nearbyOnlyOff: "近くのみ: オフ",
   },
   appNavigation: {
     decks: "デッキ",

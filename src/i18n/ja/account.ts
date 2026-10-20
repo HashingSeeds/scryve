@@ -2,7 +2,7 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
-  openPlay: "プレイを開く",
+  openPlay: "プレイへ移動",
   signIn: "サインイン",
   localGamesStay: "ローカルゲームはこのデバイスに保存されます。",
   legal: {
@@ -25,26 +25,26 @@ export default {
     title: "設定",
     localDefaults: "ローカルゲームの初期設定",
     players: "プレイヤー",
-    openScryveTo: "起動時に開く画面",
+    openScryveTo: "Scryveを開いたときに表示する画面",
     launchDestination: {
       play: "プレイ",
       decks: "デッキ",
     },
     launchDestinationHint: "プレイは進行中のゲームを再開するか、新しいボードを開きます。",
     game: "ゲーム",
-    chooseGame: "新しいゲームの開始時のタイトル",
+    chooseGame: "新しいゲームの設定",
     closeGameChoices: "ゲームの選択肢を閉じる",
     defaultsHint: "新しいゲームを同じシステムとフォーマットで始めたい場合のみ設定してください。",
     haptics: {
       label: "触覚フィードバック",
-      helper: "ライフ変更後に軽い振動で反応します。失敗してもプレイは妨げられません。",
+      helper: "ライフが変わると、軽い振動で知らせます。失敗してもプレイは妨げられません。",
     },
     theme: {
       heading: "テーマ",
       system: "システム",
       light: "ライト",
       dark: "ダーク",
-      hint: "システムはデバイスの外観に従います。ライトとダークはここで変更するまで固定されます。",
+      hint: "「システム」はデバイスの外観設定に従います。ライトとダークは、ここで変更するまで固定されます。",
     },
     appIcon: {
       heading: "アプリアイコン",
@@ -82,14 +82,14 @@ export default {
     privacy: {
       heading: "プライバシー",
       shareUsageHelper:
-        "初期設定ではオフです。アカウントに紐付かないランダムなIDで利用状況を共有します。詳細はプライバシーポリシーをご覧ください。",
+        "初期設定ではオフです。アカウントに紐づかないランダムIDで利用状況を共有します。詳細はプライバシーポリシーをご覧ください。",
       saveFailed: "選択を保存できませんでした。もう一度お試しください。",
       unavailable:
         "このビルドでは利用状況の共有は利用できません。PostHogイベントは送信されません。",
     },
     accountData: {
       description:
-        "Scryveアカウントに紐付くクラウドデータを管理します。ローカルゲームはこのデバイスに保存されます。",
+        "Scryveアカウントに紐づくクラウドデータを管理します。ローカルゲームはこのデバイスに残ります。",
       requestDeletion: "アカウント削除をリクエスト",
       requestDeletionHint: "アカウント削除リクエストのページを開きます",
     },
@@ -153,7 +153,7 @@ export default {
     removeScreenshot: "スクリーンショットを削除",
     addScreenshot: "スクリーンショットを追加",
     disclosure:
-      "メッセージ、メールアドレス(入力した場合)、アプリのバージョン、ビルド、プラットフォーム、追加したスクリーンショットをSentryに送信します。",
+      "メッセージ、入力した場合はメールアドレス、アプリのバージョン、ビルド、プラットフォーム、追加したスクリーンショットをSentryに送信します。",
     send: "送信",
     preferEmail: "メールをご希望ですか?",
     emailSupport: "メールでサポートに連絡",
@@ -171,11 +171,11 @@ export default {
       },
       choosePlay: {
         title: "プレイ方法を選ぶ",
-        body: "1台のデバイスで一緒に遊ぶか、「接続」を選んで別々のデバイスで遊びます。",
+        body: "1台のデバイスで一緒に遊ぶか、「通信対戦」を選んでそれぞれのデバイスで遊べます。",
       },
       setUpTable: {
         title: "テーブルを設定する",
-        body: "プレイヤー数と開始時のライフを選んで、ゲームを始めます。",
+        body: "プレイヤー数と初期ライフを選んで、ゲームを開始してください。",
       },
     },
     faq: {
@@ -183,7 +183,7 @@ export default {
       restorePro: {
         question: "Scryve Proを復元",
         answer:
-          "Scryveを開き、アカウントからScryve Proを選んで「購入を復元」をタップしてください。購入時と同じAppleまたはGoogleアカウントを使用してください。",
+          "Scryveを開き、アカウントからScryve Proを選んで「購入を復元」をタップしてください。最初に購入したときと同じAppleアカウントまたはGoogleアカウントを使用してください。",
       },
       manageSubscription: {
         question: "サブスクリプションの管理・解約",
@@ -196,27 +196,27 @@ export default {
           "Scryveを再起動してもう一度お試しください。問題が続く場合は、状況を簡単に書いてここから報告してください。",
       },
       accountPrivacy: {
-        question: "アカウントとプライバシーについて",
+        question: "アカウントやプライバシーについて",
         answer:
-          "アカウントはScryveのアカウント画面から管理できます。アカウントへのアクセスや削除でお困りの場合は、お問い合わせください。",
+          "アカウントはScryveのアカウント画面で管理できます。アカウントへのアクセスや削除でお困りの場合はお問い合わせください。",
       },
     },
     appVersion: "Scryve {{version}}",
   },
   profile: {
     title: "アカウント",
-    signedIn: "ログイン中",
+    signedIn: "サインイン済み",
     yourAccount: "あなたのアカウント",
     profileAndSecurity: "プロフィールとセキュリティ",
     profileHint: "プロフィール管理を開き、名前、メールアドレス、パスワードを変更します",
-    profileDetails: "名前、メール、パスワード、ログイン方法。",
+    profileDetails: "名前、メール、パスワード、サインイン方法。",
     independence:
       "Scryveは独立したアプリであり、ゲーム内容に関する通知に記載のゲーム発行元、権利者、データ提供元とは提携しておらず、承認も受けていません。",
-    signingOut: "ログアウト中…",
-    signOut: "ログアウト",
-    signOutFailed: "ログアウトできませんでした。もう一度お試しください。",
-    signOutFailedShort: "ログアウトできませんでした",
-    signInPrompt: "プロフィールを開く前にログインしてください。",
+    signingOut: "サインアウト中…",
+    signOut: "サインアウト",
+    signOutFailed: "サインアウトできませんでした。もう一度お試しください。",
+    signOutFailedShort: "サインアウトできませんでした",
+    signInPrompt: "プロフィールを開く前にサインインしてください。",
     reauthenticate: "再認証",
   },
   deleteAccount: {
@@ -230,32 +230,32 @@ export default {
     },
     checkingStatus: "削除の状況を確認中…",
     intro:
-      "Scryveアカウントを完全に削除し、コネクテッドプレイの履歴を匿名化します。先に内容をご確認ください。",
+      "Scryveアカウントを完全に削除し、通信対戦の履歴を匿名化します。先に内容をご確認ください。",
     steps: {
       cloud: {
         title: "クラウドアカウントが削除されます",
-        body: "プロフィール、アバター、ログイン情報、招待、アカウントに紐づくコネクテッドデータが削除されます。",
+        body: "プロフィール、アバター、サインイン情報、招待、アカウントに紐づく通信対戦データが削除されます。",
       },
       history: {
-        title: "共有された対戦履歴は匿名化されます",
-        body: "他のプレイヤーには対戦結果が残りますが、あなたの席は、中立的なアバターの「削除されたプレイヤー」として紐づけが解除されます。",
+        title: "共有されたマッチ履歴は匿名化されます",
+        body: "ほかのプレイヤーにはマッチ結果が残りますが、あなたの席は中立的なアバターの「削除されたプレイヤー」として関連付けが解除されます。",
       },
       local: {
-        title: "ローカルゲームはこの端末に残ります",
-        body: "オフラインのゲーム履歴はこの端末にのみ保存されます。アカウントとは紐づいておらず、リモートで消去されません。",
+        title: "ローカルゲームはこのデバイスに保存されます",
+        body: "オフラインのゲーム履歴はこのデバイスにのみ保存されています。アカウントに紐づいておらず、リモートで消去されることはありません。",
       },
       signOut: {
-        title: "すべての端末からログアウトします",
-        body: "この端末と、ログイン中の他の端末は自動的にログアウトされます。",
+        title: "すべてのデバイスがサインアウトされます",
+        body: "このデバイスとサインイン中の他のデバイスは自動的にサインアウトされます。",
       },
     },
     subscription: {
       heading: "Scryve Proを購読していますか?",
-      body: "アカウントを削除しても購読は解約されません。AppleまたはGoogle Playで解約するまで課金が続く場合があります。今すぐ削除することもできますが、残りの有料期間は利用できなくなります。",
+      body: "アカウントを削除しても解約にはなりません。AppleまたはGoogle Playで解約するまで課金が続く場合があります。今すぐ削除もできますが、残りの有料期間は利用できなくなります。",
       manageApple: "Appleのサブスクリプションを管理",
       manageGoogle: "Google Playのサブスクリプションを管理",
     },
-    signedInAs: "{{email}}でログイン中",
+    signedInAs: "{{email}}でサインイン中",
     confirmLabel: "続行するには{{word}}と入力してください",
     submit: {
       submitting: "リクエストを送信中…",
@@ -271,9 +271,9 @@ export default {
       failed:
         "Scryveは自動で完了できませんでした。このページに戻り、もう一度リクエストを送信して再試行してください。",
       identityPending:
-        "コネクテッドデータは匿名化されました。現在、Scryveがログイン情報を削除しています。",
+        "通信対戦のデータは匿名化されました。現在、Scryveがサインイン情報を削除しています。",
       processing:
-        "Scryveがコネクテッド履歴を匿名化し、アカウントに紐づくデータを削除しています。このページは閉じても問題ありません。",
+        "Scryveは通信対戦の履歴を匿名化し、アカウントに紐づくデータを削除しています。このページは安全に閉じられます。",
     },
     panel: {
       failed: {
@@ -282,30 +282,29 @@ export default {
       },
       completed: {
         title: "削除が完了しました",
-        body: "この受付記録にアカウントの詳細は含まれません。",
+        body: "この受領書にはアカウントの詳細は含まれません。",
       },
       received: {
         title: "削除リクエストを受け付けました",
-        body: "リクエストの処理中は、新しいコネクテッドの操作はできません。",
+        body: "リクエストの処理中は、新しい通信対戦のアクティビティがブロックされます。",
       },
     },
     receipt: {
-      completedBody:
-        "Scryveはログイン用アカウントを削除し、コネクテッドプレイの履歴を匿名化しました。",
+      completedBody: "Scryveはサインイン用アカウントを削除し、通信対戦の履歴を匿名化しました。",
       failedBody: "Scryveは残りの削除作業を自動で完了できませんでした。",
       lastUpdated: "最終更新 {{day}} {{time}}",
       next: {
         completed: "これ以上の操作は不要です。",
-        failed: "もう一度ログインし、このページに戻ってリクエストを再試行してください。",
+        failed: "もう一度サインインし、このページに戻ってリクエストをやり直してください。",
         pending: "Scryveを閉じても問題ありません。戻ると、このページは確認を続けます。",
       },
-      signInToRetry: "ログインして再試行",
+      signInToRetry: "サインインして再試行",
       returnHome: "ホームに戻る",
     },
     route: {
       statusCheckFailed:
-        "Scryveは削除の状況を確認できませんでした。確認が成功するまで、アカウントの削除はできません。",
-      signInPrompt: "Scryveアカウントの削除をリクエストするにはログインしてください。",
+        "削除の状況を確認できませんでした。確認が成功するまでアカウントは削除できません。",
+      signInPrompt: "Scryveアカウントの削除をリクエストするには、サインインしてください。",
       checkingReceipt: "削除の受付記録を確認中…",
       checkingAccount: "アカウントを確認中…",
       reconnect: "アカウントを削除する前に、Scryveに再接続してください。",
@@ -313,15 +312,15 @@ export default {
     },
   },
   cloud: {
-    signInToContinue: "続行するにはログインしてください。",
+    signInToContinue: "続行するにはサインインしてください。",
     chooseUsername: "プレイヤーのユーザー名を選んでください。",
     reconnect: "続行するには再接続してください。",
-    chooseUsernameAction: "ユーザー名を選ぶ",
-    unavailableHeading: "コネクテッド機能は利用できません",
+    chooseUsernameAction: "ユーザー名を選択",
+    unavailableHeading: "通信対戦機能は利用できません",
     localPlayAvailable: "ローカルプレイは引き続き利用できます。",
     notConfigured:
-      "このビルドではコネクテッド機能を利用できません。ローカルプレイは引き続き利用できます。",
-    closeSignIn: "ログインを閉じる",
+      "このビルドでは通信対戦機能を利用できません。ローカルプレイは引き続き利用できます。",
+    closeSignIn: "サインインを閉じる",
   },
   billing: {
     access: {
@@ -343,12 +342,12 @@ export default {
       revenueCatNotConfigured: "RevenueCatが設定されていません。",
       unexpected: "購入中に予期しないエラーが発生しました。",
       offline: "インターネットに接続して、もう一度お試しください。",
-      notAllowed: "この端末またはストアアカウントでは購入できません。",
+      notAllowed: "このデバイスまたはストアアカウントでは購入が許可されていません。",
       productUnavailable: "このScryve Proのオプションは現在のストアでは利用できません。",
       pending: "ストアがこの購入を処理中です。完了するとアクセスが更新されます。",
       misconfigured: "このビルドではScryve Proが正しく設定されていません。",
       failed: "購入を完了できませんでした。",
-      waitForBilling: "アカウントへの課金接続が完了するまでお待ちのうえ、もう一度お試しください。",
+      waitForBilling: "課金がアカウントに接続されるまで待ってから、もう一度お試しください。",
       foilWebOnly: "Foilの購入はウェブでのみご利用いただけます。",
       manageBeforeFoil: "Foilに切り替える前に、現在のサブスクリプションを管理してください。",
       productNotInStore: "{{productId}}は現在のストアでは利用できません。",
@@ -361,7 +360,7 @@ export default {
     title: "Foil Supporter",
     price: "年額500米ドル",
     description: "Proと同じ機能です。Scryveへの任意のサポートです。解約するまで毎年更新されます。",
-    signInPrompt: "FoilをScryveアカウントに紐付けるにはサインインしてください。",
+    signInPrompt: "FoilをScryveアカウントに連携するには、サインインしてください。",
     alreadyPro:
       "すでにProをご利用中です。プランを切り替える前に、現在のサブスクリプションを管理してください。",
     manageSubscription: "サブスクリプションを管理",
@@ -407,7 +406,7 @@ export default {
     readTerms: "利用規約を読む",
     readPrivacy: "プライバシーポリシーを読む",
     shareUsageHelper:
-      "初期設定はオフです。共有いただくと、ご要望に沿った開発に役立ちます。詳細はプライバシーポリシーをご覧ください。",
+      "初期設定ではオフです。共有いただくと、皆さんが求める機能の開発に役立ちます。詳細はプライバシーポリシーをご覧ください。",
     sharingSaveFailed:
       "共有設定を保存できませんでした。もう一度お試しいただくか、共有をオフにして続行してください。",
     saving: "保存中…",
@@ -418,16 +417,16 @@ export default {
   },
   consentSync: {
     syncing: "同意を同期中…",
-    stillPending: "アカウントの同期はまだ保留中です。同意はこの端末に保存されています。",
-    pending: "同意はこの端末に保存されました。アカウントの同期は保留中です。",
+    stillPending: "アカウントの同期はまだ保留中です。同意はこのデバイスに保存されています。",
+    pending: "同意はこのデバイスに保存されました。アカウントの同期は保留中です。",
     retrying: "再試行中…",
-    retryAccessibilityLabel: "アカウントの同意同期を再試行",
+    retryAccessibilityLabel: "アカウントの同意の同期を再試行",
   },
   updates: {
     downloading: "アップデートをダウンロード中…",
     downloadingProgress: "アップデートをダウンロード中 {{percent}}%",
     ready: "アップデート準備完了",
-    cancelReady: "アップデートの準備完了をキャンセル",
+    cancelReady: "閉じる",
     restart: "再起動",
     whatsNew: "このアップデートの内容",
     dialogMessage: "次回Scryveを開いたときに適用されます。ゲームはどちらの場合も保存されます。",

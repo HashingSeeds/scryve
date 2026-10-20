@@ -68,7 +68,8 @@ const decks = {
     accountCopy: "Account copy: {{cards}} cards · {{entries}} entries · revision {{revision}}",
     keepMine: "Keep mine",
     retrySync: "Retry sync",
-    keepAccount: "Keep account",
+    // Button: keep the deck version saved in the account and drop this device's edit.
+    keepAccount: "Keep account copy",
     discardLocal: "Discard local edit",
     saveCardsFailed: "Could not save your card changes",
     discardCardsFailed: "Could not discard local card edits",
@@ -125,6 +126,7 @@ const decks = {
     discardTitle: "Discard changes?",
     cancelDiscard: "Cancel discard changes?",
     discardBody: "Your edits will be lost.",
+    // Button that throws away unsaved edits. Must not read like Cancel.
     discard: "Discard",
   },
   guestStorage: {
@@ -205,7 +207,9 @@ const decks = {
   },
   cardFocus: {
     close: "Close card details",
+    // The front face of a double-faced card.
     front: "Front",
+    // The back face of a double-faced card, not navigation.
     back: "Back",
     loadingDetails: "Loading details…",
     commanderColor: "Commander color",
@@ -320,12 +324,14 @@ const decks = {
       G: "Green",
     },
     landDrops: "Land drop odds",
+    // "On the play" means going first, with no draw on turn one.
     landDropsOnPlay: "Land drop odds on the play",
     turn: "Turn {{turn}}",
     openingHand: "Opening hand, keeping 2 to 5 lands",
     keepSeven: "Keep 7",
     mulligan: "Mulligan",
     mulliganTwice: "Mulligan twice",
+    // "Free" means it costs no card, not free of charge.
     freeMulligan: "The first mulligan is free in this format.",
     missing_one: "{{count}} card has no card data yet.",
     missing_other: "{{count}} cards have no card data yet.",
@@ -434,6 +440,7 @@ const decks = {
     reviewTitle: "Review deck",
     importedDeck: "Imported deck",
     viewOn: "View on {{source}}",
+    // {{source}} is the deck website; {{author}} made the deck.
     viewOnBy: "View on {{source}} by {{author}}",
     openFailed: "Could not open {{source}}.",
     nameRequired: "Add a deck name.",
@@ -480,13 +487,18 @@ const decks = {
     sourceLink: "{{source}} link",
     pasteInstead: "Paste text instead",
     deckList: "Deck list",
+    // Card names, quoted examples and section headings are parser input; keep them in English exactly.
     listHelperYgo:
       "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported.",
+    // Pokémon TCG Live is a product name; keep it in English.
     listHelperPokemon:
       "Paste a Pokémon TCG Live list with quantities, names, set codes, and card numbers.",
+    // Card names, quoted examples and section headings are parser input; keep them in English exactly.
     listHelperMtg:
       'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.',
+    // Card names and quoted examples are parser input; keep them in English exactly.
     listHelperLorcana: 'Use lines like "4 Aladdin - Heroic Outlaw".',
+    // Card names and quoted examples are parser input; keep them in English exactly.
     listHelperFab: 'Paste a Fabrary card list or lines like "3x Snatch (red)".',
     returnToReview: "Return to review",
     loadingDeck: "Loading deck…",

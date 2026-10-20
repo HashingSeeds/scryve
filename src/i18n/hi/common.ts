@@ -29,8 +29,8 @@ export default {
     account: "खाता",
     signIn: "साइन इन करें",
     closeMenu: "यूटिलिटी मेन्यू बंद करें",
-    nearbyOnlyOn: "केवल आस-पास: चालू",
-    nearbyOnlyOff: "केवल आस-पास: बंद",
+    nearbyOnlyOn: "सिर्फ़ आस-पास: चालू",
+    nearbyOnlyOff: "सिर्फ़ आस-पास: बंद",
   },
   appNavigation: {
     decks: "डेक",
@@ -46,7 +46,7 @@ export default {
     triggerLabel: "{{label}}, {{value}}",
     openHint: {
       format: "फ़ॉर्मैट के विकल्प खोलता है",
-      commanderColor: "कमांडर रंग के विकल्प खोलता है",
+      commanderColor: "कमांडर कलर के विकल्प खोलता है",
       addTo: '"में जोड़ें" के विकल्प खोलता है',
       changeBy: '"बदलाव की मात्रा" के विकल्प खोलता है',
       thisIsMe: '"यह मैं हूँ" के विकल्प खोलता है',
@@ -55,7 +55,7 @@ export default {
     },
     closeLabel: {
       format: "फ़ॉर्मैट के विकल्प बंद करें",
-      commanderColor: "कमांडर रंग के विकल्प बंद करें",
+      commanderColor: "कमांडर कलर के विकल्प बंद करें",
       addTo: '"में जोड़ें" के विकल्प बंद करें',
       changeBy: '"बदलाव की मात्रा" के विकल्प बंद करें',
       thisIsMe: '"यह मैं हूँ" के विकल्प बंद करें',

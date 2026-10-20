@@ -1,5 +1,6 @@
 const account = {
-  openPlay: "Open Play",
+  // Button that goes to the Play tab.
+  openPlay: "Go to Play",
   signIn: "Sign in",
   localGamesStay: "Local games stay on this device.",
   legal: {
@@ -22,13 +23,15 @@ const account = {
     title: "Settings",
     localDefaults: "Local game defaults",
     players: "players",
-    openScryveTo: "Open Scryve to",
+    // Label above a choice of which screen Scryve shows when it opens.
+    openScryveTo: "When Scryve opens, show",
     launchDestination: {
       play: "Play",
       decks: "Decks",
     },
     launchDestinationHint: "Play resumes a current game or opens a fresh board.",
     game: "Game",
+    // Heading of the picker for the game and format new games start with.
     chooseGame: "Start new games as",
     closeGameChoices: "Close game choices",
     defaultsHint:
@@ -424,7 +427,8 @@ const account = {
     downloading: "Downloading update…",
     downloadingProgress: "Downloading update {{percent}}%",
     ready: "Update ready",
-    cancelReady: "Cancel update ready",
+    // Accessibility label for tapping outside the update-ready sheet. It does not cancel the update.
+    cancelReady: "Close",
     restart: "Restart",
     whatsNew: "What's in this update",
     dialogMessage: "Applies the next time you open Scryve. Your game is saved either way.",

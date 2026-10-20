@@ -33,15 +33,15 @@ export default {
     chooseColor: "Choisissez une couleur pour ce commandant.",
     copyLimit: "Ce changement dépasserait la limite de 999 exemplaires par entrée de carte.",
     detailsMissing:
-      "Certains détails de cartes sont manquants. L'identité de couleur du deck n'a pas été entièrement vérifiée.",
+      "Certains détails de cartes sont manquants. L’identité couleur du deck n’a pas été entièrement vérifiée.",
     duplicateCommander: "Un autre exemplaire de ce commandant reste dans le deck.",
-    colorIdentityConflict: "Hors de l'identité de couleur de ce commandant : {{names}}.",
+    colorIdentityConflict: "Hors de l'identité couleur de ce commandant : {{names}}.",
     colorIdentityConflictMore_one:
-      "Hors de l'identité de couleur de ce commandant : {{names}} et {{count}} autre.",
+      "Hors de l'identité couleur de ce commandant : {{names}} et {{count}} de plus.",
     colorIdentityConflictMore_many:
-      "Hors de l'identité de couleur de ce commandant : {{names}} et {{count}} d'autres.",
+      "Hors de l'identité couleur de ce commandant : {{names}} et {{count}} de plus.",
     colorIdentityConflictMore_other:
-      "Hors de l'identité de couleur de ce commandant : {{names}} et {{count}} autres.",
+      "Hors de l'identité couleur de ce commandant : {{names}} et {{count}} de plus.",
   },
   draft: {
     copyLimit: "Une carte peut avoir au maximum {{limit}} exemplaires.",
@@ -54,21 +54,21 @@ export default {
   syncReason: {
     deckConflict: "Le deck a été modifié sur un autre appareil. Choisissez la version à conserver.",
     deckRejected:
-      "Le serveur n'accepte pas cette modification. Abandonnez-la et modifiez à nouveau.",
+      "Le serveur ne peut pas accepter cette modification. Abandonnez-la et modifiez à nouveau.",
     versionConflict:
       "Les cartes du deck ont changé sur un autre appareil. Choisissez la liste de cartes à conserver.",
     versionQueueConflict:
       "Une modification de cartes précédente est en conflit. Choisissez la liste de cartes à conserver.",
     draftUnsynced:
-      "Ce brouillon hors ligne n'a jamais été synchronisé. Abandonnez-le et recréez la version.",
+      "Ce brouillon hors ligne n’a jamais été synchronisé. Supprimez-le et recréez la version.",
     versionRejected:
-      "Le serveur n'accepte pas ces changements. Abandonnez-les et modifiez à nouveau.",
+      "Le serveur ne peut pas accepter ces modifications. Abandonnez-les et modifiez à nouveau.",
   },
   conflict: {
     name: "Nom",
     format: "Format",
     notes: "Notes",
-    syncFailed: "Impossible de synchroniser cette modification. Réessayez ou abandonnez-la.",
+    syncFailed: "Cette modification n'a pas pu être synchronisée. Réessayez ou abandonnez-la.",
     later: "Plus tard",
     keepWhichCards: "Conserver quelle liste de cartes ?",
     reviewCards: "Revoir les modifications de cartes enregistrées",
@@ -80,11 +80,11 @@ export default {
     accountCopy: "Copie du compte : {{cards}} cartes · {{entries}} entrées · révision {{revision}}",
     keepMine: "Garder la mienne",
     retrySync: "Réessayer la synchro",
-    keepAccount: "Garder le compte",
-    discardLocal: "Abandonner la modif. locale",
+    keepAccount: "Garder la copie du compte",
+    discardLocal: "Abandonner la modification locale",
     saveCardsFailed: "Impossible d'enregistrer vos changements de cartes",
-    discardCardsFailed: "Impossible d'abandonner les modifications de cartes locales",
-    keepWhichVersion: "Conserver quelle version ?",
+    discardCardsFailed: "Impossible d'abandonner les modifications locales des cartes",
+    keepWhichVersion: "Quelle version garder ?",
     reviewLocal: "Revoir la modif. locale",
     thisDevice: "Cet appareil",
     account: "Compte",
@@ -113,11 +113,11 @@ export default {
       "Vous êtes hors ligne. Les cartes déjà présentes dans vos decks peuvent être ajoutées.",
     saveFailed: "Impossible d'enregistrer le deck",
     versionLimit_one:
-      "Ce deck contient jusqu'à {{count}} version. Supprimez-en une pour en ajouter une autre.",
+      "Ce deck contient jusqu’à {{count}} version. Supprimez-en une pour en ajouter une autre.",
     versionLimit_many:
-      "Ce deck contient jusqu'à {{count}} de versions. Supprimez-en une pour en ajouter une autre.",
+      "Ce deck contient jusqu’à {{count}} de versions. Supprimez-en une pour en ajouter une autre.",
     versionLimit_other:
-      "Ce deck contient jusqu'à {{count}} versions. Supprimez-en une pour en ajouter une autre.",
+      "Ce deck contient jusqu’à {{count}} versions. Supprimez-en une pour en ajouter une autre.",
     cardsNotSaved:
       "Les cartes enregistrées ne sont pas disponibles. Reconnectez-vous ou créez une version vide.",
     createVersionFailed: "Impossible de créer la version",
@@ -141,7 +141,7 @@ export default {
     keepDeck: "Garder ce deck",
     deleteDeckTitle: "Supprimer ce deck ?",
     keepEditing: "Continuer la modification",
-    discardTitle: "Abandonner les changements ?",
+    discardTitle: "Abandonner les modifications ?",
     cancelDiscard: "Annuler l'abandon des modifications ?",
     discardBody: "Vos modifications seront perdues.",
     discard: "Abandonner",
@@ -170,9 +170,11 @@ export default {
     synced_one: "{{count}} deck synchronisé.",
     synced_many: "{{count}} decks synchronisés.",
     synced_other: "{{count}} decks synchronisés.",
-    didNotFit_one: "{{count}} deck n'a pas tenu et reste enregistré sur cet appareil.",
-    didNotFit_many: "{{count}} decks n'ont pas tenu et restent enregistrés sur cet appareil.",
-    didNotFit_other: "{{count}} decks n'ont pas tenu et restent enregistrés sur cet appareil.",
+    didNotFit_one: "{{count}} deck n'a pas pu être ajouté et reste enregistré sur cet appareil.",
+    didNotFit_many:
+      "{{count}} decks n'ont pas pu être ajoutés et restent enregistrés sur cet appareil.",
+    didNotFit_other:
+      "{{count}} decks n'ont pas pu être ajoutés et restent enregistrés sur cet appareil.",
     makeRoom: "Faire de la place",
   },
   cardDetails: {
@@ -180,7 +182,7 @@ export default {
     facesFailed: "Impossible de charger les deux faces. Affichage des infos de carte enregistrées.",
     commanderRulesStale:
       "Impossible d'actualiser les règles Commander. Affichage des infos de carte enregistrées.",
-    none: "Aucun autre détail de carte n'est disponible.",
+    none: "Aucun détail supplémentaire sur la carte n’est disponible.",
     loadFailed: "Impossible de charger les détails de la carte",
   },
   settings: {
@@ -192,7 +194,7 @@ export default {
     delete: "Supprimer le deck",
   },
   versionDialog: {
-    close: "Fermer l'éditeur de version",
+    close: "Fermer l’éditeur de version",
     name: "Nom de la version",
     nameHelper:
       "Un nom que vous reconnaîtrez plus tard, comme « vs Contrôle » ou « Version économique ».",
@@ -201,7 +203,7 @@ export default {
     copyFrom: "Copier {{version}}",
     copyDetail: "Partir de la liste actuelle",
     empty: "Partir de zéro",
-    emptyDetail: "Construire cette version depuis le début",
+    emptyDetail: "Créer cette version de zéro",
     delete: "Supprimer la version",
   },
   loading: {
@@ -227,8 +229,8 @@ export default {
     colorless: "Incolore",
     withChosen: "{{colors}} + couleur choisie",
     chooseColor: "Choisir une couleur",
-    identity: "Identité de couleur : {{identity}}",
-    identityBothFaces: "Identité de couleur : {{identity}} · Les deux faces",
+    identity: "Identité couleur : {{identity}}",
+    identityBothFaces: "Identité couleur : {{identity}} · Les deux faces",
   },
   cardFocus: {
     close: "Fermer les détails de la carte",
@@ -239,7 +241,7 @@ export default {
     setCommander: "Définir comme commandant",
     quantityIn: "{{quantity}}× dans {{section}}",
     eligibilityUnverified: "Éligibilité comme commandant non encore vérifiée.",
-    ineligible: "Cette carte ne peut pas être commandant seule.",
+    ineligible: "Cette carte ne peut pas être un commandant à elle seule.",
     notLegal: "Cette carte n'est pas légale en Commander.",
   },
   cardRow: {
@@ -247,7 +249,7 @@ export default {
     decrease: "Diminuer {{card}}",
     increase: "Augmenter {{card}}",
     changeCommander: "Changer de commandant",
-    chooseCommander: "Choisir un commandant",
+    chooseCommander: "Choisir le commandant",
     change: "Changer",
     choose: "Choisir",
   },
@@ -257,10 +259,10 @@ export default {
     placeholder: "Rechercher par nom de carte",
     addTo: "Ajouter à",
     inDeck: "Dans ce deck",
-    checking: "Vérification de l'éligibilité comme commandant…",
+    checking: "Vérification de l'éligibilité des commandants…",
     noEligible: "Aucun commandant éligible dans ce deck.",
     cachedCards: "Cartes en cache",
-    searchCached: "Rechercher les commandants en cache par nom.",
+    searchCached: "Rechercher des commandants en cache par nom.",
     searchScryfall: "Rechercher un commandant sur Scryfall.",
     searching: "Recherche…",
     offline: "Vous êtes hors ligne. Recherche parmi les cartes déjà dans vos decks.",
@@ -270,7 +272,7 @@ export default {
     addCard: "Ajouter {{card}} au deck",
     added: "{{card}} ajoutée.",
     noCached:
-      "Aucune carte en cache ne correspond. Les cartes apparaissent ici après un ajout en ligne.",
+      "Aucune carte en cache ne correspond. Les cartes apparaissent ici après leur ajout en ligne.",
     noResults: "Aucune carte trouvée.",
     dismissFilters: "Fermer les filtres de commandant",
     colorMatch: "Correspondance de couleur",
@@ -293,9 +295,9 @@ export default {
     deleteFailed: "Impossible de supprimer ce deck.",
     title: "Limite de decks atteinte",
     proBody:
-      "Les comptes Pro peuvent avoir {{limit}} decks. Supprimez un deck pour faire de la place.",
+      "Les comptes Pro peuvent contenir {{limit}} decks. Supprimez un deck pour faire de la place.",
     freeBody:
-      "Les comptes gratuits peuvent avoir {{limit}} decks. Passez à Pro pour {{premiumLimit}}, ou supprimez un deck pour faire de la place.",
+      "Les comptes gratuits peuvent contenir {{limit}} decks. Passez à Pro pour {{premiumLimit}}, ou supprimez un deck pour faire de la place.",
     upgrade: "Passer à Pro",
     deleteADeck: "Supprimer un deck",
     notNow: "Pas maintenant",
@@ -333,11 +335,11 @@ export default {
     curve: "Courbe de mana",
     average: "Moyenne : {{value}}",
     lands: "Terrains",
-    landsWithModal: "{{lands}} + {{modal}} modal",
+    landsWithModal: "{{lands}} + {{modal}} modaux",
     suggested: "Terrains suggérés",
     range: "{{low}} à {{high}}",
     ramp: "Accélération",
-    cheapDraw: "Pioche peu chère",
+    cheapDraw: "Pioche peu coûteuse",
     colors: "Couleurs",
     pips: "Symboles",
     sources: "Terrains",
@@ -348,10 +350,10 @@ export default {
       R: "Rouge",
       G: "Vert",
     },
-    landDrops: "Probabilité de poser un terrain",
-    landDropsOnPlay: "Probabilité de poser un terrain en jouant en premier",
+    landDrops: "Probabilités de pose de terrain",
+    landDropsOnPlay: "Probabilités de pose de terrain en début de partie",
     turn: "Tour {{turn}}",
-    openingHand: "Main de départ, avec 2 à 5 terrains gardés",
+    openingHand: "Main de départ, en gardant 2 à 5 terrains",
     keepSeven: "Garder 7",
     mulligan: "Mulligan",
     mulliganTwice: "Mulligan deux fois",
@@ -359,11 +361,11 @@ export default {
     missing_one: "{{count}} carte n'a pas encore de données.",
     missing_many: "{{count}} de cartes n'ont pas encore de données.",
     missing_other: "{{count}} cartes n'ont pas encore de données.",
-    credit: "Suggestion de terrains d'après la formule de Frank Karsten.",
+    credit: "Suggestion de terrains issue de la formule de Frank Karsten.",
   },
   shelf: {
     title: "Decks",
-    backToLobby: "Retour au lobby",
+    backToLobby: "Retour au salon",
     addDeck: "Ajouter un deck",
     collection: "Collection de decks",
     collectionAll: "Tous",
@@ -400,7 +402,7 @@ export default {
     system: "Jeu",
     allSystems: "Tous les jeux",
     format: "Format",
-    chooseSystem: "Choisissez un jeu pour filtrer par format.",
+    chooseSystem: "Choisissez un système pour filtrer par format.",
     clearFilters: "Effacer les filtres",
     showDecks: "Afficher les decks",
     syncUnavailable: "La synchronisation des decks est indisponible dans cette version.",
@@ -414,7 +416,7 @@ export default {
     reload: "Recharger le deck enregistré",
     deleteTitle: "Supprimer le deck invité ?",
     cancelDelete: "Annuler la suppression du deck invité ?",
-    deleteBody: "Cela retire le deck de cet appareil.",
+    deleteBody: "Cela supprime le deck de cet appareil.",
   },
   addDeck: {
     modeBrowse: "Parcourir",
@@ -453,7 +455,7 @@ export default {
     guestFull: "{{limit}} decks enregistrés sur cet appareil",
     replaceDeck: "Remplacer {{name}}…",
     signInUpgrade: "Connectez-vous, puis passez à Pro",
-    proSubscription: "Pro est un abonnement lié à votre compte · {{limit}} decks",
+    proSubscription: "Pro est un abonnement sur votre compte · {{limit}} decks",
     replaceTitle: "Remplacer le deck local ?",
     cancelReplace: "Annuler le remplacement du deck local ?",
     replaceBody: "{{name}} sera remplacé.",
@@ -482,10 +484,10 @@ export default {
       "{{count}} lignes sans correspondance ou non valides supprimées de cet import. Texte d’origine conservé dans le formulaire d’import.",
     problemsRemoved_other:
       "{{count}} lignes sans correspondance ou non valides supprimées de cet import. Texte d’origine conservé dans le formulaire d’import.",
-    saveOnDevice: "Enregistrer sur l’appareil",
+    saveOnDevice: "Enregistrer sur l'appareil",
     saveDeck: "Enregistrer le deck",
     previewTitle: "Aperçu du deck",
-    datedExample: "Exemple ancien. Les cartes peuvent ne plus être légales dans ce format.",
+    datedExample: "Exemple ancien. Certaines cartes peuvent ne plus être légales dans ce format.",
     openSourceFailed: "Impossible d’ouvrir la source du deck.",
     viewSource: "Voir le deck source",
     previewReady: "Aperçu prêt",
@@ -495,16 +497,16 @@ export default {
     saveDeckOnDevice: "Enregistrer le deck sur cet appareil",
     importDeck: "Importer le deck",
     originalPrecon:
-      "Liste précon d’origine. Les cartes peuvent ne plus être légales dans ce format.",
+      "Liste précon d’origine. Certaines cartes peuvent ne plus être légales dans ce format.",
     loadingImages: "Chargement des images des cartes",
     loadingOfficial: "Chargement de la liste officielle des cartes",
     previewUnavailable: "Aperçu indisponible",
     unresolvedCards_one:
-      "Ce deck contient {{count}} carte sans correspondance, il ne peut donc pas encore être importé.",
+      "Ce deck contient {{count}} carte non reconnue, il ne peut donc pas encore être importé.",
     unresolvedCards_many:
-      "Ce deck contient {{count}} de cartes sans correspondance, il ne peut donc pas encore être importé.",
+      "Ce deck contient {{count}} cartes non reconnues, il ne peut donc pas encore être importé.",
     unresolvedCards_other:
-      "Ce deck contient {{count}} cartes sans correspondance, il ne peut donc pas encore être importé.",
+      "Ce deck contient {{count}} cartes non reconnues, il ne peut donc pas encore être importé.",
     startingPoint: "Point de départ",
     browseOffline: "Vous êtes hors ligne. Les decks se chargeront à la reconnexion.",
     rateLimited_one:
@@ -525,13 +527,13 @@ export default {
     pasteInstead: "Coller du texte à la place",
     deckList: "Liste du deck",
     listHelperYgo:
-      "Collez des ID de cartes YDK ou des lignes comme 3 Ash Blossom. Les titres Main, Extra et Side sont pris en charge.",
+      "Collez des identifiants de cartes YDK ou des lignes comme 3 Ash Blossom. Les titres Main, Extra et Side sont pris en charge.",
     listHelperPokemon:
-      "Collez une liste Pokémon TCG Live avec quantités, noms, codes d’extension et numéros de carte.",
+      "Collez une liste Pokémon TCG Live avec les quantités, les noms, les codes d'extension et les numéros de carte.",
     listHelperMtg:
-      "Utilisez des lignes comme « 1 Sol Ring ». Les titres Commander, Mainboard et Sideboard sont pris en charge.",
-    listHelperLorcana: "Utilisez des lignes comme « 4 Aladdin - Heroic Outlaw ».",
-    listHelperFab: "Collez une liste de cartes Fabrary ou des lignes comme « 3x Snatch (red) ».",
+      'Utilisez des lignes comme "1 Sol Ring". Les titres Commander, Mainboard et Sideboard sont pris en charge.',
+    listHelperLorcana: 'Utilisez des lignes comme "4 Aladdin - Heroic Outlaw".',
+    listHelperFab: 'Collez une liste de cartes Fabrary ou des lignes comme "3x Snatch (red)".',
     returnToReview: "Retour à la vérification",
     loadingDeck: "Chargement du deck…",
     reloadSource: "Recharger la source",

@@ -475,7 +475,7 @@ describe("ConnectedBoardScreen", () => {
     )
     expect(screen.getByTestId("connected-game-board")).toBeTruthy()
     reviewSyncIssues()
-    expect(screen.getByText("Connected summary")).toBeTruthy()
+    expect(screen.getByText("Game over")).toBeTruthy()
     expect(screen.getByText("12 life changes accepted · final")).toBeTruthy()
     expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
     expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(true)
