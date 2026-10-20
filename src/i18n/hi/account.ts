@@ -77,10 +77,6 @@ export default {
         Holo: "होलो",
       },
     },
-    menuButton: {
-      heading: "गेम मेन्यू बटन",
-      hint: "बोर्ड के केंद्र में आकार बदलता है। Prism बटन को टेबल पर मौजूद सभी के रंगों से रंगता है।",
-    },
     privacy: {
       heading: "गोपनीयता",
       shareUsageHelper:

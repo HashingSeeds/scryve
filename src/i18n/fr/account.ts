@@ -77,10 +77,6 @@ export default {
         Holo: "Holo",
       },
     },
-    menuButton: {
-      heading: "Bouton du menu de jeu",
-      hint: "Change la forme au centre du plateau. Prism teinte le bouton avec les couleurs de tous les joueurs à la table.",
-    },
     privacy: {
       heading: "Confidentialité",
       shareUsageHelper:

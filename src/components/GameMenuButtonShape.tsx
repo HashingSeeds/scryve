@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement } from "react"
+import { useEffect, useState, type ReactElement } from "react"
 import Animated, {
   cancelAnimation,
   Easing,
@@ -8,32 +8,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated"
-import Svg, {
-  ClipPath,
-  Defs,
-  G,
-  LinearGradient,
-  Path,
-  RadialGradient,
-  Stop,
-} from "react-native-svg"
-
-import { PLAYER_COLORS } from "@/features/game/domain"
-
-export type MenuButtonStyle = "keystoneIIFlat" | "prismFlat"
-
-export const MENU_BUTTON_STYLES = ["keystoneIIFlat", "prismFlat"] as const
-
-export const DEFAULT_MENU_BUTTON_STYLE: MenuButtonStyle = "keystoneIIFlat"
-
-export const MENU_BUTTON_STYLE_LABELS: Record<MenuButtonStyle, string> = {
-  keystoneIIFlat: "Keystone II",
-  prismFlat: "Prism",
-}
-
-export function isMenuButtonStyle(value: unknown): value is MenuButtonStyle {
-  return MENU_BUTTON_STYLES.includes(value as MenuButtonStyle)
-}
+import Svg, { ClipPath, Defs, G, LinearGradient, Path, Stop } from "react-native-svg"
 
 const PENTAGON_SIDES = 5
 const PENTAGON_VIEWBOX = 100
@@ -42,17 +17,12 @@ const PENTAGON_RADIUS = 46
 const PENTAGON_STROKE_WIDTH = 7
 const HAIRLINE_STROKE_WIDTH = 1.4
 
-const WEDGES_NARROW_ENOUGH_TO_HIDE_THEIR_SEAMS = 12
-const SWEEP_DIM_OPACITY = { light: 0.72, dark: 0.66 } as const
-const SWEEP_SHEEN_OPACITY = 0.16
-
 const KEYSTONE_II_FACE = {
   light: { top: "#3F3C47", bottom: "#17161C" },
   dark: { top: "#46434E", bottom: "#26242C" },
 } as const
 
 const KEYSTONE_II_BEVEL = { shade: 0.48, light: 0.4 } as const
-const PRISM_BEVEL = { shade: 0.36, light: 0.22 } as const
 const BEVEL_SHADE_STROKE_WIDTH = 6.5
 const BEVEL_LIGHT_STROKE_WIDTH = 5.5
 
@@ -205,56 +175,6 @@ export function mixColorsInLinearLight(from: string, to: string, ratio: number):
   )
 }
 
-export interface SweepWedge {
-  key: string
-  path: string
-  from: string
-  to: string
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-}
-
-function seatColorAtTurn(seatColors: readonly string[], turn: number): string {
-  const wrapped = ((turn % 1) + 1) % 1
-  const exact = wrapped * seatColors.length
-  const index = Math.floor(exact)
-  return mixColorsInLinearLight(
-    seatColors[index % seatColors.length],
-    seatColors[(index + 1) % seatColors.length],
-    exact - index,
-  )
-}
-
-export function buildSweepWedges(
-  seatColors: readonly string[],
-  wedgeCount: number = WEDGES_NARROW_ENOUGH_TO_HIDE_THEIR_SEAMS,
-): SweepWedge[] {
-  if (seatColors.length === 0) return []
-  const radius = PENTAGON_RADIUS + PENTAGON_STROKE_WIDTH
-  return Array.from({ length: wedgeCount }, (_, index) => {
-    const startTurn = index / wedgeCount
-    const endTurn = (index + 1) / wedgeCount
-    const startAngle = startTurn * Math.PI * 2 - Math.PI / 2
-    const endAngle = endTurn * Math.PI * 2 - Math.PI / 2
-    const x1 = PENTAGON_CENTER + radius * Math.cos(startAngle)
-    const y1 = PENTAGON_CENTER + radius * Math.sin(startAngle)
-    const x2 = PENTAGON_CENTER + radius * Math.cos(endAngle)
-    const y2 = PENTAGON_CENTER + radius * Math.sin(endAngle)
-    return {
-      key: `sweep-${index}`,
-      path: `M${PENTAGON_CENTER},${PENTAGON_CENTER} L${x1.toFixed(2)},${y1.toFixed(2)} A${radius},${radius} 0 0 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`,
-      from: seatColorAtTurn(seatColors, startTurn),
-      to: seatColorAtTurn(seatColors, endTurn),
-      x1,
-      y1,
-      x2,
-      y2,
-    }
-  })
-}
-
 function PentagonBevel({
   clipId,
   opacity,
@@ -405,23 +325,19 @@ function SignalTrace({ color }: { color: string }) {
 }
 
 export interface GameMenuButtonShapeProps {
-  variant: MenuButtonStyle
   isDark: boolean
   boardBackgroundColor: string
-  seatColors?: readonly string[]
   signal?: BorderSignal
   animateSignal?: boolean
 }
 
 export function GameMenuButtonShape({
-  variant,
   isDark,
   boardBackgroundColor,
-  seatColors,
   signal,
   animateSignal = false,
 }: GameMenuButtonShapeProps): ReactElement {
-  const signalLayer = <SignalBorder signal={signal} animate={animateSignal} />
+  const face = isDark ? KEYSTONE_II_FACE.dark : KEYSTONE_II_FACE.light
   return (
     <Svg
       testID="game-menu-pentagon"
@@ -429,36 +345,6 @@ export function GameMenuButtonShape({
       height="100%"
       viewBox={`0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}`}
     >
-      {variant === "prismFlat" ? (
-        <PrismShape
-          isDark={isDark}
-          boardBackgroundColor={boardBackgroundColor}
-          seatColors={seatColors}
-          signalLayer={signalLayer}
-        />
-      ) : (
-        <KeystoneTwoShape
-          isDark={isDark}
-          boardBackgroundColor={boardBackgroundColor}
-          signalLayer={signalLayer}
-        />
-      )}
-    </Svg>
-  )
-}
-
-function KeystoneTwoShape({
-  isDark,
-  boardBackgroundColor,
-  signalLayer,
-}: {
-  isDark: boolean
-  boardBackgroundColor: string
-  signalLayer: ReactElement
-}): ReactElement {
-  const face = isDark ? KEYSTONE_II_FACE.dark : KEYSTONE_II_FACE.light
-  return (
-    <>
       <Defs>
         <ClipPath id="keystoneTwoFace">
           <Path d={FACE_PATH} />
@@ -475,73 +361,9 @@ function KeystoneTwoShape({
         strokeWidth={PENTAGON_STROKE_WIDTH}
         strokeLinejoin="round"
       />
-      {signalLayer}
+      <SignalBorder signal={signal} animate={animateSignal} />
       {isDark ? null : <PentagonBevel clipId="keystoneTwoFace" opacity={KEYSTONE_II_BEVEL} />}
       <PentagonHairline color={boardBackgroundColor} />
-    </>
-  )
-}
-
-function PrismShape({
-  isDark,
-  boardBackgroundColor,
-  seatColors,
-  signalLayer,
-}: {
-  isDark: boolean
-  boardBackgroundColor: string
-  seatColors?: readonly string[]
-  signalLayer: ReactElement
-}): ReactElement {
-  const palette = seatColors && seatColors.length > 0 ? seatColors : PLAYER_COLORS
-  const paletteKey = palette.join("|")
-  const wedges = useMemo(() => buildSweepWedges(paletteKey.split("|")), [paletteKey])
-  return (
-    <>
-      <Defs>
-        <ClipPath id="prismFace">
-          <Path d={FACE_PATH} />
-        </ClipPath>
-        {wedges.map((wedge) => (
-          <LinearGradient
-            key={`${wedge.key}-gradient`}
-            id={`${wedge.key}-gradient`}
-            gradientUnits="userSpaceOnUse"
-            x1={wedge.x1}
-            y1={wedge.y1}
-            x2={wedge.x2}
-            y2={wedge.y2}
-          >
-            <Stop offset="0" stopColor={wedge.from} />
-            <Stop offset="1" stopColor={wedge.to} />
-          </LinearGradient>
-        ))}
-        <RadialGradient id="prismSheen" cx="0.34" cy="0.26" r="0.78">
-          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={SWEEP_SHEEN_OPACITY} />
-          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <G clipPath="url(#prismFace)">
-        {wedges.map((wedge) => (
-          <Path key={wedge.key} d={wedge.path} fill={`url(#${wedge.key}-gradient)`} />
-        ))}
-        <Path
-          d={PENTAGON_PATH}
-          fill="#000000"
-          fillOpacity={isDark ? SWEEP_DIM_OPACITY.dark : SWEEP_DIM_OPACITY.light}
-        />
-        <Path d={PENTAGON_PATH} fill="url(#prismSheen)" />
-      </G>
-      <Path
-        d={PENTAGON_PATH}
-        fill="none"
-        stroke={boardBackgroundColor}
-        strokeWidth={PENTAGON_STROKE_WIDTH}
-        strokeLinejoin="round"
-      />
-      {signalLayer}
-      {isDark ? null : <PentagonBevel clipId="prismFace" opacity={PRISM_BEVEL} />}
-      <PentagonHairline color={boardBackgroundColor} />
-    </>
+    </Svg>
   )
 }

@@ -344,22 +344,6 @@ describe("SettingsScreen", () => {
     })
   })
 
-  it("exposes the two shipping menu button treatments", () => {
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
-          onBack={jest.fn()}
-          onSettingsChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    for (const style of ["keystoneIIFlat", "prismFlat"]) {
-      expect(view.getByTestId(`menu-button-style-${style}`)).toBeTruthy()
-    }
-  })
-
   it("changes local defaults, haptics, and theme", () => {
     const onSettingsChange = jest.fn()
     const view = render(
@@ -375,16 +359,14 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByTestId("default-starting-life-increment"))
     fireEvent.press(view.getByTestId("haptics-switch"))
     fireEvent.press(view.getByText("Dark"))
-    fireEvent.press(view.getByTestId("menu-button-style-prismFlat"))
     fireEvent.press(view.getByTestId("launch-destination-decks"))
-    expect(onSettingsChange).toHaveBeenCalledTimes(6)
+    expect(onSettingsChange).toHaveBeenCalledTimes(5)
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         defaultPlayerCount: 3,
         defaultStartingLife: 21,
         hapticsEnabled: false,
         themePreference: "dark",
-        menuButtonStyle: "prismFlat",
         launchDestination: "decks",
       }),
     )

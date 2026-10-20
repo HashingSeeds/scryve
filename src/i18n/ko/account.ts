@@ -75,10 +75,6 @@ export default {
         Holo: "홀로",
       },
     },
-    menuButton: {
-      heading: "게임 메뉴 버튼",
-      hint: "보드 중앙의 모양을 바꿉니다. 프리즘은 테이블에 있는 모든 사람의 색으로 버튼을 물들입니다.",
-    },
     privacy: {
       heading: "개인정보",
       shareUsageHelper:

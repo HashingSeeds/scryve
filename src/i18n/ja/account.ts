@@ -75,10 +75,6 @@ export default {
         Holo: "ホロ",
       },
     },
-    menuButton: {
-      heading: "ゲームメニューボタン",
-      hint: "ボードの中央にあるボタンの形を変更します。プリズムは、テーブルにいる全員の色でボタンを彩ります。",
-    },
     privacy: {
       heading: "プライバシー",
       shareUsageHelper:

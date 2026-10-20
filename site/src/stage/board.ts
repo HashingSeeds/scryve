@@ -34,7 +34,7 @@ import {
   type PokemonTableEvent,
 } from "./pokemon"
 
-// The game menu button, ported from the app's dark keystoneIIFlat shape
+// The game menu button, ported from the app's dark keystone shape
 // (src/components/GameMenuButtonShape.tsx) and three-bar glyph (GameRadialMenu.tsx),
 // which the app draws at 80px. Keep the geometry in sync with those files.
 const PENTAGON_VIEWBOX = 100

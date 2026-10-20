@@ -76,10 +76,6 @@ const account = {
         Holo: "Holo",
       },
     },
-    menuButton: {
-      heading: "Game menu button",
-      hint: "Changes the shape at the center of the board. Prism tints the button with the colors of everyone at the table.",
-    },
     privacy: {
       heading: "Privacy",
       shareUsageHelper:

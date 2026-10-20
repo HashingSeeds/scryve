@@ -9,7 +9,6 @@ import * as Updates from "expo-updates"
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { DialogCard } from "@/components/DialogCard"
-import { MENU_BUTTON_STYLE_LABELS, MENU_BUTTON_STYLES } from "@/components/GameMenuButtonShape"
 import { Icon } from "@/components/Icon"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
@@ -296,25 +295,6 @@ export function SettingsScreen({
         </View>
         <Text tx="account:settings.theme.hint" size="xs" style={themed($muted)} />
         {AppIcon}
-        <Text
-          tx="account:settings.menuButton.heading"
-          preset="subheading"
-          accessibilityRole="header"
-        />
-        <View style={themed($row)}>
-          {MENU_BUTTON_STYLES.map((style) => (
-            <ChoiceButton
-              key={style}
-              compact
-              testID={`menu-button-style-${style}`}
-              text={MENU_BUTTON_STYLE_LABELS[style]}
-              selected={settings.menuButtonStyle === style}
-              style={themed($choice)}
-              onPress={() => update({ menuButtonStyle: style })}
-            />
-          ))}
-        </View>
-        <Text tx="account:settings.menuButton.hint" size="xs" style={themed($muted)} />
         <Text
           tx="account:settings.privacy.heading"
           preset="subheading"

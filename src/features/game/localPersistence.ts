@@ -1,8 +1,3 @@
-import {
-  DEFAULT_MENU_BUTTON_STYLE,
-  isMenuButtonStyle,
-  type MenuButtonStyle,
-} from "@/components/GameMenuButtonShape"
 import { translate } from "@/i18n/translate"
 import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { storage as mmkvStorage } from "@/utils/storage"
@@ -88,7 +83,6 @@ export interface LocalSettings {
   defaultStartingLife: number
   hapticsEnabled: boolean
   themePreference: ThemePreference
-  menuButtonStyle: MenuButtonStyle
   launchDestination: LaunchDestination
   defaultSystem?: PlaySystemId
   defaultFormat?: string
@@ -101,7 +95,6 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   defaultStartingLife: 20,
   hapticsEnabled: true,
   themePreference: "system",
-  menuButtonStyle: DEFAULT_MENU_BUTTON_STYLE,
   launchDestination: "play",
 }
 
@@ -498,9 +491,6 @@ function parseSettings(value: unknown): LocalSettings | null {
     defaultStartingLife: migrated.defaultStartingLife,
     hapticsEnabled: migrated.hapticsEnabled,
     themePreference: migrated.themePreference,
-    menuButtonStyle: isMenuButtonStyle(migrated.menuButtonStyle)
-      ? migrated.menuButtonStyle
-      : DEFAULT_MENU_BUTTON_STYLE,
     launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
     ...systemPreference,
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
