@@ -219,6 +219,39 @@ const decks = {
     ineligible: "This card cannot be a commander on its own.",
     notLegal: "This card is not legal in Commander.",
   },
+  // Screen readers say these in place of the symbol icons in card rules text, e.g. "{T}: Add {G}." is read as "tap: Add green mana."
+  cardSymbols: {
+    // Flesh and Blood: the attack stat.
+    power: "power",
+    // Flesh and Blood: the block stat.
+    defense: "defense",
+    life: "life",
+    // Flesh and Blood: resource points paid for costs.
+    resource: "resource",
+    // Flesh and Blood: a resource that Mystic cards produce.
+    chi: "chi",
+    // Flesh and Blood: a hero's hand size.
+    intellect: "intellect",
+    // Turn the card sideways to use it.
+    tap: "tap",
+    untap: "untap",
+    // Flesh and Blood: a variable amount of resource points.
+    variableResource: "X resource",
+    white: "white mana",
+    blue: "blue mana",
+    black: "black mana",
+    red: "red mana",
+    green: "green mana",
+    colorless: "colorless mana",
+    // {{amount}} is a number or the letter X.
+    generic: "{{amount}} generic mana",
+    energy: "energy",
+    snow: "snow mana",
+    // A hybrid cost paid with either kind of mana.
+    either: "{{first}} or {{second}}",
+    // A Phyrexian cost paid with mana or with 2 life.
+    orLife: "{{mana}} or 2 life",
+  },
   cardRow: {
     remove: "Remove {{card}}",
     decrease: "Decrease {{card}}",

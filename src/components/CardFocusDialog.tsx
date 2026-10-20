@@ -6,6 +6,7 @@ import { type ImageStyle } from "expo-image"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
+import { CardSymbolText, spokenCardText } from "@/components/CardSymbolText"
 import { DialogCard } from "@/components/DialogCard"
 import { FilterPill } from "@/components/FilterPill"
 import { RetryableError } from "@/components/RetryableError"
@@ -144,7 +145,7 @@ export function CardFocusDialog({
   const imageAccessibilityLabel = [
     visibleName,
     visibleDetails?.typeLine,
-    visibleDetails?.oracleText,
+    visibleDetails?.oracleText && spokenCardText(card.game, visibleDetails.oracleText),
   ]
     .filter(Boolean)
     .join(". ")
@@ -204,13 +205,20 @@ export function CardFocusDialog({
         />
         <View style={themed($details)}>
           {visibleDetails?.manaCost ? (
-            <Text size="sm" style={themed($dimText)} text={visibleDetails.manaCost} />
+            <CardSymbolText
+              game={card.game}
+              size="sm"
+              style={themed($dimText)}
+              text={visibleDetails.manaCost}
+            />
           ) : null}
           {visibleDetails?.typeLine ? (
             <Text size="sm" style={themed($dimText)} text={visibleDetails.typeLine} />
           ) : null}
           {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
-          {visibleDetails?.oracleText ? <Text selectable text={visibleDetails.oracleText} /> : null}
+          {visibleDetails?.oracleText ? (
+            <CardSymbolText game={card.game} selectable text={visibleDetails.oracleText} />
+          ) : null}
           {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
           {imageCredit ? <Text size="xxs" style={themed($dimText)} text={imageCredit} /> : null}
           {!details && !detailsError ? (
