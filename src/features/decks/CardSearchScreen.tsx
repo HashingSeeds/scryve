@@ -175,12 +175,11 @@ export function CardSearchScreen({
   function matchesFilters(details?: FocusedCardDetails) {
     if (!keywords.every((keyword) => details?.keywords?.split("\n").includes(keyword))) return false
     if (!colorFilters.length) return true
-    if (colorFilters.includes("C"))
-      return details?.colorIdentity === "" && details.commanderEligibility !== "color-choice"
+    const canChooseColor = choosingCommander && details?.commanderEligibility === "color-choice"
+    if (colorFilters.includes("C")) return details?.colorIdentity === "" && !canChooseColor
     const identity = details?.colorIdentity
     if (identity === undefined) return false
     const missing = colorFilters.filter((color) => !identity.includes(color))
-    const canChooseColor = details?.commanderEligibility === "color-choice"
     return (
       (missing.length === 0 || (canChooseColor && missing.length === 1)) &&
       (!exactColors || [...identity].every((color) => colorFilters.includes(color)))

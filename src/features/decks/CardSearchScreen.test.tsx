@@ -242,10 +242,15 @@ it("filters added cards by color identity, searching on colors alone", async () 
 
 it("filters cached cards by color identity offline", () => {
   mockConnection.isWebSocketConnected = false
-  saveCardDetails({ talrand: eligible, ring: { ...eligible, colorIdentity: "" } })
-  const view = cardSearch(deck.slice(0, 2).map((card) => ({ card, game: "mtg" })))
+  saveCardDetails({
+    talrand: eligible,
+    ring: { ...eligible, colorIdentity: "" },
+    unknown: { ...eligible, commanderEligibility: "color-choice", colorIdentity: "" },
+  })
+  const view = cardSearch(deck.map((card) => ({ card, game: "mtg" })))
   fireEvent.press(view.getByTestId("card-color-C"))
   expect(view.getByText("Sol Ring")).toBeTruthy()
+  expect(view.getByText("Unknown")).toBeTruthy()
   expect(view.queryByText("Talrand")).toBeNull()
   expect(mockAction).not.toHaveBeenCalled()
 })
