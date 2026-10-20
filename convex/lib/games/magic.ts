@@ -99,7 +99,8 @@ async function scryfallOracleId(ctx: ActionCtx, cardId: string) {
   if (!original.ok) scryfallLookupError(original.status, cardId, "Card")
   const value: unknown = await original.json()
   const reference = normalizeScryfallCard(value)
-  if (reference) await ctx.runMutation(internal.cards.cache, reference)
+  /** why: concurrent first lookups of one card write the same row, and a write conflict that outlasts Convex's retries must not drop a lookup that already succeeded. */
+  if (reference) await ctx.runMutation(internal.cards.cache, reference).catch(() => null)
   return stringValue(objectRecord(value)?.oracle_id)
 }
 
@@ -114,7 +115,9 @@ export async function scryfallImageCandidates(ctx: ActionCtx, cardId: string): P
   const oracleId = storedOracleId ?? (await scryfallOracleId(ctx, cardId))
   if (!oracleId || !/^[\da-f-]{36}$/i.test(oracleId)) return []
   const urls = await scryfallPrintingImages(ctx, cardId, oracleId)
-  if (urls.length > 0) await ctx.runMutation(internal.cards.cacheImageFallbacks, { oracleId, urls })
+  /** why: same write race as scryfallOracleId; the artwork is already fetched. */
+  if (urls.length > 0)
+    await ctx.runMutation(internal.cards.cacheImageFallbacks, { oracleId, urls }).catch(() => null)
   return urls
 }
 
