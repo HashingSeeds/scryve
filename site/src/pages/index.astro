@@ -6,7 +6,8 @@ import GetTheApp from "../components/GetTheApp.astro"
 import Base from "../layouts/Base.astro"
 import { APP_LINKS } from "../links"
 import { demoCards } from "../stage/deck-demo"
-import { PLAY_SYSTEM_IDS, playSystemRules } from "@/features/game/playSystems"
+import { SITE_SYSTEM_IDS } from "../stage/systems"
+import { playSystemRules } from "@/features/game/playSystems"
 
 const qr = await qrcode.toString(new URL("/", Astro.site).href, {
   type: "svg",
@@ -84,7 +85,7 @@ const plans = [
           <h1>The life counter for Magic, Yu-Gi-Oh!, and Pokémon. <span>Tap to change a total. Really, you try. <svg class="smiley" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M8 14.5c1 1.4 2.4 2 4 2s3-.6 4-2" /><circle class="eye" cx="9" cy="9.5" r="1.2" /><circle class="eye" cx="15" cy="9.5" r="1.2" /></svg></span></h1>
           <div class="hero-games">
             <div class="picker" data-pick="system" role="group" aria-label="Game">
-              {PLAY_SYSTEM_IDS.map((id) => (
+              {SITE_SYSTEM_IDS.map((id) => (
                 <button type="button" data-value={id} aria-pressed={String(id === "mtg")}>{playSystemRules(id).shortLabel}</button>
               ))}
             </div>

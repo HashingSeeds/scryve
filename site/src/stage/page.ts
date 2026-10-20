@@ -1,9 +1,5 @@
 import { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
-import {
-  defaultStartingLife,
-  PLAY_SYSTEM_IDS,
-  type PlaySystemId,
-} from "@/features/game/playSystems"
+import { defaultStartingLife, type PlaySystemId } from "@/features/game/playSystems"
 
 import {
   createCommanderDemo,
@@ -14,6 +10,7 @@ import {
 } from "./board"
 import { center, HINT_PRESS_MS, seatAxis, showTapHint } from "./hint"
 import { createPokemonDemo, SAMPLE_PRIZES } from "./pokemon"
+import { SITE_SYSTEM_IDS } from "./systems"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
@@ -27,7 +24,7 @@ function startingLife(system: PlaySystemId) {
   return defaultStartingLife(system, system === "mtg" ? "commander" : undefined)
 }
 
-// Totals mid-game, so the board looks played. Yu-Gi-Oh! starts every seat at 8000.
+// Totals mid-game, so the board looks played.
 function sampleValues(system: PlaySystemId, count: number): readonly number[] {
   if (system === "mtg") return SAMPLE_LIFE.slice(0, count)
   if (system === "pokemon") return SAMPLE_PRIZES.slice(0, count)
@@ -115,7 +112,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   systemPickers.forEach((picker) => {
     picker.addEventListener("click", (event) => {
       const value = picked(event)
-      const id = PLAY_SYSTEM_IDS.find((system) => system === value)
+      const id = SITE_SYSTEM_IDS.find((system) => system === value)
       if (id)
         game.reset({
           system: id,
@@ -265,7 +262,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   systemPickers.forEach((picker) =>
     picker.addEventListener("click", (event) => {
       const value = picked(event)
-      if (!borrowed && PLAY_SYSTEM_IDS.some((system) => system === value))
+      if (!borrowed && SITE_SYSTEM_IDS.some((system) => system === value))
         choose(value === "pokemon" ? "pokemon" : "commander")
     }),
   )
