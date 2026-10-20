@@ -1,10 +1,11 @@
 import { useState } from "react"
 import { Modal, View } from "react-native"
-import { useClerk, useUser } from "@clerk/expo"
+import { isClerkAPIResponseError, useClerk, useUser } from "@clerk/expo"
 import { UserProfileView } from "@clerk/expo/native"
 
 import { translate } from "@/i18n/translate"
 import { AccountScreen } from "@/screens/AccountScreen"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 
 import type { AccountProfileProps } from "./accountProfileProps"
 import { writeSessionHint } from "./sessionHint"
@@ -36,7 +37,19 @@ export function AccountProfile({
       writeSessionHint({ userId: null })
       await clerk.signOut()
       onSignedOut?.()
-    } catch {
+    } catch (cause) {
+      reportCrash(
+        cause instanceof Error ? cause : new Error("Clerk sign-out failed"),
+        ErrorType.HANDLED,
+        {
+          tags: {
+            area: "auth.signOut",
+            ...(isClerkAPIResponseError(cause)
+              ? { clerkCodes: cause.errors.map((error) => error.code).join(",") }
+              : {}),
+          },
+        },
+      )
       setError(translate("account:profile.signOutFailed"))
     } finally {
       setIsSigningOut(false)
