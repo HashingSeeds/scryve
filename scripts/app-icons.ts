@@ -129,7 +129,7 @@ function tintable(variant: IconArt): IconArt {
   }
 }
 
-// why: an icon drawn for a light background, like Pencil, loses its dark lines on the system's dark background, so it borrows its dark sibling's art there.
+// why: an icon drawn for a light background, like Pencil, loses its dark lines on the tinted icon's dark background, so it borrows its dark sibling's art there.
 function onDarkBackground(variant: IconArt): IconArt {
   if (!variant.darkTwin) return variant
   const twin = APP_ICON_VARIANTS.find(({ name }) => name === variant.darkTwin)
@@ -182,10 +182,10 @@ function mark(variant: IconArt, defs: Defs) {
     </g>`
 }
 
-// why: iOS fills the whole square; Android draws only the foreground layer, shrunk into the adaptive icon safe zone with rounder board corners so circle masks keep the whole mark. iOS dark and tinted icons and Android's monochrome layer sit on a system background, so theirs is left transparent.
+// why: iOS fills the whole square; Android draws only the foreground layer, shrunk into the adaptive icon safe zone with rounder board corners so circle masks keep the whole mark. iOS tinted icons and Android's monochrome layer sit on a system background, so theirs is left transparent.
 function svg(icon: IconArt, look: Look) {
   const ios = look.startsWith("ios")
-  const onDark = look === "iosDark" || look === "iosTinted" ? onDarkBackground(icon) : icon
+  const onDark = look === "iosTinted" ? onDarkBackground(icon) : icon
   const variant = look === "iosTinted" ? tintable(onDark) : onDark
   const defs = defsFor(ios ? 54 : 120)
   const shape = () =>

@@ -156,7 +156,8 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
       const assets = appIconAssets(name)
       return {
         name,
-        ios: { light: assets.ios, dark: assets.iosDark, tinted: assets.iosTinted },
+        // why: a picked icon is the player's choice, so dark mode keeps its own background instead of the system's.
+        ios: { light: assets.ios, dark: assets.ios, tinted: assets.iosTinted },
         android: {
           foregroundImage: assets.androidForeground,
           monochromeImage: assets.androidMonochrome,

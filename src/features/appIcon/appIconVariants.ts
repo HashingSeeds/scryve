@@ -144,7 +144,6 @@ export function appIconAssets(name: AppIconName) {
   const base = `./assets/images/app-icons/${name.toLowerCase()}`
   return {
     ios: `${base}-ios.png`,
-    iosDark: `${base}-ios-dark.png`,
     iosTinted: `${base}-ios-tinted.png`,
     androidForeground: `${base}-android-foreground.png`,
     androidMonochrome: `${base}-android-monochrome.png`,
