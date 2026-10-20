@@ -473,10 +473,15 @@ export default {
   },
   nearby: {
     title: "Partidas cercanas",
+    accessTitle: "El acceso a dispositivos cercanos está desactivado",
     accessDenied:
       "Permite el acceso a dispositivos cercanos en Ajustes para encontrar y crear partidas.",
+    openSettings: "Abrir ajustes",
     connecting: "Conectando…",
+    starting: "Abriendo la sala…",
+    connectingTo: "Conectando con {{name}}…",
     reconnecting: "Reconectando…",
+    reconnectingTo: "Reconectando con {{name}}…",
     nameLabel: "Tu nombre",
     namePlaceholder: "Visible para la mesa",
     empty: "Aún no hay partidas en esta red.",

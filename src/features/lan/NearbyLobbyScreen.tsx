@@ -1,11 +1,14 @@
 import { useEffect, useRef } from "react"
+import { Linking } from "react-native"
 
+import { Button } from "@/components/Button"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
-import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
+import { LobbyClosedScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
 import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
 import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
+import { NearbyStatusScreen } from "./NearbyStatusScreen"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
 
@@ -27,7 +30,8 @@ const selectLobbyScreen = ({
 })
 
 export function NearbyLobbyScreen({
-  error: routeError,
+  accessDenied = false,
+  hosting = false,
   myDecks,
   signedIn = false,
   onBack,
@@ -35,7 +39,8 @@ export function NearbyLobbyScreen({
   onLeft,
   onManageDecks,
 }: {
-  error?: string
+  accessDenied?: boolean
+  hosting?: boolean
   myDecks?: MyDecks
   signedIn?: boolean
   onBack: () => void
@@ -52,26 +57,41 @@ export function NearbyLobbyScreen({
     onPlay()
   }, [lobby?.status, lobby?.round, onPlay])
 
-  const shownError = routeError ?? error
   if (!role) {
     if (lobby?.status === "abandoned")
       return <LobbyClosedScreen status="abandoned" onClose={onLeft} />
+    if (accessDenied)
+      return (
+        <NearbyStatusScreen
+          title={translate("connected:nearby.accessTitle")}
+          message={translate("connected:nearby.accessDenied")}
+          actions={<OpenSettingsButton />}
+          onBack={onBack}
+        />
+      )
+    if (error) return <NearbyStatusScreen message={error} onBack={onBack} />
     return (
-      <LobbyStatusScreen
-        message={shownError ?? translate("connected:nearby.connecting")}
-        error={Boolean(shownError)}
+      <NearbyStatusScreen
+        busy
+        message={translate(hosting ? "connected:nearby.starting" : "connected:nearby.connecting")}
         onBack={onBack}
       />
     )
   }
   if (!lobby || !players)
     return (
-      <LobbyStatusScreen
-        message={translate(
-          status === "reconnecting"
-            ? "connected:nearby.reconnecting"
-            : "connected:nearby.connecting",
-        )}
+      <NearbyStatusScreen
+        busy
+        message={
+          role === "host"
+            ? translate("connected:nearby.starting")
+            : translate(
+                status === "reconnecting"
+                  ? "connected:nearby.reconnectingTo"
+                  : "connected:nearby.connectingTo",
+                { name: serviceName },
+              )
+        }
         onBack={() => {
           lanSession.leave()
           onBack()
@@ -128,6 +148,16 @@ export function NearbyLobbyScreen({
             }
           : undefined
       }
+    />
+  )
+}
+
+export function OpenSettingsButton() {
+  return (
+    <Button
+      tx="connected:nearby.openSettings"
+      preset="reversed"
+      onPress={() => void Linking.openSettings()}
     />
   )
 }

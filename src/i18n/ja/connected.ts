@@ -452,10 +452,15 @@ export default {
   },
   nearby: {
     title: "近くのゲーム",
+    accessTitle: "付近のデバイスへのアクセスがオフです",
     accessDenied:
       "ゲームを探したりホストしたりするには、設定で付近のデバイスへのアクセスを許可してください。",
+    openSettings: "設定を開く",
     connecting: "接続中…",
+    starting: "ロビーを準備中…",
+    connectingTo: "{{name}}に接続中…",
     reconnecting: "再接続中…",
+    reconnectingTo: "{{name}}に再接続中…",
     nameLabel: "名前",
     namePlaceholder: "テーブルに表示されます",
     empty: "このネットワークにはまだゲームがありません。",

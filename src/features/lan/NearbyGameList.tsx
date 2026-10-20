@@ -12,6 +12,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { LAN_NAME_MAX_LENGTH, lanPlayAvailable, loadLanName, saveLanName } from "./lanAvailability"
 import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
+import { OpenSettingsButton } from "./NearbyLobbyScreen"
 import { useNearbyGames } from "./useNearbyGames"
 
 const selectRole = ({ role }: LanSessionState) => role
@@ -31,7 +32,12 @@ function NearbyGames({ onJoin }: { onJoin: () => void }) {
   return (
     <View testID="nearby-games" style={themed($section)}>
       <Text preset="subheading" accessibilityRole="header" tx="connected:nearby.title" />
-      {denied ? <AlertNote text={translate("connected:nearby.accessDenied")} /> : null}
+      {denied ? (
+        <>
+          <AlertNote text={translate("connected:nearby.accessDenied")} />
+          <OpenSettingsButton />
+        </>
+      ) : null}
       <TextField
         labelTx="connected:nearby.nameLabel"
         placeholderTx="connected:nearby.namePlaceholder"
