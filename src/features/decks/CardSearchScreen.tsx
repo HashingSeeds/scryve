@@ -68,7 +68,7 @@ function scryfallQuery({
     ...keywords.map((keyword) => `kw:"${keyword.replace(/["\\]/g, "")}"`),
   ].filter(Boolean)
   if (!filters.length) return text
-  const words = text.slice(0, 80).replace(/[()"]/g, " ").trim()
+  const words = commander ? text.slice(0, 80).replace(/[()"]/g, " ").trim() : text
   return [words.length >= 2 ? `(${words})` : "", ...filters].filter(Boolean).join(" ")
 }
 

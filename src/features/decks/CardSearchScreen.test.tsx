@@ -211,12 +211,12 @@ it("filters added cards by color identity, searching on colors alone", async () 
   })
   fireEvent.press(view.getByTestId("card-filters-button"))
   fireEvent.press(view.getByLabelText("Allow additional colors"))
-  fireEvent.changeText(view.getByTestId("card-search-input"), "counter (spell)")
+  fireEvent.changeText(view.getByTestId("card-search-input"), 'o:"draw a card" or t:wizard')
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
     deviceId: expect.any(String),
     game: "mtg",
-    query: "(counter  spell) id>=ub",
+    query: '(o:"draw a card" or t:wizard) id>=ub',
   })
 })
 
