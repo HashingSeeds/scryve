@@ -14,7 +14,7 @@ export default {
       d100: "d100",
     },
     tapToRoll: "タップして振る",
-    tapToFlip: "タップして投げる",
+    tapToFlip: "タップしてコイントス",
     coinFace: {
       Heads: "表",
       Tails: "裏",

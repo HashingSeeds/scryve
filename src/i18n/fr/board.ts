@@ -14,7 +14,7 @@ export default {
       d100: "d100",
     },
     tapToRoll: "Touchez pour lancer",
-    tapToFlip: "Touchez pour tirer à pile ou face",
+    tapToFlip: "Touchez pour lancer la pièce",
     coinFace: {
       Heads: "Face",
       Tails: "Pile",
