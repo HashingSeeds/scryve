@@ -71,8 +71,8 @@ describe("GameBoardStage on a pinned screen", () => {
     )
   })
 
-  it("keeps a held action's tools out on the pinned board while the menu is closed", () => {
-    const onFirst = jest.fn()
+  it("carries the armed tool on the pinned board's pentagon", () => {
+    const onExit = jest.fn()
     render(
       <ThemeProvider initialContext="dark">
         <GameBoardStage
@@ -81,15 +81,8 @@ describe("GameBoardStage on a pinned screen", () => {
           renderGrid={() => <View testID="grid" />}
           menu={{
             open: false,
-            actions: menuActions({
-              kind: "dice",
-              label: "Dice",
-              tools: [
-                { key: "first", label: "First", accessibilityLabel: "First", onPress: onFirst },
-              ],
-            }),
-            heldAction: "dice",
-            exitAction: { label: "Close dice", onPress: jest.fn() },
+            actions: menuActions(),
+            exitAction: { label: "Close dice", onPress: onExit, heldTool: "coin" },
             onToggle: jest.fn(),
             onClose: jest.fn(),
           }}
@@ -98,8 +91,9 @@ describe("GameBoardStage on a pinned screen", () => {
     )
 
     const cluster = screen.getByTestId("game-menu-cluster")
-    fireEvent.press(within(cluster).getByTestId("dice-first"))
-    expect(onFirst).toHaveBeenCalledTimes(1)
+    expect(within(cluster).getByTestId("game-menu-held-tool")).toBeTruthy()
+    fireEvent.press(within(cluster).getByTestId("game-menu-button"))
+    expect(onExit).toHaveBeenCalledTimes(1)
   })
 
   it("turns the connected sync status with the menu so the holder can read it", () => {

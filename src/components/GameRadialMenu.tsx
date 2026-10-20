@@ -1,9 +1,11 @@
-import { type ComponentProps, memo, useEffect } from "react"
+import { type ComponentProps, memo, useEffect, useState } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
   Easing,
   ReduceMotion,
+  runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -14,6 +16,7 @@ import Animated, {
   ZoomOut,
 } from "react-native-reanimated"
 
+import type { DiceTool } from "@/features/game/dice"
 import { nearestEquivalentAngle } from "@/features/game/pinnedBoardGeometry"
 import {
   rotateGameBoardAnchor,
@@ -32,6 +35,7 @@ import {
 } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { DiceBagGlyph, DieFace } from "./DiceGlyph"
 import {
   GameMenuButtonShape,
   mixColorsInLinearLight,
@@ -40,12 +44,18 @@ import {
 import { Text } from "./Text"
 
 export interface RadialMenuTool {
-  key: string
+  key: DiceTool
   label: string
   accessibilityLabel: string
   selected?: boolean
-  dimmed?: boolean
   onPress: () => void
+}
+
+export interface RadialMenuToolBag {
+  recent: RadialMenuTool
+  tools: readonly RadialMenuTool[]
+  open: boolean
+  onToggle: () => void
 }
 
 export type RadialMenuAction = {
@@ -56,7 +66,7 @@ export type RadialMenuAction = {
   blocked?: boolean
 } & (
   | { onPress: (event?: GestureResponderEvent) => void; tools?: undefined }
-  | { tools: readonly RadialMenuTool[]; onPress?: undefined }
+  | { tools: RadialMenuToolBag; onPress?: undefined }
 )
 
 export type GameMenuSignalTone = "slow" | "offline" | "catchingUp" | "caughtUp" | "attention"
@@ -82,10 +92,15 @@ export interface GameRadialMenuProps {
   actions: GameMenuActions
   onToggle: () => void
   onClose: () => void
-  exitAction?: { label: string; onPress: () => void }
+  exitAction?: GameMenuExitAction
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
-  heldAction?: GameMenuActionKind
+}
+
+export interface GameMenuExitAction {
+  label: string
+  onPress: () => void
+  heldTool?: DiceTool
 }
 
 /** why: the pentagon has five sides and the fan is laid out for exactly one action per side. */
@@ -119,6 +134,17 @@ const TOOL_RADIUS = TOOL_SIZE / 2
 const TOOL_INSET = (ACTION_HEIGHT - TOOL_SIZE) / 2
 const TOOL_OFFSET = ACTION_WIDTH / 2 - TOOL_INSET - TOOL_RADIUS
 const TOOL_TINT = 0.45
+const BAG_COLUMNS = 4
+const BAG_EDGE_COLUMNS = 2
+const BAG_CELL_WIDTH = 60
+const BAG_CELL_HEIGHT = 58
+const BAG_GAP = 6
+const BAG_PADDING = 8
+// why: clears the pentagon at its larger size, so the bag never covers the button that closes it.
+const BAG_CLEARANCE = MENU_BUTTON_SIZE / 2 + 10
+const BAG_BELOW_ANCHOR_SHARE = 0.35
+const BAG_OPEN_SPRING = { damping: 16, stiffness: 240, mass: 0.7 } as const
+const BAG_CLOSED_SCALE = 0.4
 
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
@@ -142,6 +168,8 @@ const POP_EASING = Easing.inOut(Easing.quad)
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
 const BADGE_EXITING = ZoomOut.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
+const HOLD_SWAP_MS = 220
+const HOLD_SWAP_SCALE = 0.4
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -167,6 +195,7 @@ function rotateBasePoseToSide(stepsFromTopSide: number): RadialActionPose {
 const CENTER_ACTION_POSES: readonly RadialActionPose[] =
   CENTER_ACTION_SIDE_STEPS.map(rotateBasePoseToSide)
 const EDGE_POSE_DISTANCE = 112
+const EDGE_ANCHOR_SHARE = 0.25
 const LEFT_EDGE_POSE_ANGLES = [0, 45, 90, 135, 180] as const
 
 function poseAlongAngle(angleDeg: number, order: number): RadialActionPose {
@@ -187,11 +216,34 @@ export function getRadialActionPoses(anchor: {
   x: number
   y: number
 }): readonly RadialActionPose[] {
-  const anchorNearLeftEdge = anchor.x < 0.25
-  const anchorNearRightEdge = anchor.x > 0.75
+  const anchorNearLeftEdge = anchor.x < EDGE_ANCHOR_SHARE
+  const anchorNearRightEdge = anchor.x > 1 - EDGE_ANCHOR_SHARE
   if (anchorNearLeftEdge) return LEFT_EDGE_POSE_ANGLES.map(poseAlongAngle)
   if (anchorNearRightEdge) return LEFT_EDGE_POSE_ANGLES.map(poseAlongAngle).map(mirrorPose)
   return CENTER_ACTION_POSES
+}
+
+export interface ToolBagLayout {
+  x: number
+  y: number
+  columns: number
+  width: number
+  height: number
+}
+
+export function getToolBagLayout(anchor: { x: number; y: number }, count: number): ToolBagLayout {
+  const nearEdge = anchor.x < EDGE_ANCHOR_SHARE || anchor.x > 1 - EDGE_ANCHOR_SHARE
+  const columns = nearEdge ? BAG_EDGE_COLUMNS : BAG_COLUMNS
+  const rows = Math.ceil(count / columns)
+  const width = columns * BAG_CELL_WIDTH + (columns - 1) * BAG_GAP + 2 * BAG_PADDING
+  const height = rows * BAG_CELL_HEIGHT + (rows - 1) * BAG_GAP + 2 * BAG_PADDING
+  const size = { columns, width, height }
+  if (nearEdge) {
+    const x = width / 2 + BAG_CLEARANCE
+    return { ...size, x: anchor.x < EDGE_ANCHOR_SHARE ? x : -x, y: 0 }
+  }
+  const y = height / 2 + BAG_CLEARANCE
+  return { ...size, x: 0, y: anchor.y < BAG_BELOW_ANCHOR_SHARE ? y : -y }
 }
 
 export function getRadialActionStart(pose: { x: number; y: number }): { x: number; y: number } {
@@ -228,12 +280,12 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   exitAction,
   signal,
   statusLine,
-  heldAction,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
 
   const anchorStyle = percentAnchorStyle(anchor)
+  const bag = openToolBag(actions)
 
   const nativeAnchorStyle = useAnimatedStyle(() => {
     const frame = nativeFrame?.value
@@ -244,10 +296,9 @@ export const GameRadialMenu = memo(function GameRadialMenu({
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <GameMenuBackdrop open={menuOpen} onClose={onClose} />
+      <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? onClose} />
       <GameRadialFan
         open={menuOpen}
-        heldAction={heldAction}
         anchor={anchor}
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         actions={actions}
@@ -259,6 +310,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         compact={compact}
         exitAction={exitAction}
         signal={signal}
+        bag={bag}
         onToggle={onToggle}
       />
 
@@ -321,6 +373,10 @@ function percentAnchorStyle(anchor: { x: number; y: number }): ViewStyle {
   return { left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }
 }
 
+export function openToolBag(actions: GameMenuActions) {
+  return actions.find((action) => action.tools?.open)?.tools
+}
+
 export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { themed } = useAppTheme()
   useCloseOnBack(open, onClose)
@@ -338,14 +394,12 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
 
 function GameRadialFan({
   open,
-  heldAction,
   anchor,
   anchorStyle = percentAnchorStyle(anchor),
   actions,
   poseTurnMs = 0,
 }: {
   open: boolean
-  heldAction?: GameMenuActionKind
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   actions: GameMenuActions
@@ -353,16 +407,18 @@ function GameRadialFan({
 }) {
   const reducedMotion = useReducedMotion()
   const poses = getRadialActionPoses(anchor)
+  const bagOpen = !!openToolBag(actions)
   return (
     <>
       {actions.map((action, index) => (
         <RadialAction
           key={action.kind}
           action={action}
+          anchor={anchor}
           anchorStyle={anchorStyle}
           pose={poses[index]}
           reducedMotion={reducedMotion}
-          open={open || action.kind === heldAction}
+          open={open && (!bagOpen || !!action.tools)}
           poseTurnMs={poseTurnMs}
         />
       ))}
@@ -378,8 +434,9 @@ type GameMenuAnchorProps = {
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   compact?: boolean
-  exitAction?: { label: string; onPress: () => void }
+  exitAction?: GameMenuExitAction
   signal?: GameMenuSignal
+  bag?: RadialMenuToolBag
   onToggle: () => void
 }
 
@@ -390,15 +447,13 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle,
   actions,
   statusLine,
-  heldAction,
   ...anchorProps
-}: Omit<GameMenuAnchorProps, "anchorStyle"> & {
+}: Omit<GameMenuAnchorProps, "anchorStyle" | "bag"> & {
   holderAnchor: { x: number; y: number }
   holderHeight: number
   facingAngle: number
   actions: GameMenuActions
   statusLine?: GameMenuStatusLine
-  heldAction?: GameMenuActionKind
 }) {
   const menuOpen = anchorProps.open && !anchorProps.exitAction
   const reducedMotion = useReducedMotion()
@@ -422,13 +477,12 @@ export const GameMenuCluster = memo(function GameMenuCluster({
     >
       <GameRadialFan
         open={menuOpen}
-        heldAction={heldAction}
         anchor={holderAnchor}
         anchorStyle={$clusterCenter}
         actions={actions}
         poseTurnMs={FACING_TURN_MS}
       />
-      <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
+      <GameMenuAnchor {...anchorProps} bag={openToolBag(actions)} anchorStyle={$clusterCenter} />
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
@@ -450,6 +504,7 @@ function GameMenuAnchor({
   compact,
   exitAction,
   signal,
+  bag,
   onToggle,
 }: GameMenuAnchorProps) {
   const {
@@ -460,22 +515,21 @@ function GameMenuAnchor({
   const animateFully = reducedMotion === false
   const suppressed = !!exitAction
   const menuOpen = open && !suppressed
+  const heldTool = exitAction?.heldTool
   useCloseOnBack(suppressed, () => exitAction?.onPress())
-  const pentagonRotation = useSharedValue(
-    menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
-  )
+  const spinTarget = menuOpen
+    ? PENTAGON_OPEN_ROTATION_DEG
+    : suppressed && !heldTool
+      ? -PENTAGON_OPEN_ROTATION_DEG
+      : 0
+  const pentagonRotation = useSharedValue(spinTarget)
   useEffect(() => {
-    const spinTarget = menuOpen
-      ? PENTAGON_OPEN_ROTATION_DEG
-      : suppressed
-        ? -PENTAGON_OPEN_ROTATION_DEG
-        : 0
     pentagonRotation.value = animateFully
       ? withSpring(spinTarget, PENTAGON_SPIN_SPRING)
       : withTiming(spinTarget, {
           duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
         })
-  }, [animateFully, menuOpen, suppressed, pentagonRotation, reducedMotion])
+  }, [animateFully, spinTarget, pentagonRotation, reducedMotion])
 
   const pentagonSpinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${pentagonRotation.value}deg` }],
@@ -505,6 +559,24 @@ function GameMenuAnchor({
   }, [animateFully, needsAttention, pop])
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
 
+  // why: the die stays drawn while it shrinks away, so the bars grow back in its place instead of cutting over.
+  const [lastHeldTool, setLastHeldTool] = useState(heldTool)
+  if (heldTool && heldTool !== lastHeldTool) setLastHeldTool(heldTool)
+  const shownTool = heldTool ?? lastHeldTool
+  const holding = useSharedValue(heldTool ? 1 : 0)
+  useEffect(() => {
+    const target = heldTool ? 1 : 0
+    holding.value = animateFully ? withTiming(target, { duration: HOLD_SWAP_MS }) : target
+  }, [animateFully, heldTool, holding])
+  const heldToolStyle = useAnimatedStyle(() => ({
+    opacity: holding.value,
+    transform: [{ scale: HOLD_SWAP_SCALE + (1 - HOLD_SWAP_SCALE) * holding.value }],
+  }))
+  const barsStyle = useAnimatedStyle(() => ({
+    opacity: 1 - holding.value,
+    transform: [{ scale: HOLD_SWAP_SCALE + (1 - HOLD_SWAP_SCALE) * (1 - holding.value) }],
+  }))
+
   return (
     <Animated.View
       testID="game-menu-anchor"
@@ -522,9 +594,11 @@ function GameMenuAnchor({
         accessibilityLabel={[
           exitAction
             ? exitAction.label
-            : menuOpen
-              ? translate("board:menu.close")
-              : translate("board:menu.open"),
+            : menuOpen && bag
+              ? translate("board:menu.closeDiceBag")
+              : menuOpen
+                ? translate("board:menu.close")
+                : translate("board:menu.open"),
           signal?.accessibilityText,
         ]
           .filter(Boolean)
@@ -538,7 +612,7 @@ function GameMenuAnchor({
         }
         accessibilityState={{ expanded: menuOpen }}
         style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
-        onPress={exitAction ? exitAction.onPress : onToggle}
+        onPress={exitAction ? exitAction.onPress : menuOpen && bag ? bag.onToggle : onToggle}
       >
         <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
           <SignalledMenuButtonShape
@@ -547,12 +621,23 @@ function GameMenuAnchor({
             reducedMotion={reducedMotion}
           />
         </Animated.View>
-        <MenuGlyph
-          color={colors.gameMenu.anchorGlyph}
-          pose={menuOpen ? 1 : exitAction ? -1 : 0}
-          animateFully={animateFully}
-          reducedMotion={reducedMotion}
-        />
+        {shownTool ? (
+          <Animated.View
+            testID={heldTool ? "game-menu-held-tool" : undefined}
+            pointerEvents="none"
+            style={[$heldTool, heldToolStyle]}
+          >
+            <DieFace tool={shownTool} size={HELD_TOOL_SIZE} color={colors.gameMenu.anchorGlyph} />
+          </Animated.View>
+        ) : null}
+        <Animated.View style={barsStyle}>
+          <MenuGlyph
+            color={colors.gameMenu.anchorGlyph}
+            pose={menuOpen ? 1 : exitAction && !heldTool ? -1 : 0}
+            animateFully={animateFully}
+            reducedMotion={reducedMotion}
+          />
+        </Animated.View>
       </BoardPressable>
       {signal?.badge ? (
         <View
@@ -658,6 +743,7 @@ function MenuGlyph({
 
 function RadialAction({
   action,
+  anchor,
   anchorStyle,
   pose,
   reducedMotion,
@@ -665,6 +751,7 @@ function RadialAction({
   poseTurnMs,
 }: {
   action: RadialMenuAction
+  anchor: { x: number; y: number }
   anchorStyle: ComponentProps<typeof Animated.View>["style"]
   pose: RadialActionPose
   reducedMotion: ReducedMotionPreference
@@ -722,23 +809,20 @@ function RadialAction({
 
   if (action.tools) {
     return (
-      <Animated.View
-        style={[themed($actionAnchor), anchorStyle, animatedStyle]}
-        pointerEvents={open ? "box-none" : "none"}
-        aria-hidden={!open}
-        accessibilityElementsHidden={!open}
-        importantForAccessibility={open ? "auto" : "no-hide-descendants"}
-      >
-        <View pointerEvents="box-none" style={[themed($action), { backgroundColor: background }]}>
-          <RadialToolRow
-            kind={action.kind}
-            tools={action.tools}
-            pose={pose}
-            open={open}
-            background={background}
-          />
-        </View>
-      </Animated.View>
+      <RadialToolBag
+        kind={action.kind}
+        bag={action.tools}
+        layout={getToolBagLayout(anchor, action.tools.tools.length)}
+        anchorStyle={anchorStyle}
+        arrivalStyle={animatedStyle}
+        pose={pose}
+        poseX={poseX}
+        poseY={poseY}
+        poseRotation={poseRotation}
+        open={open}
+        background={background}
+        reducedMotion={reducedMotion}
+      />
     )
   }
 
@@ -794,88 +878,233 @@ function RadialAction({
   )
 }
 
-function RadialToolRow({
+/** why: the pill and the open bag are one object, so the bag grows out of the pill's pose and turns upright as it opens, then shrinks back into it. */
+function RadialToolBag({
   kind,
-  tools,
+  bag,
+  layout,
+  anchorStyle,
+  arrivalStyle,
   pose,
+  poseX,
+  poseY,
+  poseRotation,
   open,
   background,
+  reducedMotion,
 }: {
   kind: GameMenuActionKind
-  tools: readonly RadialMenuTool[]
+  bag: RadialMenuToolBag
+  layout: ToolBagLayout
+  anchorStyle: AnchorStyle
+  arrivalStyle: AnchorStyle
   pose: RadialActionPose
+  poseX: SharedValue<number>
+  poseY: SharedValue<number>
+  poseRotation: SharedValue<number>
   open: boolean
   background: string
+  reducedMotion: ReducedMotionPreference
 }) {
-  const offsets = getRadialToolOffsets(pose)
+  const { themed } = useAppTheme()
+  const bagOpen = open && bag.open
+  const pillOpen = open && !bag.open
+  const progress = useSharedValue(bagOpen ? 1 : 0)
+  // why: a closed bag left mounted sits invisibly over the pill and swallows taps on web.
+  const [closing, setClosing] = useState(false)
+
+  useEffect(() => {
+    if (!bagOpen && progress.value > 0) setClosing(true)
+    const target = bagOpen ? 1 : 0
+    const settle = (finished?: boolean) => {
+      "worklet"
+      if (finished && !bagOpen) runOnJS(setClosing)(false)
+    }
+    progress.value =
+      reducedMotion === false
+        ? withSpring(target, BAG_OPEN_SPRING, settle)
+        : withTiming(
+            target,
+            { duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS) },
+            settle,
+          )
+  }, [bagOpen, progress, reducedMotion])
+
+  const pillStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }))
+  const bagStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [
+      { translateX: poseX.value + (layout.x - poseX.value) * progress.value },
+      { translateY: poseY.value + (layout.y - poseY.value) * progress.value },
+      { rotate: `${poseRotation.value * (1 - progress.value)}deg` },
+      { scale: BAG_CLOSED_SCALE + (1 - BAG_CLOSED_SCALE) * progress.value },
+    ],
+  }))
+
+  const [inner, outer] = getRadialToolOffsets(pose)
+  const slot = (offset: number) => ({ left: ACTION_WIDTH / 2 + offset - TOOL_RADIUS })
+  const pillForeground = accessibleForeground(background)
+
   return (
     <>
-      {tools.slice(0, offsets.length).map((tool, index) => (
-        <RadialTool
-          key={tool.key}
-          testID={open ? `${kind}-${tool.key}` : undefined}
-          open={open}
-          tool={tool}
-          left={ACTION_WIDTH / 2 + offsets[index] - TOOL_RADIUS}
-          background={background}
-        />
-      ))}
+      <Animated.View
+        style={[themed($actionAnchor), anchorStyle, arrivalStyle]}
+        pointerEvents={pillOpen ? "box-none" : "none"}
+        aria-hidden={!pillOpen}
+        accessibilityElementsHidden={!pillOpen}
+        importantForAccessibility={pillOpen ? "auto" : "no-hide-descendants"}
+      >
+        <Animated.View
+          pointerEvents="box-none"
+          style={[themed($action), { backgroundColor: background }, pillStyle]}
+        >
+          <View pointerEvents="none" style={[$toolDivider, { backgroundColor: pillForeground }]} />
+          <View style={[$toolSlot, slot(inner)]}>
+            <BoardPressable
+              testID={pillOpen ? `${kind}-bag` : undefined}
+              disabled={!pillOpen}
+              tabIndex={pillOpen ? undefined : -1}
+              accessibilityRole="button"
+              accessibilityLabel={translate("board:menu.openDiceBag")}
+              accessibilityState={{ expanded: bag.open }}
+              style={({ pressed }) => [$tool, pressed && themed($pressedAction)]}
+              onPress={bag.onToggle}
+            >
+              <DiceBagGlyph size={BAG_GLYPH_SIZE} color={pillForeground} />
+            </BoardPressable>
+          </View>
+          <View style={[$toolSlot, slot(outer)]}>
+            <RecentTool
+              testID={pillOpen ? `${kind}-${bag.recent.key}` : undefined}
+              tool={bag.recent}
+              open={pillOpen}
+              background={background}
+            />
+          </View>
+        </Animated.View>
+      </Animated.View>
+      {bagOpen || closing ? (
+        <Animated.View
+          style={[
+            $bagAnchor,
+            { width: layout.width, height: layout.height },
+            { marginLeft: -layout.width / 2, marginTop: -layout.height / 2 },
+            anchorStyle,
+            bagStyle,
+          ]}
+          pointerEvents={bagOpen ? "auto" : "none"}
+          aria-hidden={!bagOpen}
+          accessibilityElementsHidden={!bagOpen}
+          importantForAccessibility={bagOpen ? "auto" : "no-hide-descendants"}
+        >
+          <View
+            testID={bagOpen ? `${kind}-bag-open` : undefined}
+            style={[themed($action), $bag, { backgroundColor: background }]}
+          >
+            {bag.tools.map((tool) => (
+              <BagTool
+                key={tool.key}
+                testID={bagOpen ? `${kind}-bag-${tool.key}` : undefined}
+                tool={tool}
+                open={bagOpen}
+                background={background}
+              />
+            ))}
+          </View>
+        </Animated.View>
+      ) : null}
     </>
   )
 }
 
-function RadialTool({
+function toolFill(tool: RadialMenuTool, background: string, selectedFill: string) {
+  return tool.selected ? selectedFill : mixColorsInLinearLight(background, "#FFFFFF", TOOL_TINT)
+}
+
+function RecentTool({
   testID,
-  open,
   tool,
-  left,
+  open,
   background,
 }: {
   testID?: string
-  open: boolean
   tool: RadialMenuTool
-  left: number
+  open: boolean
   background: string
 }) {
   const {
     themed,
     theme: { colors },
   } = useAppTheme()
-  const fill = tool.selected
-    ? colors.gameMenu.anchorGlyph
-    : mixColorsInLinearLight(background, "#FFFFFF", TOOL_TINT)
+  const fill = tool.selected ? colors.gameMenu.anchorGlyph : background
   const foreground = accessibleForeground(fill)
 
   return (
-    <View style={[$toolSlot, { left }]}>
-      <BoardPressable
-        testID={testID}
-        disabled={!open}
-        tabIndex={open ? undefined : -1}
-        accessibilityRole="button"
-        accessibilityLabel={tool.accessibilityLabel}
-        accessibilityState={tool.selected === undefined ? undefined : { selected: tool.selected }}
-        style={({ pressed }) => [
-          $tool,
-          { backgroundColor: fill },
-          tool.dimmed && $dimmedTool,
-          pressed && themed($pressedAction),
+    <BoardPressable
+      testID={testID}
+      disabled={!open}
+      tabIndex={open ? undefined : -1}
+      accessibilityRole="button"
+      accessibilityLabel={tool.accessibilityLabel}
+      accessibilityState={{ selected: !!tool.selected }}
+      style={({ pressed }) => [
+        $tool,
+        tool.selected && { backgroundColor: fill },
+        pressed && themed($pressedAction),
+      ]}
+      onPress={tool.onPress}
+    >
+      <DieFace tool={tool.key} size={RECENT_GLYPH_SIZE} color={foreground} />
+    </BoardPressable>
+  )
+}
+
+function BagTool({
+  testID,
+  tool,
+  open,
+  background,
+}: {
+  testID?: string
+  tool: RadialMenuTool
+  open: boolean
+  background: string
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const fill = toolFill(tool, background, colors.gameMenu.anchorGlyph)
+  const foreground = accessibleForeground(fill)
+
+  return (
+    <BoardPressable
+      testID={testID}
+      disabled={!open}
+      tabIndex={open ? undefined : -1}
+      accessibilityRole="button"
+      accessibilityLabel={tool.accessibilityLabel}
+      accessibilityState={{ selected: !!tool.selected }}
+      style={({ pressed }) => [
+        $bagTool,
+        { backgroundColor: fill },
+        pressed && themed($pressedAction),
+      ]}
+      onPress={tool.onPress}
+    >
+      <DieFace tool={tool.key} size={BAG_TOOL_GLYPH_SIZE} color={foreground} />
+      <Text
+        text={tool.label}
+        weight="bold"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.2}
+        style={[
+          $bagToolText,
+          tool.label.length > TOOL_LABEL_MAX_CHARACTERS && $compactToolText,
+          { color: foreground },
         ]}
-        onPress={tool.onPress}
-      >
-        <Text
-          text={tool.label}
-          weight="bold"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}
-          style={[
-            $toolText,
-            tool.label.length > TOOL_LABEL_MAX_CHARACTERS && $compactToolText,
-            { color: foreground },
-          ]}
-        />
-      </BoardPressable>
-    </View>
+      />
+    </BoardPressable>
   )
 }
 
@@ -916,6 +1145,16 @@ const $menuButton: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
+const HELD_TOOL_SIZE = 32
+const $heldTool: ViewStyle = {
+  position: "absolute",
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  alignItems: "center",
+  justifyContent: "center",
+}
 const $menuButtonPressed: ViewStyle = {
   transform: [{ scale: 0.93 }],
 }
@@ -974,11 +1213,41 @@ const $tool: ViewStyle = {
   justifyContent: "center",
   borderRadius: TOOL_RADIUS,
 }
-const $toolText: TextStyle = { fontSize: 14, lineHeight: 18, letterSpacing: 0.2 }
 // why: the tool circle fits about five characters at full size; longer translations ("Moneda") would truncate.
 const TOOL_LABEL_MAX_CHARACTERS = 5
 const $compactToolText: TextStyle = { fontSize: 11, lineHeight: 14, letterSpacing: 0 }
-const $dimmedTool: ViewStyle = { opacity: 0.45 }
+const RECENT_GLYPH_SIZE = 34
+const BAG_GLYPH_SIZE = 30
+const BAG_TOOL_GLYPH_SIZE = 28
+const TOOL_DIVIDER_HEIGHT = 26
+// why: the pill holds two buttons that do different things, so a hairline shows where one ends.
+const $toolDivider: ViewStyle = {
+  position: "absolute",
+  left: ACTION_WIDTH / 2 - 0.75,
+  top: (ACTION_HEIGHT - TOOL_DIVIDER_HEIGHT) / 2,
+  width: 1.5,
+  height: TOOL_DIVIDER_HEIGHT,
+  borderRadius: 0.75,
+  opacity: 0.3,
+}
+const $bagAnchor: ViewStyle = { position: "absolute", zIndex: 30 }
+const $bag: ViewStyle = {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: BAG_GAP,
+  padding: BAG_PADDING,
+  paddingHorizontal: BAG_PADDING,
+  borderRadius: ACTION_HEIGHT / 2,
+}
+const $bagTool: ViewStyle = {
+  width: BAG_CELL_WIDTH,
+  height: BAG_CELL_HEIGHT,
+  borderRadius: 18,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+}
+const $bagToolText: TextStyle = { fontSize: 13, lineHeight: 16, letterSpacing: 0.2 }
 const SIGNAL_BADGE_SIZE = 22
 // why: a zero-size box at the anchor centers the badge on its real width, so "100" sits where "1" does.
 const $signalBadgeCenter: ViewStyle = {

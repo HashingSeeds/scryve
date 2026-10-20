@@ -5,9 +5,12 @@ import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/li
 
 export type DiceRules = Pick<FirstPlayerDefinition, "die" | "winnerChooses">
 export type Die = DiceRules["die"]
-export type DiceTool = Die | "coin"
+export const BAG_DICE = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const
+export type BagDie = (typeof BAG_DICE)[number]
+export type DiceTool = BagDie | "coin"
+export const DICE_TOOLS: readonly DiceTool[] = [...BAG_DICE, "coin"]
 export type CoinFace = "Heads" | "Tails"
-export type DiceRoll = { tool: Die; value: number } | { tool: "coin"; value: CoinFace }
+export type DiceRoll = { tool: BagDie; value: number } | { tool: "coin"; value: CoinFace }
 
 export type DicePhase = "bloom" | "chip"
 
@@ -49,8 +52,17 @@ export type DiceSeatView =
 
 export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" }
 
+export const PROMPT_FADE_MS = 260
 export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
-export const DIE_SIDES: Record<Die, number> = { d6: 6, d20: 20 }
+export const DIE_SIDES: Record<BagDie, number> = {
+  d4: 4,
+  d6: 6,
+  d8: 8,
+  d10: 10,
+  d12: 12,
+  d20: 20,
+  d100: 100,
+}
 const COIN_FACES: readonly CoinFace[] = ["Heads", "Tails"]
 
 export function randomIndex(count: number, random = Math.random) {
@@ -67,7 +79,7 @@ export function systemDice(system: unknown): FirstPlayerDefinition {
   return systemDefinition(system)?.firstPlayer ?? DEFAULT_DICE
 }
 
-function rollDie(die: Die, random: () => number) {
+function rollDie(die: BagDie, random: () => number) {
   return randomIndex(DIE_SIDES[die], random) + 1
 }
 
@@ -101,7 +113,11 @@ export function dicePlayerName(
 }
 
 export function armTool(state: DiceState, tool: DiceTool): DiceState {
-  return { ...state, armed: state.armed === tool ? null : tool }
+  return state.armed === tool ? state : { ...state, armed: tool }
+}
+
+export function defaultTool({ die, twoPlayerCoinFlip }: FirstPlayerDefinition): DiceTool {
+  return twoPlayerCoinFlip ? "coin" : die
 }
 
 export function rollForSeat(
@@ -115,6 +131,7 @@ export function rollForSeat(
   return {
     state: {
       ...state,
+      armed: null,
       results: { ...state.results, [seatId]: { roll: result, phase: "bloom", attempt } },
     },
     roll: result,

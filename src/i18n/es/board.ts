@@ -5,9 +5,16 @@ export default {
   dice: {
     tool: {
       coin: "Moneda",
+      d4: "d4",
       d6: "d6",
+      d8: "d8",
+      d10: "d10",
+      d12: "d12",
       d20: "d20",
+      d100: "d100",
     },
+    tapToRoll: "Toca para tirar",
+    tapToFlip: "Toca para lanzar",
     coinFace: {
       Heads: "Cara",
       Tails: "Cruz",
@@ -512,6 +519,8 @@ export default {
     connect: "Conectar",
     end: "Terminar",
     closeDice: "Cerrar dados",
+    openDiceBag: "Abrir bolsa de dados",
+    closeDiceBag: "Cerrar bolsa de dados",
     exitCommander: "Salir del daño de comandante",
     closeLayoutChooser: "Cerrar selector de diseño",
     showsConnectionDetails: "Muestra los detalles de la conexión",

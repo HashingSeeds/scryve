@@ -2,6 +2,7 @@ import { AccessibilityInfo, StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Path } from "react-native-svg"
 
+import { DICE_TOOLS, type DiceTool } from "@/features/game/dice"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
@@ -10,8 +11,10 @@ import {
   GameRadialMenu,
   getRadialActionPoses,
   getRadialToolOffsets,
+  getToolBagLayout,
   type GameMenuActions,
   type RadialMenuTool,
+  type RadialMenuToolBag,
 } from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
@@ -24,20 +27,28 @@ describe("GameRadialMenu", () => {
     { kind: "home", label: "Home", onPress: callbacks[3] },
     { kind: "end-game", label: "End game", onPress: callbacks[4] },
   ]
-  const tools: RadialMenuTool[] = ["coin", "d20"].map((key) => ({
+  const tool = (key: DiceTool): RadialMenuTool => ({
     key,
     label: key,
     accessibilityLabel: key,
     onPress: jest.fn(),
-  }))
+  })
+  const bag: RadialMenuToolBag = {
+    recent: tool("d20"),
+    tools: DICE_TOOLS.map(tool),
+    open: false,
+    onToggle: jest.fn(),
+  }
+  beforeEach(() => jest.clearAllMocks())
   const [layout, dice, status, home, endGame] = actions
-  const actionsWithDiceTools: GameMenuActions = [
+  const diceActions = (open = false): GameMenuActions => [
     layout,
-    { kind: "dice", label: "Dice", tools },
+    { kind: "dice", label: "Dice", tools: { ...bag, open } },
     status,
     home,
     endGame,
   ]
+  const actionsWithDiceTools = diceActions()
 
   function menu(
     open: boolean,
@@ -290,13 +301,30 @@ describe("GameRadialMenu", () => {
     jest.restoreAllMocks()
   })
 
-  it("lays an action's two tools out inside the pill, the first nearer the pentagon", () => {
+  it("leads the pill with the last tool, keeps the bag nearer the pentagon, and swaps the pill for the bag", () => {
     const view = render(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
 
     expect(view.queryByTestId("dice-button")).toBeNull()
-    for (const tool of tools) expect(view.getByTestId(`dice-${tool.key}`)).toBeTruthy()
+    expect(view.queryByTestId("dice-bag-open")).toBeNull()
     fireEvent.press(view.getByTestId("dice-d20"))
-    expect(tools[1].onPress).toHaveBeenCalledTimes(1)
+    expect(bag.recent.onPress).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByTestId("dice-bag"))
+    expect(bag.onToggle).toHaveBeenCalledTimes(1)
+
+    const onClose = jest.fn()
+    const onToggle = jest.fn()
+    view.rerender(menu(true, onClose, { actions: diceActions(true), onToggle }))
+    expect(view.queryByTestId("dice-d20")).toBeNull()
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.getByTestId("dice-bag-open")).toBeTruthy()
+    fireEvent.press(view.getByTestId("dice-bag-coin"))
+    expect(bag.tools.at(-1)?.onPress).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByTestId("game-menu-backdrop"))
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice bag")
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(bag.onToggle).toHaveBeenCalledTimes(3)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(onToggle).not.toHaveBeenCalled()
 
     for (const anchor of [
       { x: 0.5, y: 0.5 },
@@ -317,36 +345,61 @@ describe("GameRadialMenu", () => {
     const view = render(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
     const hidden = { includeHiddenElements: true }
 
-    for (const label of ["d20", "Layout"]) {
+    for (const label of ["Open dice bag", "Layout"]) {
       const button = view.getByLabelText(label, hidden)
       expect(button.props.tabIndex).toBe(-1)
       expect(button.props.accessibilityState.disabled).toBe(true)
     }
 
     view.rerender(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
-    for (const label of ["d20", "Layout"]) {
+    expect(view.queryByLabelText("d4", hidden)).toBeNull()
+    for (const label of ["Open dice bag", "Layout"]) {
       const button = view.getByLabelText(label, hidden)
       expect(button.props.tabIndex).toBeUndefined()
       expect(button.props.accessibilityState.disabled).toBe(false)
     }
   })
 
-  it("keeps a held action's tools out and pressable while the menu is closed", () => {
+  it("carries an armed tool on the pentagon, which puts it away", () => {
+    const onExit = jest.fn()
     const view = render(
       menu(false, jest.fn(), {
         actions: actionsWithDiceTools,
-        heldAction: "dice",
-        exitAction: { label: "Close dice", onPress: jest.fn() },
+        exitAction: { label: "Close dice", onPress: onExit, heldTool: "d20" },
       }),
     )
 
     expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
-    expect(view.queryByTestId("layout-button")).toBeNull()
-    fireEvent.press(view.getByTestId("dice-coin"))
-    expect(tools[0].onPress).toHaveBeenCalledTimes(1)
+    expect(view.queryByTestId("dice-d20")).toBeNull()
+    expect(view.getByTestId("game-menu-held-tool")).toBeTruthy()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(onExit).toHaveBeenCalledTimes(1)
 
-    view.rerender(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
-    expect(view.queryByTestId("dice-coin")).toBeNull()
+    view.rerender(
+      menu(false, jest.fn(), { exitAction: { label: "Exit commander damage", onPress: onExit } }),
+    )
+    expect(view.queryByTestId("game-menu-held-tool")).toBeNull()
+  })
+
+  it("opens the bag clear of the pentagon, toward open space", () => {
+    const count = DICE_TOOLS.length
+    const clear = (layout: ReturnType<typeof getToolBagLayout>) =>
+      Math.abs(layout.x) - layout.width / 2 >= 40 || Math.abs(layout.y) - layout.height / 2 >= 40
+
+    const middle = getToolBagLayout({ x: 0.5, y: 0.5 }, count)
+    expect(middle).toMatchObject({ x: 0, columns: 4 })
+    expect(middle.y).toBeLessThan(0)
+    expect(getToolBagLayout({ x: 0.5, y: 0.2 }, count).y).toBeGreaterThan(0)
+    expect(getToolBagLayout({ x: 0.1, y: 0.5 }, count)).toMatchObject({ y: 0, columns: 2 })
+    expect(getToolBagLayout({ x: 0.1, y: 0.5 }, count).x).toBeGreaterThan(0)
+    expect(getToolBagLayout({ x: 0.9, y: 0.5 }, count).x).toBeLessThan(0)
+    for (const anchor of [
+      { x: 0.5, y: 0.5 },
+      { x: 0.5, y: 0.2 },
+      { x: 0.1, y: 0.5 },
+      { x: 0.9, y: 0.5 },
+    ])
+      expect(clear(getToolBagLayout(anchor, count))).toBe(true)
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

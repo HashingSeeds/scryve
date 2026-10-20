@@ -5,9 +5,16 @@ export default {
   dice: {
     tool: {
       coin: "코인",
+      d4: "d4",
       d6: "d6",
+      d8: "d8",
+      d10: "d10",
+      d12: "d12",
       d20: "d20",
+      d100: "d100",
     },
+    tapToRoll: "탭하여 굴리기",
+    tapToFlip: "탭하여 던지기",
     coinFace: {
       Heads: "앞면",
       Tails: "뒷면",
@@ -470,6 +477,8 @@ export default {
     connect: "연결",
     end: "종료",
     closeDice: "주사위 닫기",
+    openDiceBag: "주사위 주머니 열기",
+    closeDiceBag: "주사위 주머니 닫기",
     exitCommander: "커맨더 피해 종료",
     closeLayoutChooser: "레이아웃 선택 닫기",
     showsConnectionDetails: "연결 정보를 표시합니다",

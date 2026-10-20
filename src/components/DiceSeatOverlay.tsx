@@ -1,25 +1,28 @@
 import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { Platform, StyleSheet, View } from "react-native"
 import Animated, {
   ReduceMotion,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
-  ZoomOut,
+  FadeOut,
 } from "react-native-reanimated"
 
 import {
   DIE_SIDES,
+  PROMPT_FADE_MS,
   rollLabel,
   rollValueLabel,
   toolLabel,
+  type BagDie,
   type DiceSeatChip,
   type DiceSeatView,
   type DiceTool,
-  type Die,
 } from "@/features/game/dice"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -27,12 +30,14 @@ import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { DieFace } from "./DiceGlyph"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
 export interface LifeCardDice {
   view?: DiceSeatView
   armed?: DiceTool
+  leaving?: boolean
   chips?: readonly DiceSeatChip[]
   onPress: () => void
   onChoose?: (order: "first" | "second") => void
@@ -58,11 +63,17 @@ const TURN_ORDERS = ["first", "second"] as const
 const BLOOM_SPRING = { damping: 14, stiffness: 180, mass: 0.8 } as const
 const BLOOM_START_SCALE = 0.4
 const BLOOM_START_TURN_DEG = -40
-const BLOOM_EXIT_MS = 300
+const BLOOM_EXIT_MS = 160
 // why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
 const GATED_MOTION = ReduceMotion.Never
-// why: web runs only predefined layout animations, so the shrink is one of those and everything else is driven by shared values.
-const BLOOM_EXITING = ZoomOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
+// why: the result itself flies into its chip, so the card behind it only fades. On web the exit copy lands at the wrong place and size on a turned seat, so web skips it and lets the chip carry the handoff.
+const BLOOM_EXITING =
+  Platform.OS === "web" ? undefined : FadeOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
+const PROMPT_FADE_IN_MS = 200
+const ARMED_PULSE_SCALE = 1.08
+const ARMED_PULSE_MS = 650
+// why: the seat's life stays faintly visible behind the prompt, so players still know whose seat it is.
+const ARMED_TINT_OPACITY = 0.88
 const TUMBLE_TICKS = 9
 const tumbleStepMs = (step: number) => 30 + step * step * 1.2
 const COIN_FLIP_MS = 640
@@ -106,32 +117,51 @@ function Bloom({
     ],
   }))
 
+  const prompting = !!armed && !view
+  const leaving = prompting && !!dice.leaving
+  // why: dice mode tints every seat at once, so the prompt fades in and out rather than cutting.
+  const promptOpacity = useSharedValue(prompting && reducedMotion === false ? 0 : 1)
+  useEffect(() => {
+    if (!prompting) return
+    const target = leaving ? 0 : 1
+    promptOpacity.value =
+      reducedMotion === false
+        ? withTiming(target, { duration: leaving ? PROMPT_FADE_MS : PROMPT_FADE_IN_MS })
+        : target
+  }, [leaving, prompting, promptOpacity, reducedMotion])
+  const promptStyle = useAnimatedStyle(() => ({ opacity: promptOpacity.value }))
   const overlayStyle = [
     themed($overlay),
     compact && themed($compactOverlay),
     covers && !scrim && { backgroundColor: color },
     scrim && themed($scrim),
-    armed && !view && [themed($ring), { borderColor: foreground }],
+    prompting && [themed($ring), { borderColor: foreground }],
   ]
-  const content =
-    view && covers && !scrim ? (
-      <View style={[themed($content), rotationStyle, dim && $dim]}>
-        <Result
-          view={view}
-          playerName={playerName}
-          foreground={foreground}
-          compact={compact}
-          tumble={tumble}
-          onChoose={dice.onChoose}
-        />
+  const content = prompting ? (
+    <>
+      <View style={[$fill, { backgroundColor: color, opacity: ARMED_TINT_OPACITY }]} />
+      <View style={[themed($content), rotationStyle]}>
+        <ArmedPrompt tool={armed} foreground={foreground} compact={compact} />
       </View>
-    ) : null
+    </>
+  ) : view && covers && !scrim ? (
+    <View style={[themed($content), rotationStyle, dim && $dim]}>
+      <Result
+        view={view}
+        playerName={playerName}
+        foreground={foreground}
+        compact={compact}
+        tumble={tumble}
+        onChoose={dice.onChoose}
+      />
+    </View>
+  ) : null
 
   return (
     <Animated.View
       exiting={animate ? BLOOM_EXITING : undefined}
-      pointerEvents="box-none"
-      style={[$layer, animate && arriveStyle]}
+      pointerEvents={leaving ? "none" : "box-none"}
+      style={[$layer, animate && arriveStyle, prompting && promptStyle]}
     >
       {view?.kind === "choice" ? (
         <View testID={`dice-seat-${seatNumber}`} accessible={false} style={overlayStyle}>
@@ -145,7 +175,7 @@ function Bloom({
           accessibilityHint={
             interactive && view ? translate("board:dice.settlesResult") : undefined
           }
-          disabled={!interactive}
+          disabled={!interactive || leaving}
           onPress={dice.onPress}
           style={overlayStyle}
         >
@@ -153,6 +183,50 @@ function Bloom({
         </BoardPressable>
       )}
     </Animated.View>
+  )
+}
+
+function ArmedPrompt({
+  tool,
+  foreground,
+  compact,
+}: {
+  tool: DiceTool
+  foreground: string
+  compact?: boolean
+}) {
+  const reducedMotion = useReducedMotion()
+  const pulse = useSharedValue(1)
+  useEffect(() => {
+    if (reducedMotion !== false) {
+      pulse.value = 1
+      return
+    }
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(ARMED_PULSE_SCALE, { duration: ARMED_PULSE_MS, reduceMotion: GATED_MOTION }),
+        withTiming(1, { duration: ARMED_PULSE_MS, reduceMotion: GATED_MOTION }),
+      ),
+      -1,
+      false,
+      undefined,
+      GATED_MOTION,
+    )
+  }, [pulse, reducedMotion])
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }))
+  return (
+    <>
+      <Animated.View testID="dice-armed-prompt" style={pulseStyle}>
+        <DieFace tool={tool} size={compact ? 48 : 72} color={foreground} />
+      </Animated.View>
+      <Text
+        tx={tool === "coin" ? "board:dice.tapToFlip" : "board:dice.tapToRoll"}
+        weight="bold"
+        size={compact ? "xs" : "sm"}
+        maxFontSizeMultiplier={1.2}
+        style={{ color: foreground }}
+      />
+    </>
   )
 }
 
@@ -193,7 +267,7 @@ function useTumble(view: DiceSeatView | undefined): Tumble {
   return { ...state, flip }
 }
 
-function passingFace(step: number, die: Die) {
+function passingFace(step: number, die: BagDie) {
   let seed = 7
   for (let i = 0; i <= step; i += 1) seed = (seed * 1103515245 + 12345) % 2147483648
   return (seed % DIE_SIDES[die]) + 1
@@ -364,6 +438,7 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
 
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.
 const $layer: ViewStyle = { ...StyleSheet.absoluteFill, zIndex: 16 }
+const $fill: ViewStyle = StyleSheet.absoluteFill
 const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   ...StyleSheet.absoluteFill,
   overflow: "hidden",

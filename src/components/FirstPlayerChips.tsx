@@ -10,7 +10,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { DiceGlyph } from "./DiceGlyph"
+import { DieFace } from "./DiceGlyph"
 import { COMPACT_MENU_BUTTON_SIZE, MENU_BUTTON_SIZE } from "./GameRadialMenu"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
@@ -105,7 +105,7 @@ export const FirstPlayerChips = memo(function FirstPlayerChips({
                   ]}
                 >
                   {"tool" in offer.glyph ? (
-                    <DiceGlyph tool={offer.glyph.tool} size={GLYPH_SIZE} color={foreground} />
+                    <DieFace tool={offer.glyph.tool} size={GLYPH_SIZE} color={foreground} />
                   ) : (
                     <PlayerMark
                       seatNumber={offer.glyph.seatNumber}

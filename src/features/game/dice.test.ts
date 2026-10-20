@@ -112,15 +112,15 @@ describe("first-player choice", () => {
 })
 
 describe("dice per seat", () => {
-  it("rolls for the tapped seat while a tool is armed and keeps the tool armed", () => {
+  it("rolls once for the tapped seat, then puts the tool away", () => {
     expect(rollForSeat(EMPTY_DICE, ada)).toBeUndefined()
     const armed = armTool(EMPTY_DICE, "d20")
     const rolled = rollForSeat(armed, ada, d20s(17))!
     expect(rolled.roll).toEqual({ tool: "d20", value: 17 })
-    expect(rolled.state.armed).toBe("d20")
+    expect(rolled.state.armed).toBeNull()
     expect(diceSeatView(rolled.state, ada)).toEqual({ kind: "roll", roll: rolled.roll, attempt: 1 })
     expect(diceSeatView(rolled.state, grace)).toBeUndefined()
-    expect(armTool(rolled.state, "d20").armed).toBeNull()
+    expect(rollForSeat(rolled.state, grace)).toBeUndefined()
   })
 
   it("settles a bloom into a chip that the next roll replaces and a tap clears", () => {
@@ -132,7 +132,7 @@ describe("dice per seat", () => {
     ])
     expect(settleResult(chipped, grace)).toBe(chipped)
 
-    const again = rollForSeat(chipped, grace, () => 0.1)!.state
+    const again = rollForSeat(armTool(chipped, "coin"), grace, () => 0.1)!.state
     expect(diceSeatView(again, grace)).toEqual({
       kind: "roll",
       roll: { tool: "coin", value: "Heads" },

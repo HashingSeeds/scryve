@@ -5,9 +5,16 @@ export default {
   dice: {
     tool: {
       coin: "सिक्का",
+      d4: "d4",
       d6: "d6",
+      d8: "d8",
+      d10: "d10",
+      d12: "d12",
       d20: "d20",
+      d100: "d100",
     },
+    tapToRoll: "रोल करने के लिए टैप करें",
+    tapToFlip: "उछालने के लिए टैप करें",
     coinFace: {
       Heads: "चित",
       Tails: "पट",
@@ -489,6 +496,8 @@ export default {
     connect: "कनेक्ट करें",
     end: "समाप्त",
     closeDice: "पासे बंद करें",
+    openDiceBag: "पासों का थैला खोलें",
+    closeDiceBag: "पासों का थैला बंद करें",
     exitCommander: "कमांडर डैमेज से बाहर निकलें",
     closeLayoutChooser: "लेआउट चुनना बंद करें",
     showsConnectionDetails: "कनेक्शन का विवरण दिखाता है",

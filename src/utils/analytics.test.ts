@@ -164,6 +164,23 @@ it("drops unexpected events, free text, SDK metadata, and unknown catalog values
   ).not.toContain("private")
 })
 
+it("records which die was armed, from where, and how soon after the last roll", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  expect(
+    analyticsProperties("dice_armed", {
+      tool: "d20",
+      source: "bag",
+      system: "mtg",
+      since_roll_ms: 4200.4,
+    }),
+  ).toEqual(
+    expect.objectContaining({ tool: "d20", source: "bag", system: "mtg", since_roll_ms: 4200 }),
+  )
+  const unknown = analyticsProperties("dice_rolled", { tool: "d7", system: "private" })
+  expect(unknown).not.toHaveProperty("tool")
+  expect(unknown).toEqual(expect.objectContaining({ system: "none" }))
+})
+
 it("allowlists completion entry points without adding them to game starts", () => {
   const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
   for (const end_source of ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"])

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import type { RadialMenuTool } from "@/components/GameRadialMenu"
+import type { RadialMenuTool, RadialMenuToolBag } from "@/components/GameRadialMenu"
 import { useResultAnnouncer } from "@/components/ResultAnnouncer"
 import { translate } from "@/i18n/translate"
+import { captureAnalytics } from "@/utils/analytics"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 
@@ -10,6 +11,9 @@ import {
   armTool,
   clearFirst,
   clearResult,
+  defaultTool,
+  PROMPT_FADE_MS,
+  DICE_TOOLS,
   dicePlayerName,
   diceSeatChips,
   diceSeatView,
@@ -34,16 +38,47 @@ import {
 } from "./dice"
 import type { GamePlayer, PlayerId } from "./types"
 
-const BLOOM_MS = { d6: 5000, d20: 5000, coin: 4500, first: 2500 } as const
+const BLOOM_MS = { roll: 2300, first: 2500 } as const
 const FIRST_HOLD = "first"
+const FADE_HOLD = "fade"
 
 type State = {
   gameId: string
   mode: boolean
+  bag: boolean
+  recent: DiceTool | null
+  leaving: DiceTool | null
   dice: DiceState
 }
 
-const CLOSED: Omit<State, "gameId"> = { mode: false, dice: EMPTY_DICE }
+// why: only picking a tool closes the game menu; if opening the bag did too, closing the bag would leave the player with no menu to return to.
+export function closingMenu(bag: RadialMenuToolBag, closeMenu: () => void): RadialMenuToolBag {
+  const closing = (tool: RadialMenuTool): RadialMenuTool => ({
+    ...tool,
+    onPress: () => {
+      closeMenu()
+      tool.onPress()
+    },
+  })
+  return { ...bag, recent: closing(bag.recent), tools: bag.tools.map(closing) }
+}
+
+const CLOSED: Omit<State, "gameId"> = {
+  mode: false,
+  bag: false,
+  recent: null,
+  leaving: null,
+  dice: EMPTY_DICE,
+}
+
+function toolAccessibilityLabel(tool: DiceTool, armed: boolean) {
+  if (tool === "coin")
+    return armed ? translate("board:dice.coinArmed") : translate("board:dice.flipCoinForSeat")
+  const die = toolLabel(tool)
+  return armed
+    ? translate("board:dice.dieArmed", { die })
+    : translate("board:dice.rollDieForSeat", { die })
+}
 
 export function useDice(
   players: readonly Pick<GamePlayer, "id" | "name">[],
@@ -60,6 +95,8 @@ export function useDice(
   const holds = useRef(new Map<string, ReturnType<typeof setTimeout>>()).current
   const stable = useStableCallbacks()
   const seatKey = players.map(({ id }) => id).join(",")
+  const lastRollAt = useRef<{ gameId: string; at: number }>(undefined)
+  const systemId = typeof system === "string" ? system : undefined
 
   function dropHold(key: string) {
     clearTimeout(holds.get(key))
@@ -103,16 +140,47 @@ export function useDice(
     return (dice: DiceState) => dice
   }
 
+  // why: the seat prompts fade out on their own clock; a layout exit animation drew them at the wrong place on web.
+  function fadePrompts(tool: DiceTool | null) {
+    dropHold(FADE_HOLD)
+    if (!tool || reducedMotion !== false) return null
+    holds.set(
+      FADE_HOLD,
+      setTimeout(() => {
+        holds.delete(FADE_HOLD)
+        setStored((current) =>
+          current?.gameId === gameId ? { ...current, leaving: null } : current,
+        )
+      }, PROMPT_FADE_MS),
+    )
+    return tool
+  }
+
   const name = (seatId: PlayerId) => dicePlayerName(players, seatId)
   const seatIds = () => players.map(({ id }) => id)
 
   const close = stable("close", () => {
     players.forEach(({ id }) => dropHold(id))
     resetAnnouncer()
-    set({ ...dice, armed: null, results: {} }, { mode: false })
+    // why: the pentagon is the only way out of dice mode, so putting the die away must keep the rolls on the seats.
+    const settled = players.reduce((next, { id }) => settleResult(next, id), dice)
+    set({ ...settled, armed: null }, { mode: false, bag: false, leaving: fadePrompts(dice.armed) })
   })
 
-  const arm = stable("arm", (tool: DiceTool) => set(armTool(dice, tool), { mode: true }))
+  function armFrom(source: "pill" | "bag", tool: DiceTool) {
+    const last = lastRollAt.current?.gameId === gameId ? lastRollAt.current.at : undefined
+    captureAnalytics("dice_armed", {
+      tool,
+      source,
+      system: systemId,
+      ...(last !== undefined && { since_roll_ms: Date.now() - last }),
+    })
+    dropHold(FADE_HOLD)
+    set(armTool(dice, tool), { mode: true, bag: false, recent: tool, leaving: null })
+  }
+  const arm = stable("arm", (tool: DiceTool) => armFrom("pill", tool))
+  const pick = stable("pick", (tool: DiceTool) => armFrom("bag", tool))
+  const toggleBag = stable("toggleBag", () => update({ bag: !state.bag }))
 
   function holdFirst(next: DiceState) {
     return settleFirst(next) === next ? next : hold(FIRST_HOLD, BLOOM_MS.first, settleFirst)(next)
@@ -150,8 +218,13 @@ export function useDice(
     const rolled = rollForSeat(dice, player.id)
     if (rolled) {
       announce(rollLabel(player.name, rolled.roll))
+      lastRollAt.current = { gameId, at: Date.now() }
+      captureAnalytics("dice_rolled", { tool: rolled.roll.tool, system: systemId })
       const settle = (next: DiceState) => settleResult(next, player.id)
-      return set(hold(player.id, BLOOM_MS[rolled.roll.tool], settle)(rolled.state))
+      return set(hold(player.id, BLOOM_MS.roll, settle)(rolled.state), {
+        mode: false,
+        leaving: fadePrompts(dice.armed),
+      })
     }
     const view = diceSeatView(dice, player.id)
     if (view?.kind === "rolloff" && view.status === "tied") {
@@ -183,34 +256,23 @@ export function useDice(
   })
 
   const { armed } = dice
-  // why: innermost first, the order the petal lays them out from the pentagon outward.
-  const tools: readonly RadialMenuTool[] = useMemo(
-    () => [
-      {
-        key: "coin",
-        label: toolLabel("coin"),
-        accessibilityLabel:
-          armed === "coin"
-            ? translate("board:dice.coinArmed")
-            : translate("board:dice.flipCoinForSeat"),
-        selected: armed === "coin",
-        dimmed: armed !== null && armed !== "coin",
-        onPress: () => arm("coin"),
-      },
-      {
-        key: die,
-        label: toolLabel(die),
-        accessibilityLabel:
-          armed === die
-            ? translate("board:dice.dieArmed", { die: toolLabel(die) })
-            : translate("board:dice.rollDieForSeat", { die: toolLabel(die) }),
-        selected: armed === die,
-        dimmed: armed !== null && armed !== die,
-        onPress: () => arm(die),
-      },
-    ],
-    [arm, armed, die],
-  )
+  const recent = state.recent ?? defaultTool(rules)
+  const bagOpen = state.bag
+  const tools: RadialMenuToolBag = useMemo(() => {
+    const tool = (key: DiceTool, onPress: () => void): RadialMenuTool => ({
+      key,
+      label: toolLabel(key),
+      accessibilityLabel: toolAccessibilityLabel(key, armed === key),
+      selected: armed === key,
+      onPress,
+    })
+    return {
+      recent: tool(recent, () => arm(recent)),
+      tools: DICE_TOOLS.map((key) => tool(key, () => pick(key))),
+      open: bagOpen,
+      onToggle: toggleBag,
+    }
+  }, [arm, armed, bagOpen, pick, recent, toggleBag])
 
   return {
     open: state.mode,
@@ -224,6 +286,7 @@ export function useDice(
     gameStarted,
     grid: {
       armed,
+      leaving: armed ? null : state.leaving,
       seatFor: (player: GamePlayer) => diceSeatView(dice, player.id),
       chipsFor: (player: GamePlayer) => diceSeatChips(dice, player.id),
       onPressSeat: pressSeat,

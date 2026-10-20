@@ -67,6 +67,7 @@ export interface CommanderDamageGridBinding {
 
 export interface DiceGridBinding {
   armed: LifeCardDice["armed"] | null
+  leaving?: LifeCardDice["armed"] | null
   seatFor: (player: GamePlayer) => LifeCardDice["view"]
   chipsFor: (player: GamePlayer) => readonly DiceSeatChip[]
   onPressSeat: (player: GamePlayer) => void
@@ -95,10 +96,12 @@ function seatDiceFor(
 ): LifeCardDice | undefined {
   const view = dice?.seatFor(player)
   const chips = dice?.chipsFor(player)
-  if (!dice || !(view || dice.armed || chips?.length)) return undefined
+  const armed = dice?.armed ?? dice?.leaving ?? undefined
+  if (!dice || !(view || armed || chips?.length)) return undefined
   return {
     view,
-    armed: dice.armed ?? undefined,
+    armed,
+    leaving: !dice.armed && !!dice.leaving,
     chips,
     onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>

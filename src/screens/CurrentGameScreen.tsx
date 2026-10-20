@@ -50,7 +50,7 @@ import type {
   MatchSeatOutcome,
   PlayerId,
 } from "@/features/game/types"
-import { useDice } from "@/features/game/useDice"
+import { closingMenu, useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
@@ -186,17 +186,7 @@ export function CurrentGameScreen({
     playerCount,
     system,
   ])
-  const diceTools = useMemo(
-    () =>
-      dice.tools.map((tool) => ({
-        ...tool,
-        onPress: () => {
-          setMenuOpen(false)
-          tool.onPress()
-        },
-      })),
-    [dice.tools],
-  )
+  const diceTools = useMemo(() => closingMenu(dice.tools, () => setMenuOpen(false)), [dice.tools])
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
@@ -374,14 +364,19 @@ export function CurrentGameScreen({
 
   const diceOpen = dice.open
   const closeDice = dice.close
+  const diceArmed = dice.grid.armed
   const exitAction = useMemo(
     () =>
       diceOpen
-        ? { label: translate("board:menu.closeDice"), onPress: closeDice }
+        ? {
+            label: translate("board:menu.closeDice"),
+            onPress: closeDice,
+            ...(diceArmed ? { heldTool: diceArmed } : {}),
+          }
         : armedPlayerId || inspectedPlayerId
           ? { label: translate("board:menu.exitCommander"), onPress: exitCommanderMode }
           : undefined,
-    [armedPlayerId, closeDice, diceOpen, inspectedPlayerId, exitCommanderMode],
+    [armedPlayerId, closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderMode],
   )
 
   return (
@@ -451,7 +446,6 @@ export function CurrentGameScreen({
                   },
                 }
               : {}),
-            heldAction: diceOpen ? "dice" : undefined,
             onToggle: toggleMenu,
             onClose: closeMenu,
           }}

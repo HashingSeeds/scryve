@@ -148,7 +148,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("dice-coin")).toBeNull()
+    expect(view.queryByTestId("dice-bag")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -156,7 +156,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
-    expect(view.getByTestId("dice-coin")).toBeTruthy()
+    expect(view.getByTestId("dice-bag")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("decks-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
@@ -198,36 +198,51 @@ describe("CurrentGameScreen", () => {
     expect(onRules).toHaveBeenCalledTimes(1)
   })
 
-  it("enters dice mode from a pea in the menu and closes it from the pentagon", () => {
+  it("opens the dice bag over the menu, which its pentagon returns to", () => {
     const view = renderGame()
     fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("dice-coin"))
+    fireEvent.press(view.getByTestId("dice-bag"))
+
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.getByTestId("dice-bag-d12")).toBeTruthy()
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice bag")
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.queryByTestId("dice-bag-d12")).toBeNull()
+    expect(view.getByTestId("layout-button")).toBeTruthy()
+  })
+
+  it("enters dice mode from the dice bag and closes it from the pentagon", () => {
+    const view = renderGame()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("dice-bag"))
+    fireEvent.press(view.getByTestId("dice-bag-coin"))
 
     expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
     expect(view.queryByTestId("layout-button")).toBeNull()
-    expect(view.getByTestId("dice-coin").props.accessibilityState.selected).toBe(true)
+    expect(view.queryByTestId("dice-bag")).toBeNull()
+    expect(view.getByTestId("game-menu-held-tool")).toBeTruthy()
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
     expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
 
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("dice-coin")).toBeNull()
+    expect(view.queryByTestId("game-menu-held-tool")).toBeNull()
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
     expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
   })
 
-  it("arms a die from the menu and rolls it for the tapped seat, leaving a chip", () => {
+  it("arms a die from the menu, rolls it once for the tapped seat, and leaves a chip", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderGame()
     layoutSeats(view)
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("dice-d20"))
 
+    expect(view.getByTestId("game-menu-held-tool")).toBeTruthy()
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
-    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
-
-    fireEvent.press(view.getByTestId("dice-d20"))
-    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.queryByTestId("game-menu-held-tool")).toBeNull()
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
     expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
   })
