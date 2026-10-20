@@ -115,7 +115,7 @@ function englishNotes(source) {
       .trim()
   const visit = (object, prefix, inherited) => {
     for (const property of object.properties) {
-      if (!ts.isPropertyAssignment(property)) continue
+      if (!ts.isPropertyAssignment(property) || ts.isComputedPropertyName(property.name)) continue
       const keyPath = prefix ? `${prefix}.${property.name.text}` : property.name.text
       const own = (ts.getLeadingCommentRanges(source, property.getFullStart()) ?? []).map(
         commentText,
@@ -142,7 +142,7 @@ function translationUnits(englishFlat, notes = {}) {
     const id = isPlural ? match[1] : key
     const unit = units.get(id) ?? { id, plural: Boolean(isPlural), english: {}, notes: new Set() }
     unit.english[key] = text
-    if (notes[key]) unit.notes.add(notes[key])
+    if (Object.hasOwn(notes, key)) unit.notes.add(notes[key])
     units.set(id, unit)
   }
   for (const unit of units.values()) {
@@ -299,10 +299,10 @@ async function check() {
     for (const locale of Object.keys(LOCALES)) {
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
       for (const unit of staleUnits({ units, lock, localeFlat, locale })) {
-        const invalid = validateUnit(unit, localeFlat, locale)
-        if (invalid.length === 0)
+        if (lock[unit.id] !== unit.hash)
           problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
-        for (const problem of invalid) problems.push(`${locale}/${namespace}: ${problem}`)
+        for (const problem of validateUnit(unit, localeFlat, locale))
+          problems.push(`${locale}/${namespace}: ${problem}`)
       }
       for (const key of orphanKeys({ units, localeFlat, locale }))
         problems.push(`${locale}/${namespace}: ${key} no longer exists in English`)

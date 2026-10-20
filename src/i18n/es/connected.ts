@@ -479,6 +479,8 @@ export default {
     nameLabel: "Tu nombre",
     namePlaceholder: "Visible para la mesa",
     empty: "Aún no hay partidas en esta red.",
+    notFound:
+      "No se encontraron partidas. Comprueba que estás en la misma red Wi-Fi que el anfitrión. Las redes Wi-Fi de invitados y públicas suelen bloquearlo.",
     join: "Unirse a {{name}}",
     you: "{{name}} (tú)",
     away: "Ausente",
@@ -486,7 +488,8 @@ export default {
     backToGame: "Volver a la partida",
     errors: {
       hostFailed: "No se pudo crear: {{error}}",
-      unreachable: "{{name}} no está accesible. Puede que la partida haya terminado.",
+      unreachable:
+        "No se pudo conectar con {{name}}. Puede que la partida haya terminado o que esta red Wi-Fi bloquee la conexión entre dispositivos.",
       lostHost: "Se perdió la conexión con el anfitrión. Puede que la partida haya terminado.",
     },
     rejected: {

@@ -238,7 +238,7 @@ export default {
     player: "{{name}}, {{value}}",
     playerWinner: "{{name}}, {{value}}, vainqueur",
     draw: "Égalité",
-    abandon: "Annuler la partie",
+    abandon: "Terminer sans résultat",
     end: "Terminer la partie",
   },
   pokemon: {

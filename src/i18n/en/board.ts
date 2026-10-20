@@ -284,6 +284,7 @@ const board = {
     benchFocusHint: "Tap to count damage on it or switch it in, or edit.",
   },
   commanderClaim: {
+    // One line that cuts off its end on narrow seats: keep {{name}} and {{damage}} first.
     dealt: "{{name}}: {{damage}} commander damage",
     more_one: "{{count}} more",
     more_other: "{{count}} more",

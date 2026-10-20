@@ -73,7 +73,7 @@
       "best of N": "au meilleur des N",
       "draw": "Égalité for one game; match nul for a whole match",
       "coin heads / tails": "Face / Pile (heads = Face, tails = Pile)",
-      "abandon (ends it for everyone)": "a game: annuler la partie; a lobby: dissoudre le salon",
+      "abandon (ends it for everyone)": "a game: terminer sans résultat (status: annulée); a lobby: dissoudre le salon. Never Annuler, which is Cancel.",
       "leave (just you)": "quitter",
       "seat": "place (never siège)",
       "host (the player)": "hôte; to host: héberger",

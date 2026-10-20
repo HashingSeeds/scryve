@@ -449,6 +449,8 @@ export default {
     nameLabel: "내 이름",
     namePlaceholder: "테이블에 표시됩니다",
     empty: "이 네트워크에 아직 게임이 없습니다.",
+    notFound:
+      "게임을 찾지 못했습니다. 호스트와 같은 Wi-Fi에 연결되어 있는지 확인하세요. 게스트 Wi-Fi와 공용 Wi-Fi는 연결을 막는 경우가 많습니다.",
     join: "{{name}} 참가",
     you: "{{name}} (나)",
     away: "자리 비움",
@@ -456,7 +458,8 @@ export default {
     backToGame: "게임으로 돌아가기",
     errors: {
       hostFailed: "게임을 만들 수 없습니다: {{error}}",
-      unreachable: "{{name}}에 연결할 수 없습니다. 게임이 종료되었을 수 있습니다.",
+      unreachable:
+        "{{name}}에 연결할 수 없습니다. 게임이 종료되었거나 이 Wi-Fi에서 기기 간 연결을 차단하고 있을 수 있습니다.",
       lostHost: "호스트와 연결이 끊겼습니다. 게임이 종료되었을 수 있습니다.",
     },
     rejected: {

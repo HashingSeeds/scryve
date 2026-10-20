@@ -304,7 +304,7 @@ export default {
     benchFocusHint: "タップでダメージを数える、入れ替える、または編集。",
   },
   commanderClaim: {
-    dealt: "{{name}}:統率者ダメージ {{damage}}",
+    dealt: "{{name}}:{{damage}} 統率者ダメージ",
     more_other: "他{{count}}件",
     morePending_other: "他{{count}}件が保留中",
     action: {

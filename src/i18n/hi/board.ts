@@ -234,7 +234,7 @@ export default {
     playerWinner: "{{name}}, {{value}}, विजेता",
     draw: "ड्रॉ",
     abandon: "बिना नतीजे खत्म करें",
-    end: "गेम समाप्त करें",
+    end: "गेम खत्म करें",
   },
   pokemon: {
     unnamed: "Pokémon",

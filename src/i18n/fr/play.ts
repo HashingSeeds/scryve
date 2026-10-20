@@ -5,7 +5,7 @@ export default {
   playerNames: "Noms des joueurs",
   startGame: "Lancer la partie",
   finish: "Terminer",
-  abandon: "Annuler la partie",
+  abandon: "Terminer sans résultat",
   ending: "Fin en cours…",
   gameSummary: "Résumé de la partie",
   noGames: "Aucune partie",

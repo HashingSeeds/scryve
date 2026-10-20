@@ -110,7 +110,7 @@ export default {
     fab_other: "{{count}} cambios de vidas",
   },
   noneTaken: "ninguna carta de Premio tomada",
-  taken: "Cartas de Premio tomadas: {{amount}}",
+  taken: "{{amount}} cartas de Premio tomadas",
   even: "sin cambios",
   fromStart: "{{delta}} desde el inicio",
 } satisfies LocaleNamespace

@@ -303,7 +303,7 @@ export default {
     benchFocusHint: "탭하면 데미지를 세거나 교체하고, 편집할 수 있습니다.",
   },
   commanderClaim: {
-    dealt: "{{name}}: 커맨더 피해 {{damage}}점",
+    dealt: "{{name}}: {{damage}}점 커맨더 피해",
     more_other: "{{count}}개 더",
     morePending_other: "{{count}}개 더 대기 중",
     action: {
