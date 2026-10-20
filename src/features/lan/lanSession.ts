@@ -408,8 +408,10 @@ export class LanSession {
     for (const settle of this.hostAcks.splice(0)) settleAfterRender(settle)
     const lobby = lanLobbyOf(game)
     for (const [key, peer] of this.peers) {
-      peer.send({ type: "state", lobby, projection: lanProjection(game, key) })
-      for (const reply of this.replies.get(key) ?? []) peer.send(reply)
+      peer.send(
+        { type: "state", lobby, projection: lanProjection(game, key) },
+        ...(this.replies.get(key) ?? []),
+      )
     }
     this.replies.clear()
     if (this.backgrounded) this.saveHostedGame()

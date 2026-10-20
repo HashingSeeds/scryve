@@ -449,6 +449,8 @@ const connected = {
     nameLabel: "Your name",
     namePlaceholder: "Shown to the table",
     empty: "No games on this network yet.",
+    notFound:
+      "No games found. Check that you're on the same Wi-Fi as the host. Guest and public Wi-Fi often block this.",
     join: "Join {{name}}",
     you: "{{name}} (you)",
     away: "Away",
@@ -456,7 +458,8 @@ const connected = {
     backToGame: "Back to game",
     errors: {
       hostFailed: "Could not host: {{error}}",
-      unreachable: "{{name}} isn't reachable. The game may have ended.",
+      unreachable:
+        "Couldn't reach {{name}}. The game may have ended, or this Wi-Fi blocks devices from connecting.",
       lostHost: "Lost the host. The game may have ended.",
     },
     rejected: {
