@@ -20,6 +20,18 @@ describe("translate", () => {
     expect(translate("play:summary.playerCount", { count: 4 })).toBe("4 players")
   })
 
+  it("keeps a string option apart from extra options it looks like", () => {
+    const plain = { name: "x", count: 1 }
+    const lookalike = { name: "x\u0000count\u0001number\u00011" }
+
+    expect(translate("decks:conflict.nameLine", plain)).toBe(
+      i18n.t("decks:conflict.nameLine", plain),
+    )
+    expect(translate("decks:conflict.nameLine", lookalike)).toBe(
+      i18n.t("decks:conflict.nameLine", lookalike),
+    )
+  })
+
   it("follows language changes and added resources", async () => {
     const language = i18n.language
     expect(translate("play:summary.playerCount", { count: 4 })).toBe("4 players")

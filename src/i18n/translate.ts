@@ -19,7 +19,9 @@ function cacheKey(key: string, options: TOptions | undefined) {
     const value: unknown = options[name]
     // why: objects and functions (`replace`, `interpolation`, `lngs`) can change without a new key.
     if (value !== null && (typeof value === "object" || typeof value === "function")) return
-    result += `\u0000${name}\u0001${typeof value}\u0001${String(value)}`
+    // why: JSON escapes the delimiters, so a name like "x\u0000count..." can't pose as a second option.
+    const text = typeof value === "string" ? JSON.stringify(value) : String(value)
+    result += `\u0000${name}\u0001${typeof value}\u0001${text}`
   }
   return result
 }
