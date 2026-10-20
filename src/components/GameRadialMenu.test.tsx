@@ -313,28 +313,6 @@ describe("GameRadialMenu", () => {
     }
   })
 
-  it("offers the first-player badge on the pentagon only while the menu is closed and free", () => {
-    const onPress = jest.fn()
-    const badge = {
-      color: "#55C894",
-      glyph: { tool: "d20" },
-      accessibilityLabel: "Roll for who goes first",
-      onPress,
-    } as const
-    const view = render(menu(false, jest.fn(), { badge }))
-
-    fireEvent.press(view.getByTestId("first-player-badge"))
-    expect(onPress).toHaveBeenCalledTimes(1)
-
-    view.rerender(menu(true, jest.fn(), { badge }))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
-
-    view.rerender(
-      menu(false, jest.fn(), { badge, exitAction: { label: "Close dice", onPress: jest.fn() } }),
-    )
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
-  })
-
   it("disables hidden tools and pills and takes them out of the tab order", () => {
     const view = render(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
     const hidden = { includeHiddenElements: true }

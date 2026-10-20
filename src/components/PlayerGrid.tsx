@@ -509,6 +509,7 @@ export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
 export type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 export {
   getPlayerContentRotation,
+  getPlayerGridFacings,
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,

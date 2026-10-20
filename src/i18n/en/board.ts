@@ -73,6 +73,12 @@ const board = {
     loserChooses: "{{name}} lost the last game. Choose who goes first",
     flip: "Flip for who goes first",
     roll: "Roll for who goes first",
+    // One line on a small pill: at most about 16 Latin or 9 CJK characters plus the name.
+    chip: {
+      roll: "Roll for first",
+      flip: "Flip for first",
+      loserChooses: "{{name}} picks who's first",
+    },
   },
   layout: {
     balanced: "Balanced",

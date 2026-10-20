@@ -4,6 +4,7 @@ import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
+import { FirstPlayerChips, type FirstPlayerOffer } from "@/components/FirstPlayerChips"
 import {
   GameMenuBackdrop,
   GameMenuCluster,
@@ -11,6 +12,7 @@ import {
   type GameRadialMenuProps,
 } from "@/components/GameRadialMenu"
 import {
+  getPlayerGridFacings,
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   type PlayerGridLayoutVariant,
@@ -31,6 +33,7 @@ export interface GameBoardStageProps {
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
+  firstPlayer?: FirstPlayerOffer
   windowOverlay?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
@@ -48,6 +51,7 @@ function PinnedGameBoardStage({
   layoutVariant,
   renderGrid,
   menu,
+  firstPlayer,
   windowOverlay,
   onBoardSizeChange,
   testID = "game-board",
@@ -77,6 +81,10 @@ function PinnedGameBoardStage({
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
+  const facings = useMemo(
+    () => getPlayerGridFacings(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
   const holderAnchor = useMemo(
@@ -120,9 +128,16 @@ function PinnedGameBoardStage({
               signal={menu.signal}
               statusLine={menu.statusLine}
               heldAction={menu.heldAction}
-              badge={menu.badge}
               onToggle={menu.onToggle}
             />
+            {firstPlayer && !menu.open && !menu.exitAction ? (
+              <FirstPlayerChips
+                offer={firstPlayer}
+                anchor={boardAnchor}
+                facings={facings}
+                compact={playerCount > 2}
+              />
+            ) : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
@@ -136,6 +151,7 @@ function LegacyGameBoardStage({
   layoutVariant,
   renderGrid,
   menu,
+  firstPlayer,
   windowOverlay,
   onBoardSizeChange,
   testID = "game-board",
@@ -156,6 +172,10 @@ function LegacyGameBoardStage({
       ),
     [playerCount, gridLayout, rotation, topEdgeBand, height],
   )
+  const facings = useMemo(
+    () => getPlayerGridFacings(playerCount, gridLayout).map((facing) => facing + rotation),
+    [playerCount, gridLayout, rotation],
+  )
 
   return (
     <Animated.View
@@ -172,6 +192,14 @@ function LegacyGameBoardStage({
         nativeFrame={boardOrientation.nativeFrame}
         compact={playerCount > 2}
       />
+      {firstPlayer && !menu.open && !menu.exitAction ? (
+        <FirstPlayerChips
+          offer={firstPlayer}
+          anchor={menuAnchor}
+          facings={facings}
+          compact={playerCount > 2}
+        />
+      ) : null}
       {windowOverlay}
     </Animated.View>
   )

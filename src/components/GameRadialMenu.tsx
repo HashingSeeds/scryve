@@ -14,7 +14,6 @@ import Animated, {
   ZoomOut,
 } from "react-native-reanimated"
 
-import type { DiceTool } from "@/features/game/dice"
 import { nearestEquivalentAngle } from "@/features/game/pinnedBoardGeometry"
 import {
   rotateGameBoardAnchor,
@@ -33,15 +32,12 @@ import {
 } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { DiceGlyph } from "./DiceGlyph"
 import {
   GameMenuButtonShape,
   mixColorsInLinearLight,
   PENTAGON_BADGE_ANCHOR,
 } from "./GameMenuButtonShape"
-import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
-import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 export interface RadialMenuTool {
   key: string
@@ -77,13 +73,6 @@ export interface GameMenuStatusLine {
   onPress: () => void
 }
 
-export interface GameMenuBadge {
-  color: string
-  glyph: { tool: DiceTool } | { seatNumber: number; shape?: PlayerMarkShape }
-  accessibilityLabel: string
-  onPress: () => void
-}
-
 export interface GameRadialMenuProps {
   open: boolean
   anchor: { x: number; y: number }
@@ -97,7 +86,6 @@ export interface GameRadialMenuProps {
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
   heldAction?: GameMenuActionKind
-  badge?: GameMenuBadge
 }
 
 /** why: the pentagon has five sides and the fan is laid out for exactly one action per side. */
@@ -116,8 +104,8 @@ export interface RadialActionPose {
   delayMs: number
 }
 
-const MENU_BUTTON_SIZE = 80
-const COMPACT_MENU_BUTTON_SIZE = 70
+export const MENU_BUTTON_SIZE = 80
+export const COMPACT_MENU_BUTTON_SIZE = 70
 const MENU_FALLBACK_ANIMATION_MS = 220
 
 const PENTAGON_SIDES = 5
@@ -131,23 +119,6 @@ const TOOL_RADIUS = TOOL_SIZE / 2
 const TOOL_INSET = (ACTION_HEIGHT - TOOL_SIZE) / 2
 const TOOL_OFFSET = ACTION_WIDTH / 2 - TOOL_INSET - TOOL_RADIUS
 const TOOL_TINT = 0.45
-const BADGE_SIZE = 28
-const BADGE_POP_DELAY_MS = 260
-const START_BADGE_SHARE_OF_EDGE = 0.4
-const PENTAGON_CIRCUMRADIUS = 0.46
-function pentagonCorner(angleDeg: number) {
-  const angle = (angleDeg * Math.PI) / 180
-  return {
-    x: 0.5 + PENTAGON_CIRCUMRADIUS * Math.cos(angle),
-    y: 0.5 + PENTAGON_CIRCUMRADIUS * Math.sin(angle),
-  }
-}
-const PENTAGON_APEX = pentagonCorner(-90)
-const PENTAGON_UPPER_LEFT = pentagonCorner(-90 - 360 / PENTAGON_SIDES)
-const START_BADGE_ANCHOR = {
-  x: PENTAGON_UPPER_LEFT.x + START_BADGE_SHARE_OF_EDGE * (PENTAGON_APEX.x - PENTAGON_UPPER_LEFT.x),
-  y: PENTAGON_UPPER_LEFT.y + START_BADGE_SHARE_OF_EDGE * (PENTAGON_APEX.y - PENTAGON_UPPER_LEFT.y),
-}
 
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
@@ -171,9 +142,6 @@ const POP_EASING = Easing.inOut(Easing.quad)
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
 const BADGE_EXITING = ZoomOut.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
-const START_BADGE_ENTERING = ZoomIn.delay(BADGE_POP_DELAY_MS)
-  .duration(SIGNAL_BADGE_SCALE_MS)
-  .reduceMotion(GATED_MOTION)
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -261,7 +229,6 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   signal,
   statusLine,
   heldAction,
-  badge,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
@@ -292,7 +259,6 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         compact={compact}
         exitAction={exitAction}
         signal={signal}
-        badge={badge}
         onToggle={onToggle}
       />
 
@@ -414,7 +380,6 @@ type GameMenuAnchorProps = {
   compact?: boolean
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
-  badge?: GameMenuBadge
   onToggle: () => void
 }
 
@@ -485,7 +450,6 @@ function GameMenuAnchor({
   compact,
   exitAction,
   signal,
-  badge,
   onToggle,
 }: GameMenuAnchorProps) {
   const {
@@ -613,42 +577,6 @@ function GameMenuAnchor({
                 { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
               ]}
             />
-          </Animated.View>
-        </View>
-      ) : null}
-      {badge && !menuOpen && !suppressed ? (
-        <View
-          pointerEvents="box-none"
-          style={compact ? $compactStartBadgeCenter : $largeStartBadgeCenter}
-        >
-          <Animated.View entering={animateFully ? START_BADGE_ENTERING : undefined}>
-            <BoardPressable
-              testID="first-player-badge"
-              accessibilityRole="button"
-              accessibilityLabel={badge.accessibilityLabel}
-              hitSlop={START_BADGE_HIT_SLOP}
-              onPress={badge.onPress}
-              style={({ pressed }) => [
-                themed($startBadge),
-                { backgroundColor: badge.color },
-                pressed && themed($pressedAction),
-              ]}
-            >
-              {"tool" in badge.glyph ? (
-                <DiceGlyph
-                  tool={badge.glyph.tool}
-                  size={15}
-                  color={accessibleForeground(badge.color)}
-                />
-              ) : (
-                <PlayerMark
-                  seatNumber={badge.glyph.seatNumber}
-                  shape={badge.glyph.shape}
-                  color={accessibleForeground(badge.color)}
-                  size={15}
-                />
-              )}
-            </BoardPressable>
           </Animated.View>
         </View>
       ) : null}
@@ -1068,34 +996,6 @@ function signalBadgeAt(buttonSize: number): ViewStyle {
 }
 const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
 const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
-// why: the badge has a fixed size, so it is centered on its anchor by offsetting half its size rather than by flex centering in a zero-size box, which iOS left hanging half a badge low.
-function startBadgeAt(buttonSize: number): ViewStyle {
-  return {
-    position: "absolute",
-    left: START_BADGE_ANCHOR.x * buttonSize - BADGE_SIZE / 2,
-    top: START_BADGE_ANCHOR.y * buttonSize - BADGE_SIZE / 2,
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-  }
-}
-// why: the badge sits up and left of the menu button's center, so slop toward the bottom or right would catch center taps meant to open the menu.
-const START_BADGE_HIT_SLOP = { top: 9, left: 9, bottom: 0, right: 0 }
-const $largeStartBadgeCenter = startBadgeAt(MENU_BUTTON_SIZE)
-const $compactStartBadgeCenter = startBadgeAt(COMPACT_MENU_BUTTON_SIZE)
-const $startBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: BADGE_SIZE,
-  height: BADGE_SIZE,
-  borderRadius: BADGE_SIZE / 2,
-  borderWidth: 2.5,
-  borderColor: colors.gameMenu.anchorBorder,
-  alignItems: "center",
-  justifyContent: "center",
-  shadowColor: colors.gameMenu.shadow,
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.45,
-  shadowRadius: 4,
-  elevation: 6,
-})
 const $signalBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   minWidth: SIGNAL_BADGE_SIZE,
   height: SIGNAL_BADGE_SIZE,

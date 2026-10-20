@@ -13,8 +13,9 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
+import type { FirstPlayerOffer } from "@/components/FirstPlayerChips"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { type GameMenuActions, type GameMenuBadge } from "@/components/GameRadialMenu"
+import type { GameMenuActions } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
@@ -142,7 +143,7 @@ export function CurrentGameScreen({
   const playerCount = runtime.game.players.length
   const { events } = runtime.game
   const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events }), [events])
-  const badge = useMemo<GameMenuBadge | undefined>(() => {
+  const firstPlayer = useMemo<FirstPlayerOffer | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
       markFirstPlayerUsed()
@@ -152,6 +153,7 @@ export function CurrentGameScreen({
       return {
         color: loser.color,
         glyph: { seatNumber: loserSeat + 1, shape: loser.shape },
+        label: translate("board:firstPlayer.chip.loserChooses", { name: loser.name }),
         accessibilityLabel: translate("board:firstPlayer.loserChooses", { name: loser.name }),
         onPress: offer(() => diceAsk(loser.id, "loss")),
       }
@@ -159,12 +161,14 @@ export function CurrentGameScreen({
       return {
         color: colors.gameMenu.actions.dice,
         glyph: { tool: "coin" },
+        label: translate("board:firstPlayer.chip.flip"),
         accessibilityLabel: translate("board:firstPlayer.flip"),
         onPress: offer(diceFlip),
       }
     return {
       color: colors.gameMenu.actions.dice,
       glyph: { tool: die },
+      label: translate("board:firstPlayer.chip.roll"),
       accessibilityLabel: translate("board:firstPlayer.roll"),
       onPress: offer(diceRollOff),
     }
@@ -392,6 +396,7 @@ export function CurrentGameScreen({
           playerCount={playerCount}
           layoutVariant={layoutVariant}
           onBoardSizeChange={setBoardSize}
+          firstPlayer={firstPlayer}
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}
@@ -447,7 +452,6 @@ export function CurrentGameScreen({
                 }
               : {}),
             heldAction: diceOpen ? "dice" : undefined,
-            badge,
             onToggle: toggleMenu,
             onClose: closeMenu,
           }}
