@@ -200,8 +200,8 @@ Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a re
 - Use a separate development PostHog project to check opt-in, offline capture followed by reconnect, and opt-out with queued events. Never use the live analytics project for development checks.
 - Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. SDK initialization and event processing are scheduled after the current task, but that is not a measured performance guarantee.
 
-The six explicit events are `app_opened`, `game_started`, `game_completed`,
-`connection_attempt`, `deck_used`, and `stats_viewed`. A local start means the first
+The explicit events are `app_opened`, `game_started`, `game_completed`,
+`connection_attempt`, `deck_used`, `stats_viewed`, `dice_armed`, and `dice_rolled`. A local start means the first
 accepted gameplay action, not rendering the fresh board. Completed local games include
 `end_source`: `game_menu`, `new_game_prompt`, or `stale_game_prompt`. A cancelled
 prompt does not label a later manual finish. Connected completion observations
@@ -210,7 +210,11 @@ entry point. This describes the UI path, not the player's motivation. Connected 
 completions count observations per consenting installation, not unique games or
 all players at the table. Historical views do not emit game events. Stats events
 mean a visit to history or a loaded deck page showing its record, not proof the
-player read the stats. A saved deck and an assigned deck are separate from browsing.
+player read the stats. A saved deck and an assigned deck are separate from browsing. Dice events name the
+tool and system only. Picking a die puts it away after one roll, so `dice_armed`
+carries `source` (the pill's last tool or the bag) and `since_roll_ms`, the time
+since this installation's last roll in the same game; short gaps mean players
+wanted several rolls in a row.
 
 Use `consent_source = first_use` for activation cohorts from the optional, unchecked
 choice on the first-use legal screen. `consent_source = settings` includes existing

@@ -1,6 +1,13 @@
-import type { TextStyle, ViewStyle } from "react-native"
+import { type ReactNode, useEffect, useState } from "react"
+import type { LayoutChangeEvent, LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated, { ReduceMotion, ZoomIn } from "react-native-reanimated"
+import Animated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  ZoomIn,
+} from "react-native-reanimated"
 
 import { rollLabel, rollValueLabel, type DiceSeatChip } from "@/features/game/dice"
 import { translate } from "@/i18n/translate"
@@ -9,12 +16,17 @@ import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { DiceGlyph } from "./DiceGlyph"
+import { DieFace } from "./DiceGlyph"
 import { Text } from "./Text"
 
 export const DICE_CHIP_HEIGHT = 36
 export const COMPACT_DICE_CHIP_HEIGHT = 32
 const CHIP_POP_MS = 260
+const FLIGHT_SPRING = { damping: 20, stiffness: 110, mass: 1 } as const
+// why: the chip starts about as large as the result it replaces, so it reads as that result shrinking into place.
+const FLIGHT_START_SCALE = 2.6
+
+type Point = { x: number; y: number }
 
 export interface DiceChipsProps {
   seatNumber: number
@@ -23,6 +35,7 @@ export interface DiceChipsProps {
   compact?: boolean
   chips: readonly DiceSeatChip[]
   onClear: (chip: DiceSeatChip) => void
+  bloomCenterInRow?: Point
 }
 
 export function DiceChips({
@@ -32,17 +45,34 @@ export function DiceChips({
   compact,
   chips,
   onClear,
+  bloomCenterInRow,
 }: DiceChipsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
+  const [rowOffset, setRowOffset] = useState<Point>()
   if (chips.length === 0) return null
+  const flight =
+    reducedMotion === false && bloomCenterInRow && rowOffset
+      ? { x: bloomCenterInRow.x - rowOffset.x, y: bloomCenterInRow.y - rowOffset.y }
+      : undefined
   // why: Reanimated reads the system setting only at startup, so an animation already gated on the live preference must not consult it again.
   const entering =
-    reducedMotion === false
+    reducedMotion === false && !bloomCenterInRow
       ? ZoomIn.duration(CHIP_POP_MS).reduceMotion(ReduceMotion.Never)
       : undefined
   return (
-    <View testID={`dice-chips-seat-${seatNumber}`} pointerEvents="box-none" style={themed($row)}>
+    <View
+      testID={`dice-chips-seat-${seatNumber}`}
+      pointerEvents="box-none"
+      onLayout={({ nativeEvent: { layout } }) =>
+        setRowOffset((current) =>
+          current?.x === layout.x && current.y === layout.y
+            ? current
+            : { x: layout.x, y: layout.y },
+        )
+      }
+      style={themed($row)}
+    >
       {chips.map((chip) => {
         const key = chipKey(chip)
         const label =
@@ -50,7 +80,12 @@ export function DiceChips({
             ? translate("board:dice.goesFirst", { name: playerName })
             : rollLabel(playerName, chip.roll)
         return (
-          <Animated.View key={key} entering={entering}>
+          <ChipFlight
+            key={key}
+            entering={entering}
+            from={flight}
+            awaiting={!!bloomCenterInRow && reducedMotion === false}
+          >
             <BoardPressable
               testID={`dice-chip-${seatNumber}-${key}`}
               accessibilityRole="button"
@@ -73,7 +108,7 @@ export function DiceChips({
                 />
               ) : (
                 <>
-                  <DiceGlyph tool={chip.roll.tool} size={compact ? 13 : 15} color={foreground} />
+                  <DieFace tool={chip.roll.tool} size={compact ? 15 : 18} color={foreground} />
                   <Text
                     text={rollValueLabel(chip.roll)}
                     weight="bold"
@@ -83,10 +118,62 @@ export function DiceChips({
                 </>
               )}
             </BoardPressable>
-          </Animated.View>
+          </ChipFlight>
         )
       })}
     </View>
+  )
+}
+
+// why: the chip lands where it lives; it waits unseen for its first layout so it never flashes at rest before flying.
+function ChipFlight({
+  from,
+  awaiting,
+  entering,
+  children,
+}: {
+  from?: Point
+  awaiting: boolean
+  entering?: ReturnType<typeof ZoomIn.duration>
+  children: ReactNode
+}) {
+  const [layout, setLayout] = useState<LayoutRectangle>()
+  const progress = useSharedValue(awaiting ? 0 : 1)
+  const start = useSharedValue<Point>({ x: 0, y: 0 })
+  const [flown, setFlown] = useState(!awaiting)
+
+  useEffect(() => {
+    if (flown || !layout || (awaiting && !from)) return
+    if (from) {
+      start.value = {
+        x: from.x - (layout.x + layout.width / 2),
+        y: from.y - (layout.y + layout.height / 2),
+      }
+      progress.value = withSpring(1, FLIGHT_SPRING)
+    } else progress.value = 1
+    setFlown(true)
+  }, [awaiting, from, flown, layout, progress, start])
+
+  const style = useAnimatedStyle(() => {
+    const rest = 1 - progress.value
+    return {
+      opacity: progress.value > 0 ? 1 : 0,
+      transform: [
+        { translateX: start.value.x * rest },
+        { translateY: start.value.y * rest },
+        { scale: 1 + (FLIGHT_START_SCALE - 1) * rest },
+      ],
+    }
+  })
+
+  return (
+    <Animated.View
+      entering={entering}
+      onLayout={(event: LayoutChangeEvent) => setLayout(event.nativeEvent.layout)}
+      style={style}
+    >
+      {children}
+    </Animated.View>
   )
 }
 

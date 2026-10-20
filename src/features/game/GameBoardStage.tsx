@@ -10,6 +10,7 @@ import {
   GameMenuCluster,
   GameRadialMenu,
   type GameRadialMenuProps,
+  openToolBag,
 } from "@/components/GameRadialMenu"
 import {
   getPlayerGridFacings,
@@ -108,6 +109,7 @@ function PinnedGameBoardStage({
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
   const menuOpen = menu.open && !menu.exitAction
+  const bag = openToolBag(menu.actions)
 
   return (
     <View testID={testID} style={$stage}>
@@ -115,7 +117,7 @@ function PinnedGameBoardStage({
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             {renderGrid(boardOrientation)}
-            <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
+            <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
             <GameMenuCluster
               open={menu.open}
               anchor={boardAnchor}
@@ -127,7 +129,6 @@ function PinnedGameBoardStage({
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
-              heldAction={menu.heldAction}
               onToggle={menu.onToggle}
             />
             {firstPlayer && !menu.open && !menu.exitAction ? (

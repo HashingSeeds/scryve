@@ -189,6 +189,8 @@ export const LifeCard = memo(function LifeCard({
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const safeContentStyle = lifeCardContentInsetStyle(contentInsets)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
+  const sidewaysContent = Math.abs(contentRotation) === 90
+  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
   const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
@@ -671,6 +673,13 @@ export const LifeCard = memo(function LifeCard({
           <View
             testID={`life-identity-row-seat-${seatNumber}`}
             pointerEvents="box-none"
+            onLayout={({ nativeEvent: { layout } }) =>
+              setIdentityRowAt((current) =>
+                current?.x === layout.x && current.y === layout.y
+                  ? current
+                  : { x: layout.x, y: layout.y },
+              )
+            }
             style={[
               $cornerRow,
               {
@@ -741,6 +750,18 @@ export const LifeCard = memo(function LifeCard({
                 compact={compact}
                 chips={diceChips}
                 onClear={dice.onClearChip}
+                bloomCenterInRow={
+                  identityRowAt && cardSize.width > 0
+                    ? {
+                        x:
+                          (sidewaysContent ? cardSize.height : cardSize.width) / 2 -
+                          identityRowAt.x,
+                        y:
+                          (sidewaysContent ? cardSize.width : cardSize.height) / 2 -
+                          identityRowAt.y,
+                      }
+                    : undefined
+                }
               />
             ) : null}
           </View>

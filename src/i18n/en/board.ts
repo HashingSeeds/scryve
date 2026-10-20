@@ -1,6 +1,17 @@
 const board = {
   dice: {
-    tool: { coin: "Coin", d6: "d6", d20: "d20" },
+    tool: {
+      coin: "Coin",
+      d4: "d4",
+      d6: "d6",
+      d8: "d8",
+      d10: "d10",
+      d12: "d12",
+      d20: "d20",
+      d100: "d100",
+    },
+    tapToRoll: "Tap to roll",
+    tapToFlip: "Tap to flip",
     coinFace: { Heads: "Heads", Tails: "Tails" },
     unnamedPlayer: "Player",
     rollResult: "{{name}}, {{tool}}, {{value}}",
@@ -456,6 +467,8 @@ const board = {
     connect: "Connect",
     end: "End",
     closeDice: "Close dice",
+    openDiceBag: "Open dice bag",
+    closeDiceBag: "Close dice bag",
     exitCommander: "Exit commander damage",
     closeLayoutChooser: "Close layout chooser",
     showsConnectionDetails: "Shows connection details",

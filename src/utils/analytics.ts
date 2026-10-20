@@ -3,6 +3,7 @@ import * as Application from "expo-application"
 import Constants from "expo-constants"
 import type PostHog from "posthog-react-native"
 
+import { DICE_TOOLS, type DiceTool } from "@/features/game/dice"
 import { createClientId } from "@/features/game/domain"
 import { isPlaySystemId, playSystemFormats } from "@/features/game/playSystems"
 import { loadString, saveString, storage } from "@/utils/storage"
@@ -24,6 +25,8 @@ const values = {
   end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"],
   timing: ["join.completed", "join.failed", "mutation.ack"],
   write: ["life", "table", "commander.claim", "commander.resolve"],
+  tool: DICE_TOOLS,
+  source: ["pill", "bag"],
 } as const
 
 export type GameEndSource = (typeof values.end_source)[number]
@@ -52,6 +55,8 @@ type Events = {
     attempt_count?: number
     write?: (typeof values.write)[number]
   }
+  dice_armed: { tool: DiceTool; source: "pill" | "bag"; system?: string; since_roll_ms?: number }
+  dice_rolled: { tool: DiceTool; system?: string }
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -62,6 +67,8 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   deck_used: ["feature"],
   stats_viewed: ["surface"],
   sync_timing: ["timing", "duration_ms", "attempt_count", "write"],
+  dice_armed: ["tool", "source", "system", "since_roll_ms"],
+  dice_rolled: ["tool", "system"],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"
@@ -103,7 +110,7 @@ export function analyticsProperties(event: string, properties: Record<string, un
     } else if (key === "player_count") {
       if (typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= 6)
         result[key] = value
-    } else if (key === "duration_ms" || key === "attempt_count") {
+    } else if (key === "duration_ms" || key === "attempt_count" || key === "since_roll_ms") {
       if (typeof value === "number" && Number.isFinite(value) && value >= 0)
         result[key] = Math.round(value)
     } else if (

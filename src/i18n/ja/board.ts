@@ -5,9 +5,16 @@ export default {
   dice: {
     tool: {
       coin: "コイン",
+      d4: "d4",
       d6: "d6",
+      d8: "d8",
+      d10: "d10",
+      d12: "d12",
       d20: "d20",
+      d100: "d100",
     },
+    tapToRoll: "タップして振る",
+    tapToFlip: "タップしてコイントス",
     coinFace: {
       Heads: "表",
       Tails: "裏",
@@ -469,6 +476,8 @@ export default {
     connect: "通信対戦にする",
     end: "終了",
     closeDice: "ダイスを閉じる",
+    openDiceBag: "ダイスバッグを開く",
+    closeDiceBag: "ダイスバッグを閉じる",
     exitCommander: "統率者ダメージを終了",
     closeLayoutChooser: "レイアウト選択を閉じる",
     showsConnectionDetails: "接続の詳細を表示します",

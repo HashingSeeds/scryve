@@ -79,7 +79,7 @@ import {
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
-import { useDice } from "@/features/game/useDice"
+import { closingMenu, useDice } from "@/features/game/useDice"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
@@ -681,17 +681,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
   // why: dice stay on this device; other seats never see these rolls.
   const dice = useDice(players, publicId, system)
-  const diceTools = useMemo(
-    () =>
-      dice.tools.map((tool) => ({
-        ...tool,
-        onPress: () => {
-          setMenuOpen(false)
-          tool.onPress()
-        },
-      })),
-    [dice.tools],
-  )
+  const diceTools = useMemo(() => closingMenu(dice.tools, () => setMenuOpen(false)), [dice.tools])
   const layoutVariant =
     layoutSelection?.playerCount === players.length
       ? layoutSelection.layout
@@ -920,17 +910,22 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
   const diceOpen = dice.open
   const closeDice = dice.close
+  const diceArmed = dice.grid.armed
   const exitAction = useMemo(
     () =>
       diceOpen
-        ? { label: translate("connected:board.menu.closeDice"), onPress: closeDice }
+        ? {
+            label: translate("connected:board.menu.closeDice"),
+            onPress: closeDice,
+            ...(diceArmed ? { heldTool: diceArmed } : {}),
+          }
         : armedCommander || inspectedPlayerId
           ? {
               label: translate("connected:board.menu.exitCommanderDamage"),
               onPress: exitCommanderDamage,
             }
           : undefined,
-    [armedCommander, closeDice, diceOpen, inspectedPlayerId, exitCommanderDamage],
+    [armedCommander, closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderDamage],
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
@@ -1035,7 +1030,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             syncStatusText && syncSignal.kind !== "live"
               ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
               : undefined,
-          heldAction: diceOpen ? "dice" : undefined,
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}

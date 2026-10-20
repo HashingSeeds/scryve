@@ -5,9 +5,16 @@ export default {
   dice: {
     tool: {
       coin: "Pièce",
+      d4: "d4",
       d6: "d6",
+      d8: "d8",
+      d10: "d10",
+      d12: "d12",
       d20: "d20",
+      d100: "d100",
     },
+    tapToRoll: "Touchez pour lancer",
+    tapToFlip: "Touchez pour lancer la pièce",
     coinFace: {
       Heads: "Face",
       Tails: "Pile",
@@ -511,6 +518,8 @@ export default {
     connect: "Passer en ligne",
     end: "Fin",
     closeDice: "Fermer les dés",
+    openDiceBag: "Ouvrir le sac de dés",
+    closeDiceBag: "Fermer le sac de dés",
     exitCommander: "Quitter les blessures de commandant",
     closeLayoutChooser: "Fermer le choix de disposition",
     showsConnectionDetails: "Affiche les détails de connexion",
