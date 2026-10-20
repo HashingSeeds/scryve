@@ -142,7 +142,11 @@ function sentryToken() {
   const telemetryEnv = path.join(os.homedir(), ".config", "telemetry", "env")
   const contents = fs.existsSync(telemetryEnv) ? fs.readFileSync(telemetryEnv, "utf8") : ""
   const token = contents.match(/^TELEMETRY_SENTRY_TOKEN=(.*)$/m)?.[1]
-  if (!token) throw new Error("Set SENTRY_READ_TOKEN (event:read) to check beta for new issues")
+  if (!token) {
+    throw new Error(
+      `No Sentry read token (event:read) to check beta for new issues. Set SENTRY_READ_TOKEN, or TELEMETRY_SENTRY_TOKEN in ${telemetryEnv} (the telemetry skill's setup.sh writes it)`,
+    )
+  }
   return token
 }
 
