@@ -306,6 +306,7 @@ export default {
       history: "इतिहास",
       rules: "नियम",
       end: "समाप्त",
+      leave: "बाहर निकलें",
       closeDice: "पासा बंद करें",
       exitCommanderDamage: "कमांडर डैमेज से बाहर निकलें",
     },

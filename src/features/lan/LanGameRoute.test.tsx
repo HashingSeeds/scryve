@@ -38,7 +38,15 @@ jest.mock("./lanSession", () => {
   }
   const getState = () => mockStore.state
   return {
-    lanSession: { getState, resumeHostedGame: () => undefined, revealRole: jest.fn() },
+    lanSession: {
+      getState,
+      resumeHostedGame: () => undefined,
+      revealRole: jest.fn(),
+      leave: () => {
+        mockStore.state = { status: "idle" }
+        mockStore.listeners.forEach((listener) => listener())
+      },
+    },
     useLanSession: () => useSyncExternalStore(subscribe, getState),
   }
 })
@@ -75,11 +83,15 @@ it("sends a host who abandons to Play instead of its emptied lobby", () => {
   expect(mockRedirect).not.toHaveBeenCalled()
 })
 
-it("sends a guest whose host ended the game back to the closed lobby", () => {
+it("sends a guest who leaves a game the host ended straight to Play", () => {
   abandonFromBoard(
     { role: "guest", status: "connected", seatKey: "guest", projection },
     { status: "idle", seatKey: "guest", projection },
   )
-  expect(mockRouter.back).toHaveBeenCalledTimes(1)
-  expect(mockRouter.dismissTo).not.toHaveBeenCalled()
+  expect(mockRouter.dismissTo).toHaveBeenCalledTimes(1)
+  expect(mockRouter.dismissTo).toHaveBeenCalledWith({
+    pathname: "/",
+    params: { destination: "play" },
+  })
+  expect(mockRouter.back).not.toHaveBeenCalled()
 })

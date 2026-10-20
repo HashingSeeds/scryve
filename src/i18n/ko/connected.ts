@@ -291,6 +291,7 @@ export default {
       history: "기록",
       rules: "규칙",
       end: "종료",
+      leave: "나가기",
       closeDice: "주사위 닫기",
       exitCommanderDamage: "커맨더 피해 나가기",
     },

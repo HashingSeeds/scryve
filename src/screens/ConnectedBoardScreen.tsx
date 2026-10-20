@@ -19,6 +19,7 @@ import { AlertNote } from "@/components/AlertNote"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import type { GameMenuActions } from "@/components/GameRadialMenu"
@@ -261,6 +262,7 @@ type ConnectedBoardReadyProps = {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
+  onLeave?: () => void
   view: ConnectedBoardReadyView
   controls: ConnectedBoardControls
   ownerId: string
@@ -332,6 +334,8 @@ interface ConnectedBoardRuntimeProps {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
+  // why: a nearby board has no More menu, so a guest needs this to get off the board.
+  onLeave?: () => void
   onBack?: () => void
   onHistory?: () => void
   onRules?: (system: SystemId, ruleId?: string) => void
@@ -372,6 +376,7 @@ export function ConnectedBoardWithRuntime({
   onGameEnded,
   onRematch,
   onGameAbandoned,
+  onLeave,
   onBack,
   onHistory,
   onRules,
@@ -535,6 +540,7 @@ export function ConnectedBoardWithRuntime({
               onGameEnded={onGameEnded}
               onRematch={onRematch}
               onGameAbandoned={onGameAbandoned}
+              onLeave={onLeave}
               view={view}
               controls={controls}
               ownerId={ownerId}
@@ -563,6 +569,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onGameEnded,
   onRematch,
   onGameAbandoned,
+  onLeave,
   view,
   controls,
   ownerId,
@@ -579,6 +586,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
+  const [confirmingLeave, setConfirmingLeave] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
@@ -811,6 +819,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }
 
   const canEnd = active && game.isHost && !view.finishing
+  const leave = !game.isHost ? onLeave : undefined
   const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
@@ -862,30 +871,40 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               onDecks?.()
             },
           },
-      {
-        kind: "end-game",
-        label: translate("connected:board.menu.end"),
-        detail: canEnd && finishBlocker ? translate(finishBlocker.petal) : undefined,
-        blocked: canEnd && Boolean(finishBlocker),
-        disabled: !canEnd,
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
-          setMenuOpen(false)
-          const runtime = controls.current()
-          if (finishBlockerFor(runtime)) {
-            setStatusOpen(true)
-            return
+      leave
+        ? {
+            kind: "end-game",
+            label: translate("connected:board.menu.leave"),
+            onPress: () => {
+              setMenuOpen(false)
+              setConfirmingLeave(true)
+            },
           }
-          const projection = runtime.status === "ready" ? runtime.projection : undefined
-          const outcome = projection?.treacheryOutcome
-          const standing = projection && !outcome ? connectedLastStanding(projection) : undefined
-          setDrawSelected(outcome?.kind === "draw")
-          setWinnerPlayerIds(
-            outcome?.kind === "win" ? outcome.winnerPlayerIds : standing ? [standing] : [],
-          )
-          setConfirmingFinish(true)
-        },
-      },
+        : {
+            kind: "end-game",
+            label: translate("connected:board.menu.end"),
+            detail: canEnd && finishBlocker ? translate(finishBlocker.petal) : undefined,
+            blocked: canEnd && Boolean(finishBlocker),
+            disabled: !canEnd,
+            onPress: (event) => {
+              captureMenuDialogOrigin(event)
+              setMenuOpen(false)
+              const runtime = controls.current()
+              if (finishBlockerFor(runtime)) {
+                setStatusOpen(true)
+                return
+              }
+              const projection = runtime.status === "ready" ? runtime.projection : undefined
+              const outcome = projection?.treacheryOutcome
+              const standing =
+                projection && !outcome ? connectedLastStanding(projection) : undefined
+              setDrawSelected(outcome?.kind === "draw")
+              setWinnerPlayerIds(
+                outcome?.kind === "win" ? outcome.winnerPlayerIds : standing ? [standing] : [],
+              )
+              setConfirmingFinish(true)
+            },
+          },
     ],
     [
       canEnd,
@@ -894,6 +913,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       diceTools,
       finishBlocker,
       layoutOptions.length,
+      leave,
       onDecks,
       openGameRules,
     ],
@@ -1352,6 +1372,20 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             />
           </View>
         </DialogCard>
+      ) : null}
+      {confirmingLeave && leave ? (
+        <ConfirmDialog
+          visible
+          title={translate("play:newGame.leaveGameTitle")}
+          backdropAccessibilityLabel={translate("play:newGame.cancelLeaveGame")}
+          message={translate("play:newGame.leaveGameMessage")}
+          confirmText={translate("play:newGame.leaveGameConfirm")}
+          dialogTestID="connected-leave-confirmation"
+          confirmTestID="confirm-connected-leave"
+          cancelTestID="cancel-connected-leave"
+          onConfirm={leave}
+          onClose={() => setConfirmingLeave(false)}
+        />
       ) : null}
     </Screen>
   )

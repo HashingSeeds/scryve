@@ -8,10 +8,8 @@ import { ConnectedBoardWithRuntime } from "@/screens/ConnectedBoardScreen"
 
 const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("/lan"))
 const backToPlay = () => router.dismissTo({ pathname: "/", params: { destination: "play" } })
-// why: only a guest still holds the ended game; a host's abandon clears the session, and the route has already left for Play.
-const leaveAbandonedGame = () => {
-  if (lanSession.getState().projection) backToLobby()
-}
+// why: leaving clears the game, and the gameGone effect takes the player to Play without stopping at the lobby's closed screen.
+const leaveGame = () => lanSession.leave()
 
 export default function LanGameRoute() {
   // why: resuming before useLanGame reads the session puts the saved game on the first render instead of leaving the route.
@@ -40,7 +38,8 @@ export default function LanGameRoute() {
       onRevealRole={lanSession.revealRole}
       roleRevealOnline={role === "host" || status === "connected"}
       onGameEnded={backToLobby}
-      onGameAbandoned={leaveAbandonedGame}
+      onGameAbandoned={leaveGame}
+      onLeave={leaveGame}
       onBack={backToLobby}
       onSettings={() => router.push("/settings")}
     />
