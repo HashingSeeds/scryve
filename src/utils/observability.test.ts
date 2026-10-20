@@ -212,16 +212,15 @@ describe("observability initialization", () => {
     expect(beforeSendTransaction({ type: "transaction", transaction: "settings" })).toBeNull()
   })
 
-  it("drops a metric captured before sharing was turned off", () => {
-    mockAnalytics.enabled = true
+  it("captures metrics only while usage sharing is on", () => {
     initObservability()
     const { beforeSendMetric } = (Sentry.init as jest.Mock).mock.calls[0][0]
     const metric = { name: "life.tap_to_paint", type: "distribution", value: 14 }
-    expect(beforeSendMetric(metric)).toBe(metric)
-
-    mockAnalytics.enabled = false
-
     expect(beforeSendMetric(metric)).toBeNull()
+
+    mockAnalytics.enabled = true
+
+    expect(beforeSendMetric(metric)).toBe(metric)
   })
 
   it("forwards telemetry to the sync timing adapter", () => {
