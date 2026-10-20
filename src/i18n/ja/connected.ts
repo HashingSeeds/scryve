@@ -296,6 +296,7 @@ export default {
       history: "履歴",
       rules: "ルール",
       end: "終了",
+      leave: "退出",
       closeDice: "ダイスを閉じる",
       exitCommanderDamage: "統率者ダメージを閉じる",
     },

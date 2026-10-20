@@ -303,6 +303,7 @@ const connected = {
       history: "History",
       rules: "Rules",
       end: "End",
+      leave: "Leave",
       closeDice: "Close dice",
       exitCommanderDamage: "Exit commander damage",
     },

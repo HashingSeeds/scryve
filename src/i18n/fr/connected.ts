@@ -323,6 +323,7 @@ export default {
       history: "Historique",
       rules: "Règles",
       end: "Fin",
+      leave: "Quitter",
       closeDice: "Fermer les dés",
       exitCommanderDamage: "Quitter les blessures de commandant",
     },

@@ -7,8 +7,9 @@ import {
   connectedDeploymentScope,
   loadNewestResumeGame,
 } from "@/features/connected/persistence"
+import { useConnectedGame } from "@/features/connected/useConnectedGame"
 
-import { ConnectedBoardScreen } from "./ConnectedBoardScreen"
+import { ConnectedBoardScreen, ConnectedBoardWithRuntime } from "./ConnectedBoardScreen"
 import {
   connectedHarness,
   mockBlockPlayer,
@@ -587,6 +588,33 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+  })
+
+  it("lets a nearby guest leave from the menu slot a host uses to end the game", () => {
+    const onLeave = jest.fn()
+    function NearbyBoard() {
+      const runtime = useConnectedGame("game-public", "owner")
+      return (
+        <ConnectedBoardWithRuntime
+          publicId="game-public"
+          ownerId="owner"
+          cloud={false}
+          runtime={runtime}
+          onLeave={onLeave}
+        />
+      )
+    }
+    render(themed(<NearbyBoard />))
+    openConnectedMenu()
+    expect(screen.getByTestId("end-game-button").props.accessibilityLabel).toBe("Leave")
+    fireEvent.press(screen.getByTestId("end-game-button"))
+    fireEvent.press(screen.getByTestId("cancel-connected-leave"))
+    expect(onLeave).not.toHaveBeenCalled()
+
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("end-game-button"))
+    fireEvent.press(screen.getByTestId("confirm-connected-leave"))
+    expect(onLeave).toHaveBeenCalledTimes(1)
   })
 
   it("abandons the connected game when no result is chosen", async () => {

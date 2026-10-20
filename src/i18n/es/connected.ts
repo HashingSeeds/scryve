@@ -315,6 +315,7 @@ export default {
       history: "Historial",
       rules: "Reglas",
       end: "Terminar",
+      leave: "Salir",
       closeDice: "Cerrar dados",
       exitCommanderDamage: "Salir del daño de comandante",
     },
