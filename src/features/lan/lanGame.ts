@@ -463,7 +463,10 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
     isHost: viewerKey === game.hostKey,
     eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
     serverUpdatedAt: game.updatedAt,
-    recentOperationIds: game.recentOperationIds,
+    // why: a viewer only reconciles its own pending changes, and every id is bytes the host base64-encodes in JS for every guest on every broadcast.
+    recentOperationIds: game.recentOperationIds.filter(
+      (operationId) => (memory?.events.get(operationId)?.actorUserId ?? viewerKey) === viewerKey,
+    ),
     players: game.seats.map((seat) => ({
       playerId: seat.key,
       seat: seat.seat,

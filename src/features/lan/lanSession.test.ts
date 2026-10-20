@@ -113,6 +113,43 @@ describe("nearby host", () => {
     expect(lifeOf(session, key)).toBe(37)
   })
 
+  it("sends an idle change at once and holds a burst for the next broadcast", async () => {
+    const { session, bob } = await startedGame()
+    const { key } = bob.pass()
+    jest.advanceTimersByTime(1000)
+    const acked = () =>
+      bob.sent.flatMap((message) => (message.type === "ack" ? [message.operationId] : []))
+    const write = (operationId: string) =>
+      bob.send({ type: "op", event: lifeEvent(operationId, key, -1, roundOf(session)) })
+
+    write("life-operation-0001")
+    jest.advanceTimersByTime(0)
+    expect(acked()).toEqual(["life-operation-0001"])
+
+    write("life-operation-0002")
+    write("life-operation-0003")
+    jest.advanceTimersByTime(32)
+    expect(acked()).toEqual(["life-operation-0001"])
+    jest.advanceTimersByTime(1)
+    expect(acked()).toEqual(["life-operation-0001", "life-operation-0002", "life-operation-0003"])
+  })
+
+  it("sends each guest only its own recent changes", async () => {
+    const { session, alice, bob } = await startedGame()
+    const round = roundOf(session)
+
+    alice.send({ type: "op", event: lifeEvent("life-operation-0001", alice.pass().key, -1, round) })
+    bob.send({ type: "op", event: lifeEvent("life-operation-0002", bob.pass().key, -1, round) })
+    jest.advanceTimersByTime(50)
+
+    const recent = (guest: typeof alice) => {
+      const state = guest.sent.findLast((message) => message.type === "state")
+      return state?.type === "state" ? state.projection.recentOperationIds : undefined
+    }
+    expect(recent(alice)).toEqual(["life-operation-0001"])
+    expect(recent(bob)).toEqual(["life-operation-0002"])
+  })
+
   it("hosts its game again after the OS ends it in the background, with changes from after it left, and a guest reclaims its seat", async () => {
     const { session, bob } = await startedGame()
     const pass = bob.pass()
