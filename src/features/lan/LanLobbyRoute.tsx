@@ -6,7 +6,7 @@ import { MyDecksSource, type MyDecks } from "@/features/decks/LocalDeckChoicesSo
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { lanSeatsReady, parseLanSetup, type LanSetup } from "@/features/lan/lanGame"
-import { lanSession, useLanSession } from "@/features/lan/lanSession"
+import { lanSession, useLanSessionSlice, type LanSessionState } from "@/features/lan/lanSession"
 import { checkLocalNetworkAccess } from "@/features/lan/lanTransport"
 import { NearbyLobbyScreen } from "@/features/lan/NearbyLobbyScreen"
 import { useNearbyGames } from "@/features/lan/useNearbyGames"
@@ -32,6 +32,8 @@ function setupFromParams(params: Record<string, string | undefined>): LanSetup |
   )
 }
 
+const selectLobby = ({ role, lobby }: LanSessionState) => ({ role, lobby })
+
 const backToPlay = () => router.dismissTo({ pathname: "/", params: { destination: "play" } })
 
 export default function LanLobbyRoute() {
@@ -52,7 +54,7 @@ function LanLobby() {
   const setup = useMemo(() => setupFromParams(params), [params])
   const onPlay = useCallback(() => router.push("/lan/game"), [])
   const [accessError, setAccessError] = useState<string>()
-  const { role, lobby } = useLanSession()
+  const { role, lobby } = useLanSessionSlice(selectLobby)
   const auth = useAuthAccess()
   const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
   const [myDecks, setMyDecks] = useState<MyDecks>()

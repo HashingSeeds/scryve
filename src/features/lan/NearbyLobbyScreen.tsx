@@ -4,10 +4,27 @@ import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
-import { lanSession, useLanSession } from "./lanSession"
+import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
 import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
+
+// why: the lobby shows no life totals, so leaving them out keeps every life change from re-rendering it under the board.
+const selectLobbyScreen = ({
+  lobby,
+  projection,
+  role,
+  status,
+  error,
+  serviceName,
+}: LanSessionState) => ({
+  lobby,
+  role,
+  status,
+  error,
+  serviceName,
+  players: projection?.players.map(({ currentLife: _currentLife, ...player }) => player),
+})
 
 export function NearbyLobbyScreen({
   error: routeError,
@@ -26,7 +43,7 @@ export function NearbyLobbyScreen({
   onLeft: () => void
   onManageDecks?: () => void
 }) {
-  const { lobby, projection, role, status, error, serviceName } = useLanSession()
+  const { lobby, players, role, status, error, serviceName } = useLanSessionSlice(selectLobbyScreen)
 
   const startedRound = useRef(lobby?.status === "active" ? lobby.round : undefined)
   useEffect(() => {
@@ -47,7 +64,7 @@ export function NearbyLobbyScreen({
       />
     )
   }
-  if (!lobby || !projection)
+  if (!lobby || !players)
     return (
       <LobbyStatusScreen
         message={translate(
@@ -69,7 +86,7 @@ export function NearbyLobbyScreen({
       lobby={{
         ...lobby.setup,
         isHost,
-        players: projection.players.map((player) => ({
+        players: players.map((player) => ({
           ...player,
           ...(away.has(player.playerId) ? { away: true } : {}),
         })),

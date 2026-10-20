@@ -98,6 +98,7 @@ function AppStack() {
     <Stack
       screenOptions={{
         headerShown: false,
+        freezeOnBlur: true,
         // why: once a board sets statusBarHidden, react-native-screens styles every screen's bar itself, white unless told otherwise.
         statusBarStyle: themeContext === "dark" ? "light" : "dark",
       }}

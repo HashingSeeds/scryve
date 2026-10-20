@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react"
+import { useRef, useSyncExternalStore } from "react"
 import { AppState, Platform } from "react-native"
 import { ConvexError } from "convex/values"
 import type { Service } from "react-native-zeroconf"
@@ -11,6 +11,7 @@ import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
+import { structurallyEqual } from "@/utils/structurallyEqual"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
 import { HOSTED_GAME_KEY, loadLanName, savedHostedGame } from "./lanAvailability"
@@ -664,3 +665,12 @@ export class LanSession {
 export const lanSession = new LanSession()
 
 export const useLanSession = () => useSyncExternalStore(lanSession.subscribe, lanSession.getState)
+
+export function useLanSessionSlice<Slice>(select: (state: LanSessionState) => Slice): Slice {
+  const last = useRef<{ slice: Slice }>(undefined)
+  return useSyncExternalStore(lanSession.subscribe, () => {
+    const slice = select(lanSession.getState())
+    if (!last.current || !structurallyEqual(last.current.slice, slice)) last.current = { slice }
+    return last.current.slice
+  })
+}

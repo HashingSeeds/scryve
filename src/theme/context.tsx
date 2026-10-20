@@ -91,12 +91,10 @@ export const ThemeProvider: FC<PropsWithChildren<ThemeProviderProps>> = ({
     [theme],
   )
 
-  const value = {
-    theme,
-    themeContext,
-    setThemeContextOverride,
-    themed,
-  }
+  const value = useMemo(
+    () => ({ theme, themeContext, setThemeContextOverride, themed }),
+    [theme, themeContext, setThemeContextOverride, themed],
+  )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }

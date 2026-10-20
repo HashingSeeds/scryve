@@ -5,7 +5,10 @@ import { ThemeProvider } from "@/theme/context"
 import { NearbyGameList } from "./NearbyGameList"
 
 const mockAccess = jest.fn()
-jest.mock("./lanSession", () => ({ lanSession: {}, useLanSession: () => ({}) }))
+jest.mock("./lanSession", () => ({
+  lanSession: {},
+  useLanSessionSlice: (select: (state: object) => unknown) => select({}),
+}))
 jest.mock("./lanTransport", () => ({
   checkLocalNetworkAccess: () => mockAccess(),
   isLanGameService: () => true,
