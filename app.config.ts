@@ -183,7 +183,10 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     ios: {
       ...config.ios,
       bundleIdentifier: getUniqueIdentifier(),
-      associatedDomains: inviteUrl ? [`applinks:${inviteUrl.host}`] : [],
+      // why: webcredentials lets iOS password managers match logins saved for this domain to the app.
+      associatedDomains: inviteUrl
+        ? [`applinks:${inviteUrl.host}`, `webcredentials:${inviteUrl.host}`]
+        : [],
       infoPlist: {
         ...config.ios?.infoPlist,
         NSLocalNetworkUsageDescription:

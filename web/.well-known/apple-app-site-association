@@ -1,0 +1,21 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "69V3522FCX.com.sowinghope.count",
+          "69V3522FCX.com.sowinghope.count.preview",
+          "69V3522FCX.com.sowinghope.count.dev"
+        ],
+        "components": [{ "/": "/join/*" }]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "69V3522FCX.com.sowinghope.count",
+      "69V3522FCX.com.sowinghope.count.preview",
+      "69V3522FCX.com.sowinghope.count.dev"
+    ]
+  }
+}

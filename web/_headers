@@ -1,0 +1,4 @@
+# Cloudflare Pages response headers. iOS reads the association file as JSON, but it has no
+# extension, so Pages would otherwise serve it as application/octet-stream.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
