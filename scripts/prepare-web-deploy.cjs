@@ -1,7 +1,7 @@
 // Assembles the Cloudflare Pages output in dist/:
 //   dist/            marketing site (site/dist, built by `pnpm site:build`)
 //   dist/play/       Expo web export (`expo export --output-dir dist/play`, base path /play)
-//   dist/_redirects  routing rules copied from web/_redirects
+//   dist/_redirects, dist/_headers, dist/.well-known/  Pages config and app association files from web/
 const fs = require("node:fs")
 const path = require("node:path")
 
@@ -110,8 +110,5 @@ for (const entry of fs.readdirSync(distDirectory)) {
     fs.rmSync(path.join(distDirectory, entry), { force: true, recursive: true })
 }
 fs.cpSync(siteDirectory, distDirectory, { recursive: true })
-fs.copyFileSync(
-  path.join(process.cwd(), "web", "_redirects"),
-  path.join(distDirectory, "_redirects"),
-)
-console.log("Merged the marketing site and Pages redirects into dist/.")
+fs.cpSync(path.join(process.cwd(), "web"), distDirectory, { recursive: true })
+console.log("Merged the marketing site and web/ Pages files into dist/.")

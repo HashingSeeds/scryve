@@ -184,7 +184,9 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     ios: {
       ...config.ios,
       bundleIdentifier: getUniqueIdentifier(),
-      associatedDomains: inviteUrl ? [`applinks:${inviteUrl.host}`] : [],
+      associatedDomains: inviteUrl
+        ? [`applinks:${inviteUrl.host}`, `webcredentials:${inviteUrl.host}`]
+        : [],
       infoPlist: {
         ...config.ios?.infoPlist,
         NSLocalNetworkUsageDescription:
