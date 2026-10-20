@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
+import { FlatList, ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 import Svg, { Path } from "react-native-svg"
 
@@ -22,7 +22,7 @@ import { DeckCount } from "@/features/decks/DeckLimit"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
-import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
+import { LocalDeckSyncNotice } from "@/features/decks/LocalDeckSyncNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import { translate } from "@/i18n/translate"
@@ -234,6 +234,45 @@ function DeckShelfUnavailable({ retry }: { retry: () => void }) {
   )
 }
 
+function selectLocalDeck(row: ShelfDeck, onSelect: (deck: DeckSelection) => void) {
+  onSelect({
+    deckId: row._id,
+    name: row.name,
+    game: row.game ?? DEFAULT_DECK_GAME,
+    format: row.format,
+    cardQuantity: row.cardQuantity,
+  })
+}
+
+function LocalDeckList({
+  rows,
+  showGame,
+  onSelect,
+  footer,
+}: {
+  rows: ShelfDeck[]
+  showGame: boolean
+  onSelect: (deck: DeckSelection) => void
+  footer: ReactNode
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <FlatList
+      testID="local-decks-list"
+      data={rows}
+      keyExtractor={(row) => String(row._id)}
+      contentContainerStyle={themed($listContent)}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={rows.length ? <Text size="xs" tx="decks:shelf.onDevice" /> : null}
+      renderItem={({ item: row }) => (
+        <DeckRow deck={row} showGame={showGame} onPress={() => selectLocalDeck(row, onSelect)} />
+      )}
+      ListFooterComponent={<>{footer}</>}
+    />
+  )
+}
+
 function DeckShelf({
   system,
   format,
@@ -243,7 +282,11 @@ function DeckShelf({
   clearVisibleFilters,
   onSelect,
   access,
+  localRows,
+  notice,
 }: {
+  localRows: ShelfDeck[]
+  notice: ReactNode
   system: string
   format: string
   search: string
@@ -329,15 +372,40 @@ function DeckShelf({
     }
   }
 
+  const emptyShelf =
+    syncEnabled && synced.unavailable && synced.decks.length === 0 ? (
+      <View style={themed($empty)}>
+        <Text tx="decks:shelf.reconnect" />
+        <Button tx="common:tryAgain" onPress={() => void synced.retry()} />
+      </View>
+    ) : mine ? (
+      <View style={themed($empty)}>
+        <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : emptyTitle} />
+        <Text
+          size="sm"
+          style={themed($dimmedText)}
+          tx={filtered ? "decks:shelf.tryAnotherSearch" : emptyDetail}
+        />
+        {filtered ? <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} /> : null}
+      </View>
+    ) : (
+      <DeckShelfSkeleton />
+    )
+  const sections = [
+    ...(localRows.length ? [{ key: "local" as const, data: localRows }] : []),
+    { key: "synced" as const, data: visibleDecks },
+  ]
+
   return (
-    <FlatList
+    <SectionList
       testID="decks-list"
-      data={visibleDecks}
+      sections={sections}
       extraData={failedDeckIds}
       keyExtractor={(deck) => String(deck._id)}
       contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      stickySectionHeadersEnabled={false}
       ListHeaderComponent={
         <View>
           {favoriteError ? (
@@ -357,44 +425,40 @@ function DeckShelf({
           ) : null}
         </View>
       }
-      renderItem={({ item: deck }) => (
-        <DeckRow
-          deck={deck}
-          showGame={system === ALL_SYSTEMS}
-          needsReview={failedDeckIds.has(String(deck._id))}
-          onToggleFavorite={() => void toggleFavorite(deck)}
-          onPress={(reviewChanges) => {
-            onSelect({
-              ...(reviewChanges ? { reviewChanges } : {}),
-              deckId: deck._id,
-              name: deck.name,
-              game: deck.game ?? DEFAULT_DECK_GAME,
-              format: deck.format,
-              cardQuantity: deck.cardQuantity,
-            })
-          }}
-        />
-      )}
-      ListEmptyComponent={
-        syncEnabled && synced.unavailable && synced.decks.length === 0 ? (
-          <View style={themed($empty)}>
-            <Text tx="decks:shelf.reconnect" />
-            <Button tx="common:tryAgain" onPress={() => void synced.retry()} />
-          </View>
-        ) : mine ? (
-          <View style={themed($empty)}>
-            <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : emptyTitle} />
-            <Text
-              size="sm"
-              style={themed($dimmedText)}
-              tx={filtered ? "decks:shelf.tryAnotherSearch" : emptyDetail}
-            />
-            {filtered ? (
-              <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} />
-            ) : null}
-          </View>
+      renderSectionHeader={({ section }) =>
+        section.key === "local" ? (
+          <Text size="xs" tx="decks:shelf.onDevice" />
+        ) : localRows.length ? (
+          <Text size="xs" tx="decks:shelf.synced" />
+        ) : null
+      }
+      renderSectionFooter={({ section }) =>
+        section.key === "local" ? <>{notice}</> : section.data.length ? null : emptyShelf
+      }
+      renderItem={({ item: deck, section }) =>
+        section.key === "local" ? (
+          <DeckRow
+            deck={deck}
+            showGame={system === ALL_SYSTEMS}
+            onPress={() => selectLocalDeck(deck, onSelect)}
+          />
         ) : (
-          <DeckShelfSkeleton />
+          <DeckRow
+            deck={deck}
+            showGame={system === ALL_SYSTEMS}
+            needsReview={failedDeckIds.has(String(deck._id))}
+            onToggleFavorite={() => void toggleFavorite(deck)}
+            onPress={(reviewChanges) => {
+              onSelect({
+                ...(reviewChanges ? { reviewChanges } : {}),
+                deckId: deck._id,
+                name: deck.name,
+                game: deck.game ?? DEFAULT_DECK_GAME,
+                format: deck.format,
+                cardQuantity: deck.cardQuantity,
+              })
+            }}
+          />
         )
       }
     />
@@ -571,71 +635,79 @@ export function DecksScreen({
             ) : null}
           </View>
         ) : null}
-        {visibleGuestRows.length ? (
-          <View>
-            <Text size="xs" tx="decks:shelf.onDevice" />
-            {visibleGuestRows.map((guestRow) => (
-              <DeckRow
-                key={guestRow._id}
-                deck={guestRow}
-                showGame={system === ALL_SYSTEMS}
-                onPress={() =>
-                  onSelect({
-                    deckId: guestRow._id,
-                    name: guestRow.name,
-                    game: guestRow.game ?? DEFAULT_DECK_GAME,
-                    format: guestRow.format,
-                    cardQuantity: guestRow.cardQuantity,
-                  })
-                }
-              />
-            ))}
-          </View>
-        ) : null}
-        {access?.ready ? <GuestDeckTransfer access={access} /> : null}
         {guestOnly ? (
-          !visibleGuestRows.length ? (
-            <View style={themed($empty)}>
-              <Text
-                preset="subheading"
-                tx={guestDecks.length ? "decks:shelf.nothingMatches" : "decks:shelf.noDecks"}
-              />
-              <Text
-                size="sm"
-                tx={guestDecks.length ? "decks:shelf.tryAnotherSearch" : "decks:shelf.guestEmpty"}
-              />
-              {guestDecks.length ? (
-                <Button
-                  tx="decks:shelf.clearSearch"
-                  onPress={() => {
-                    clearVisibleFilters()
-                    setCollection("all")
-                  }}
-                />
-              ) : null}
-            </View>
-          ) : null
+          <LocalDeckList
+            rows={visibleGuestRows}
+            showGame={system === ALL_SYSTEMS}
+            onSelect={onSelect}
+            footer={
+              visibleGuestRows.length ? null : (
+                <View style={themed($empty)}>
+                  <Text
+                    preset="subheading"
+                    tx={guestDecks.length ? "decks:shelf.nothingMatches" : "decks:shelf.noDecks"}
+                  />
+                  <Text
+                    size="sm"
+                    tx={
+                      guestDecks.length ? "decks:shelf.tryAnotherSearch" : "decks:shelf.guestEmpty"
+                    }
+                  />
+                  {guestDecks.length ? (
+                    <Button
+                      tx="decks:shelf.clearSearch"
+                      onPress={() => {
+                        clearVisibleFilters()
+                        setCollection("all")
+                      }}
+                    />
+                  ) : null}
+                </View>
+              )
+            }
+          />
         ) : access && !access.ready && !(isDeckSyncEnabled() && access.ownerId) ? (
-          access.loading ? (
-            <DeckShelfSkeleton />
-          ) : (
-            <View style={themed($empty)}>
-              <Text text={access.message ?? translate("decks:shelf.unavailable")} />
-              <Button
-                text={access.actionLabel ?? translate("common:tryAgain")}
-                onPress={access.request}
-              />
-            </View>
-          )
+          <LocalDeckList
+            rows={visibleGuestRows}
+            showGame={system === ALL_SYSTEMS}
+            onSelect={onSelect}
+            footer={
+              access.loading ? (
+                <DeckShelfSkeleton />
+              ) : (
+                <View style={themed($empty)}>
+                  <Text text={access.message ?? translate("decks:shelf.unavailable")} />
+                  <Button
+                    text={access.actionLabel ?? translate("common:tryAgain")}
+                    onPress={access.request}
+                  />
+                </View>
+              )
+            }
+          />
         ) : unavailableMessage ? (
-          <View testID="decks-offline-state" style={themed($empty)}>
-            <Text preset="subheading" tx="decks:shelf.unavailable" />
-            <Text size="sm" style={themed($dimmedText)} text={unavailableMessage} />
-          </View>
+          <LocalDeckList
+            rows={visibleGuestRows}
+            showGame={system === ALL_SYSTEMS}
+            onSelect={onSelect}
+            footer={
+              <View testID="decks-offline-state" style={themed($empty)}>
+                <Text preset="subheading" tx="decks:shelf.unavailable" />
+                <Text size="sm" style={themed($dimmedText)} text={unavailableMessage} />
+              </View>
+            }
+          />
         ) : (
           <ConvexQueryBoundary
             resetKey={`${collection}:${system}:${activeFormat}`}
-            fallback={({ retry }) => <DeckShelfUnavailable retry={retry} />}
+            fallback={({ retry }) => (
+              <LocalDeckList
+                rows={visibleGuestRows}
+                showGame={system === ALL_SYSTEMS}
+                onSelect={onSelect}
+                footer={<DeckShelfUnavailable retry={retry} />}
+              />
+            )}
           >
             <DeckShelf
               system={system}
@@ -646,6 +718,8 @@ export function DecksScreen({
               clearVisibleFilters={clearVisibleFilters}
               onSelect={onSelect}
               access={access}
+              localRows={visibleGuestRows}
+              notice={access?.ready ? <LocalDeckSyncNotice access={access} /> : null}
             />
           </ConvexQueryBoundary>
         )}

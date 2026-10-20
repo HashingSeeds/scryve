@@ -6,7 +6,8 @@ import { translate } from "@/i18n/translate"
 import { saveString, storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
-import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
+import type { Id } from "../../../convex/_generated/dataModel"
+import { MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
 
 const GUEST_DECKS_KEY = "decks.guest.v2"
 const LEGACY_GUEST_DECK_KEY = "decks.guest.v1"
@@ -28,12 +29,19 @@ const CARD_STRING_FIELDS = [
 ] as const
 
 export type GuestDeckPayload = FunctionArgs<typeof api.decks.importResolved>
+export type UnsyncedOrigin = {
+  deckId: Id<"decks">
+  ownerId: string
+  versionId?: Id<"deckVersions">
+  expectedRevision: number
+}
 export type GuestDeck = {
   schemaVersion: 1
   localId: string
   createdAt: number
   updatedAt: number
   deck: GuestDeckPayload
+  unsynced?: UnsyncedOrigin
 }
 
 export class GuestDeckStorageError extends Error {}
@@ -85,6 +93,18 @@ function isPayload(value: unknown): value is GuestDeckPayload {
   })
 }
 
+function isUnsyncedOrigin(value: unknown) {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      typeof value.deckId === "string" &&
+      typeof value.ownerId === "string" &&
+      (value.versionId === undefined || typeof value.versionId === "string") &&
+      typeof value.expectedRevision === "number" &&
+      Number.isSafeInteger(value.expectedRevision))
+  )
+}
+
 function isGuestDeck(value: unknown): value is GuestDeck {
   return (
     isRecord(value) &&
@@ -97,7 +117,8 @@ function isGuestDeck(value: unknown): value is GuestDeck {
     typeof value.updatedAt === "number" &&
     Number.isSafeInteger(value.updatedAt) &&
     value.updatedAt >= value.createdAt &&
-    isPayload(value.deck)
+    isPayload(value.deck) &&
+    isUnsyncedOrigin(value.unsynced)
   )
 }
 
@@ -192,7 +213,7 @@ export function loadGuestDeck(localId: string) {
 
 export function saveGuestDeck(
   deck: GuestDeckPayload,
-  options: { localId?: string; now?: number } = {},
+  options: { localId?: string; now?: number; unsynced?: UnsyncedOrigin } = {},
 ): GuestDeck {
   if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const decks = writableDecks()
@@ -201,10 +222,6 @@ export function saveGuestDeck(
     : undefined
   if (options.localId && !previous)
     throw new GuestDeckStorageError("Guest deck localId does not match a saved deck.")
-  if (!previous && decks.length >= FREE_DECK_LIMIT)
-    throw new GuestDeckStorageError(
-      translate("decks:guestStorage.limit", { limit: FREE_DECK_LIMIT }),
-    )
   const updatedAt = Math.max(options.now ?? Date.now(), (previous?.updatedAt ?? 0) + 1)
   if (!Number.isSafeInteger(updatedAt) || updatedAt < 0)
     throw new GuestDeckStorageError("Guest deck timestamp is invalid.")
@@ -214,6 +231,9 @@ export function saveGuestDeck(
     createdAt: previous?.createdAt ?? updatedAt,
     updatedAt,
     deck,
+    ...((options.unsynced ?? previous?.unsynced)
+      ? { unsynced: options.unsynced ?? previous?.unsynced }
+      : {}),
   }
   commit(
     previous
@@ -241,26 +261,6 @@ export function clearGuestDecks() {
   }
   snapshot = []
   notify()
-}
-
-export function replaceGuestDeck(deck: GuestDeckPayload, expectedLocalId: string): GuestDeck {
-  const decks = writableDecks()
-  if (!decks.some((candidate) => candidate.localId === expectedLocalId))
-    throw new GuestDeckStorageError(translate("decks:guestStorage.changed"))
-  if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
-  const now = Date.now()
-  const next: GuestDeck = {
-    schemaVersion: 1,
-    localId: randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-    deck,
-  }
-  commit(
-    decks.map((candidate) => (candidate.localId === expectedLocalId ? next : candidate)),
-    translate("decks:guestStorage.saveFailed"),
-  )
-  return next
 }
 
 export function acknowledgeGuestDeckImport(localId: string, updatedAt: number | null) {

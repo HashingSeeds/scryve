@@ -209,7 +209,7 @@ test("cancel keeps a guest deck and confirm deletes it", () => {
 
 test("shows only the deck it was opened for", () => {
   const view = renderScreen(jest.fn(), "22222222-2222-4222-8222-222222222222")
-  expect(view.getByText("Guest deck unavailable")).toBeTruthy()
+  expect(view.getByText("Local deck unavailable")).toBeTruthy()
   expect(view.queryByText("Offline Commander")).toBeNull()
 })
 

@@ -11,6 +11,7 @@ import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { getCommanderWarnings, selectCommander } from "@/features/decks/commanderSelection"
@@ -24,24 +25,37 @@ import {
   useGuestDeck,
   type GuestDeckPayload,
 } from "@/features/decks/guestDeck"
+import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
+import { LocalDeckSyncAction } from "@/features/decks/LocalDeckSyncAction"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import type { Id } from "../../convex/_generated/dataModel"
 import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 import { picksCommander } from "../../convex/lib/systems"
 
-type GuestDeckDetailScreenProps = { localId: string; onBack: () => void }
+type GuestDeckDetailScreenProps = {
+  localId: string
+  access?: CloudAccess
+  onBack: () => void
+  onSynced?: (deckId: Id<"decks">) => void
+}
 type GuestCard = GuestDeckPayload["cards"][number]
 
 function sameDraft(a: GuestDeckPayload | undefined, b: GuestDeckPayload | undefined) {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
-export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreenProps) {
+export function GuestDeckDetailScreen({
+  localId,
+  access,
+  onBack,
+  onSynced,
+}: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
   const stored = useGuestDeck(localId)
@@ -61,6 +75,8 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
   const [choosingCommander, setChoosingCommander] = useState(false)
   const [commanderSelected, setCommanderSelected] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const syncingElsewhere = useLocalDeckSyncing(localId)
   const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [pendingNavigation, setPendingNavigation] =
@@ -224,6 +240,7 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
         cards={current.cards}
         note={current.note ?? ""}
         editing={editing}
+        editingDisabled={syncing || syncingElsewhere}
         dirty={!sameDraft(current, baseRef.current)}
         onBack={() => (sameDraft(current, baseRef.current) ? onBack() : setDiscarding(true))}
         onEdit={() => setEditing(true)}
@@ -280,6 +297,15 @@ export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreen
         }
         error={
           <>
+            {(access?.signedIn ?? Boolean(access?.ownerId)) && onSynced ? (
+              <LocalDeckSyncAction
+                access={access}
+                localId={localId}
+                disabled={editing || !sameDraft(current, baseRef.current)}
+                onSynced={onSynced}
+                onSyncingChange={setSyncing}
+              />
+            ) : null}
             {error ? <Text testID="guest-deck-error" style={themed($error)} text={error} /> : null}
             {conflict ? (
               <Button

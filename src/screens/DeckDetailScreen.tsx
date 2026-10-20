@@ -50,6 +50,7 @@ import {
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DECK_TAB_LABELS, deckTabs, DeckView, type DeckTab } from "@/features/decks/DeckView"
+import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import {
   deckQueryVersionId,
   isDeckKnownDeleted,
@@ -76,6 +77,7 @@ type DeckDialog =
   | "deleteVersion"
   | "settings"
   | "deleteDeck"
+  | "unsyncDeck"
   | "discard"
   | "syncConflict"
 
@@ -97,6 +99,7 @@ type DeckDetailScreenProps = {
   summary?: DeckDetailSummary
   onBack: () => void
   onAddMatch?: (versionId: Id<"deckVersions">, deckName: string) => void
+  onUnsynced?: (localId: string) => void
 }
 
 function DeckDetailPlaceholder({
@@ -258,6 +261,7 @@ function DeckDetailContent({
   summary,
   onBack,
   onAddMatch,
+  onUnsynced,
   access,
   reviewChanges,
 }: DeckDetailScreenProps) {
@@ -315,6 +319,7 @@ function DeckDetailContent({
   const deleteVersion = useMutation(api.decks.deleteVersion)
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
+  const { unsync } = useLocalDeckSync(access?.ownerId)
   const [tab, setTab] = useState<DeckTab>("cards")
   const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
   const [draft, setDraftState] = useState(closedDeckDraft)
@@ -365,6 +370,13 @@ function DeckDetailContent({
     }
   }, [failedEdit, failedCardEdit])
   const writeMotion = versionWrites.pending.length + versionWrites.failures.length
+  // why: unsyncing snapshots the server copy, so edits still queued on this device would be lost.
+  const hasQueuedEdits = [
+    ...metadataWrites.pending.map((write) => write.deckId),
+    ...metadataWrites.failures.map((failure) => failure.action.deckId),
+    ...versionWrites.pending.map((write) => write.deckId),
+    ...versionWrites.failures.map((failure) => failure.action.deckId),
+  ].includes(deckId as Id<"decks">)
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
   useEffect(() => {
@@ -729,6 +741,19 @@ function DeckDetailContent({
       await updateDeck({ deckId: deckId as Id<"decks">, name, format })
       setDialog("none")
     }, translate("decks:detail.updateFailed"))
+  }
+
+  function confirmUnsync() {
+    setDialog("unsyncDeck")
+  }
+
+  async function keepOnDevice() {
+    if (!onUnsynced) return
+    await run(async () => {
+      const localId = await unsync(deckId as Id<"decks">)
+      setDialog("none")
+      onUnsynced(localId)
+    }, translate("decks:deckLimit.moveFailed"))
   }
 
   async function deleteDeck() {
@@ -1159,6 +1184,7 @@ function DeckDetailContent({
           error={error}
           onSubmit={submitSettings}
           onDelete={() => setDialog("deleteDeck")}
+          {...(onUnsynced && !hasQueuedEdits ? { onUnsync: confirmUnsync } : {})}
           onClose={() => setDialog("none")}
         >
           {view.hasVersionRows ? (
@@ -1288,6 +1314,41 @@ function DeckDetailContent({
         </DialogCard>
       ) : null}
 
+      {dialog === "unsyncDeck" ? (
+        <DialogCard
+          visible
+          onClose={() => setDialog("none")}
+          closeDisabled={busy}
+          backdropAccessibilityLabel={translate("common:cancel")}
+          dialogTestID="unsync-deck-dialog"
+          dialogAccessibilityRole="alert"
+          accessibilityViewIsModal
+        >
+          <Text
+            preset="subheading"
+            tx="decks:deckLimit.confirmTitle"
+            txOptions={{ name: deck.name }}
+            style={themed($dialogText)}
+          />
+          <Text size="sm" tx="decks:deckLimit.moveBody" style={themed($dialogText)} />
+          <View style={themed($dialogActions)}>
+            <Button
+              tx="common:cancel"
+              style={themed($dialogButton)}
+              disabled={busy}
+              onPress={() => setDialog("none")}
+            />
+            <Button
+              tx={busy ? "decks:deckLimit.moving" : "decks:deckLimit.move"}
+              testID="unsync-deck-confirm"
+              preset="reversed"
+              style={themed($dialogButton)}
+              disabled={busy}
+              onPress={() => void keepOnDevice()}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
       {dialog === "deleteDeck" ? (
         <DialogCard
           visible

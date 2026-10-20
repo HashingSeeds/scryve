@@ -209,6 +209,15 @@ describe("DecksScreen", () => {
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
+  it("scrolls local decks in the same list as synced decks, each under its own label", () => {
+    for (let index = 0; index < 3; index++)
+      saveGuestDeck({ name: `Local ${index}`, format: "commander", game: "mtg", cards: [] })
+    const list = within(renderShelf().getByTestId("decks-list"))
+    expect(list.getByText("On this device")).toBeTruthy()
+    expect(list.getByText("Local 0")).toBeTruthy()
+    expect(list.getByText("Synced")).toBeTruthy()
+  })
+
   it("opens each local deck while auth is loading without querying the private shelf", () => {
     saveGuestDeck({ name: "Guest Commander", format: "commander", game: "mtg", cards: [] })
     const second = saveGuestDeck({ name: "Guest Modern", format: "modern", game: "mtg", cards: [] })
@@ -589,9 +598,9 @@ describe("DecksScreen", () => {
   })
 
   it.each([
-    [{ used: 2, limit: 2, premium: false }, "2 of 2 free decks used"],
+    [{ used: 2, limit: 2, premium: false }, "2 of 2 free synced decks"],
     [{ used: 2, limit: 100, premium: true }, undefined],
-    [{ used: 90, limit: 100, premium: true }, "90 of 100 decks used"],
+    [{ used: 90, limit: 100, premium: true }, "90 of 100 synced decks"],
   ])("shows the deck count beside the title for %j", (capacity, label) => {
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],

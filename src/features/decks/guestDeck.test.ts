@@ -9,8 +9,9 @@ import {
   loadGuestDeck,
   loadGuestDecks,
   saveGuestDeck,
-  replaceGuestDeck,
+  type UnsyncedOrigin,
 } from "./guestDeck"
+import type { Id } from "../../../convex/_generated/dataModel"
 import { FREE_DECK_LIMIT } from "../../../convex/lib/policy"
 
 const deck = { name: "Scratch", format: "commander", cards: [] }
@@ -28,12 +29,11 @@ describe("guest deck storage", () => {
     loadGuestDecks()
   })
 
-  it("keeps up to the free deck limit and edits each deck in place", () => {
-    const saved = Array.from({ length: FREE_DECK_LIMIT }, (_, index) =>
+  it("keeps more decks than the synced deck limit and edits each deck in place", () => {
+    const saved = Array.from({ length: FREE_DECK_LIMIT + 3 }, (_, index) =>
       saveGuestDeck({ ...deck, name: `Deck ${index}` }, { now: 100 }),
     )
-    expect(new Set(saved.map((entry) => entry.localId)).size).toBe(FREE_DECK_LIMIT)
-    expect(() => saveGuestDeck({ ...deck, name: "Other" })).toThrow(`Only ${FREE_DECK_LIMIT}`)
+    expect(new Set(saved.map((entry) => entry.localId)).size).toBe(FREE_DECK_LIMIT + 3)
 
     const [first, second] = saved
     const edited = saveGuestDeck({ ...deck, name: "Updated" }, { localId: first.localId, now: 100 })
@@ -140,21 +140,16 @@ describe("guest deck storage", () => {
     set.mockRestore()
   })
 
-  it("replaces a confirmed slot atomically with a new identity", () => {
-    const first = saveGuestDeck(deck)
-    const second = saveGuestDeck({ ...deck, name: "Second" })
-    const set = jest.spyOn(storage, "set").mockImplementation(() => {
-      throw new Error("disk full")
-    })
-    expect(() => replaceGuestDeck({ ...deck, name: "New deck" }, first.localId)).toThrow(
-      "Unable to save",
-    )
-    expect(loadGuestDecks()).toEqual([first, second])
-    set.mockRestore()
-    const next = replaceGuestDeck({ ...deck, name: "New deck" }, first.localId)
-    expect(next.localId).not.toBe(first.localId)
-    expect(loadGuestDecks()).toEqual([next, second])
-    expect(() => replaceGuestDeck(deck, first.localId)).toThrow("saved deck changed")
+  it("keeps an unsynced deck's server origin through edits", () => {
+    const unsynced: UnsyncedOrigin = {
+      deckId: "deck-1" as Id<"decks">,
+      ownerId: "owner",
+      versionId: "version-1" as Id<"deckVersions">,
+      expectedRevision: 4,
+    }
+    const saved = saveGuestDeck(deck, { unsynced })
+    saveGuestDeck({ ...deck, name: "Edited" }, { localId: saved.localId })
+    expect(loadGuestDecks()).toMatchObject([{ deck: { name: "Edited" }, unsynced }])
   })
 
   it("round-trips guest route ids", () => {
