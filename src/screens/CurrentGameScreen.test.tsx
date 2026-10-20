@@ -382,7 +382,7 @@ describe("CurrentGameScreen", () => {
 
     const badge = view.getByTestId("first-player-badge")
     expect(badge.props.accessibilityLabel).toBe("Grace lost the last game. Choose who goes first")
-    expect(StyleSheet.flatten(badge.props.style).backgroundColor).toBe("#39755C")
+    expect(StyleSheet.flatten(badge.props.style).borderColor).toBe("#39755C")
 
     fireEvent.press(badge)
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)

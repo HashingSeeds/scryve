@@ -91,6 +91,11 @@ export default {
     loserChooses: "{{name}}さんが前のゲームに負けました。先攻を選んでください",
     flip: "コイントスで先攻を決める",
     roll: "ダイスで先攻を決める",
+    chip: {
+      roll: "ダイスで先攻決め",
+      flip: "コイントスで先攻決め",
+      loserChooses: "{{name}}さんが先攻を選ぶ",
+    },
   },
   layout: {
     balanced: "バランス",

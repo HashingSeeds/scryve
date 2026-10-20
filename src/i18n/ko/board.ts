@@ -90,6 +90,11 @@ export default {
     loserChooses: "{{name}}님이 지난 게임에서 패배했습니다. 선공을 정하세요",
     flip: "코인을 던져 선공 정하기",
     roll: "주사위를 굴려 선공 정하기",
+    chip: {
+      roll: "주사위로 선공 정하기",
+      flip: "코인으로 선공 정하기",
+      loserChooses: "{{name}}님이 선공 선택",
+    },
   },
   layout: {
     balanced: "균형",

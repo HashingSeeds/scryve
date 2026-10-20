@@ -92,6 +92,11 @@ export default {
     loserChooses: "{{name}} perdió la última partida. Elige quién juega primero",
     flip: "Lanzar moneda para decidir quién juega primero",
     roll: "Tirar dado para decidir quién juega primero",
+    chip: {
+      roll: "Tirar para empezar",
+      flip: "Moneda para empezar",
+      loserChooses: "{{name}} elige quién empieza",
+    },
   },
   layout: {
     balanced: "Equilibrado",

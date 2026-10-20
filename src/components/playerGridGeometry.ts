@@ -107,6 +107,20 @@ export function getPlayerContentRotation(input: {
   return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
 }
 
+export function getPlayerGridFacings(
+  playerCount: number,
+  layout: ReturnType<typeof getPlayerGridLayout>,
+): LifeCardContentRotation[] {
+  const facings = getPlayerGridRows(playerCount, layout).flatMap((row, rowIndex) =>
+    row.flatMap((slot, columnIndex) =>
+      slot === null
+        ? []
+        : [getPlayerContentRotation({ playerCount, layout, row, rowIndex, columnIndex, slot })],
+    ),
+  )
+  return [...new Set(facings)]
+}
+
 export function chunkSeats(
   seats: number[],
   columnCount: number,

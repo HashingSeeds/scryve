@@ -73,6 +73,11 @@ const board = {
     loserChooses: "{{name}} lost the last game. Choose who goes first",
     flip: "Flip for who goes first",
     roll: "Roll for who goes first",
+    chip: {
+      roll: "Roll for first",
+      flip: "Flip for first",
+      loserChooses: "{{name}} picks who's first",
+    },
   },
   layout: {
     balanced: "Balanced",
