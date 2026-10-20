@@ -1,4 +1,6 @@
+import { Dimensions } from "react-native"
 import { render } from "@testing-library/react-native"
+import Svg from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -37,5 +39,19 @@ describe("CardSymbolText", () => {
     const rules = view.getByTestId("rules")
     expect(rules.props.accessibilityLabel).toBe("tap: Add green mana.")
     expect(view.queryByText(/\{T\}|\{G\}/)).toBeNull()
+  })
+
+  it("grows glyphs with the system font size up to the text's cap", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { ...window, fontScale: 2 } })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSymbolText game="mtg" text="{T}" />
+        <CardSymbolText game="mtg" text="{T}" maxFontSizeMultiplier={1.5} />
+      </ThemeProvider>,
+    )
+    const widths = view.UNSAFE_getAllByType(Svg).map((svg) => svg.props.width)
+    Dimensions.set({ window })
+    expect(widths).toEqual([35, 26])
   })
 })

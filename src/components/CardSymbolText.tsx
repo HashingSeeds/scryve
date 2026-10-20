@@ -1,5 +1,5 @@
 import { Fragment } from "react"
-import { View, type ViewStyle } from "react-native"
+import { useWindowDimensions, View, type ViewStyle } from "react-native"
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from "react-native-svg"
 
 import { $sizeStyles, Text, type TextProps } from "@/components/Text"
@@ -243,8 +243,18 @@ export interface CardSymbolTextProps extends Omit<TextProps, "children" | "tx"> 
   text: string
 }
 
+/** why: Text grows with the system font size but inline Views do not, so glyphs must apply the same scale and cap. */
+function textScale(fontScale: number, maxFontSizeMultiplier: number | null | undefined) {
+  return maxFontSizeMultiplier && maxFontSizeMultiplier >= 1
+    ? Math.min(fontScale, maxFontSizeMultiplier)
+    : fontScale
+}
+
 export function CardSymbolText({ game, text, size, ...rest }: CardSymbolTextProps) {
-  const glyphSize = Math.round($sizeStyles[size ?? "sm"].fontSize * 1.1)
+  const { fontScale } = useWindowDimensions()
+  const glyphSize = Math.round(
+    $sizeStyles[size ?? "sm"].fontSize * 1.1 * textScale(fontScale, rest.maxFontSizeMultiplier),
+  )
   const $glyph: ViewStyle = {
     width: glyphSize,
     height: glyphSize,
