@@ -294,7 +294,9 @@ export function CardSearchScreen({
     if (!searchRequested) return
     if (offline) {
       setBusy(false)
-      const wanted = query.trim().toLowerCase()
+      const wanted = (
+        choosingCommander ? query.slice(0, 80).replace(/[()"]/g, " ").trim() : query.trim()
+      ).toLowerCase()
       const cached = loadCardDetails()
       setCachedRules(cached)
       setResults(undefined)

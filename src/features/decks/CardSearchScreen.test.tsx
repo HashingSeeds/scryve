@@ -168,6 +168,26 @@ it("uses only cached eligible cards offline without provider requests", () => {
   expect(mockAction).not.toHaveBeenCalled()
 })
 
+it("matches a quoted commander name in cached cards offline", () => {
+  mockConnection.isWebSocketConnected = false
+  saveCardDetails({ talrand: eligible })
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardSearchScreen
+        game="mtg"
+        format="commander"
+        initialSection="commander"
+        commanderCards={[]}
+        offlineCandidates={[{ card: deck[0], game: "mtg" }]}
+        onAdd={jest.fn()}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  fireEvent.changeText(view.getByTestId("card-search-input"), '"Talrand"')
+  expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
+})
+
 it("keeps required color-choice commanders out of the colorless filter", () => {
   mockConnection.isWebSocketConnected = false
   saveCardDetails({
