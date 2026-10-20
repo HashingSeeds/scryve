@@ -9,7 +9,8 @@ export const LAN_SERVICE_TYPE = "scryve"
 const LAN_PROTOCOL = "tcp"
 const CONNECT_TIMEOUT_MS = 2_500
 const RESOLVE_TIMEOUT_SECONDS = 3
-const HEARTBEAT_MS = 1_000
+// why: phone Wi-Fi radios doze between packets, and a dozing host on a real table held 1 in 10 changes for 300+ ms; traffic every 200 ms keeps the radio awake at no measurable battery cost.
+const HEARTBEAT_MS = 200
 // why: a peer that loses Wi-Fi never sends a close, so silence is the only sign the socket is dead.
 const SILENCE_LIMIT_MS = 4_000
 
