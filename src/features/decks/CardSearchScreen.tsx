@@ -42,6 +42,36 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 
+function scryfallQuery({
+  text,
+  commander,
+  colors,
+  exactColors,
+  keywords,
+}: {
+  text: string
+  commander: boolean
+  colors: string[]
+  exactColors: boolean
+  keywords: string[]
+}) {
+  const identity = colors.includes("C")
+    ? "id:c"
+    : colors.length
+      ? `id${exactColors ? "=" : ">="}${colors.join("").toLowerCase()}`
+      : ""
+  const filters = [
+    commander ? "is:commander f:commander" : "",
+    commander && identity && !colors.includes("C")
+      ? `(${identity} or o:"choose a color")`
+      : identity,
+    ...keywords.map((keyword) => `kw:"${keyword.replace(/["\\]/g, "")}"`),
+  ].filter(Boolean)
+  if (!filters.length) return text
+  const words = commander ? text.slice(0, 80).replace(/[()"]/g, " ").trim() : text
+  return [words.length >= 2 ? `(${words})` : "", ...filters].filter(Boolean).join(" ")
+}
+
 export function CardSearchScreen({
   game,
   format,
@@ -72,6 +102,8 @@ export function CardSearchScreen({
     initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
   const choosingCommander = section === "commander" && picksCommander(game, format)
+  const filtersCards =
+    systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
   const [candidateError, setCandidateError] = useState<string>()
@@ -107,8 +139,7 @@ export function CardSearchScreen({
   })
   const [keywordError, setKeywordError] = useState<string>()
   const searchRequested =
-    query.trim().length >= 2 ||
-    (choosingCommander && (colorFilters.length > 0 || keywords.length > 0))
+    query.trim().length >= 2 || (filtersCards && (colorFilters.length > 0 || keywords.length > 0))
 
   useEffect(() => {
     if (!filtersOpen || offline || !convex) return
@@ -144,12 +175,11 @@ export function CardSearchScreen({
   function matchesFilters(details?: FocusedCardDetails) {
     if (!keywords.every((keyword) => details?.keywords?.split("\n").includes(keyword))) return false
     if (!colorFilters.length) return true
-    if (colorFilters.includes("C"))
-      return details?.colorIdentity === "" && details.commanderEligibility !== "color-choice"
+    const canChooseColor = choosingCommander && details?.commanderEligibility === "color-choice"
+    if (colorFilters.includes("C")) return details?.colorIdentity === "" && !canChooseColor
     const identity = details?.colorIdentity
     if (identity === undefined) return false
     const missing = colorFilters.filter((color) => !identity.includes(color))
-    const canChooseColor = details?.commanderEligibility === "color-choice"
     return (
       (missing.length === 0 || (canChooseColor && missing.length === 1)) &&
       (!exactColors || [...identity].every((color) => colorFilters.includes(color)))
@@ -259,14 +289,13 @@ export function CardSearchScreen({
     setResults(undefined)
     setOfflineResults(undefined)
     setMessage(undefined)
-    const searchQuery = choosingCommander
-      ? query.slice(0, 80).replace(/[()"]/g, " ").trim()
-      : query.trim()
     setBusy(searchRequested)
     if (!searchRequested) return
     if (offline) {
       setBusy(false)
-      const wanted = searchQuery.toLowerCase()
+      const wanted = (
+        choosingCommander ? query.slice(0, 80).replace(/[()"]/g, " ").trim() : query.trim()
+      ).toLowerCase()
       const cached = loadCardDetails()
       setCachedRules(cached)
       setResults(undefined)
@@ -291,9 +320,13 @@ export function CardSearchScreen({
         const found = await convex.action(api.cards.search, {
           game,
           deviceId,
-          query: choosingCommander
-            ? `${searchQuery.length >= 2 ? `(${searchQuery}) ` : ""}is:commander f:commander${colorFilters.length ? (colorFilters.includes("C") ? " id:c" : ` (id${exactColors ? "=" : ">="}${colorFilters.join("").toLowerCase()} or o:"choose a color")`) : ""}${keywords.map((keyword) => ` kw:"${keyword.replace(/["\\]/g, "")}"`).join("")}`
-            : searchQuery,
+          query: scryfallQuery({
+            text: query.trim(),
+            commander: choosingCommander,
+            colors: colorFilters,
+            exactColors,
+            keywords,
+          }),
         })
         if (active) setResults(found)
       } catch (cause) {
@@ -391,8 +424,8 @@ export function CardSearchScreen({
   )
   const cachedCandidates = offlineResults?.filter(
     (entry) =>
-      !choosingCommander ||
-      (!inDeck(entry.card) && matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
+      (!choosingCommander || !inDeck(entry.card)) &&
+      (!filtersCards || matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
   const ResultRow = choosingCommander ? TouchableOpacity : View
@@ -438,7 +471,7 @@ export function CardSearchScreen({
               }}
             />
           ) : null}
-          {choosingCommander ? (
+          {filtersCards ? (
             <View style={$filterRow}>
               <ScrollView
                 horizontal
@@ -450,7 +483,7 @@ export function CardSearchScreen({
                 {SEARCH_COLORS.map((color) => (
                   <FilterPill
                     key={color}
-                    testID={`commander-color-${color}`}
+                    testID={`card-color-${color}`}
                     label={colorLabel(color)}
                     selected={colorFilters.includes(color)}
                     onPress={() => toggleColor(color)}
@@ -458,13 +491,13 @@ export function CardSearchScreen({
                 ))}
               </ScrollView>
               <FilterButton
-                testID="commander-filters-button"
+                testID="card-filters-button"
                 count={keywords.length + (!exactColors ? 1 : 0)}
                 onPress={() => setFiltersOpen(true)}
               />
             </View>
           ) : null}
-          {choosingCommander && keywords.length ? (
+          {filtersCards && keywords.length ? (
             <View style={$pills}>
               {keywords.map((keyword) => (
                 <FilterPill
@@ -669,8 +702,10 @@ export function CardSearchScreen({
         <DialogCard
           visible
           onClose={() => setFiltersOpen(false)}
-          dialogTestID="commander-filters-dialog"
-          backdropAccessibilityLabel={translate("decks:cardSearch.dismissFilters")}
+          dialogTestID="card-filters-dialog"
+          backdropAccessibilityLabel={translate(
+            choosingCommander ? "decks:cardSearch.dismissFilters" : "decks:shelf.dismissFilters",
+          )}
         >
           <Text preset="subheading" tx="decks:filters.label" />
           <ScrollView contentContainerStyle={$filterBody} keyboardShouldPersistTaps="handled">
