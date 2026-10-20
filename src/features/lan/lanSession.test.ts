@@ -53,7 +53,7 @@ afterEach(() => jest.useRealTimers())
 function socket() {
   const sent: LanHostMessage[] = []
   const peer = {
-    send: (message: LanHostMessage) => sent.push(message),
+    send: jest.fn((...messages: LanHostMessage[]) => sent.push(...messages)),
     sendAndClose: (message: LanHostMessage) => sent.push(message),
     close: jest.fn(),
   }
@@ -97,14 +97,16 @@ const lifeOf = (session: LanSession, key: string) =>
   session.getState().projection?.players.find((player) => player.playerId === key)?.currentLife
 
 describe("nearby host", () => {
-  it("sends a guest the projection with its change before acknowledging the change", async () => {
+  it("sends a guest the projection with its change, then the acknowledgement, in one write", async () => {
     const { session, bob } = await startedGame()
     const { key } = bob.pass()
     bob.sent.length = 0
+    bob.peer.send.mockClear()
 
     bob.send({ type: "op", event: lifeEvent("life-operation-0001", key, -3, roundOf(session)) })
     jest.advanceTimersByTime(50)
 
+    expect(bob.peer.send).toHaveBeenCalledTimes(1)
     expect(bob.sent.map((message) => message.type)).toEqual(["state", "ack"])
     const state = bob.sent[0]
     expect(state.type === "state" && state.projection.recentOperationIds).toEqual([
