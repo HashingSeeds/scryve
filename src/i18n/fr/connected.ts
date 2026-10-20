@@ -482,10 +482,15 @@ export default {
   },
   nearby: {
     title: "Parties à proximité",
+    accessTitle: "L'accès aux appareils à proximité est désactivé",
     accessDenied:
       "Autorisez l'accès aux appareils à proximité dans les Réglages pour trouver et héberger des parties.",
+    openSettings: "Ouvrir les réglages",
     connecting: "Connexion…",
+    starting: "Ouverture du salon…",
+    connectingTo: "Connexion à {{name}}…",
     reconnecting: "Reconnexion…",
+    reconnectingTo: "Reconnexion à {{name}}…",
     nameLabel: "Votre nom",
     namePlaceholder: "Affiché à la table",
     empty: "Aucune partie sur ce réseau pour l'instant.",

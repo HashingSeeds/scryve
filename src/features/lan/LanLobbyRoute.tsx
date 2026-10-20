@@ -7,10 +7,8 @@ import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { lanSeatsReady, parseLanSetup, type LanSetup } from "@/features/lan/lanGame"
 import { lanSession, useLanSessionSlice, type LanSessionState } from "@/features/lan/lanSession"
-import { checkLocalNetworkAccess } from "@/features/lan/lanTransport"
 import { NearbyLobbyScreen } from "@/features/lan/NearbyLobbyScreen"
 import { useNearbyGames } from "@/features/lan/useNearbyGames"
-import { translate } from "@/i18n/translate"
 
 function setupFromParams(params: Record<string, string | undefined>): LanSetup | undefined {
   if (params.setup) {
@@ -53,28 +51,22 @@ function LanLobby() {
   }>()
   const setup = useMemo(() => setupFromParams(params), [params])
   const onPlay = useCallback(() => router.push("/lan/game"), [])
-  const [accessError, setAccessError] = useState<string>()
   const { role, lobby } = useLanSessionSlice(selectLobby)
   const auth = useAuthAccess()
   const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
   const [myDecks, setMyDecks] = useState<MyDecks>()
 
+  // why: lets an agent drive devices it can deep link into but cannot tap.
+  const { access, games } = useNearbyGames(Boolean(params.join) && !role)
+
   // why: hosting starts once per visit; a remount after leaving must not reopen the lobby.
   const hosted = useRef(false)
   useEffect(() => {
-    if (hosted.current || !setup || lanSession.getState().role) return
+    if (hosted.current || !setup || !access || access === "denied" || lanSession.getState().role)
+      return
     hosted.current = true
-    void checkLocalNetworkAccess()
-      .catch(() => "denied" as const)
-      .then((access) =>
-        access === "denied"
-          ? setAccessError(translate("connected:nearby.accessDenied"))
-          : lanSession.host(setup),
-      )
-  }, [setup])
-
-  // why: lets an agent drive devices it can deep link into but cannot tap.
-  const { games } = useNearbyGames(Boolean(params.join) && !role)
+    void lanSession.host(setup)
+  }, [setup, access])
   const joining = useRef(false)
   useEffect(() => {
     const target =
@@ -99,7 +91,8 @@ function LanLobby() {
         <MyDecksSource ownerId={ownerId} onChange={setMyDecks} />
       ) : null}
       <NearbyLobbyScreen
-        error={accessError}
+        accessDenied={access === "denied"}
+        hosting={Boolean(setup)}
         myDecks={ownerId ? myDecks : undefined}
         signedIn={Boolean(ownerId)}
         onBack={backToPlay}
