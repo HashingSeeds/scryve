@@ -1287,7 +1287,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             <Text tx="connected:board.finish.title" preset="subheading" />
             <Text size="xs" tx="connected:board.finish.subtitle" style={themed($dialogSubtitle)} />
           </View>
-          <View style={themed($resultChoices)}>
+          <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
             {game.players.map((player) => (
               <WinnerChoice
                 key={player.playerId}
@@ -1304,7 +1304,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               selected={drawSelected}
               onPress={selectDraw}
             />
-          </View>
+          </ScrollView>
           {view.finishError ? (
             <AlertNote testID="connected-finish-error" text={view.finishError} />
           ) : null}
@@ -1427,6 +1427,7 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dialogAction: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
