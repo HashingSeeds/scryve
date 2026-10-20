@@ -46,8 +46,8 @@ export async function deckCapacity(ctx: Ctx, user: Doc<"users">) {
   const limit = premium ? MAX_PREMIUM_DECKS : FREE_DECK_LIMIT
   const active = await ctx.db
     .query("decks")
-    .withIndex("by_owner_and_archived_at", (q) =>
-      q.eq("ownerUserId", user._id).eq("archivedAt", undefined),
+    .withIndex("by_owner_and_archived_at_and_unsynced_at", (q) =>
+      q.eq("ownerUserId", user._id).eq("archivedAt", undefined).eq("unsyncedAt", undefined),
     )
     .take(MAX_PREMIUM_DECKS + 1)
   const used = active.length

@@ -20,6 +20,7 @@ import {
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { deckStartingValue } from "./lib/deckStartingValue"
+import { isActiveDeck } from "./lib/deckSync"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { gatedTableAction, gatedTableState, tableRelatedSeatId } from "./lib/gameEngine"
 import { limitGameRate } from "./lib/gameRateLimits"
@@ -485,7 +486,7 @@ async function deckSelectionIsPlayable(
   const [system, format] = gameDeckRules(game)
   return (
     deck !== null &&
-    deck.archivedAt === undefined &&
+    isActiveDeck(deck) &&
     (deck.game ?? DEFAULT_DECK_GAME) === system &&
     deck.format === format
   )
@@ -1347,6 +1348,7 @@ export const publishFinishedLocalGame = mutation({
     const me = meSeats[0]
     let myDeck: Doc<"decks"> | undefined
     if (me?.deckVersionId) {
+      // why: a deck unsynced or deleted after play started still gets this result; rejecting would drop a finished game from history.
       const version = await ctx.db.get(me.deckVersionId)
       const deck = version ? await ctx.db.get(version.deckId) : null
       if (!version || !deck || deck.ownerUserId !== user._id)
@@ -1466,7 +1468,7 @@ async function claimableDeck(
   return version &&
     deck &&
     deck.ownerUserId === userId &&
-    deck.archivedAt === undefined &&
+    isActiveDeck(deck) &&
     (deck.game ?? DEFAULT_DECK_GAME) === system &&
     deck.format === format
     ? { version, deck }

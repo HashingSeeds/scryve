@@ -361,11 +361,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner_and_updated_at", ["ownerUserId", "updatedAt"])
-    .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"])
-    .index("by_owner_and_archived_at_and_unsynced_at", {
-      fields: ["ownerUserId", "archivedAt", "unsyncedAt"],
-      staged: true,
-    })
+    .index("by_owner_and_archived_at_and_unsynced_at", ["ownerUserId", "archivedAt", "unsyncedAt"])
     .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"])
     .index("by_owner_and_sync_id", ["ownerUserId", "syncId"]),
 

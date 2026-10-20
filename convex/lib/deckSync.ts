@@ -16,6 +16,10 @@ export const syncedDeckValidator = v.object({
   updatedAt: v.number(),
 })
 
+export function isActiveDeck(deck: Pick<Doc<"decks">, "archivedAt" | "unsyncedAt">) {
+  return deck.archivedAt === undefined && deck.unsyncedAt === undefined
+}
+
 export function syncedDeck(deck: Doc<"decks">) {
   return {
     id: deck.syncId ?? deck._id,
@@ -25,7 +29,8 @@ export function syncedDeck(deck: Doc<"decks">) {
     format: deck.format,
     game: deck.game ?? DEFAULT_DECK_GAME,
     note: deck.note ?? "",
-    deleted: deck.archivedAt !== undefined,
+    // why: other devices drop an unsynced deck exactly like a deleted one; installed clients know only this flag.
+    deleted: !isActiveDeck(deck),
     createdAt: deck.createdAt,
     updatedAt: deck.updatedAt,
   }

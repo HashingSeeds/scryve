@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, type MutationCtx } from "./_generated/server"
 import { requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
+import { isActiveDeck } from "./lib/deckSync"
 import { assertGameSystem } from "./lib/integrations"
 import { assertGameScores, MAX_GAMES_PER_MATCH, type MatchBestOf } from "./lib/matchResults"
 import {
@@ -63,7 +64,7 @@ async function ownedDeckVersion(
     !version ||
     !deck ||
     deck.ownerUserId !== userId ||
-    deck.archivedAt !== undefined ||
+    !isActiveDeck(deck) ||
     version.archivedAt !== undefined
   )
     throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })

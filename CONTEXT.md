@@ -30,3 +30,17 @@ The player who creates a connected game; in a nearby game, also its authority.
 **Seat**:
 A player's place in a game; in a connected game, owned by one device.
 _Avoid_: Slot, player position
+
+**Synced deck**:
+A deck stored on the server that syncs to every device and tracks versions and stats. Counts toward the deck limit.
+
+**Local deck**:
+A deck stored only on one device. Unlimited, with no versions or stats.
+_Avoid_: Guest deck (in copy)
+
+**Unsynced deck**:
+A synced deck moved to one device to free a spot under the limit. The server keeps its versions and stats until it is synced again. Code: `decks.unsyncedAt`.
+
+**Deleted deck**:
+A deck the player removed. Code calls this `archive` and `decks.archivedAt`; players only ever see "Delete".
+_Avoid_: Archived deck (in copy)

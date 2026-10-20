@@ -285,9 +285,12 @@ function coverCandidate(card: Doc<"deckCards">) {
   return card.smallImageUrl ?? card.imageUrl
 }
 
-function assertNotArchived(deck: Doc<"decks">) {
+// why: unsynced decks reuse the deck_archived code because installed clients already treat it as permanent.
+function assertActiveDeck(deck: Doc<"decks">) {
   if (deck.archivedAt !== undefined)
     throw new ConvexError({ code: "deck_archived", message: "This deck was deleted" })
+  if (deck.unsyncedAt !== undefined)
+    throw new ConvexError({ code: "deck_archived", message: "This deck is not synced" })
 }
 
 async function activeVersions(ctx: QueryCtx | MutationCtx, deckId: Id<"decks">) {
@@ -382,8 +385,8 @@ export const listMine = query({
     const capacity = await deckCapacity(ctx, user)
     const active = await ctx.db
       .query("decks")
-      .withIndex("by_owner_and_archived_at", (q) =>
-        q.eq("ownerUserId", user._id).eq("archivedAt", undefined),
+      .withIndex("by_owner_and_archived_at_and_unsynced_at", (q) =>
+        q.eq("ownerUserId", user._id).eq("archivedAt", undefined).eq("unsyncedAt", undefined),
       )
       .take(MAX_PREMIUM_DECKS + 1)
     const decks = await Promise.all(
@@ -647,7 +650,7 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const game = args.game === undefined ? undefined : assertDeckGame(args.game)
     const currentGame = deck.game ?? DEFAULT_DECK_GAME
     if (game !== undefined && game !== currentGame)
@@ -676,7 +679,7 @@ export const setFavorite = mutation({
   args: { deckId: v.id("decks"), favorite: v.boolean() },
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     await ctx.db.patch(deck._id, { favoritedAt: args.favorite ? Date.now() : undefined })
     return null
   },
@@ -747,7 +750,7 @@ export const saveVersion = mutation({
   },
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const game = deck.game ?? DEFAULT_DECK_GAME
     await requireReleasedCapability(ctx, game, "deckImport")
     assertDeckSize(args.cards, game)
@@ -770,26 +773,44 @@ export const saveVersion = mutation({
       await ctx.db.patch(deck._id, { updatedAt: now })
       return versionId
     }
-    const totals = cardTotals(args.cards)
-    const existingCards = await ctx.db
-      .query("deckCards")
-      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", target._id))
-      .take(MAX_DECK_CARDS + 1)
-    if (
-      canonicalCards(existingCards.map((card) => canonicalCardFieldsWithDefaults(game, card))) ===
-      canonicalCards(args.cards.map((card) => cardFields(game, card)))
-    )
-      return target._id
-    await replaceVersionCards(ctx, target._id, game, args.cards)
-    await ctx.db.patch(target._id, {
-      ...totals,
-      syncRevision: (target.syncRevision ?? 0) + 1,
-      updatedAt: now,
-    })
-    await ctx.db.patch(deck._id, { updatedAt: now })
+    if (await saveVersionCards(ctx, game, target, args.cards, now))
+      await ctx.db.patch(deck._id, { updatedAt: now })
     return target._id
   },
 })
+
+async function versionHasCards(
+  ctx: MutationCtx,
+  game: string,
+  versionId: Id<"deckVersions">,
+  cards: DeckCardInput[],
+) {
+  const existingCards = await ctx.db
+    .query("deckCards")
+    .withIndex("by_deck_version", (q) => q.eq("deckVersionId", versionId))
+    .take(MAX_DECK_CARDS + 1)
+  return (
+    canonicalCards(existingCards.map((card) => canonicalCardFieldsWithDefaults(game, card))) ===
+    canonicalCards(cards.map((card) => cardFields(game, card)))
+  )
+}
+
+async function saveVersionCards(
+  ctx: MutationCtx,
+  game: string,
+  version: Doc<"deckVersions">,
+  cards: DeckCardInput[],
+  now: number,
+) {
+  if (await versionHasCards(ctx, game, version._id, cards)) return false
+  await replaceVersionCards(ctx, version._id, game, cards)
+  await ctx.db.patch(version._id, {
+    ...cardTotals(cards),
+    syncRevision: (version.syncRevision ?? 0) + 1,
+    updatedAt: now,
+  })
+  return true
+}
 
 export const createVersion = mutation({
   args: {
@@ -800,7 +821,7 @@ export const createVersion = mutation({
   },
   handler: async (ctx, args) => {
     const { user, deck } = await ownedDeck(ctx, args.deckId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const versions = await activeVersions(ctx, deck._id)
     await requireVersionCapacity(ctx, user, versions.length)
     const source = args.fromVersionId
@@ -843,7 +864,7 @@ export const updateVersion = mutation({
   },
   handler: async (ctx, args) => {
     const { deck, version } = await ownedVersion(ctx, args.versionId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const note = args.note === undefined ? undefined : assertDeckNote(args.note)
     await ctx.db.patch(version._id, {
       ...(args.name === undefined ? {} : { name: assertVersionName(args.name) }),
@@ -859,7 +880,7 @@ export const deleteVersion = mutation({
   args: { versionId: v.id("deckVersions") },
   handler: async (ctx, args) => {
     const { deck, version } = await ownedVersion(ctx, args.versionId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const versions = await activeVersions(ctx, deck._id)
     if (versions.length <= 1)
       throw new ConvexError({
@@ -890,6 +911,134 @@ export const archive = mutation({
       syncRevision: (deck.syncRevision ?? 0) + 1,
     })
     return null
+  },
+})
+
+async function deckMatchesCopy(
+  ctx: MutationCtx,
+  deck: Doc<"decks">,
+  copy: {
+    versionId?: Id<"deckVersions">
+    name: string
+    format: string
+    note?: string
+    cards: DeckCardInput[]
+  },
+) {
+  const versions = await activeVersions(ctx, deck._id)
+  const target = copy.versionId
+    ? versions.find((version) => version._id === copy.versionId)
+    : versions.at(-1)
+  return (
+    target !== undefined &&
+    deck.name === copy.name.trim() &&
+    deck.format === copy.format.trim().toLowerCase() &&
+    (copy.note === undefined || (deck.note ?? "") === copy.note.trim()) &&
+    (await versionHasCards(ctx, deck.game ?? DEFAULT_DECK_GAME, target._id, copy.cards))
+  )
+}
+
+// why: unsync keeps the row instead of deleting it so resync brings back its versions and stats.
+export const unsync = mutation({
+  args: { deckId: v.id("decks") },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    if (deck.archivedAt !== undefined)
+      throw new ConvexError({ code: "deck_archived", message: "This deck was deleted" })
+    const game = deck.game ?? DEFAULT_DECK_GAME
+    const latest = (await activeVersions(ctx, deck._id)).at(-1)
+    const cards = latest
+      ? await ctx.db
+          .query("deckCards")
+          .withIndex("by_deck_version", (q) => q.eq("deckVersionId", latest._id))
+          .take(MAX_DECK_CARDS)
+      : []
+    // why: a retry after a lost response must return the same copy, so an unsynced deck is not an error.
+    let expectedRevision = deck.syncRevision ?? 0
+    if (deck.unsyncedAt === undefined) {
+      const now = Date.now()
+      expectedRevision += 1
+      await ctx.db.patch(deck._id, {
+        unsyncedAt: now,
+        updatedAt: now,
+        syncRevision: expectedRevision,
+      })
+    }
+    return {
+      deckId: deck._id,
+      expectedRevision,
+      ...(latest ? { versionId: latest._id } : {}),
+      name: deck.name,
+      format: deck.format,
+      game,
+      ...(deck.note ? { note: deck.note } : {}),
+      cards: cards.map((card) => canonicalCardFieldsWithDefaults(game, card)),
+    }
+  },
+})
+
+export const resync = mutation({
+  args: {
+    deckId: v.id("decks"),
+    expectedRevision: v.number(),
+    versionId: v.optional(v.id("deckVersions")),
+    name: v.string(),
+    format: v.string(),
+    game: v.optional(v.string()),
+    note: v.optional(v.string()),
+    cards: v.array(cardValidator),
+  },
+  handler: async (ctx, args) => {
+    const { user, deck } = await ownedDeck(ctx, args.deckId)
+    if (deck.archivedAt !== undefined)
+      throw new ConvexError({ code: "deck_archived", message: "This deck was deleted" })
+    const revision = deck.syncRevision ?? 0
+    const game = deck.game ?? DEFAULT_DECK_GAME
+    if (args.game !== undefined && args.game !== game)
+      throw new ConvexError({
+        code: "deck_game_immutable",
+        message: "Create a new deck to change game systems",
+      })
+    if (deck.unsyncedAt === undefined) {
+      // why: two devices can hold copies of one unsync, so a retry only succeeds when the deck already matches this copy.
+      if (revision === args.expectedRevision + 1 && (await deckMatchesCopy(ctx, deck, args)))
+        return { deckId: deck._id }
+      throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
+    }
+    if (revision !== args.expectedRevision)
+      throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
+    await requireDeckCapacity(ctx, user)
+    await requireReleasedCapability(ctx, game, "deckImport")
+    assertDeckSize(args.cards, game)
+    const name = assertDeckName(args.name)
+    const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
+    const note = args.note === undefined ? undefined : assertDeckNote(args.note)
+    const versions = await activeVersions(ctx, deck._id)
+    const target = args.versionId
+      ? versions.find((version) => version._id === args.versionId)
+      : versions.at(-1)
+    if (args.versionId && !target)
+      throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+    const now = Date.now()
+    if (target) await saveVersionCards(ctx, game, target, args.cards, now)
+    else
+      await insertDeckVersion(
+        ctx,
+        deck._id,
+        game,
+        { versionNumber: 1, name: DEFAULT_VERSION_NAME },
+        args.cards,
+        now,
+      )
+    await ctx.db.patch(deck._id, {
+      name,
+      format,
+      ...(note === undefined ? {} : { note }),
+      unsyncedAt: undefined,
+      updatedAt: now,
+      syncRevision: revision + 1,
+    })
+    return { deckId: deck._id }
   },
 })
 
@@ -1077,7 +1226,7 @@ export const syncVersionWrite = mutation({
     }
 
     const { deck } = await ownedDeck(ctx, args.deckId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const game = deck.game ?? DEFAULT_DECK_GAME
     await requireReleasedCapability(ctx, game, "deckImport")
     const version = await ctx.db.get(args.versionId)
@@ -1159,7 +1308,7 @@ async function ownedStableVersion(ctx: MutationCtx, versionId: Id<"deckVersions"
   if (!version)
     throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
   const { deck } = await ownedDeck(ctx, version.deckId)
-  assertNotArchived(deck)
+  assertActiveDeck(deck)
   return { deck, version }
 }
 
@@ -1193,7 +1342,7 @@ export const syncCreateVersion = mutation({
     const replay = await versionOperationReceipt(ctx, user, args.operationId, requestKey)
     if (replay) return replay
     const { deck } = await ownedDeck(ctx, args.deckId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const game = deck.game ?? DEFAULT_DECK_GAME
     await requireReleasedCapability(ctx, game, "deckImport")
     assertDeckSize(args.cards, game)
@@ -1431,7 +1580,7 @@ export const selectForSeat = mutation({
       return { deckId: null, deckVersionId: null }
     }
     const { deck, version } = await ownedVersion(ctx, args.deckVersionId)
-    assertNotArchived(deck)
+    assertActiveDeck(deck)
     const deckGame = deck.game ?? DEFAULT_DECK_GAME
     const lobbyGame = game.system ?? game.game ?? DEFAULT_DECK_GAME
     if (deckGame !== lobbyGame)

@@ -1040,6 +1040,170 @@ async function premiumVersions(t: ConvexTestHarness, clerkUserId: string) {
   })
 }
 
+describe("unsynced decks", () => {
+  const card = {
+    oracleId: "11111111-1111-1111-1111-111111111111",
+    scryfallId: "22222222-2222-2222-2222-222222222222",
+    name: "Kept Card",
+    quantity: 1,
+    board: "commander" as const,
+  }
+
+  async function deckWithCards(t: ConvexTestHarness, subject: string) {
+    const owner = await synced(t, subject, "Owner")
+    const deckId = await owner.mutation(api.decks.create, { name: "Elves", format: "commander" })
+    const versionId = await owner.mutation(api.decks.saveVersion, { deckId, cards: [card] })
+    return { owner, deckId, versionId }
+  }
+
+  it("frees a synced spot, keeps a copy of the latest version, and takes the spot back on resync", async () => {
+    const t = makeConvexTest()
+    const { owner, deckId, versionId } = await deckWithCards(t, "unsync-capacity")
+    await owner.mutation(api.decks.create, { name: "Second", format: "commander" })
+
+    const copy = await owner.mutation(api.decks.unsync, { deckId })
+    expect(copy).toMatchObject({
+      deckId,
+      versionId,
+      name: "Elves",
+      format: "commander",
+      cards: [{ name: "Kept Card", quantity: 1, board: "commander" }],
+    })
+    await expect(owner.mutation(api.decks.unsync, { deckId })).resolves.toEqual(copy)
+    await expect(owner.query(api.decks.listMine)).resolves.toMatchObject({
+      decks: [{ name: "Second" }],
+      capacity: { used: 1, canCreate: true },
+    })
+    const third = await owner.mutation(api.decks.create, { name: "Third", format: "commander" })
+    await expect(owner.mutation(api.decks.resync, copy)).rejects.toMatchObject({
+      data: { code: "deck_limit_reached" },
+    })
+
+    await owner.mutation(api.decks.archive, { deckId: third })
+    await owner.mutation(api.decks.resync, copy)
+    await expect(owner.mutation(api.decks.resync, copy)).resolves.toEqual({
+      deckId,
+    })
+    await expect(owner.query(api.decks.capacity)).resolves.toMatchObject({ used: 2 })
+  })
+
+  it("refuses edits, seat picks, and match logs while unsynced", async () => {
+    const t = makeConvexTest()
+    const { owner, deckId, versionId } = await deckWithCards(t, "unsync-guards")
+    await owner.mutation(api.decks.unsync, { deckId })
+
+    await expect(
+      owner.mutation(api.decks.update, { deckId, name: "Renamed" }),
+    ).rejects.toMatchObject({ data: { code: "deck_archived" } })
+    await expect(
+      owner.mutation(api.decks.saveVersion, { deckId, versionId, cards: [] }),
+    ).rejects.toMatchObject({ data: { code: "deck_archived" } })
+    await expect(
+      owner.mutation(api.matches.recordManualMatch, {
+        publicId: "unsynced-match-0001",
+        bestOf: 1,
+        finishedAt: Date.UTC(2026, 9, 3),
+        me: { seat: 1, deckVersionId: versionId, outcome: "win" },
+        opponents: [{ seat: 2, displayName: "Bob", outcome: "loss" }],
+      }),
+    ).rejects.toMatchObject({ data: { code: "deck_not_found" } })
+    const created = await owner.mutation(api.games.createLobby, {
+      publicId: "unsynced-deck-public-1",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken,
+      manualCodeCandidates: ["ABC237"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: hostDeviceId,
+    })
+    await expect(
+      owner.mutation(api.decks.selectForSeat, {
+        publicId: created.publicId,
+        seat: 1,
+        deckVersionId: versionId,
+      }),
+    ).rejects.toMatchObject({ data: { code: "deck_archived" } })
+  })
+
+  it("brings back stats and versions on resync and applies the device's edits", async () => {
+    const t = makeConvexTest()
+    const { owner, deckId, versionId } = await deckWithCards(t, "unsync-stats")
+    await owner.mutation(api.matches.recordManualMatch, {
+      publicId: "resync-match-000001",
+      bestOf: 1,
+      finishedAt: Date.UTC(2026, 9, 3),
+      me: { seat: 1, deckVersionId: versionId, outcome: "win" },
+      opponents: [{ seat: 2, displayName: "Bob", outcome: "loss" }],
+    })
+    const copy = await owner.mutation(api.decks.unsync, { deckId })
+
+    await owner.mutation(api.decks.resync, {
+      ...copy,
+      name: "Elves Remade",
+      cards: [{ ...card, quantity: 2 }],
+    })
+    await expect(owner.query(api.decks.stats, { deckId })).resolves.toMatchObject({
+      manual: { matches: { total: 1, wins: 1 } },
+      byVersion: [{ deckVersionId: versionId, manual: { matches: { total: 1, wins: 1 } } }],
+    })
+    await expect(owner.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      deck: { name: "Elves Remade" },
+      cards: [{ name: "Kept Card", quantity: 2 }],
+    })
+  })
+
+  it("rejects a stale copy's resync after the deck was resynced and unsynced again elsewhere", async () => {
+    const t = makeConvexTest()
+    const { owner, deckId } = await deckWithCards(t, "unsync-stale-copy")
+    const firstCopy = await owner.mutation(api.decks.unsync, { deckId })
+    await owner.mutation(api.decks.resync, firstCopy)
+    const secondCopy = await owner.mutation(api.decks.unsync, { deckId })
+
+    await expect(owner.mutation(api.decks.resync, firstCopy)).rejects.toMatchObject({
+      data: { code: "sync_conflict" },
+    })
+    await expect(
+      owner.mutation(api.decks.resync, { ...secondCopy, name: "Second device edit" }),
+    ).resolves.toEqual({ deckId })
+    await expect(owner.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      deck: { name: "Second device edit" },
+    })
+  })
+
+  it("rejects a second device's edited copy of the same unsync instead of reporting success", async () => {
+    const t = makeConvexTest()
+    const { owner, deckId } = await deckWithCards(t, "unsync-two-copies")
+    const copy = await owner.mutation(api.decks.unsync, { deckId })
+    const sameCopy = await owner.mutation(api.decks.unsync, { deckId })
+    await owner.mutation(api.decks.resync, copy)
+
+    await expect(owner.mutation(api.decks.resync, copy)).resolves.toEqual({ deckId })
+    await expect(
+      owner.mutation(api.decks.resync, { ...sameCopy, name: "Other device edit" }),
+    ).rejects.toMatchObject({ data: { code: "sync_conflict" } })
+  })
+
+  it("tells other devices an unsynced deck is gone, then back at a newer revision", async () => {
+    const t = makeConvexTest()
+    const { owner, deckId } = await deckWithCards(t, "unsync-sync-page")
+    const page = async () =>
+      (await owner.query(api.decks.syncPage, { paginationOpts: { numItems: 10, cursor: null } }))
+        .page[0]
+    const before = await page()
+    const copy = await owner.mutation(api.decks.unsync, { deckId })
+    const unsynced = await page()
+    expect(unsynced).toMatchObject({ deckId, deleted: true })
+    expect(unsynced.revision).toBeGreaterThan(before.revision)
+
+    await owner.mutation(api.decks.resync, copy)
+    const resynced = await page()
+    expect(resynced).toMatchObject({ deckId, deleted: false })
+    expect(resynced.revision).toBeGreaterThan(unsynced.revision)
+  })
+})
+
 describe("deck versions", () => {
   it("gives every new deck one named version slot", async () => {
     const t = makeConvexTest()
