@@ -354,12 +354,18 @@ export default defineSchema({
     game: v.optional(v.string()),
     note: v.optional(v.string()),
     favoritedAt: v.optional(v.number()),
+    // why: archivedAt means deleted. The name predates unsynced decks and stays for installed clients.
     archivedAt: v.optional(v.number()),
+    unsyncedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_owner_and_updated_at", ["ownerUserId", "updatedAt"])
     .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"])
+    .index("by_owner_and_archived_at_and_unsynced_at", {
+      fields: ["ownerUserId", "archivedAt", "unsyncedAt"],
+      staged: true,
+    })
     .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"])
     .index("by_owner_and_sync_id", ["ownerUserId", "syncId"]),
 
