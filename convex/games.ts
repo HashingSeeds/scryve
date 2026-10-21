@@ -1422,7 +1422,11 @@ export const publishFinishedLocalGame = mutation({
               : myDeck
                 ? { deckKey: myDeck.deckKey ?? myDeck.syncId ?? String(myDeck._id) }
                 : {}),
-            ...(me?.deckFingerprint ? { deckFingerprint: me.deckFingerprint } : {}),
+            ...(me?.deckFingerprint
+              ? { deckFingerprint: me.deckFingerprint }
+              : me?.deckKey && myDeck && me.deckVersionId
+                ? { deckFingerprint: (await pinnedDeck(ctx, me.deckVersionId)).deckFingerprint }
+                : {}),
           }
     const gameId = await ctx.db.insert("games", {
       publicId,
