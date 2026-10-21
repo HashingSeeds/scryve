@@ -87,7 +87,7 @@ import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { isGameUnavailableError } from "@/utils/convexError"
+import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
@@ -103,6 +103,8 @@ type ConnectedBoardScreenProps = {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
+  // why: called after a guest leaves on the server, so the route only has to navigate.
+  onLeave?: () => void
   onBack?: () => void
   onHistory?: () => void
   onRules?: (system: SystemId, ruleId?: string) => void
@@ -262,7 +264,7 @@ type ConnectedBoardReadyProps = {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
-  onLeave?: () => void
+  onLeave?: () => unknown
   view: ConnectedBoardReadyView
   controls: ConnectedBoardControls
   ownerId: string
@@ -334,8 +336,8 @@ interface ConnectedBoardRuntimeProps {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
-  // why: a nearby board has no More menu, so a guest needs this to get off the board.
-  onLeave?: () => void
+  // why: a guest can't end the game, so the host's End slot leaves it instead. A rejection shows in the confirm dialog.
+  onLeave?: () => unknown
   onBack?: () => void
   onHistory?: () => void
   onRules?: (system: SystemId, ruleId?: string) => void
@@ -354,18 +356,26 @@ interface ConnectedBoardRuntimeProps {
 function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
   const runtime = useConnectedGame(props.publicId, props.ownerId)
   const reveal = useMutation(api.games.revealMyRole)
+  const leaveGame = useMutation(api.games.leaveMyGame)
   const online = useConvexOnline()
-  const { publicId } = props
+  const { publicId, onLeave } = props
   const onRevealRole = useCallback(
     () => reveal({ publicId, deviceId: localGameRepository.getDeviceId() }),
     [publicId, reveal],
   )
+  const leave = useCallback(async () => {
+    if (!online) throw new Error(translate("connected:host.reconnectToExit"))
+    await leaveGame({ publicId, deviceId: localGameRepository.getDeviceId() })
+    removeResumeEntryEverywhere(publicId)
+    onLeave?.()
+  }, [leaveGame, onLeave, online, publicId])
   return (
     <ConnectedBoardWithRuntime
       {...props}
       runtime={runtime}
       onRevealRole={onRevealRole}
       roleRevealOnline={online}
+      onLeave={onLeave ? leave : undefined}
     />
   )
 }
@@ -587,6 +597,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState<string>()
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
@@ -810,6 +822,23 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
 
   const canEnd = active && game.isHost && !view.finishing
   const leave = !game.isHost ? onLeave : undefined
+  async function confirmLeave() {
+    if (!leave || leaving) return
+    setLeaving(true)
+    setLeaveError(undefined)
+    // why: success navigates off the board, so the dialog stays busy instead of offering a second leave.
+    try {
+      await leave()
+    } catch (cause) {
+      setLeaveError(
+        convexErrorMessage(
+          cause,
+          cause instanceof Error ? cause.message : translate("connected:host.exitFailed"),
+        ),
+      )
+      setLeaving(false)
+    }
+  }
   const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
@@ -867,6 +896,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             label: translate("connected:board.menu.leave"),
             onPress: () => {
               setMenuOpen(false)
+              setLeaveError(undefined)
               setConfirmingLeave(true)
             },
           }
@@ -1377,7 +1407,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           dialogTestID="connected-leave-confirmation"
           confirmTestID="confirm-connected-leave"
           cancelTestID="cancel-connected-leave"
-          onConfirm={leave}
+          busy={leaving}
+          notice={
+            leaveError ? <AlertNote testID="connected-leave-error" text={leaveError} /> : null
+          }
+          onConfirm={confirmLeave}
           onClose={() => setConfirmingLeave(false)}
         />
       ) : null}
