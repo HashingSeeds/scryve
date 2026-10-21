@@ -223,8 +223,8 @@ describe("CounterChips", () => {
     expect(spoken()).toHaveTextContent("Seat 1, Ada, now Monarch")
   })
 
-  it("takes the card's own controls out of reach while a sheet covers it", () => {
-    const onTableSheetOpenChange = jest.fn()
+  it("takes the card's own controls out of reach while a sheet covers it, and opening one starts play", () => {
+    const onPlayStart = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard
@@ -233,7 +233,7 @@ describe("CounterChips", () => {
           life={40}
           color="#41476E"
           seatTable={seat({ counters: { poison: 2 } })}
-          onTableSheetOpenChange={onTableSheetOpenChange}
+          onPlayStart={onPlayStart}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -247,10 +247,9 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("life-seat-1-1")).toBeNull()
     expect(view.queryByTestId("counter-chips-seat-1")).toBeNull()
     expect(view.getByTestId("life-total-seat-1", { includeHiddenElements: true })).not.toBeVisible()
-    expect(onTableSheetOpenChange).toHaveBeenLastCalledWith(true)
+    expect(onPlayStart).toHaveBeenCalledTimes(1)
 
     fireEvent.press(view.getByTestId("counter-close-1"))
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
-    expect(onTableSheetOpenChange).toHaveBeenLastCalledWith(false)
   })
 })

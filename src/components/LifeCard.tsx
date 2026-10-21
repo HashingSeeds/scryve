@@ -112,7 +112,7 @@ export interface LifeCardProps {
   eliminated?: string
   seatTable?: SeatTable
   dice?: LifeCardDice
-  onTableSheetOpenChange?: (open: boolean) => void
+  onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -143,7 +143,7 @@ export const LifeCard = memo(function LifeCard({
   dice,
   eliminated,
   seatTable,
-  onTableSheetOpenChange,
+  onPlayStart,
   onChange,
   style,
 }: LifeCardProps) {
@@ -307,10 +307,8 @@ export const LifeCard = memo(function LifeCard({
   // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
   const [tableSheetOpen, setTableSheetOpen] = useState(false)
   useEffect(() => {
-    if (!tableSheetOpen) return
-    onTableSheetOpenChange?.(true)
-    return () => onTableSheetOpenChange?.(false)
-  }, [onTableSheetOpenChange, tableSheetOpen])
+    if (tableSheetOpen || editorOpen) onPlayStart?.()
+  }, [editorOpen, onPlayStart, tableSheetOpen])
   const recentDelta = useRecentDelta(life)
   const previousLife = useRef(life)
   useEffect(() => {
@@ -406,6 +404,7 @@ export const LifeCard = memo(function LifeCard({
   }
 
   function openCommanderOverview() {
+    onPlayStart?.()
     setCommanderOverviewOpen(true)
   }
 

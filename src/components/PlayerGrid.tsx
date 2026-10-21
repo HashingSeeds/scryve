@@ -137,7 +137,7 @@ export interface PlayerGridProps {
   dice?: DiceGridBinding
   onOpenRule?: (ruleId: string) => void
   /** why: each seat reports its counter sheet opening and closing, so the board can hide what the sheet would sit under. */
-  onTableSheetOpenChange?: (open: boolean) => void
+  onPlayStart?: () => void
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -160,7 +160,7 @@ export function PlayerGrid({
   table,
   dice,
   onOpenRule,
-  onTableSheetOpenChange,
+  onPlayStart,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -376,12 +376,10 @@ export function PlayerGrid({
                         .map(({ id, name }) => ({ id, name }))}
                       table={table}
                       dice={seatDice}
-                      onTableSheetOpenChange={
-                        onTableSheetOpenChange && stable("tableSheet", onTableSheetOpenChange)
-                      }
                       onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
                         onChange(player.id, delta),
                       )}
+                      onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
                       style={getScreenCornerSquaringStyle({
                         rows,
                         rowIndex,
@@ -494,9 +492,7 @@ export function PlayerGrid({
                         : undefined
                     }
                     dice={seatDice}
-                    onTableSheetOpenChange={
-                      onTableSheetOpenChange && stable("tableSheet", onTableSheetOpenChange)
-                    }
+                    onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
                     )}

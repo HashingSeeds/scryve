@@ -61,6 +61,29 @@ describe("useLocalGame persistence", () => {
     expect(result.current.game.firstPlayerOffered).toBe(true)
   })
 
+  it("closes the first-player offer on any board action, even one that leaves no damage", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = createLocalGame({
+      now: 1,
+      system: "pokemon",
+      startingLife: 6,
+      players: [
+        { name: "Ash", color: "#000" },
+        { name: "Misty", color: "#111" },
+      ],
+    })
+    const { result } = renderHook(() => useLocalGame(initial, repository))
+
+    act(() => {
+      result.current.placePokemon(initial.players[0].id, "active", {
+        name: "Pikachu",
+        hp: 60,
+        prizes: 1,
+      })
+    })
+    expect(result.current.game.firstPlayerOffered).toBe(true)
+  })
+
   it("closes the offer when a reopened save already in play is cleared back to its start", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = createLocalGame({
