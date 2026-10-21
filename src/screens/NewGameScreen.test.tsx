@@ -1117,11 +1117,12 @@ describe("NewGameScreen", () => {
           retry: jest.fn(),
         },
       })
-      expect(view.queryByTestId("connected-host-preparation")).toBeNull()
+      expect(view.getByTestId("host-connected-button")).toHaveTextContent("Host lobby")
       expect(view.queryByText("Retry connection")).toBeNull()
       expect(view.getByTestId("host-connected-button")).toBeDisabled()
       act(() => jest.advanceTimersByTime(200))
-      expect(view.getByTestId("connected-host-preparation")).toBeTruthy()
+      expect(view.getByTestId("host-connected-button")).toHaveTextContent("Checking your games…")
+      expect(view.queryByTestId("setup-status")).toBeNull()
       expect(view.queryByText("Retry connection")).toBeNull()
     } finally {
       jest.useRealTimers()
@@ -1153,7 +1154,7 @@ describe("NewGameScreen", () => {
       act(() => jest.advanceTimersByTime(100))
       view.rerender(renderSetup(readyHost))
       act(() => jest.advanceTimersByTime(200))
-      expect(view.queryByTestId("connected-host-preparation")).toBeNull()
+      expect(view.getByTestId("host-connected-button")).toHaveTextContent("Host lobby")
       expect(view.queryByText("Retry connection")).toBeNull()
       expect(view.getByTestId("host-connected-button")).toBeEnabled()
     } finally {
@@ -1173,7 +1174,7 @@ describe("NewGameScreen", () => {
 
     expect(view.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
     await waitFor(() =>
-      expect(view.getByTestId("connected-host-preparation")).toHaveTextContent(
+      expect(view.getByTestId("host-connected-button")).toHaveTextContent(
         "Preparing your connected profile…",
       ),
     )

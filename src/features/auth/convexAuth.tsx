@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useConvexAuth, useConvexConnectionState } from "convex/react"
 
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
@@ -30,6 +30,11 @@ export function createConvexAuthHook(
   return function useConvexAuthFromClerk() {
     const { isLoaded, isSignedIn, getToken, orgId, orgRole, sessionId } = useAuthFromClerk()
     const currentGetToken = useRef(getToken)
+    // why: Convex keeps the previous session's "not authenticated" answer until the new token is checked, so a fresh sign-in briefly reads as a rejected session. One loading render resets Convex to pending.
+    const signedInSession = isSignedIn ? sessionId : undefined
+    const [settledSession, setSettledSession] = useState(signedInSession)
+    if (settledSession !== signedInSession) setSettledSession(signedInSession)
+    const sessionStarting = Boolean(signedInSession) && settledSession !== signedInSession
 
     useEffect(() => {
       currentGetToken.current = getToken
@@ -56,11 +61,11 @@ export function createConvexAuthHook(
 
     return useMemo(
       () => ({
-        isLoading: !isLoaded,
+        isLoading: !isLoaded || sessionStarting,
         isAuthenticated: isSignedIn ?? false,
         fetchAccessToken,
       }),
-      [fetchAccessToken, isLoaded, isSignedIn],
+      [fetchAccessToken, isLoaded, isSignedIn, sessionStarting],
     )
   }
 }
