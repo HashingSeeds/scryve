@@ -1389,11 +1389,13 @@ export const publishFinishedLocalGame = mutation({
     if (me?.deckKey !== undefined) assertDeckKey(me.deckKey)
     if (me?.deckFingerprint !== undefined) assertDeckFingerprint(me.deckFingerprint)
     let myDeck: Doc<"decks"> | undefined
+    let versionKey: string | undefined
     if (me?.deckVersionId) {
       const version = await ctx.db.get(me.deckVersionId)
       const deck = version ? await ctx.db.get(version.deckId) : null
       if (deck && deck.ownerUserId !== user._id)
         throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+      if (deck) versionKey = deck.deckKey ?? deck.syncId ?? String(deck._id)
       if (
         version &&
         version.archivedAt === undefined &&
@@ -1414,13 +1416,13 @@ export const publishFinishedLocalGame = mutation({
         })
     }
     const attribution =
-      me?.deckVersionId && !myDeck && !me.deckKey
+      me?.deckVersionId && !versionKey && !me.deckKey
         ? {}
         : {
             ...(me?.deckKey
               ? { deckKey: me.deckKey }
-              : myDeck
-                ? { deckKey: myDeck.deckKey ?? myDeck.syncId ?? String(myDeck._id) }
+              : versionKey
+                ? { deckKey: versionKey }
                 : {}),
             ...(me?.deckFingerprint
               ? { deckFingerprint: me.deckFingerprint }

@@ -203,7 +203,7 @@ it("publishes local deck keys without legacy rows, keeps local ids, and replays 
 })
 
 it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as const)(
-  "records %s versions from installed clients without attribution",
+  "records %s versions from installed clients",
   async (kind) => {
     const t = setup()
     const { actor, deckId, versionId } = await deck(t)
@@ -226,9 +226,12 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
     await t.run(async (ctx) => {
       const summary = (await ctx.db.get(ack.summaryId))!
       expect(summary.players[0].deckId).toBeUndefined()
-      expect(summary.players[0].deckKey).toBeUndefined()
       const result = (await ctx.db.query("deckResults").unique())!
-      expect(result.deckKey).toBeUndefined()
+      // A deck that still exists keeps following its key; a missing one can't be named.
+      const keyed = kind === "archived" || kind === "moved" || kind === "archivedVersion"
+      expect(summary.players[0].deckKey).toBe(keyed ? "deck-key" : undefined)
+      expect(result.deckKey).toBe(keyed ? "deck-key" : undefined)
+      expect(result.fingerprint).toBeUndefined()
       expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
     })
   },
