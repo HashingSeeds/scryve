@@ -27,6 +27,7 @@ type ShelfState = {
     favoritedAt?: number
     lastPlayedAt?: number
     record?: { games: number; wins: number; losses: number; draws: number; unknown: number }
+    keyRecord?: { games: number; wins: number; losses: number; draws: number; unknown: number }
   }>
   capacity: { used: number; limit: number; premium: boolean; canCreate: boolean }
   analyticsLocked: boolean
@@ -290,6 +291,7 @@ describe("DecksScreen", () => {
         {
           ...commanderDeck,
           coverImageUrl: "https://cards.scryfall.io/small/example.jpg",
+          keyRecord: { games: 5, wins: 3, losses: 2, draws: 0, unknown: 0 },
         },
       ],
       capacity: { used: 1, limit: 100, premium: true, canCreate: true },
@@ -298,7 +300,7 @@ describe("DecksScreen", () => {
     const view = renderShelf({ onSelect })
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByText("3 versions")).toBeTruthy()
-    expect(view.getByText("75% of 4")).toBeTruthy()
+    expect(view.getByText("60% of 5")).toBeTruthy()
     expect(
       StyleSheet.flatten(view.getByTestId("deck-card-existing-deck").props.style),
     ).toMatchObject({

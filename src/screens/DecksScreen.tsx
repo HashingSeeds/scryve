@@ -51,6 +51,7 @@ type ShelfDeck = {
   lastPlayedAt?: number
   favoritedAt?: number
   record?: DeckRecord
+  keyRecord?: DeckRecord
 }
 
 export type DeckSelection = {
@@ -118,7 +119,7 @@ function DeckRow({
   const { theme, themed } = useAppTheme()
   const game = deck.game ?? DEFAULT_DECK_GAME
   const favorite = deck.favoritedAt !== undefined
-  const record = recordSummary(deck.record)
+  const record = recordSummary(deck.keyRecord ?? deck.record)
   const versions =
     deck.versionCount && deck.versionCount > 1
       ? translate("decks:shelf.versionCount", { count: deck.versionCount })
