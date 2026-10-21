@@ -206,6 +206,11 @@ export function CurrentGameScreen({
     setArmedPlayerId((current) => (current === player.id ? null : player.id))
   }
 
+  function inspectCommanderDamage(playerId: PlayerId | null) {
+    if (playerId) markFirstPlayerUsed()
+    setInspectedPlayerId(playerId)
+  }
+
   function assignCommanderDamage(target: GamePlayer, step: number) {
     if (!armedPlayerId || armedPlayerId === target.id) return
     runtime.assignCommanderDamage(armedPlayerId, target.id, step)
@@ -423,7 +428,7 @@ export function CurrentGameScreen({
                   ? {
                       incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
                       armedPlayerId,
-                      inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
+                      inspection: { playerId: inspectedPlayerId, onChange: inspectCommanderDamage },
                       onPressSword: toggleSword,
                       onStage: assignCommanderDamage,
                     }
