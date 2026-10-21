@@ -298,6 +298,30 @@ describe("PokemonSheet", () => {
     expect(screen.getByTestId("pokemon-name-input-seat-1")).toBeTruthy()
   })
 
+  it("saves a cardless Pokémon's pick by name when the catalog has no HP for it", async () => {
+    mockAction.mockImplementation((_reference: unknown, args: { query?: string }) =>
+      Promise.resolve(args.query ? [hit] : hit),
+    )
+    const onUpdate = jest.fn(() => true)
+    const onClose = jest.fn()
+    const pokemon = { id: "active-001", hp: 999, prizes: 1, damage: 20 }
+    render(sheet({ mode: { kind: "edit", pokemon, slot: "active" }, onUpdate, onClose }))
+
+    fireEvent.changeText(screen.getByTestId("pokemon-search-seat-1"), "Charizard")
+    act(() => jest.advanceTimersByTime(350))
+    await flush()
+    fireEvent.press(screen.getByTestId("pokemon-result-sv03-125"))
+    await flush()
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+
+    expect(onUpdate).toHaveBeenCalledWith("active-001", {
+      hp: 999,
+      prizes: 2,
+      name: "Charizard ex",
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it("keeps a half-typed Pokémon on screen when the connection comes back", () => {
     mockOnline = false
     const view = render(sheet())
