@@ -2,8 +2,16 @@ import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
-import { internalMutation } from "./_generated/server"
-import { isAbandonedSummary, removeGameResult } from "./lib/results"
+import { internalMutation, internalQuery } from "./_generated/server"
+import { addDeckResult, canonicalResultId, gameResultId } from "./lib/deckResults"
+import {
+  resultDeckKey,
+  matchDeltas,
+  outcomeTally,
+  gameResultSource,
+  isAbandonedSummary,
+  removeGameResult,
+} from "./lib/results"
 
 // why: each row costs a summary lookup plus reads and writes on two stats tables, so a large page would hit transaction limits.
 const MAX_BATCH = 100
@@ -53,5 +61,126 @@ export const removeAbandonedGameResults = internalMutation({
       isDone: page.isDone,
       continueCursor: page.continueCursor,
     }
+  },
+})
+
+const batchArgs = { cursor: v.union(v.string(), v.null()), batchSize: v.number() }
+function batchSize(size: number) {
+  if (!Number.isSafeInteger(size) || size < 1 || size > 100)
+    throw new Error("Batch size must be 1–100")
+  return size
+}
+
+export const backfillDeckKeys = internalMutation({
+  args: batchArgs,
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("decks")
+      .paginate({ cursor: args.cursor, numItems: batchSize(args.batchSize) })
+    for (const deck of page.page)
+      if (!deck.deckKey) await ctx.db.patch(deck._id, { deckKey: deck.syncId ?? String(deck._id) })
+    return { isDone: page.isDone, continueCursor: page.continueCursor }
+  },
+})
+
+export const backfillGameResults = internalMutation({
+  args: batchArgs,
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("deckGameResults")
+      .paginate({ cursor: args.cursor, numItems: batchSize(args.batchSize) })
+    for (const result of page.page) {
+      const summary = await ctx.db
+        .query("gameSummaries")
+        .withIndex("by_game", (q) => q.eq("gameId", result.gameId))
+        .unique()
+      if (!summary || isAbandonedSummary(summary)) continue
+      const player = summary.players.find((player) => player.playerId === result.playerId)
+      if (!player || player.userId !== result.userId) continue
+      await addDeckResult(ctx, {
+        resultId: gameResultId(summary, player),
+        userId: result.userId,
+        deckKey: await resultDeckKey(ctx, {
+          deckId: result.deckId,
+          deckKey: player.deckKey,
+          userId: result.userId,
+        }),
+        kind: "game",
+        source: await gameResultSource(ctx, summary),
+        outcome: result.outcome,
+        finishedAt: result.finishedAt,
+        summaryId: summary._id,
+        matchId: summary.matchId,
+        deltas: { games: outcomeTally(result.outcome) },
+      })
+    }
+    return { isDone: page.isDone, continueCursor: page.continueCursor }
+  },
+})
+
+export const backfillMatchResults = internalMutation({
+  args: batchArgs,
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("deckMatchResults")
+      .paginate({ cursor: args.cursor, numItems: batchSize(args.batchSize) })
+    for (const result of page.page) {
+      const match = await ctx.db.get(result.matchId)
+      if (!match) continue
+      const seat = match.seats.find(
+        (seat) => seat.userId === result.userId && seat.deckVersionId === result.deckVersionId,
+      )
+      if (!seat) continue
+      await addDeckResult(ctx, {
+        resultId: canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
+        userId: result.userId,
+        deckKey: await resultDeckKey(ctx, seat),
+        kind: "match",
+        source: result.source,
+        outcome: result.outcome,
+        finishedAt: result.finishedAt,
+        matchId: match._id,
+        deltas: matchDeltas(match, seat),
+      })
+    }
+    return { isDone: page.isDone, continueCursor: page.continueCursor }
+  },
+})
+
+export const compareDeckKeyStats = internalQuery({
+  args: batchArgs,
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("decks")
+      .paginate({ cursor: args.cursor, numItems: batchSize(args.batchSize) })
+    const mismatches = []
+    for (const deck of page.page) {
+      const legacy = await ctx.db
+        .query("deckStats")
+        .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
+        .unique()
+      const stats = await ctx.db
+        .query("deckKeyStats")
+        .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+          q
+            .eq("userId", deck.ownerUserId)
+            .eq("deckKey", deck.deckKey ?? deck.syncId ?? String(deck._id))
+            .eq("fingerprint", "all"),
+        )
+        .unique()
+      const fields = ["games", "wins", "losses", "draws", "unknown"] as const
+      const lines = ["manualMatches", "manualGames", "connectedMatches"] as const
+      const tallyFields = ["total", "wins", "losses", "draws", "unknown"] as const
+      if (
+        fields.some((field) => (legacy?.[field] ?? 0) !== (stats?.[field] ?? 0)) ||
+        lines.some((line) =>
+          tallyFields.some(
+            (field) => (legacy?.[line]?.[field] ?? 0) !== (stats?.[line]?.[field] ?? 0),
+          ),
+        )
+      )
+        mismatches.push({ deckId: deck._id, legacy, stats })
+    }
+    return { mismatches, isDone: page.isDone, continueCursor: page.continueCursor }
   },
 })

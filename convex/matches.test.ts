@@ -1,5 +1,6 @@
 import { convexTest, type TestConvex } from "convex-test"
 
+import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
@@ -62,6 +63,7 @@ async function statsFor(t: TestConvex<typeof schema>, deckId: Id<"decks">) {
 describe("recordManualMatch", () => {
   it("writes the match, history, deck result, and manual counters once per publicId", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckId, deckVersionId } = await owner(t)
     const args = twoPlayer(deckVersionId)
     const first = await actor.mutation(api.matches.recordManualMatch, args)
@@ -96,6 +98,8 @@ describe("recordManualMatch", () => {
     const rows = await t.run(async (ctx) => ({
       history: await ctx.db.query("gameHistoryEntries").collect(),
       results: await ctx.db.query("deckMatchResults").collect(),
+      deckResults: await ctx.db.query("deckResults").collect(),
+      keyStats: await ctx.db.query("deckKeyStats").collect(),
     }))
     expect(rows.history).toEqual([
       expect.objectContaining({ source: "manual", matchId: first.matchId, outcome: "win" }),
@@ -116,6 +120,7 @@ describe("recordManualMatch", () => {
 
   it("counts matches but not games when no score is given", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckId, deckVersionId } = await owner(t)
     await actor.mutation(api.matches.recordManualMatch, {
       publicId: "manual-match-000002",
@@ -135,6 +140,7 @@ describe("recordManualMatch", () => {
 
   it("accepts a pod whose wins spread past the best of", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckId } = await owner(t)
     await actor.mutation(api.matches.recordManualMatch, {
       publicId: "manual-match-pod-211",
@@ -153,6 +159,7 @@ describe("recordManualMatch", () => {
 
   it("leaves deck stats alone when no deck is attached", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckId } = await owner(t)
     await actor.mutation(api.matches.recordManualMatch, {
       publicId: "manual-match-000003",
@@ -166,6 +173,8 @@ describe("recordManualMatch", () => {
       matches: await ctx.db.query("matches").collect(),
       history: await ctx.db.query("gameHistoryEntries").collect(),
       results: await ctx.db.query("deckMatchResults").collect(),
+      deckResults: await ctx.db.query("deckResults").collect(),
+      keyStats: await ctx.db.query("deckKeyStats").collect(),
     }))
     expect(rows.matches[0].system).toBeUndefined()
     expect(rows.history).toHaveLength(1)
@@ -174,6 +183,7 @@ describe("recordManualMatch", () => {
 
   it("rejects another user's publicId and another user's deck", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const alice = await owner(t)
     const bob = await owner(t, "match-other")
     await alice.actor.mutation(api.matches.recordManualMatch, twoPlayer(alice.deckVersionId))
@@ -191,6 +201,7 @@ describe("recordManualMatch", () => {
 
   it("rejects an archived version", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckVersionId } = await owner(t)
     await t.run((ctx) => ctx.db.patch(deckVersionId, { archivedAt: Date.now() }))
     await expect(
@@ -260,6 +271,7 @@ describe("recordManualMatch", () => {
     },
   ])("rejects $name", async ({ patch, message }) => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckVersionId } = await owner(t)
     await expect(
       actor.mutation(api.matches.recordManualMatch, { ...twoPlayer(deckVersionId), ...patch }),
@@ -270,6 +282,7 @@ describe("recordManualMatch", () => {
 describe("deleteManualMatch", () => {
   it("removes the rows and reverses the counters it added", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckId, deckVersionId } = await owner(t)
     await actor.mutation(api.matches.recordManualMatch, {
       ...twoPlayer(deckVersionId, "manual-match-keep01"),
@@ -286,6 +299,8 @@ describe("deleteManualMatch", () => {
       matches: await ctx.db.query("matches").collect(),
       history: await ctx.db.query("gameHistoryEntries").collect(),
       results: await ctx.db.query("deckMatchResults").collect(),
+      deckResults: await ctx.db.query("deckResults").collect(),
+      keyStats: await ctx.db.query("deckKeyStats").collect(),
     }))
     expect(rows.matches.map((match) => match.publicId)).toEqual(["manual-match-keep01"])
     expect(rows.history).toHaveLength(1)
@@ -301,6 +316,7 @@ describe("deleteManualMatch", () => {
 
   it("only lets the owner delete", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const alice = await owner(t)
     const bob = await owner(t, "match-other")
     const { matchId } = await alice.actor.mutation(
@@ -323,6 +339,7 @@ describe("account deletion", () => {
 
   it("deletes the owner's manual matches with their history and deck results", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, deckVersionId } = await owner(t)
     await actor.mutation(api.matches.recordManualMatch, twoPlayer(deckVersionId))
     const requestId = await t.run(async (ctx) => {
@@ -343,7 +360,9 @@ describe("account deletion", () => {
       matches: await ctx.db.query("matches").collect(),
       history: await ctx.db.query("gameHistoryEntries").collect(),
       results: await ctx.db.query("deckMatchResults").collect(),
+      deckResults: await ctx.db.query("deckResults").collect(),
+      keyStats: await ctx.db.query("deckKeyStats").collect(),
     }))
-    expect(rows).toEqual({ matches: [], history: [], results: [] })
+    expect(rows).toEqual({ matches: [], history: [], results: [], deckResults: [], keyStats: [] })
   })
 })

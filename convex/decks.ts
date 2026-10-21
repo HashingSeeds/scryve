@@ -13,6 +13,7 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
+import { assertDeckKey, createOrReviveDeck, deckForKey, pinnedDeck } from "./lib/deckKeys"
 import { deckStartingValue } from "./lib/deckStartingValue"
 import {
   syncedDeck,
@@ -44,6 +45,7 @@ import {
   MAX_DECK_VERSIONS,
   MAX_PREMIUM_DECKS,
 } from "./lib/policy"
+import { resultDeckKey } from "./lib/results"
 
 const boardValidator = v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))
 const cardValidator = v.object({
@@ -255,6 +257,37 @@ async function insertDeckVersion(
   return versionId
 }
 
+async function writeInitialVersion(
+  ctx: MutationCtx,
+  deckId: Id<"decks">,
+  game: string,
+  cards: DeckCardInput[],
+  now: number,
+) {
+  const latest = await ctx.db
+    .query("deckVersions")
+    .withIndex("by_deck_and_version_number", (q) => q.eq("deckId", deckId))
+    .order("desc")
+    .first()
+  if (!latest)
+    return await insertDeckVersion(
+      ctx,
+      deckId,
+      game,
+      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
+      cards,
+      now,
+    )
+  await replaceVersionCards(ctx, latest._id, game, cards)
+  await ctx.db.patch(latest._id, {
+    ...cardTotals(cards),
+    archivedAt: undefined,
+    updatedAt: now,
+    syncRevision: (latest.syncRevision ?? 0) + 1,
+  })
+  return latest._id
+}
+
 async function replaceVersionCards(
   ctx: MutationCtx,
   versionId: Id<"deckVersions">,
@@ -431,6 +464,7 @@ export const listMine = query({
 
 export const create = mutation({
   args: {
+    deckKey: v.optional(v.string()),
     name: v.string(),
     format: v.string(),
     game: v.optional(v.string()),
@@ -438,35 +472,34 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    if (args.deckKey !== undefined) await deckForKey(ctx, user._id, args.deckKey)
     await requireDeckCapacity(ctx, user)
     const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
     await requireReleasedCapability(ctx, game, "deckImport")
     const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
     const note = args.note ? assertDeckNote(args.note) : ""
     const now = Date.now()
-    const deckId = await ctx.db.insert("decks", {
-      ownerUserId: user._id,
-      name: assertDeckName(args.name),
-      format,
-      game,
-      ...(note ? { note } : {}),
-      createdAt: now,
-      updatedAt: now,
-    })
-    await insertDeckVersion(
+    const deckId = await createOrReviveDeck(
       ctx,
-      deckId,
-      game,
-      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
-      [],
-      now,
+      {
+        ownerUserId: user._id,
+        name: assertDeckName(args.name),
+        format,
+        game,
+        ...(note ? { note } : {}),
+        createdAt: now,
+        updatedAt: now,
+      },
+      args.deckKey,
     )
+    await writeInitialVersion(ctx, deckId, game, [], now)
     return deckId
   },
 })
 
 export const importResolved = mutation({
   args: {
+    deckKey: v.optional(v.string()),
     name: v.string(),
     format: v.string(),
     game: v.optional(v.string()),
@@ -475,6 +508,7 @@ export const importResolved = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    if (args.deckKey !== undefined) await deckForKey(ctx, user._id, args.deckKey)
     await requireDeckCapacity(ctx, user)
     if (args.cards.length < 1)
       throw new ConvexError({
@@ -488,29 +522,27 @@ export const importResolved = mutation({
     const note = args.note ? assertDeckNote(args.note) : ""
 
     const now = Date.now()
-    const deckId = await ctx.db.insert("decks", {
-      ownerUserId: user._id,
-      name: assertDeckName(args.name),
-      format,
-      game,
-      ...(note ? { note } : {}),
-      createdAt: now,
-      updatedAt: now,
-    })
-    await insertDeckVersion(
+    const deckId = await createOrReviveDeck(
       ctx,
-      deckId,
-      game,
-      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
-      args.cards,
-      now,
+      {
+        ownerUserId: user._id,
+        name: assertDeckName(args.name),
+        format,
+        game,
+        ...(note ? { note } : {}),
+        createdAt: now,
+        updatedAt: now,
+      },
+      args.deckKey,
     )
+    await writeInitialVersion(ctx, deckId, game, args.cards, now)
     return deckId
   },
 })
 
 export const importGuest = mutation({
   args: {
+    deckKey: v.optional(v.string()),
     localId: v.string(),
     localUpdatedAt: v.number(),
     name: v.string(),
@@ -521,6 +553,7 @@ export const importGuest = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    if (args.deckKey !== undefined) assertDeckKey(args.deckKey)
     if (
       !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(args.localId)
     )
@@ -536,7 +569,14 @@ export const importGuest = mutation({
         q.eq("ownerUserId", user._id).eq("guestLocalId", args.localId),
       )
       .unique()
-    if (existing) {
+    if (
+      existing &&
+      args.deckKey !== undefined &&
+      args.deckKey !== (existing.deckKey ?? existing.syncId ?? String(existing._id)) &&
+      args.deckKey !== args.localId
+    )
+      throw new ConvexError({ code: "deck_key_conflict", message: "Deck key cannot change" })
+    if (existing && (existing.archivedAt === undefined || args.deckKey === undefined)) {
       const receiptUpdatedAt = existing.guestUpdatedAt ?? null
       return {
         status: "already_imported" as const,
@@ -544,6 +584,9 @@ export const importGuest = mutation({
         localUpdatedAt: receiptUpdatedAt,
       }
     }
+    if (existing && !existing.deckKey)
+      await ctx.db.patch(existing._id, { deckKey: args.deckKey ?? args.localId })
+    await deckForKey(ctx, user._id, existing?.deckKey ?? args.deckKey ?? args.localId)
     const capacity = await deckCapacity(ctx, user)
     if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
     const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
@@ -552,33 +595,37 @@ export const importGuest = mutation({
     const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
     const note = args.note ? assertDeckNote(args.note) : ""
     const now = Date.now()
-    const deckId = await ctx.db.insert("decks", {
-      ownerUserId: user._id,
-      guestLocalId: args.localId,
-      guestUpdatedAt: args.localUpdatedAt,
-      name: assertDeckName(args.name),
-      format,
-      game,
-      ...(note ? { note } : {}),
-      createdAt: now,
-      updatedAt: now,
-    })
-    await insertDeckVersion(
+    const deckId = await createOrReviveDeck(
       ctx,
-      deckId,
-      game,
-      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
-      args.cards,
-      now,
+      {
+        ownerUserId: user._id,
+        guestLocalId: args.localId,
+        guestUpdatedAt: args.localUpdatedAt,
+        name: assertDeckName(args.name),
+        format,
+        game,
+        ...(note ? { note } : {}),
+        createdAt: now,
+        updatedAt: now,
+      },
+      args.deckKey === args.localId
+        ? (existing?.deckKey ?? args.localId)
+        : (args.deckKey ?? existing?.deckKey ?? args.localId),
     )
+    await writeInitialVersion(ctx, deckId, game, args.cards, now)
     return { status: "imported" as const, deckId, localUpdatedAt: args.localUpdatedAt }
   },
 })
 
 export const importCatalog = mutation({
-  args: { catalogDeckId: v.id("deckCatalogs"), name: v.optional(v.string()) },
+  args: {
+    deckKey: v.optional(v.string()),
+    catalogDeckId: v.id("deckCatalogs"),
+    name: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    if (args.deckKey !== undefined) await deckForKey(ctx, user._id, args.deckKey)
     await requireDeckCapacity(ctx, user)
     const catalogDeck = await ctx.db.get(args.catalogDeckId)
     if (!catalogDeck)
@@ -617,22 +664,19 @@ export const importCatalog = mutation({
       assertDeckFormat(catalogDeck.format ?? defaultDeckFormat(game)),
     )
     const now = Date.now()
-    const deckId = await ctx.db.insert("decks", {
-      ownerUserId: user._id,
-      name: assertDeckName(args.name ?? catalogDeck.name),
-      format,
-      game,
-      createdAt: now,
-      updatedAt: now,
-    })
-    await insertDeckVersion(
+    const deckId = await createOrReviveDeck(
       ctx,
-      deckId,
-      game,
-      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
-      cards,
-      now,
+      {
+        ownerUserId: user._id,
+        name: assertDeckName(args.name ?? catalogDeck.name),
+        format,
+        game,
+        createdAt: now,
+        updatedAt: now,
+      },
+      args.deckKey,
     )
+    await writeInitialVersion(ctx, deckId, game, cards, now)
     return deckId
   },
 })
@@ -913,6 +957,7 @@ const SYNC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a
 export const syncWrite = mutation({
   args: {
     id: v.string(),
+    deckKey: v.optional(v.string()),
     operationId: v.string(),
     expectedOwnerId: v.optional(v.string()),
     returnConflict: v.optional(v.boolean()),
@@ -958,6 +1003,7 @@ export const syncWrite = mutation({
         message: "Deck ID must be a UUID or deck ID",
       })
     const id = databaseId ? args.id : args.id.toLowerCase()
+    if (args.deckKey !== undefined) assertDeckKey(args.deckKey)
     const operationId = args.operationId.toLowerCase()
     const requestKey = JSON.stringify([
       id,
@@ -967,6 +1013,7 @@ export const syncWrite = mutation({
       args.game,
       args.note,
       args.deleted,
+      ...(args.deckKey === undefined ? [] : [args.deckKey]),
     ])
     const receipt = await ctx.db
       .query("deckSyncReceipts")
@@ -999,13 +1046,24 @@ export const syncWrite = mutation({
       if (args.returnConflict && deck) return { status: "conflict", deck: syncedDeck(deck) }
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
     }
+    if (deck && args.deckKey && args.deckKey !== (deck.deckKey ?? deck.syncId ?? String(deck._id)))
+      throw new ConvexError({ code: "deck_key_conflict", message: "Deck key cannot change" })
+    if (deck?.archivedAt !== undefined && !args.deleted && args.deckKey !== undefined) {
+      await requireDeckCapacity(ctx, user)
+      await ctx.db.patch(deck._id, { archivedAt: undefined, movedToDeviceAt: undefined })
+    }
     const metadata = { name: args.name, format: args.format, game: args.game, note: args.note }
     let deckId: Id<"decks">
     if (!deck) {
-      deckId = await ctx.runMutation(api.decks.create, metadata)
-      await ctx.db.patch(deckId, { syncId: id, syncRevision: 1 })
+      const previous = await deckForKey(ctx, user._id, args.deckKey ?? id)
+      deckId = await ctx.runMutation(api.decks.create, { ...metadata, deckKey: args.deckKey ?? id })
+      await ctx.db.patch(deckId, {
+        syncId: previous ? previous.syncId : id,
+        syncRevision: previous ? (previous.syncRevision ?? 0) + 1 : 1,
+      })
     } else {
       deckId = deck._id
+      if (!deck.deckKey) await ctx.db.patch(deckId, { deckKey: deck.syncId ?? String(deckId) })
       if (args.deleted) await ctx.runMutation(api.decks.archive, { deckId })
       else await ctx.runMutation(api.decks.update, { deckId, ...metadata })
     }
@@ -1426,7 +1484,11 @@ export const selectForSeat = mutation({
           code: "deck_required",
           message: "This lobby requires every player to choose a deck",
         })
-      await ctx.db.patch(player._id, { deckVersionId: undefined })
+      await ctx.db.patch(player._id, {
+        deckVersionId: undefined,
+        deckKey: undefined,
+        deckFingerprint: undefined,
+      })
       await ctx.db.patch(game._id, { updatedAt: Date.now() })
       return { deckId: null, deckVersionId: null }
     }
@@ -1444,7 +1506,10 @@ export const selectForSeat = mutation({
         code: "deck_format_mismatch",
         message: "Choose a deck matching the lobby format",
       })
-    await ctx.db.patch(player._id, { deckVersionId: version._id })
+    await ctx.db.patch(player._id, {
+      deckVersionId: version._id,
+      ...(await pinnedDeck(ctx, version._id)),
+    })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return { deckId: deck._id, deckVersionId: version._id }
   },
@@ -1467,6 +1532,49 @@ export const stats = query({
           ...(await versionRecord(ctx, version._id)),
         })),
       ),
+    }
+  },
+})
+
+export const moveToDevice = mutation({
+  args: { deckId: v.id("decks"), expectedRevision: v.number() },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    if (deck.movedToDeviceAt !== undefined) return syncedDeck(deck)
+    if ((deck.syncRevision ?? 0) !== args.expectedRevision)
+      throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
+    const now = Date.now()
+    await ctx.db.patch(deck._id, {
+      archivedAt: now,
+      movedToDeviceAt: now,
+      updatedAt: now,
+      syncRevision: (deck.syncRevision ?? 0) + 1,
+    })
+    return syncedDeck((await ctx.db.get(deck._id))!)
+  },
+})
+
+export const statsForKey = query({
+  args: { deckKey: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    assertDeckKey(args.deckKey)
+    const deckKey =
+      (await resultDeckKey(ctx, { userId: user._id, deckKey: args.deckKey })) ?? args.deckKey
+    const rows = ctx.db
+      .query("deckKeyStats")
+      .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+        q.eq("userId", user._id).eq("deckKey", deckKey),
+      )
+    const all = await ctx.db
+      .query("deckKeyStats")
+      .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+        q.eq("userId", user._id).eq("deckKey", deckKey).eq("fingerprint", "all"),
+      )
+      .unique()
+    return {
+      all,
+      fingerprints: (await rows.take(51)).filter((row) => row.fingerprint !== "all").slice(0, 50),
     }
   },
 })

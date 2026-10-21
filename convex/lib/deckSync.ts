@@ -5,6 +5,7 @@ import type { Doc } from "../_generated/dataModel"
 
 export const syncedDeckValidator = v.object({
   id: v.string(),
+  deckKey: v.optional(v.string()),
   deckId: v.id("decks"),
   revision: v.number(),
   name: v.string(),
@@ -19,6 +20,7 @@ export const syncedDeckValidator = v.object({
 export function syncedDeck(deck: Doc<"decks">) {
   return {
     id: deck.syncId ?? deck._id,
+    ...(deck.deckKey ? { deckKey: deck.deckKey } : {}),
     deckId: deck._id,
     revision: deck.syncRevision ?? 0,
     name: deck.name,

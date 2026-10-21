@@ -1,6 +1,7 @@
 import type { FunctionArgs } from "convex/server"
 import { convexTest, type TestConvex } from "convex-test"
 
+import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
@@ -145,6 +146,7 @@ describe("removeAbandonedGameResults", () => {
 
   it("removes only abandoned games and keeps finished no-winner games counting", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { deckA, deckB } = await seed(t)
     const before = await state(t)
     expect(before.results).toHaveLength(4)
@@ -163,6 +165,7 @@ describe("removeAbandonedGameResults", () => {
 
   it("stays exact when a run stops after deleting and restarts from the beginning", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { deckA, deckB } = await seed(t)
     const first = await t.mutation(internal.resultsBackfill.removeAbandonedGameResults, {
       paginationOpts: { numItems: 3, cursor: null },
@@ -186,6 +189,7 @@ describe("removeAbandonedGameResults", () => {
 
   it("floors counters at 0 when a deck's tally is already empty", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { deckA, deckB, versionB } = await seed(t)
     await t.run(async (ctx) => {
       const stats = await ctx.db
@@ -205,6 +209,7 @@ describe("removeAbandonedGameResults", () => {
 
   it("counts without writing on a dry run", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     await seed(t)
     const before = await state(t)
     const log = jest.spyOn(console, "log").mockImplementation(() => {})

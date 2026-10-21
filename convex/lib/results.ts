@@ -1,6 +1,8 @@
+import { addDeckResult, removeDeckResult, canonicalResultId, gameResultId } from "./deckResults"
 import type { MatchOutcome } from "./matchResults"
+import { MAX_PLAYERS } from "./policy"
 import type { Doc, Id } from "../_generated/dataModel"
-import type { MutationCtx } from "../_generated/server"
+import type { MutationCtx, QueryCtx } from "../_generated/server"
 
 // why: the only writer of deck result rows and deck stat counters, so every source counts the same way.
 // why: Scryve games stay in top-level fields and other lines in envelopes; decks.ts reads both, and merging them needs a backfill.
@@ -15,7 +17,7 @@ export type ResultTally = {
 
 type StatsDoc = Doc<"deckStats"> | Doc<"deckVersionStats">
 type EnvelopeLine = "manualMatches" | "manualGames" | "connectedMatches"
-type TallyDeltas = Partial<Record<"games" | EnvelopeLine, ResultTally>>
+export type TallyDeltas = Partial<Record<"games" | EnvelopeLine, ResultTally>>
 type StatsPatch = Partial<Record<keyof typeof EMPTY_GAMES, number>> &
   Partial<Record<EnvelopeLine, ResultTally>> & { updatedAt: number }
 
@@ -23,7 +25,7 @@ const ENVELOPE_LINES = ["manualMatches", "manualGames", "connectedMatches"] as c
 const EMPTY_GAMES = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
 const MAX_ROWS_PER_MATCH = 10
 
-function outcomeTally(outcome: MatchOutcome): ResultTally {
+export function outcomeTally(outcome: MatchOutcome): ResultTally {
   return {
     total: 1,
     wins: outcome === "win" ? 1 : 0,
@@ -104,10 +106,25 @@ export async function recordPlayerResult(
   summary: Doc<"gameSummaries">,
   player: Doc<"gameSummaries">["players"][number],
   now: number,
+  source?: "local" | "nearby" | "connected",
 ) {
-  if (isAbandonedSummary(summary) || !player.userId || !player.deckId || !player.deckVersionId)
-    return
+  if (isAbandonedSummary(summary) || !player.userId) return
   const outcome = player.outcome ?? "unknown"
+  source ??= await gameResultSource(ctx, summary)
+  await addDeckResult(ctx, {
+    resultId: gameResultId(summary, player),
+    userId: player.userId,
+    deckKey: await resultDeckKey(ctx, player),
+    fingerprint: player.deckFingerprint,
+    kind: "game",
+    source,
+    outcome,
+    finishedAt: summary.finishedAt,
+    summaryId: summary._id,
+    matchId: summary.matchId,
+    deltas: { games: outcomeTally(outcome) },
+  })
+  if (!player.deckId || !player.deckVersionId) return
   await ctx.db.insert("deckGameResults", {
     deckId: player.deckId,
     deckVersionId: player.deckVersionId,
@@ -132,7 +149,8 @@ export async function recordGameResults(
   summary: Doc<"gameSummaries">,
   now: number,
 ) {
-  for (const player of summary.players) await recordPlayerResult(ctx, summary, player, now)
+  const source = await gameResultSource(ctx, summary)
+  for (const player of summary.players) await recordPlayerResult(ctx, summary, player, now, source)
 }
 
 /** why: the abandoned-game backfill must undo exactly what recordGameResults added. */
@@ -141,6 +159,12 @@ export async function removeGameResult(
   result: Doc<"deckGameResults">,
   now: number,
 ) {
+  const summary = await ctx.db
+    .query("gameSummaries")
+    .withIndex("by_game", (q) => q.eq("gameId", result.gameId))
+    .unique()
+  const player = summary?.players.find((player) => player.playerId === result.playerId)
+  if (summary && player) await removeDeckResult(ctx, gameResultId(summary, player))
   await ctx.db.delete(result._id)
   await applyStats(
     ctx,
@@ -157,7 +181,10 @@ function ownerSeatOf(match: Doc<"matches">) {
 }
 
 // why: record and remove derive counters from the stored seats so they always cancel out.
-function matchDeltas(match: Doc<"matches">, owner: Doc<"matches">["seats"][number]): TallyDeltas {
+export function matchDeltas(
+  match: Doc<"matches">,
+  owner: Doc<"matches">["seats"][number],
+): TallyDeltas {
   const matchTally = outcomeTally(owner.outcome ?? "unknown")
   if (match.source === "connected") return { connectedMatches: matchTally }
   const others = match.seats.filter((seat) => seat.seat !== owner.seat)
@@ -184,9 +211,25 @@ function deckedOwnerSeat(match: Doc<"matches">) {
 }
 
 export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
-  const owner = deckedOwnerSeat(match)
-  if (!owner || match.finishedAt === undefined) return
+  if (match.finishedAt === undefined) return
   if (match.source === "connected" && match.status !== "finished") return
+  for (const seat of match.seats) {
+    if (!seat.userId) continue
+    await addDeckResult(ctx, {
+      resultId: canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
+      userId: seat.userId,
+      deckKey: await resultDeckKey(ctx, seat),
+      fingerprint: seat.deckFingerprint,
+      kind: "match",
+      source: match.source,
+      outcome: seat.outcome ?? "unknown",
+      finishedAt: match.finishedAt,
+      matchId: match._id,
+      deltas: matchDeltas(match, seat),
+    })
+  }
+  const owner = deckedOwnerSeat(match)
+  if (!owner) return
   await ctx.db.insert("deckMatchResults", {
     deckId: owner.deckId,
     deckVersionId: owner.deckVersionId,
@@ -201,6 +244,11 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
 
 /** why: deleting a manual match must reverse exactly what recordMatchResult added. */
 export async function removeMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
+  for (const seat of match.seats)
+    await removeDeckResult(
+      ctx,
+      canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
+    )
   const owner = deckedOwnerSeat(match)
   if (!owner || match.finishedAt === undefined) return
   const finishedAt = match.finishedAt
@@ -213,4 +261,34 @@ export async function removeMatchResult(ctx: MutationCtx, match: Doc<"matches">,
     .take(MAX_ROWS_PER_MATCH)
   for (const result of results) await ctx.db.delete(result._id)
   await applyStats(ctx, owner.deckId, owner.deckVersionId, matchDeltas(match, owner), -1, now)
+}
+
+export async function resultDeckKey(
+  ctx: MutationCtx | QueryCtx,
+  seat: { deckKey?: string; deckId?: Id<"decks">; userId?: Id<"users"> },
+) {
+  if (seat.deckKey) {
+    if (seat.userId) {
+      const alias = await ctx.db
+        .query("decks")
+        .withIndex("by_owner_and_guest_local_id", (q) =>
+          q.eq("ownerUserId", seat.userId!).eq("guestLocalId", seat.deckKey),
+        )
+        .unique()
+      if (alias) return alias.deckKey ?? alias.syncId ?? String(alias._id)
+    }
+    return seat.deckKey
+  }
+  const deck = seat.deckId ? await ctx.db.get(seat.deckId) : null
+  return deck ? (deck.deckKey ?? deck.syncId ?? String(deck._id)) : undefined
+}
+
+export async function gameResultSource(ctx: MutationCtx, summary: Doc<"gameSummaries">) {
+  const game = await ctx.db.get(summary.gameId)
+  if (game?.mode !== "local") return "connected" as const
+  const players = await ctx.db
+    .query("gamePlayers")
+    .withIndex("by_game", (q) => q.eq("gameId", summary.gameId))
+    .take(MAX_PLAYERS)
+  return players.some((player) => player.seatPassHash) ? ("nearby" as const) : ("local" as const)
 }

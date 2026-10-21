@@ -153,6 +153,7 @@ const fieldNames: Record<FieldName<PendingDeckWrite>, true> = {
   game: true,
   note: true,
   deleted: true,
+  deckKey: true,
 }
 
 const codec: DurableOutboxCodec<PendingDeckWrite, FailedDeckWrite> = {

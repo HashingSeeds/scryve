@@ -1,0 +1,40 @@
+[
+  {
+    "cards": [],
+    "canonical": "v1:[]",
+    "hex": "47b17e54bc62242c2c81f577095c22a3f82e9e283fb2cf5b03f1c4d5b2a35080"
+  },
+  {
+    "cards": [
+      {
+        "name": "Art A",
+        "oracleId": "oracle-a",
+        "board": "main",
+        "quantity": 1
+      },
+      {
+        "name": "Art B",
+        "cardId": "oracle-a",
+        "game": "mtg",
+        "identityNamespace": "scryfall-oracle",
+        "section": "main",
+        "quantity": 2
+      },
+      {
+        "name": "Commander",
+        "oracleId": "oracle-a",
+        "board": "commander",
+        "commanderColor": "G",
+        "quantity": 1
+      },
+      {
+        "game": "pokemon",
+        "name": "Unknown",
+        "originalReference": "  Ｐikachu   EX  ",
+        "quantity": 2
+      }
+    ],
+    "canonical": "v1:[[\"mtg\",\"scryfall-oracle\",\"oracle-a\",\"commander\",\"G\",1],[\"mtg\",\"scryfall-oracle\",\"oracle-a\",\"main\",\"\",3],[\"pokemon\",\"tcgdex-card\",[\"unresolved\",\"pikachu ex\"],\"main\",\"\",2]]",
+    "hex": "3cde13a94f186837dd8522fc7f34a3a20a474067217efa193e645917b82e4268"
+  }
+]
