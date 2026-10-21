@@ -774,6 +774,22 @@ describe("card details batch", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it("refetches a cached Pokémon whose category and HP a brief result erased", async () => {
+    const t = makeConvexTest()
+    const full = { ...pokemonCard, stage: "Stage 2", types: ["Fire"], hp: 120 }
+    const { category: _erased, ...damaged } = normalizePokemonCards(full)[0]
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: [{ ...damaged, facets: [] }] })
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response(full))
+
+    await expect(
+      t.action(api.cards.byCatalogId, { game: "pokemon", cardId: "base1-4" }),
+    ).resolves.toMatchObject({
+      category: "Pokemon",
+      facets: expect.arrayContaining([{ key: "hp", value: "120" }]),
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
   it("keeps catalog capability restrictions for batched details", async () => {
     const t = makeConvexTest()
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
