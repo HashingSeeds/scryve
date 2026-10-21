@@ -22,7 +22,7 @@ import {
   parseHp,
   pokemonName,
   rotatedLayerStyle,
-  type BenchClearance,
+  type MenuClearance,
 } from "./pokemonCardLayout"
 import { catalogRows, hitDetail, pokemonPrintingLabel } from "./pokemonCatalogHits"
 import { PokemonKeypad, tallestKeypadHeight } from "./PokemonKeypad"
@@ -53,7 +53,7 @@ export interface PokemonSheetProps {
   cardWidth: number
   cardHeight: number
   insets: LifeCardContentInsets
-  clearance: BenchClearance
+  clearance: MenuClearance
   compact?: boolean
   damageStep: number
   mode: PokemonSheetMode

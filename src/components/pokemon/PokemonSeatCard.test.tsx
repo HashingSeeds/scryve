@@ -183,15 +183,14 @@ describe("PokemonSeatCard", () => {
 
   it.each([
     { menuCorner: undefined, insets: undefined, left: 16, right: 16 },
-    { menuCorner: "topLeft", insets: undefined, left: 44, right: 16 },
     {
       menuCorner: "topRight",
       insets: { top: 0, bottom: 0, left: 47, right: 0 },
       left: 63,
-      right: 44,
+      right: 16,
     },
   ] as const)(
-    "ends the bench $left and $right from the seat edges, on the mark line or past the menu",
+    "ends the bench $left and $right from the seat edges, on the mark line wherever the menu sits",
     ({ menuCorner, insets, left, right }) => {
       const table = pokemonTable(["Ada", "Grace"])
       render(<Seat harness={table} seat={0} menuCorner={menuCorner} contentInsets={insets} />)
@@ -201,12 +200,12 @@ describe("PokemonSeatCard", () => {
 
       const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
       const bench = StyleSheet.flatten(screen.getByTestId("pokemon-bench-seat-1").props.style)
-      expect((layer.paddingLeft as number) + (bench.marginLeft as number)).toBe(left)
-      expect((layer.paddingRight as number) + (bench.marginRight as number)).toBe(right)
+      expect((layer.paddingLeft as number) + (bench.marginHorizontal as number)).toBe(left)
+      expect((layer.paddingRight as number) + (bench.marginHorizontal as number)).toBe(right)
     },
   )
 
-  it("drops the bench below a menu centered on the seat's top edge", () => {
+  it("drops the Active below a menu centered on the seat's top edge", () => {
     const table = pokemonTable(["Ada", "Grace"])
     render(<Seat harness={table} seat={0} menuEdgeCenter="top" />)
     fireEvent(screen.getByTestId("pokemon-card-seat-1"), "layout", {

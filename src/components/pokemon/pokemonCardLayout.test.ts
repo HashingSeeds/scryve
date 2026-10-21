@@ -1,6 +1,6 @@
 import {
   benchChipMetrics,
-  benchMenuClearance,
+  menuClearance,
   CHIP_BAR_HEIGHT,
   contentInsetsFor,
   heroFontSize,
@@ -30,25 +30,25 @@ describe("pokemonCardLayout", () => {
     expect(contentInsetsFor(-90, insets)).toEqual({ top: 0, right: 50, bottom: 0, left: 34 })
   })
 
-  it("drops the bench below a centered menu and shortens it beside a corner menu", () => {
+  it("clears a menu centered on the top edge or in a top corner", () => {
     const none = { top: 0, left: 0, right: 0 }
-    expect(benchMenuClearance(0, undefined, "top")).toEqual({ ...none, top: MENU_CLEARANCE })
-    expect(benchMenuClearance(180, undefined, "bottom")).toEqual({ ...none, top: MENU_CLEARANCE })
-    expect(benchMenuClearance(180, undefined, "top")).toEqual(none)
-    expect(benchMenuClearance(0, "topLeft", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
-    expect(benchMenuClearance(0, "topRight", undefined)).toEqual({ ...none, right: MENU_CLEARANCE })
-    expect(benchMenuClearance(0, "bottomLeft", undefined)).toEqual(none)
-    expect(benchMenuClearance(90, "topRight", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
-    expect(benchMenuClearance(90, "bottomRight", undefined)).toEqual({
+    expect(menuClearance(0, undefined, "top")).toEqual({ ...none, top: MENU_CLEARANCE })
+    expect(menuClearance(180, undefined, "bottom")).toEqual({ ...none, top: MENU_CLEARANCE })
+    expect(menuClearance(180, undefined, "top")).toEqual(none)
+    expect(menuClearance(0, "topLeft", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
+    expect(menuClearance(0, "topRight", undefined)).toEqual({ ...none, right: MENU_CLEARANCE })
+    expect(menuClearance(0, "bottomLeft", undefined)).toEqual(none)
+    expect(menuClearance(90, "topRight", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
+    expect(menuClearance(90, "bottomRight", undefined)).toEqual({
       ...none,
       right: MENU_CLEARANCE,
     })
-    expect(benchMenuClearance(90, "topLeft", undefined)).toEqual(none)
-    expect(benchMenuClearance(-90, "bottomLeft", undefined)).toEqual({
+    expect(menuClearance(90, "topLeft", undefined)).toEqual(none)
+    expect(menuClearance(-90, "bottomLeft", undefined)).toEqual({
       ...none,
       left: MENU_CLEARANCE,
     })
-    expect(benchMenuClearance(180, "bottomRight", undefined)).toEqual({
+    expect(menuClearance(180, "bottomRight", undefined)).toEqual({
       ...none,
       left: MENU_CLEARANCE,
     })
