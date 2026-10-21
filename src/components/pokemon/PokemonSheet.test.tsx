@@ -282,6 +282,22 @@ describe("PokemonSheet", () => {
     })
   })
 
+  it("gives a cardless Pokémon's search the room above the keypad while typing", async () => {
+    mockAction.mockResolvedValue([hit])
+    const pokemon = { id: "active-001", hp: 999, prizes: 1, damage: 0 }
+    render(sheet({ mode: { kind: "edit", pokemon, slot: "active" } }))
+
+    fireEvent(screen.getByTestId("pokemon-search-seat-1"), "focus")
+    for (const key of ["c", "h"]) fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    act(() => jest.advanceTimersByTime(350))
+    await flush()
+    expect(screen.getByTestId("pokemon-result-sv03-125")).toBeTruthy()
+    expect(screen.queryByTestId("pokemon-name-input-seat-1")).toBeNull()
+
+    fireEvent(screen.getByTestId("pokemon-search-seat-1"), "blur")
+    expect(screen.getByTestId("pokemon-name-input-seat-1")).toBeTruthy()
+  })
+
   it("keeps a half-typed Pokémon on screen when the connection comes back", () => {
     mockOnline = false
     const view = render(sheet())
