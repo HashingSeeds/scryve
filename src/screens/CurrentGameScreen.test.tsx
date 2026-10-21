@@ -370,6 +370,19 @@ describe("CurrentGameScreen", () => {
     )
   })
 
+  it("forgets who went first when the result is cleared before play", () => {
+    const rolls = [0.9, 0.1]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const initial = game()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
+    fireEvent.press(view.getByTestId("dice-chip-1-first"))
+    expect(repository.loadActiveGame()?.firstPlayerId).toBeUndefined()
+  })
+
   it("flips a coin for Pokémon and lets the winner choose first or second", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const initial = game(2, "pokemon")

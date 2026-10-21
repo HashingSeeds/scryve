@@ -186,16 +186,17 @@ export function useLocalGame(
   }, [replaceBoard])
 
   const setFirstPlayer = useCallback(
-    (playerId: PlayerId) => {
+    (playerId: PlayerId | undefined) => {
       const current = gameRef.current
       if (
         current.status !== "active" ||
         hasPlayBegun(current) ||
         current.firstPlayerId === playerId ||
-        !current.players.some(({ id }) => id === playerId)
+        (playerId !== undefined && !current.players.some(({ id }) => id === playerId))
       )
         return
-      replaceBoard({ ...current, firstPlayerId: playerId })
+      const { firstPlayerId: _previous, ...board } = current
+      replaceBoard(playerId === undefined ? board : { ...board, firstPlayerId: playerId })
     },
     [replaceBoard],
   )
