@@ -3,14 +3,17 @@ import { v } from "convex/values"
 
 import type { Doc } from "./_generated/dataModel"
 import { query, type QueryCtx } from "./_generated/server"
+import { maskSummaryPlayersForViewer } from "./games"
 import { requireUser } from "./lib/auth"
 import { assertDeckKey } from "./lib/deckKeys"
+import { blockedUserIdsFor } from "./lib/moderation"
+import { boundedPaginationOptions } from "./lib/pagination"
 import { resultDeckKey } from "./lib/results"
 
-// why: breakdowns read result rows, so a deck past this many results is broken down by its latest ones.
 export const BREAKDOWN_SCAN = 1000
 const MAX_LISTS = 50
 const MAX_DECK_TOTALS = 1000
+const GAMES_PAGE_ROWS = 100
 
 type Result = Doc<"deckResults">
 
@@ -33,10 +36,8 @@ function resultsFor(ctx: QueryCtx, key: Awaited<ReturnType<typeof callerKey>>) {
 }
 
 const sourceGroup = (result: Result) => (result.source === "manual" ? "manual" : "scryve")
-// why: a connected match also records each of its games, so counting the match too would double it.
 const countsOnce = (result: Result) => result.kind === "game" || result.source === "manual"
 
-// why: slices hold plain outcome counts, so the client sums them for any filter without another query.
 export const summary = query({
   args: { deckKey: v.string() },
   handler: async (ctx, args) => {
@@ -115,7 +116,6 @@ export const summary = query({
 export const games = query({
   args: {
     deckKey: v.string(),
-    // why: null picks results recorded before lists were tracked.
     fingerprint: v.optional(v.union(v.string(), v.null())),
     podSize: v.optional(v.number()),
     source: v.optional(v.union(v.literal("scryve"), v.literal("manual"))),
@@ -138,7 +138,8 @@ export const games = query({
               : q.neq(q.field("source"), "manual"),
         ),
       )
-      .paginate(args.paginationOpts)
+      .paginate(boundedPaginationOptions(args.paginationOpts, GAMES_PAGE_ROWS))
+    const blocked = await blockedUserIdsFor(ctx, key.userId)
     return {
       ...page,
       page: await Promise.all(
@@ -146,7 +147,9 @@ export const games = query({
           const summary = result.summaryId ? await ctx.db.get(result.summaryId) : null
           const match = !summary && result.matchId ? await ctx.db.get(result.matchId) : null
           const opponents = summary
-            ? summary.players
+            ? maskSummaryPlayersForViewer(summary.players, key.userId, blocked, {
+                localGame: result.source === "local",
+              })
                 .filter((player) => player.userId !== key.userId)
                 .map((player) => ({ name: player.displayName, deckName: player.deckNameAtFinish }))
             : (match?.seats ?? [])
@@ -170,7 +173,6 @@ export const games = query({
   },
 })
 
-// why: deck list rows for decks on this device have no server row to carry their record.
 export const totalsByKey = query({
   args: {},
   handler: async (ctx) => {

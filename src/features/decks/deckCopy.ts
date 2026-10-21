@@ -3,7 +3,6 @@ import { translate } from "@/i18n/translate"
 import { versionLabel } from "../../../convex/lib/deckVersions"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "../../../convex/lib/nameFilter"
 
-// why: a percent over fewer games than this says more about luck than the deck.
 export const MIN_RATED_GAMES = 10
 
 export function recordText(record: Pick<DeckRecord, "wins" | "losses" | "draws">) {

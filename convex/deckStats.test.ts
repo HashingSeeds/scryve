@@ -172,6 +172,50 @@ it("pages a deck's games newest first with filters and the ids History opens", a
   expect(tracked.page).toHaveLength(2)
 })
 
+it("masks a blocked opponent's name the way History does", async () => {
+  const { t, actor } = await signedIn()
+  await actor.mutation(
+    api.games.publishFinishedLocalGame,
+    game("local-game-000000009", { win: true, finishedAt: T }),
+  )
+  const opponents = async () =>
+    (
+      await actor.query(api.deckStats.games, {
+        deckKey: "burn",
+        paginationOpts: { numItems: 10, cursor: null },
+      })
+    ).page[0].opponents.map((opponent) => opponent.name)
+  await t.run(async (ctx) => {
+    const rival = await ctx.db.insert("users", {
+      clerkUserId: "rival",
+      displayName: "rival",
+      createdAt: T,
+      updatedAt: T,
+    })
+    const summary = (await ctx.db.query("gameSummaries").first())!
+    await ctx.db.patch(summary._id, {
+      players: summary.players.map((player, index) =>
+        index === 1 ? { ...player, userId: rival, usernameAtFinish: "rivalname" } : player,
+      ),
+    })
+  })
+  expect(await opponents()).toContain("rivalname")
+  await t.run(async (ctx) => {
+    const owner = (await ctx.db.query("users").collect()).find(
+      (user) => user.displayName === "owner",
+    )!
+    const rival = (await ctx.db.query("users").collect()).find(
+      (user) => user.clerkUserId === "rival",
+    )!
+    await ctx.db.insert("userBlocks", {
+      blockerUserId: owner._id,
+      blockedUserId: rival._id,
+      createdAt: T,
+    })
+  })
+  expect(await opponents()).not.toContain("rivalname")
+})
+
 it("counts a connected match through its games only", async () => {
   const { t, actor } = await signedIn()
   const userId = (await t.run(async (ctx) => ctx.db.query("users").first()))!._id
