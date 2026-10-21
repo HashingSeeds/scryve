@@ -32,7 +32,11 @@ let mockPreventRemoveCallback:
   ((options: { data: { action: { type: string } } }) => void) | undefined
 const mockNavigationDispatch = jest.fn()
 const mockNavigation = { dispatch: mockNavigationDispatch }
-jest.mock("expo-router", () => ({ useNavigation: () => mockNavigation }))
+const mockStatsPush = jest.fn()
+jest.mock("expo-router", () => ({
+  useNavigation: () => mockNavigation,
+  router: { push: (...args: unknown[]) => mockStatsPush(...args) },
+}))
 jest.mock("expo-router/react-navigation", () => ({
   usePreventRemove: (preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
     mockPreventRemove = preventRemove
@@ -350,6 +354,16 @@ test("renders signed-in local deck stats by key with the same source filters", (
   )
   expect(mockStatsQuery).toHaveBeenCalledWith(expect.anything(), { deckKey: "stable-deck-key" })
   expect(view.getByText("3-1-0")).toBeTruthy()
+  fireEvent.press(view.getByTestId("open-deck-stats"))
+  expect(mockStatsPush).toHaveBeenCalledWith({
+    pathname: "/connected/decks/stats",
+    params: {
+      deckKey: "stable-deck-key",
+      deckName: "Offline Commander",
+      game: "mtg",
+      format: "commander",
+    },
+  })
   fireEvent.press(view.getByTestId("deck-stats-source-manual"))
   expect(view.getByText("1-1-0")).toBeTruthy()
 })

@@ -1,5 +1,8 @@
+import { clear } from "@/utils/storage"
+
 import { chosenDeckCards, chosenDeckKey, localDeckChoices, pinDeckChoice } from "./deckChoices"
 import { deckFingerprint } from "./deckFingerprint"
+import { lookupListSnapshot } from "./listSnapshots"
 
 const mockLoadPending = jest.fn()
 const mockMappedVersionId = jest.fn((_versionId: string): string | undefined => undefined)
@@ -37,6 +40,7 @@ jest.mock("./deckFingerprint", () => ({
 }))
 
 beforeEach(() => {
+  clear()
   jest.clearAllMocks()
   mockLoadCards.mockReturnValue(undefined)
   mockLoadPending.mockReturnValue([])
@@ -79,7 +83,9 @@ it("hashes only the selected synced version's cached cards and resolves its shel
   })
   expect(mockLoadCards).toHaveBeenCalledWith("version")
   expect(deckFingerprint).toHaveBeenCalledTimes(1)
-  expect(deckFingerprint).toHaveBeenCalledWith(cards.map((card) => ({ ...card, game: "mtg" })))
+  const pinned = cards.map((card) => ({ ...card, game: "mtg" }))
+  expect(deckFingerprint).toHaveBeenCalledWith(pinned)
+  expect(await lookupListSnapshot("synced-key", `v1:${"a".repeat(64)}`, "owner")).toEqual(pinned)
 })
 
 it("leaves an uncached synced list's fingerprint unknown", async () => {
@@ -102,6 +108,9 @@ it("loads only the selected local deck and never sends its local id as a server 
     deckFingerprint: `v1:${"a".repeat(64)}`,
   })
   expect(mockLoadGuestDeck).toHaveBeenCalledWith("local")
+  expect(await lookupListSnapshot("key", `v1:${"a".repeat(64)}`, "owner")).toEqual(
+    cards.map((card) => ({ ...card, game: "mtg" })),
+  )
   expect(mockLoadCards).not.toHaveBeenCalled()
 })
 

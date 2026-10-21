@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { type ReactNode, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
@@ -16,6 +16,8 @@ export interface SelectOption {
   id: string
   label: string
   detail?: string
+  accessory?: ReactNode
+  accessibilityLabel?: string
 }
 
 export type SelectFieldName = keyof (typeof common)["selectField"]["openHint"]
@@ -119,7 +121,7 @@ export function SelectField({
         accessibilityRole="button"
         accessibilityLabel={translate("common:selectField.triggerLabel", {
           label,
-          value: selected?.label ?? placeholder,
+          value: selected?.accessibilityLabel ?? selected?.label ?? placeholder,
         })}
         accessibilityHint={translate(`common:selectField.openHint.${field}`)}
         accessibilityState={{ expanded: open, disabled }}
@@ -140,6 +142,7 @@ export function SelectField({
             style={[themed($triggerValue), !selected && { color: colors.textDim }]}
           />
         </View>
+        {selected?.accessory}
         <Text text={dropsDown || !open ? CARET_DOWN : CARET_UP} style={themed($caret)} />
       </Pressable>
       <Modal transparent visible={open} animationType="none" onRequestClose={() => setOpen(false)}>
@@ -176,6 +179,8 @@ export function SelectField({
                 testID={testID ? `${testID}-option-${option.id}` : undefined}
                 label={option.label}
                 detail={option.detail}
+                accessory={option.accessory}
+                accessibilityLabel={option.accessibilityLabel}
                 selected={option.id === value}
                 onPress={() => choose(option.id)}
               />
@@ -190,6 +195,8 @@ export function SelectField({
 function MenuOption({
   label,
   detail,
+  accessory,
+  accessibilityLabel,
   selected,
   divided,
   testID,
@@ -197,6 +204,8 @@ function MenuOption({
 }: {
   label: string
   detail?: string
+  accessory?: ReactNode
+  accessibilityLabel?: string
   selected: boolean
   divided?: boolean
   testID?: string
@@ -210,6 +219,7 @@ function MenuOption({
     <Pressable
       testID={testID}
       accessibilityRole="menuitem"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       style={({ pressed }) => [
         themed($optionRow),
@@ -219,7 +229,10 @@ function MenuOption({
       onPress={onPress}
     >
       <View style={themed($optionText)}>
-        <Text text={label} numberOfLines={1} style={themed($optionLabel)} />
+        <View style={$optionName}>
+          <Text text={label} numberOfLines={1} style={[themed($optionLabel), $shrink]} />
+          {accessory}
+        </View>
         {detail ? (
           <Text size="xs" text={detail} numberOfLines={2} style={themed($optionDetail)} />
         ) : null}
@@ -302,3 +315,6 @@ const $optionText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $optionLabel: ThemedStyle<TextStyle> = () => ({ fontWeight: "400" })
 const $optionDetail: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $optionCheck: ThemedStyle<TextStyle> = () => ({ fontWeight: "700", lineHeight: 20 })
+
+const $optionName: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
+const $shrink: TextStyle = { flexShrink: 1 }

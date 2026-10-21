@@ -27,6 +27,7 @@ import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
+import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { useGuestDecks } from "@/features/decks/guestDeck"
 import {
   createLocalGame,
@@ -892,11 +893,24 @@ function NewGameForm({
                       options={[
                         ...(deck &&
                         !deckChoices.some((choice) => deckChoiceId(choice) === deckChoiceId(deck))
-                          ? [{ id: deckChoiceId(deck)!, label: deck.name }]
+                          ? [
+                              {
+                                id: deckChoiceId(deck)!,
+                                label: deck.name,
+                                accessory: deck.localId ? <DeviceGlyph /> : undefined,
+                                accessibilityLabel: deck.localId
+                                  ? translate("decks:stats.onDeviceLabel", { name: deck.name })
+                                  : undefined,
+                              },
+                            ]
                           : []),
                         ...deckChoices.map((choice) => ({
                           id: deckChoiceId(choice)!,
                           label: choice.name,
+                          accessory: choice.localId ? <DeviceGlyph /> : undefined,
+                          accessibilityLabel: choice.localId
+                            ? translate("decks:stats.onDeviceLabel", { name: choice.name })
+                            : undefined,
                         })),
                       ]}
                       onSelect={chooseDeck}

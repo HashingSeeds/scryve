@@ -58,6 +58,7 @@ export function DeckView({
   onCancel,
   onDetails,
   onAddMatch,
+  onStats,
   onAdd,
   onChooseCommander,
   commanderWarnings,
@@ -92,6 +93,7 @@ export function DeckView({
   onSave: () => void
   onCancel: () => void
   onDetails: () => void
+  onStats?: () => void
   onAddMatch?: () => void
   onAdd: () => void
   onChooseCommander?: () => void
@@ -184,7 +186,17 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
-              {stats ? <DeckStats {...stats} /> : statsContent}
+              {stats || statsContent ? (
+                <TouchableOpacity
+                  testID="open-deck-stats"
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("decks:stats.viewStats")}
+                  disabled={!onStats}
+                  onPress={onStats}
+                >
+                  {stats ? <DeckStats {...stats} /> : statsContent}
+                </TouchableOpacity>
+              ) : null}
               {onAddMatch ? (
                 <TouchableOpacity
                   testID="add-match-result"

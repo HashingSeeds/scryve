@@ -21,6 +21,7 @@ import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckCount } from "@/features/decks/DeckLimit"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncNotice } from "@/features/decks/LocalDeckSyncNotice"
@@ -118,6 +119,7 @@ function DeckRow({
 }) {
   const { theme, themed } = useAppTheme()
   const game = deck.game ?? DEFAULT_DECK_GAME
+  const local = guestDeckLocalId(String(deck._id)) !== undefined
   const favorite = deck.favoritedAt !== undefined
   const record = recordSummary(deck.keyRecord ?? deck.record)
   const versions =
@@ -135,13 +137,20 @@ function DeckRow({
         style={themed($openButton)}
         accessibilityRole="button"
         accessibilityLabel={
-          needsReview ? translate("decks:shelf.needsReview", { name: deck.name }) : deck.name
+          local
+            ? translate("decks:stats.onDeviceLabel", { name: deck.name })
+            : needsReview
+              ? translate("decks:shelf.needsReview", { name: deck.name })
+              : deck.name
         }
         activeOpacity={0.75}
         onPress={() => onPress()}
       >
         <View style={themed($rowCopy)}>
-          <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} />
+          <View style={$nameRow}>
+            <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} style={$name} />
+            {local ? <DeviceGlyph /> : null}
+          </View>
           <Text
             size="xxs"
             numberOfLines={1}
@@ -921,3 +930,6 @@ const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingVertical: spacing.xl,
 })
+
+const $nameRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
+const $name: TextStyle = { flexShrink: 1 }

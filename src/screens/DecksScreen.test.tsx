@@ -219,6 +219,11 @@ describe("DecksScreen", () => {
     const list = within(view.getByTestId("decks-list"))
     expect(list.getByText("On this device")).toBeTruthy()
     expect(list.getByText("Local 0")).toBeTruthy()
+    expect(list.getByLabelText("Local 0, on this device")).toBeTruthy()
+    expect(list.getAllByTestId("device-glyph").length).toBeGreaterThan(0)
+    expect(
+      within(view.getByTestId("deck-card-existing-deck")).queryByTestId("device-glyph"),
+    ).toBeNull()
     expect(list.getByText("Synced")).toBeTruthy()
   })
 
@@ -250,13 +255,14 @@ describe("DecksScreen", () => {
     })
     expect(view.getByText("Guest Commander")).toBeTruthy()
     expect(view.queryByText("Existing Deck")).toBeNull()
-    fireEvent.press(view.getByLabelText("Guest Modern"))
+    fireEvent.press(view.getByLabelText("Guest Modern, on this device"))
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ deckId: guestDeckRouteId(second.localId), name: "Guest Modern" }),
     )
     fireEvent.changeText(view.getByTestId("deck-search-input"), "modern")
     expect(view.queryByText("Guest Commander")).toBeNull()
     expect(view.getByText("Guest Modern")).toBeTruthy()
+    expect(view.getByLabelText("Guest Modern, on this device")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("deck-search-input"), "no match")
     expect(view.queryByText("Guest Commander")).toBeNull()
     expect(view.queryByText("Nothing matches")).toBeNull()
