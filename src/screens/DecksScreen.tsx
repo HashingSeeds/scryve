@@ -425,7 +425,7 @@ function DeckShelf({
           ) : null}
           {leftovers.error ? (
             <View>
-              <Text tx="decks:localSync.conflict" />
+              <Text tx="decks:localSync.failed" />
               <Button tx="common:retry" onPress={leftovers.retry} />
             </View>
           ) : null}

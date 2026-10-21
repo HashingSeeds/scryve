@@ -192,8 +192,10 @@ function commit(decks: GuestDeck[], failure: string) {
   if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) throw new GuestDeckStorageError(failure)
   snapshot = decks
   if (pendingLegacy) {
-    storage.delete(LEGACY_GUEST_DECK_KEY)
-    pendingLegacy = false
+    try {
+      storage.delete(LEGACY_GUEST_DECK_KEY)
+      pendingLegacy = false
+    } catch {}
   }
   notify()
 }
