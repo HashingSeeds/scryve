@@ -51,10 +51,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # expo doctor flags eas-cli as a project dependency, so CI installs a global copy pinned by
-      # package.json `config.easCli`, the version local scripts run too.
-      - name: Install EAS CLI
-        run: npm install -g "eas-cli@$(node -p "require('./package.json').config.easCli")"
+      - name: Set up EAS CLI
+        uses: ./.github/actions/setup-eas-cli
 
       - name: List fingerprint sources
         id: sources
@@ -146,8 +144,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install EAS CLI
-        run: npm install -g "eas-cli@$(node -p "require('./package.json').config.easCli")"
+      - name: Set up EAS CLI
+        uses: ./.github/actions/setup-eas-cli
 
       - name: Compare PR-token and release-token fingerprints
         env:
