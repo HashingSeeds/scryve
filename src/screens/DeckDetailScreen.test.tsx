@@ -1558,6 +1558,29 @@ describe("DeckDetailScreen", () => {
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("deleted-edit")
   })
 
+  it("says the deck is gone when another device deleted or moved it", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [{ ...cachedMetadata, revision: 6, deleted: true }]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: true,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("This deck may have been deleted.")).toBeTruthy()
+    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
+  })
+
   it("keeps same-name Pokemon reprints distinct when only original references identify them", () => {
     expect(
       cardDetailsKey(

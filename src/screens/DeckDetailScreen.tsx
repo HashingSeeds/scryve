@@ -774,7 +774,15 @@ function DeckDetailContent({
     }, translate("decks:detail.deleteFailed"))
   }
 
-  if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
+  if (!deck)
+    return (
+      <DeckDetailPlaceholder
+        summary={summary}
+        onBack={onBack}
+        access={access}
+        failure={knownDeleted ? { kind: "missing", retry: onBack } : undefined}
+      />
+    )
 
   const configuredSections = localizedDeckSections(deck.game, deck.format)
   const { accountMetadata, versionConflict, versionCardConflict, failureMessage } = view
