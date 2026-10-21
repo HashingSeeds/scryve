@@ -371,13 +371,16 @@ it("dual-writes local games and manual create/delete, and leaves totals intact w
   })
 })
 
-it("manual local decks record a fingerprint without a version", async () => {
+it("manual local decks record a fingerprint and name without a version", async () => {
   const t = setup()
   const { actor } = await account(t)
   const args = manual()
   args.me.deckKey = "offline"
   args.me.deckFingerprint = fingerprint
+  args.me.deckName = " Mono Red "
   const ack = await actor.mutation(api.matches.recordManualMatch, args)
+  const match = await t.run(async (ctx) => ctx.db.get(ack.matchId))
+  expect(match?.seats[0].deckName).toBe("Mono Red")
   expect(
     (await actor.query(api.decks.statsForKey, { deckKey: "offline" })).fingerprints,
   ).toHaveLength(1)

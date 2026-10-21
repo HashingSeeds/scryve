@@ -87,6 +87,7 @@ export const recordManualMatch = mutation({
       deckVersionId: v.optional(v.id("deckVersions")),
       deckKey: v.optional(v.string()),
       deckFingerprint: v.optional(v.string()),
+      deckName: v.optional(v.string()),
     }),
     opponents: v.array(
       v.object({
@@ -156,7 +157,9 @@ export const recordManualMatch = mutation({
               deckVersionId: attached.version._id,
               deckName: attached.deck.name,
             }
-          : {}),
+          : args.me.deckKey && args.me.deckName?.trim()
+            ? { deckName: assertDeckName(args.me.deckName) }
+            : {}),
         ...scoreFields(args.me),
         outcome: args.me.outcome,
       },
