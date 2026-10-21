@@ -167,7 +167,8 @@ export function CloudProviders({ children }: { children: ReactNode }) {
     <ClerkProvider
       publishableKey={config.value.clerkPublishableKey}
       tokenCache={tokenCache}
-      afterSignOutUrl={APP_ROOT_URL}
+      // why: on a development Clerk instance, signOut builds this URL from window.location, which React Native lacks, so native sign out threw after removing the session.
+      afterSignOutUrl={Platform.OS === "web" ? APP_ROOT_URL : undefined}
       __experimental_resourceCache={resourceCache}
     >
       <ConfiguredAuth convexUrl={config.value.convexUrl}>{children}</ConfiguredAuth>
