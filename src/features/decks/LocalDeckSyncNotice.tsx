@@ -35,9 +35,10 @@ export function LocalDeckSyncNotice({
   const ownerId = access.ownerId
   const localDecks = useGuestDecks().filter((local) => !excludedLocalIds?.has(local.localId))
   const capacity = useQuery(api.decks.capacity, access.ready && ownerId ? {} : "skip")
-  const [dismissed, setDismissed] = useState(
-    () => ownerId !== undefined && storage.getBoolean(dismissedKey(ownerId)) === true,
-  )
+  const [dismissedOwner, setDismissedOwner] = useState<string>()
+  const dismissed =
+    ownerId !== undefined &&
+    (dismissedOwner === ownerId || storage.getBoolean(dismissedKey(ownerId)) === true)
   const [picking, setPicking] = useState(false)
   const free = capacity ? capacity.limit - capacity.used : 0
   if (!ownerId || !capacity || dismissed || free < 1 || !localDecks.length) return null
@@ -58,7 +59,7 @@ export function LocalDeckSyncNotice({
           style={$flex1}
           onPress={() => {
             storage.set(dismissedKey(ownerId), true)
-            setDismissed(true)
+            setDismissedOwner(ownerId)
           }}
         />
       </View>

@@ -31,12 +31,16 @@ const access: CloudAccess = {
   request: jest.fn(),
 }
 
-function renderNotice() {
-  return render(
+function notice(cloud = access) {
+  return (
     <ThemeProvider initialContext="light">
-      <LocalDeckSyncNotice access={access} />
-    </ThemeProvider>,
+      <LocalDeckSyncNotice access={cloud} />
+    </ThemeProvider>
   )
+}
+
+function renderNotice() {
+  return render(notice())
 }
 
 describe("local deck sync notice", () => {
@@ -77,5 +81,15 @@ describe("local deck sync notice", () => {
     expect(view.queryByTestId("local-deck-sync-notice")).toBeNull()
     view.unmount()
     expect(renderNotice().queryByTestId("local-deck-sync-notice")).toBeNull()
+  })
+
+  it("stays hidden when the account finishes loading after the notice mounts", () => {
+    saveGuestDeck({ name: "Elves", format: "commander", cards: [] })
+    const first = renderNotice()
+    fireEvent.press(first.getByTestId("local-deck-sync-dismiss"))
+    first.unmount()
+    const view = render(notice({ ...access, ready: false, ownerId: undefined }))
+    view.rerender(notice())
+    expect(view.queryByTestId("local-deck-sync-notice")).toBeNull()
   })
 })
