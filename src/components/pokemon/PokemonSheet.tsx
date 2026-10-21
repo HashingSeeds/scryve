@@ -144,13 +144,14 @@ export function PokemonSheet({
   const searchField = useRef<ComponentRef<typeof TextField>>(null)
   useEffect(() => moveFocus(searchField.current ?? firstControl.current), [])
   const catalog = usePokemonCatalog(lookupOpen ? query : "")
-  const keepsCardlessHp = cardless && !draft.cardId && !draft.hp.trim()
+  // why: a pick the catalog can't give HP for (a Trainer, a failed lookup) still names a cardless Pokémon, which keeps counting damage; its card only sticks once HP is typed, since a card with no HP would read as 999 HP.
+  const keepsCardlessHp = cardless && !draft.hp.trim()
   const hp = keepsCardlessHp ? editing.hp : parseHp(draft.hp)
   const card: PokemonCard | undefined = hp
     ? {
         hp,
         prizes: draft.prizes,
-        ...(draft.cardId ? { cardId: draft.cardId } : {}),
+        ...(draft.cardId && !keepsCardlessHp ? { cardId: draft.cardId } : {}),
         ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
       }
     : undefined
