@@ -159,16 +159,14 @@ describe("guest deck storage", () => {
     expect(saveGuestDeck(deck, { localId: legacy.localId }).deckKey).toBe(legacy.localId)
   })
 
-  it("saves from the parsed snapshot without reading or validating the whole store again", () => {
-    saveGuestDeck(deck)
-    loadGuestDecks()
-    const read = jest.spyOn(storage, "getString")
-    const write = jest.spyOn(storage, "set")
-    saveGuestDeck({ ...deck, name: "Second" })
-    expect(read).not.toHaveBeenCalled()
-    expect(write).toHaveBeenCalledTimes(1)
-    read.mockRestore()
-    write.mockRestore()
+  it("keeps another tab's deck when writing from a stale snapshot", () => {
+    const first = saveGuestDeck(deck)
+    storage.set("decks.guest.v2", JSON.stringify([first, legacy]))
+
+    const second = saveGuestDeck({ ...deck, name: "Second" })
+
+    expect(loadGuestDecks()).toEqual([first, legacy, second])
+    expect(JSON.parse(storage.getString("decks.guest.v2") ?? "")).toEqual([first, legacy, second])
   })
 
   it("round-trips guest route ids", () => {

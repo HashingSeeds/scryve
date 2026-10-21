@@ -152,8 +152,10 @@ export default {
   },
   localSync: {
     notice_one: "{{count}} mazo solo está en este dispositivo. Puedes sincronizar {{free}} más.",
-    notice_many: "{{count}} de mazos solo están en este dispositivo. Puedes sincronizar {{free}} más.",
-    notice_other: "{{count}} mazos solo están en este dispositivo. Puedes sincronizar {{free}} más.",
+    notice_many:
+      "{{count}} de mazos solo están en este dispositivo. Puedes sincronizar {{free}} más.",
+    notice_other:
+      "{{count}} mazos solo están en este dispositivo. Puedes sincronizar {{free}} más.",
     choose: "Elige mazos para sincronizar",
     keepLocal: "Mantener en el dispositivo",
     pickTitle_one: "Elige {{count}} mazo para sincronizar",
@@ -165,9 +167,11 @@ export default {
     sync: "Sincronizar",
     syncing: "Sincronizando…",
     failed: "No se pudo sincronizar este mazo. Sigue guardado en este dispositivo.",
-    limit_reached: "Tus mazos sincronizados están llenos. El mazo sigue guardado en este dispositivo.",
+    limit_reached:
+      "Tus mazos sincronizados están llenos. El mazo sigue guardado en este dispositivo.",
     conflict: "Este mazo cambió en otro dispositivo. Sigue guardado en este dispositivo.",
-    kept_newer_edits: "Este mazo tiene ediciones más recientes. Sigue guardado en este dispositivo.",
+    kept_newer_edits:
+      "Este mazo tiene ediciones más recientes. Sigue guardado en este dispositivo.",
   },
   cardDetails: {
     offline: "Sin conexión. Mostrando la información guardada de la carta.",

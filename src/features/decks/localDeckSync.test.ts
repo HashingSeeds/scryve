@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
+import type { DeckSyncSnapshot } from "./decksSync"
 import { clearGuestDecks, loadGuestDecks, saveGuestDeck } from "./guestDeck"
 import { useLocalDeckLeftovers, useLocalDeckSync } from "./localDeckSync"
 import type { Id } from "../../../convex/_generated/dataModel"
@@ -40,6 +41,7 @@ const metadata = [
     updatedAt: 2,
   },
 ]
+const freshMetadata = { metadata, loading: false }
 
 function renderSync() {
   return renderHook(() => useLocalDeckSync("owner")).result.current
@@ -130,6 +132,49 @@ test("keeps edits newer than an import receipt", async () => {
   expect(loadGuestDecks()).toEqual([local])
 })
 
+test("preserves the original guest alias through sync, move, edit, and sync again", async () => {
+  const original = saveGuestDeck(deck, { deckKey: "stable-key" })
+  mockImportGuest.mockImplementation(async (args) => ({
+    status: "imported",
+    deckId,
+    localUpdatedAt: args.localUpdatedAt,
+  }))
+  const hook = renderHook(() => useLocalDeckSync("owner"))
+  await act(async () => {
+    await hook.result.current.sync(original.localId)
+  })
+  mockQuery.mockResolvedValue({
+    deck: {
+      ...deck,
+      _id: deckId,
+      deckKey: original.deckKey,
+      guestLocalId: original.localId,
+      syncRevision: 2,
+    },
+    cards: [],
+  })
+  let copyId = ""
+  await act(async () => {
+    copyId = await hook.result.current.keepOnDevice(deckId)
+  })
+  expect(copyId).not.toBe(original.localId)
+  act(() => {
+    saveGuestDeck({ ...deck, name: "Edited" }, { localId: copyId })
+    loadGuestDecks()
+  })
+  await act(async () => {
+    await hook.result.current.sync(copyId)
+  })
+  expect(mockImportGuest).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      deckKey: original.deckKey,
+      localId: original.localId,
+      name: "Edited",
+    }),
+  )
+  expect(loadGuestDecks()).toEqual([])
+})
+
 test("resolves live-key leftovers through Sync and leaves deleted-key copies alone", async () => {
   const local = saveGuestDeck(deck, { deckKey: "stable-key" })
   const other = saveGuestDeck(deck, { deckKey: "removed-key" })
@@ -140,7 +185,13 @@ test("resolves live-key leftovers through Sync and leaves deleted-key copies alo
   })
   const { result } = renderHook(() =>
     useLocalDeckLeftovers(
-      [...metadata, { ...metadata[0], id: "removed", deckKey: "removed-key", deleted: true }],
+      {
+        loading: false,
+        metadata: [
+          ...metadata,
+          { ...metadata[0], id: "removed", deckKey: "removed-key", deleted: true },
+        ],
+      },
       "owner",
       true,
     ),
@@ -150,21 +201,62 @@ test("resolves live-key leftovers through Sync and leaves deleted-key copies alo
   expect(result.current.error).toBe(false)
 })
 
-test("hides a failed leftover and offers a retry without deleting its content", async () => {
+test("waits for a successful metadata pull before reconciling cached leftovers", async () => {
   const local = saveGuestDeck(deck, { deckKey: "stable-key" })
-  mockImportGuest.mockRejectedValue(new Error("lost connection"))
-  const { result } = renderHook(() => useLocalDeckLeftovers(metadata, "owner", true))
-  await waitFor(() => expect(result.current.error).toBe(true))
-  expect(result.current.localIds.has(local.localId)).toBe(true)
+  const hook = renderHook(
+    (snapshot: Pick<DeckSyncSnapshot, "metadata" | "loading" | "unavailable">) =>
+      useLocalDeckLeftovers(snapshot, "owner", true),
+    { initialProps: { metadata, loading: true, unavailable: false } },
+  )
+  expect(mockImportGuest).not.toHaveBeenCalled()
+  expect(hook.result.current.localIds.has(local.localId)).toBe(false)
+  hook.rerender({ metadata, loading: false, unavailable: true })
+  expect(mockImportGuest).not.toHaveBeenCalled()
+  hook.rerender({
+    metadata: [{ ...metadata[0], deleted: true }],
+    loading: false,
+    unavailable: false,
+  })
+  expect(mockImportGuest).not.toHaveBeenCalled()
   expect(loadGuestDecks()).toEqual([local])
+
   mockImportGuest.mockResolvedValue({
     status: "already_imported",
     deckId,
     localUpdatedAt: local.updatedAt,
   })
-  act(() => result.current.retry())
+  hook.rerender({ metadata, loading: false, unavailable: false })
   await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+  expect(mockImportGuest).toHaveBeenCalledTimes(1)
 })
+
+test.each(["connection", "kept_newer_edits", "conflict"])(
+  "shows a failed leftover after %s and offers a retry without deleting its content",
+  async (failure) => {
+    const local = saveGuestDeck(deck, { deckKey: "stable-key" })
+    if (failure === "connection") mockImportGuest.mockRejectedValue(new Error("lost connection"))
+    else if (failure === "conflict")
+      mockImportGuest.mockRejectedValue(new ConvexError({ code: "sync_conflict" }))
+    else
+      mockImportGuest.mockResolvedValue({
+        status: "already_imported",
+        deckId,
+        localUpdatedAt: local.updatedAt - 1,
+      })
+    const { result } = renderHook(() => useLocalDeckLeftovers(freshMetadata, "owner", true))
+    expect(result.current.localIds.has(local.localId)).toBe(true)
+    await waitFor(() => expect(result.current.error).toBe(true))
+    expect(result.current.localIds.has(local.localId)).toBe(false)
+    expect(loadGuestDecks()).toEqual([local])
+    mockImportGuest.mockResolvedValue({
+      status: "already_imported",
+      deckId,
+      localUpdatedAt: local.updatedAt,
+    })
+    act(() => result.current.retry())
+    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+  },
+)
 
 test("reuses a saved move copy on retry and never deletes it on a later refusal", async () => {
   mockMove.mockRejectedValueOnce(new Error("connection lost"))

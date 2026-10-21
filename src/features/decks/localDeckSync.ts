@@ -4,7 +4,7 @@ import { ConvexError } from "convex/values"
 
 import { convexErrorCode } from "@/utils/convexError"
 
-import { getDeckSyncController, isDeckSyncEnabled, type SyncedDeck } from "./decksSync"
+import { getDeckSyncController, isDeckSyncEnabled, type DeckSyncSnapshot } from "./decksSync"
 import { useDeckMetadataWrites } from "./decksSyncWrites"
 import { useDeckVersionWrites } from "./decksVersionWrites"
 import {
@@ -62,7 +62,7 @@ export function useLocalDeckSync(ownerId: string | undefined) {
         const response = await importGuest({
           ...local.deck,
           deckKey: local.deckKey ?? local.localId,
-          localId,
+          localId: local.guestLocalId ?? localId,
           localUpdatedAt: local.updatedAt,
         })
         if (response.status === "limit_reached") return { status: "limit_reached" }
@@ -98,7 +98,7 @@ export function useLocalDeckSync(ownerId: string | undefined) {
       }
       if (existing && JSON.stringify(existing.deck) !== JSON.stringify(copy))
         throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
-      const draft = existing ?? saveGuestDeck(copy, { deckKey })
+      const draft = existing ?? saveGuestDeck(copy, { deckKey, guestLocalId: server.guestLocalId })
       setSyncing(draft.localId, true)
       try {
         const removed = await moveToDevice({ deckId, expectedRevision: server.syncRevision ?? 0 })
@@ -136,14 +136,18 @@ export function useDecksWithQueuedEdits(ownerId: string | undefined, ready: bool
 }
 
 export function useLocalDeckLeftovers(
-  metadata: SyncedDeck[],
+  {
+    metadata,
+    loading,
+    unavailable,
+  }: Pick<DeckSyncSnapshot, "metadata" | "loading" | "unavailable">,
   ownerId: string | undefined,
   ready: boolean,
 ) {
   const locals = useGuestDecks()
   const { sync } = useLocalDeckSync(ownerId)
   const attempted = useRef(new Set<string>())
-  const [error, setError] = useState(false)
+  const [failed, setFailed] = useState(new Set<string>())
   const moving = useSyncExternalStore(
     subscribeSyncing,
     () => syncingLocalIds,
@@ -156,25 +160,34 @@ export function useLocalDeckLeftovers(
     return locals.filter((local) => liveKeys.has(local.deckKey ?? local.localId))
   }, [locals, metadata])
   useEffect(() => {
-    if (!ready) return
+    if (!ready || loading || unavailable) return
     for (const local of leftovers) {
       const attempt = `${ownerId}:${local.localId}:${local.updatedAt}`
       if (moving.has(local.localId) || attempted.current.has(attempt)) continue
       attempted.current.add(attempt)
       void sync(local.localId).then(
         (result) => {
-          if (result.status !== "synced") setError(true)
+          if (result.status !== "synced") setFailed((previous) => new Set(previous).add(attempt))
         },
-        () => setError(true),
+        () => setFailed((previous) => new Set(previous).add(attempt)),
       )
     }
-  }, [leftovers, moving, ownerId, ready, sync, error])
+  }, [leftovers, moving, ownerId, ready, loading, unavailable, sync, failed])
   return {
-    localIds: new Set(leftovers.map((local) => local.localId)),
-    error,
+    localIds: new Set(
+      leftovers
+        .filter((local) => {
+          const attempt = `${ownerId}:${local.localId}:${local.updatedAt}`
+          return (
+            moving.has(local.localId) || (attempted.current.has(attempt) && !failed.has(attempt))
+          )
+        })
+        .map((local) => local.localId),
+    ),
+    error: failed.size > 0,
     retry: () => {
       attempted.current.clear()
-      setError(false)
+      setFailed(new Set())
     },
   }
 }

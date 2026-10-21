@@ -35,6 +35,7 @@ export type GuestDeck = {
   updatedAt: number
   deck: GuestDeckPayload
   deckKey?: string
+  guestLocalId?: string
 }
 
 export class GuestDeckStorageError extends Error {}
@@ -100,7 +101,12 @@ function isGuestDeck(value: unknown): value is GuestDeck {
     value.updatedAt >= value.createdAt &&
     isPayload(value.deck) &&
     (value.deckKey === undefined ||
-      (typeof value.deckKey === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.deckKey)))
+      (typeof value.deckKey === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.deckKey))) &&
+    (value.guestLocalId === undefined ||
+      (typeof value.guestLocalId === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          value.guestLocalId,
+        )))
   )
 }
 
@@ -177,8 +183,9 @@ function notify() {
 }
 
 function writableDecks() {
+  const decks = readStored()
   if (loadError) throw loadError
-  return snapshot
+  return decks
 }
 
 function commit(decks: GuestDeck[], failure: string) {
@@ -202,7 +209,7 @@ export function loadGuestDeck(localId: string) {
 
 export function saveGuestDeck(
   deck: GuestDeckPayload,
-  options: { localId?: string; now?: number; deckKey?: string } = {},
+  options: { localId?: string; now?: number; deckKey?: string; guestLocalId?: string } = {},
 ): GuestDeck {
   if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const decks = writableDecks()
@@ -225,6 +232,7 @@ export function saveGuestDeck(
     schemaVersion: 1,
     localId,
     deckKey,
+    guestLocalId: previous?.guestLocalId ?? options.guestLocalId,
     createdAt: previous?.createdAt ?? updatedAt,
     updatedAt,
     deck,
@@ -260,7 +268,7 @@ export function clearGuestDecks() {
 }
 
 export function acknowledgeGuestDeckImport(localId: string, updatedAt: number | null) {
-  const current = loadGuestDeck(localId)
+  const current = writableDecks().find((deck) => deck.localId === localId)
   if (!current || current.updatedAt !== updatedAt) return false
   deleteGuestDeck(localId)
   return true

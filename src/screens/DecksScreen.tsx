@@ -302,7 +302,7 @@ function DeckShelf({
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const onlineMine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
   const synced = useDeckSync(syncEnabled, access?.ownerId, access?.ready ?? false, onlineMine)
-  const leftovers = useLocalDeckLeftovers(synced.metadata, access?.ownerId, access?.ready ?? false)
+  const leftovers = useLocalDeckLeftovers(synced, access?.ownerId, access?.ready ?? false)
   const deviceRows = localRows.filter(
     (row) => !leftovers.localIds.has(guestDeckLocalId(String(row._id)) ?? ""),
   )
