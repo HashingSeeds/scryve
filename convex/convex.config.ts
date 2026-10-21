@@ -4,6 +4,7 @@ import { v } from "convex/values"
 
 const app = defineApp({
   env: {
+    CARD_CATALOG_SYNC: v.optional(v.string()),
     CLERK_SECRET_KEY: v.optional(v.string()),
     CLERK_WEBHOOK_SIGNING_SECRET: v.optional(v.string()),
     REVENUECAT_SECRET_API_KEY: v.optional(v.string()),

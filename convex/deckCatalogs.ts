@@ -5,7 +5,14 @@ import { ConvexError, v } from "convex/values"
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server"
-import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server"
+import {
+  action,
+  env,
+  internalAction,
+  internalMutation,
+  internalQuery,
+  query,
+} from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { assertDeckGameFormat, magicCatalogCardFields } from "./lib/deckGames"
 import { deckRateLimiter } from "./lib/deckRateLimits"
@@ -538,9 +545,11 @@ export const searchTopDecks = action({
   },
 })
 
+/** why: previews set CARD_CATALOG_SYNC=off to skip these writes; Top Decks still refresh on demand. */
 export const refreshScheduled = internalAction({
   args: {},
   handler: async (ctx) => {
+    if (env.CARD_CATALOG_SYNC === "off") return null
     if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks"))
       await ctx.runMutation(internal.deckCatalogs.seedMagicExamples, {})
     for (const game of GAME_SYSTEM_IDS.filter(isProviderGame)) {
