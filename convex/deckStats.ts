@@ -10,6 +10,7 @@ import { resultDeckKey } from "./lib/results"
 // why: breakdowns read result rows, so a deck past this many results is broken down by its latest ones.
 export const BREAKDOWN_SCAN = 1000
 const MAX_LISTS = 50
+const MAX_DECK_TOTALS = 1000
 
 type Result = Doc<"deckResults">
 
@@ -166,5 +167,27 @@ export const games = query({
         }),
       ),
     }
+  },
+})
+
+// why: deck list rows for decks on this device have no server row to carry their record.
+export const totalsByKey = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx)
+    const rows = await ctx.db
+      .query("deckKeyStats")
+      .withIndex("by_user_and_fingerprint", (q) =>
+        q.eq("userId", user._id).eq("fingerprint", "all"),
+      )
+      .take(MAX_DECK_TOTALS)
+    return rows.map(({ deckKey, games, wins, losses, draws, unknown }) => ({
+      deckKey,
+      games,
+      wins,
+      losses,
+      draws,
+      unknown,
+    }))
   },
 })

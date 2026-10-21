@@ -1,3 +1,4 @@
+import { honestRate, recordText } from "@/features/stats/deckStatsMath"
 import { translate } from "@/i18n/translate"
 
 import { versionLabel } from "../../../convex/lib/deckVersions"
@@ -30,6 +31,7 @@ export function deckNameWarning(name: string) {
 export function recordSummary(record: DeckRecord | undefined) {
   if (!record) return undefined
   if (record.games === 0) return translate("decks:record.noGames")
+  if (honestRate(record).tooFew) return recordText(record)
   return translate("decks:record.winRate", {
     percent: Math.round((record.wins / record.games) * 100),
     games: record.games,

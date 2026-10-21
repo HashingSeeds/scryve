@@ -201,3 +201,17 @@ it("counts a connected match through its games only", async () => {
   })
   expect(games.page.map((row) => row.kind)).toEqual(["game", "game", "game"])
 })
+
+it("lists each of the caller's deck keys with its total record", async () => {
+  const { t, actor } = await signedIn()
+  await actor.mutation(
+    api.games.publishFinishedLocalGame,
+    game("local-game-000000001", { win: true, fingerprint: list(1), finishedAt: T }),
+  )
+  expect(await actor.query(api.deckStats.totalsByKey, {})).toEqual([
+    { deckKey: "burn", games: 1, wins: 1, losses: 0, draws: 0, unknown: 0 },
+  ])
+  const other = t.withIdentity({ subject: "other" })
+  await other.mutation(api.users.syncCurrent, { displayName: "other" })
+  expect(await other.query(api.deckStats.totalsByKey, {})).toEqual([])
+})

@@ -333,6 +333,7 @@ export function createConvexReactMock() {
       if (connectedHarness.queryErrors.has(name)) throw new Error(`${name} failed`)
       if (name.includes("listMine"))
         return connectedHarness.decks === undefined ? undefined : { decks: connectedHarness.decks }
+      if (name.includes("totalsByKey")) return []
       if (name.includes("entitlements.current"))
         return { fullHistory: false, unlimitedDecks: false, deckAnalytics: false }
       return connectedHarness.projection
@@ -387,6 +388,7 @@ const connectedApi = {
     migrateMyHistoryEntries: "games.migrateMyHistoryEntries",
   },
   decks: { listMine: "decks.listMine", selectForSeat: "decks.selectForSeat" },
+  deckStats: { totalsByKey: "deckStats.totalsByKey" },
   moderation: {
     reportPlayer: "moderation.reportPlayer",
     blockPlayer: "moderation.blockPlayer",

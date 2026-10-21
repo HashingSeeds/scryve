@@ -526,6 +526,11 @@ export function DecksScreen({
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
   const guestDecks = useGuestDecks()
+  const totals = useQuery(api.deckStats.totalsByKey, access?.ready ? {} : "skip")
+  const keyTotals = useMemo(
+    () => new Map((totals ?? []).map(({ deckKey, ...record }) => [deckKey, record])),
+    [totals],
+  )
   const [collection, setCollection] = useState<DeckCollection>("all")
   const [system, setSystem] = useState(
     DECK_GAME_LIST.find((game) => game.id === initialSystem)?.id ?? ALL_SYSTEMS,
@@ -557,6 +562,7 @@ export function DecksScreen({
     game: guest.deck.game ?? DEFAULT_DECK_GAME,
     format: guest.deck.format,
     cardQuantity: guest.deck.cards.reduce((total, card) => total + card.quantity, 0),
+    keyRecord: keyTotals.get(guest.deckKey ?? guest.localId),
   }))
   const visibleGuestRows = guestRows.filter(
     (guestRow) =>

@@ -77,12 +77,21 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
   },
 }
 
+let mockTotals: {
+  deckKey: string
+  games: number
+  wins: number
+  losses: number
+  draws: number
+  unknown: number
+}[] = []
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexClient,
   useQuery: (reference: unknown, args?: unknown) => {
     if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error
     if (reference === "decks.capacity") return mockListMine.value?.capacity
+    if (reference === "deckStats.totalsByKey") return mockTotals
     return mockListMine.value
   },
   useMutation: () => mockSetFavorite,
@@ -90,6 +99,7 @@ jest.mock("convex/react", () => ({
 
 jest.mock("../../convex/_generated/api", () => ({
   api: {
+    deckStats: { totalsByKey: "deckStats.totalsByKey" },
     decks: {
       capacity: "decks.capacity",
       listMine: "decks.listMine",
@@ -227,6 +237,17 @@ describe("DecksScreen", () => {
     expect(list.getByText("Synced")).toBeTruthy()
   })
 
+  it("shows a local deck's record from its key totals", () => {
+    saveGuestDeck(
+      { name: "Local record", format: "commander", game: "mtg", cards: [] },
+      { deckKey: "local-key" },
+    )
+    mockTotals = [{ deckKey: "local-key", games: 4, wins: 3, losses: 1, draws: 0, unknown: 0 }]
+    const list = within(renderShelf().getByTestId("decks-list"))
+    expect(list.getByText("3-1")).toBeTruthy()
+    mockTotals = []
+  })
+
   it("leaves out the Synced label when only local decks exist", () => {
     saveGuestDeck({ name: "Local only", format: "commander", game: "mtg", cards: [] })
     mockListMine.value = {
@@ -318,7 +339,7 @@ describe("DecksScreen", () => {
     const view = renderShelf({ onSelect })
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByText("3 versions")).toBeTruthy()
-    expect(view.getByText("60% of 5")).toBeTruthy()
+    expect(view.getByText("3-2")).toBeTruthy()
     expect(
       StyleSheet.flatten(view.getByTestId("deck-card-existing-deck").props.style),
     ).toMatchObject({
@@ -576,7 +597,7 @@ describe("DecksScreen", () => {
     const view = renderShelf()
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByText("3 versions")).toBeTruthy()
-    expect(view.getByText("75% of 4")).toBeTruthy()
+    expect(view.getByText("3-1")).toBeTruthy()
     expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
   })
 
