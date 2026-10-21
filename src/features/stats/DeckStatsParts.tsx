@@ -22,12 +22,11 @@ export function statsDate(time: number) {
 }
 
 export function listDateSpan(row: ReturnType<typeof listStats>[number]) {
-  return row.firstAt !== undefined && row.lastAt !== undefined
-    ? translate("decks:stats.dateSpan", {
-        first: statsDate(row.firstAt),
-        last: statsDate(row.lastAt),
-      })
-    : translate("decks:stats.datesMissing")
+  if (row.firstAt === undefined || row.lastAt === undefined)
+    return translate("decks:stats.datesMissing")
+  const first = statsDate(row.firstAt)
+  const last = statsDate(row.lastAt)
+  return first === last ? first : translate("decks:stats.dateSpan", { first, last })
 }
 
 export function listLabel(row: ReturnType<typeof listStats>[number]) {

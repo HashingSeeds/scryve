@@ -41,7 +41,7 @@ type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void; source
 
 export function DeckCompareScreen(props: Props) {
   return (
-    <Screen safeAreaEdges={["top", "bottom"]}>
+    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
       <Header titleTx="decks:stats.compare" leftTx="common:back" onLeftPress={props.onBack} />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
@@ -260,3 +260,5 @@ const PICKER_SIDES = ["left", "right"] as const
 function pickerLabel(list: ReturnType<typeof listStats>[number]) {
   return `${listLabel(list)} ▾`
 }
+
+const $screen: ViewStyle = { flex: 1 }

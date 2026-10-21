@@ -16,7 +16,10 @@ jest.mock("@/features/billing/RevenueCatContext", () => ({
 it("labels current, previous and untracked lists with localized date spans", () => {
   const lists = listStats(deckStatsSummary, "scryve")
   expect(lists.map(listLabel)).toEqual(["Current", "Previous", "Not tracked"])
-  expect(listDateSpan(lists[0])).toContain("to")
+  const sep10 = new Date(2026, 8, 10, 12).getTime()
+  const oct1 = new Date(2026, 9, 1, 12).getTime()
+  expect(listDateSpan({ ...lists[0], firstAt: sep10, lastAt: oct1 })).toContain(" to ")
+  expect(listDateSpan({ ...lists[0], firstAt: oct1, lastAt: oct1 + 60_000 })).not.toContain(" to ")
   expect(listDateSpan({ ...lists[0], firstAt: undefined })).toBe("Dates not tracked")
   expect(listLabel({ ...lists[0], label: "dated" })).toBe(listDateSpan(lists[0]))
 })

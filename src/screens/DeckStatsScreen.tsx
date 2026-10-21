@@ -47,7 +47,7 @@ type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void }
 
 export function DeckStatsScreen(props: Props) {
   return (
-    <Screen safeAreaEdges={["top", "bottom"]}>
+    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
       <Header title={props.deckName} leftTx="common:back" onLeftPress={props.onBack} />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
@@ -137,11 +137,14 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
               <>
                 <View style={$hero}>
                   <Text testID="stats-headline" text={rate.text} style={[$headline, $numbers]} />
-                  {rate.tooFew ? (
-                    <Text size="xs" style={themed($dim)} tx="decks:stats.tooFew" />
-                  ) : null}
                   <Text
-                    text={`${recordText(record)} · ${translate("decks:stats.gameCount", { count: record.games })}`}
+                    text={[
+                      rate.tooFew ? undefined : recordText(record),
+                      translate("decks:stats.gameCount", { count: record.games }),
+                      rate.tooFew ? translate("decks:stats.tooFew") : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                     style={$numbers}
                   />
                   {manualMatches || connectedMatches ? (
@@ -290,7 +293,10 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 item.gamePublicId
                   ? router.push({
                       pathname: "/history/[gameId]",
-                      params: { gameId: item.gamePublicId, source: "connected" },
+                      params: {
+                        gameId: item.gamePublicId,
+                        ...(item.source === "connected" ? { source: "connected" } : {}),
+                      },
                     })
                   : item.matchPublicId
                     ? router.push({
@@ -359,3 +365,5 @@ const $actionTouch: ViewStyle = { minHeight: 44, justifyContent: "center", paddi
 const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $win: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
 const $loss: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
+
+const $screen: ViewStyle = { flex: 1 }

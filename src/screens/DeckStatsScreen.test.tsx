@@ -28,6 +28,7 @@ jest.mock("convex/react", () => ({
       results: [
         {
           resultId: "game",
+          source: "local",
           outcome: "win",
           finishedAt: 30,
           podSize: 4,
@@ -121,7 +122,7 @@ it("opens game and match history, disables missing history, and loads another pa
   fireEvent.press(view.getByTestId("stats-game-game"))
   expect(mockPush).toHaveBeenLastCalledWith({
     pathname: "/history/[gameId]",
-    params: { gameId: "game-public", source: "connected" },
+    params: { gameId: "game-public" },
   })
   fireEvent.press(view.getByTestId("stats-game-match"))
   expect(mockPush).toHaveBeenLastCalledWith({
