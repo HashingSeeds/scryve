@@ -144,11 +144,14 @@ jobs:
       - name: Check translations
         run: pnpm i18n:check
 
+      # Jest keys its transform cache by file content and config, so any older entry is safe. The
+      # sha suffix saves a fresh cache each run; an exact key would never pick up new test files.
       - name: Restore Jest cache
         uses: actions/cache@v4
         with:
           path: .jest-cache
-          key: jest-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: jest-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: jest-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Run Jest tests
         id: jest
