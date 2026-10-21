@@ -202,8 +202,22 @@ const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => undefined,
   useConvexConnectionState: () => mockConnectionState,
-  useQuery: (_reference: string, args: Record<string, unknown> | "skip") => {
+  useQuery: (reference: string, args: Record<string, unknown> | "skip") => {
     if (args === "skip") return undefined
+    if (reference === "decks.statsForKey") {
+      const record = mockDetail.value?.record as typeof loadedDetail.record | undefined
+      return record
+        ? {
+            all: {
+              ...record,
+              manualMatches: record.manual.matches,
+              manualGames: record.manual.games,
+              connectedMatches: undefined,
+            },
+            fingerprints: [],
+          }
+        : undefined
+    }
     queryArgs.push(args)
     if (mockDetail.error) throw mockDetail.error
     return mockDetail.value
@@ -247,6 +261,7 @@ jest.mock("../../convex/_generated/api", () => ({
   api: {
     decks: {
       detail: "decks.detail",
+      statsForKey: "decks.statsForKey",
       saveVersion: "decks.saveVersion",
       createVersion: "decks.createVersion",
       updateVersion: "decks.updateVersion",

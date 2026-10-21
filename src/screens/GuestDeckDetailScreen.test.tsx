@@ -7,11 +7,22 @@ import { ThemeProvider } from "@/theme/context"
 
 import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
+const mockStatsQuery = jest.fn((..._args: unknown[]) => ({
+  all: {
+    games: 4,
+    wins: 3,
+    losses: 1,
+    draws: 0,
+    manualMatches: { total: 2, wins: 1, losses: 1, draws: 0 },
+  },
+  fingerprints: [],
+}))
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
 const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvex,
+  useQuery: (...args: unknown[]) => mockStatsQuery(...args),
   useConvexConnectionState: () => mockConnectionState,
   useAction: () => mockSearchCards,
 }))
@@ -74,6 +85,7 @@ function renderScreen(onBack = jest.fn(), localId = mockStored.localId) {
 
 beforeEach(() => {
   clearCardDetails()
+  mockStatsQuery.mockClear()
   mockSearchCards.mockReset()
   mockConnectionState.isWebSocketConnected = true
   mockPreventRemove = false
@@ -209,7 +221,7 @@ test("cancel keeps a guest deck and confirm deletes it", () => {
 
 test("shows only the deck it was opened for", () => {
   const view = renderScreen(jest.fn(), "22222222-2222-4222-8222-222222222222")
-  expect(view.getByText("Guest deck unavailable")).toBeTruthy()
+  expect(view.getByText("Local deck unavailable")).toBeTruthy()
   expect(view.queryByText("Offline Commander")).toBeNull()
 })
 
@@ -317,4 +329,32 @@ test("shows lookup errors and retries when the saved card is reopened", async ()
   mockSearchCards.mockResolvedValueOnce({ oracleText: "Molecule Man rules text" })
   fireEvent.press(view.getByLabelText("1× Molecule Man"))
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
+})
+
+test("renders signed-in local deck stats by key with the same source filters", () => {
+  mockCurrent = { ...mockStored, deckKey: "stable-deck-key" }
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <GuestDeckDetailScreen
+        localId={mockStored.localId}
+        onBack={jest.fn()}
+        access={{
+          ready: true,
+          loading: false,
+          signedIn: true,
+          ownerId: "owner",
+          request: jest.fn(),
+        }}
+      />
+    </ThemeProvider>,
+  )
+  expect(mockStatsQuery).toHaveBeenCalledWith(expect.anything(), { deckKey: "stable-deck-key" })
+  expect(view.getByText("3-1-0")).toBeTruthy()
+  fireEvent.press(view.getByTestId("deck-stats-source-manual"))
+  expect(view.getByText("1-1-0")).toBeTruthy()
+})
+
+test("does not query account stats while signed out", () => {
+  renderScreen()
+  expect(mockStatsQuery).not.toHaveBeenCalled()
 })

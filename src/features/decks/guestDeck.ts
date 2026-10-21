@@ -6,7 +6,7 @@ import { translate } from "@/i18n/translate"
 import { saveString, storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
-import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
+import { MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
 
 const GUEST_DECKS_KEY = "decks.guest.v2"
 const LEGACY_GUEST_DECK_KEY = "decks.guest.v1"
@@ -27,13 +27,14 @@ const CARD_STRING_FIELDS = [
   "smallImageUrl",
 ] as const
 
-export type GuestDeckPayload = FunctionArgs<typeof api.decks.importResolved>
+export type GuestDeckPayload = Omit<FunctionArgs<typeof api.decks.importResolved>, "deckKey">
 export type GuestDeck = {
   schemaVersion: 1
   localId: string
   createdAt: number
   updatedAt: number
   deck: GuestDeckPayload
+  deckKey?: string
 }
 
 export class GuestDeckStorageError extends Error {}
@@ -97,7 +98,9 @@ function isGuestDeck(value: unknown): value is GuestDeck {
     typeof value.updatedAt === "number" &&
     Number.isSafeInteger(value.updatedAt) &&
     value.updatedAt >= value.createdAt &&
-    isPayload(value.deck)
+    isPayload(value.deck) &&
+    (value.deckKey === undefined ||
+      (typeof value.deckKey === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.deckKey)))
   )
 }
 
@@ -150,14 +153,19 @@ function migrateLegacyDeck(decks: GuestDeck[]) {
   }
 }
 
+let loadError: unknown
+let pendingLegacy = false
+
 function readStored(): GuestDeck[] {
+  loadError = undefined
   let store: ReturnType<typeof readStore>
   try {
     store = readStore()
-  } catch {
+  } catch (cause) {
+    loadError = cause
     return []
   }
-  if (store.legacy) migrateLegacyDeck(store.decks)
+  pendingLegacy = store.legacy && !migrateLegacyDeck(store.decks)
   return store.decks
 }
 
@@ -169,15 +177,17 @@ function notify() {
 }
 
 function writableDecks() {
-  const store = readStore()
-  if (store.legacy && !migrateLegacyDeck(store.decks))
-    throw new GuestDeckStorageError(translate("decks:guestStorage.saveFailed"))
-  return store.decks
+  if (loadError) throw loadError
+  return snapshot
 }
 
 function commit(decks: GuestDeck[], failure: string) {
   if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) throw new GuestDeckStorageError(failure)
   snapshot = decks
+  if (pendingLegacy) {
+    storage.delete(LEGACY_GUEST_DECK_KEY)
+    pendingLegacy = false
+  }
   notify()
 }
 
@@ -187,12 +197,12 @@ export function loadGuestDecks() {
 }
 
 export function loadGuestDeck(localId: string) {
-  return loadGuestDecks().find((deck) => deck.localId === localId)
+  return snapshot.find((deck) => deck.localId === localId)
 }
 
 export function saveGuestDeck(
   deck: GuestDeckPayload,
-  options: { localId?: string; now?: number } = {},
+  options: { localId?: string; now?: number; deckKey?: string } = {},
 ): GuestDeck {
   if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const decks = writableDecks()
@@ -201,16 +211,20 @@ export function saveGuestDeck(
     : undefined
   if (options.localId && !previous)
     throw new GuestDeckStorageError("Guest deck localId does not match a saved deck.")
-  if (!previous && decks.length >= FREE_DECK_LIMIT)
-    throw new GuestDeckStorageError(
-      translate("decks:guestStorage.limit", { limit: FREE_DECK_LIMIT }),
-    )
   const updatedAt = Math.max(options.now ?? Date.now(), (previous?.updatedAt ?? 0) + 1)
   if (!Number.isSafeInteger(updatedAt) || updatedAt < 0)
     throw new GuestDeckStorageError("Guest deck timestamp is invalid.")
+  const localId = previous?.localId ?? randomUUID()
+  const deckKey = previous?.deckKey ?? previous?.localId ?? options.deckKey ?? localId
+  if (
+    !/^[A-Za-z0-9_-]{1,128}$/.test(deckKey) ||
+    (previous && options.deckKey !== undefined && options.deckKey !== deckKey)
+  )
+    throw new GuestDeckStorageError("Deck key cannot change.")
   const next: GuestDeck = {
     schemaVersion: 1,
-    localId: previous?.localId ?? randomUUID(),
+    localId,
+    deckKey,
     createdAt: previous?.createdAt ?? updatedAt,
     updatedAt,
     deck,
@@ -240,27 +254,9 @@ export function clearGuestDecks() {
     throw new GuestDeckStorageError(translate("decks:guestStorage.deleteAllFailed"))
   }
   snapshot = []
+  loadError = undefined
+  pendingLegacy = false
   notify()
-}
-
-export function replaceGuestDeck(deck: GuestDeckPayload, expectedLocalId: string): GuestDeck {
-  const decks = writableDecks()
-  if (!decks.some((candidate) => candidate.localId === expectedLocalId))
-    throw new GuestDeckStorageError(translate("decks:guestStorage.changed"))
-  if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
-  const now = Date.now()
-  const next: GuestDeck = {
-    schemaVersion: 1,
-    localId: randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-    deck,
-  }
-  commit(
-    decks.map((candidate) => (candidate.localId === expectedLocalId ? next : candidate)),
-    translate("decks:guestStorage.saveFailed"),
-  )
-  return next
 }
 
 export function acknowledgeGuestDeckImport(localId: string, updatedAt: number | null) {

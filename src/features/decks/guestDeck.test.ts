@@ -9,7 +9,6 @@ import {
   loadGuestDeck,
   loadGuestDecks,
   saveGuestDeck,
-  replaceGuestDeck,
 } from "./guestDeck"
 import { FREE_DECK_LIMIT } from "../../../convex/lib/policy"
 
@@ -28,12 +27,11 @@ describe("guest deck storage", () => {
     loadGuestDecks()
   })
 
-  it("keeps up to the free deck limit and edits each deck in place", () => {
-    const saved = Array.from({ length: FREE_DECK_LIMIT }, (_, index) =>
+  it("keeps more decks than the synced deck limit and edits each deck in place", () => {
+    const saved = Array.from({ length: FREE_DECK_LIMIT + 3 }, (_, index) =>
       saveGuestDeck({ ...deck, name: `Deck ${index}` }, { now: 100 }),
     )
-    expect(new Set(saved.map((entry) => entry.localId)).size).toBe(FREE_DECK_LIMIT)
-    expect(() => saveGuestDeck({ ...deck, name: "Other" })).toThrow(`Only ${FREE_DECK_LIMIT}`)
+    expect(new Set(saved.map((entry) => entry.localId)).size).toBe(FREE_DECK_LIMIT + 3)
 
     const [first, second] = saved
     const edited = saveGuestDeck({ ...deck, name: "Updated" }, { localId: first.localId, now: 100 })
@@ -120,6 +118,7 @@ describe("guest deck storage", () => {
       throw new Error("disk unavailable")
     })
     const write = jest.spyOn(storage, "set")
+    loadGuestDecks()
     expect(() => saveGuestDeck(deck)).toThrow("Unable to read")
     expect(write).not.toHaveBeenCalled()
     read.mockRestore()
@@ -140,21 +139,36 @@ describe("guest deck storage", () => {
     set.mockRestore()
   })
 
-  it("replaces a confirmed slot atomically with a new identity", () => {
-    const first = saveGuestDeck(deck)
-    const second = saveGuestDeck({ ...deck, name: "Second" })
-    const set = jest.spyOn(storage, "set").mockImplementation(() => {
-      throw new Error("disk full")
-    })
-    expect(() => replaceGuestDeck({ ...deck, name: "New deck" }, first.localId)).toThrow(
-      "Unable to save",
+  it("defaults keys to localId and persists them through edits and reloads", () => {
+    const saved = saveGuestDeck(deck)
+    expect(saved.deckKey).toBe(saved.localId)
+    const edited = saveGuestDeck({ ...deck, name: "Edited" }, { localId: saved.localId })
+    expect(edited.deckKey).toBe(saved.deckKey)
+    expect(loadGuestDecks()[0].deckKey).toBe(saved.deckKey)
+    expect(saveGuestDeck(edited.deck).deckKey).not.toBe(saved.deckKey)
+  })
+
+  it("keeps a supplied key immutable and reads old decks without a key", () => {
+    const saved = saveGuestDeck(deck, { deckKey: "server-key" })
+    expect(saveGuestDeck(deck, { localId: saved.localId }).deckKey).toBe("server-key")
+    expect(() => saveGuestDeck(deck, { localId: saved.localId, deckKey: "other" })).toThrow(
+      "cannot change",
     )
-    expect(loadGuestDecks()).toEqual([first, second])
-    set.mockRestore()
-    const next = replaceGuestDeck({ ...deck, name: "New deck" }, first.localId)
-    expect(next.localId).not.toBe(first.localId)
-    expect(loadGuestDecks()).toEqual([next, second])
-    expect(() => replaceGuestDeck(deck, first.localId)).toThrow("saved deck changed")
+    storage.set("decks.guest.v2", JSON.stringify([legacy]))
+    loadGuestDecks()
+    expect(saveGuestDeck(deck, { localId: legacy.localId }).deckKey).toBe(legacy.localId)
+  })
+
+  it("saves from the parsed snapshot without reading or validating the whole store again", () => {
+    saveGuestDeck(deck)
+    loadGuestDecks()
+    const read = jest.spyOn(storage, "getString")
+    const write = jest.spyOn(storage, "set")
+    saveGuestDeck({ ...deck, name: "Second" })
+    expect(read).not.toHaveBeenCalled()
+    expect(write).toHaveBeenCalledTimes(1)
+    read.mockRestore()
+    write.mockRestore()
   })
 
   it("round-trips guest route ids", () => {
