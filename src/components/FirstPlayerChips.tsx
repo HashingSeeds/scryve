@@ -32,7 +32,7 @@ const GLYPH_SIZE = 20
 // why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
 const CHIP_ENTERING = ZoomIn.delay(260).duration(180).reduceMotion(ReduceMotion.Never)
 
-/** why: players read the board from every side, so the offer is repeated once per direction the seats face (`facings`, clockwise degrees in this view's frame), each copy turned toward its players. When seats face both across and along the board, the copies pinwheel around the menu button so neighbors never overlap. Each copy sits in a square around the anchor because Android drops touches outside a parent's bounds. */
+/** why: players read the board from both ends, so the offer is repeated once per direction in `facings` (at most two opposite directions, clockwise degrees in this view's frame), each copy turned toward its players and centered on the same line through the menu button. Each copy sits in a square around the anchor because Android drops touches outside a parent's bounds. */
 export const FirstPlayerChips = memo(function FirstPlayerChips({
   offer,
   anchor,
@@ -51,7 +51,6 @@ export const FirstPlayerChips = memo(function FirstPlayerChips({
   const animateFully = useReducedMotion() === false
   const reach = (compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE) / 2 + CHIP_GAP
   const box = 2 * (reach + CHIP_MAX_WIDTH)
-  const pinwheel = facings.some((f) => f % 180 === 0) && facings.some((f) => f % 180 !== 0)
   const chooser = "seatNumber" in offer.glyph
   // why: a loser's own color would vanish on their own card, so their chip is dark with a ring in their color.
   const fill = chooser ? colors.gameMenu.anchor : offer.color
@@ -82,14 +81,7 @@ export const FirstPlayerChips = memo(function FirstPlayerChips({
               },
             ]}
           >
-            <View
-              pointerEvents="box-none"
-              style={[
-                $row,
-                { top: box / 2 + reach },
-                pinwheel ? [$pinwheelRow, { paddingLeft: box / 2 - reach }] : null,
-              ]}
-            >
+            <View pointerEvents="box-none" style={[$row, { top: box / 2 + reach }]}>
               <Animated.View entering={animateFully ? CHIP_ENTERING : undefined}>
                 <BoardPressable
                   testID={primary ? "first-player-badge" : "first-player-badge-mirror"}
@@ -133,7 +125,6 @@ export const FirstPlayerChips = memo(function FirstPlayerChips({
 
 const $box: ViewStyle = { position: "absolute" }
 const $row: ViewStyle = { position: "absolute", left: 0, right: 0, alignItems: "center" }
-const $pinwheelRow: ViewStyle = { alignItems: "flex-start" }
 const $chip: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flexDirection: "row",
   alignItems: "center",
