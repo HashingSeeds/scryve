@@ -88,7 +88,6 @@ async function apply(ctx: MutationCtx, result: DeckResult, sign: 1 | -1) {
   }
 }
 
-// why: result ids come from clients, so each account keeps its own copy of a seat's result.
 function storedResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {
   return ctx.db
     .query("deckResults")
@@ -110,7 +109,6 @@ export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
           ...(result.deckVersionId ? { deckVersionId: result.deckVersionId } : {}),
         }
       : {}
-  // why: a seat claimed with a deck after a deckless copy was recorded starts counting for that deck.
   const adoptedKey = existing.deckKey ? undefined : result.deckKey
   const adopted = adoptedKey
     ? {

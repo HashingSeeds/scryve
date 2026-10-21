@@ -730,6 +730,13 @@ it("sync creation defaults to syncId and explicit keys revive archived rows with
     expectedRevision: moved.revision,
   })
   expect(revived).toMatchObject({ deckId, deckKey: "deck-key", deleted: false, revision: 2 })
+  const card = {
+    name: "Card",
+    quantity: 4,
+    oracleId: "00000000-0000-4000-8000-000000000009",
+    scryfallId: "00000000-0000-4000-8000-000000000010",
+  }
+  const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [card] })
   await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 2 })
   const revivedByKey = await actor.mutation(api.decks.syncWrite, {
     ...metadata,
@@ -737,7 +744,29 @@ it("sync creation defaults to syncId and explicit keys revive archived rows with
     id: "00000000-0000-4000-8000-000000000005",
     operationId: "00000000-0000-4000-8000-000000000006",
   })
-  expect(revivedByKey).toMatchObject({ deckId, deckKey: "deck-key", revision: 4, deleted: false })
+  if ("status" in revivedByKey) throw new Error("Expected write")
+  expect(revivedByKey).toMatchObject({
+    deckId,
+    deckKey: "deck-key",
+    revision: 4,
+    deleted: false,
+  })
+  await expect(
+    actor.mutation(api.decks.syncWrite, {
+      ...metadata,
+      name: "Renamed",
+      id: revivedByKey.id,
+      operationId: "00000000-0000-4000-8000-000000000011",
+      expectedRevision: 4,
+    }),
+  ).resolves.toMatchObject({ deckId, name: "Renamed", revision: 5 })
+  const cards = await t.run(async (ctx) =>
+    ctx.db
+      .query("deckCards")
+      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", versionId))
+      .collect(),
+  )
+  expect(cards).toEqual([expect.objectContaining(card)])
   await expect(
     actor.mutation(api.decks.syncWrite, {
       ...metadata,

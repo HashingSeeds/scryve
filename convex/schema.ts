@@ -623,7 +623,6 @@ export default defineSchema({
     deltas: v.object({ games: v.optional(manualRecordValidator), ...manualStatsFields }),
     legacyDeckId: v.optional(v.id("decks")),
     podSize: v.optional(v.number()),
-    // why: removals reverse deckVersionStats from this row once the legacy receipt tables stop.
     deckVersionId: v.optional(v.id("deckVersions")),
   })
     .index("by_user_and_result_id", ["userId", "resultId"])

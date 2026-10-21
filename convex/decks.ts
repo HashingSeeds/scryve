@@ -613,7 +613,6 @@ export const importGuest = mutation({
         live.name === args.name.trim() &&
         (await pinnedDeck(ctx, latest._id)).deckFingerprint ===
           (await deckFingerprint(args.cards.map((card) => ({ ...card, game: card.game ?? game }))))
-      // why: the device drops its copy only when it holds what the live deck already has.
       return {
         status: "already_imported" as const,
         deckId: live._id,
@@ -1093,11 +1092,22 @@ export const syncWrite = mutation({
     let deckId: Id<"decks">
     if (!deck) {
       const previous = await deckForKey(ctx, user._id, args.deckKey ?? id)
-      deckId = await ctx.runMutation(api.decks.create, { ...metadata, deckKey: args.deckKey ?? id })
-      await ctx.db.patch(deckId, {
-        syncId: previous ? previous.syncId : id,
-        syncRevision: previous ? (previous.syncRevision ?? 0) + 1 : 1,
-      })
+      if (previous) {
+        await requireDeckCapacity(ctx, user)
+        await ctx.db.patch(previous._id, {
+          archivedAt: undefined,
+          movedToDeviceAt: undefined,
+          unsyncedAt: undefined,
+        })
+        deckId = previous._id
+        await ctx.runMutation(api.decks.update, { deckId, ...metadata })
+      } else {
+        deckId = await ctx.runMutation(api.decks.create, {
+          ...metadata,
+          deckKey: args.deckKey ?? id,
+        })
+        await ctx.db.patch(deckId, { syncId: id, syncRevision: 1 })
+      }
     } else {
       deckId = deck._id
       if (!deck.deckKey) await ctx.db.patch(deckId, { deckKey: deck.syncId ?? String(deckId) })
