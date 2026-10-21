@@ -65,7 +65,7 @@ jobs:
   ygo-image-mirror:
     needs: changes
     if: needs.changes.outputs.ygo == 'true'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check out repository

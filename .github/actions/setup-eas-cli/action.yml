@@ -1,0 +1,30 @@
+name: Set up EAS CLI
+# expo doctor flags eas-cli as a project dependency, so CI installs a global copy pinned by
+# package.json `config.easCli`, the version local scripts run too. The install takes about 30s, so
+# it is cached per version.
+description: Install the eas-cli pinned by package.json config.easCli
+runs:
+  using: composite
+  steps:
+    - name: Read pinned versions
+      id: version
+      shell: bash
+      run: |
+        echo "eas=$(node -p "require('./package.json').config.easCli")" >> "$GITHUB_OUTPUT"
+        echo "node=$(node -v)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore EAS CLI
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.eas-cli
+        key: eas-cli-${{ runner.os }}-${{ steps.version.outputs.node }}-${{ steps.version.outputs.eas }}
+
+    - name: Install EAS CLI
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm install -g --prefix ~/.eas-cli "eas-cli@${{ steps.version.outputs.eas }}"
+
+    - name: Add EAS CLI to PATH
+      shell: bash
+      run: echo "$HOME/.eas-cli/bin" >> "$GITHUB_PATH"

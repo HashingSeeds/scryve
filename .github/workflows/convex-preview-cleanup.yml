@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   sweep:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     # why: the token lives only in this environment, which is limited to main, so workflows on
     # other branches can't read it.
