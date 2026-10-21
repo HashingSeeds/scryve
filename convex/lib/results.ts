@@ -125,7 +125,9 @@ export async function recordPlayerResult(
     matchId: summary.matchId,
     podSize: summary.players.length,
     deltas: { games: outcomeTally(outcome) },
-    ...(player.deckId && player.deckVersionId ? { legacyDeckId: player.deckId } : {}),
+    ...(player.deckId && player.deckVersionId
+      ? { legacyDeckId: player.deckId, deckVersionId: player.deckVersionId }
+      : {}),
   })
   if (!player.deckId || !player.deckVersionId) return
   await ctx.db.insert("deckGameResults", {
@@ -231,7 +233,9 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
       matchId: match._id,
       podSize: match.seats.length,
       deltas: matchDeltas(match, seat),
-      ...(owner?.seat === seat.seat ? { legacyDeckId: owner.deckId } : {}),
+      ...(owner?.seat === seat.seat
+        ? { legacyDeckId: owner.deckId, deckVersionId: owner.deckVersionId }
+        : {}),
     })
   }
   if (!owner) return

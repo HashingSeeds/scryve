@@ -403,6 +403,11 @@ it("dual-writes local games and manual create/delete, and leaves totals intact w
   match.me.deckVersionId = versionId
   const ack = await actor.mutation(api.matches.recordManualMatch, match)
   await assertEqual(t)
+  expect(
+    (await t.run(async (ctx) => ctx.db.query("deckResults").collect())).map(
+      (row) => row.deckVersionId,
+    ),
+  ).toEqual([versionId, versionId])
   expect((await allStats(t))[0]).toMatchObject({
     games: 1,
     wins: 1,
@@ -612,6 +617,7 @@ it("backfills in bounded pages, retries without duplication, and matches legacy 
   const rows = await t.run(async (ctx) => ctx.db.query("deckResults").collect())
   expect(rows).toHaveLength(2)
   expect(rows.every((row) => row.fingerprint === undefined)).toBe(true)
+  expect(rows.every((row) => row.deckVersionId === versionId)).toBe(true)
   expect(rows.find((row) => row.kind === "game")?.resultId).toBe(
     `legacy:${ack.summaryId}:${(await t.run(async (ctx) => ctx.db.get(ack.summaryId)))!.players[0].playerId}`,
   )

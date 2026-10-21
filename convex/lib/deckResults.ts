@@ -104,7 +104,12 @@ export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
     return
   }
   const legacy =
-    result.legacyDeckId && !existing.legacyDeckId ? { legacyDeckId: result.legacyDeckId } : {}
+    result.legacyDeckId && !existing.legacyDeckId
+      ? {
+          legacyDeckId: result.legacyDeckId,
+          ...(result.deckVersionId ? { deckVersionId: result.deckVersionId } : {}),
+        }
+      : {}
   // why: a seat claimed with a deck after a deckless copy was recorded starts counting for that deck.
   const adoptedKey = existing.deckKey ? undefined : result.deckKey
   const adopted = adoptedKey
