@@ -123,6 +123,7 @@ export async function recordPlayerResult(
     finishedAt: summary.finishedAt,
     summaryId: summary._id,
     matchId: summary.matchId,
+    podSize: summary.players.length,
     deltas: { games: outcomeTally(outcome) },
     ...(player.deckId && player.deckVersionId ? { legacyDeckId: player.deckId } : {}),
   })
@@ -228,6 +229,7 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
       outcome: seat.outcome ?? "unknown",
       finishedAt: match.finishedAt,
       matchId: match._id,
+      podSize: match.seats.length,
       deltas: matchDeltas(match, seat),
       ...(owner?.seat === seat.seat ? { legacyDeckId: owner.deckId } : {}),
     })

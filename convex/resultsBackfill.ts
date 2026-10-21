@@ -112,6 +112,7 @@ export const backfillGameResults = internalMutation({
         finishedAt: result.finishedAt,
         summaryId: summary._id,
         matchId: summary.matchId,
+        podSize: summary.players.length,
         deltas: { games: outcomeTally(result.outcome) },
         legacyDeckId: result.deckId,
       })
@@ -142,6 +143,7 @@ export const backfillMatchResults = internalMutation({
         outcome: result.outcome,
         finishedAt: result.finishedAt,
         matchId: match._id,
+        podSize: match.seats.length,
         deltas: matchDeltas(match, seat),
         legacyDeckId: result.deckId,
       })

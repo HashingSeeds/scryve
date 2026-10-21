@@ -304,6 +304,7 @@ it("keeps a new client's pinned key and deck name for a moved deck", async () =>
     expect(await ctx.db.query("deckResults").unique()).toMatchObject({
       deckKey: "deck-key",
       fingerprint,
+      podSize: 2,
     })
   })
   await assertEqual(t)
@@ -438,6 +439,9 @@ it("manual local decks record a fingerprint and name without a version", async (
   const ack = await actor.mutation(api.matches.recordManualMatch, args)
   const match = await t.run(async (ctx) => ctx.db.get(ack.matchId))
   expect(match?.seats[0].deckName).toBe("Mono Red")
+  expect(await t.run(async (ctx) => ctx.db.query("deckResults").unique())).toMatchObject({
+    podSize: 2,
+  })
   expect(
     (await actor.query(api.decks.statsForKey, { deckKey: "offline" })).fingerprints,
   ).toHaveLength(1)

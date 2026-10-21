@@ -622,6 +622,7 @@ export default defineSchema({
     matchId: v.optional(v.id("matches")),
     deltas: v.object({ games: v.optional(manualRecordValidator), ...manualStatsFields }),
     legacyDeckId: v.optional(v.id("decks")),
+    podSize: v.optional(v.number()),
   })
     .index("by_user_and_result_id", ["userId", "resultId"])
     .index("by_legacy_deck_id", ["legacyDeckId"])
