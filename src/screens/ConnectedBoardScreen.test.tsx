@@ -16,6 +16,7 @@ import {
   mockChangeLife,
   mockDismissFailed,
   mockFinish,
+  mockLeave,
   mockRuntimeAbandon,
   mockReportPlayer,
   mockResolveCommanderDamageClaim,
@@ -588,6 +589,24 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+  })
+
+  it("lets a cloud guest leave once the server lets them go", async () => {
+    const onLeave = jest.fn()
+    mockLeave.mockRejectedValueOnce(new Error("Could not reach the server"))
+    render(themed(<ConnectedBoardScreen publicId="game-public" onLeave={onLeave} />))
+    openConnectedMenu()
+    expect(screen.getByTestId("end-game-button").props.accessibilityLabel).toBe("Leave")
+    fireEvent.press(screen.getByTestId("end-game-button"))
+    fireEvent.press(screen.getByTestId("confirm-connected-leave"))
+    expect(await screen.findByTestId("connected-leave-error")).toBeTruthy()
+    expect(onLeave).not.toHaveBeenCalled()
+
+    fireEvent.press(screen.getByTestId("confirm-connected-leave"))
+    await waitFor(() => expect(onLeave).toHaveBeenCalledTimes(1))
+    expect(mockLeave).toHaveBeenLastCalledWith(
+      expect.objectContaining({ publicId: "game-public", deviceId: expect.any(String) }),
+    )
   })
 
   it("lets a nearby guest leave from the menu slot a host uses to end the game", () => {
