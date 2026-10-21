@@ -920,7 +920,6 @@ function NewGameForm({
                 />
               ) : null}
             </View>
-            {/* why: one row at most, so a status sharing it with Join with code never stacks a second row under the buttons. */}
             {joinInFooter || statusText ? (
               <View style={themed($secondaryRow)}>
                 {joinInFooter ? (
