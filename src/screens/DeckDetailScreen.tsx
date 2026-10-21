@@ -1347,6 +1347,7 @@ function DeckDetailContent({
             style={themed($dialogText)}
           />
           <Text size="sm" tx="decks:deckLimit.moveBody" style={themed($dialogText)} />
+          {error ? <AlertNote text={error} /> : null}
           <View style={themed($dialogActions)}>
             <Button
               tx="common:cancel"
