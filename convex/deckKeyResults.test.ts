@@ -227,10 +227,9 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
       const summary = (await ctx.db.get(ack.summaryId))!
       expect(summary.players[0].deckId).toBeUndefined()
       const result = (await ctx.db.query("deckResults").unique())!
-      // A deck that still exists keeps following its key; a missing one can't be named.
-      const keyed = kind === "archived" || kind === "moved" || kind === "archivedVersion"
-      expect(summary.players[0].deckKey).toBe(keyed ? "deck-key" : undefined)
-      expect(result.deckKey).toBe(keyed ? "deck-key" : undefined)
+      const deckStillExists = kind === "archived" || kind === "moved" || kind === "archivedVersion"
+      expect(summary.players[0].deckKey).toBe(deckStillExists ? "deck-key" : undefined)
+      expect(result.deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.fingerprint).toBeUndefined()
       expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
     })
@@ -295,6 +294,18 @@ it("names a local deck's results from the name its device sends", async () => {
   const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
   const summary = await t.run(async (ctx) => ctx.db.get(ack.summaryId))
   expect(summary?.players[0].deckNameAtFinish).toBe("Mono Red")
+})
+
+it("lists a synced deck with totals from games it played while only on a device", async () => {
+  const t = setup()
+  const { actor } = await account(t)
+  const args = publish()
+  args.players[0] = { ...args.players[0], deckKey: "deck-key", deckName: "Burn" }
+  await actor.mutation(api.games.publishFinishedLocalGame, args)
+  await actor.mutation(api.decks.create, { name: "Burn", format: "modern", deckKey: "deck-key" })
+  const [listed] = (await actor.query(api.decks.listMine, {})).decks
+  expect(listed.record.games).toBe(0)
+  expect(listed.keyRecord).toMatchObject({ games: 1, wins: 1 })
 })
 
 it("settles a device copy onto the live deck that already has its key", async () => {

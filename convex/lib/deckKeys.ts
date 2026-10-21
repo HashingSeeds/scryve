@@ -5,6 +5,11 @@ import { MAX_DECK_CARDS } from "./policy"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
+// why: decks from before deck keys follow their sync id, or their row id when never synced.
+export function deckKeyOf(deck: Doc<"decks">) {
+  return deck.deckKey ?? deck.syncId ?? String(deck._id)
+}
+
 export function assertDeckKey(key: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key))
     throw new ConvexError({
@@ -30,7 +35,7 @@ export async function pinnedDeck(ctx: MutationCtx, versionId: Id<"deckVersions">
     .take(MAX_DECK_CARDS + 1)
   if (cards.length > MAX_DECK_CARDS) throw new Error("Deck has too many cards")
   return {
-    deckKey: deck.deckKey ?? deck.syncId ?? String(deck._id),
+    deckKey: deckKeyOf(deck),
     deckFingerprint: await deckFingerprint(
       cards.map((card) => ({ ...card, game: card.game ?? deck.game ?? "mtg" })),
     ),
@@ -51,10 +56,7 @@ export async function findDeckByKey(ctx: QueryCtx, userId: Id<"users">, key: str
         .query("decks")
         .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", userId).eq("syncId", key))
         .unique()
-  return candidate?.ownerUserId === userId &&
-    (candidate.deckKey ?? candidate.syncId ?? String(candidate._id)) === key
-    ? candidate
-    : null
+  return candidate?.ownerUserId === userId && deckKeyOf(candidate) === key ? candidate : null
 }
 
 export async function deckForKey(ctx: MutationCtx, userId: Id<"users">, key: string) {

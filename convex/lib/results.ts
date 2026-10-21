@@ -1,3 +1,4 @@
+import { deckKeyOf } from "./deckKeys"
 import { addDeckResult, removeDeckResult, canonicalResultId, gameResultId } from "./deckResults"
 import type { MatchOutcome } from "./matchResults"
 import { MAX_PLAYERS } from "./policy"
@@ -277,12 +278,12 @@ export async function resultDeckKey(
           q.eq("ownerUserId", seat.userId!).eq("guestLocalId", seat.deckKey),
         )
         .unique()
-      if (alias) return alias.deckKey ?? alias.syncId ?? String(alias._id)
+      if (alias) return deckKeyOf(alias)
     }
     return seat.deckKey
   }
   const deck = seat.deckId ? await ctx.db.get(seat.deckId) : null
-  return deck ? (deck.deckKey ?? deck.syncId ?? String(deck._id)) : undefined
+  return deck ? deckKeyOf(deck) : undefined
 }
 
 export async function gameResultSource(ctx: MutationCtx, summary: Doc<"gameSummaries">) {

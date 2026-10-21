@@ -17,6 +17,7 @@ import {
   assertDeckKey,
   createOrReviveDeck,
   deckForKey,
+  deckKeyOf,
   findDeckByKey,
   pinnedDeck,
 } from "./lib/deckKeys"
@@ -393,6 +394,17 @@ async function deckRecord(ctx: QueryCtx, deckId: Id<"decks">) {
   )
 }
 
+// why: new clients read totals that follow the deck key; `record` stays on the legacy totals installed clients read.
+async function keyRecord(ctx: QueryCtx, deck: Doc<"decks">) {
+  const stats = await ctx.db
+    .query("deckKeyStats")
+    .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+      q.eq("userId", deck.ownerUserId).eq("deckKey", deckKeyOf(deck)).eq("fingerprint", "all"),
+    )
+    .unique()
+  return stats ? statsRecord(stats) : undefined
+}
+
 async function lastPlayedAt(ctx: QueryCtx, deckId: Id<"decks">) {
   const result = await ctx.db
     .query("deckGameResults")
@@ -460,6 +472,7 @@ export const listMine = query({
               latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
             lastPlayedAt: await lastPlayedAt(ctx, deck._id),
             record: await deckRecord(ctx, deck._id),
+            keyRecord: await keyRecord(ctx, deck),
           }
         }),
     )
@@ -578,7 +591,7 @@ export const importGuest = mutation({
     if (
       existing &&
       args.deckKey !== undefined &&
-      args.deckKey !== (existing.deckKey ?? existing.syncId ?? String(existing._id)) &&
+      args.deckKey !== deckKeyOf(existing) &&
       args.deckKey !== args.localId
     )
       throw new ConvexError({ code: "deck_key_conflict", message: "Deck key cannot change" })
@@ -1059,7 +1072,7 @@ export const syncWrite = mutation({
       if (args.returnConflict && deck) return { status: "conflict", deck: syncedDeck(deck) }
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
     }
-    if (deck && args.deckKey && args.deckKey !== (deck.deckKey ?? deck.syncId ?? String(deck._id)))
+    if (deck && args.deckKey && args.deckKey !== deckKeyOf(deck))
       throw new ConvexError({ code: "deck_key_conflict", message: "Deck key cannot change" })
     if (deck?.archivedAt !== undefined && !args.deleted && args.deckKey !== undefined) {
       await requireDeckCapacity(ctx, user)

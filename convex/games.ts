@@ -19,7 +19,7 @@ import {
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
-import { assertDeckKey, assertDeckFingerprint, pinnedDeck } from "./lib/deckKeys"
+import { assertDeckKey, assertDeckFingerprint, deckKeyOf, pinnedDeck } from "./lib/deckKeys"
 import { limitResultRate } from "./lib/deckRateLimits"
 import { canonicalResultId } from "./lib/deckResults"
 import { deckStartingValue } from "./lib/deckStartingValue"
@@ -1395,7 +1395,7 @@ export const publishFinishedLocalGame = mutation({
       const deck = version ? await ctx.db.get(version.deckId) : null
       if (deck && deck.ownerUserId !== user._id)
         throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
-      if (deck) versionKey = deck.deckKey ?? deck.syncId ?? String(deck._id)
+      if (deck) versionKey = deckKeyOf(deck)
       if (
         version &&
         version.archivedAt === undefined &&
@@ -1419,11 +1419,7 @@ export const publishFinishedLocalGame = mutation({
       me?.deckVersionId && !versionKey && !me.deckKey
         ? {}
         : {
-            ...(me?.deckKey
-              ? { deckKey: me.deckKey }
-              : versionKey
-                ? { deckKey: versionKey }
-                : {}),
+            ...(me?.deckKey ? { deckKey: me.deckKey } : versionKey ? { deckKey: versionKey } : {}),
             ...(me?.deckFingerprint
               ? { deckFingerprint: me.deckFingerprint }
               : me?.deckKey && myDeck && me.deckVersionId
@@ -1621,7 +1617,7 @@ export const claimNearbySeat = mutation({
       ...(chosen
         ? {
             deckVersionId: chosen.version._id,
-            deckKey: chosen.deck.deckKey ?? chosen.deck.syncId ?? String(chosen.deck._id),
+            deckKey: deckKeyOf(chosen.deck),
           }
         : {}),
     })
@@ -1633,7 +1629,7 @@ export const claimNearbySeat = mutation({
       ...(chosen
         ? {
             deckId: chosen.deck._id,
-            deckKey: chosen.deck.deckKey ?? chosen.deck.syncId ?? String(chosen.deck._id),
+            deckKey: deckKeyOf(chosen.deck),
             deckNameAtFinish: chosen.deck.name,
             deckVersionId: chosen.version._id,
             deckVersionNumber: chosen.version.versionNumber,
