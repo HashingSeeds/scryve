@@ -23,7 +23,7 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 import {
-  benchMenuClearance,
+  menuClearance,
   contentInsetsFor,
   MENU_CLEARANCE,
   rotatedLayerStyle,
@@ -109,7 +109,7 @@ export function LifeCalculator({
   const sideways = Math.abs(rotation) === 90
   const height = sideways ? cardWidth : cardHeight
   const insets = contentInsetsFor(rotation, contentInsets)
-  const clearance = benchMenuClearance(rotation, menuCorner, menuEdgeCenter)
+  const clearance = menuClearance(rotation, menuCorner, menuEdgeCenter)
   const beside = height > 0 && height - insets.top - insets.bottom < COLUMN_MIN_HEIGHT
   const fade = reducedMotion === false
   const inkText = { color: ink }

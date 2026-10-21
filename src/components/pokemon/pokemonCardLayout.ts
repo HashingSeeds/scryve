@@ -41,14 +41,14 @@ export function contentInsetsFor(
 // why: measured from the seat edge, this clears the larger 80pt menu pentagon at its widest point with an 8pt gap.
 export const MENU_CLEARANCE = 44
 
-export type BenchClearance = { top: number; left: number; right: number }
-const NO_CLEARANCE: BenchClearance = { top: 0, left: 0, right: 0 }
+export type MenuClearance = { top: number; left: number; right: number }
+const NO_CLEARANCE: MenuClearance = { top: 0, left: 0, right: 0 }
 
-export function benchMenuClearance(
+export function menuClearance(
   rotation: LifeCardContentRotation,
   menuCorner: LifeCardMenuCorner | undefined,
   menuEdgeCenter: LifeCardMenuEdge | undefined,
-): BenchClearance {
+): MenuClearance {
   const edges = CONTENT_EDGES[rotation]
   if (menuEdgeCenter === edges.top) return { ...NO_CLEARANCE, top: MENU_CLEARANCE }
   const corner = menuCorner?.toLowerCase()

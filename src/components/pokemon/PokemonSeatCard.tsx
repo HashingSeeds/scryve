@@ -22,7 +22,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 import {
   benchChipMetrics,
   type BenchChipMetrics,
-  benchMenuClearance,
+  menuClearance,
   CHIP_BAR_HEIGHT,
   CARDLESS_POKEMON,
   CONTENT_EDGES,
@@ -149,7 +149,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const displayName = playerName.trim() || translate("board:seat.unnamedPlayer")
   const identity = seatIdentityLabel(seatNumber, playerName)
   const insets = contentInsetsFor(contentRotation, contentInsets)
-  const clearance = benchMenuClearance(contentRotation, menuCorner, menuEdgeCenter)
+  const clearance = menuClearance(contentRotation, menuCorner, menuEdgeCenter)
   const sideways = Math.abs(contentRotation) === 90
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
@@ -161,8 +161,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchChip = benchChipMetrics(cramped, fontScale)
   const identityMetrics = seatIdentityMetrics(cramped)
-  const benchSide = (inset: number, menu: number) =>
-    Math.max(identityMetrics.edge, menu - inset) - padding
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
   const edges = CONTENT_EDGES[contentRotation]
@@ -395,6 +393,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.bottom -
       clearance.top -
       benchChip.height -
+      padding -
       prizeRowHeight -
       bottomRowLift -
       (cramped ? COMPACT_HERO_CAPTION_HEIGHT : HERO_CAPTION_HEIGHT),
@@ -410,7 +409,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     themed($bar),
     {
       backgroundColor: ink === "#FFFFFF" ? BAR_ON_DARK : BAR_ON_LIGHT,
-      bottom: padding + insets.bottom + bottomRowLift + prizeRowHeight,
+      bottom: padding * 2 + insets.bottom + bottomRowLift + prizeRowHeight + benchChip.height,
     },
   ]
   const barInk = ink
@@ -461,82 +460,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           !readyToLayout && $hidden,
         ]}
       >
-        <View
-          testID={`pokemon-bench-seat-${seatNumber}`}
-          accessibilityLabel={translate("board:pokemon.benchLabel", {
-            identity,
-            filled: board.bench.length,
-            size: rules.benchSize,
-          })}
-          style={[
-            themed($bench),
-            {
-              height: benchChip.height,
-              marginLeft: benchSide(insets.left, clearance.left),
-              marginRight: benchSide(insets.right, clearance.right),
-            },
-          ]}
-        >
-          {Array.from({ length: Math.max(rules.benchSize, board.bench.length) }, (_, index) => {
-            const pokemon = board.bench[index]
-            if (pokemon)
-              return (
-                <BenchChip
-                  key={pokemon.id}
-                  pokemon={pokemon}
-                  ink={ink}
-                  chip={benchChip}
-                  interactive={controlsLive}
-                  promotes={!board.active}
-                  focused={focused?.id === pokemon.id}
-                  triggerRef={trigger(`bench:${pokemon.id}`)}
-                  onPress={() => pressBench(pokemon)}
-                  onLongPress={() =>
-                    openSheet({ kind: "edit", pokemonId: pokemon.id }, `bench:${pokemon.id}`)
-                  }
-                />
-              )
-            if (index === board.bench.length && controlsLive)
-              return (
-                <BoardPressable
-                  key="add"
-                  ref={trigger(ADD_TRIGGER)}
-                  testID={`pokemon-bench-add-seat-${seatNumber}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={translate("board:pokemon.addBench", { identity })}
-                  accessibilityHint={holdCopy.hint}
-                  accessibilityActions={[{ name: "longpress", label: holdCopy.action }]}
-                  onAccessibilityAction={({ nativeEvent }) => {
-                    if (nativeEvent.actionName === "longpress")
-                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
-                  }}
-                  delayLongPress={LONG_PRESS_MS}
-                  onLongPress={() => placeOn("bench", ADD_TRIGGER, !tapPicksCard)}
-                  onKeyDown={(event) => {
-                    if (HOLD_KEYS.has(event.key) && !event.repeat)
-                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
-                  }}
-                  onPress={() => placeOn("bench", ADD_TRIGGER, tapPicksCard)}
-                  style={({ pressed }) => [
-                    themed($chip),
-                    $slot,
-                    { borderColor: tint(0.45) },
-                    pressed && { backgroundColor: tint(0.14) },
-                  ]}
-                >
-                  <Text text="+" size="lg" weight="medium" style={[{ color: ink }, $dim80]} />
-                </BoardPressable>
-              )
-            return (
-              <View
-                key={`slot-${index}`}
-                testID={`pokemon-bench-slot-${index}-seat-${seatNumber}`}
-                style={[themed($chip), $slot, { borderColor: tint(0.3) }]}
-              />
-            )
-          })}
-        </View>
-
         {shown ? (
           <PokemonHero
             key={shown.id}
@@ -627,6 +550,82 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             ) : null}
           </BoardPressable>
         )}
+
+        <View
+          testID={`pokemon-bench-seat-${seatNumber}`}
+          accessibilityLabel={translate("board:pokemon.benchLabel", {
+            identity,
+            filled: board.bench.length,
+            size: rules.benchSize,
+          })}
+          style={[
+            themed($bench),
+            {
+              height: benchChip.height,
+              marginHorizontal: identityMetrics.edge - padding,
+              marginBottom: padding,
+            },
+          ]}
+        >
+          {Array.from({ length: Math.max(rules.benchSize, board.bench.length) }, (_, index) => {
+            const pokemon = board.bench[index]
+            if (pokemon)
+              return (
+                <BenchChip
+                  key={pokemon.id}
+                  pokemon={pokemon}
+                  ink={ink}
+                  chip={benchChip}
+                  interactive={controlsLive}
+                  promotes={!board.active}
+                  focused={focused?.id === pokemon.id}
+                  triggerRef={trigger(`bench:${pokemon.id}`)}
+                  onPress={() => pressBench(pokemon)}
+                  onLongPress={() =>
+                    openSheet({ kind: "edit", pokemonId: pokemon.id }, `bench:${pokemon.id}`)
+                  }
+                />
+              )
+            if (index === board.bench.length && controlsLive)
+              return (
+                <BoardPressable
+                  key="add"
+                  ref={trigger(ADD_TRIGGER)}
+                  testID={`pokemon-bench-add-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("board:pokemon.addBench", { identity })}
+                  accessibilityHint={holdCopy.hint}
+                  accessibilityActions={[{ name: "longpress", label: holdCopy.action }]}
+                  onAccessibilityAction={({ nativeEvent }) => {
+                    if (nativeEvent.actionName === "longpress")
+                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
+                  }}
+                  delayLongPress={LONG_PRESS_MS}
+                  onLongPress={() => placeOn("bench", ADD_TRIGGER, !tapPicksCard)}
+                  onKeyDown={(event) => {
+                    if (HOLD_KEYS.has(event.key) && !event.repeat)
+                      placeOn("bench", ADD_TRIGGER, !tapPicksCard)
+                  }}
+                  onPress={() => placeOn("bench", ADD_TRIGGER, tapPicksCard)}
+                  style={({ pressed }) => [
+                    themed($chip),
+                    $slot,
+                    { borderColor: tint(0.45) },
+                    pressed && { backgroundColor: tint(0.14) },
+                  ]}
+                >
+                  <Text text="+" size="lg" weight="medium" style={[{ color: ink }, $dim80]} />
+                </BoardPressable>
+              )
+            return (
+              <View
+                key={`slot-${index}`}
+                testID={`pokemon-bench-slot-${index}-seat-${seatNumber}`}
+                style={[themed($chip), $slot, { borderColor: tint(0.3) }]}
+              />
+            )
+          })}
+        </View>
 
         {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
         <View
