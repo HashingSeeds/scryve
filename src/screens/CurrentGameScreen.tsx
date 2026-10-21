@@ -111,11 +111,6 @@ export function CurrentGameScreen({
   }, [rules])
   const [menuOpen, setMenuOpen] = useState(false)
   const [boardSize, setBoardSize] = useState<BoardSize>()
-  const [openTableSheets, setOpenTableSheets] = useState(0)
-  const trackTableSheet = useCallback(
-    (open: boolean) => setOpenTableSheets((count) => count + (open ? 1 : -1)),
-    [],
-  )
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
@@ -191,15 +186,29 @@ export function CurrentGameScreen({
     playerCount,
     system,
   ])
-  const diceTools = useMemo(() => closingMenu(dice.tools, () => setMenuOpen(false)), [dice.tools])
+  // why: rolling by hand means the players skipped the first-player offer.
+  const diceTools = useMemo(
+    () =>
+      closingMenu(dice.tools, () => {
+        setMenuOpen(false)
+        markFirstPlayerUsed()
+      }),
+    [dice.tools, markFirstPlayerUsed],
+  )
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
 
   function toggleSword(player: GamePlayer) {
+    markFirstPlayerUsed()
     setInspectedPlayerId(null)
     setArmedPlayerId((current) => (current === player.id ? null : player.id))
+  }
+
+  function inspectCommanderDamage(playerId: PlayerId | null) {
+    if (playerId) markFirstPlayerUsed()
+    setInspectedPlayerId(playerId)
   }
 
   function assignCommanderDamage(target: GamePlayer, step: number) {
@@ -396,7 +405,7 @@ export function CurrentGameScreen({
           playerCount={playerCount}
           layoutVariant={layoutVariant}
           onBoardSizeChange={setBoardSize}
-          firstPlayer={openTableSheets > 0 ? undefined : firstPlayer}
+          firstPlayer={firstPlayer}
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}
@@ -404,7 +413,7 @@ export function CurrentGameScreen({
               system={system}
               lifeStep={runtime.game.lifeStep}
               onOpenRule={(ruleId) => system && onRules?.(system, ruleId)}
-              onTableSheetOpenChange={trackTableSheet}
+              onPlayStart={markFirstPlayerUsed}
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
               disabled={menuOpen}
@@ -419,7 +428,7 @@ export function CurrentGameScreen({
                   ? {
                       incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
                       armedPlayerId,
-                      inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
+                      inspection: { playerId: inspectedPlayerId, onChange: inspectCommanderDamage },
                       onPressSword: toggleSword,
                       onStage: assignCommanderDamage,
                     }

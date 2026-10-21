@@ -88,7 +88,7 @@ export interface PokemonSeatCardProps {
   table: TableRuntime
   dice?: LifeCardDice
   onChangePrizes: (delta: LifeDelta) => void
-  onTableSheetOpenChange?: (open: boolean) => void
+  onPlayStart?: () => void
   style?: StyleProp<ViewStyle>
 }
 
@@ -134,7 +134,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   opponents,
   table,
   onChangePrizes,
-  onTableSheetOpenChange,
+  onPlayStart,
   style,
 }: PokemonSeatCardProps) {
   const {
@@ -198,6 +198,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     else triggers.delete(key)
   }
   const openSheet = (next: Sheet, from: string) => {
+    onPlayStart?.()
     returnFocusTo.current = from
     setSheet(next)
   }
@@ -233,12 +234,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   }, [focus, focusHeld])
 
   const sheetOpen = sheetMode !== null
-  // why: the board hides its first player chips while a seat sheet is open, since they sit over the sheet's search field.
-  useEffect(() => {
-    if (!sheetOpen) return
-    onTableSheetOpenChange?.(true)
-    return () => onTableSheetOpenChange?.(false)
-  }, [onTableSheetOpenChange, sheetOpen])
   useEffect(() => {
     if (sheetOpen || returnFocusTo.current === null) return
     const from = returnFocusTo.current

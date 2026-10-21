@@ -13,7 +13,6 @@ import {
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
-  hasPlayBegun,
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
@@ -63,7 +62,7 @@ export function useLocalGame(
     (command: GameCommand, endSource?: GameEndSource): LocalGame => {
       const applied = applyGameCommand(gameRef.current, command, context)
       if (applied === gameRef.current) return applied
-      const next = withFirstPlayerSettled(gameRef.current, applied)
+      const next = withFirstPlayerSettled(applied)
       if (next.status === "active") {
         repository.saveActiveGame(next)
         if (!hasLocalGameStarted(gameRef.current) && hasLocalGameStarted(next))
@@ -158,7 +157,7 @@ export function useLocalGame(
           const previous = gameRef.current
           const applied = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
           if (applied === previous) return false
-          const next = withFirstPlayerSettled(previous, applied)
+          const next = withFirstPlayerSettled(applied)
           repository.saveActiveGame(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
@@ -260,9 +259,7 @@ export function useLocalGame(
   }
 }
 
-/** why: the first point of play closes the first-player offer for good, in the same write as the change itself, so damage healed or a counter cleared never brings the offer back. The board before the change counts too, since a reopened save may already be in play without the marker. */
-function withFirstPlayerSettled(previous: LocalGame, game: LocalGame): LocalGame {
-  return !game.firstPlayerOffered && (hasPlayBegun(previous) || hasPlayBegun(game))
-    ? { ...game, firstPlayerOffered: true }
-    : game
+/** why: any board action means cards are drawn, so it closes the first-player offer for good, in the same write as the change itself. Undoing the change never brings the offer back. */
+function withFirstPlayerSettled(game: LocalGame): LocalGame {
+  return game.firstPlayerOffered ? game : { ...game, firstPlayerOffered: true }
 }
