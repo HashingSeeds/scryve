@@ -135,6 +135,7 @@ describe("native auth experience", () => {
       expect.objectContaining({
         __experimental_resourceCache: "native-resource-cache",
         tokenCache: {},
+        afterSignOutUrl: undefined,
       }),
     )
   })
