@@ -452,11 +452,7 @@ function NewGameForm({
         ? translate("play:newGame.resumeCurrentGame")
         : (connected?.error ??
           connected?.blockedReason ??
-          (connectedGames.length
-            ? translate("play:newGame.gamesInProgress")
-            : preparing && showPreparation
-              ? connected?.status
-              : ""))
+          (connectedGames.length ? translate("play:newGame.gamesInProgress") : ""))
       : localGame?.match
         ? translate("play:newGame.matchStatus", {
             context: matchContextLabel(localGame),
@@ -850,7 +846,9 @@ function NewGameForm({
                         ? (connected?.access?.label ??
                           (busy
                             ? translate("play:newGame.working")
-                            : translate("play:newGame.hostLobby")))
+                            : preparing && showPreparation
+                              ? connected?.status
+                              : translate("play:newGame.hostLobby")))
                         : undefined
                 }
                 tx={connectedMode || gameBlocksStart ? undefined : "play:startGame"}
@@ -922,62 +920,68 @@ function NewGameForm({
                 />
               ) : null}
             </View>
-            {joinInFooter ? (
-              <TouchableOpacity
-                testID="join-with-code-button"
-                accessibilityRole="button"
-                style={[themed($statusRow), themed($resumeAction)]}
-                onPress={onJoin}
-              >
-                <Text
-                  tx="play:newGame.joinWithCode"
-                  size="xs"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
-                  style={themed($resumeText)}
-                />
-              </TouchableOpacity>
-            ) : null}
-            {/* why: an empty row is dead space above the home indicator, so a late status grows the footer once instead. */}
-            {statusText ? (
-              <TouchableOpacity
-                testID="setup-status"
-                accessibilityRole={hasStatusDetails ? "button" : "text"}
-                accessibilityLabel={statusText}
-                accessibilityHint={
-                  directResume
-                    ? translate("play:newGame.resumeHint")
-                    : hasStatusDetails
-                      ? translate("play:newGame.statusDetailsHint")
-                      : undefined
-                }
-                disabled={!hasStatusDetails}
-                style={[
-                  themed($statusRow),
-                  (directResume || (connectedMode && hasStatusDetails)) && themed($resumeAction),
-                ]}
-                onPress={
-                  localGameBlocksStart
-                    ? onResumeLocal
-                    : directResume && resumeGame
-                      ? () => onResumeConnected?.(resumeGame)
-                      : singleBlockingConnected && onResumeConnected
-                        ? () => onResumeConnected(singleBlockingConnected)
-                        : () => setShowStatus(true)
-                }
-              >
-                <Text
-                  testID={preparing && showPreparation ? "connected-host-preparation" : undefined}
-                  accessibilityLiveRegion="polite"
-                  size="xs"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
-                  text={statusText}
-                  style={themed(
-                    directResume || (connectedMode && hasStatusDetails) ? $resumeText : $statusText,
-                  )}
-                />
-              </TouchableOpacity>
+            {joinInFooter || statusText ? (
+              <View style={themed($secondaryRow)}>
+                {joinInFooter ? (
+                  <TouchableOpacity
+                    testID="join-with-code-button"
+                    accessibilityRole="button"
+                    style={[themed($statusRow), themed($resumeAction)]}
+                    onPress={onJoin}
+                  >
+                    <Text
+                      tx="play:newGame.joinWithCode"
+                      size="xs"
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
+                      style={themed($resumeText)}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+                {statusText ? (
+                  <TouchableOpacity
+                    testID="setup-status"
+                    accessibilityRole={hasStatusDetails ? "button" : "text"}
+                    accessibilityLabel={statusText}
+                    accessibilityHint={
+                      directResume
+                        ? translate("play:newGame.resumeHint")
+                        : hasStatusDetails
+                          ? translate("play:newGame.statusDetailsHint")
+                          : undefined
+                    }
+                    disabled={!hasStatusDetails}
+                    style={[
+                      themed($statusRow),
+                      directResume || (connectedMode && hasStatusDetails)
+                        ? themed($resumeAction)
+                        : $styles.flex1,
+                    ]}
+                    onPress={
+                      localGameBlocksStart
+                        ? onResumeLocal
+                        : directResume && resumeGame
+                          ? () => onResumeConnected?.(resumeGame)
+                          : singleBlockingConnected && onResumeConnected
+                            ? () => onResumeConnected(singleBlockingConnected)
+                            : () => setShowStatus(true)
+                    }
+                  >
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      size="xs"
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
+                      text={statusText}
+                      style={themed(
+                        directResume || (connectedMode && hasStatusDetails)
+                          ? $resumeText
+                          : $statusText,
+                      )}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             ) : null}
           </View>
         </View>
@@ -1429,14 +1433,18 @@ const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xs,
 })
+const $secondaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: spacing.xs,
+})
 const $statusText: ThemedStyle<TextStyle> = ({ colors }) => ({
   flex: 1,
   color: colors.textDim,
 })
 const $statusDetails: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $resumeAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  alignSelf: "center",
-  maxWidth: "100%",
+  flexShrink: 1,
   paddingHorizontal: spacing.md,
 })
 const $resumeText: ThemedStyle<TextStyle> = ({ colors }) => ({

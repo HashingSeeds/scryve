@@ -1,4 +1,6 @@
+import type { ReactNode } from "react"
 import { act, renderHook } from "@testing-library/react-native"
+import type { ConvexReactClient } from "convex/react"
 
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 
@@ -117,6 +119,33 @@ describe("createConvexAuthHook", () => {
 
     expect(committedGetToken).toHaveBeenCalledWith()
     expect(discardedGetToken).not.toHaveBeenCalled()
+  })
+})
+
+describe("createConvexAuthHook with Convex's auth provider", () => {
+  const convex = jest.requireActual<typeof import("convex/react")>("convex/react")
+  const signedOut = () => ({ ...clerkAuth(jest.fn()), isSignedIn: false, sessionId: null })
+
+  it("reports a fresh sign-in as pending until Convex checks the new token", () => {
+    let auth: ReturnType<Parameters<typeof createConvexAuthHook>[0]> = signedOut()
+    const setAuth = jest.fn<void, [unknown, (isAuthenticated: boolean) => void]>()
+    const client = { setAuth, clearAuth: jest.fn() } as unknown as ConvexReactClient
+    const useAuth = createConvexAuthHook(() => auth, 0)
+    const view = renderHook(convex.useConvexAuth, {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <convex.ConvexProviderWithAuth client={client} useAuth={useAuth}>
+          {children}
+        </convex.ConvexProviderWithAuth>
+      ),
+    })
+    expect(view.result.current).toMatchObject({ isLoading: false, isAuthenticated: false })
+
+    auth = clerkAuth(jest.fn())
+    view.rerender(undefined)
+    expect(view.result.current).toMatchObject({ isLoading: true, isAuthenticated: false })
+
+    act(() => setAuth.mock.lastCall?.[1](true))
+    expect(view.result.current).toMatchObject({ isLoading: false, isAuthenticated: true })
   })
 })
 
