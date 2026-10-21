@@ -242,14 +242,26 @@ describe("DecksScreen", () => {
     expect(list.getByText("Synced")).toBeTruthy()
   })
 
-  it("shows a local deck's record from its key totals", () => {
-    saveGuestDeck(
+  it("shows a local deck's record from its key totals only while its account is signed in", () => {
+    const local = saveGuestDeck(
       { name: "Local record", format: "commander", game: "mtg", cards: [] },
       { deckKey: "local-key" },
     )
     mockTotals = [{ deckKey: "local-key", games: 4, wins: 3, losses: 1, draws: 0, unknown: 0 }]
-    const list = within(renderShelf().getByTestId("decks-list"))
-    expect(list.getByText("3-1")).toBeTruthy()
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const view = renderShelf({ access })
+    const row = () => within(view.getByTestId(`deck-card-${guestDeckRouteId(local.localId)}`))
+    expect(row().getByText("3-1")).toBeTruthy()
+    view.rerender(
+      shelf({ access: { ...access, ready: false, signedIn: false, ownerId: undefined } }),
+    )
+    expect(row().queryByText("3-1")).toBeNull()
     mockTotals = []
   })
 

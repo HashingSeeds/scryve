@@ -258,11 +258,19 @@ function selectLocalDeck(row: ShelfDeck, onSelect: (deck: DeckSelection) => void
 
 type KeyTotals = FunctionReturnType<typeof api.deckStats.totalsByKey>
 
-function KeyTotalsQuery({ onTotals }: { onTotals: (totals: KeyTotals) => void }) {
-  const totals = useQuery(api.deckStats.totalsByKey, {})
+type OwnerTotals = { ownerId: string; rows: KeyTotals }
+
+function KeyTotalsQuery({
+  ownerId,
+  onTotals,
+}: {
+  ownerId: string
+  onTotals: (totals: OwnerTotals) => void
+}) {
+  const rows = useQuery(api.deckStats.totalsByKey, {})
   useEffect(() => {
-    if (totals) onTotals(totals)
-  }, [totals, onTotals])
+    if (rows) onTotals({ ownerId, rows })
+  }, [rows, ownerId, onTotals])
   return null
 }
 
@@ -537,10 +545,12 @@ export function DecksScreen({
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
   const guestDecks = useGuestDecks()
-  const [totals, setTotals] = useState<KeyTotals>()
+  const [totals, setTotals] = useState<OwnerTotals>()
+  const ownRows =
+    access?.ready && totals && totals.ownerId === access.ownerId ? totals.rows : undefined
   const keyTotals = useMemo(
-    () => new Map((totals ?? []).map(({ deckKey, ...record }) => [deckKey, record])),
-    [totals],
+    () => new Map((ownRows ?? []).map(({ deckKey, ...record }) => [deckKey, record])),
+    [ownRows],
   )
   const [collection, setCollection] = useState<DeckCollection>("all")
   const [system, setSystem] = useState(
@@ -771,9 +781,9 @@ export function DecksScreen({
           </ConvexQueryBoundary>
         )}
       </View>
-      {access?.ready ? (
+      {access?.ready && access.ownerId ? (
         <ConvexQueryBoundary fallback={() => null}>
-          <KeyTotalsQuery onTotals={setTotals} />
+          <KeyTotalsQuery ownerId={access.ownerId} onTotals={setTotals} />
         </ConvexQueryBoundary>
       ) : null}
       <FloatingAppNavigation
