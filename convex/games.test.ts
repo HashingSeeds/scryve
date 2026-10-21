@@ -997,6 +997,33 @@ describe("Convex realtime life writes", () => {
     ).resolves.toEqual({ status: "not_found", operationId: "operation-status-missing" })
   })
 
+  it("reads each seat and account once per life write and per projection rerun", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const documentsRead = (call: Parameters<typeof game.joiner.run>[0]) =>
+      game.joiner.run(async (ctx) => {
+        const before = await ctx.meta.getTransactionMetrics()
+        await call(ctx)
+        const after = await ctx.meta.getTransactionMetrics()
+        return after.documentsRead.used - before.documentsRead.used
+      })
+    const args = lifeArgs(game.publicId, game.joinerPlayerId, "operation-read-budget1", -1)
+    const gameAccountSeatAndRateLimit = 4
+    const accountGameSeatsAndHostAccount = 5
+
+    await expect(documentsRead((ctx) => ctx.runMutation(api.games.changeLife, args))).resolves.toBe(
+      gameAccountSeatAndRateLimit,
+    )
+    await expect(
+      documentsRead((ctx) =>
+        ctx.runQuery(api.games.lobbyProjection, {
+          publicId: game.publicId,
+          includeRecentOperationIds: false,
+        }),
+      ),
+    ).resolves.toBe(accountGameSeatsAndHostAccount)
+  })
+
   it("finishes only online through the host transition, preserves summary/history, and rejects new writes", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
