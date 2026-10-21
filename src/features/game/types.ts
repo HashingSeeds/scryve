@@ -73,6 +73,8 @@ export interface LocalGameAccount {
   ownerId: string
   mePlayerId?: PlayerId
   deckVersionId?: string
+  deckKey?: string
+  deckFingerprint?: string
   deckName?: string
 }
 

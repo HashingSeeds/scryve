@@ -8,6 +8,7 @@ import {
   ConnectedProfileProvider,
   resetConnectedProfileBootstrapForTests,
 } from "@/features/connected/useConnectedProfile"
+import { clearGuestDecks, saveGuestDeck } from "@/features/decks/guestDeck"
 import {
   applyGameCommand,
   asDeviceId,
@@ -15,6 +16,7 @@ import {
   defaultCommandContext,
 } from "@/features/game/domain"
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
+import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { ThemeProvider } from "@/theme/context"
 
 import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "./NewGameScreen"
@@ -49,6 +51,18 @@ jest.mock("../../convex/_generated/api", () =>
     )
     .createGeneratedApiMock(),
 )
+
+jest.mock("@/features/decks/deckVersionsCache", () => ({
+  DeckVersionCacheRepository: jest.fn().mockImplementation(() => ({ loadCards: () => undefined })),
+}))
+jest.mock("@/features/decks/decksSync", () => ({
+  ...jest.requireActual("@/features/decks/decksSync"),
+  DeckSyncRepository: jest.fn().mockImplementation(() => ({ loadShelf: () => [] })),
+}))
+
+jest.mock("@/features/stats/deckFingerprint", () => ({
+  deckFingerprint: jest.fn(async () => `v1:${"a".repeat(64)}`),
+}))
 
 function setup(overrides: Partial<NewGameScreenProps> = {}) {
   return render(
@@ -114,6 +128,8 @@ function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
 
 describe("NewGameScreen", () => {
   beforeEach(() => {
+    clearGuestDecks()
+    jest.mocked(deckFingerprint).mockClear()
     resetConnectedHarness()
     resetConnectedProfileBootstrapForTests()
   })
@@ -279,7 +295,7 @@ describe("NewGameScreen", () => {
     expect(onStartLocal.mock.calls[0][0]).toHaveLength(3)
   })
 
-  it("starts the account seat at its hero deck's life once the deck list loads", () => {
+  it("starts the account seat at its hero deck's life once the deck list loads", async () => {
     const onStartLocal = jest.fn()
     const initialGame = createLocalGame({
       players: [
@@ -312,14 +328,14 @@ describe("NewGameScreen", () => {
         />
       </ThemeProvider>,
     )
-    fireEvent.press(screen.getByTestId("start-game-button"))
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
     const [players, startingLife] = onStartLocal.mock.calls[0]
     expect(startingLife).toBe(40)
     expect(players[0].startingLife).toBeUndefined()
     expect(players[1]).toMatchObject({ startingLife: 36 })
   })
 
-  it("starts a picked hero deck at its latest life after the deck list refreshes", () => {
+  it("starts a picked hero deck at its latest life after the deck list refreshes", async () => {
     const onStartLocal = jest.fn()
     const initialGame = createLocalGame({
       players: [
@@ -353,11 +369,11 @@ describe("NewGameScreen", () => {
     fireEvent.press(screen.getByTestId("me-deck"))
     fireEvent.press(screen.getByTestId("me-deck-option-v-hero"))
     view.rerender(screenWith(30))
-    fireEvent.press(screen.getByTestId("start-game-button"))
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
     expect(onStartLocal.mock.calls[0][0][0]).toMatchObject({ startingLife: 30 })
   })
 
-  it("keeps a prepared game's hero life for its deck when the deck list is offline", () => {
+  it("keeps a prepared game's hero life for its deck when the deck list is offline", async () => {
     const onStartLocal = jest.fn()
     const initialGame = createLocalGame({
       players: [
@@ -370,7 +386,7 @@ describe("NewGameScreen", () => {
       account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "v-old", deckName: "Dash" },
     })
     setup({ onStartLocal, initialGame, account: { ownerId: "owner-a", decks: "unavailable" } })
-    fireEvent.press(screen.getByTestId("start-game-button"))
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
     expect(onStartLocal.mock.calls[0][0][0]).toMatchObject({ startingLife: 36 })
   })
 
@@ -1290,7 +1306,7 @@ describe("NewGameScreen", () => {
     expect(screen.queryByTestId("me-seat")).toBeNull()
   })
 
-  it("pre-marks the account's seat, offers matching decks, and starts the game with both", () => {
+  it("pre-marks the account's seat, offers matching decks, and starts the game with both", async () => {
     const onStartLocal = jest.fn()
     setup({
       onStartLocal,
@@ -1311,7 +1327,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(screen.getByTestId("me-deck"))
     expect(screen.queryByTestId("me-deck-option-v-standard")).toBeNull()
     fireEvent.press(screen.getByTestId("me-deck-option-v-commander"))
-    fireEvent.press(screen.getByTestId("start-game-button"))
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
     expect(onStartLocal).toHaveBeenCalledWith(
       expect.any(Array),
       40,
@@ -1589,4 +1605,86 @@ describe("NewGameScreen", () => {
     closeOptions()
     expect(screen.getByText("2 players · 20 life · Best of 3 · 50 min clock")).toBeTruthy()
   })
+})
+
+it("offers matching local decks alongside synced decks and hashes only the chosen list at Start", async () => {
+  clearGuestDecks()
+  jest.mocked(deckFingerprint).mockClear()
+  const cards = [{ name: "Bolt", oracleId: "bolt", quantity: 4 }]
+  const chosen = saveGuestDeck({ name: "Local Burn", game: "mtg", format: "commander", cards })
+  saveGuestDeck({ name: "Other system", game: "pokemon", format: "standard", cards: [] })
+  const onStartLocal = jest.fn()
+  setup({
+    onStartLocal,
+    account: {
+      ownerId: "owner-a",
+      defaultMeSeat: 0,
+      decks: [
+        {
+          versionId: "synced",
+          deckKey: "synced-key",
+          name: "Synced",
+          system: "mtg",
+          format: "commander",
+        },
+      ],
+    },
+  })
+  fireEvent.press(screen.getByTestId("game-tab-mtg"))
+  fireEvent.press(screen.getByTestId("game-type-commander"))
+  fireEvent.press(screen.getByTestId("me-deck"))
+  expect(screen.getByTestId("me-deck-option-synced")).toBeTruthy()
+  expect(screen.queryByText("Other format")).toBeNull()
+  expect(screen.queryByText("Other system")).toBeNull()
+  expect(deckFingerprint).not.toHaveBeenCalled()
+  fireEvent.press(screen.getByTestId(`me-deck-option-${chosen.localId}`))
+  expect(deckFingerprint).not.toHaveBeenCalled()
+  await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+  expect(deckFingerprint).toHaveBeenCalledTimes(1)
+  expect(deckFingerprint).toHaveBeenCalledWith(cards)
+  expect(onStartLocal.mock.calls[0][2].account).toMatchObject({
+    ownerId: "owner-a",
+    meSeat: 0,
+    deckKey: chosen.localId,
+    deckName: "Local Burn",
+    deckFingerprint: `v1:${"a".repeat(64)}`,
+  })
+  expect(onStartLocal.mock.calls[0][2].account.deckVersionId).toBeUndefined()
+  act(() => clearGuestDecks())
+})
+
+it("keeps local decks selectable while synced decks are unavailable", () => {
+  clearGuestDecks()
+  const local = saveGuestDeck({ name: "Offline Burn", game: "mtg", format: "commander", cards: [] })
+  setup({ account: { ownerId: "owner-a", defaultMeSeat: 0, decks: "unavailable" } })
+  fireEvent.press(screen.getByTestId("game-tab-mtg"))
+  fireEvent.press(screen.getByTestId("game-type-commander"))
+  fireEvent.press(screen.getByTestId("me-deck"))
+  expect(screen.getByTestId(`me-deck-option-${local.localId}`)).toBeTruthy()
+  act(() => clearGuestDecks())
+})
+
+it("does not wait for synced hero metadata to start with a local deck", async () => {
+  clearGuestDecks()
+  const local = saveGuestDeck({ name: "Local Dash", game: "fab", format: "cc", cards: [] })
+  const onStartLocal = jest.fn()
+  setup({
+    onStartLocal,
+    initialGame: createLocalGame({
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+      startingLife: 40,
+      system: "fab",
+      format: "cc",
+    }),
+    account: { ownerId: "owner-a", defaultMeSeat: 0 },
+  })
+  fireEvent.press(screen.getByTestId("me-deck"))
+  fireEvent.press(screen.getByTestId(`me-deck-option-${local.localId}`))
+  expect(screen.getByTestId("start-game-button")).toBeEnabled()
+  await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+  expect(onStartLocal.mock.calls[0][2].account.deckKey).toBe(local.localId)
+  act(() => clearGuestDecks())
 })

@@ -320,7 +320,11 @@ function parseAccount(value: unknown): LocalGameAccount | undefined {
     ownerId: value.ownerId,
     ...(typeof value.mePlayerId === "string" ? { mePlayerId: asPlayerId(value.mePlayerId) } : {}),
     ...(deckVersionId ? { deckVersionId } : {}),
-    ...(deckVersionId && typeof value.deckName === "string" ? { deckName: value.deckName } : {}),
+    ...(typeof value.deckKey === "string" ? { deckKey: value.deckKey } : {}),
+    ...(typeof value.deckFingerprint === "string" && /^v1:[0-9a-f]{64}$/.test(value.deckFingerprint)
+      ? { deckFingerprint: value.deckFingerprint }
+      : {}),
+    ...(typeof value.deckName === "string" ? { deckName: value.deckName } : {}),
   }
 }
 

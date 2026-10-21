@@ -27,6 +27,7 @@ import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
+import { useGuestDecks } from "@/features/decks/guestDeck"
 import {
   createLocalGame,
   hasLocalGameStarted,
@@ -70,6 +71,13 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
+import {
+  deckChoiceId,
+  localDeckChoices,
+  pinDeckChoice,
+  type DeckChoice,
+  type SelectedDeck,
+} from "@/features/stats/deckChoices"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -106,13 +114,7 @@ export interface ConnectedHostFeed {
   exitGame: (game: ResumableGame) => Promise<boolean>
 }
 
-export interface DeckChoice {
-  versionId: string
-  name: string
-  system: string
-  format: string
-  startingValue?: number
-}
+export type { DeckChoice } from "@/features/stats/deckChoices"
 
 export interface LocalAccountSetup {
   ownerId: string
@@ -282,14 +284,17 @@ function NewGameForm({
       ? meSeatOf(claimedGame)
       : account?.defaultMeSeat,
   )
-  const [deck, setDeck] = useState<
-    Pick<DeckChoice, "versionId" | "name" | "startingValue"> | undefined
-  >(() => {
+  const guestDecks = useGuestDecks()
+  const [pinning, setPinning] = useState(false)
+  const pinningRef = useRef(false)
+  const [deck, setDeck] = useState<SelectedDeck | undefined>(() => {
     const chosen = claimedGame?.account
-    if (!claimedGame || !chosen?.deckVersionId) return undefined
+    if (!claimedGame || (!chosen?.deckVersionId && !chosen?.deckKey)) return undefined
     const seat = meSeatOf(claimedGame)
     return {
       versionId: chosen.deckVersionId,
+      deckKey: chosen.deckKey,
+      deckFingerprint: chosen.deckFingerprint,
       name: chosen.deckName ?? "Deck",
       startingValue: seat === undefined ? undefined : claimedGame.players[seat]?.startingLife,
     }
@@ -396,21 +401,31 @@ function NewGameForm({
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
   )
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
-  const deckChoices =
-    deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
+  const deckChoices = [...(deckList ?? []), ...localDeckChoices(guestDecks)].filter(
+    (choice) => choice.system === system && choice.format === format,
+  )
   const deckSetsLife = Boolean(deck && identitySection(system, format)?.startingValueFacet)
   const deckLife = deckSetsLife
     ? (deck?.startingValue ??
-      deckChoices.find((choice) => choice.versionId === deck?.versionId)?.startingValue)
+      deckChoices.find((choice) => deckChoiceId(choice) === (deck && deckChoiceId(deck)))
+        ?.startingValue)
     : undefined
-  const deckLifeLoading = deckSetsLife && deckLife === undefined && account?.decks === undefined
+  const deckLifeLoading =
+    deckSetsLife && !deck?.localId && deckLife === undefined && account?.decks === undefined
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account
         ? {
             ownerId: account.ownerId,
             meSeat: effectiveMeSeat,
-            ...(deck ? { deckVersionId: deck.versionId, deckName: deck.name } : {}),
+            ...(deck
+              ? {
+                  deckVersionId: deck.versionId,
+                  deckKey: deck.deckKey,
+                  deckFingerprint: deck.deckFingerprint,
+                  deckName: deck.name,
+                }
+              : {}),
           }
         : undefined,
     [account, deck, effectiveMeSeat],
@@ -420,7 +435,7 @@ function NewGameForm({
     : connectedMode
       ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
       : validLife && nameValidation.valid && !localGame && !deckLifeLoading
-  const busy = cloudMode && Boolean(connected?.busy)
+  const busy = pinning || (cloudMode && Boolean(connected?.busy))
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
   const matchBlocks = Boolean(localGame?.match)
@@ -470,8 +485,8 @@ function NewGameForm({
               : translate("play:newGame.gamesInProgress")
             : ""
 
-  function submit() {
-    if (!valid || busy) return
+  async function submit() {
+    if (!valid || busy || pinningRef.current) return
     if (cloudMode && connected?.access) {
       connected.access.request()
       return
@@ -491,21 +506,39 @@ function NewGameForm({
         ruleset: format ?? NO_PLAY_SYSTEM,
         ...setup,
       })
-    else
-      onStartLocal(
-        deckLife === undefined
-          ? players
-          : players.map((player, seat) =>
-              seat === effectiveMeSeat ? { ...player, startingLife: deckLife } : player,
-            ),
-        startingLife,
-        {
-          ...setup,
-          account: accountInput,
-          ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
-          ...(clockSetup ? { clock: clockSetup } : {}),
-        },
-      )
+    else {
+      pinningRef.current = true
+      setPinning(true)
+      setPlayerSaveError(undefined)
+      try {
+        const pinned =
+          deck && accountInput?.meSeat !== undefined
+            ? await pinDeckChoice(deck, accountInput.ownerId)
+            : undefined
+        if (seenOwnerId.current !== accountInput?.ownerId) return
+        onStartLocal(
+          deckLife === undefined
+            ? players
+            : players.map((player, seat) =>
+                seat === effectiveMeSeat ? { ...player, startingLife: deckLife } : player,
+              ),
+          startingLife,
+          {
+            ...setup,
+            account: accountInput ? { ...accountInput, ...pinned } : undefined,
+            ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
+            ...(clockSetup ? { clock: clockSetup } : {}),
+          },
+        )
+      } catch (cause) {
+        setPlayerSaveError(
+          cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
+        )
+      } finally {
+        pinningRef.current = false
+        setPinning(false)
+      }
+    }
   }
 
   function changeMode(next: NewGameMode) {
@@ -566,17 +599,28 @@ function NewGameForm({
       savePlayers(seatAppearances, {
         ...accountInput,
         meSeat: seat,
-        ...(seat === undefined ? { deckVersionId: undefined, deckName: undefined } : {}),
+        ...(seat === undefined
+          ? {
+              deckVersionId: undefined,
+              deckKey: undefined,
+              deckFingerprint: undefined,
+              deckName: undefined,
+            }
+          : {}),
       })
   }
 
-  function chooseDeck(versionId: string | undefined) {
-    const choice = deckChoices.find((candidate) => candidate.versionId === versionId)
-    setDeck(choice && { versionId: choice.versionId, name: choice.name })
+  function chooseDeck(id: string | undefined) {
+    const choice = deckChoices.find((candidate) => deckChoiceId(candidate) === id)
+    setDeck(
+      choice && { ...choice, startingValue: choice.localId ? choice.startingValue : undefined },
+    )
     if (accountInput)
       savePlayers(seatAppearances, {
         ...accountInput,
         deckVersionId: choice?.versionId,
+        deckKey: choice?.deckKey,
+        deckFingerprint: undefined,
         deckName: choice?.name,
       })
   }
@@ -780,7 +824,7 @@ function NewGameForm({
                     value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
                     placeholder={translate("play:newGame.noSeat")}
                     clearLabel={translate("play:newGame.noSeat")}
-                    disabled={matchLocked}
+                    disabled={pinning || matchLocked}
                     options={players.map((player, index) => ({
                       id: String(index),
                       label: player.name,
@@ -792,25 +836,30 @@ function NewGameForm({
                       testID="me-deck"
                       label={translate("play:newGame.yourDeck")}
                       field="yourDeck"
-                      value={deck?.versionId}
+                      value={deck ? deckChoiceId(deck) : undefined}
                       placeholder={
-                        account.decks === "unavailable"
+                        deckChoices.length === 0 && account.decks === "unavailable"
                           ? translate("play:newGame.decksUnavailable")
-                          : account.decks === undefined
+                          : deckChoices.length === 0 && account.decks === undefined
                             ? translate("play:newGame.loadingDecks")
                             : deckChoices.length === 0
                               ? translate("play:newGame.noMatchingDecks")
                               : translate("play:newGame.noDeck")
                       }
                       clearLabel={translate("play:newGame.noDeck")}
-                      disabled={matchLocked || (deckList === undefined && !deck)}
+                      disabled={
+                        pinning ||
+                        matchLocked ||
+                        Boolean(initialGame && hasLocalGameStarted(initialGame)) ||
+                        (deckList === undefined && deckChoices.length === 0 && !deck)
+                      }
                       options={[
                         ...(deck &&
-                        !deckChoices.some((choice) => choice.versionId === deck.versionId)
-                          ? [{ id: deck.versionId, label: deck.name }]
+                        !deckChoices.some((choice) => deckChoiceId(choice) === deckChoiceId(deck))
+                          ? [{ id: deckChoiceId(deck)!, label: deck.name }]
                           : []),
                         ...deckChoices.map((choice) => ({
-                          id: choice.versionId,
+                          id: deckChoiceId(choice)!,
                           label: choice.name,
                         })),
                       ]}

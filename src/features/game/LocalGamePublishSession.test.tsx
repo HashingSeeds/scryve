@@ -14,7 +14,7 @@ const mockPublish = jest.fn(
   async (_args: {
     publicId: string
     result: { kind: string }
-    players: { deckVersionId?: string }[]
+    players: { deckVersionId?: string; deckKey?: string; deckName?: string }[]
   }) => ({
     publicId: "x",
     summaryId: "s",
@@ -70,7 +70,13 @@ class MemoryStorage implements StringStorage {
 
 function finishedGame(
   now: number,
-  account?: { ownerId: string; meSeat: number; deckVersionId: string },
+  account?: {
+    ownerId: string
+    meSeat: number
+    deckVersionId: string
+    deckKey?: string
+    deckName?: string
+  },
 ) {
   const game = createLocalGame({
     now,
@@ -281,10 +287,16 @@ describe("LocalGamePublishSession rejections", () => {
     expect(repository.loadHistory().map((game) => game.publish)).toEqual(["published", "failed"])
   })
 
-  it("retries a deck rejection once without the deck", async () => {
+  it("retries a deck rejection once without the version, keeping the key and name", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(
-      finishedGame(1, { ownerId: "owner-a", meSeat: 0, deckVersionId: "gone" }),
+      finishedGame(1, {
+        ownerId: "owner-a",
+        meSeat: 0,
+        deckVersionId: "gone",
+        deckKey: "burn",
+        deckName: "Burn",
+      }),
       "game_menu",
       "owner-a",
     )
@@ -297,5 +309,41 @@ describe("LocalGamePublishSession rejections", () => {
     expect(mockPublish).toHaveBeenCalledTimes(2)
     expect(mockPublish.mock.calls[0][0].players[0].deckVersionId).toBe("gone")
     expect(mockPublish.mock.calls[1][0].players[0].deckVersionId).toBeUndefined()
+    expect(mockPublish.mock.calls[1][0].players[0]).toMatchObject({
+      deckKey: "burn",
+      deckName: "Burn",
+    })
   })
 })
+
+it.each([undefined, 90_000])(
+  "retries throttled uploads after %s ms without failing the game",
+  async (retryAfterMs) => {
+    jest.useFakeTimers()
+    jest.clearAllMocks()
+    resetConnectedProfileBootstrapForTests()
+    mockConnected = true
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
+    mockPublish.mockRejectedValueOnce(
+      new ConvexError({ code: "rate_limited", message: "Wait", retryAfterMs }),
+    )
+    const view = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
+    expect(repository.loadHistory()[0].publish).toBe("pending")
+    await act(async () => {
+      jest.advanceTimersByTime(60_000)
+    })
+    if (retryAfterMs) {
+      expect(repository.loadHistory()[0].publish).toBe("pending")
+      expect(mockPublish).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        jest.advanceTimersByTime(retryAfterMs - 60_000)
+      })
+    }
+    await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
+    expect(mockPublish).toHaveBeenCalledTimes(2)
+    view.unmount()
+    jest.useRealTimers()
+  },
+)

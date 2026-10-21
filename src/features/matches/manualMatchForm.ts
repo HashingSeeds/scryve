@@ -126,7 +126,14 @@ export type ManualMatchBuild =
 
 export function buildManualMatchArgs(
   draft: ManualMatchDraft,
-  ids: { publicId: string; deckVersionId?: Id<"deckVersions"> },
+  ids: {
+    publicId: string
+    deckVersionId?: Id<"deckVersions">
+    deckKey?: string
+    deckFingerprint?: string
+    system?: string
+    format?: string
+  },
   now = Date.now(),
 ): ManualMatchBuild {
   const twoPlayer = draft.opponents.length === 1
@@ -178,6 +185,8 @@ export function buildManualMatchArgs(
   let me: RecordManualMatchArgs["me"] = {
     seat: 1,
     ...(ids.deckVersionId ? { deckVersionId: ids.deckVersionId } : {}),
+    ...(ids.deckKey ? { deckKey: ids.deckKey } : {}),
+    ...(ids.deckFingerprint ? { deckFingerprint: ids.deckFingerprint } : {}),
     outcome: draft.outcome,
   }
   const scoreGiven = twoPlayer && Object.values(draft.score).some((value) => value.trim() !== "")
@@ -210,6 +219,8 @@ export function buildManualMatchArgs(
     ok: true,
     args: {
       publicId: ids.publicId,
+      ...(ids.system ? { system: ids.system } : {}),
+      ...(ids.format ? { format: ids.format } : {}),
       bestOf: draft.bestOf,
       finishedAt,
       ...(eventName ? { eventName } : {}),
