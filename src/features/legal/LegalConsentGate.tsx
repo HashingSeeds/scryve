@@ -193,7 +193,6 @@ function ConfiguredConsentGate({
   waitingForAuth: boolean
 }) {
   const recordAcceptance = useMutation(api.legal.recordAcceptance)
-  // why: a server error (like a disabled deployment) must fall back like being offline, not reach the root error screen.
   const acceptancesQuery = useQuery_experimental({
     query: api.legal.currentAcceptances,
     args: signedIn ? {} : "skip",

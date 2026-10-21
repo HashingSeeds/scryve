@@ -51,7 +51,6 @@ export function needsStoreUpdate(installed: Build, live: Build | null | undefine
 
 function useLiveStoreUpdate() {
   const platform = Platform.OS === "ios" ? "ios" : "android"
-  // why: the app menu must still open when this check fails, so an error just means no store update is offered.
   const liveQuery = useQuery_experimental({ query: api.storeReleases.live, args: { platform } })
   const live = liveQuery.status === "success" ? liveQuery.data : undefined
   const downloaded = useDownloadedPlayVersion() !== null
