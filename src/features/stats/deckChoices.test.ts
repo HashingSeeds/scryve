@@ -1,14 +1,24 @@
 import { chosenDeckCards, chosenDeckKey, localDeckChoices, pinDeckChoice } from "./deckChoices"
 import { deckFingerprint } from "./deckFingerprint"
 
+const mockLoadPending = jest.fn()
+const mockMappedVersionId = jest.fn((_versionId: string): string | undefined => undefined)
 const mockLoadCards = jest.fn()
 const mockLoadShelf = jest.fn(() => [
   { _id: "server", syncId: "stable", deckKey: "synced-key", latestVersionId: "version" },
 ])
 const mockLoadGuestDeck = jest.fn()
 
+jest.mock("@/features/decks/decksVersionWrites", () => ({
+  ...jest.requireActual("@/features/decks/decksVersionWrites"),
+  DeckVersionWriteRepository: jest
+    .fn()
+    .mockImplementation(() => ({ loadPending: mockLoadPending })),
+}))
 jest.mock("@/features/decks/deckVersionsCache", () => ({
-  DeckVersionCacheRepository: jest.fn().mockImplementation(() => ({ loadCards: mockLoadCards })),
+  DeckVersionCacheRepository: jest
+    .fn()
+    .mockImplementation(() => ({ loadCards: mockLoadCards, mappedVersionId: mockMappedVersionId })),
 }))
 jest.mock("@/features/decks/decksSync", () => ({
   DeckSyncRepository: jest.fn().mockImplementation(() => ({ loadShelf: mockLoadShelf })),
@@ -23,6 +33,8 @@ jest.mock("./deckFingerprint", () => ({
 beforeEach(() => {
   jest.clearAllMocks()
   mockLoadCards.mockReturnValue(undefined)
+  mockLoadPending.mockReturnValue([])
+  mockMappedVersionId.mockReset()
 })
 
 it("uses a local deck's explicit key and defaults older decks to localId without hashing", () => {
@@ -113,4 +125,35 @@ it("asks for a new selection if a chosen local deck disappears before Start", as
 it("does not fetch cards to recover a missing synced key", () => {
   expect(chosenDeckKey({ name: "Burn", versionId: "missing" }, "owner")).toBeUndefined()
   expect(chosenDeckCards({ name: "Burn", versionId: "missing" }, "owner")).toBeUndefined()
+})
+
+it("pins the newest pending card write for the chosen version instead of its cache", () => {
+  mockLoadCards.mockReturnValue({ cards: [{ name: "Cached", quantity: 1 }] })
+  const pending = (
+    name: string,
+    expectedRevision: number,
+    versionId = "version",
+    op = "cards",
+  ) => ({
+    versionId,
+    expectedRevision,
+    op,
+    cards: [{ name, quantity: 1 }],
+  })
+  mockLoadPending.mockReturnValue([
+    pending("New", 2),
+    pending("Old", 1),
+    pending("Other version", 3, "other"),
+    pending("Rename", 4, "version", "rename"),
+  ])
+  expect(chosenDeckCards({ name: "Burn", versionId: "version" }, "owner")).toEqual([
+    { name: "New", quantity: 1 },
+  ])
+})
+
+it("uses a queued edit under its acknowledged version id, including an empty list", () => {
+  mockLoadCards.mockReturnValue({ cards: [{ name: "Cached", quantity: 1 }] })
+  mockMappedVersionId.mockImplementation((id) => (id === "provisional" ? "version" : undefined))
+  mockLoadPending.mockReturnValue([{ versionId: "provisional", expectedRevision: 1, cards: [] }])
+  expect(chosenDeckCards({ name: "Burn", versionId: "version" }, "owner")).toEqual([])
 })

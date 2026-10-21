@@ -286,7 +286,7 @@ function NewGameForm({
   )
   const guestDecks = useGuestDecks()
   const [pinning, setPinning] = useState(false)
-  const pinningRef = useRef(false)
+  const pinningRef = useRef<symbol | undefined>(undefined)
   const [deck, setDeck] = useState<SelectedDeck | undefined>(() => {
     const chosen = claimedGame?.account
     if (!claimedGame || (!chosen?.deckVersionId && !chosen?.deckKey)) return undefined
@@ -304,6 +304,8 @@ function NewGameForm({
   useEffect(() => {
     if (seenOwnerId.current === account?.ownerId) return
     seenOwnerId.current = account?.ownerId
+    pinningRef.current = undefined
+    setPinning(false)
     setMeSeat(account?.defaultMeSeat)
     setDeck(undefined)
   }, [account?.defaultMeSeat, account?.ownerId])
@@ -507,7 +509,8 @@ function NewGameForm({
         ...setup,
       })
     else {
-      pinningRef.current = true
+      const request = Symbol()
+      pinningRef.current = request
       setPinning(true)
       setPlayerSaveError(undefined)
       try {
@@ -515,7 +518,7 @@ function NewGameForm({
           deck && accountInput?.meSeat !== undefined
             ? await pinDeckChoice(deck, accountInput.ownerId)
             : undefined
-        if (seenOwnerId.current !== accountInput?.ownerId) return
+        if (pinningRef.current !== request || seenOwnerId.current !== accountInput?.ownerId) return
         onStartLocal(
           deckLife === undefined
             ? players
@@ -531,12 +534,15 @@ function NewGameForm({
           },
         )
       } catch (cause) {
+        if (pinningRef.current !== request) return
         setPlayerSaveError(
           cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
         )
       } finally {
-        pinningRef.current = false
-        setPinning(false)
+        if (pinningRef.current === request) {
+          pinningRef.current = undefined
+          setPinning(false)
+        }
       }
     }
   }
@@ -563,6 +569,8 @@ function NewGameForm({
     } else if (startingLife === defaultStartingLife(system, format, playerCount))
       setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
     if (type.system !== system || type.format !== format) {
+      pinningRef.current = undefined
+      setPinning(false)
       setFormat(type.format)
       setDeck(undefined)
     }
@@ -592,6 +600,8 @@ function NewGameForm({
   }
 
   function chooseMeSeat(value: string | undefined) {
+    pinningRef.current = undefined
+    setPinning(false)
     const seat = value === undefined ? undefined : Number(value)
     setMeSeat(seat)
     if (seat === undefined) setDeck(undefined)
@@ -610,19 +620,39 @@ function NewGameForm({
       })
   }
 
-  function chooseDeck(id: string | undefined) {
+  async function chooseDeck(id: string | undefined) {
+    if (deck && deckChoiceId(deck) === id) return
+    const request = Symbol()
+    pinningRef.current = request
     const choice = deckChoices.find((candidate) => deckChoiceId(candidate) === id)
-    setDeck(
-      choice && { ...choice, startingValue: choice.localId ? choice.startingValue : undefined },
-    )
-    if (accountInput)
-      savePlayers(seatAppearances, {
-        ...accountInput,
-        deckVersionId: choice?.versionId,
-        deckKey: choice?.deckKey,
-        deckFingerprint: undefined,
-        deckName: choice?.name,
-      })
+    const selected = choice && {
+      ...choice,
+      startingValue: choice.localId ? choice.startingValue : undefined,
+    }
+    setDeck(selected)
+    setPlayerSaveError(undefined)
+    try {
+      if (!accountInput || !onSavePlayers || !initialGame) return
+      const pinned = selected
+        ? await pinDeckChoice(selected, accountInput.ownerId)
+        : {
+            deckVersionId: undefined,
+            deckKey: undefined,
+            deckFingerprint: undefined,
+            deckName: undefined,
+          }
+      if (pinningRef.current !== request || seenOwnerId.current !== accountInput.ownerId) return
+      if (selected)
+        setDeck({ ...selected, deckKey: pinned.deckKey, deckFingerprint: pinned.deckFingerprint })
+      savePlayers(seatAppearances, { ...accountInput, ...pinned })
+    } catch (cause) {
+      if (pinningRef.current !== request) return
+      setPlayerSaveError(
+        cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
+      )
+    } finally {
+      if (pinningRef.current === request) pinningRef.current = undefined
+    }
   }
 
   async function confirmExit() {

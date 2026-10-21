@@ -62,6 +62,28 @@ export interface DeckVersionWriteSnapshot {
   capacityBlocked: boolean
 }
 
+export function newestPendingCardWrite(
+  pending: readonly PendingVersionWrite[],
+  versionId: string | undefined,
+  mappedVersion: (versionId: string) => string,
+) {
+  const overlayIds = new Set<string>()
+  if (versionId) {
+    overlayIds.add(versionId)
+    overlayIds.add(mappedVersion(versionId))
+  }
+  return pending
+    .filter((write) => (write.op ?? "cards") === "cards")
+    .filter(
+      (write) => overlayIds.has(write.versionId) || overlayIds.has(mappedVersion(write.versionId)),
+    )
+    .reduce<PendingVersionWrite | undefined>(
+      (newest, action) =>
+        !newest || action.expectedRevision > newest.expectedRevision ? action : newest,
+      undefined,
+    )
+}
+
 const SCOPE = "versionCards"
 const RETRY_DELAY_MS = 2_000
 // why: each card write is a full list; a 300-entry deck is ~190 KB, past the default budget.

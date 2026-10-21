@@ -1,4 +1,8 @@
 import { DeckSyncRepository } from "@/features/decks/decksSync"
+import {
+  DeckVersionWriteRepository,
+  newestPendingCardWrite,
+} from "@/features/decks/decksVersionWrites"
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
 import { translate } from "@/i18n/translate"
@@ -51,10 +55,16 @@ export function chosenDeckCards(
     if (!local) throw new Error(translate("decks:detail.maybeDeleted"))
     return local.deck.cards
   }
-  return deck.versionId
-    ? new DeckVersionCacheRepository(ownerId, undefined, deploymentUrl).loadCards(deck.versionId)
-        ?.cards
-    : undefined
+  if (!deck.versionId) return undefined
+  const cache = new DeckVersionCacheRepository(ownerId, undefined, deploymentUrl)
+  const pending = new DeckVersionWriteRepository(ownerId, undefined, deploymentUrl).loadPending()
+  return (
+    newestPendingCardWrite(
+      pending,
+      deck.versionId,
+      (versionId) => cache.mappedVersionId(versionId) ?? versionId,
+    )?.cards ?? cache.loadCards(deck.versionId)?.cards
+  )
 }
 
 export function chosenDeckKey(

@@ -2,6 +2,7 @@ import { Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
+import { SelectField } from "@/components/SelectField"
 import * as authAccess from "@/features/auth/AuthContext"
 import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
 import {
@@ -53,7 +54,9 @@ jest.mock("../../convex/_generated/api", () =>
 )
 
 jest.mock("@/features/decks/deckVersionsCache", () => ({
-  DeckVersionCacheRepository: jest.fn().mockImplementation(() => ({ loadCards: () => undefined })),
+  DeckVersionCacheRepository: jest
+    .fn()
+    .mockImplementation(() => ({ loadCards: () => undefined, mappedVersionId: () => undefined })),
 }))
 jest.mock("@/features/decks/decksSync", () => ({
   ...jest.requireActual("@/features/decks/decksSync"),
@@ -129,7 +132,10 @@ function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
 describe("NewGameScreen", () => {
   beforeEach(() => {
     clearGuestDecks()
-    jest.mocked(deckFingerprint).mockClear()
+    jest
+      .mocked(deckFingerprint)
+      .mockReset()
+      .mockResolvedValue(`v1:${"a".repeat(64)}`)
     resetConnectedHarness()
     resetConnectedProfileBootstrapForTests()
   })
@@ -1427,6 +1433,172 @@ describe("NewGameScreen", () => {
     expect(onSavePlayers).toHaveBeenLastCalledWith(expect.any(Array), {
       ownerId: "owner-a",
       meSeat: 0,
+    })
+  })
+
+  describe("deck picks after Start", () => {
+    const fingerprint = `v1:${"b".repeat(64)}`
+
+    function existingGame(pin = false) {
+      return createLocalGame({
+        players: [
+          { name: "Ada", color: "#FF0000" },
+          { name: "Grace", color: "#0000FF" },
+        ],
+        startingLife: 40,
+        system: "mtg",
+        format: "commander",
+        account: {
+          ownerId: "owner-a",
+          meSeat: 0,
+          ...(pin
+            ? { deckKey: "original", deckName: "Original", deckFingerprint: fingerprint }
+            : {}),
+        },
+      })
+    }
+
+    function pick(id: string) {
+      fireEvent.press(screen.getByTestId("me-deck"))
+      fireEvent.press(screen.getByTestId(`me-deck-option-${id}`))
+    }
+
+    it("saves a fingerprint for a deck picked after Start", async () => {
+      const local = saveGuestDeck({ name: "Burn", game: "mtg", format: "commander", cards: [] })
+      const onSavePlayers = jest.fn()
+      setup({
+        initialGame: existingGame(),
+        onSavePlayers,
+        account: { ownerId: "owner-a", decks: [] },
+      })
+      pick(local.localId)
+      await act(async () => undefined)
+      expect(onSavePlayers).toHaveBeenCalledWith(expect.any(Array), {
+        ownerId: "owner-a",
+        meSeat: 0,
+        deckKey: local.localId,
+        deckVersionId: undefined,
+        deckName: "Burn",
+        deckFingerprint: `v1:${"a".repeat(64)}`,
+      })
+    })
+
+    it("keeps the existing pin when reselecting its deck", async () => {
+      const onSavePlayers = jest.fn()
+      const onStartLocal = jest.fn()
+      setup({
+        initialGame: existingGame(true),
+        onSavePlayers,
+        onStartLocal,
+        account: { ownerId: "owner-a", decks: [] },
+      })
+      const picker = screen
+        .UNSAFE_getAllByType(SelectField)
+        .find((field) => field.props.testID === "me-deck")!
+      await act(async () => fireEvent(picker, "select", "original"))
+      await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+      expect(onStartLocal.mock.calls[0][2].account).toMatchObject({
+        deckKey: "original",
+        deckName: "Original",
+        deckFingerprint: fingerprint,
+      })
+      expect(deckFingerprint).not.toHaveBeenCalled()
+      expect(onSavePlayers).not.toHaveBeenCalled()
+      expect(screen.getByLabelText("Your deck, Original")).toBeTruthy()
+    })
+
+    it("replaces the pin when picking a different deck", async () => {
+      const local = saveGuestDeck({
+        name: "Correction",
+        game: "mtg",
+        format: "commander",
+        cards: [],
+      })
+      const onSavePlayers = jest.fn()
+      setup({
+        initialGame: existingGame(true),
+        onSavePlayers,
+        account: { ownerId: "owner-a", decks: [] },
+      })
+      pick(local.localId)
+      await act(async () => undefined)
+      expect(onSavePlayers).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          deckKey: local.localId,
+          deckName: "Correction",
+          deckFingerprint: `v1:${"a".repeat(64)}`,
+        }),
+      )
+    })
+
+    it.each(["another deck", "clear", "owner change"])(
+      "drops a pending pin after %s",
+      async (next) => {
+        const first = saveGuestDeck({ name: "First", game: "mtg", format: "commander", cards: [] })
+        const second = saveGuestDeck({
+          name: "Second",
+          game: "mtg",
+          format: "commander",
+          cards: [],
+        })
+        let resolvePin!: (fingerprint: string) => void
+        const pending = new Promise<string>((resolve) => {
+          resolvePin = resolve
+        })
+        jest.mocked(deckFingerprint).mockReturnValueOnce(pending)
+        const onSavePlayers = jest.fn()
+        const props = {
+          initialGame: existingGame(),
+          onSavePlayers,
+          account: { ownerId: "owner-a", decks: [] },
+        }
+        const view = setup(props)
+        pick(first.localId)
+        expect(onSavePlayers).not.toHaveBeenCalled()
+        if (next === "owner change") {
+          view.rerender(
+            <ThemeProvider initialContext="light">
+              <NewGameScreen
+                defaults={DEFAULT_LOCAL_SETTINGS}
+                mode="local"
+                onModeChange={jest.fn()}
+                onBack={jest.fn()}
+                onStartLocal={jest.fn()}
+                {...props}
+                account={{ ownerId: "owner-b", decks: [] }}
+              />
+            </ThemeProvider>,
+          )
+        } else {
+          pick(next === "clear" ? "none" : second.localId)
+          await act(async () => undefined)
+        }
+        await act(async () => resolvePin(fingerprint))
+        if (next === "owner change") expect(onSavePlayers).not.toHaveBeenCalled()
+        else {
+          expect(onSavePlayers).toHaveBeenCalledTimes(1)
+          expect(onSavePlayers.mock.calls[0][1]).toMatchObject({
+            deckKey: next === "clear" ? undefined : second.localId,
+            deckFingerprint: next === "clear" ? undefined : `v1:${"a".repeat(64)}`,
+          })
+        }
+      },
+    )
+
+    it("shows a pinning error without saving an unknown list", async () => {
+      const local = saveGuestDeck({ name: "Burn", game: "mtg", format: "commander", cards: [] })
+      jest.mocked(deckFingerprint).mockRejectedValueOnce(new Error("Could not pin deck."))
+      const onSavePlayers = jest.fn()
+      setup({
+        initialGame: existingGame(),
+        onSavePlayers,
+        account: { ownerId: "owner-a", decks: [] },
+      })
+      pick(local.localId)
+      await act(async () => undefined)
+      expect(screen.getByText("Could not pin deck.")).toBeTruthy()
+      expect(onSavePlayers).not.toHaveBeenCalled()
     })
   })
 

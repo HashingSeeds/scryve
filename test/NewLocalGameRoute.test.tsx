@@ -518,7 +518,7 @@ describe("new local game route while signed in", () => {
     expect(localGameRepository.loadMeSeat()).toBe(1)
   })
 
-  it("persists seat and deck picks for a running game opened without the setup flag", () => {
+  it("persists seat and deck picks for a running game opened without the setup flag", async () => {
     const game = createLocalGame({
       startingLife: 40,
       system: "mtg",
@@ -539,12 +539,14 @@ describe("new local game route while signed in", () => {
     fireEvent.press(view.getByTestId("me-seat-option-0"))
     fireEvent.press(view.getByTestId("me-deck"))
     fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
-    expect(localGameRepository.loadActiveGame()?.account).toEqual({
-      ownerId: "owner-a",
-      mePlayerId: game.players[0].id,
-      deckVersionId: "v-atraxa",
-      deckName: "Atraxa",
-    })
+    await waitFor(() =>
+      expect(localGameRepository.loadActiveGame()?.account).toEqual({
+        ownerId: "owner-a",
+        mePlayerId: game.players[0].id,
+        deckVersionId: "v-atraxa",
+        deckName: "Atraxa",
+      }),
+    )
     fireEvent.changeText(view.getByTestId("player-name-2"), "Grace")
     fireEvent(view.getByTestId("player-name-2"), "blur")
     expect(localGameRepository.loadActiveGame()).toMatchObject({
