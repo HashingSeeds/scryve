@@ -12,6 +12,7 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { loadGuestDeck } from "@/features/decks/guestDeck"
 import { createClientId } from "@/features/game/domain"
 import {
   BEST_OF_OPTIONS,
@@ -25,6 +26,8 @@ import {
   type ManualMatchDraft,
   type SeatOutcome,
 } from "@/features/matches/manualMatchForm"
+import { localDeckChoices } from "@/features/stats/deckChoices"
+import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -34,10 +37,8 @@ import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { MAX_DISPLAY_NAME_LENGTH, MAX_EVENT_NAME_LENGTH } from "../../convex/lib/policy"
 
-export type RecordMatchDeck = {
-  versionId: Id<"deckVersions">
-  name: string
-}
+export type RecordMatchDeck =
+  { versionId: Id<"deckVersions">; name: string } | { localId: string; name: string }
 
 type RecordMatchScreenProps = {
   access: CloudAccess
@@ -85,14 +86,19 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       access.request()
       return
     }
-    const built = buildManualMatchArgs(draft, { publicId, deckVersionId: deck?.versionId })
-    if (!built.ok) {
-      setError(built.error)
-      return
-    }
     setBusy(true)
     setError(undefined)
     try {
+      const built = buildManualMatchArgs(draft, {
+        publicId,
+        ...(deck && "localId" in deck ? await localDeckIds(deck.localId) : {}),
+        ...(deck && "versionId" in deck ? { deckVersionId: deck.versionId } : {}),
+      })
+      if (!built.ok) {
+        setError(built.error)
+        setBusy(false)
+        return
+      }
       await recordMatch(built.args)
       onSaved()
     } catch (cause) {
@@ -305,3 +311,17 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
+
+// why: a local deck has no server version, so the match names its key and the list it holds now.
+async function localDeckIds(localId: string) {
+  const stored = loadGuestDeck(localId)
+  if (!stored) throw new Error(translate("decks:detail.maybeDeleted"))
+  const [choice] = localDeckChoices([stored])
+  return {
+    deckKey: choice.deckKey,
+    deckFingerprint: await deckFingerprint(stored.deck.cards),
+    deckName: choice.name,
+    system: choice.system,
+    format: choice.format,
+  }
+}

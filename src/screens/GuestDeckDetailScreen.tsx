@@ -47,6 +47,7 @@ type GuestDeckDetailScreenProps = {
   access?: CloudAccess
   onBack: () => void
   onSynced?: (deckId: Id<"decks">) => void
+  onAddMatch?: (deckName: string) => void
 }
 type GuestCard = GuestDeckPayload["cards"][number]
 
@@ -59,6 +60,7 @@ export function GuestDeckDetailScreen({
   access,
   onBack,
   onSynced,
+  onAddMatch,
 }: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
@@ -251,6 +253,11 @@ export function GuestDeckDetailScreen({
               <LocalDeckStats deckKey={stored.deckKey ?? stored.localId} />
             </ConvexQueryBoundary>
           ) : undefined
+        }
+        onAddMatch={
+          onAddMatch && access?.ready && stored && !editing
+            ? () => onAddMatch(current.name)
+            : undefined
         }
         dirty={!sameDraft(current, baseRef.current)}
         onBack={() => (sameDraft(current, baseRef.current) ? onBack() : setDiscarding(true))}

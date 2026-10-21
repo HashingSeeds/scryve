@@ -7,11 +7,13 @@ import { RecordMatchScreen } from "@/screens/RecordMatchScreen"
 import type { Id } from "../../../../convex/_generated/dataModel"
 
 export default function RecordMatchRoute() {
-  const { deckId, versionId, deckName } = useLocalSearchParams<{
+  const { deckId, versionId, localId, deckName } = useLocalSearchParams<{
     deckId?: string
     versionId?: string
+    localId?: string
     deckName?: string
   }>()
+  const name = deckName ?? translate("decks:deckView.title")
   // why: after a web refresh there is no history, so fall back to where the form was opened from.
   const leave = () =>
     router.canGoBack()
@@ -25,12 +27,11 @@ export default function RecordMatchRoute() {
         <RecordMatchScreen
           access={access}
           deck={
-            deckId && versionId
-              ? {
-                  versionId: versionId as Id<"deckVersions">,
-                  name: deckName ?? translate("decks:deckView.title"),
-                }
-              : undefined
+            localId
+              ? { localId, name }
+              : deckId && versionId
+                ? { versionId: versionId as Id<"deckVersions">, name }
+                : undefined
           }
           onBack={leave}
           onSaved={leave}

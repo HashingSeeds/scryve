@@ -77,6 +77,12 @@ function LocalDeckDetailRoute({ localId }: { localId: string }) {
           onSynced={(deckId) =>
             router.replace({ pathname: "/connected/decks/[deckId]", params: { deckId } })
           }
+          onAddMatch={(deckName) =>
+            router.push({
+              pathname: "/connected/decks/match",
+              params: { deckId: guestDeckRouteId(localId), localId, deckName },
+            })
+          }
         />
       )}
     </CloudScreen>
