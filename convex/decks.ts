@@ -13,7 +13,13 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
-import { assertDeckKey, createOrReviveDeck, deckForKey, pinnedDeck } from "./lib/deckKeys"
+import {
+  assertDeckKey,
+  createOrReviveDeck,
+  deckForKey,
+  findDeckByKey,
+  pinnedDeck,
+} from "./lib/deckKeys"
 import { deckStartingValue } from "./lib/deckStartingValue"
 import {
   syncedDeck,
@@ -584,6 +590,13 @@ export const importGuest = mutation({
         localUpdatedAt: receiptUpdatedAt,
       }
     }
+    const live = args.deckKey ? await findDeckByKey(ctx, user._id, args.deckKey) : null
+    if (live && live.archivedAt === undefined && !existing)
+      return {
+        status: "already_imported" as const,
+        deckId: live._id,
+        localUpdatedAt: args.localUpdatedAt,
+      }
     if (existing && !existing.deckKey)
       await ctx.db.patch(existing._id, { deckKey: args.deckKey ?? args.localId })
     await deckForKey(ctx, user._id, existing?.deckKey ?? args.deckKey ?? args.localId)

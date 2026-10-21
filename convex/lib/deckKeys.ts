@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values"
 import { deckFingerprint } from "./deckFingerprint"
 import { MAX_DECK_CARDS } from "./policy"
 import type { Doc, Id } from "../_generated/dataModel"
-import type { MutationCtx } from "../_generated/server"
+import type { MutationCtx, QueryCtx } from "../_generated/server"
 
 export function assertDeckKey(key: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key))
@@ -37,26 +37,28 @@ export async function pinnedDeck(ctx: MutationCtx, versionId: Id<"deckVersions">
   }
 }
 
-export async function deckForKey(ctx: MutationCtx, userId: Id<"users">, key: string) {
+export async function findDeckByKey(ctx: QueryCtx, userId: Id<"users">, key: string) {
   assertDeckKey(key)
-  let deck = await ctx.db
+  const deck = await ctx.db
     .query("decks")
     .withIndex("by_owner_and_deck_key", (q) => q.eq("ownerUserId", userId).eq("deckKey", key))
     .unique()
-  if (!deck) {
-    const id = ctx.db.normalizeId("decks", key)
-    const candidate = id
-      ? await ctx.db.get(id)
-      : await ctx.db
-          .query("decks")
-          .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", userId).eq("syncId", key))
-          .unique()
-    if (
-      candidate?.ownerUserId === userId &&
-      (candidate.deckKey ?? candidate.syncId ?? String(candidate._id)) === key
-    )
-      deck = candidate
-  }
+  if (deck) return deck
+  const id = ctx.db.normalizeId("decks", key)
+  const candidate = id
+    ? await ctx.db.get(id)
+    : await ctx.db
+        .query("decks")
+        .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", userId).eq("syncId", key))
+        .unique()
+  return candidate?.ownerUserId === userId &&
+    (candidate.deckKey ?? candidate.syncId ?? String(candidate._id)) === key
+    ? candidate
+    : null
+}
+
+export async function deckForKey(ctx: MutationCtx, userId: Id<"users">, key: string) {
+  const deck = await findDeckByKey(ctx, userId, key)
   if (deck && deck.archivedAt === undefined)
     throw new ConvexError({
       code: "deck_key_conflict",

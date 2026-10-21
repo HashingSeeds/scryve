@@ -611,6 +611,7 @@ async function terminalizeGame(
     matchId?: Id<"matches">
     clientGameId?: string
     localIds?: Map<Id<"gamePlayers">, string>
+    deckNames?: Map<Id<"gamePlayers">, string>
   } = {},
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
@@ -670,7 +671,11 @@ async function terminalizeGame(
           seat: player.seat,
           ...summaryIdentitySnapshotFor(player, user, game.mode === "local"),
           ...(player.userId ? { userId: player.userId } : {}),
-          ...(deck ? { deckId: deck._id, deckNameAtFinish: deck.name } : {}),
+          ...(deck
+            ? { deckId: deck._id, deckNameAtFinish: deck.name }
+            : player.deckKey && options.deckNames?.has(player._id)
+              ? { deckNameAtFinish: options.deckNames.get(player._id) }
+              : {}),
           ...(version
             ? { deckVersionId: version._id, deckVersionNumber: version.versionNumber }
             : {}),
@@ -1304,6 +1309,7 @@ export const publishFinishedLocalGame = mutation({
         deckVersionId: v.optional(v.id("deckVersions")),
         deckKey: v.optional(v.string()),
         deckFingerprint: v.optional(v.string()),
+        deckName: v.optional(v.string()),
         seatPassHash: v.optional(v.string()),
       }),
     ),
@@ -1408,7 +1414,7 @@ export const publishFinishedLocalGame = mutation({
         })
     }
     const attribution =
-      me?.deckVersionId && !myDeck
+      me?.deckVersionId && !myDeck && !me.deckKey
         ? {}
         : {
             ...(me?.deckKey
@@ -1515,6 +1521,13 @@ export const publishFinishedLocalGame = mutation({
         clientGameId: args.publicId,
         localIds: new Map(
           [...playerIdsByLocalId].map(([localId, playerId]) => [playerId, localId]),
+        ),
+        deckNames: new Map(
+          args.players.flatMap((player) =>
+            player.me && player.deckName?.trim()
+              ? [[playerIdsByLocalId.get(player.localId)!, player.deckName.trim().slice(0, 80)]]
+              : [],
+          ),
         ),
         ...(matchId ? { matchId } : {}),
       },

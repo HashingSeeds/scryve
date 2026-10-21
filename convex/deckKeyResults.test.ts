@@ -203,7 +203,7 @@ it("publishes local deck keys without legacy rows, keeps local ids, and replays 
 })
 
 it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as const)(
-  "records %s versions without attribution",
+  "records %s versions from installed clients without attribution",
   async (kind) => {
     const t = setup()
     const { actor, deckId, versionId } = await deck(t)
@@ -221,8 +221,6 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
     args.players[0] = {
       ...args.players[0],
       deckVersionId: versionId,
-      deckKey: "discarded",
-      deckFingerprint: fingerprint,
     }
     const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
     await t.run(async (ctx) => {
@@ -235,6 +233,56 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
     })
   },
 )
+
+it("keeps a new client's pinned key and deck name when its version no longer resolves", async () => {
+  const t = setup()
+  const { actor, deckId, versionId } = await deck(t)
+  await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })
+  const args = publish()
+  args.players[0] = {
+    ...args.players[0],
+    deckVersionId: versionId,
+    deckKey: "deck-key",
+    deckFingerprint: fingerprint,
+    deckName: "Burn",
+  }
+  const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
+  await t.run(async (ctx) => {
+    const summary = (await ctx.db.get(ack.summaryId))!
+    expect(summary.players[0]).toMatchObject({ deckKey: "deck-key", deckNameAtFinish: "Burn" })
+    expect(summary.players[0].deckId).toBeUndefined()
+    expect(await ctx.db.query("deckResults").unique()).toMatchObject({
+      deckKey: "deck-key",
+      fingerprint,
+    })
+    expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
+  })
+})
+
+it("names a local deck's results from the name its device sends", async () => {
+  const t = setup()
+  const { actor } = await account(t)
+  const args = publish()
+  args.players[0] = { ...args.players[0], deckKey: "local-only", deckName: "  Mono Red  " }
+  const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
+  const summary = await t.run(async (ctx) => ctx.db.get(ack.summaryId))
+  expect(summary?.players[0].deckNameAtFinish).toBe("Mono Red")
+})
+
+it("settles a device copy onto the live deck that already has its key", async () => {
+  const t = setup()
+  const { actor, deckId } = await deck(t)
+  const copy = await actor.mutation(api.decks.importGuest, {
+    localId: "00000000-0000-4000-8000-000000000002",
+    localUpdatedAt: 7,
+    deckKey: "deck-key",
+    name: "Burn",
+    format: "modern",
+    cards: [],
+  })
+  expect(copy).toEqual({ status: "already_imported", deckId, localUpdatedAt: 7 })
+  expect(await t.run(async (ctx) => ctx.db.query("decks").collect())).toHaveLength(1)
+})
 
 it("rejects another account's version even when archived", async () => {
   const t = setup()
