@@ -492,7 +492,8 @@ export const processUserLinkedData = internalMutation({
         .withIndex("by_user_and_finished_at", (q) => q.eq("userId", request.userId!))
         .take(USER_DATA_BATCH_SIZE)
       if (deckResults.length) {
-        for (const result of deckResults) await removeDeckResult(ctx, result.resultId)
+        for (const result of deckResults)
+          await removeDeckResult(ctx, result.userId, result.resultId)
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

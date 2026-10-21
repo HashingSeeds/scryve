@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
 import { requireSeatOwner, requireUser } from "./lib/auth"
+import { deckFingerprint } from "./lib/deckFingerprint"
 import {
   assertDeckGameFormat,
   assertDeckGame,
@@ -604,15 +605,25 @@ export const importGuest = mutation({
       }
     }
     const live = args.deckKey ? await findDeckByKey(ctx, user._id, args.deckKey) : null
-    if (live && live.archivedAt === undefined && !existing)
+    if (live && live.archivedAt === undefined && !existing) {
+      const latest = (await activeVersions(ctx, live._id)).at(-1)
+      const game = args.game ?? DEFAULT_DECK_GAME
+      const sameDeck =
+        latest !== undefined &&
+        live.name === args.name.trim() &&
+        (await pinnedDeck(ctx, latest._id)).deckFingerprint ===
+          (await deckFingerprint(args.cards.map((card) => ({ ...card, game: card.game ?? game }))))
+      // why: the device drops its copy only when it holds what the live deck already has.
       return {
         status: "already_imported" as const,
         deckId: live._id,
-        localUpdatedAt: args.localUpdatedAt,
+        localUpdatedAt: sameDeck ? args.localUpdatedAt : null,
       }
+    }
+    // why: results may already be filed under the key the backfill gives this row.
     if (existing && !existing.deckKey)
-      await ctx.db.patch(existing._id, { deckKey: args.deckKey ?? args.localId })
-    await deckForKey(ctx, user._id, existing?.deckKey ?? args.deckKey ?? args.localId)
+      await ctx.db.patch(existing._id, { deckKey: deckKeyOf(existing) })
+    await deckForKey(ctx, user._id, existing ? deckKeyOf(existing) : (args.deckKey ?? args.localId))
     const capacity = await deckCapacity(ctx, user)
     if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
     const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)

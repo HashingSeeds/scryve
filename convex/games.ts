@@ -1389,40 +1389,38 @@ export const publishFinishedLocalGame = mutation({
     if (me?.deckKey !== undefined) assertDeckKey(me.deckKey)
     if (me?.deckFingerprint !== undefined) assertDeckFingerprint(me.deckFingerprint)
     let myDeck: Doc<"decks"> | undefined
-    let versionKey: string | undefined
+    let liveDeck = false
     if (me?.deckVersionId) {
       const version = await ctx.db.get(me.deckVersionId)
       const deck = version ? await ctx.db.get(version.deckId) : null
       if (deck && deck.ownerUserId !== user._id)
         throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
-      if (deck) versionKey = deckKeyOf(deck)
-      if (
-        version &&
-        version.archivedAt === undefined &&
-        deck &&
-        deck.archivedAt === undefined &&
-        deck.movedToDeviceAt === undefined
-      )
-        myDeck = deck
-      if (myDeck && (myDeck.game ?? DEFAULT_DECK_GAME) !== gameSystem)
+      // why: legacy stats still count an archived deck's games, as installed clients expect.
+      if (deck) myDeck = deck
+      liveDeck = Boolean(version?.archivedAt === undefined && deck && deck.archivedAt === undefined)
+      if (deck && liveDeck && (deck.game ?? DEFAULT_DECK_GAME) !== gameSystem)
         throw new ConvexError({
           code: "deck_system_mismatch",
           message: "This deck belongs to another game system",
         })
-      if (myDeck && myDeck.format !== (format ?? ruleset))
+      if (deck && liveDeck && deck.format !== (format ?? ruleset))
         throw new ConvexError({
           code: "deck_format_mismatch",
           message: "Choose a deck matching the game format",
         })
     }
     const attribution =
-      me?.deckVersionId && !versionKey && !me.deckKey
+      me?.deckVersionId && !myDeck && !me.deckKey
         ? {}
         : {
-            ...(me?.deckKey ? { deckKey: me.deckKey } : versionKey ? { deckKey: versionKey } : {}),
+            ...(me?.deckKey
+              ? { deckKey: me.deckKey }
+              : myDeck
+                ? { deckKey: deckKeyOf(myDeck) }
+                : {}),
             ...(me?.deckFingerprint
               ? { deckFingerprint: me.deckFingerprint }
-              : me?.deckKey && myDeck && me.deckVersionId
+              : me?.deckKey && liveDeck && me.deckVersionId
                 ? { deckFingerprint: (await pinnedDeck(ctx, me.deckVersionId)).deckFingerprint }
                 : {}),
           }

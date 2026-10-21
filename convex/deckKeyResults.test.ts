@@ -130,9 +130,9 @@ it("writer adds once and reverses the stored deltas exactly, including envelopes
   )
   expect(await allStats(t)).toHaveLength(2)
   await t.run(async (ctx) => {
-    await removeDeckResult(ctx, result.resultId)
-    await removeDeckResult(ctx, result.resultId)
-    await removeDeckResult(ctx, "missing")
+    await removeDeckResult(ctx, result.userId, result.resultId)
+    await removeDeckResult(ctx, result.userId, result.resultId)
+    await removeDeckResult(ctx, result.userId, "missing")
   })
   for (const row of await allStats(t))
     expect(row).toMatchObject({
@@ -141,7 +141,7 @@ it("writer adds once and reverses the stored deltas exactly, including envelopes
       manualMatches: { total: 0, wins: 0 },
       manualGames: { total: 0, wins: 0, losses: 0, draws: 0 },
     })
-  await t.run(async (ctx) => removeDeckResult(ctx, "game:two:1"))
+  await t.run(async (ctx) => removeDeckResult(ctx, result.userId, "game:two:1"))
   for (const row of await allStats(t)) expect(row).toMatchObject({ games: 0, wins: 0 })
 })
 
@@ -225,18 +225,66 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
     const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
     await t.run(async (ctx) => {
       const summary = (await ctx.db.get(ack.summaryId))!
-      expect(summary.players[0].deckId).toBeUndefined()
       const result = (await ctx.db.query("deckResults").unique())!
       const deckStillExists = kind === "archived" || kind === "moved" || kind === "archivedVersion"
+      expect(summary.players[0].deckId).toBe(deckStillExists ? deckId : undefined)
       expect(summary.players[0].deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.fingerprint).toBeUndefined()
-      expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
+      expect(await ctx.db.query("deckGameResults").collect()).toHaveLength(deckStillExists ? 1 : 0)
     })
+    await assertEqual(t)
   },
 )
 
-it("keeps a new client's pinned key and deck name when its version no longer resolves", async () => {
+it("keeps each account's copy of a seat result even when ids collide", async () => {
+  const t = setup()
+  const { userId } = await account(t)
+  const other = await account(t, "other")
+  const shared = {
+    resultId: "game:nearby:seat-1",
+    kind: "game" as const,
+    source: "local" as const,
+    outcome: "win" as const,
+    finishedAt: 1,
+    deltas: { games: tally },
+  }
+  await t.run(async (ctx) => {
+    await addDeckResult(ctx, { ...shared, userId: other.userId, deckKey: "theirs" })
+    await addDeckResult(ctx, { ...shared, userId, deckKey: "mine" })
+  })
+  expect((await allStats(t)).map((row) => [row.deckKey, row.games]).sort()).toEqual([
+    ["mine", 1],
+    ["theirs", 1],
+  ])
+})
+
+it("counts a deckless result for the deck its seat is later claimed with", async () => {
+  const t = setup()
+  const { userId } = await account(t)
+  const result = {
+    resultId: "game:nearby:seat-1",
+    userId,
+    kind: "game" as const,
+    source: "local" as const,
+    outcome: "win" as const,
+    finishedAt: 1,
+    deltas: { games: tally },
+  }
+  await t.run(async (ctx) => {
+    await addDeckResult(ctx, result)
+    await addDeckResult(ctx, { ...result, deckKey: "claimed", fingerprint })
+    await addDeckResult(ctx, { ...result, deckKey: "claimed", fingerprint })
+  })
+  expect((await allStats(t)).map((row) => [row.fingerprint, row.games]).sort()).toEqual([
+    ["all", 1],
+    [fingerprint, 1],
+  ])
+  await t.run(async (ctx) => removeDeckResult(ctx, userId, result.resultId))
+  expect((await allStats(t)).every((row) => row.games === 0)).toBe(true)
+})
+
+it("keeps a new client's pinned key and deck name for a moved deck", async () => {
   const t = setup()
   const { actor, deckId, versionId } = await deck(t)
   await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })
@@ -252,13 +300,13 @@ it("keeps a new client's pinned key and deck name when its version no longer res
   await t.run(async (ctx) => {
     const summary = (await ctx.db.get(ack.summaryId))!
     expect(summary.players[0]).toMatchObject({ deckKey: "deck-key", deckNameAtFinish: "Burn" })
-    expect(summary.players[0].deckId).toBeUndefined()
+    expect(summary.players[0].deckId).toBe(deckId)
     expect(await ctx.db.query("deckResults").unique()).toMatchObject({
       deckKey: "deck-key",
       fingerprint,
     })
-    expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
   })
+  await assertEqual(t)
 })
 
 it("fingerprints a new client's synced deck from its version when the device had no cards cached", async () => {
@@ -320,6 +368,15 @@ it("settles a device copy onto the live deck that already has its key", async ()
     cards: [],
   })
   expect(copy).toEqual({ status: "already_imported", deckId, localUpdatedAt: 7 })
+  const edited = await actor.mutation(api.decks.importGuest, {
+    localId: "00000000-0000-4000-8000-000000000003",
+    localUpdatedAt: 8,
+    deckKey: "deck-key",
+    name: "Burn",
+    format: "modern",
+    cards: [{ name: "Shock", quantity: 4 }],
+  })
+  expect(edited).toEqual({ status: "already_imported", deckId, localUpdatedAt: null })
   expect(await t.run(async (ctx) => ctx.db.query("decks").collect())).toHaveLength(1)
 })
 
@@ -518,7 +575,7 @@ it("backfills in bounded pages, retries without duplication, and matches legacy 
   await actor.mutation(api.matches.recordManualMatch, match)
   await t.run(async (ctx) => {
     for (const row of await ctx.db.query("deckResults").collect())
-      await removeDeckResult(ctx, row.resultId)
+      await removeDeckResult(ctx, row.userId, row.resultId)
     const summary = (await ctx.db.get(ack.summaryId))!
     await ctx.db.patch(summary._id, {
       clientGameId: undefined,

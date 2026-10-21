@@ -166,7 +166,7 @@ export async function removeGameResult(
     .withIndex("by_game", (q) => q.eq("gameId", result.gameId))
     .unique()
   const player = summary?.players.find((player) => player.playerId === result.playerId)
-  if (summary && player) await removeDeckResult(ctx, gameResultId(summary, player))
+  if (summary && player) await removeDeckResult(ctx, result.userId, gameResultId(summary, player))
   await ctx.db.delete(result._id)
   await applyStats(
     ctx,
@@ -248,10 +248,12 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
 /** why: deleting a manual match must reverse exactly what recordMatchResult added. */
 export async function removeMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
   for (const seat of match.seats)
-    await removeDeckResult(
-      ctx,
-      canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
-    )
+    if (seat.userId)
+      await removeDeckResult(
+        ctx,
+        seat.userId,
+        canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
+      )
   const owner = deckedOwnerSeat(match)
   if (!owner || match.finishedAt === undefined) return
   const finishedAt = match.finishedAt

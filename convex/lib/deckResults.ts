@@ -1,4 +1,4 @@
-import type { Doc } from "../_generated/dataModel"
+import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx } from "../_generated/server"
 
 type DeckResult = Omit<Doc<"deckResults">, "_id" | "_creationTime">
@@ -88,25 +88,38 @@ async function apply(ctx: MutationCtx, result: DeckResult, sign: 1 | -1) {
   }
 }
 
-export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
-  const existing = await ctx.db
+// why: result ids come from clients, so each account keeps its own copy of a seat's result.
+function storedResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {
+  return ctx.db
     .query("deckResults")
-    .withIndex("by_result_id", (q) => q.eq("resultId", result.resultId))
+    .withIndex("by_user_and_result_id", (q) => q.eq("userId", userId).eq("resultId", resultId))
     .unique()
-  if (existing) {
-    if (result.legacyDeckId && !existing.legacyDeckId)
-      await ctx.db.patch(existing._id, { legacyDeckId: result.legacyDeckId })
-    return
-  }
-  await ctx.db.insert("deckResults", result)
-  await apply(ctx, result, 1)
 }
 
-export async function removeDeckResult(ctx: MutationCtx, resultId: string) {
-  const result = await ctx.db
-    .query("deckResults")
-    .withIndex("by_result_id", (q) => q.eq("resultId", resultId))
-    .unique()
+export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
+  const existing = await storedResult(ctx, result.userId, result.resultId)
+  if (!existing) {
+    await ctx.db.insert("deckResults", result)
+    await apply(ctx, result, 1)
+    return
+  }
+  const legacy =
+    result.legacyDeckId && !existing.legacyDeckId ? { legacyDeckId: result.legacyDeckId } : {}
+  // why: a seat claimed with a deck after a deckless copy was recorded starts counting for that deck.
+  const adoptedKey = existing.deckKey ? undefined : result.deckKey
+  const adopted = adoptedKey
+    ? {
+        deckKey: adoptedKey,
+        ...(result.fingerprint ? { fingerprint: result.fingerprint } : {}),
+      }
+    : {}
+  if (Object.keys({ ...legacy, ...adopted }).length)
+    await ctx.db.patch(existing._id, { ...legacy, ...adopted })
+  if (adoptedKey) await apply(ctx, { ...existing, ...adopted }, 1)
+}
+
+export async function removeDeckResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {
+  const result = await storedResult(ctx, userId, resultId)
   if (!result) return
   await apply(ctx, result, -1)
   await ctx.db.delete(result._id)
