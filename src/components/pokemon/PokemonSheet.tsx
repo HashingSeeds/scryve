@@ -73,6 +73,8 @@ const FIELD_HEIGHT = 42
 const FIELD_LENGTH = { query: 120, name: 100, hp: 3 } as const
 type Field = keyof typeof FIELD_LENGTH
 const MAX_RESULTS = 12
+// why: three result rows, so a lookup on a phone's half seat still shows choices above the keypad.
+const RESULTS_FLOOR = 128
 const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
 
 export function keypadBesideForm(
@@ -306,15 +308,22 @@ export function PokemonSheet({
     paddingLeft: (compact ? 8 : 12) + insets.left,
     paddingRight: (compact ? 8 : 12) + insets.right,
   }
-  const keypadBeside = keypadBesideForm(
-    layer,
-    layer.height - padding.paddingTop - padding.paddingBottom,
-    compact,
-  )
+  const contentHeight = layer.height - padding.paddingTop - padding.paddingBottom
+  const keypadBeside = keypadBesideForm(layer, contentHeight, compact)
+  const compactKeypad =
+    compact ||
+    (!keypadBeside &&
+      contentHeight <
+        HEADER_HEIGHT + FIELD_HEIGHT + RESULTS_FLOOR + tallestKeypadHeight() + 3 * spacing.xs)
+  // why: beside or below the keypad there is room for the typed field and what answers it, not the whole form.
+  const searchFocus = keypadField === "query"
+  const formFocus = keypadField !== undefined && keypadField !== "query"
   // why: a search pick places in one tap, so placing only shows the typed form when search can't help, and a reconnect must not hide a half-typed Pokémon behind search.
   const drafting =
     draft.name !== "" || draft.hp !== "" || typingInto === "name" || typingInto === "hp"
   const showForm = Boolean(editing) || !showSearch || drafting
+  const typeInWithResults = searchFocus && !showForm
+  const resultsShown = !formFocus && (showResults || typeInWithResults)
   const narrowForm = keypadBeside && keypadField !== undefined
   const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`
 
@@ -380,6 +389,22 @@ export function PokemonSheet({
       </BoardPressable>
     ) : null
 
+  const typeIn = (
+    <BoardPressable
+      testID={`pokemon-type-in-seat-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={translate("board:pokemonSheet.notListedLabel")}
+      onPress={typeItIn}
+      style={({ pressed }) => [
+        themed($ghost),
+        { borderColor: overlayTint(ink, 0.35) },
+        pressed && button,
+      ]}
+    >
+      <Text tx="board:pokemonSheet.notListed" size="xxs" weight="medium" style={inkStyle} />
+    </BoardPressable>
+  )
+
   return (
     <View
       testID={`pokemon-sheet-seat-${seatNumber}`}
@@ -419,7 +444,7 @@ export function PokemonSheet({
       </View>
 
       <View style={[themed(compact ? $compactStack : $stack), keypadBeside && $beside]}>
-        <View style={themed(compact ? $compactStack : $stack)}>
+        <View style={[themed(compact ? $compactStack : $stack), $clip]}>
           {showSearch ? (
             <TextField
               ref={searchField}
@@ -440,11 +465,11 @@ export function PokemonSheet({
             />
           ) : null}
 
-          {showResults ? (
+          {resultsShown ? (
             <ScrollView
               testID={`pokemon-results-seat-${seatNumber}`}
               keyboardShouldPersistTaps="handled"
-              style={$results}
+              style={searchFocus ? $body : $results}
               contentContainerStyle={themed($resultsContent)}
             >
               {catalog.busy ? <ActivityIndicator color={ink} /> : null}
@@ -464,224 +489,226 @@ export function PokemonSheet({
                     onPress={() => void pickHit(hit)}
                     style={({ pressed }) => [
                       themed($result),
+                      keypadBeside && $resultStacked,
                       button,
                       pressed && $pressed,
                       picking === hit.cardId && $dim,
                     ]}
                   >
-                    <Text text={hit.name} size="xs" numberOfLines={1} style={[$grow, inkStyle]} />
+                    <Text
+                      text={hit.name}
+                      size="xs"
+                      numberOfLines={1}
+                      style={[!keypadBeside && $grow, inkStyle]}
+                    />
                     {detail ? (
                       <Text text={detail} size="xxs" numberOfLines={1} style={[inkStyle, $dim]} />
                     ) : null}
                   </BoardPressable>
                 )
               })}
+              {typeInWithResults ? typeIn : null}
             </ScrollView>
           ) : null}
 
-          <ScrollView
-            testID={`pokemon-sheet-body-seat-${seatNumber}`}
-            keyboardShouldPersistTaps="handled"
-            style={[$body, showResults && $bodyUnderResults]}
-            contentContainerStyle={themed(compact ? $compactBodyContent : $bodyContent)}
-          >
-            {pickError ? <Text text={pickError} size="xxs" style={inkStyle} /> : null}
+          {searchFocus ? null : (
+            <ScrollView
+              testID={`pokemon-sheet-body-seat-${seatNumber}`}
+              keyboardShouldPersistTaps="handled"
+              style={[$body, resultsShown && $bodyUnderResults]}
+              contentContainerStyle={themed(compact ? $compactBodyContent : $bodyContent)}
+            >
+              {pickError ? <Text text={pickError} size="xxs" style={inkStyle} /> : null}
 
-            {showForm ? (
-              <>
-                <View style={themed($row)}>
-                  <TextField
-                    testID={`pokemon-name-input-seat-${seatNumber}`}
-                    accessibilityLabel={translate("board:pokemonSheet.nameLabel")}
-                    placeholder={translate("board:pokemonSheet.namePlaceholder")}
-                    value={draft.name}
-                    selection={caretAtEnd(draft.name)}
-                    autoCorrect={false}
-                    maxLength={100}
-                    showSoftInputOnFocus={!onKeypad}
-                    onChangeText={setName}
-                    onFocus={() => focusField("name")}
-                    onBlur={() => setTypingInto(undefined)}
-                    containerStyle={$grow}
-                    inputWrapperStyle={themed($fieldWrapper)}
-                  />
-                  {keypadBeside ? null : hpAndLookup}
-                </View>
-                {keypadBeside ? <View style={themed($row)}>{hpAndLookup}</View> : null}
-                {editError ? (
-                  <Text
-                    testID={`pokemon-edit-error-seat-${seatNumber}`}
-                    accessibilityRole="alert"
-                    text={editError}
-                    size="xxs"
-                    style={inkStyle}
-                  />
-                ) : null}
-                {!catalog.available ? (
-                  <Text
-                    tx="board:pokemonSheet.catalogOffline"
-                    size="xxs"
-                    style={[inkStyle, $dim]}
-                  />
-                ) : null}
+              {showForm ? (
+                <>
+                  <View style={themed($row)}>
+                    <TextField
+                      testID={`pokemon-name-input-seat-${seatNumber}`}
+                      accessibilityLabel={translate("board:pokemonSheet.nameLabel")}
+                      placeholder={translate("board:pokemonSheet.namePlaceholder")}
+                      value={draft.name}
+                      selection={caretAtEnd(draft.name)}
+                      autoCorrect={false}
+                      maxLength={100}
+                      showSoftInputOnFocus={!onKeypad}
+                      onChangeText={setName}
+                      onFocus={() => focusField("name")}
+                      onBlur={() => setTypingInto(undefined)}
+                      containerStyle={$grow}
+                      inputWrapperStyle={themed($fieldWrapper)}
+                    />
+                    {keypadBeside ? null : hpAndLookup}
+                  </View>
+                  {keypadBeside ? <View style={themed($row)}>{hpAndLookup}</View> : null}
+                  {editError ? (
+                    <Text
+                      testID={`pokemon-edit-error-seat-${seatNumber}`}
+                      accessibilityRole="alert"
+                      text={editError}
+                      size="xxs"
+                      style={inkStyle}
+                    />
+                  ) : null}
+                  {!catalog.available ? (
+                    <Text
+                      tx="board:pokemonSheet.catalogOffline"
+                      size="xxs"
+                      style={[inkStyle, $dim]}
+                    />
+                  ) : null}
 
-                {/* why: beside the keypad the form is a third of the seat, too narrow for the label, three choices and Place in one row. */}
-                {narrowForm ? prizesLabel : null}
-                <View style={themed($row)}>
-                  {narrowForm ? null : prizesLabel}
-                  {PRIZE_CHOICES.map((count) => {
-                    const selected = draft.prizes === count
-                    return (
+                  {/* why: beside the keypad the form is a third of the seat, too narrow for the label, three choices and Place in one row. */}
+                  {narrowForm ? prizesLabel : null}
+                  <View style={themed($row)}>
+                    {narrowForm ? null : prizesLabel}
+                    {PRIZE_CHOICES.map((count) => {
+                      const selected = draft.prizes === count
+                      return (
+                        <BoardPressable
+                          key={count}
+                          testID={`pokemon-prizes-${count}-seat-${seatNumber}`}
+                          accessibilityRole="radio"
+                          accessibilityState={{ checked: selected }}
+                          accessibilityLabel={translate("board:pokemonSheet.worth", { count })}
+                          onPress={() =>
+                            setDraft((current) => ({
+                              ...current,
+                              prizes: count,
+                              prizesChosen: true,
+                            }))
+                          }
+                          style={[
+                            themed($prizeChoice),
+                            button,
+                            selected && { backgroundColor: ink },
+                          ]}
+                        >
+                          <Text
+                            text={String(count)}
+                            size="xs"
+                            weight="bold"
+                            style={selected ? onInk : inkStyle}
+                          />
+                        </BoardPressable>
+                      )
+                    })}
+                    {narrowForm ? null : placeButton}
+                  </View>
+                  {narrowForm ? placeButton : null}
+                </>
+              ) : (
+                typeIn
+              )}
+
+              {editing ? (
+                <>
+                  <View style={themed($damageReadout)}>
+                    <Text
+                      testID={`pokemon-sheet-damage-seat-${seatNumber}`}
+                      text={String(editing.damage)}
+                      accessibilityLiveRegion="polite"
+                      accessibilityLabel={
+                        cardless
+                          ? translate("board:pokemon.damageOn", {
+                              name: pokemonName(editing),
+                              damage: editing.damage,
+                            })
+                          : translate("board:pokemonSheet.damageLabel", {
+                              name: pokemonName(editing),
+                              damage: editing.damage,
+                              remaining: remainingHp(editing),
+                            })
+                      }
+                      style={[themed(compact ? $compactBig : $big), inkStyle]}
+                    />
+                    <Text
+                      text={
+                        cardless
+                          ? translate("board:pokemon.damageCounted")
+                          : translate("board:pokemonSheet.damageCaption", {
+                              remaining: remainingHp(editing),
+                            })
+                      }
+                      size="xxs"
+                      style={[inkStyle, $dim]}
+                    />
+                  </View>
+                  <View style={themed($row)}>
+                    {DAMAGE_STEPS.map((step) => (
                       <BoardPressable
-                        key={count}
-                        testID={`pokemon-prizes-${count}-seat-${seatNumber}`}
-                        accessibilityRole="radio"
-                        accessibilityState={{ checked: selected }}
-                        accessibilityLabel={translate("board:pokemonSheet.worth", { count })}
-                        onPress={() =>
-                          setDraft((current) => ({ ...current, prizes: count, prizesChosen: true }))
-                        }
-                        style={[themed($prizeChoice), button, selected && { backgroundColor: ink }]}
+                        key={step}
+                        testID={`pokemon-sheet-step-${step * damageStep}-seat-${seatNumber}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={translate(
+                          step > 0
+                            ? "board:pokemonSheet.addDamage"
+                            : "board:pokemonSheet.healDamage",
+                          { amount: Math.abs(step * damageStep) },
+                        )}
+                        onPress={() => onDamage(editing.id, step * damageStep)}
+                        style={({ pressed }) => [themed($step), button, pressed && $pressed]}
                       >
                         <Text
-                          text={String(count)}
-                          size="xs"
+                          text={stepLabel(step)}
+                          size={compact ? "xs" : "sm"}
                           weight="bold"
-                          style={selected ? onInk : inkStyle}
+                          style={inkStyle}
                         />
                       </BoardPressable>
-                    )
-                  })}
-                  {narrowForm ? null : placeButton}
-                </View>
-                {narrowForm ? placeButton : null}
-              </>
-            ) : (
-              <BoardPressable
-                testID={`pokemon-type-in-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel={translate("board:pokemonSheet.notListedLabel")}
-                onPress={typeItIn}
-                style={({ pressed }) => [
-                  themed($ghost),
-                  { borderColor: overlayTint(ink, 0.35) },
-                  pressed && button,
-                ]}
-              >
-                <Text
-                  tx="board:pokemonSheet.notListed"
-                  size="xxs"
-                  weight="medium"
-                  style={inkStyle}
-                />
-              </BoardPressable>
-            )}
-
-            {editing ? (
-              <>
-                <View style={themed($damageReadout)}>
-                  <Text
-                    testID={`pokemon-sheet-damage-seat-${seatNumber}`}
-                    text={String(editing.damage)}
-                    accessibilityLiveRegion="polite"
-                    accessibilityLabel={
-                      cardless
-                        ? translate("board:pokemon.damageOn", {
-                            name: pokemonName(editing),
-                            damage: editing.damage,
-                          })
-                        : translate("board:pokemonSheet.damageLabel", {
-                            name: pokemonName(editing),
-                            damage: editing.damage,
-                            remaining: remainingHp(editing),
-                          })
-                    }
-                    style={[themed(compact ? $compactBig : $big), inkStyle]}
-                  />
-                  <Text
-                    text={
-                      cardless
-                        ? translate("board:pokemon.damageCounted")
-                        : translate("board:pokemonSheet.damageCaption", {
-                            remaining: remainingHp(editing),
-                          })
-                    }
-                    size="xxs"
-                    style={[inkStyle, $dim]}
-                  />
-                </View>
-                <View style={themed($row)}>
-                  {DAMAGE_STEPS.map((step) => (
+                    ))}
+                  </View>
+                  <View style={themed($row)}>
+                    {mode.slot === "bench" ? (
+                      <BoardPressable
+                        testID={`pokemon-sheet-active-seat-${seatNumber}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={translate("board:pokemonSheet.makeActiveLabel", {
+                          name: pokemonName(editing),
+                        })}
+                        onPress={() => onMakeActive(editing.id)}
+                        style={[themed($action), button]}
+                      >
+                        <Text
+                          tx="board:pokemon.switch.makeActive"
+                          size="xxs"
+                          weight="medium"
+                          style={inkStyle}
+                        />
+                      </BoardPressable>
+                    ) : null}
                     <BoardPressable
-                      key={step}
-                      testID={`pokemon-sheet-step-${step * damageStep}-seat-${seatNumber}`}
+                      testID={`pokemon-sheet-ko-seat-${seatNumber}`}
                       accessibilityRole="button"
-                      accessibilityLabel={translate(
-                        step > 0 ? "board:pokemonSheet.addDamage" : "board:pokemonSheet.healDamage",
-                        { amount: Math.abs(step * damageStep) },
-                      )}
-                      onPress={() => onDamage(editing.id, step * damageStep)}
-                      style={({ pressed }) => [themed($step), button, pressed && $pressed]}
-                    >
-                      <Text
-                        text={stepLabel(step)}
-                        size={compact ? "xs" : "sm"}
-                        weight="bold"
-                        style={inkStyle}
-                      />
-                    </BoardPressable>
-                  ))}
-                </View>
-                <View style={themed($row)}>
-                  {mode.slot === "bench" ? (
-                    <BoardPressable
-                      testID={`pokemon-sheet-active-seat-${seatNumber}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={translate("board:pokemonSheet.makeActiveLabel", {
+                      accessibilityLabel={translate("board:pokemonSheet.knockedOutLabel", {
                         name: pokemonName(editing),
                       })}
-                      onPress={() => onMakeActive(editing.id)}
+                      onPress={() => onKnockOut(editing.id)}
                       style={[themed($action), button]}
                     >
                       <Text
-                        tx="board:pokemon.switch.makeActive"
+                        tx="board:pokemonSheet.knockedOut"
                         size="xxs"
                         weight="medium"
                         style={inkStyle}
                       />
                     </BoardPressable>
-                  ) : null}
-                  <BoardPressable
-                    testID={`pokemon-sheet-ko-seat-${seatNumber}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={translate("board:pokemonSheet.knockedOutLabel", {
-                      name: pokemonName(editing),
-                    })}
-                    onPress={() => onKnockOut(editing.id)}
-                    style={[themed($action), button]}
-                  >
-                    <Text
-                      tx="board:pokemonSheet.knockedOut"
-                      size="xxs"
-                      weight="medium"
-                      style={inkStyle}
-                    />
-                  </BoardPressable>
-                  <BoardPressable
-                    testID={`pokemon-sheet-remove-seat-${seatNumber}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={translate("board:pokemonSheet.removeLabel", {
-                      name: pokemonName(editing),
-                    })}
-                    onPress={() => onRemove(editing.id)}
-                    style={[themed($action), button]}
-                  >
-                    <Text tx="common:remove" size="xxs" weight="medium" style={inkStyle} />
-                  </BoardPressable>
-                </View>
-              </>
-            ) : null}
-          </ScrollView>
+                    <BoardPressable
+                      testID={`pokemon-sheet-remove-seat-${seatNumber}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={translate("board:pokemonSheet.removeLabel", {
+                        name: pokemonName(editing),
+                      })}
+                      onPress={() => onRemove(editing.id)}
+                      style={[themed($action), button]}
+                    >
+                      <Text tx="common:remove" size="xxs" weight="medium" style={inkStyle} />
+                    </BoardPressable>
+                  </View>
+                </>
+              ) : null}
+            </ScrollView>
+          )}
         </View>
         {keypadField ? (
           <View style={keypadBeside ? $keypadBeside : undefined}>
@@ -690,7 +717,7 @@ export function PokemonSheet({
               ink={ink}
               digitsOnly={keypadField === "hp"}
               capitalize={fieldValue(keypadField) === ""}
-              compact={compact}
+              compact={compactKeypad}
               onType={(text) => editField((value) => value + text)}
               onDelete={() => editField((value) => value.slice(0, -1))}
               onDone={() => Keyboard.dismiss()}
@@ -707,7 +734,17 @@ const $body: ViewStyle = { flex: 1 }
 const $results: ViewStyle = { flexGrow: 0, flexShrink: 1, maxHeight: "50%" }
 // why: a sideways seat is short, and without a floor the results squeeze the body to a sliver.
 const $bodyUnderResults: ViewStyle = { minHeight: 56 }
+// why: when the form outgrows the space above the keypad, it scrolls instead of showing through the translucent keys.
+const $clip: ViewStyle = { overflow: "hidden" }
 const $beside: ViewStyle = { flexDirection: "row" }
+// why: beside the keypad the column is too narrow for a name and its printing on one line, and the name matters more.
+const $resultStacked: ViewStyle = {
+  flexDirection: "column",
+  alignItems: "flex-start",
+  justifyContent: "center",
+  gap: 0,
+  paddingVertical: 2,
+}
 const $keypadBeside: ViewStyle = { flex: 2, justifyContent: "flex-end" }
 const $dim: TextStyle = { opacity: 0.75 }
 const $pressed: ViewStyle = { opacity: 0.7 }

@@ -376,6 +376,9 @@ export function PlayerGrid({
                         .map(({ id, name }) => ({ id, name }))}
                       table={table}
                       dice={seatDice}
+                      onTableSheetOpenChange={
+                        onTableSheetOpenChange && stable("tableSheet", onTableSheetOpenChange)
+                      }
                       onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
                         onChange(player.id, delta),
                       )}
