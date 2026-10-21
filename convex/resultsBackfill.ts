@@ -2,6 +2,7 @@ import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
+import type { Doc } from "./_generated/dataModel"
 import { internalMutation, internalQuery } from "./_generated/server"
 import { addDeckResult, canonicalResultId, gameResultId } from "./lib/deckResults"
 import {
@@ -112,6 +113,7 @@ export const backfillGameResults = internalMutation({
         summaryId: summary._id,
         matchId: summary.matchId,
         deltas: { games: outcomeTally(result.outcome) },
+        legacyDeckId: result.deckId,
       })
     }
     return { isDone: page.isDone, continueCursor: page.continueCursor }
@@ -141,11 +143,49 @@ export const backfillMatchResults = internalMutation({
         finishedAt: result.finishedAt,
         matchId: match._id,
         deltas: matchDeltas(match, seat),
+        legacyDeckId: result.deckId,
       })
     }
     return { isDone: page.isDone, continueCursor: page.continueCursor }
   },
 })
+
+const MAX_COMPARED_RESULTS = 10_000
+type Tally = { total: number; wins: number; losses: number; draws: number; unknown: number }
+type Deltas = Doc<"deckResults">["deltas"]
+
+function sumDeltas(all: Deltas[]) {
+  const add = (sum: Tally | undefined, delta: Tally | undefined) =>
+    delta
+      ? {
+          total: (sum?.total ?? 0) + delta.total,
+          wins: (sum?.wins ?? 0) + delta.wins,
+          losses: (sum?.losses ?? 0) + delta.losses,
+          draws: (sum?.draws ?? 0) + delta.draws,
+          unknown: (sum?.unknown ?? 0) + delta.unknown,
+        }
+      : sum
+  let games: Tally | undefined
+  let manualMatches: Tally | undefined
+  let manualGames: Tally | undefined
+  let connectedMatches: Tally | undefined
+  for (const deltas of all) {
+    games = add(games, deltas.games)
+    manualMatches = add(manualMatches, deltas.manualMatches)
+    manualGames = add(manualGames, deltas.manualGames)
+    connectedMatches = add(connectedMatches, deltas.connectedMatches)
+  }
+  return {
+    games: games?.total ?? 0,
+    wins: games?.wins ?? 0,
+    losses: games?.losses ?? 0,
+    draws: games?.draws ?? 0,
+    unknown: games?.unknown ?? 0,
+    manualMatches,
+    manualGames,
+    connectedMatches,
+  }
+}
 
 export const compareDeckKeyStats = internalQuery({
   args: batchArgs,
@@ -159,15 +199,11 @@ export const compareDeckKeyStats = internalQuery({
         .query("deckStats")
         .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
         .unique()
-      const stats = await ctx.db
-        .query("deckKeyStats")
-        .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
-          q
-            .eq("userId", deck.ownerUserId)
-            .eq("deckKey", deck.deckKey ?? deck.syncId ?? String(deck._id))
-            .eq("fingerprint", "all"),
-        )
-        .unique()
+      const mirrored = await ctx.db
+        .query("deckResults")
+        .withIndex("by_legacy_deck_id", (q) => q.eq("legacyDeckId", deck._id))
+        .take(MAX_COMPARED_RESULTS)
+      const stats = sumDeltas(mirrored.map((result) => result.deltas))
       const fields = ["games", "wins", "losses", "draws", "unknown"] as const
       const lines = ["manualMatches", "manualGames", "connectedMatches"] as const
       const tallyFields = ["total", "wins", "losses", "draws", "unknown"] as const

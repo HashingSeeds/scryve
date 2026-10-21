@@ -93,7 +93,11 @@ export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
     .query("deckResults")
     .withIndex("by_result_id", (q) => q.eq("resultId", result.resultId))
     .unique()
-  if (existing) return
+  if (existing) {
+    if (result.legacyDeckId && !existing.legacyDeckId)
+      await ctx.db.patch(existing._id, { legacyDeckId: result.legacyDeckId })
+    return
+  }
   await ctx.db.insert("deckResults", result)
   await apply(ctx, result, 1)
 }

@@ -621,8 +621,10 @@ export default defineSchema({
     summaryId: v.optional(v.id("gameSummaries")),
     matchId: v.optional(v.id("matches")),
     deltas: v.object({ games: v.optional(manualRecordValidator), ...manualStatsFields }),
+    legacyDeckId: v.optional(v.id("decks")),
   })
     .index("by_result_id", ["resultId"])
+    .index("by_legacy_deck_id", ["legacyDeckId"])
     .index("by_user_and_finished_at", ["userId", "finishedAt"])
     .index("by_user_and_deck_key_and_finished_at", ["userId", "deckKey", "finishedAt"]),
 

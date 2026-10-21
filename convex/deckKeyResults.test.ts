@@ -269,6 +269,21 @@ it("fingerprints a new client's synced deck from its version when the device had
   expect(result).toMatchObject({ deckKey: "deck-key", fingerprint: await deckFingerprint([]) })
 })
 
+it("comparison ignores games a deck played while it was only on a device", async () => {
+  const t = setup()
+  const { actor, versionId } = await deck(t)
+  const synced = publish("synced-game-000000001")
+  synced.players[0] = { ...synced.players[0], deckVersionId: versionId, deckKey: "deck-key" }
+  await actor.mutation(api.games.publishFinishedLocalGame, synced)
+  const local = publish("local-game-0000000001")
+  local.players[0] = { ...local.players[0], deckKey: "deck-key", deckName: "Burn" }
+  await actor.mutation(api.games.publishFinishedLocalGame, local)
+  expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
+    games: 2,
+  })
+  await assertEqual(t)
+})
+
 it("names a local deck's results from the name its device sends", async () => {
   const t = setup()
   const { actor } = await account(t)

@@ -123,6 +123,7 @@ export async function recordPlayerResult(
     summaryId: summary._id,
     matchId: summary.matchId,
     deltas: { games: outcomeTally(outcome) },
+    ...(player.deckId && player.deckVersionId ? { legacyDeckId: player.deckId } : {}),
   })
   if (!player.deckId || !player.deckVersionId) return
   await ctx.db.insert("deckGameResults", {
@@ -213,6 +214,7 @@ function deckedOwnerSeat(match: Doc<"matches">) {
 export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
   if (match.finishedAt === undefined) return
   if (match.source === "connected" && match.status !== "finished") return
+  const owner = deckedOwnerSeat(match)
   for (const seat of match.seats) {
     if (!seat.userId) continue
     await addDeckResult(ctx, {
@@ -226,9 +228,9 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
       finishedAt: match.finishedAt,
       matchId: match._id,
       deltas: matchDeltas(match, seat),
+      ...(owner?.seat === seat.seat ? { legacyDeckId: owner.deckId } : {}),
     })
   }
-  const owner = deckedOwnerSeat(match)
   if (!owner) return
   await ctx.db.insert("deckMatchResults", {
     deckId: owner.deckId,
