@@ -188,3 +188,34 @@ describe("bulk card dataset sync", () => {
     expect(state).not.toHaveProperty("pending")
   })
 })
+
+describe("scheduled catalog jobs", () => {
+  const previous = process.env.CARD_CATALOG_SYNC
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+    if (previous === undefined) delete process.env.CARD_CATALOG_SYNC
+    else process.env.CARD_CATALOG_SYNC = previous
+  })
+
+  it("skip when CARD_CATALOG_SYNC is off and run otherwise", async () => {
+    const t = makeConvexTest()
+    const dataset = useDataset("v1")
+    const runScheduled = async () => {
+      await t.action(internal.cardDatasetSync.syncScheduled, { game: "ygo" })
+      await t.action(internal.deckCatalogs.refreshScheduled, {})
+      return await t.run(async (ctx) => ({
+        cards: (await ctx.db.query("gameCards").take(200)).length,
+        decks: (await ctx.db.query("deckCatalogs").take(1)).length,
+      }))
+    }
+
+    process.env.CARD_CATALOG_SYNC = "off"
+    await expect(runScheduled()).resolves.toEqual({ cards: 0, decks: 0 })
+    expect(dataset.version).not.toHaveBeenCalled()
+
+    delete process.env.CARD_CATALOG_SYNC
+    await expect(runScheduled()).resolves.toEqual({ cards: 150, decks: 1 })
+  })
+})

@@ -25,6 +25,7 @@ import type { DataModel } from "./dataModel.js";
  * Typesafe environment variables declared in `convex.config.ts`.
  */
 type Env = {
+  readonly CARD_CATALOG_SYNC: string | undefined;
   readonly CLERK_SECRET_KEY: string | undefined;
   readonly CLERK_WEBHOOK_SIGNING_SECRET: string | undefined;
   readonly MODERATION_ALERT_FROM: string | undefined;

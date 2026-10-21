@@ -59,7 +59,9 @@ crons.interval("refresh deck catalogs", { hours: 6 }, internal.deckCatalogs.refr
 
 for (const [game, { catalog }] of Object.entries(GAME_PROVIDERS)) {
   if (catalog.bulk)
-    crons.interval(`sync ${game} cards`, { hours: 12 }, internal.cardDatasetSync.sync, { game })
+    crons.interval(`sync ${game} cards`, { hours: 12 }, internal.cardDatasetSync.syncScheduled, {
+      game,
+    })
 }
 
 export default crons
