@@ -850,7 +850,6 @@ function NewGameForm({
                       disabled={
                         pinning ||
                         matchLocked ||
-                        Boolean(initialGame && hasLocalGameStarted(initialGame)) ||
                         (deckList === undefined && deckChoices.length === 0 && !deck)
                       }
                       options={[

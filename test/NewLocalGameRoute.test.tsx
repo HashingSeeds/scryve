@@ -1,5 +1,5 @@
 import { router } from "expo-router"
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import {
   applyGameCommand,
@@ -484,7 +484,7 @@ describe("new local game route while signed in", () => {
     localGameRepository.saveMeSeat(undefined)
   })
 
-  it("carries the picked seat and deck from a fresh New Game into the started game", () => {
+  it("carries the picked seat and deck from a fresh New Game into the started game", async () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <NewLocalGameRoute />
@@ -498,6 +498,7 @@ describe("new local game route while signed in", () => {
     fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
     fireEvent.press(view.getByTestId("start-game-button"))
 
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalled())
     const call = (router.dismissTo as jest.Mock).mock.calls.at(-1)?.[0] as {
       params: { prepared: string }
     }

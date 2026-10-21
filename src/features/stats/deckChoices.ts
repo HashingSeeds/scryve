@@ -48,7 +48,7 @@ export function chosenDeckCards(
 ) {
   if (deck.localId) {
     const local = loadGuestDeck(deck.localId)
-    if (!local) throw new Error(translate("decks:guestStorage.changed"))
+    if (!local) throw new Error(translate("decks:detail.maybeDeleted"))
     return local.deck.cards
   }
   return deck.versionId
