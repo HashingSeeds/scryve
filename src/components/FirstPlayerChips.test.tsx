@@ -32,13 +32,18 @@ describe("FirstPlayerChips", () => {
   })
 
   it.each([
-    [2, "auto", [180, 0]],
-    [4, "auto", [90, -90]],
-    [4, "tabletop", [180, 90, -90, 0]],
+    [2, "auto", 390, 844, [180, 0]],
+    [3, "auto", 390, 844, [90, -90]],
+    [3, "even-grid", 390, 844, [90, -90]],
+    [4, "auto", 390, 844, [90, -90]],
+    [4, "tabletop", 390, 844, [90, -90]],
+    [4, "tabletop", 844, 390, [180, 0]],
+    [5, "auto", 390, 844, [90, -90]],
+    [6, "tabletop", 390, 844, [90, -90]],
   ] as const)(
-    "finds every way %i seats in the %s layout face",
-    (playerCount, layoutVariant, facings) => {
-      const layout = getPlayerGridLayout({ playerCount, width: 390, height: 844, layoutVariant })
+    "offers %i seats in the %s layout (%i×%i) at most two lined-up directions",
+    (playerCount, layoutVariant, width, height, facings) => {
+      const layout = getPlayerGridLayout({ playerCount, width, height, layoutVariant })
       expect(getPlayerGridFacings(playerCount, layout)).toEqual(facings)
     },
   )
