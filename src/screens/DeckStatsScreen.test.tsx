@@ -92,7 +92,7 @@ it("uses exact totals, shows bounded breakdowns, and filters paginated list game
     { initialNumItems: 20 },
   )
   fireEvent.press(view.getByTestId("stats-source-manual"))
-  expect(view.getByTestId("stats-headline")).toHaveTextContent("58%")
+  expect(view.getByTestId("stats-headline")).toHaveTextContent("3-2")
   expect(view.getByText("Matches 3-2-0")).toBeTruthy()
   expect(mockPagination).toHaveBeenLastCalledWith(
     "games",

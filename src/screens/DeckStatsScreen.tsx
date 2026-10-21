@@ -176,22 +176,24 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 <StatsSection
                   title={translate("decks:stats.lists")}
                   action={
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      testID="stats-compare"
-                      disabled={!capacity}
-                      style={$actionTouch}
-                      onPress={() =>
-                        capacity?.premium
-                          ? router.push({
-                              pathname: "/connected/decks/compare",
-                              params: { deckKey, deckName, game, format, source },
-                            })
-                          : setProPrompt(true)
-                      }
-                    >
-                      <Text tx="decks:stats.compare" size="sm" style={themed($action)} />
-                    </TouchableOpacity>
+                    lists.filter((list) => list.fingerprint !== null).length < 2 ? undefined : (
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        testID="stats-compare"
+                        disabled={!capacity}
+                        style={$actionTouch}
+                        onPress={() =>
+                          capacity?.premium
+                            ? router.push({
+                                pathname: "/connected/decks/compare",
+                                params: { deckKey, deckName, game, format, source },
+                              })
+                            : setProPrompt(true)
+                        }
+                      >
+                        <Text tx="decks:stats.compare" size="sm" style={themed($action)} />
+                      </TouchableOpacity>
+                    )
                   }
                 />
                 {lists.map((list) => (

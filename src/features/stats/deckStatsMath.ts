@@ -36,7 +36,7 @@ export function exactRecord(row: DeckSummary["all"], source: StatsSource): Recor
     losses: row?.losses ?? 0,
     draws: row?.draws ?? 0,
   }
-  const manual = row?.manualGames
+  const manual = row?.manualMatches
   if (source === "scryve") return scryve
   return {
     games: (source === "all" ? scryve.games : 0) + (manual?.total ?? 0),

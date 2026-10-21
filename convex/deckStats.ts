@@ -32,18 +32,14 @@ function resultsFor(ctx: QueryCtx, key: Awaited<ReturnType<typeof callerKey>>) {
 }
 
 const sourceGroup = (result: Result) => (result.source === "manual" ? "manual" : "scryve")
+// why: a connected match also records each of its games, so counting the match too would double it.
+const countsOnce = (result: Result) => result.kind === "game" || result.source === "manual"
 
 // why: slices hold plain outcome counts, so the client sums them for any filter without another query.
 export const summary = query({
   args: { deckKey: v.string() },
   handler: async (ctx, args) => {
     const key = await callerKey(ctx, args.deckKey)
-    const totals = await ctx.db
-      .query("deckKeyStats")
-      .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
-        q.eq("userId", key.userId).eq("deckKey", key.deckKey),
-      )
-      .take(MAX_LISTS + 1)
     const scanned = await resultsFor(ctx, key).take(BREAKDOWN_SCAN + 1)
     const slices = new Map<
       string,
@@ -59,7 +55,7 @@ export const summary = query({
         lastAt: number
       }
     >()
-    for (const result of scanned.slice(0, BREAKDOWN_SCAN)) {
+    for (const result of scanned.slice(0, BREAKDOWN_SCAN).filter(countsOnce)) {
       const slice = {
         source: sourceGroup(result),
         fingerprint: result.fingerprint ?? null,
@@ -85,9 +81,30 @@ export const summary = query({
         lastAt: Math.max(current.lastAt, result.finishedAt),
       })
     }
+    const lastPlayed = new Map<string, number>()
+    for (const slice of slices.values())
+      if (slice.fingerprint)
+        lastPlayed.set(
+          slice.fingerprint,
+          Math.max(lastPlayed.get(slice.fingerprint) ?? 0, slice.lastAt),
+        )
+    const recent = [...lastPlayed.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, MAX_LISTS)
+      .map(([fingerprint]) => fingerprint)
+    const totals = await Promise.all(
+      ["all", ...recent].map((fingerprint) =>
+        ctx.db
+          .query("deckKeyStats")
+          .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+            q.eq("userId", key.userId).eq("deckKey", key.deckKey).eq("fingerprint", fingerprint),
+          )
+          .unique(),
+      ),
+    )
     return {
-      all: totals.find((row) => row.fingerprint === "all") ?? null,
-      lists: totals.filter((row) => row.fingerprint !== "all").slice(0, MAX_LISTS),
+      all: totals[0],
+      lists: totals.slice(1).filter((row) => row !== null),
       slices: [...slices.values()],
       scannedAll: scanned.length <= BREAKDOWN_SCAN,
     }
@@ -108,6 +125,7 @@ export const games = query({
     const page = await resultsFor(ctx, key)
       .filter((q) =>
         q.and(
+          q.or(q.eq(q.field("kind"), "game"), q.eq(q.field("source"), "manual")),
           args.fingerprint === undefined
             ? true
             : q.eq(q.field("fingerprint"), args.fingerprint ?? undefined),

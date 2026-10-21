@@ -28,6 +28,7 @@ import {
 } from "@/features/matches/manualMatchForm"
 import { localDeckChoices } from "@/features/stats/deckChoices"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
+import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -316,9 +317,11 @@ async function localDeckIds(localId: string) {
   const stored = loadGuestDeck(localId)
   if (!stored) throw new Error(translate("decks:detail.maybeDeleted"))
   const [choice] = localDeckChoices([stored])
+  const fingerprint = await deckFingerprint(stored.deck.cards)
+  if (choice.deckKey) saveListSnapshot(choice.deckKey, fingerprint, stored.deck.cards)
   return {
     deckKey: choice.deckKey,
-    deckFingerprint: await deckFingerprint(stored.deck.cards),
+    deckFingerprint: fingerprint,
     deckName: choice.name,
     system: choice.system,
     format: choice.format,

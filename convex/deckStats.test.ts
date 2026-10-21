@@ -3,6 +3,7 @@ import { convexTest } from "convex-test"
 
 import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api } from "./_generated/api"
+import { addDeckResult } from "./lib/deckResults"
 import schema from "./schema"
 
 const modules = {
@@ -169,4 +170,34 @@ it("pages a deck's games newest first with filters and the ids History opens", a
     paginationOpts: { numItems: 10, cursor: null },
   })
   expect(tracked.page).toHaveLength(2)
+})
+
+it("counts a connected match through its games only", async () => {
+  const { t, actor } = await signedIn()
+  const userId = (await t.run(async (ctx) => ctx.db.query("users").first()))!._id
+  await t.run(async (ctx) => {
+    for (const [resultId, kind, outcome] of [
+      ["game:a:1", "game", "win"],
+      ["game:b:1", "game", "loss"],
+      ["game:c:1", "game", "win"],
+      ["match:m:1", "match", "win"],
+    ] as const)
+      await addDeckResult(ctx, {
+        resultId,
+        userId,
+        deckKey: "burn",
+        kind,
+        source: "connected",
+        outcome,
+        finishedAt: T,
+        deltas: {},
+      })
+  })
+  const summary = await actor.query(api.deckStats.summary, { deckKey: "burn" })
+  expect(summary.slices.reduce((total, slice) => total + slice.games, 0)).toBe(3)
+  const games = await actor.query(api.deckStats.games, {
+    deckKey: "burn",
+    paginationOpts: { numItems: 10, cursor: null },
+  })
+  expect(games.page.map((row) => row.kind)).toEqual(["game", "game", "game"])
 })

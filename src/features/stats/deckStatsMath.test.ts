@@ -76,7 +76,7 @@ it("computes the 90 percent Wilson interval including zero and all wins", () => 
   expect(likelyRange(sumSlices([]))).toBeUndefined()
 })
 
-it("keeps exact game totals separate from manual match envelopes", () => {
+it("counts manual results as matches, like the breakdown rows", () => {
   const row = {
     games: 20,
     wins: 12,
@@ -85,8 +85,8 @@ it("keeps exact game totals separate from manual match envelopes", () => {
     manualMatches: { total: 5, wins: 3, losses: 2, draws: 0 },
     manualGames: { total: 12, wins: 7, losses: 5, draws: 0 },
   } as NonNullable<DeckSummary["all"]>
-  expect(exactRecord(row, "all")).toEqual({ games: 32, wins: 19, losses: 12, draws: 1 })
-  expect(exactRecord({ ...row, manualGames: undefined }, "manual").games).toBe(0)
+  expect(exactRecord(row, "all")).toEqual({ games: 25, wins: 15, losses: 9, draws: 1 })
+  expect(exactRecord(row, "manual")).toEqual({ games: 5, wins: 3, losses: 2, draws: 0 })
 })
 
 it("orders tracked lists by last played and gives untracked its own label", () => {

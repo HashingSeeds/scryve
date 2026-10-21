@@ -186,15 +186,15 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
-              {stats || statsContent ? (
+              {stats ? <DeckStats {...stats} /> : statsContent}
+              {onStats && (stats || statsContent) ? (
                 <TouchableOpacity
                   testID="open-deck-stats"
                   accessibilityRole="button"
-                  accessibilityLabel={translate("decks:stats.viewStats")}
-                  disabled={!onStats}
+                  style={$noteAction}
                   onPress={onStats}
                 >
-                  {stats ? <DeckStats {...stats} /> : statsContent}
+                  <Text size="sm" tx="decks:stats.viewStats" style={themed($action)} />
                 </TouchableOpacity>
               ) : null}
               {onAddMatch ? (
