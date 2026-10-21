@@ -1,7 +1,7 @@
 import { Linking, Platform } from "react-native"
 import * as Application from "expo-application"
 import * as Updates from "expo-updates"
-import { useQuery } from "convex/react"
+import { useQuery_experimental } from "convex/react"
 
 import type { TxKeyPath } from "@/i18n"
 
@@ -51,7 +51,8 @@ export function needsStoreUpdate(installed: Build, live: Build | null | undefine
 
 function useLiveStoreUpdate() {
   const platform = Platform.OS === "ios" ? "ios" : "android"
-  const live = useQuery(api.storeReleases.live, { platform })
+  const liveQuery = useQuery_experimental({ query: api.storeReleases.live, args: { platform } })
+  const live = liveQuery.status === "success" ? liveQuery.data : undefined
   const downloaded = useDownloadedPlayVersion() !== null
   const installed = {
     version: Application.nativeApplicationVersion ?? "",

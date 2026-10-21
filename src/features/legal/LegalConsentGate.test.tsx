@@ -37,7 +37,12 @@ let mockAccountAcceptances: unknown = []
 let mockConvexAuth = { isAuthenticated: true, isLoading: false }
 const mockRecordAcceptance = jest.fn(async () => ({ acceptedAt: 0 }))
 jest.mock("convex/react", () => ({
-  useQuery: () => mockAccountAcceptances,
+  useQuery_experimental: () =>
+    mockAccountAcceptances instanceof Error
+      ? { status: "error", error: mockAccountAcceptances }
+      : mockAccountAcceptances === undefined
+        ? { status: "pending" }
+        : { status: "success", data: mockAccountAcceptances },
   useMutation: () => mockRecordAcceptance,
   useConvexAuth: () => mockConvexAuth,
 }))
@@ -471,6 +476,13 @@ describe("LegalConsentGate", () => {
     } finally {
       jest.useRealTimers()
     }
+  })
+
+  it("falls back to the device answer right away when the account query fails", () => {
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = new Error("Server Error")
+    expect(renderGate().getByText("APP CONTENT")).toBeTruthy()
   })
 
   it("falls back to the device consent prompt when authentication never loads", () => {
