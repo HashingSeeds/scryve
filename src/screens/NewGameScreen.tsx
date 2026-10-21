@@ -624,6 +624,7 @@ function NewGameForm({
     if (deck && deckChoiceId(deck) === id) return
     const request = Symbol()
     pinningRef.current = request
+    const previous = deck
     const choice = deckChoices.find((candidate) => deckChoiceId(candidate) === id)
     const selected = choice && {
       ...choice,
@@ -647,6 +648,7 @@ function NewGameForm({
       savePlayers(seatAppearances, { ...accountInput, ...pinned })
     } catch (cause) {
       if (pinningRef.current !== request) return
+      setDeck(previous)
       setPlayerSaveError(
         cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
       )

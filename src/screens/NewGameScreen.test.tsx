@@ -1599,6 +1599,7 @@ describe("NewGameScreen", () => {
       await act(async () => undefined)
       expect(screen.getByText("Could not pin deck.")).toBeTruthy()
       expect(onSavePlayers).not.toHaveBeenCalled()
+      expect(within(screen.getByTestId("me-deck")).queryByText("Burn")).toBeNull()
     })
   })
 
