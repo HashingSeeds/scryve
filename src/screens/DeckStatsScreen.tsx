@@ -73,6 +73,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
   const [filter, setFilter] = useState<{
     fingerprint?: string | null
     podSize?: number
+    wentFirst?: boolean | null
     label: string
   }>()
   const [proPrompt, setProPrompt] = useState(false)
@@ -84,6 +85,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
           ...(source === "all" ? {} : { source }),
           ...(filter?.fingerprint !== undefined ? { fingerprint: filter.fingerprint } : {}),
           ...(filter?.podSize !== undefined ? { podSize: filter.podSize } : {}),
+          ...(filter?.wentFirst !== undefined ? { wentFirst: filter.wentFirst } : {}),
         }
       : "skip",
     { initialNumItems: 20 },
@@ -236,6 +238,32 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                     }
                   />
                 ))}
+                {summary.slices.some(
+                  (slice) =>
+                    slice.wentFirst !== null && (source === "all" || slice.source === source),
+                ) ? (
+                  <>
+                    <StatsSection title={translate("decks:stats.turnOrder")} />
+                    {([true, false, null] as const).map((wentFirst) => {
+                      const label = translate(
+                        wentFirst === null
+                          ? "decks:stats.turnOrderNotTracked"
+                          : wentFirst
+                            ? "decks:stats.wentFirst"
+                            : "decks:stats.notFirst",
+                      )
+                      return (
+                        <StatsRow
+                          key={String(wentFirst)}
+                          testID={`stats-turn-order-${wentFirst}`}
+                          label={label}
+                          record={sumSlices(summary.slices, source, { wentFirst })}
+                          onPress={() => showGames({ wentFirst, label })}
+                        />
+                      )
+                    })}
+                  </>
+                ) : null}
                 {source === "all" ? (
                   <>
                     <StatsSection title={translate("decks:stats.sources")} />

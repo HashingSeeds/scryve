@@ -28,6 +28,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
     startedAt: game.createdAt,
     finishedAt: game.finishedAt,
     eventCount: game.eventCount,
+    ...(game.firstPlayerId ? { firstPlayerLocalId: game.firstPlayerId } : {}),
     players: ordered.map((player, index) => ({
       localId: player.id,
       seat: index + 1,

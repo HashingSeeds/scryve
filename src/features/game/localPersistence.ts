@@ -466,6 +466,10 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
       ? { firstChooserSeat: value.firstChooserSeat }
       : {}),
     ...(value.firstPlayerOffered === true ? { firstPlayerOffered: true } : {}),
+    ...(typeof value.firstPlayerId === "string" &&
+    players.some(({ id }) => id === value.firstPlayerId)
+      ? { firstPlayerId: asPlayerId(value.firstPlayerId) }
+      : {}),
   }
 }
 
@@ -555,6 +559,10 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         startingLife: value.startingLife,
         players,
         eventCount: value.eventCount,
+        ...(typeof value.firstPlayerId === "string" &&
+        players.some(({ id }) => id === value.firstPlayerId)
+          ? { firstPlayerId: asPlayerId(value.firstPlayerId) }
+          : {}),
         createdAt: value.createdAt,
         finishedAt: value.finishedAt,
         ...(result ? { result } : {}),
@@ -799,6 +807,7 @@ export class LocalGameRepository {
       startingLife: game.startingLife,
       players: game.players,
       eventCount: game.events.length,
+      ...(game.firstPlayerId ? { firstPlayerId: game.firstPlayerId } : {}),
       createdAt: game.createdAt,
       finishedAt: game.finishedAt,
       ...(game.result ? { result: game.result } : {}),

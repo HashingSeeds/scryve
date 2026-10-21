@@ -109,7 +109,8 @@ describe("LocalGamePublishSession", () => {
 
   it("uploads the owner's pending games, marks them published, and skips other accounts", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
-    repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
+    const game = finishedGame(1)
+    repository.archiveGame({ ...game, firstPlayerId: game.players[1].id }, "game_menu", "owner-a")
     repository.archiveGame(finishedGame(10), "game_menu", "owner-b")
     repository.archiveGame(finishedGame(20), "game_menu")
     expect(repository.pendingPublishes("owner-a")).toHaveLength(1)
@@ -118,6 +119,7 @@ describe("LocalGamePublishSession", () => {
     await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
     expect(mockPublish.mock.calls[0]?.[0]).toMatchObject({
       publicId: repository.loadHistory()[2].id,
+      firstPlayerLocalId: game.players[1].id,
       result: { kind: "win" },
     })
     await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))

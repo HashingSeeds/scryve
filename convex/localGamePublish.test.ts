@@ -255,3 +255,58 @@ describe("publishFinishedLocalGame", () => {
     else process.env.CLERK_SECRET_KEY = previousClerkSecret
   })
 })
+
+it.each(["player_a", "player_b", undefined])(
+  "records first player %s per seat and replays without duplicate results",
+  async (firstPlayerLocalId) => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "owner", "Owner")
+    await synced(t, "other", "Other")
+    const args = finishedGame({ firstPlayerLocalId })
+    args.players[0] = { ...args.players[0], me: true, deckKey: "burn" }
+    const ack = await owner.mutation(api.games.publishFinishedLocalGame, args)
+    expect(await owner.mutation(api.games.publishFinishedLocalGame, args)).toEqual(ack)
+    const { firstPlayerLocalId: _, ...older } = args
+    expect(await owner.mutation(api.games.publishFinishedLocalGame, older)).toEqual(ack)
+    await t.run(async (ctx) => {
+      const summary = (await ctx.db.get(ack.summaryId))!
+      expect(summary.firstPlayerId).toBe(
+        summary.players.find((player) => player.localId === firstPlayerLocalId)?.playerId,
+      )
+      const ownerResult = (await ctx.db.query("deckResults").collect())[0]
+      expect(ownerResult.wentFirst).toBe(
+        firstPlayerLocalId === undefined ? undefined : firstPlayerLocalId === "player_a",
+      )
+      expect(await ctx.db.query("deckResults").collect()).toHaveLength(1)
+      const other = (await ctx.db.query("users").collect()).find(
+        (user) => user.displayName === "Other",
+      )!
+      const seat = { ...summary.players[1], userId: other._id, deckKey: "elves" }
+      const { recordPlayerResult } =
+        jest.requireActual<typeof import("./lib/results")>("./lib/results")
+      await recordPlayerResult(ctx, summary, seat, Date.now(), "local")
+      const results = await ctx.db.query("deckResults").collect()
+      expect(results).toHaveLength(2)
+      expect(results.find((result) => result.userId === other._id)?.wentFirst).toBe(
+        firstPlayerLocalId === undefined ? undefined : firstPlayerLocalId === "player_b",
+      )
+      expect((await ctx.db.query("deckKeyStats").collect()).map((stats) => stats.games)).toEqual([
+        1, 1,
+      ])
+    })
+  },
+)
+
+it("rejects a first player outside the game, including on a replay", async () => {
+  const t = convexTest(schema, modules)
+  const owner = await synced(t, "owner", "Owner")
+  const args = finishedGame({ firstPlayerLocalId: "absent" })
+  await expect(owner.mutation(api.games.publishFinishedLocalGame, args)).rejects.toThrow(
+    "First player must belong to this game",
+  )
+  expect(await t.run(async (ctx) => ctx.db.query("games").collect())).toHaveLength(0)
+  await owner.mutation(api.games.publishFinishedLocalGame, finishedGame())
+  await expect(owner.mutation(api.games.publishFinishedLocalGame, args)).rejects.toThrow(
+    "First player must belong to this game",
+  )
+})

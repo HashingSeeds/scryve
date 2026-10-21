@@ -12,13 +12,14 @@ export type RecordCounts = Pick<StatsSlice, "games" | "wins" | "losses" | "draws
 export function sumSlices(
   slices: readonly StatsSlice[],
   source: StatsSource = "all",
-  filter: { fingerprint?: string | null; podSize?: number | null } = {},
+  filter: { fingerprint?: string | null; podSize?: number | null; wentFirst?: boolean | null } = {},
 ): RecordCounts {
   return slices.reduce(
     (total, slice) => {
       if (source !== "all" && slice.source !== source) return total
       if (filter.fingerprint !== undefined && slice.fingerprint !== filter.fingerprint) return total
       if (filter.podSize !== undefined && slice.podSize !== filter.podSize) return total
+      if (filter.wentFirst !== undefined && slice.wentFirst !== filter.wentFirst) return total
       return {
         games: total.games + slice.games,
         wins: total.wins + slice.wins,

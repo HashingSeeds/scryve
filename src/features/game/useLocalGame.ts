@@ -13,6 +13,7 @@ import {
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  hasPlayBegun,
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
@@ -184,6 +185,21 @@ export function useLocalGame(
     if (!current.firstPlayerOffered) replaceBoard({ ...current, firstPlayerOffered: true })
   }, [replaceBoard])
 
+  const setFirstPlayer = useCallback(
+    (playerId: PlayerId) => {
+      const current = gameRef.current
+      if (
+        current.status !== "active" ||
+        hasPlayBegun(current) ||
+        current.firstPlayerId === playerId ||
+        !current.players.some(({ id }) => id === playerId)
+      )
+        return
+      replaceBoard({ ...current, firstPlayerId: playerId })
+    },
+    [replaceBoard],
+  )
+
   const rematch = useCallback(() => replaceBoard(createRematch(gameRef.current)), [replaceBoard])
 
   const nextMatchGame = useCallback(
@@ -246,6 +262,7 @@ export function useLocalGame(
     restartMatchGame: restartMatchGameBoard,
     endMatch,
     markFirstPlayerUsed,
+    setFirstPlayer,
     latestMatchGame,
     pendingMatchEnd: () => {
       const matchId = repository.loadPendingMatchEnd()

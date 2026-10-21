@@ -124,6 +124,9 @@ export async function recordPlayerResult(
     summaryId: summary._id,
     matchId: summary.matchId,
     podSize: summary.players.length,
+    ...(summary.firstPlayerId !== undefined
+      ? { wentFirst: summary.firstPlayerId === player.playerId }
+      : {}),
     deltas: { games: outcomeTally(outcome) },
     ...(player.deckId && player.deckVersionId
       ? { legacyDeckId: player.deckId, deckVersionId: player.deckVersionId }

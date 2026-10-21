@@ -130,6 +130,11 @@ export function CurrentGameScreen({
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const dice = useDice(runtime.game.players, runtime.game.id, system)
+  const { firstPlayerId } = dice
+  const { setFirstPlayer } = runtime
+  useEffect(() => {
+    if (firstPlayerId) setFirstPlayer(firstPlayerId)
+  }, [firstPlayerId, setFirstPlayer])
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
   const markFirstPlayerUsed = runtime.markFirstPlayerUsed

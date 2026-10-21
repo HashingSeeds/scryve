@@ -186,6 +186,7 @@ describe("buildFinishedLocalGameSnapshot", () => {
       format: "commander",
       startingLife: 40,
       players: [{ ...game.players[0], life: 12 }, game.players[1], game.players[2]],
+      firstPlayerId: game.players[2].id,
       eventCount: 9,
       createdAt: 100,
       finishedAt: 200,
@@ -208,6 +209,7 @@ describe("buildFinishedLocalGameSnapshot", () => {
       startedAt: 100,
       finishedAt: 200,
       eventCount: 9,
+      firstPlayerLocalId: game.players[2].id,
       result: { kind: "win", winnerLocalIds: [game.players[1].id] },
     })
     expect(snapshot.players.map(({ seat, currentLife }) => [seat, currentLife])).toEqual([
@@ -241,6 +243,7 @@ describe("buildFinishedLocalGameSnapshot", () => {
       finishedAt: 200,
     })
     expect(snapshot).not.toHaveProperty("system")
+    expect(snapshot).not.toHaveProperty("firstPlayerLocalId")
   })
 
   it("caps life at the server's limit, so one runaway seat can't sink the upload", () => {

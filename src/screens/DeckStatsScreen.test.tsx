@@ -210,3 +210,31 @@ it("offers retry when stats fail", () => {
   expect(view.getByTestId("stats-headline")).toHaveTextContent("60%")
   error.mockRestore()
 })
+
+it.each([true, false, null])("shows honest turn order rates and filters %s", (wentFirst) => {
+  const view = render(screen())
+  expect(view.getByText("Turn order")).toBeTruthy()
+  expect(within(view.getByTestId("stats-turn-order-true")).getByText("4-4")).toBeTruthy()
+  expect(within(view.getByTestId("stats-turn-order-false")).getByText("67%")).toBeTruthy()
+  expect(view.getByText("Turn order not tracked")).toBeTruthy()
+  fireEvent.press(view.getByTestId(`stats-turn-order-${wentFirst}`))
+  expect(mockPagination).toHaveBeenLastCalledWith(
+    "games",
+    { deckKey: "key", source: "scryve", wentFirst },
+    { initialNumItems: 20 },
+  )
+})
+
+it("hides turn order when the selected source has no tracked results", () => {
+  const view = render(screen())
+  fireEvent.press(view.getByTestId("stats-source-manual"))
+  expect(view.queryByText("Turn order")).toBeNull()
+  fireEvent.press(view.getByTestId("stats-source-all"))
+  expect(view.getByText("Turn order")).toBeTruthy()
+  mockSummary = {
+    ...deckStatsSummary,
+    slices: deckStatsSummary.slices.map((slice) => ({ ...slice, wentFirst: null })),
+  }
+  view.rerender(screen())
+  expect(view.queryByText("Turn order")).toBeNull()
+})

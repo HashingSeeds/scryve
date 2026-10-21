@@ -118,6 +118,7 @@ export interface LocalGame {
   clock?: RoundClock
   firstChooserSeat?: number
   firstPlayerOffered?: true
+  firstPlayerId?: PlayerId
   seatPassHashes?: SeatPassHashes
 }
 
@@ -156,6 +157,7 @@ export interface LocalGameSummary {
   startingLife: number
   players: GamePlayer[]
   eventCount: number
+  firstPlayerId?: PlayerId
   createdAt: number
   finishedAt: number
   result?: LocalGameResult
