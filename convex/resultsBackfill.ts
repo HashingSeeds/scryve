@@ -4,6 +4,7 @@ import { v } from "convex/values"
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import { internalMutation, internalQuery } from "./_generated/server"
+import { deckKeyOf } from "./lib/deckKeys"
 import { addDeckResult, canonicalResultId, gameResultId } from "./lib/deckResults"
 import {
   resultDeckKey,
@@ -207,7 +208,14 @@ export const compareDeckKeyStats = internalQuery({
         .query("deckResults")
         .withIndex("by_legacy_deck_id", (q) => q.eq("legacyDeckId", deck._id))
         .take(MAX_COMPARED_RESULTS)
-      const stats = sumDeltas(mirrored.map((result) => result.deltas))
+      // why: installed clients will read this deck's record from its key, so a row filed elsewhere must show up.
+      const stats = sumDeltas(
+        mirrored
+          .filter(
+            (result) => result.userId === deck.ownerUserId && result.deckKey === deckKeyOf(deck),
+          )
+          .map((result) => result.deltas),
+      )
       const fields = ["games", "wins", "losses", "draws", "unknown"] as const
       const lines = ["manualMatches", "manualGames", "connectedMatches"] as const
       const tallyFields = ["total", "wins", "losses", "draws", "unknown"] as const

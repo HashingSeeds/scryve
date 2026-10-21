@@ -573,6 +573,19 @@ it("statsForKey is authenticated and scoped to the caller, with at most 50 lists
   expect(stats.fingerprints).toHaveLength(50)
 })
 
+it("comparison flags a deck's legacy result filed under another key", async () => {
+  const t = setup()
+  const { actor, versionId } = await deck(t)
+  const args = publish()
+  args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "some-other-key" }
+  await actor.mutation(api.games.publishFinishedLocalGame, args)
+  const { mismatches } = await t.query(internal.resultsBackfill.compareDeckKeyStats, {
+    cursor: null,
+    batchSize: 100,
+  })
+  expect(mismatches).toHaveLength(1)
+})
+
 it("backfills in bounded pages, retries without duplication, and matches legacy totals", async () => {
   const t = setup()
   const { actor, deckId, versionId } = await deck(t)
