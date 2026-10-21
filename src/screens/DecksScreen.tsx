@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
+import type { FunctionReturnType } from "convex/server"
 import Svg, { Path } from "react-native-svg"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -253,6 +254,16 @@ function selectLocalDeck(row: ShelfDeck, onSelect: (deck: DeckSelection) => void
     format: row.format,
     cardQuantity: row.cardQuantity,
   })
+}
+
+type KeyTotals = FunctionReturnType<typeof api.deckStats.totalsByKey>
+
+function KeyTotalsQuery({ onTotals }: { onTotals: (totals: KeyTotals) => void }) {
+  const totals = useQuery(api.deckStats.totalsByKey, {})
+  useEffect(() => {
+    if (totals) onTotals(totals)
+  }, [totals, onTotals])
+  return null
 }
 
 function LocalDeckList({
@@ -526,7 +537,7 @@ export function DecksScreen({
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
   const guestDecks = useGuestDecks()
-  const totals = useQuery(api.deckStats.totalsByKey, access?.ready ? {} : "skip")
+  const [totals, setTotals] = useState<KeyTotals>()
   const keyTotals = useMemo(
     () => new Map((totals ?? []).map(({ deckKey, ...record }) => [deckKey, record])),
     [totals],
@@ -760,6 +771,11 @@ export function DecksScreen({
           </ConvexQueryBoundary>
         )}
       </View>
+      {access?.ready ? (
+        <ConvexQueryBoundary fallback={() => null}>
+          <KeyTotalsQuery onTotals={setTotals} />
+        </ConvexQueryBoundary>
+      ) : null}
       <FloatingAppNavigation
         destination={{
           kind: onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play",

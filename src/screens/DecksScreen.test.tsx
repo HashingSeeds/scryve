@@ -77,21 +77,26 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
   },
 }
 
-let mockTotals: {
-  deckKey: string
-  games: number
-  wins: number
-  losses: number
-  draws: number
-  unknown: number
-}[] = []
+let mockTotals:
+  | {
+      deckKey: string
+      games: number
+      wins: number
+      losses: number
+      draws: number
+      unknown: number
+    }[]
+  | Error = []
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexClient,
   useQuery: (reference: unknown, args?: unknown) => {
     if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error
     if (reference === "decks.capacity") return mockListMine.value?.capacity
-    if (reference === "deckStats.totalsByKey") return mockTotals
+    if (reference === "deckStats.totalsByKey") {
+      if (mockTotals instanceof Error) throw mockTotals
+      return mockTotals
+    }
     return mockListMine.value
   },
   useMutation: () => mockSetFavorite,
@@ -245,6 +250,17 @@ describe("DecksScreen", () => {
     mockTotals = [{ deckKey: "local-key", games: 4, wins: 3, losses: 1, draws: 0, unknown: 0 }]
     const list = within(renderShelf().getByTestId("decks-list"))
     expect(list.getByText("3-1")).toBeTruthy()
+    mockTotals = []
+  })
+
+  it("still lists local decks when their key totals fail to load", () => {
+    saveGuestDeck(
+      { name: "Local despite totals", format: "commander", game: "mtg", cards: [] },
+      { deckKey: "local-key" },
+    )
+    mockTotals = new Error("totals unavailable")
+    const list = within(renderShelf().getByTestId("decks-list"))
+    expect(list.getByText("Local despite totals")).toBeTruthy()
     mockTotals = []
   })
 
