@@ -11,13 +11,18 @@ const mockSaveReceiptToken = jest.fn((_token: string) => true)
 const mockResetAnalyticsId = jest.fn(() => "analytics-id")
 let mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
 let mockLoadedReceiptToken: string | undefined = undefined
-let mockDeletion: { status: string; receiptToken?: string } | null | undefined = null
+let mockDeletion: { status: string; receiptToken?: string } | Error | null | undefined = null
 
 jest.mock("@clerk/expo", () => ({
   useClerk: () => ({ signOut: (...args: []) => mockSignOut(...args) }),
 }))
 jest.mock("convex/react", () => ({
-  useQuery: () => mockDeletion,
+  useQuery_experimental: () =>
+    mockDeletion instanceof Error
+      ? { status: "error", error: mockDeletion }
+      : mockDeletion === undefined
+        ? { status: "pending" }
+        : { status: "success", data: mockDeletion },
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => mockAuth,
@@ -69,6 +74,14 @@ describe("AccountDeletionSessionGuard", () => {
 
     expect(mockSignOut).not.toHaveBeenCalled()
     expect(mockSaveReceiptToken).not.toHaveBeenCalled()
+  })
+
+  it("stays signed in when the deletion check fails", () => {
+    mockDeletion = new Error("Server Error")
+
+    render(<AccountDeletionSessionGuard />)
+
+    expect(mockSignOut).not.toHaveBeenCalled()
   })
 
   it("stays signed in for a failed deletion so it can be retried", () => {

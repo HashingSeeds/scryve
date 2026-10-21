@@ -12,7 +12,7 @@ import {
 } from "react"
 import { Platform, StyleSheet, View } from "react-native"
 import { router, usePathname } from "expo-router"
-import { useConvexAuth, useMutation, useQuery } from "convex/react"
+import { useConvexAuth, useMutation, useQuery_experimental } from "convex/react"
 
 import { CONSENT_DOCUMENT_IDS, type ConsentDocumentId } from "@/content/legal"
 import { privacyContent } from "@/content/privacy"
@@ -193,14 +193,21 @@ function ConfiguredConsentGate({
   waitingForAuth: boolean
 }) {
   const recordAcceptance = useMutation(api.legal.recordAcceptance)
-  const accountAcceptances = useQuery(api.legal.currentAcceptances, signedIn ? {} : "skip")
+  // why: a server error (like a disabled deployment) must fall back like being offline, not reach the root error screen.
+  const acceptancesQuery = useQuery_experimental({
+    query: api.legal.currentAcceptances,
+    args: signedIn ? {} : "skip",
+  })
+  const accountAcceptances =
+    acceptancesQuery.status === "success" ? acceptancesQuery.data : undefined
   const { isAuthenticated: backendReady } = useConvexAuth()
   const [cached, setCached] = useCachedAcceptancesForUser(userId)
   const [pendingSync, setPendingSync] = usePendingConsentForUser(userId)
   const [deviceAccepted, setDeviceAccepted] = useState<AcceptedVersions>(() =>
     deviceAcceptanceStore.read(),
   )
-  const [accountUnreachable, setAccountUnreachable] = useState(false)
+  const [accountTimedOut, setAccountTimedOut] = useState(false)
+  const accountUnreachable = accountTimedOut || acceptancesQuery.status === "error"
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSyncingAcceptance, setIsSyncingAcceptance] = useState(false)
   const [retryFailed, setRetryFailed] = useState(false)
@@ -238,7 +245,7 @@ function ConfiguredConsentGate({
       inheritsDeviceAcceptance
     )
       return
-    const timer = setTimeout(() => setAccountUnreachable(true), ACCOUNT_CONSENT_TIMEOUT_MS)
+    const timer = setTimeout(() => setAccountTimedOut(true), ACCOUNT_CONSENT_TIMEOUT_MS)
     return () => clearTimeout(timer)
   }, [signedIn, backendAnswered, cacheSaysAccepted, inheritsDeviceAcceptance, pendingSyncIsCurrent])
 

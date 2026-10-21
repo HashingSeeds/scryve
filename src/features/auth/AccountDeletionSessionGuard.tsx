@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { useClerk } from "@clerk/expo"
-import { useQuery } from "convex/react"
+import { useQuery_experimental } from "convex/react"
 
 import {
   isValidReceiptToken,
@@ -22,10 +22,12 @@ export function AccountDeletionSessionGuard() {
 function SignedInDeletionGuard() {
   const auth = useAuthAccess()
   const clerk = useClerk()
-  const deletion = useQuery(
-    api.accountDeletion.currentAccountDeletion,
-    auth.isSignedIn ? {} : "skip",
-  )
+  // why: this guard runs on every screen, so a failed check must leave the session alone rather than crash the app.
+  const deletionQuery = useQuery_experimental({
+    query: api.accountDeletion.currentAccountDeletion,
+    args: auth.isSignedIn ? {} : "skip",
+  })
+  const deletion = deletionQuery.status === "success" ? deletionQuery.data : undefined
   useEffect(() => {
     if (!auth.isSignedIn || !deletion || deletion.status === "failed") return
     if (
