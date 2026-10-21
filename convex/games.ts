@@ -331,7 +331,6 @@ async function displayNamesForViewer(
 ) {
   const blocked = await blockedUserIdsFor(ctx, viewer.user._id)
   const names = new Map<Id<"gamePlayers">, string>()
-  // why: every seat reruns this on each life change, so read each account once and reuse the viewer's.
   const users = new Map([[viewer.user._id, viewer.user]])
   for (const player of players) {
     const user = player.userId
