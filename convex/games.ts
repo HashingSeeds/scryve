@@ -326,13 +326,18 @@ function displayNameForViewer(
 
 async function displayNamesForViewer(
   ctx: QueryCtx,
-  viewer: { userId: Id<"users">; isHost: boolean },
+  viewer: { user: Doc<"users">; isHost: boolean },
   players: Doc<"gamePlayers">[],
 ) {
-  const blocked = await blockedUserIdsFor(ctx, viewer.userId)
+  const blocked = await blockedUserIdsFor(ctx, viewer.user._id)
   const names = new Map<Id<"gamePlayers">, string>()
+  // why: every seat reruns this on each life change, so read each account once and reuse the viewer's.
+  const users = new Map([[viewer.user._id, viewer.user]])
   for (const player of players) {
-    const user = player.userId ? await ctx.db.get(player.userId) : null
+    const user = player.userId
+      ? (users.get(player.userId) ?? (await ctx.db.get(player.userId)))
+      : null
+    if (user) users.set(user._id, user)
     names.set(
       player._id,
       displayNameForViewer(player, user, {
@@ -1667,7 +1672,7 @@ export const lobbyProjection = query({
             .take(100)
         : []
     const invite = isHost ? await currentUsableInvite(ctx, game, Date.now()) : null
-    const displayNames = await displayNamesForViewer(ctx, { userId: user._id, isHost }, players)
+    const displayNames = await displayNamesForViewer(ctx, { user, isHost }, players)
     const commanderDamage = await commanderDamageProjection(ctx, game, user, players)
     const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
     const decidedOutcome =
@@ -2160,7 +2165,7 @@ export const changeLife = mutation({
       .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
       .first()
     if (!membership) throw gameWriteError("game_membership_required", "Game membership required")
-    const target = await ctx.db.get(args.playerId)
+    const target = membership._id === args.playerId ? membership : await ctx.db.get(args.playerId)
     if (
       !target ||
       target.gameId !== game._id ||
