@@ -222,6 +222,18 @@ describe("DecksScreen", () => {
     expect(list.getByText("Synced")).toBeTruthy()
   })
 
+  it("leaves out the Synced label when only local decks exist", () => {
+    saveGuestDeck({ name: "Local only", format: "commander", game: "mtg", cards: [] })
+    mockListMine.value = {
+      decks: [],
+      capacity: { used: 0, limit: 2, premium: false, canCreate: true },
+      analyticsLocked: false,
+    }
+    const list = within(renderShelf().getByTestId("decks-list"))
+    expect(list.getByText("Local only")).toBeTruthy()
+    expect(list.queryByText("Synced")).toBeNull()
+  })
+
   it("opens each local deck while auth is loading without querying the private shelf", () => {
     saveGuestDeck({ name: "Guest Commander", format: "commander", game: "mtg", cards: [] })
     const second = saveGuestDeck({ name: "Guest Modern", format: "modern", game: "mtg", cards: [] })

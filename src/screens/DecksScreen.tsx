@@ -400,7 +400,7 @@ function DeckShelf({
       <DeckShelfSkeleton />
     )
   const sections = [
-    { key: "synced" as const, data: visibleDecks },
+    ...(visibleDecks.length || emptyShelf ? [{ key: "synced" as const, data: visibleDecks }] : []),
     ...(deviceRows.length ? [{ key: "local" as const, data: deviceRows }] : []),
   ]
 
