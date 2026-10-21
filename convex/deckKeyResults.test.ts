@@ -313,11 +313,22 @@ it("keeps a new client's pinned key and deck name for a moved deck", async () =>
 it("fingerprints a new client's synced deck from its version when the device had no cards cached", async () => {
   const t = setup()
   const { actor, versionId } = await deck(t)
-  const args = publish()
+  const args = { ...publish(), startedAt: Date.now(), finishedAt: Date.now() }
   args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "deck-key" }
   await actor.mutation(api.games.publishFinishedLocalGame, args)
   const result = await t.run(async (ctx) => ctx.db.query("deckResults").unique())
   expect(result).toMatchObject({ deckKey: "deck-key", fingerprint: await deckFingerprint([]) })
+})
+
+it("leaves the list unknown when a synced deck changed after its uncached game started", async () => {
+  const t = setup()
+  const { actor, versionId } = await deck(t)
+  const args = publish()
+  args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "deck-key" }
+  await actor.mutation(api.games.publishFinishedLocalGame, args)
+  const result = await t.run(async (ctx) => ctx.db.query("deckResults").unique())
+  expect(result).toMatchObject({ deckKey: "deck-key" })
+  expect(result?.fingerprint).toBeUndefined()
 })
 
 it("comparison ignores games a deck played while it was only on a device", async () => {
