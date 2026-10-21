@@ -312,7 +312,6 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 
-// why: a local deck has no server version, so the match names its key and the list it holds now.
 async function localDeckIds(localId: string) {
   const stored = loadGuestDeck(localId)
   if (!stored) throw new Error(translate("decks:detail.maybeDeleted"))
