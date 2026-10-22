@@ -166,6 +166,10 @@ export default {
     onDeviceCount: "En este dispositivo · Mazos sincronizados {{used}}/{{limit}}",
     sync: "Sincronizar",
     syncing: "Sincronizando…",
+    addAsNew: "Añadir a tu cuenta como un mazo nuevo",
+    addAsNewConfirm: "Añadir mazo nuevo",
+    otherAccount:
+      "Este mazo viene de otra cuenta. ¿Añadir un mazo nuevo con estadísticas vacías? Lo verás dos veces: sincronizado y en este dispositivo.",
     failed: "No se pudo sincronizar este mazo. Sigue guardado en este dispositivo.",
     limit_reached:
       "Tus mazos sincronizados están llenos. El mazo sigue guardado en este dispositivo.",
@@ -313,6 +317,8 @@ export default {
     close: "Cerrar límite de mazos",
     unavailable: "Los espacios de mazo no están disponibles. Se conserva tu borrador.",
     moveFailed: "No se pudo mover este mazo a este dispositivo.",
+    moveConflict:
+      "Este mazo cambió en otro dispositivo, así que sigue sincronizado. Inténtalo de nuevo.",
     title: "Límite de mazos sincronizados alcanzado",
     proBody:
       "Las cuentas Pro sincronizan {{limit}} mazos. Mueve un mazo a este dispositivo para liberar espacio.",

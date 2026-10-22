@@ -92,4 +92,38 @@ describe("local deck sync notice", () => {
     view.rerender(notice())
     expect(view.queryByTestId("local-deck-sync-notice")).toBeNull()
   })
+
+  it.each([false, true])(
+    "offers a separate account deck and keeps the moved copy, accept: %s",
+    async (accept) => {
+      const local = saveGuestDeck(
+        { name: "Elves", format: "commander", cards: [] },
+        { movedFromAccount: true },
+      )
+      mockImportGuest.mockResolvedValueOnce({ status: "other_account" })
+      const view = renderNotice()
+      fireEvent.press(view.getByTestId("local-deck-sync-choose"))
+      fireEvent.press(view.getByTestId(`local-deck-sync-choice-${local.localId}`))
+      fireEvent.press(view.getByTestId("local-deck-sync-confirm"))
+      await waitFor(() => expect(view.getByText("Add to your account as a new deck")).toBeTruthy())
+      expect(view.getByText(/You'll see it twice: synced and on this device/)).toBeTruthy()
+      expect(loadGuestDecks()).toEqual([local])
+      if (accept) {
+        mockImportGuest.mockResolvedValueOnce({
+          status: "imported",
+          deckId: "new-deck",
+          localUpdatedAt: local.updatedAt,
+        })
+        fireEvent.press(view.getByTestId("local-deck-add-as-new"))
+        await waitFor(() => expect(mockImportGuest).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(view.queryByTestId("local-deck-add-as-new")).toBeNull())
+        expect(mockImportGuest.mock.lastCall?.[0].deckKey).not.toBe(local.deckKey)
+        expect(mockImportGuest.mock.lastCall?.[0].localId).not.toBe(local.localId)
+      } else {
+        fireEvent.press(view.getByTestId("local-deck-add-as-new-cancel"))
+        expect(mockImportGuest).toHaveBeenCalledTimes(1)
+      }
+      expect(loadGuestDecks()).toEqual([local])
+    },
+  )
 })

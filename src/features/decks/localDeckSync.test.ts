@@ -88,13 +88,13 @@ test("saves server content and its key before moving the exact revision", async 
   })
   mockMove.mockImplementation(async () => {
     expect(loadGuestDecks()).toMatchObject([
-      { deckKey: "stable-key", deck: { ...deck, cards: [card] } },
+      { deckKey: "stable-key", movedFromAccount: true, deck: { ...deck, cards: [card] } },
     ])
     return { ...metadata[0], deleted: true, revision: 3 }
   })
   const localId = await renderSync().keepOnDevice(deckId)
   expect(loadGuestDecks()[0].localId).toBe(localId)
-  expect(mockMove).toHaveBeenCalledWith({ deckId, expectedRevision: 2 })
+  expect(mockMove).toHaveBeenCalledWith({ deckId, expectedRevision: 2, expectedVersion: null })
   expect(mockAcceptMetadata).toHaveBeenCalledWith([{ ...metadata[0], deleted: true, revision: 3 }])
 })
 
@@ -278,4 +278,114 @@ test("keeps local edits when retrying a move would overwrite a different saved c
   await expect(renderSync().keepOnDevice(deckId)).rejects.toBeInstanceOf(ConvexError)
   expect(mockMove).not.toHaveBeenCalled()
   expect(loadGuestDecks()).toEqual([edited])
+})
+
+test.each([200, undefined])(
+  "moves the exact version copied, with updatedAt %s",
+  async (updatedAt) => {
+    const version = { _id: "version-1", createdAt: 100, updatedAt }
+    mockQuery.mockResolvedValue({
+      deck: { ...deck, _id: deckId, syncRevision: 2 },
+      version,
+      cards: [],
+    })
+    await renderSync().keepOnDevice(deckId)
+    expect(mockMove).toHaveBeenCalledWith({
+      deckId,
+      expectedRevision: 2,
+      expectedVersion: { id: version._id, updatedAt: updatedAt ?? 100 },
+    })
+  },
+)
+
+test("a card conflict preserves the server and existing device decks and explains the failure", async () => {
+  const other = saveGuestDeck(deck)
+  mockMove.mockRejectedValue(
+    new ConvexError({ code: "sync_conflict", message: "Deck cards changed on another device" }),
+  )
+  await expect(renderSync().keepOnDevice(deckId)).rejects.toThrow(
+    "This deck changed on another device, so it is still synced.",
+  )
+  expect(loadGuestDecks()).toEqual([other])
+  expect(mockAcceptMetadata).not.toHaveBeenCalled()
+})
+
+test.each([0, 100, undefined])(
+  "reconciles an interrupted move with guest receipt %s",
+  async (guestUpdatedAt) => {
+    jest.spyOn(Date, "now").mockReturnValue(500)
+    mockQuery.mockResolvedValue({
+      deck: {
+        ...deck,
+        _id: deckId,
+        deckKey: "stable-key",
+        syncRevision: 2,
+        guestLocalId: "11111111-1111-4111-8111-111111111111",
+        guestUpdatedAt,
+      },
+      version: null,
+      cards: [],
+    })
+    mockMove.mockRejectedValue(new Error("interrupted"))
+    await expect(renderSync().keepOnDevice(deckId)).rejects.toThrow("interrupted")
+    const [copy] = loadGuestDecks()
+    expect(copy.updatedAt).toBe(guestUpdatedAt ?? 500)
+    mockImportGuest.mockResolvedValue({
+      status: "already_imported",
+      deckId,
+      localUpdatedAt: guestUpdatedAt ?? null,
+    })
+    const hook = renderHook(() => useLocalDeckLeftovers(freshMetadata, "owner", true))
+    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+    expect(hook.result.current.error).toBe(false)
+    jest.restoreAllMocks()
+  },
+)
+
+test("a missing receipt never clears a moved copy with different cards", async () => {
+  const copy = saveGuestDeck(
+    { ...deck, cards: [{ name: "Elves", quantity: 1 }] },
+    { movedFromAccount: true },
+  )
+  mockImportGuest.mockResolvedValue({ status: "already_imported", deckId, localUpdatedAt: null })
+  await expect(renderSync().sync(copy.localId)).resolves.toEqual({ status: "kept_newer_edits" })
+  expect(loadGuestDecks()).toEqual([copy])
+})
+
+test("a flagged copy sends only import fields and can revive its original account deck", async () => {
+  const payload = { ...deck, guestLocalId: "local-only", movedFromAccount: true }
+  const copy = saveGuestDeck(payload, { movedFromAccount: true })
+  mockImportGuest.mockResolvedValue({ status: "imported", deckId, localUpdatedAt: copy.updatedAt })
+  await expect(renderSync().sync(copy.localId)).resolves.toEqual({ status: "synced", deckId })
+  expect(mockImportGuest).toHaveBeenCalledWith({
+    ...deck,
+    deckKey: copy.deckKey,
+    localId: copy.localId,
+    localUpdatedAt: copy.updatedAt,
+    movedFromAccount: true,
+  })
+  expect(loadGuestDecks()).toEqual([])
+})
+
+test("other_account keeps the copy and offers an import with a fresh key and alias", async () => {
+  const copy = saveGuestDeck(deck, {
+    movedFromAccount: true,
+    guestLocalId: "11111111-1111-4111-8111-111111111111",
+  })
+  mockImportGuest.mockResolvedValueOnce({ status: "other_account" })
+  const result = await renderSync().sync(copy.localId)
+  expect(result.status).toBe("other_account")
+  expect(loadGuestDecks()).toEqual([copy])
+  expect(mockImportGuest).toHaveBeenCalledTimes(1)
+  if (result.status !== "other_account") throw new Error("Expected new deck offer")
+  mockImportGuest.mockResolvedValue({ status: "imported", deckId, localUpdatedAt: copy.updatedAt })
+  await expect(result.addAsNew()).resolves.toEqual({ status: "synced", deckId })
+  const args = mockImportGuest.mock.lastCall?.[0]
+  expect(args.deckKey).not.toBe(copy.deckKey)
+  expect(args.localId).not.toBe(copy.localId)
+  expect(args.localId).not.toBe(copy.guestLocalId)
+  expect(args.movedFromAccount).toBeUndefined()
+  expect(loadGuestDecks()).toEqual([copy])
+  await result.addAsNew()
+  expect(mockImportGuest).toHaveBeenLastCalledWith(args)
 })

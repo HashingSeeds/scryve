@@ -16,7 +16,8 @@ import { convexErrorMessage } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import { useGuestDecks } from "./guestDeck"
-import { useLocalDeckSync } from "./localDeckSync"
+import { LocalDeckAccountDialog } from "./LocalDeckAccountDialog"
+import { useLocalDeckSync, type LocalDeckSyncResult } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import { MAX_PREMIUM_DECKS } from "../../../convex/lib/policy"
 
@@ -95,6 +96,8 @@ function LocalDeckSyncPicker({
   const localDecks = useGuestDecks().filter((local) => !excludedLocalIds?.has(local.localId))
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [otherAccount, setOtherAccount] =
+    useState<Extract<LocalDeckSyncResult, { status: "other_account" }>>()
   const [error, setError] = useState<string>()
 
   function toggle(localId: string) {
@@ -113,6 +116,10 @@ function LocalDeckSyncPicker({
     try {
       for (const localId of selected.slice(0, free)) {
         const result = await sync(localId)
+        if (result.status === "other_account") {
+          setOtherAccount(result)
+          return
+        }
         if (result.status !== "synced") {
           setError(translate(`decks:localSync.${result.status}`))
           return
@@ -126,6 +133,15 @@ function LocalDeckSyncPicker({
       setBusy(false)
     }
   }
+
+  if (otherAccount)
+    return (
+      <LocalDeckAccountDialog
+        result={otherAccount}
+        onClose={() => setOtherAccount(undefined)}
+        onSynced={onClose}
+      />
+    )
 
   return (
     <DialogCard

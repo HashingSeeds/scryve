@@ -173,6 +173,10 @@ export default {
     onDeviceCount: "Sur cet appareil · Decks synchronisés {{used}}/{{limit}}",
     sync: "Synchroniser",
     syncing: "Synchronisation…",
+    addAsNew: "Ajouter à votre compte comme nouveau deck",
+    addAsNewConfirm: "Ajouter le nouveau deck",
+    otherAccount:
+      "Ce deck provient d'un autre compte. Ajouter un nouveau deck avec des statistiques vides ? Vous le verrez en double : synchronisé et sur cet appareil.",
     failed: "Impossible de synchroniser ce deck. Il reste enregistré sur cet appareil.",
     limit_reached:
       "Vos decks synchronisés sont au complet. Le deck reste enregistré sur cet appareil.",
@@ -319,6 +323,8 @@ export default {
     close: "Fermer la limite de decks",
     unavailable: "Emplacements de deck indisponibles. Votre brouillon est conservé.",
     moveFailed: "Impossible de déplacer ce deck vers cet appareil.",
+    moveConflict:
+      "Ce deck a été modifié sur un autre appareil, il est donc toujours synchronisé. Réessayez.",
     title: "Limite de decks synchronisés atteinte",
     proBody:
       "Les comptes Pro synchronisent {{limit}} decks. Déplacez un deck vers cet appareil pour faire de la place.",

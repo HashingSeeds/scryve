@@ -12,7 +12,8 @@ import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { DeckLimitDialog } from "./DeckLimit"
-import { useLocalDeckSync } from "./localDeckSync"
+import { LocalDeckAccountDialog } from "./LocalDeckAccountDialog"
+import { useLocalDeckSync, type LocalDeckSyncResult } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -33,6 +34,8 @@ export function LocalDeckSyncAction({
   const { sync } = useLocalDeckSync(access?.ownerId)
   const capacity = useQuery(api.decks.capacity, access?.ready ? {} : "skip")
   const [busy, setBusy] = useState(false)
+  const [otherAccount, setOtherAccount] =
+    useState<Extract<LocalDeckSyncResult, { status: "other_account" }>>()
   const [error, setError] = useState<string>()
   const [makingRoom, setMakingRoom] = useState(false)
 
@@ -43,6 +46,7 @@ export function LocalDeckSyncAction({
     try {
       const result = await sync(localId)
       if (result.status === "synced") onSynced(result.deckId)
+      else if (result.status === "other_account") setOtherAccount(result)
       else if (result.status === "limit_reached") setMakingRoom(true)
       else setError(translate(`decks:localSync.${result.status}`))
     } catch (cause) {
@@ -76,6 +80,17 @@ export function LocalDeckSyncAction({
         />
       ) : null}
       {error ? <Text accessibilityRole="alert" size="xs" text={error} /> : null}
+      {otherAccount ? (
+        <LocalDeckAccountDialog
+          result={otherAccount}
+          onClose={() => setOtherAccount(undefined)}
+          onSynced={(deckId) => {
+            setOtherAccount(undefined)
+            onSynced(deckId)
+          }}
+          onSyncingChange={onSyncingChange}
+        />
+      ) : null}
       {makingRoom ? (
         <DeckLimitDialog
           access={access}

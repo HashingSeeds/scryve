@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { Platform } from "react-native"
 import { randomUUID } from "expo-crypto"
 import type { FunctionArgs } from "convex/server"
 
@@ -36,6 +37,7 @@ export type GuestDeck = {
   deck: GuestDeckPayload
   deckKey?: string
   guestLocalId?: string
+  movedFromAccount?: boolean
 }
 
 export class GuestDeckStorageError extends Error {}
@@ -100,6 +102,7 @@ function isGuestDeck(value: unknown): value is GuestDeck {
     Number.isSafeInteger(value.updatedAt) &&
     value.updatedAt >= value.createdAt &&
     isPayload(value.deck) &&
+    (value.movedFromAccount === undefined || typeof value.movedFromAccount === "boolean") &&
     (value.deckKey === undefined ||
       (typeof value.deckKey === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.deckKey))) &&
     (value.guestLocalId === undefined ||
@@ -183,7 +186,7 @@ function notify() {
 }
 
 function writableDecks() {
-  const decks = readStored()
+  const decks = Platform.OS === "web" ? readStored() : snapshot
   if (loadError) throw loadError
   return decks
 }
@@ -211,7 +214,13 @@ export function loadGuestDeck(localId: string) {
 
 export function saveGuestDeck(
   deck: GuestDeckPayload,
-  options: { localId?: string; now?: number; deckKey?: string; guestLocalId?: string } = {},
+  options: {
+    localId?: string
+    now?: number
+    deckKey?: string
+    guestLocalId?: string
+    movedFromAccount?: boolean
+  } = {},
 ): GuestDeck {
   if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const decks = writableDecks()
@@ -220,7 +229,7 @@ export function saveGuestDeck(
     : undefined
   if (options.localId && !previous)
     throw new GuestDeckStorageError("Guest deck localId does not match a saved deck.")
-  const updatedAt = Math.max(options.now ?? Date.now(), (previous?.updatedAt ?? 0) + 1)
+  const updatedAt = Math.max(options.now ?? Date.now(), previous ? previous.updatedAt + 1 : 0)
   if (!Number.isSafeInteger(updatedAt) || updatedAt < 0)
     throw new GuestDeckStorageError("Guest deck timestamp is invalid.")
   const localId = previous?.localId ?? randomUUID()
@@ -235,6 +244,7 @@ export function saveGuestDeck(
     localId,
     deckKey,
     guestLocalId: previous?.guestLocalId ?? options.guestLocalId,
+    movedFromAccount: previous?.movedFromAccount ?? options.movedFromAccount,
     createdAt: previous?.createdAt ?? updatedAt,
     updatedAt,
     deck,

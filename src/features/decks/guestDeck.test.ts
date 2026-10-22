@@ -1,3 +1,5 @@
+import { Platform } from "react-native"
+
 import { storage } from "@/utils/storage"
 
 import {
@@ -22,6 +24,7 @@ const legacy = {
 }
 
 describe("guest deck storage", () => {
+  afterEach(() => jest.restoreAllMocks())
   beforeEach(() => {
     storage.clearAll()
     loadGuestDecks()
@@ -160,6 +163,7 @@ describe("guest deck storage", () => {
   })
 
   it("keeps another tab's deck when writing from a stale snapshot", () => {
+    jest.replaceProperty(Platform, "OS", "web")
     const first = saveGuestDeck(deck)
     storage.set("decks.guest.v2", JSON.stringify([first, legacy]))
 
@@ -167,6 +171,27 @@ describe("guest deck storage", () => {
 
     expect(loadGuestDecks()).toEqual([first, legacy, second])
     expect(JSON.parse(storage.getString("decks.guest.v2") ?? "")).toEqual([first, legacy, second])
+  })
+
+  it("uses the native snapshot for saves and acknowledgments without rereading storage", () => {
+    jest.replaceProperty(Platform, "OS", "ios")
+    const first = saveGuestDeck(deck, { now: 100 })
+    const read = jest.spyOn(storage, "getString")
+    const edited = saveGuestDeck({ ...deck, name: "Edited" }, { localId: first.localId })
+    const second = saveGuestDeck(deck)
+    expect(acknowledgeGuestDeckImport(edited.localId, edited.updatedAt)).toBe(true)
+    expect(read).not.toHaveBeenCalled()
+    read.mockRestore()
+    expect(loadGuestDecks()).toEqual([second])
+  })
+
+  it("keeps the moved flag through edits and reloads", () => {
+    const saved = saveGuestDeck(deck, { movedFromAccount: true })
+    saveGuestDeck({ ...deck, name: "Edited" }, { localId: saved.localId })
+    expect(loadGuestDecks()[0].movedFromAccount).toBe(true)
+    storage.set("decks.guest.v2", JSON.stringify([{ ...saved, movedFromAccount: "yes" }]))
+    expect(loadGuestDecks()).toEqual([])
+    expect(() => saveGuestDeck(deck)).toThrow("unsupported")
   })
 
   it("round-trips guest route ids", () => {

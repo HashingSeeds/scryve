@@ -150,6 +150,11 @@ const decks = {
     onDeviceCount: "On this device · Synced decks {{used}}/{{limit}}",
     sync: "Sync",
     syncing: "Syncing…",
+    addAsNew: "Add to your account as a new deck",
+    addAsNewConfirm: "Add new deck",
+    // A deck moved out of another account stays on this device when the player adds a separate copy.
+    otherAccount:
+      "This deck came from another account. Add a new deck with empty stats? You'll see it twice: synced and on this device.",
     failed: "Could not sync this deck. It is still saved on this device.",
     limit_reached: "Your synced decks are full. The deck is still saved on this device.",
     conflict: "This deck changed on another device. It is still saved on this device.",
@@ -304,6 +309,7 @@ const decks = {
     close: "Close deck limit",
     unavailable: "Deck slots unavailable. Your draft is kept.",
     moveFailed: "Could not move this deck to this device.",
+    moveConflict: "This deck changed on another device, so it is still synced. Try again.",
     title: "Synced deck limit reached",
     proBody: "Pro accounts sync {{limit}} decks. Move a deck to this device to make room.",
     freeBody:
