@@ -40,6 +40,7 @@ export type SupportScreenshot = {
 export interface SupportScreenProps {
   onBack: () => void
   onEmailSupport: () => void
+  onOpenFeedback: () => void
   onSubmitFeedback: (feedback: SupportFeedback) => void
   onPickScreenshot: () => Promise<SupportScreenshot | null>
   onOpenPrivacy: () => void
@@ -52,6 +53,7 @@ export interface SupportScreenProps {
 export function SupportScreen({
   onBack,
   onEmailSupport,
+  onOpenFeedback,
   onSubmitFeedback,
   onPickScreenshot,
   onOpenPrivacy,
@@ -127,6 +129,8 @@ export function SupportScreen({
           />
           <Text tx="account:support.subtitle" style={themed($subtitle)} />
         </View>
+
+        <Button tx="feedback:board.title" onPress={onOpenFeedback} />
 
         <View style={themed($contact)}>
           <Text tx="account:support.contactUs" preset="subheading" accessibilityRole="header" />

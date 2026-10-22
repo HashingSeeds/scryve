@@ -22,6 +22,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={onSubmitFeedback}
           onPickScreenshot={onPickScreenshot}
           onOpenPrivacy={jest.fn()}
@@ -57,6 +58,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={onSubmitFeedback}
           onPickScreenshot={jest.fn(async () => screenshot)}
           onOpenPrivacy={jest.fn()}
@@ -91,6 +93,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={onEmailSupport}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={onSubmitFeedback}
           onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={onOpenPrivacy}
@@ -131,6 +134,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={jest.fn()}
           onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
@@ -150,6 +154,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={jest.fn()}
           onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
@@ -169,6 +174,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={jest.fn()}
           onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
@@ -190,6 +196,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={onSubmitFeedback}
           onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
@@ -220,6 +227,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onOpenFeedback={jest.fn()}
           onSubmitFeedback={onSubmitFeedback}
           onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}

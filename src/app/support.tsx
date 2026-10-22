@@ -81,6 +81,7 @@ export default function SupportRoute() {
         onEmailSupport={() =>
           void Linking.openURL("mailto:support@sowinghope.how?subject=Scryve%20Support")
         }
+        onOpenFeedback={() => router.push("/feedback")}
         onSubmitFeedback={submitFeedback}
         onPickScreenshot={pickScreenshot}
         onOpenPrivacy={() => router.push("/privacy")}
