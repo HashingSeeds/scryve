@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Deck stats follow the deck, not its server row
@@ -56,6 +56,19 @@ Turns stay out until a turn tracker exists.
 - Version-sync receipts keep a hash of the canonical request in `requestKey`, where the serialized cards live today, and keep the result metadata replay needs. Existing receipts get the same hash in a backfill. Each new deck version records the operation id that created it, so a retry finds the version even after its receipt is gone. Once that guard and the backfill are in place, these receipts join the existing pruning cron.
 - Free accounts get 50 manual results a day, counted by unique result id at upload time on the server, so a replayed upload costs nothing. `recordManualMatch` and `publishFinishedLocalGame` also get rate limits, which neither has today. An upload is checked for an existing result id before any limit applies. Installed clients treat a `rate_limited` error from `publishFinishedLocalGame` as permanent and give up on the game, so only clients that say they retry throttled uploads get throttled. Older clients keep today's behavior.
 - Results and totals are small rows without card lists, but they are not bounded. A player who logs one result per throwaway deck adds a result and a totals row each time, up to the daily limits. Keeping them forever is an owner decision, listed below.
+
+## What ships first
+
+The first release (#607 to #617) builds deck keys, list fingerprints, pinned lists, the results writer and its backfills, devices keeping decks, the stats screen, and the first player. The rest of this decision comes in later phases:
+
+- retention, purging, and receipt hashing and pruning;
+- removal markers. Moving a deck to one device archives its row for now, cards included. Until purging ships, those cards stay on the server, the same growth #591 had;
+- the daily manual result limit and the upload rate limits;
+- guest known-player ids and per-seat claims;
+- writer provenance and tournament authority checks;
+- eliminations, how a game ended, the Commander bracket, and opponent deck labels.
+
+**Archived decks keep their row.** When a device copy of a moved deck syncs, the server looks for that account's row with the deck's key, archived ones included. Finding none means the copy came from another account. So any future purge of archived decks must keep the deck row and drop only its cards, or a player's own copy reads as someone else's.
 
 ## Rollout
 
