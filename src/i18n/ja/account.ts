@@ -144,6 +144,7 @@ export default {
       help: "返信用メールアドレス",
     },
     emailInvalid: "有効なメールアドレスを入力してください。",
+    translationNotice: "どの言語でも書けます。AIツールで翻訳する場合があります。",
     replyTime: "通常、2営業日以内に返信します。",
     selectedScreenshot: "選択したスクリーンショット",
     removeScreenshot: "スクリーンショットを削除",

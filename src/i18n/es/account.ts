@@ -147,6 +147,8 @@ export default {
       help: "Correo para responderte",
     },
     emailInvalid: "Introduce una dirección de correo válida.",
+    translationNotice:
+      "Escribe en el idioma que quieras. Podemos usar herramientas de IA para traducirlo.",
     replyTime: "Solemos responder en dos días hábiles.",
     selectedScreenshot: "Captura seleccionada",
     removeScreenshot: "Quitar captura",

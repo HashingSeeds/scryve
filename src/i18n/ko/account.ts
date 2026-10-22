@@ -144,6 +144,7 @@ export default {
       help: "답변 받을 이메일",
     },
     emailInvalid: "올바른 이메일 주소를 입력하세요.",
+    translationNotice: "어떤 언어로든 작성하세요. AI 도구로 번역할 수 있습니다.",
     replyTime: "보통 영업일 기준 2일 이내에 답변드립니다.",
     selectedScreenshot: "선택한 스크린샷",
     removeScreenshot: "스크린샷 삭제",
