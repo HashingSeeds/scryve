@@ -130,7 +130,7 @@ const excerpt = (request: Doc<"feedbackRequests">) => ({
 
 async function boardItems(ctx: QueryCtx, who: Viewer | null, requests: Doc<"feedbackRequests">[]) {
   return await Promise.all(
-    requests.map(excerpt).map(async (request) => {
+    requests.map(async (request) => {
       if (!who) return boardItem(request, { voted: false, reported: false, mine: false })
       const bySender = (table: "feedbackVotes" | "feedbackReports") =>
         ctx.db
@@ -202,7 +202,7 @@ export const board = query({
     // why: declined requests stay on All only, so the Features and Bugs tabs show what's still open.
     const shown =
       kind && !status ? requests.filter((request) => request.status !== "declined") : requests
-    return await boardItems(ctx, who, shown)
+    return await boardItems(ctx, who, shown.map(excerpt))
   },
 })
 

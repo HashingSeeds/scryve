@@ -227,7 +227,7 @@ describe("feedback", () => {
     expect(await t.query(api.feedback.board, {})).toEqual([])
     const input = await t.query(internal.feedback.apolloCardInput, { requestId })
     expect(feedbackCard(input!)).toMatchObject({
-      phase: "player:1:reports:1",
+      phase: "player:request:reports:1",
       meta: { status: "In review · private", reports: "1" },
     })
 
@@ -354,6 +354,21 @@ describe("feedback search, ids and retries", () => {
     })
   })
 
+  it("lists an excerpt of a long request but opens it in full", async () => {
+    const t = makeConvexTest()
+    const body = "x".repeat(600)
+    const requestId = await t.mutation(api.feedback.submit, {
+      key: ME,
+      kind: "feature",
+      title: "Long one",
+      body,
+      includeAccount: false,
+    })
+    await apollo(t, requestId, "publish")
+    expect((await t.query(api.feedback.board, {}))[0]?.body).toHaveLength(280)
+    expect((await t.query(api.feedback.published, { requestId }))?.body).toBe(body)
+  })
+
   it("inserts a retried submit or reply once", async () => {
     const t = makeConvexTest()
     const args = {
@@ -427,7 +442,7 @@ describe("feedbackCard", () => {
     expect(card).toMatchObject({
       key: "scryve:r1",
       kind: "approval",
-      phase: "player:2:reports:0",
+      phase: "player:m:reports:0",
       title: "Request: See https://evil.test/x",
       meta: { status: "In review · private", votes: "3", from: "Anonymous" },
     })
@@ -450,9 +465,18 @@ describe("feedbackCard", () => {
     })
     expect(card).toMatchObject({
       kind: "update",
-      phase: "player:2:reports:0",
+      phase: "player:m:reports:0",
       meta: { status: "Shipped in 2.2.0 · public" },
     })
     expect(card.actions[2]).toMatchObject({ id: "hide" })
+  })
+
+  it("drops the oldest text first so the newest reply always shows", () => {
+    const card = feedbackCard({
+      request: { ...request, body: "a".repeat(2000) },
+      messages: [message("player", "b".repeat(1990)), message("player", "newest")],
+    })
+    expect(card.body.length).toBeLessThanOrEqual(4000)
+    expect(card.body.endsWith("Player: newest")).toBe(true)
   })
 })

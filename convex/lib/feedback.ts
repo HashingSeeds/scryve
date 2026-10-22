@@ -57,6 +57,19 @@ function clip(text: string, max: number) {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`
 }
 
+// why: when the thread outgrows the card, older text drops first, so the message that triggered the alert always shows.
+function clipOldestFirst(parts: string[], max: number) {
+  const kept: string[] = []
+  let room = max
+  for (const part of [...parts].reverse()) {
+    if (room <= 1) break
+    const piece = clip(part, room)
+    kept.unshift(piece)
+    room -= piece.length + 2
+  }
+  return kept.join("\n\n")
+}
+
 export type FeedbackCardInput = {
   request: Doc<"feedbackRequests">
   messages: Doc<"feedbackMessages">[]
@@ -76,13 +89,14 @@ export function deletedFeedbackCard(requestId: Id<"feedbackRequests">) {
 export function feedbackCard({ request, messages, account }: FeedbackCardInput) {
   const key = `${APOLLO_KEY_PREFIX}${request._id}`
   const label = request.kind === "bug" ? "Bug" : "Request"
-  const playerTurns = 1 + messages.filter((message) => message.from === "player").length
+  // why: the message window is bounded, so a count would stop changing on long threads; the newest player message's id always does.
+  const playerTurn = messages.findLast((message) => message.from === "player")?._id ?? "request"
   const awaitingTeam = (messages.at(-1)?.from ?? "player") === "player"
   const thread = messages
     .slice(-6)
     .map((message) => `${message.from === "player" ? "Player" : "You"}: ${message.body}`)
   // why: Apollo shows cards from a scoped token as plain text, so player text can't carry a tappable link.
-  const body = clip([request.body, ...thread].join("\n\n"), 4000)
+  const body = clipOldestFirst([request.body, ...thread], 4000)
   const status =
     request.status === "shipped" && request.shippedIn
       ? `Shipped in ${request.shippedIn}`
@@ -92,7 +106,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     key,
     kind: awaitingTeam ? "approval" : "update",
     // why: a new phase pushes again, so only the player's own messages and new reports notify Matthew.
-    phase: `player:${playerTurns}:reports:${request.reports}`,
+    phase: `player:${playerTurn}:reports:${request.reports}`,
     push: "alert",
     title: clip(`${label}: ${request.title}`, 200),
     body,
