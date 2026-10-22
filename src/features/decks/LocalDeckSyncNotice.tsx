@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { Platform, ScrollView, View } from "react-native"
 import { useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
@@ -98,6 +98,7 @@ function LocalDeckSyncPicker({
   const [busy, setBusy] = useState(false)
   const [otherAccount, setOtherAccount] =
     useState<Extract<LocalDeckSyncResult, { status: "other_account" }>>()
+  const [waitingForDismiss, setWaitingForDismiss] = useState<typeof otherAccount>()
   const [error, setError] = useState<string>()
 
   function toggle(localId: string) {
@@ -117,7 +118,8 @@ function LocalDeckSyncPicker({
       for (const localId of selected.slice(0, free)) {
         const result = await sync(localId)
         if (result.status === "other_account") {
-          setOtherAccount(result)
+          if (Platform.OS === "ios") setWaitingForDismiss(result)
+          else setOtherAccount(result)
           return
         }
         if (result.status !== "synced") {
@@ -145,8 +147,16 @@ function LocalDeckSyncPicker({
 
   return (
     <DialogCard
-      visible
+      visible={!waitingForDismiss}
       onClose={onClose}
+      onDismissed={
+        waitingForDismiss
+          ? () => {
+              setOtherAccount(waitingForDismiss)
+              setWaitingForDismiss(undefined)
+            }
+          : undefined
+      }
       closeDisabled={busy}
       backdropAccessibilityLabel={translate("common:close")}
       dialogTestID="local-deck-sync-picker"

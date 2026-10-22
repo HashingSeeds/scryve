@@ -1,4 +1,5 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { Modal } from "react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { ThemeProvider } from "@/theme/context"
@@ -105,6 +106,13 @@ describe("local deck sync notice", () => {
       fireEvent.press(view.getByTestId("local-deck-sync-choose"))
       fireEvent.press(view.getByTestId(`local-deck-sync-choice-${local.localId}`))
       fireEvent.press(view.getByTestId("local-deck-sync-confirm"))
+      const closingPicker = await waitFor(() => {
+        const closing = view.UNSAFE_getAllByType(Modal).find((modal) => !modal.props.visible)
+        expect(closing).toBeDefined()
+        return closing!
+      })
+      expect(view.queryByText("Add to your account as a new deck")).toBeNull()
+      act(() => closingPicker.props.onDismiss())
       await waitFor(() => expect(view.getByText("Add to your account as a new deck")).toBeTruthy())
       expect(view.getByText(/You'll see it twice: synced and on this device/)).toBeTruthy()
       expect(loadGuestDecks()).toEqual([local])
@@ -122,6 +130,10 @@ describe("local deck sync notice", () => {
       } else {
         fireEvent.press(view.getByTestId("local-deck-add-as-new-cancel"))
         expect(mockImportGuest).toHaveBeenCalledTimes(1)
+        await waitFor(() =>
+          expect(view.UNSAFE_getAllByType(Modal).some((modal) => modal.props.visible)).toBe(true),
+        )
+        expect(view.getByTestId("local-deck-sync-confirm")).toBeTruthy()
       }
       expect(loadGuestDecks()).toEqual([local])
     },
