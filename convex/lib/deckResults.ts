@@ -4,6 +4,72 @@ import type { MutationCtx } from "../_generated/server"
 type DeckResult = Omit<Doc<"deckResults">, "_id" | "_creationTime">
 const LINES = ["manualMatches", "manualGames", "connectedMatches"] as const
 
+type Tally = NonNullable<DeckResult["deltas"]["games"]>
+type EnvelopeLine = (typeof LINES)[number]
+type StatsPatch = Partial<Record<keyof typeof EMPTY_GAMES, number>> &
+  Partial<Record<EnvelopeLine, Tally>> & { updatedAt: number }
+const EMPTY_GAMES = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
+
+function addTally(current: Tally | undefined, delta: Tally, sign: 1 | -1) {
+  const sum = (key: keyof Tally) => Math.max(0, (current?.[key] ?? 0) + sign * delta[key])
+  return {
+    total: sum("total"),
+    wins: sum("wins"),
+    losses: sum("losses"),
+    draws: sum("draws"),
+    unknown: sum("unknown"),
+  }
+}
+
+function statsPatch(
+  current: Doc<"deckVersionStats"> | null,
+  deltas: DeckResult["deltas"],
+  sign: 1 | -1,
+  now: number,
+) {
+  const games =
+    deltas.games &&
+    addTally(current ? { ...current, total: current.games } : undefined, deltas.games, sign)
+  const patch: StatsPatch = games
+    ? {
+        updatedAt: now,
+        games: games.total,
+        wins: games.wins,
+        losses: games.losses,
+        draws: games.draws,
+        unknown: games.unknown,
+      }
+    : { updatedAt: now }
+  for (const line of LINES) {
+    const delta = deltas[line]
+    if (delta) patch[line] = addTally(current?.[line], delta, sign)
+  }
+  return patch
+}
+
+export async function applyVersionStats(
+  ctx: MutationCtx,
+  result: Pick<DeckResult, "legacyDeckId" | "deckVersionId" | "deltas">,
+  sign: 1 | -1,
+  now = Date.now(),
+) {
+  const { legacyDeckId: deckId, deckVersionId, deltas } = result
+  if (!deckId || !deckVersionId) return
+  const versionStats = await ctx.db
+    .query("deckVersionStats")
+    .withIndex("by_version", (q) => q.eq("deckVersionId", deckVersionId))
+    .unique()
+  const versionPatch = statsPatch(versionStats, deltas, sign, now)
+  if (versionStats) await ctx.db.patch(versionStats._id, versionPatch)
+  else if (sign === 1)
+    await ctx.db.insert("deckVersionStats", {
+      deckId,
+      deckVersionId,
+      ...EMPTY_GAMES,
+      ...versionPatch,
+    })
+}
+
 export function canonicalResultId(
   result:
     | { kind: "match"; publicId: string; seat: number }
@@ -95,19 +161,21 @@ function storedResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {
     .unique()
 }
 
-export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
+export async function addDeckResult(
+  ctx: MutationCtx,
+  result: DeckResult,
+  options?: { versionStatsAlreadyApplied: true },
+) {
   const existing = await storedResult(ctx, result.userId, result.resultId)
   if (!existing) {
     await ctx.db.insert("deckResults", result)
     await apply(ctx, result, 1)
+    if (!options?.versionStatsAlreadyApplied) await applyVersionStats(ctx, result, 1)
     return
   }
   const legacy =
-    result.legacyDeckId && !existing.legacyDeckId
-      ? {
-          legacyDeckId: result.legacyDeckId,
-          ...(result.deckVersionId ? { deckVersionId: result.deckVersionId } : {}),
-        }
+    !existing.deckVersionId && result.legacyDeckId && result.deckVersionId
+      ? { legacyDeckId: result.legacyDeckId, deckVersionId: result.deckVersionId }
       : {}
   const adoptedKey = existing.deckKey ? undefined : result.deckKey
   const adopted = adoptedKey
@@ -120,6 +188,8 @@ export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
   if (Object.keys({ ...legacy, ...adopted, ...opponents }).length)
     await ctx.db.patch(existing._id, { ...legacy, ...adopted, ...opponents })
   if (adoptedKey) await apply(ctx, { ...existing, ...adopted }, 1)
+  if (legacy.deckVersionId && !options?.versionStatsAlreadyApplied)
+    await applyVersionStats(ctx, { ...existing, ...legacy }, 1)
 }
 
 export async function setDeckResultOpponents(
@@ -136,7 +206,9 @@ export async function removeDeckResult(ctx: MutationCtx, userId: Id<"users">, re
   const result = await storedResult(ctx, userId, resultId)
   if (!result) return
   await apply(ctx, result, -1)
+  await applyVersionStats(ctx, result, -1)
   await ctx.db.delete(result._id)
+  return result
 }
 
 export async function removeUserDeckStats(

@@ -195,7 +195,7 @@ export const recordManualMatch = mutation({
       finishedAt,
       outcome: args.me.outcome,
     })
-    await recordMatchResult(ctx, (await ctx.db.get(matchId))!, now)
+    await recordMatchResult(ctx, (await ctx.db.get(matchId))!)
     return { matchId }
   },
 })
@@ -215,7 +215,7 @@ export const deleteManualMatch = mutation({
       .filter((q) => q.eq(q.field("matchId"), match._id))
       .take(MAX_ROWS_PER_MATCH)
     for (const entry of history) await ctx.db.delete(entry._id)
-    await removeMatchResult(ctx, match, Date.now())
+    await removeMatchResult(ctx, match)
     await ctx.db.delete(match._id)
     return null
   },
@@ -399,7 +399,7 @@ export const finishScryveMatch = mutation({
       }
     })
     await ctx.db.patch(match._id, { status: "finished", finishedAt, seats, updatedAt: now })
-    await recordMatchResult(ctx, (await ctx.db.get(match._id))!, now)
+    await recordMatchResult(ctx, (await ctx.db.get(match._id))!)
     return { matchId: match._id }
   },
 })

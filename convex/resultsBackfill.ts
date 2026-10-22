@@ -98,25 +98,29 @@ export const backfillGameResults = internalMutation({
       if (!summary || isAbandonedSummary(summary)) continue
       const player = summary.players.find((player) => player.playerId === result.playerId)
       if (!player || player.userId !== result.userId) continue
-      await addDeckResult(ctx, {
-        resultId: gameResultId(summary, player),
-        userId: result.userId,
-        deckKey: await resultDeckKey(ctx, {
-          deckId: result.deckId,
-          deckKey: player.deckKey,
+      await addDeckResult(
+        ctx,
+        {
+          resultId: gameResultId(summary, player),
           userId: result.userId,
-        }),
-        kind: "game",
-        source: await gameResultSource(ctx, summary),
-        outcome: result.outcome,
-        finishedAt: result.finishedAt,
-        summaryId: summary._id,
-        matchId: summary.matchId,
-        podSize: summary.players.length,
-        deltas: { games: outcomeTally(result.outcome) },
-        legacyDeckId: result.deckId,
-        deckVersionId: result.deckVersionId,
-      })
+          deckKey: await resultDeckKey(ctx, {
+            deckId: result.deckId,
+            deckKey: player.deckKey,
+            userId: result.userId,
+          }),
+          kind: "game",
+          source: await gameResultSource(ctx, summary),
+          outcome: result.outcome,
+          finishedAt: result.finishedAt,
+          summaryId: summary._id,
+          matchId: summary.matchId,
+          podSize: summary.players.length,
+          deltas: { games: outcomeTally(result.outcome) },
+          legacyDeckId: result.deckId,
+          deckVersionId: result.deckVersionId,
+        },
+        { versionStatsAlreadyApplied: true },
+      )
     }
     return { isDone: page.isDone, continueCursor: page.continueCursor }
   },
@@ -135,20 +139,24 @@ export const backfillMatchResults = internalMutation({
         (seat) => seat.userId === result.userId && seat.deckVersionId === result.deckVersionId,
       )
       if (!seat) continue
-      await addDeckResult(ctx, {
-        resultId: canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
-        userId: result.userId,
-        deckKey: await resultDeckKey(ctx, seat),
-        kind: "match",
-        source: result.source,
-        outcome: result.outcome,
-        finishedAt: result.finishedAt,
-        matchId: match._id,
-        podSize: match.seats.length,
-        deltas: matchDeltas(match, seat),
-        legacyDeckId: result.deckId,
-        deckVersionId: result.deckVersionId,
-      })
+      await addDeckResult(
+        ctx,
+        {
+          resultId: canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
+          userId: result.userId,
+          deckKey: await resultDeckKey(ctx, seat),
+          kind: "match",
+          source: result.source,
+          outcome: result.outcome,
+          finishedAt: result.finishedAt,
+          matchId: match._id,
+          podSize: match.seats.length,
+          deltas: matchDeltas(match, seat),
+          legacyDeckId: result.deckId,
+          deckVersionId: result.deckVersionId,
+        },
+        { versionStatsAlreadyApplied: true },
+      )
     }
     return { isDone: page.isDone, continueCursor: page.continueCursor }
   },
@@ -323,7 +331,10 @@ async function legacyReasons(
 
 const COMPARISON_PHASES = ["decks", "versions", "totals", "results"] as const
 
-/** why: each entity can read up to MAX_COMPARED_RESULTS results, so run it in small batches; oversized histories fail the gate explicitly. */
+/**
+ * why: each entity can read up to MAX_COMPARED_RESULTS results, so run it in small batches; oversized histories fail the gate explicitly.
+ * This comparison only applies before legacy stat writes retire; deckStats freezes after that release.
+ */
 export const compareDeckKeyStats = internalQuery({
   args: batchArgs,
   handler: async (ctx, args) => {

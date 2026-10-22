@@ -83,6 +83,24 @@ async function seed(t: Tester) {
     me: { seat: 1, gamesWon: 2, outcome: "win", deckVersionId: versionA },
     opponents: [{ seat: 2, displayName: "Grace", gamesWon: 1, outcome: "loss" }],
   })
+  await t.run(async (ctx) => {
+    for (const summary of await ctx.db.query("gameSummaries").collect()) {
+      const player = summary.players[0]
+      await ctx.db.insert("deckGameResults", {
+        deckId: player.deckId!,
+        deckVersionId: player.deckVersionId!,
+        gameId: summary.gameId,
+        playerId: player.playerId,
+        userId: player.userId!,
+        outcome: player.outcome!,
+        finishedAt: summary.finishedAt,
+      })
+    }
+    for (const versionStats of await ctx.db.query("deckVersionStats").collect()) {
+      const { _id, _creationTime, deckVersionId: _, ...stats } = versionStats
+      await ctx.db.insert("deckStats", stats)
+    }
+  })
   return { deckA, versionA, deckB, versionB }
 }
 
@@ -121,9 +139,10 @@ async function expectCleaned(t: Tester, deckA: Id<"decks">, deckB: Id<"decks">) 
   const after = await state(t)
   expect(after.results).toEqual(["game_nowinner_000000001", "game_won_0000000000001"])
   expect(after.outcomes).toEqual(["unknown", "win"])
-  expect(after.stats).toEqual([
+  expect(after.versionStats.map((row) => row && { ...row, deckVersionId: undefined })).toEqual([
     {
       deckId: deckA,
+      deckVersionId: undefined,
       games: 2,
       wins: 1,
       losses: 0,
@@ -132,11 +151,12 @@ async function expectCleaned(t: Tester, deckA: Id<"decks">, deckB: Id<"decks">) 
       manualMatches: { total: 1, wins: 1, losses: 0, draws: 0, unknown: 0 },
       manualGames: { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 },
     },
-    { deckId: deckB, ...EMPTY },
+    { deckId: deckB, deckVersionId: undefined, ...EMPTY },
   ])
-  expect(after.versionStats.map((row) => row && { ...row, deckVersionId: undefined })).toEqual(
-    after.stats.map((row) => row && { ...row, deckVersionId: undefined }),
-  )
+  expect(after.stats).toEqual([
+    expect.objectContaining({ deckId: deckA, games: 3, wins: 1, unknown: 2 }),
+    expect.objectContaining({ deckId: deckB, games: 1, unknown: 1 }),
+  ])
   return after
 }
 
@@ -144,24 +164,34 @@ describe("removeAbandonedGameResults", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
 
-  it("removes only abandoned games and keeps finished no-winner games counting", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
-    const { deckA, deckB } = await seed(t)
-    const before = await state(t)
-    expect(before.results).toHaveLength(4)
-    expect(before.stats.find((row) => row?.deckId === deckA)).toMatchObject({
-      games: 3,
-      wins: 1,
-      unknown: 2,
-    })
+  it.each([true, false])(
+    "removes only abandoned games, with backfilled results=%s",
+    async (backfilled) => {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const { deckA, deckB } = await seed(t)
+      if (!backfilled)
+        await t.run(async (ctx) => {
+          for (const row of await ctx.db.query("deckResults").collect())
+            await ctx.db.delete(row._id)
+          for (const row of await ctx.db.query("deckKeyStats").collect())
+            await ctx.db.delete(row._id)
+        })
+      const before = await state(t)
+      expect(before.results).toHaveLength(4)
+      expect(before.stats.find((row) => row?.deckId === deckA)).toMatchObject({
+        games: 3,
+        wins: 1,
+        unknown: 2,
+      })
 
-    await runBackfill(t, { numItems: 1 })
-    const after = await expectCleaned(t, deckA, deckB)
+      await runBackfill(t, { numItems: 1 })
+      const after = await expectCleaned(t, deckA, deckB)
 
-    await runBackfill(t, { numItems: 1 })
-    expect(await state(t)).toEqual(after)
-  })
+      await runBackfill(t, { numItems: 1 })
+      expect(await state(t)).toEqual(after)
+    },
+  )
 
   it("stays exact when a run stops after deleting and restarts from the beginning", async () => {
     const t = convexTest(schema, modules)
@@ -178,9 +208,9 @@ describe("removeAbandonedGameResults", () => {
     })
     const partial = await state(t)
     expect(partial.results).toHaveLength(3)
-    expect(partial.stats).toEqual([
+    expect(partial.versionStats).toEqual([
       expect.objectContaining({ deckId: deckA, games: 2, wins: 1, unknown: 1 }),
-      { deckId: deckB, ...EMPTY, games: 1, unknown: 1 },
+      expect.objectContaining({ deckId: deckB, ...EMPTY, games: 1, unknown: 1 }),
     ])
 
     await runBackfill(t, { numItems: 1 })
@@ -192,15 +222,10 @@ describe("removeAbandonedGameResults", () => {
     registerRateLimiter(t)
     const { deckA, deckB, versionB } = await seed(t)
     await t.run(async (ctx) => {
-      const stats = await ctx.db
-        .query("deckStats")
-        .withIndex("by_deck", (q) => q.eq("deckId", deckB))
-        .unique()
       const versionStats = await ctx.db
         .query("deckVersionStats")
         .withIndex("by_version", (q) => q.eq("deckVersionId", versionB))
         .unique()
-      await ctx.db.patch(stats!._id, EMPTY)
       await ctx.db.patch(versionStats!._id, EMPTY)
     })
     await runBackfill(t, { numItems: 50 })
