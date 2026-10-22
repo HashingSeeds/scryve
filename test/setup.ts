@@ -1,5 +1,6 @@
 import { createElement, forwardRef, useImperativeHandle, type ReactNode } from "react"
 import "react-native-url-polyfill/auto"
+import "react-native-gesture-handler/jestSetup"
 // eslint-disable-next-line no-restricted-imports
 import * as ReactNative from "react-native"
 

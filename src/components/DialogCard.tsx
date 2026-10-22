@@ -7,6 +7,7 @@ import type {
   ViewStyle,
 } from "react-native"
 import { Modal, Pressable, StyleSheet, View } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -107,7 +108,8 @@ export function DialogCard({
       animationType={animateFromOrigin ? "none" : "fade"}
       onRequestClose={requestClose}
     >
-      <View style={$dialogFill}>
+      {/* why: a Modal is its own native root, so gestures inside it need their own root view. */}
+      <GestureHandlerRootView style={$dialogFill}>
         <Pressable
           testID={backdropTestID}
           accessibilityRole="button"
@@ -141,7 +143,7 @@ export function DialogCard({
             {children}
           </Animated.View>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   )
 }

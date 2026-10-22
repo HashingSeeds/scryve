@@ -1,6 +1,7 @@
 import "react-native-url-polyfill/auto"
 
 import { useCallback, useEffect, useState } from "react"
+import type { ViewStyle } from "react-native"
 import { AppMetrics, ObserveRoot } from "expo-observe"
 import {
   SplashScreen,
@@ -10,6 +11,7 @@ import {
 } from "expo-router"
 import { setOptions as setSplashScreenOptions } from "expo-splash-screen"
 import * as Sentry from "@sentry/react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -72,23 +74,27 @@ function Root() {
   }
 
   return (
-    <ThemeProvider>
-      <CloudProviders>
-        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <KeyboardProvider>
-            <LegalConsentGate onResolved={resolveConsent}>
-              <AccountDeletionSessionGuard />
-              <LocalGameClaimPrompt />
-              <AppStack />
-              <UpdateReadyToastWithForegroundChecks />
-              <RestartCurtain />
-            </LegalConsentGate>
-          </KeyboardProvider>
-        </SafeAreaProvider>
-      </CloudProviders>
-    </ThemeProvider>
+    <GestureHandlerRootView style={$root}>
+      <ThemeProvider>
+        <CloudProviders>
+          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+            <KeyboardProvider>
+              <LegalConsentGate onResolved={resolveConsent}>
+                <AccountDeletionSessionGuard />
+                <LocalGameClaimPrompt />
+                <AppStack />
+                <UpdateReadyToastWithForegroundChecks />
+                <RestartCurtain />
+              </LegalConsentGate>
+            </KeyboardProvider>
+          </SafeAreaProvider>
+        </CloudProviders>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   )
 }
+
+const $root: ViewStyle = { flex: 1 }
 
 const BOARD_OPTIONS = { statusBarHidden: true, gestureEnabled: false }
 

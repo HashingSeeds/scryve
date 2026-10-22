@@ -1,5 +1,7 @@
 import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
+import { State, type PanGesture } from "react-native-gesture-handler"
+import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
@@ -74,6 +76,19 @@ describe("SegmentedControl", () => {
 
     layout("system-ruler", 200)
     expect(width()).toBe(300)
+  })
+
+  it("selects the segment a drag is released over", () => {
+    const { view, onSelect } = renderControl("none")
+    layoutOf(view)("system", 308)
+
+    fireGestureHandler<PanGesture>(getByGestureTestId("system-drag"), [
+      { state: State.BEGAN, x: 50 },
+      { state: State.ACTIVE, x: 50 },
+      { x: 260 },
+      { state: State.END, x: 260 },
+    ])
+    expect(onSelect).toHaveBeenCalledWith("ygo")
   })
 
   it("falls back to two columns before one, whatever the segment count", () => {
