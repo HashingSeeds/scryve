@@ -155,6 +155,7 @@ const sideboardVersion = {
 const loadedDetail = {
   deck: {
     _id: "deck-1",
+    deckKey: "deck-key",
     name: "Existing Deck",
     format: "commander",
     game: "mtg",
@@ -2401,7 +2402,7 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("open-deck-stats"))
     expect(mockStatsPush).toHaveBeenCalledWith({
       pathname: "/connected/decks/stats",
-      params: expect.objectContaining({ deckKey: "deck-1", deckName: "Existing Deck" }),
+      params: expect.objectContaining({ deckKey: "deck-key", deckName: "Existing Deck" }),
     })
   })
 })

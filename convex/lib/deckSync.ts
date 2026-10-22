@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { v, type Infer } from "convex/values"
 
 import { DEFAULT_DECK_GAME } from "./deckGames"
 import type { Doc } from "../_generated/dataModel"
@@ -17,10 +17,10 @@ export const syncedDeckValidator = v.object({
   updatedAt: v.number(),
 })
 
-export function syncedDeck(deck: Doc<"decks">) {
+export function syncedDeck(deck: Doc<"decks">): Infer<typeof syncedDeckValidator> {
   return {
     id: deck.syncId ?? deck._id,
-    ...(deck.deckKey ? { deckKey: deck.deckKey } : {}),
+    deckKey: deck.deckKey,
     deckId: deck._id,
     revision: deck.syncRevision ?? 0,
     name: deck.name,

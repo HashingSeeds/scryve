@@ -5,11 +5,6 @@ import { MAX_DECK_CARDS } from "./policy"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
-// why: decks from before deck keys follow their sync id, or their row id when never synced.
-export function deckKeyOf(deck: Doc<"decks">) {
-  return deck.deckKey ?? deck.syncId ?? String(deck._id)
-}
-
 export function assertDeckKey(key: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key))
     throw new ConvexError({
@@ -35,7 +30,7 @@ export async function pinnedDeck(ctx: MutationCtx, versionId: Id<"deckVersions">
     .take(MAX_DECK_CARDS + 1)
   if (cards.length > MAX_DECK_CARDS) throw new Error("Deck has too many cards")
   return {
-    deckKey: deckKeyOf(deck),
+    deckKey: deck.deckKey,
     deckFingerprint: await deckFingerprint(
       cards.map((card) => ({ ...card, game: card.game ?? deck.game ?? "mtg" })),
     ),
@@ -44,19 +39,10 @@ export async function pinnedDeck(ctx: MutationCtx, versionId: Id<"deckVersions">
 
 export async function findDeckByKey(ctx: QueryCtx, userId: Id<"users">, key: string) {
   assertDeckKey(key)
-  const deck = await ctx.db
+  return await ctx.db
     .query("decks")
     .withIndex("by_owner_and_deck_key", (q) => q.eq("ownerUserId", userId).eq("deckKey", key))
     .unique()
-  if (deck) return deck
-  const id = ctx.db.normalizeId("decks", key)
-  const candidate = id
-    ? await ctx.db.get(id)
-    : await ctx.db
-        .query("decks")
-        .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", userId).eq("syncId", key))
-        .unique()
-  return candidate?.ownerUserId === userId && deckKeyOf(candidate) === key ? candidate : null
 }
 
 export async function deckForKey(ctx: MutationCtx, userId: Id<"users">, key: string) {
@@ -71,7 +57,7 @@ export async function deckForKey(ctx: MutationCtx, userId: Id<"users">, key: str
 
 export async function createOrReviveDeck(
   ctx: MutationCtx,
-  fields: Omit<Doc<"decks">, "_id" | "_creationTime">,
+  fields: Omit<Doc<"decks">, "_id" | "_creationTime" | "deckKey">,
   key?: string,
 ) {
   if (key !== undefined) assertDeckKey(key)
@@ -79,7 +65,6 @@ export async function createOrReviveDeck(
   if (existing) {
     await ctx.db.patch(existing._id, {
       ...fields,
-      deckKey: key,
       archivedAt: undefined,
       movedToDeviceAt: undefined,
       unsyncedAt: undefined,
@@ -89,7 +74,5 @@ export async function createOrReviveDeck(
     })
     return existing._id
   }
-  const id = await ctx.db.insert("decks", fields)
-  await ctx.db.patch(id, { deckKey: key ?? String(id) })
-  return id
+  return await ctx.db.insert("decks", { ...fields, deckKey: key ?? crypto.randomUUID() })
 }

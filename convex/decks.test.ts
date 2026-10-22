@@ -616,6 +616,7 @@ describe("premium deck tracking", () => {
       if (!deck) throw new Error("missing deck")
       for (let index = 0; index < 101; index++)
         await ctx.db.insert("decks", {
+          deckKey: `deleted-${index}`,
           ownerUserId: deck.ownerUserId,
           name: `Deleted ${index}`,
           format: "commander",

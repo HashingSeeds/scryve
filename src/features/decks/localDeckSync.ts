@@ -203,7 +203,7 @@ export function useLocalDeckSync(ownerId: string | undefined) {
         if (!ownerId) throw new Error("Sign in to move a synced deck to this device")
         const detail = await convex.query(api.decks.detail, { deckId })
         const { deck: server } = detail
-        const deckKey = server.deckKey ?? server.syncId ?? String(server._id)
+        const deckKey = server.deckKey
         const existing = localDecks.find((local) => (local.deckKey ?? local.localId) === deckKey)
         const copy = deviceDeckPayload(detail)
         if (existing && JSON.stringify(existing.deck) !== JSON.stringify(copy))
@@ -289,9 +289,7 @@ export function useLocalDeckLeftovers(
     () => syncingLocalIds,
   )
   const leftovers = useMemo(() => {
-    const liveKeys = new Set(
-      metadata.filter((deck) => !deck.deleted).map((deck) => deck.deckKey ?? deck.id),
-    )
+    const liveKeys = new Set(metadata.filter((deck) => !deck.deleted).map((deck) => deck.deckKey))
     return locals.filter((local) => liveKeys.has(local.deckKey ?? local.localId))
   }, [locals, metadata])
   useEffect(() => {

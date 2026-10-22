@@ -35,6 +35,7 @@ describe("receipt pruning", () => {
           updatedAt: now,
         })
         const deckId = await ctx.db.insert("decks", {
+          deckKey: `${prefix}-deck`,
           ownerUserId,
           name: "Deck",
           format: "commander",

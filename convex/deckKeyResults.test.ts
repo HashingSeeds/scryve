@@ -5,6 +5,7 @@ import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import { deckFingerprint } from "./lib/deckFingerprint"
+import { assertDeckKey } from "./lib/deckKeys"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { addDeckResult, canonicalResultId, removeDeckResult } from "./lib/deckResults"
 import { removeGameResult } from "./lib/results"
@@ -659,12 +660,21 @@ it("manual matches use the resolved deck's key over the client's key", async () 
   await assertEqual(t)
 })
 
-it("reimports an archived pre-backfill guest deck without duplicating its alias", async () => {
+it("generates a valid key when a caller creates a deck without one", async () => {
+  const t = setup()
+  const { actor } = await account(t)
+  const deckId = await actor.mutation(api.decks.create, { name: "Burn", format: "modern" })
+  const stored = await t.run(async (ctx) => ctx.db.get(deckId))
+  if (!stored) throw new Error("Expected a deck")
+  expect(assertDeckKey(stored.deckKey)).toBe(stored.deckKey)
+})
+
+it("reimports an archived migrated guest deck without duplicating its alias", async () => {
   const t = setup()
   const { actor, deckId } = await deck(t)
   const localId = "00000000-0000-4000-8000-000000000001"
   await t.run(async (ctx) =>
-    ctx.db.patch(deckId, { archivedAt: 1, deckKey: undefined, guestLocalId: localId }),
+    ctx.db.patch(deckId, { archivedAt: 1, deckKey: String(deckId), guestLocalId: localId }),
   )
   const args = {
     deckKey: localId,
@@ -765,7 +775,7 @@ it("rejects a move when a card save changed the version since detail was read", 
 
 it("backfills in bounded pages, retries without duplication, and matches legacy totals", async () => {
   const t = setup()
-  const { actor, deckId, versionId } = await deck(t)
+  const { actor, versionId } = await deck(t)
   const game = publish()
   game.players[0].deckVersionId = versionId
   const ack = await actor.mutation(api.games.publishFinishedLocalGame, game)
@@ -784,7 +794,6 @@ it("backfills in bounded pages, retries without duplication, and matches legacy 
     })
     for (const match of await ctx.db.query("matches").collect())
       await ctx.db.patch(match._id, { seats: match.seats.map(({ deckKey: _, ...seat }) => seat) })
-    await ctx.db.patch(deckId, { deckKey: undefined })
   })
   for (let run = 0; run < 2; run++) {
     for (const fn of [
@@ -1164,7 +1173,7 @@ it("preserves old guestLocalId as an owner-scoped alias after backfilling keys",
   const t = setup()
   const { actor, deckId } = await deck(t)
   const alias = "00000000-0000-4000-8000-000000000011"
-  await t.run(async (ctx) => ctx.db.patch(deckId, { deckKey: undefined, guestLocalId: alias }))
+  await t.run(async (ctx) => ctx.db.patch(deckId, { deckKey: String(deckId), guestLocalId: alias }))
   await t.mutation(internal.resultsBackfill.backfillDeckKeys, { cursor: null, batchSize: 100 })
   const args = publish()
   args.players[0].deckKey = alias
@@ -1350,7 +1359,7 @@ it("scrubs a deleted publisher without changing another player's result id durin
     expect(after.results).toEqual(before.map((result) => ({ ...result, opponents: [] })))
     expect(after.stats).toEqual([])
     const guestStats = await guest.actor.query(api.decks.statsForKey, {
-      deckKey: String(guestDeck),
+      deckKey: (await guest.actor.query(api.decks.detail, { deckId: guestDeck })).deck.deckKey,
     })
     expect(guestStats.all?.games).toBe(1)
   } finally {

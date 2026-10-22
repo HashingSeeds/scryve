@@ -89,7 +89,7 @@ export function chosenDeckKey(
   const cached = new DeckSyncRepository(ownerId, undefined, deploymentUrl)
     .loadShelf()
     .find((candidate) => candidate.latestVersionId === deck.versionId)
-  return cached ? (cached.deckKey ?? cached.syncId ?? String(cached._id)) : undefined
+  return cached?.deckKey
 }
 
 export async function pinDeckChoice(deck: SelectedDeck, ownerId: string) {

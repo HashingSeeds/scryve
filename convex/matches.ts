@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, type MutationCtx } from "./_generated/server"
 import { requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
-import { assertDeckKey, assertDeckFingerprint, deckKeyOf } from "./lib/deckKeys"
+import { assertDeckKey, assertDeckFingerprint } from "./lib/deckKeys"
 import { limitResultRate } from "./lib/deckRateLimits"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { assertGameSystem } from "./lib/integrations"
@@ -146,7 +146,7 @@ export const recordManualMatch = mutation({
         displayName: user.displayName,
         userId: user._id,
         ...(attached
-          ? { deckKey: deckKeyOf(attached.deck) }
+          ? { deckKey: attached.deck.deckKey }
           : args.me.deckKey
             ? { deckKey: args.me.deckKey }
             : {}),

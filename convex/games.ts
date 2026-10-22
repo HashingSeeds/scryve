@@ -19,7 +19,7 @@ import {
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
-import { assertDeckKey, assertDeckFingerprint, deckKeyOf, pinnedDeck } from "./lib/deckKeys"
+import { assertDeckKey, assertDeckFingerprint, pinnedDeck } from "./lib/deckKeys"
 import { limitResultRate } from "./lib/deckRateLimits"
 import { canonicalResultId } from "./lib/deckResults"
 import { deckStartingValue } from "./lib/deckStartingValue"
@@ -1445,11 +1445,7 @@ export const publishFinishedLocalGame = mutation({
       me?.deckVersionId && !myDeck && !me.deckKey
         ? {}
         : {
-            ...(myDeck
-              ? { deckKey: deckKeyOf(myDeck) }
-              : me?.deckKey
-                ? { deckKey: me.deckKey }
-                : {}),
+            ...(myDeck ? { deckKey: myDeck.deckKey } : me?.deckKey ? { deckKey: me.deckKey } : {}),
             ...(me?.deckFingerprint
               ? { deckFingerprint: me.deckFingerprint }
               : me?.deckKey && liveDeck && listUnchangedSinceStart && me.deckVersionId
@@ -1656,7 +1652,7 @@ export const claimNearbySeat = mutation({
       ...(chosen
         ? {
             deckVersionId: chosen.version._id,
-            deckKey: deckKeyOf(chosen.deck),
+            deckKey: chosen.deck.deckKey,
           }
         : {}),
     })
@@ -1670,7 +1666,7 @@ export const claimNearbySeat = mutation({
       ...(chosen
         ? {
             deckId: chosen.deck._id,
-            deckKey: deckKeyOf(chosen.deck),
+            deckKey: chosen.deck.deckKey,
             deckNameAtFinish: chosen.deck.name,
             deckVersionId: chosen.version._id,
             deckVersionNumber: chosen.version.versionNumber,
