@@ -88,6 +88,7 @@ it("breaks a deck's results down by source, list and pod size for its owner only
         source: "scryve",
         fingerprint: list(1),
         podSize: 2,
+        wentFirst: null,
         games: 1,
         wins: 1,
         losses: 0,
@@ -99,6 +100,7 @@ it("breaks a deck's results down by source, list and pod size for its owner only
         source: "scryve",
         fingerprint: list(1),
         podSize: 4,
+        wentFirst: null,
         games: 1,
         wins: 0,
         losses: 1,
@@ -110,6 +112,7 @@ it("breaks a deck's results down by source, list and pod size for its owner only
         source: "scryve",
         fingerprint: null,
         podSize: 4,
+        wentFirst: null,
         games: 1,
         wins: 1,
         losses: 0,
@@ -302,4 +305,51 @@ it("lists each of the caller's deck keys with its total record", async () => {
   const other = t.withIdentity({ subject: "other" })
   await other.mutation(api.users.syncCurrent, { displayName: "other" })
   expect(await other.query(api.deckStats.totalsByKey, {})).toEqual([])
+})
+
+it("separates true, false and untracked turn order slices and combines game filters", async () => {
+  const { t, actor } = await signedIn()
+  for (const [index, firstPlayerLocalId] of ["seat-0", "seat-1", undefined].entries()) {
+    await actor.mutation(api.games.publishFinishedLocalGame, {
+      ...game(`turn-order-game-00000${index}`, {
+        win: index === 0,
+        fingerprint: list(1),
+        players: 3,
+        finishedAt: T + index,
+      }),
+      firstPlayerLocalId,
+    })
+  }
+  const summary = await actor.query(api.deckStats.summary, { deckKey: "burn" })
+  expect(summary.slices).toHaveLength(3)
+  expect(summary.slices.map(({ wentFirst, games }) => [wentFirst, games])).toEqual([
+    [null, 1],
+    [false, 1],
+    [true, 1],
+  ])
+  for (const [index, wentFirst] of [true, false, null].entries()) {
+    const page = await actor.query(api.deckStats.games, {
+      deckKey: "burn",
+      fingerprint: list(1),
+      podSize: 3,
+      source: "scryve",
+      wentFirst,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(page.page.map((row) => row.gamePublicId)).toEqual([`turn-order-game-00000${index}`])
+  }
+  const all = await actor.query(api.deckStats.games, {
+    deckKey: "burn",
+    paginationOpts: { numItems: 10, cursor: null },
+  })
+  expect(all.page).toHaveLength(3)
+  const other = t.withIdentity({ subject: "other" })
+  await other.mutation(api.users.syncCurrent, { displayName: "Other" })
+  expect(
+    await other.query(api.deckStats.games, {
+      deckKey: "burn",
+      wentFirst: true,
+      paginationOpts: { numItems: 10, cursor: null },
+    }),
+  ).toMatchObject({ page: [] })
 })

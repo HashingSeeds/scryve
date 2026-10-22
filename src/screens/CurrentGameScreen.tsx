@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -130,6 +130,13 @@ export function CurrentGameScreen({
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const dice = useDice(runtime.game.players, runtime.game.id, system)
+  const { firstPlayerId } = dice
+  const { setFirstPlayer } = runtime
+  const settledFirstPlayer = useRef(firstPlayerId)
+  useEffect(() => {
+    if (firstPlayerId || settledFirstPlayer.current) setFirstPlayer(firstPlayerId)
+    settledFirstPlayer.current = firstPlayerId
+  }, [firstPlayerId, setFirstPlayer])
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
   const markFirstPlayerUsed = runtime.markFirstPlayerUsed

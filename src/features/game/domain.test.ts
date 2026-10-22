@@ -17,6 +17,7 @@ import {
   createLocalGame,
   createClientId,
   createRematch,
+  createNextMatchGame,
   meSeatOf,
   reduceGameEvent,
   validatePlayerNames,
@@ -579,18 +580,26 @@ describe("first chooser on a rematch", () => {
   it("hands the loser the first choice, keeps it through a restart, and reopens the offer", () => {
     const won = {
       ...finished,
+      firstPlayerId: finished.players[0].id,
       result: { kind: "win" as const, winnerPlayerIds: [finished.players[0].id] },
     }
     const next = createRematch(won)
     expect(next.firstChooserSeat).toBe(1)
     expect(next.firstPlayerOffered).toBeUndefined()
+    expect(next.firstPlayerId).toBeUndefined()
+    expect(createNextMatchGame(won).firstPlayerId).toBeUndefined()
     expect(
       createRematch({ ...finished, result: { kind: "draw" } }).firstChooserSeat,
     ).toBeUndefined()
 
-    const restarted = restartMatchGame({ ...next, firstPlayerOffered: true })
+    const restarted = restartMatchGame({
+      ...next,
+      firstPlayerOffered: true,
+      firstPlayerId: next.players[0].id,
+    })
     expect(restarted.firstChooserSeat).toBe(1)
     expect(restarted.firstPlayerOffered).toBeUndefined()
+    expect(restarted.firstPlayerId).toBeUndefined()
     expect(restarted.match).toEqual(next.match)
   })
 })

@@ -14,6 +14,7 @@ const slice = (overrides: Partial<StatsSlice> = {}): StatsSlice => ({
   source: "scryve",
   fingerprint: "a",
   podSize: 4,
+  wentFirst: null,
   games: 8,
   wins: 4,
   losses: 4,
@@ -127,4 +128,23 @@ it("orders tracked lists by last played and gives untracked its own label", () =
     ["previous", "previous"],
     ["old", "dated"],
   ])
+})
+
+it("combines turn order with source, pod and list filters, keeping unknown separate from false", () => {
+  const slices = [
+    slice({ wentFirst: true }),
+    slice({ wentFirst: false, wins: 2, losses: 6 }),
+    slice(),
+    slice({ source: "manual", wentFirst: null }),
+  ]
+  expect(sumSlices(slices, "scryve", { wentFirst: true, fingerprint: "a", podSize: 4 })).toEqual({
+    games: 8,
+    wins: 4,
+    losses: 4,
+    draws: 0,
+  })
+  expect(sumSlices(slices, "scryve", { wentFirst: false }).wins).toBe(2)
+  expect(sumSlices(slices, "scryve", { wentFirst: null }).games).toBe(8)
+  expect(sumSlices(slices, "all", { wentFirst: null }).games).toBe(16)
+  expect(sumSlices(slices).games).toBe(32)
 })

@@ -42,12 +42,15 @@ function game(playerCount = 2, system?: "pokemon") {
   })
 }
 
-function renderGame(initialGame = game()) {
+function renderGame(
+  initialGame = game(),
+  repository = new LocalGameRepository(new MemoryStorage()),
+) {
   return render(
     <ThemeProvider initialContext="light">
       <CurrentGameScreen
         initialGame={initialGame}
-        repository={new LocalGameRepository(new MemoryStorage())}
+        repository={repository}
         onViewSummary={jest.fn()}
       />
     </ThemeProvider>,
@@ -250,7 +253,9 @@ describe("CurrentGameScreen", () => {
   it("offers the first-player roll only while the game is fresh, and its chip leaves on the first life change", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
-    const view = renderGame()
+    const initial = game()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = renderGame(initial, repository)
     layoutSeats(view)
     expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
       "Roll for who goes first",
@@ -262,9 +267,11 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("first-player-badge"))
     expect(view.queryByTestId("first-player-badge")).toBeNull()
     expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
 
     fireEvent.press(view.getByTestId("life-seat-2-1"))
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()
     expect(view.queryByTestId("first-player-badge")).toBeNull()
 
@@ -363,9 +370,24 @@ describe("CurrentGameScreen", () => {
     )
   })
 
+  it("forgets who went first when the result is cleared before play", () => {
+    const rolls = [0.9, 0.1]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const initial = game()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
+    fireEvent.press(view.getByTestId("dice-chip-1-first"))
+    expect(repository.loadActiveGame()?.firstPlayerId).toBeUndefined()
+  })
+
   it("flips a coin for Pokémon and lets the winner choose first or second", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
-    const view = renderGame(game(2, "pokemon"))
+    const initial = game(2, "pokemon")
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = renderGame(initial, repository)
     layoutSeats(view, "pokemon-card-seat")
     expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
       "Flip for who goes first",
@@ -375,7 +397,9 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the flip/)
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
 
+    expect(repository.loadActiveGame()?.firstPlayerId).toBeUndefined()
     fireEvent.press(view.getByTestId("dice-go-second"))
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
   })

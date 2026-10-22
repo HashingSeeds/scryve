@@ -275,6 +275,7 @@ export function useDice(
   }, [arm, armed, bagOpen, pick, recent, toggleBag])
 
   return {
+    firstPlayerId: firstPlayerSeat(dice),
     open: state.mode,
     die,
     close,

@@ -1,6 +1,7 @@
 import {
   applyGameCommand,
   asDeviceId,
+  asPlayerId,
   commanderDamageKey,
   createLocalGame,
   createRematch,
@@ -769,4 +770,26 @@ describe("first-player offer on the game", () => {
     expect(loaded?.firstChooserSeat).toBeUndefined()
     expect(loaded?.firstPlayerOffered).toBeUndefined()
   })
+})
+
+it("keeps the first player through active saves, history summaries and archived detail", () => {
+  const storage = new MemoryStorage()
+  const repository = new LocalGameRepository(storage)
+  const initial = makeGame()
+  const game = { ...initial, firstPlayerId: initial.players[1].id }
+  repository.saveActiveGame(game)
+  expect(new LocalGameRepository(storage).loadActiveGame()?.firstPlayerId).toBe(game.firstPlayerId)
+  const finished = applyGameCommand(game, { type: "game.finish" }, tapContext)
+  repository.archiveGame(finished, "game_menu", "owner")
+  const reopened = new LocalGameRepository(storage)
+  expect(reopened.loadHistory()[0].firstPlayerId).toBe(game.firstPlayerId)
+  expect(reopened.pendingPublishes("owner")[0].firstPlayerId).toBe(game.firstPlayerId)
+  expect(reopened.loadHistoryDetail(game.id)?.game.firstPlayerId).toBe(game.firstPlayerId)
+
+  repository.saveActiveGame({ ...game, firstPlayerId: asPlayerId("missing") })
+  expect(repository.loadActiveGame()?.firstPlayerId).toBeUndefined()
+  const summaries = JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)
+  summaries[0].firstPlayerId = 42
+  storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(summaries))
+  expect(reopened.loadHistory()[0].firstPlayerId).toBeUndefined()
 })

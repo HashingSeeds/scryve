@@ -275,6 +275,7 @@ export default defineSchema({
     .index("by_resolved_by_user", ["resolvedByUserId"]),
 
   gameSummaries: defineTable({
+    firstPlayerId: v.optional(v.id("gamePlayers")),
     clientGameId: v.optional(v.string()),
     gameId: v.id("games"),
     publicId: v.string(),
@@ -605,6 +606,7 @@ export default defineSchema({
   }).index("by_deck", ["deckId"]),
 
   deckResults: defineTable({
+    wentFirst: v.optional(v.boolean()),
     resultId: v.string(),
     userId: v.id("users"),
     deckKey: v.optional(v.string()),
