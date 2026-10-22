@@ -486,8 +486,8 @@ export default {
     accessDenied:
       "Autorisez l'accès aux appareils à proximité dans les Réglages pour trouver et héberger des parties.",
     openSettings: "Ouvrir les réglages",
-    connecting: "Connexion…",
     starting: "Ouverture du salon…",
+    connecting: "Connexion…",
     connectingTo: "Connexion à {{name}}…",
     reconnecting: "Reconnexion…",
     reconnectingTo: "Reconnexion à {{name}}…",

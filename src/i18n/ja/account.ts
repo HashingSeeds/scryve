@@ -85,7 +85,7 @@ export default {
     },
     help: {
       heading: "ヘルプ",
-      support: "ヘルプとサポート",
+      support: "サポート",
     },
     appInfo: {
       heading: "アプリ情報",
@@ -114,51 +114,10 @@ export default {
     copyFailed: "コピーできませんでした。もう一度お試しください。",
   },
   support: {
-    pageTitle: "Scryveヘルプ",
-    pageDescription: "Scryveの始め方、よくある質問の答え、サポートへの連絡方法をご案内します。",
-    title: "ヘルプ",
-    subtitle:
-      "ゲーム、アカウント、Scryve Proに関する回答です。お困りの際はメッセージをお送りください。",
-    contactUs: "お問い合わせ",
-    contactReason: "お問い合わせの種類",
-    kind: {
-      bug: "不具合を報告",
-      help: "ヘルプを依頼",
-      feedback: "フィードバックを送る",
-    },
-    messageLabel: {
-      bug: "何が起きましたか?",
-      help: "どのようなご用件ですか?",
-      feedback: "ご意見をお聞かせください",
-    },
-    messagePlaceholder: {
-      bug: "何が起きましたか?どうなると思いましたか?",
-      help: "お困りの内容をお知らせください",
-      feedback: "アイデア、ご要望など何でも",
-    },
-    emailLabel: {
-      bug: "返信用メールアドレス(任意)",
-      help: "返信用メールアドレス",
-      feedback: "返信用メールアドレス(任意)",
-    },
-    emailInvalid: "有効なメールアドレスを入力してください。",
-    translationNotice:
-      "どの言語でも書けます。AIツールで翻訳する場合があります。詳しくは<privacy>プライバシーポリシー</privacy>をご覧ください。",
-    replyTime: "通常、2営業日以内に返信します。",
-    selectedScreenshot: "選択したスクリーンショット",
-    removeScreenshot: "スクリーンショットを削除",
-    addScreenshot: "スクリーンショットを追加",
-    disclosure:
-      "メッセージ、入力した場合はメールアドレス、アプリのバージョン、ビルド、プラットフォーム、追加したスクリーンショットをSentryに送信します。",
-    send: "送信",
-    preferEmail: "メールをご希望ですか?",
-    emailSupport: "メールでサポートに連絡",
-    status: {
-      queued: "フィードバックを保存しました。オフラインの場合は、再接続時に送信されます。",
-      saveFailed:
-        "メッセージを保存できませんでした。もう一度お試しいただくか、メールでご連絡ください。",
-      screenshotFailed: "そのスクリーンショットを追加できませんでした。別の画像をお試しください。",
-    },
+    pageTitle: "Scryve サポート",
+    pageDescription:
+      "Scryveの使い方、よくある質問の回答、機能のリクエスト、サポートへのお問い合わせはこちらから。",
+    title: "サポート",
     gettingStarted: {
       heading: "はじめに",
       startGame: {
@@ -239,6 +198,10 @@ export default {
       local: {
         title: "ローカルゲームはこのデバイスに保存されます",
         body: "オフラインのゲーム履歴はこのデバイスにのみ保存されています。アカウントに紐づいておらず、リモートで消去されることはありません。",
+      },
+      feedback: {
+        title: "アカウントなしで送信したフィードバックは残ります",
+        body: "アカウントを含めて送信したフィードバックは削除されます。アカウントなしで送信したものは、送信したデバイスに残ります。削除するには、機能リクエストから「自分のリクエスト」を開き、「フィードバックを削除」をタップしてください。",
       },
       signOut: {
         title: "すべてのデバイスがサインアウトされます",

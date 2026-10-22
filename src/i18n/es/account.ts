@@ -87,7 +87,7 @@ export default {
     },
     help: {
       heading: "Ayuda",
-      support: "Ayuda y soporte",
+      support: "Soporte",
     },
     appInfo: {
       heading: "Información de la app",
@@ -116,51 +116,10 @@ export default {
     copyFailed: "No se pudo copiar. Inténtalo de nuevo.",
   },
   support: {
-    pageTitle: "Ayuda de Scryve",
+    pageTitle: "Soporte de Scryve",
     pageDescription:
-      "Aprende a empezar con Scryve, encuentra respuestas a preguntas frecuentes o contacta con soporte.",
-    title: "Ayuda",
-    subtitle:
-      "Respuestas sobre partidas, cuentas y Scryve Pro. Envíanos un mensaje si necesitas ayuda.",
-    contactUs: "Contáctanos",
-    contactReason: "Motivo del contacto",
-    kind: {
-      bug: "Informar de un error",
-      help: "Pedir ayuda",
-      feedback: "Enviar comentarios",
-    },
-    messageLabel: {
-      bug: "¿Qué pasó?",
-      help: "¿En qué podemos ayudarte?",
-      feedback: "¿Qué tienes en mente?",
-    },
-    messagePlaceholder: {
-      bug: "¿Qué pasó? ¿Qué esperabas?",
-      help: "Cuéntanos con qué necesitas ayuda",
-      feedback: "Ideas, sugerencias o cualquier otra cosa",
-    },
-    emailLabel: {
-      bug: "Correo para responderte (opcional)",
-      help: "Correo para responderte",
-      feedback: "Correo para la respuesta (opcional)",
-    },
-    emailInvalid: "Introduce una dirección de correo válida.",
-    translationNotice:
-      "Escribe en el idioma que quieras. Podemos usar herramientas de IA para traducirlo. Consulta nuestra <privacy>Política de privacidad</privacy>.",
-    replyTime: "Solemos responder en dos días hábiles.",
-    selectedScreenshot: "Captura seleccionada",
-    removeScreenshot: "Quitar captura",
-    addScreenshot: "Añadir captura",
-    disclosure:
-      "Envía a Sentry tu mensaje, el correo si lo indicas, la versión de la app, la compilación, la plataforma y cualquier captura de pantalla que añadas.",
-    send: "Enviar",
-    preferEmail: "¿Prefieres el correo?",
-    emailSupport: "Escribir a soporte",
-    status: {
-      queued: "Comentarios en cola. Si no tienes conexión, se enviarán al reconectarte.",
-      saveFailed: "No se pudo guardar tu mensaje. Inténtalo de nuevo o escríbenos por correo.",
-      screenshotFailed: "No se pudo añadir esa captura. Prueba con otra imagen.",
-    },
+      "Empieza con Scryve, encuentra respuestas a preguntas frecuentes, sugiere funciones o contacta con soporte.",
+    title: "Soporte",
     gettingStarted: {
       heading: "Primeros pasos",
       startGame: {
@@ -242,6 +201,10 @@ export default {
       local: {
         title: "Las partidas locales se quedan en este dispositivo",
         body: "El historial de partidas sin conexión se guarda solo en este dispositivo. No está vinculado a tu cuenta y no se borra de forma remota.",
+      },
+      feedback: {
+        title: "Los comentarios enviados sin tu cuenta se conservan",
+        body: "Los comentarios que enviaste con tu cuenta se eliminan. Los que enviaste sin ella se quedan en el dispositivo que los envió. Para borrarlos, abre Solicitudes de funciones, luego Mis solicitudes y toca Eliminar mis comentarios.",
       },
       signOut: {
         title: "Se cierra la sesión en todos los dispositivos",

@@ -85,7 +85,7 @@ export default {
     },
     help: {
       heading: "도움말",
-      support: "도움말 및 지원",
+      support: "지원",
     },
     appInfo: {
       heading: "앱 정보",
@@ -114,50 +114,10 @@ export default {
     copyFailed: "복사할 수 없습니다. 다시 시도해 주세요.",
   },
   support: {
-    pageTitle: "Scryve 도움말",
+    pageTitle: "Scryve 지원",
     pageDescription:
-      "Scryve 시작 방법을 알아보고, 자주 묻는 질문의 답을 찾거나 지원팀에 문의하세요.",
-    title: "도움말",
-    subtitle: "게임, 계정, Scryve Pro에 대한 답변입니다. 도움이 필요하면 메시지를 보내 주세요.",
-    contactUs: "문의하기",
-    contactReason: "문의 유형",
-    kind: {
-      bug: "버그 신고",
-      help: "도움 요청",
-      feedback: "의견 보내기",
-    },
-    messageLabel: {
-      bug: "어떤 일이 있었나요?",
-      help: "무엇을 도와드릴까요?",
-      feedback: "어떤 생각이 있으신가요?",
-    },
-    messagePlaceholder: {
-      bug: "어떤 일이 있었나요? 어떻게 되기를 기대했나요?",
-      help: "도움이 필요한 내용을 알려 주세요",
-      feedback: "아이디어, 요청 또는 기타 의견",
-    },
-    emailLabel: {
-      bug: "답변 받을 이메일 (선택)",
-      help: "답변 받을 이메일",
-      feedback: "답변받을 이메일 (선택)",
-    },
-    emailInvalid: "올바른 이메일 주소를 입력하세요.",
-    translationNotice:
-      "어떤 언어로든 작성하세요. AI 도구로 번역할 수 있습니다. <privacy>개인정보 처리방침</privacy>을 확인하세요.",
-    replyTime: "보통 영업일 기준 2일 이내에 답변드립니다.",
-    selectedScreenshot: "선택한 스크린샷",
-    removeScreenshot: "스크린샷 삭제",
-    addScreenshot: "스크린샷 추가",
-    disclosure:
-      "메시지, 입력한 경우 이메일, 앱 버전, 빌드, 플랫폼, 추가한 스크린샷을 Sentry로 전송합니다.",
-    send: "보내기",
-    preferEmail: "이메일이 편하신가요?",
-    emailSupport: "이메일 지원",
-    status: {
-      queued: "피드백이 대기 중입니다. 오프라인이면 다시 연결될 때 전송됩니다.",
-      saveFailed: "메시지를 저장하지 못했습니다. 다시 시도하거나 이메일로 보내 주세요.",
-      screenshotFailed: "스크린샷을 추가할 수 없습니다. 다른 이미지를 선택해 주세요.",
-    },
+      "Scryve 시작 방법을 확인하고, 자주 묻는 질문의 답을 찾고, 기능을 제안하거나 지원팀에 문의하세요.",
+    title: "지원",
     gettingStarted: {
       heading: "시작하기",
       startGame: {
@@ -238,6 +198,10 @@ export default {
       local: {
         title: "로컬 게임은 이 기기에 남습니다",
         body: "오프라인 게임 기록은 이 기기에만 저장됩니다. 계정에 연결되어 있지 않으며 원격으로 삭제되지 않습니다.",
+      },
+      feedback: {
+        title: "계정 없이 보낸 피드백은 유지됩니다",
+        body: "계정을 포함해 보낸 피드백은 삭제됩니다. 계정 없이 보낸 피드백은 보낸 기기에 남습니다. 삭제하려면 기능 요청을 열고 내 요청을 선택한 다음 내 피드백 삭제를 누르세요.",
       },
       signOut: {
         title: "모든 기기에서 로그아웃됩니다",

@@ -477,8 +477,8 @@ export default {
     accessDenied:
       "Permite el acceso a dispositivos cercanos en Ajustes para encontrar y crear partidas.",
     openSettings: "Abrir ajustes",
-    connecting: "Conectando…",
     starting: "Abriendo la sala…",
+    connecting: "Conectando…",
     connectingTo: "Conectando con {{name}}…",
     reconnecting: "Reconectando…",
     reconnectingTo: "Reconectando con {{name}}…",
