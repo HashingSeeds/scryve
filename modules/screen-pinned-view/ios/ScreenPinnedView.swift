@@ -87,7 +87,15 @@ final class ScreenPinnedView: ExpoView {
 
     if pinned {
       rotor.bounds = CGRect(origin: .zero, size: hardware)
-      rotor.center = convert(CGPoint(x: window.bounds.midX, y: window.bounds.midY), from: window)
+      // A navigation swipe slides this screen across the window, and a relayout mid-swipe (the
+      // keyboard closing) would otherwise leave the board offset by the slide. Only mid-rotation,
+      // while the Fabric frame is still the old size, does the window center differ from ours.
+      let windowSized =
+        abs(bounds.width - windowSize.width) < 1 && abs(bounds.height - windowSize.height) < 1
+      rotor.center =
+        windowSized
+        ? CGPoint(x: bounds.midX, y: bounds.midY)
+        : convert(CGPoint(x: window.bounds.midX, y: window.bounds.midY), from: window)
       // A Fabric relayout mid-rotation lands here too; leave the angle to the transition block.
       if transition != nil || !transitioning {
         var target = interfaceAngle(fixed: fixed, window: window)
