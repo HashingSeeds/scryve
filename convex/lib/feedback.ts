@@ -53,14 +53,6 @@ const STATUS_LABELS: Record<FeedbackStatus, string> = {
   declined: "Declined",
 }
 
-/**
- * why: the Apollo token is scoped, and Apollo rejects a card whose text links outside its allowed
- * prefixes. Player text can hold any link, so links are shown defanged (`https[:]//…`).
- */
-export function defang(text: string) {
-  return text.replace(/([a-z][a-z0-9+.-]*):\/\//gi, "$1[:]//")
-}
-
 function clip(text: string, max: number) {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`
 }
@@ -88,10 +80,9 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
   const awaitingTeam = (messages.at(-1)?.from ?? "player") === "player"
   const thread = messages
     .slice(-6)
-    .map(
-      (message) => `**${message.from === "player" ? "Player" : "You"}:** ${defang(message.body)}`,
-    )
-  const body = clip([defang(request.body), ...thread].join("\n\n"), 4000)
+    .map((message) => `${message.from === "player" ? "Player" : "You"}: ${message.body}`)
+  // why: Apollo shows cards from a scoped token as plain text, so player text can't carry a tappable link.
+  const body = clip([request.body, ...thread].join("\n\n"), 4000)
   const status =
     request.status === "shipped" && request.shippedIn
       ? `Shipped in ${request.shippedIn}`
@@ -103,7 +94,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     // why: a new phase pushes again, so only the player's own messages notify Matthew.
     phase: `player:${playerTurns}`,
     push: "alert",
-    title: clip(`${label}: ${defang(request.title)}`, 200),
+    title: clip(`${label}: ${request.title}`, 200),
     body,
     meta: {
       status: `${status}${request.published ? " · public" : " · private"}`,

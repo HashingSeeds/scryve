@@ -267,16 +267,16 @@ describe("feedbackCard", () => {
     body,
   })
 
-  it("defangs player links and asks for Matthew while the player spoke last", () => {
+  it("asks for Matthew while the player spoke last", () => {
     const card = feedbackCard({ request, messages: [message("player", "http://a.test")] })
     expect(card).toMatchObject({
       key: "scryve:r1",
       kind: "approval",
       phase: "player:2",
-      title: "Request: See https[:]//evil.test/x",
+      title: "Request: See https://evil.test/x",
       meta: { status: "In review · private", votes: "3", from: "Anonymous" },
     })
-    expect(card.body).toBe("Like ftp[:]//files.test\n\n**Player:** http[:]//a.test")
+    expect(card.body).toBe("Like ftp://files.test\n\nPlayer: http://a.test")
     expect(card.actions.map(({ id }) => id)).toEqual([
       "reply",
       "publish",
