@@ -1,10 +1,19 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
+import { captureAnalytics } from "@/utils/analytics"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
+
 import type { DeckSyncSnapshot } from "./decksSync"
 import { clearGuestDecks, loadGuestDecks, saveGuestDeck } from "./guestDeck"
 import { useLocalDeckLeftovers, useLocalDeckSync } from "./localDeckSync"
 import type { Id } from "../../../convex/_generated/dataModel"
+
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
+}))
 
 const mockImportGuest = jest.fn()
 const mockMove = jest.fn()
@@ -50,6 +59,7 @@ function renderSync() {
 beforeEach(() => {
   clearGuestDecks()
   jest.clearAllMocks()
+  mockImportGuest.mockReset()
   mockQuery.mockResolvedValue({
     deck: { ...deck, _id: deckId, deckKey: "stable-key", syncRevision: 2 },
     cards: [],
@@ -71,6 +81,8 @@ test("sync passes the stable key and drops the copy only after a matching receip
     localUpdatedAt: local.updatedAt,
   })
   expect(loadGuestDecks()).toEqual([])
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", { action: "sync", outcome: "ok" })
 })
 
 test("retains the local copy at capacity", async () => {
@@ -78,6 +90,9 @@ test("retains the local copy at capacity", async () => {
   mockImportGuest.mockResolvedValue({ status: "limit_reached" })
   await expect(renderSync().sync(local.localId)).resolves.toEqual({ status: "limit_reached" })
   expect(loadGuestDecks()).toEqual([local])
+  expect(reportCrash).not.toHaveBeenCalled()
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", { action: "sync", outcome: "limit" })
 })
 
 test("saves server content and its key before moving the exact revision", async () => {
@@ -96,6 +111,11 @@ test("saves server content and its key before moving the exact revision", async 
   expect(loadGuestDecks()[0].localId).toBe(localId)
   expect(mockMove).toHaveBeenCalledWith({ deckId, expectedRevision: 2, expectedVersion: null })
   expect(mockAcceptMetadata).toHaveBeenCalledWith([{ ...metadata[0], deleted: true, revision: 3 }])
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
+    action: "move_to_device",
+    outcome: "ok",
+  })
 })
 
 test("does not move server content if saving the local copy fails", async () => {
@@ -113,12 +133,37 @@ test("deletes only the new copy when the server refuses the move", async () => {
   mockMove.mockRejectedValue(new ConvexError({ code: "sync_conflict" }))
   await expect(renderSync().keepOnDevice(deckId)).rejects.toBeInstanceOf(ConvexError)
   expect(loadGuestDecks()).toEqual([other])
+  expect(reportCrash).not.toHaveBeenCalled()
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
+    action: "move_to_device",
+    outcome: "conflict",
+  })
 })
+
+test.each(["unauthenticated", "rate_limited"])(
+  "counts a %s move as failed without reporting it",
+  async (code) => {
+    mockMove.mockRejectedValue(new ConvexError({ code }))
+    await expect(renderSync().keepOnDevice(deckId)).rejects.toBeInstanceOf(ConvexError)
+    expect(reportCrash).not.toHaveBeenCalled()
+    expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
+      action: "move_to_device",
+      outcome: "failed",
+    })
+  },
+)
 
 test("keeps the copy if the move reply is lost", async () => {
   mockMove.mockRejectedValue(new Error("connection lost"))
   await expect(renderSync().keepOnDevice(deckId)).rejects.toThrow("connection lost")
   expect(loadGuestDecks()).toMatchObject([{ deckKey: "stable-key", deck }])
+  expect(reportCrash).not.toHaveBeenCalled()
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
+    action: "move_to_device",
+    outcome: "failed",
+  })
 })
 
 test("keeps edits newer than an import receipt", async () => {
@@ -199,6 +244,7 @@ test("resolves live-key leftovers through Sync and leaves deleted-key copies alo
   await waitFor(() => expect(loadGuestDecks()).toEqual([other]))
   expect(mockImportGuest).toHaveBeenCalledTimes(1)
   expect(result.current.error).toBe(false)
+  expect(captureAnalytics).not.toHaveBeenCalled()
 })
 
 test("waits for a successful metadata pull before reconciling cached leftovers", async () => {
@@ -386,6 +432,98 @@ test("other_account keeps the copy and offers an import with a fresh key and ali
   expect(args.localId).not.toBe(copy.guestLocalId)
   expect(args.movedFromAccount).toBeUndefined()
   expect(loadGuestDecks()).toEqual([copy])
+  expect(reportCrash).not.toHaveBeenCalled()
+  expect(captureAnalytics).toHaveBeenCalledTimes(2)
+  expect(captureAnalytics).toHaveBeenNthCalledWith(1, "deck_sync", {
+    action: "sync",
+    outcome: "other_account",
+  })
+  expect(captureAnalytics).toHaveBeenNthCalledWith(2, "deck_sync", {
+    action: "add_as_new",
+    outcome: "ok",
+  })
   await result.addAsNew()
   expect(mockImportGuest).toHaveBeenLastCalledWith(args)
+})
+
+test.each(["sync", "move_to_device", "add_as_new"] as const)(
+  "reports an unexpected %s failure once without content",
+  async (action) => {
+    const local = saveGuestDeck(deck)
+    const failure = new ConvexError({ code: "invalid_deck_key", message: "private deck content" })
+    const sync = renderSync()
+    let operation: () => Promise<unknown>
+    if (action === "move_to_device") {
+      mockQuery.mockRejectedValueOnce(failure)
+      operation = () => sync.keepOnDevice(deckId)
+    } else if (action === "add_as_new") {
+      mockImportGuest.mockResolvedValueOnce({ status: "other_account" })
+      const result = await sync.sync(local.localId)
+      if (result.status !== "other_account") throw new Error("Expected new deck offer")
+      operation = result.addAsNew
+    } else operation = () => sync.sync(local.localId)
+    jest.mocked(captureAnalytics).mockClear()
+    if (action !== "move_to_device") mockImportGuest.mockRejectedValueOnce(failure)
+    await expect(operation()).rejects.toBe(failure)
+    expect(reportCrash).toHaveBeenCalledTimes(1)
+    expect(reportCrash).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "LocalDeckSyncFailed",
+        message: "Device deck operation failed",
+      }),
+      ErrorType.HANDLED,
+      {
+        tags: { action, code: "invalid_deck_key" },
+        fingerprint: ["local-deck-sync-failed", action],
+      },
+    )
+    const [error] = jest.mocked(reportCrash).mock.calls[0]
+    expect(error).not.toHaveProperty("cause")
+    expect(captureAnalytics).toHaveBeenCalledTimes(1)
+    expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", { action, outcome: "failed" })
+  },
+)
+
+test.each([
+  new Error("offline"),
+  new TypeError("Network request failed"),
+  new ConvexError({ code: "sync_conflict", message: "private" }),
+])("does not report an expected sync failure %s", async (failure) => {
+  const local = saveGuestDeck(deck)
+  mockImportGuest.mockRejectedValueOnce(failure)
+  const result = renderSync().sync(local.localId)
+  if (failure instanceof ConvexError) await expect(result).resolves.toEqual({ status: "conflict" })
+  else await expect(result).rejects.toBe(failure)
+  expect(reportCrash).not.toHaveBeenCalled()
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
+    action: "sync",
+    outcome: failure instanceof ConvexError ? "conflict" : "failed",
+  })
+})
+
+test("reports a stuck automatic reconcile once across retries without a usage event", async () => {
+  const local = saveGuestDeck(deck, { deckKey: "stable-key" })
+  mockImportGuest.mockResolvedValue({
+    status: "already_imported",
+    deckId,
+    localUpdatedAt: local.updatedAt - 1,
+  })
+  const hook = renderHook(() => useLocalDeckLeftovers(freshMetadata, "owner", true))
+  await waitFor(() => expect(hook.result.current.error).toBe(true))
+  act(() => hook.result.current.retry())
+  await waitFor(() => expect(hook.result.current.error).toBe(true))
+  expect(reportCrash).toHaveBeenCalledTimes(1)
+  expect(reportCrash).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: "LocalDeckReconcileKeptNewerEdits",
+      message: "Device deck reconciliation kept newer edits",
+    }),
+    ErrorType.HANDLED,
+    {
+      tags: { status: "kept_newer_edits" },
+      fingerprint: ["local-deck-reconcile-kept-newer-edits"],
+    },
+  )
+  expect(captureAnalytics).not.toHaveBeenCalled()
 })

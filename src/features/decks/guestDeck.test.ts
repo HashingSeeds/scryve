@@ -14,6 +14,11 @@ import {
 } from "./guestDeck"
 import { FREE_DECK_LIMIT } from "../../../convex/lib/policy"
 
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
+}))
+
 const deck = { name: "Scratch", format: "commander", cards: [] }
 const legacy = {
   schemaVersion: 1,
@@ -199,3 +204,86 @@ describe("guest deck storage", () => {
     expect(guestDeckLocalId("k17abc")).toBeUndefined()
   })
 })
+
+it.each(["web", "ios"] as const)(
+  "reports each store failure once per session on %s without content",
+  async (platform) => {
+    await jest.isolateModulesAsync(async () => {
+      const { Platform }: typeof import("react-native") = require("react-native")
+      jest.replaceProperty(Platform, "OS", platform)
+      const { storage }: typeof import("@/utils/storage") = require("@/utils/storage")
+      const {
+        reportCrash,
+        ErrorType,
+      }: typeof import("@/utils/crashReporting") = require("@/utils/crashReporting")
+      jest.mocked(reportCrash).mockClear()
+      storage.clearAll()
+      storage.set("decks.guest.v2", "private deck content")
+      const guest: typeof import("./guestDeck") = require("./guestDeck")
+      expect(reportCrash).not.toHaveBeenCalled()
+      for (const [raw, reason] of [
+        ["private deck content", "malformed"],
+        ['[{"deck":{"name":"private deck content"}}]', "unsupported"],
+      ]) {
+        storage.set("decks.guest.v2", raw)
+        guest.loadGuestDecks()
+        guest.loadGuestDecks()
+        await Promise.resolve()
+        expect(reportCrash).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            name: "GuestDeckLoadFailed",
+            message: "Device deck store load failed",
+          }),
+          ErrorType.HANDLED,
+          {
+            tags: { platform: platform === "web" ? "web" : "native", reason },
+            fingerprint: ["guest-deck-storage", "load"],
+          },
+        )
+      }
+      const read = jest.spyOn(storage, "getString").mockImplementation(() => {
+        throw new Error("private deck content")
+      })
+      guest.loadGuestDecks()
+      guest.loadGuestDecks()
+      read.mockRestore()
+      await Promise.resolve()
+      expect(reportCrash).toHaveBeenCalledTimes(3)
+      expect(reportCrash).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "GuestDeckLoadFailed" }),
+        ErrorType.HANDLED,
+        {
+          tags: { platform: platform === "web" ? "web" : "native", reason: "read_failed" },
+          fingerprint: ["guest-deck-storage", "load"],
+        },
+      )
+      guest.clearGuestDecks()
+      const write = jest.spyOn(storage, "set").mockImplementation(() => {
+        throw new Error("private deck content")
+      })
+      expect(() => guest.saveGuestDeck(deck)).toThrow()
+      expect(() => guest.saveGuestDeck(deck)).toThrow()
+      write.mockRestore()
+      await Promise.resolve()
+      expect(reportCrash).toHaveBeenCalledTimes(4)
+      expect(reportCrash).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          name: "GuestDeckSaveFailed",
+          message: "Device deck store save failed",
+        }),
+        ErrorType.HANDLED,
+        {
+          tags: { platform: platform === "web" ? "web" : "native" },
+          fingerprint: ["guest-deck-storage", "save"],
+        },
+      )
+      for (const [error, , context] of jest.mocked(reportCrash).mock.calls) {
+        expect(error).not.toHaveProperty("cause")
+        expect(JSON.stringify({ name: error.name, message: error.message, context })).not.toContain(
+          "private deck content",
+        )
+      }
+      jest.restoreAllMocks()
+    })
+  },
+)

@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
+import { useFocusEffect } from "expo-router"
 import { useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -34,12 +35,18 @@ import { cardChanges, lookupListSnapshot } from "@/features/stats/listSnapshots"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../convex/_generated/api"
 
 type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void; source?: StatsSource }
 
 export function DeckCompareScreen(props: Props) {
+  useFocusEffect(
+    useCallback(() => {
+      captureAnalytics("stats_viewed", { surface: "compare" })
+    }, []),
+  )
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
       <Header titleTx="decks:stats.compare" leftTx="common:back" onLeftPress={props.onBack} />

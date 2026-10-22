@@ -3,11 +3,17 @@ import { ConvexError } from "convex/values"
 
 import { resetConnectedProfileBootstrapForTests } from "@/features/connected/useConnectedProfile"
 import { pendingSeatClaims, rememberSeatClaim, setNearbyOwner } from "@/features/lan/nearbyAccount"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { remove } from "@/utils/storage"
 
 import { applyGameCommand, asDeviceId, createLocalGame, defaultCommandContext } from "./domain"
 import { LocalGamePublishSession } from "./LocalGamePublishSession"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
+
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
+}))
 
 const mockSyncCurrent = jest.fn(async () => "convex-user-a")
 const mockPublish = jest.fn(
@@ -191,6 +197,7 @@ describe("LocalGamePublishSession", () => {
     render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
     await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
     expect(repository.pendingPublishes("owner-a")).toHaveLength(1)
+    expect(reportCrash).not.toHaveBeenCalled()
 
     await act(async () => {
       repository.archiveGame(finishedGame(30), "game_menu", "owner-a")
@@ -293,6 +300,19 @@ describe("LocalGamePublishSession rejections", () => {
     await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
     expect(mockPublish).toHaveBeenCalledTimes(2)
     expect(repository.loadHistory().map((game) => game.publish)).toEqual(["published", "failed"])
+    expect(reportCrash).toHaveBeenCalledTimes(1)
+    expect(reportCrash).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "LocalGamePublishFailed",
+        message: "Finished game could not be published",
+      }),
+      ErrorType.HANDLED,
+      { tags: { code: "server_error" }, fingerprint: ["local-game-publish", "failed"] },
+    )
+    const again = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await act(async () => undefined)
+    again.unmount()
+    expect(reportCrash).toHaveBeenCalledTimes(1)
   })
 
   it.each(["deck_version_not_found", "invalid_deck_key", "invalid_deck_fingerprint"])(
@@ -323,6 +343,19 @@ describe("LocalGamePublishSession rejections", () => {
       })
       for (const field of ["deckVersionId", "deckKey", "deckFingerprint", "deckName"])
         expect(mockPublish.mock.calls[1][0].players[0]).not.toHaveProperty(field)
+      expect(reportCrash).toHaveBeenCalledTimes(1)
+      expect(reportCrash).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "LocalGamePublishDeckStripped",
+          message: "Game published without its deck",
+        }),
+        ErrorType.HANDLED,
+        { tags: { code }, fingerprint: ["local-game-publish", "deck_stripped"] },
+      )
+      const again = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+      await act(async () => undefined)
+      again.unmount()
+      expect(reportCrash).toHaveBeenCalledTimes(1)
     },
   )
 
@@ -339,6 +372,12 @@ describe("LocalGamePublishSession rejections", () => {
     render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
     await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("failed"))
     expect(mockPublish).toHaveBeenCalledTimes(2)
+    expect(reportCrash).toHaveBeenCalledTimes(1)
+    expect(reportCrash).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "LocalGamePublishFailed" }),
+      ErrorType.HANDLED,
+      { tags: { code: "invalid_deck_key" }, fingerprint: ["local-game-publish", "failed"] },
+    )
   })
 })
 
@@ -407,3 +446,41 @@ it.each([undefined, 90_000])(
     jest.useRealTimers()
   },
 )
+
+it("reports a stripped-deck upload only after its retry succeeds", async () => {
+  jest.clearAllMocks()
+  resetConnectedProfileBootstrapForTests()
+  mockConnected = true
+  const repository = new LocalGameRepository(new MemoryStorage())
+  repository.archiveGame(
+    finishedGame(1, { ownerId: "owner-a", meSeat: 0, deckKey: "private-deck" }),
+    "game_menu",
+    "owner-a",
+  )
+  const rejection = new ConvexError({
+    code: "deck_version_not_found",
+    message: "private deck content",
+  })
+  mockPublish.mockRejectedValueOnce(rejection).mockRejectedValueOnce(new Error("offline"))
+  render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+  await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(2))
+  expect(reportCrash).not.toHaveBeenCalled()
+  mockPublish.mockRejectedValueOnce(rejection)
+  await act(async () => {
+    repository.archiveGame(finishedGame(30), "game_menu", "owner-a")
+  })
+  await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
+  expect(reportCrash).toHaveBeenCalledTimes(1)
+  expect(reportCrash).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: "LocalGamePublishDeckStripped",
+      message: "Game published without its deck",
+    }),
+    ErrorType.HANDLED,
+    {
+      tags: { code: "deck_version_not_found" },
+      fingerprint: ["local-game-publish", "deck_stripped"],
+    },
+  )
+  expect(jest.mocked(reportCrash).mock.calls[0][0]).not.toHaveProperty("cause")
+})

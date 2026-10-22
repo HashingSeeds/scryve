@@ -21,7 +21,9 @@ const values = {
   stage: ["started", "succeeded", "failed"],
   reason: ["offline", "access", "profile", "input", "request", "local-active", "unknown"],
   feature: ["library", "saved", "assigned"],
-  surface: ["history", "deck"],
+  surface: ["history", "deck", "deck_stats", "compare"],
+  deck_sync_action: ["sync", "move_to_device", "add_as_new"],
+  outcome: ["ok", "conflict", "limit", "other_account", "kept_newer_edits", "failed"],
   end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"],
   timing: ["join.completed", "join.failed", "mutation.ack"],
   write: ["life", "table", "commander.claim", "commander.resolve"],
@@ -41,14 +43,18 @@ type GameProperties = {
 type Events = {
   app_opened: Record<string, never>
   game_started: GameProperties
-  game_completed: GameProperties & { end_source?: GameEndSource }
+  game_completed: GameProperties & { end_source?: GameEndSource; first_player_known?: boolean }
   connection_attempt: {
     action: "create" | "join"
     stage: "started" | "succeeded" | "failed"
     reason?: (typeof values.reason)[number]
   }
   deck_used: { feature: "library" | "saved" | "assigned" }
-  stats_viewed: { surface: "history" | "deck" }
+  stats_viewed: { surface: (typeof values.surface)[number] }
+  deck_sync: {
+    action: (typeof values.deck_sync_action)[number]
+    outcome: (typeof values.outcome)[number]
+  }
   sync_timing: {
     timing: SyncTiming
     duration_ms: number
@@ -62,10 +68,11 @@ type Events = {
 const eventKeys: Record<keyof Events, readonly string[]> = {
   app_opened: [],
   game_started: ["system", "format", "player_count", "mode"],
-  game_completed: ["system", "format", "player_count", "mode", "end_source"],
+  game_completed: ["system", "format", "player_count", "mode", "end_source", "first_player_known"],
   connection_attempt: ["action", "stage", "reason"],
   deck_used: ["feature"],
   stats_viewed: ["surface"],
+  deck_sync: ["action", "outcome"],
   sync_timing: ["timing", "duration_ms", "attempt_count", "write"],
   dice_armed: ["tool", "source", "system", "since_roll_ms"],
   dice_rolled: ["tool", "system"],
@@ -113,6 +120,11 @@ export function analyticsProperties(event: string, properties: Record<string, un
     } else if (key === "duration_ms" || key === "attempt_count" || key === "since_roll_ms") {
       if (typeof value === "number" && Number.isFinite(value) && value >= 0)
         result[key] = Math.round(value)
+    } else if (key === "first_player_known") {
+      if (typeof value === "boolean") result[key] = value
+    } else if (event === "deck_sync" && key === "action") {
+      if (typeof value === "string" && values.deck_sync_action.some((action) => action === value))
+        result[key] = value
     } else if (
       Object.hasOwn(values, key) &&
       typeof value === "string" &&
@@ -302,7 +314,13 @@ export function initAnalytics() {
 
 export function captureGame(
   event: "game_started" | "game_completed",
-  game: { id: string; system?: string; format?: string; playerCount: number },
+  game: {
+    id: string
+    system?: string
+    format?: string
+    playerCount: number
+    firstPlayerId?: string
+  },
   mode: GameProperties["mode"],
   endSource: GameEndSource = "unknown",
 ) {
@@ -326,6 +344,9 @@ export function captureGame(
         player_count: game.playerCount,
         mode,
         ...(event === "game_completed" ? { end_source: endSource } : {}),
+        ...(event === "game_completed" && mode === "local"
+          ? { first_player_known: Boolean(game.firstPlayerId) }
+          : {}),
       })
     } catch {}
   }, 0)

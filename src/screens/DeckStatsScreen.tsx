@@ -1,7 +1,7 @@
-import { useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { FlatList, TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
-import { router } from "expo-router"
+import { router, useFocusEffect } from "expo-router"
 import { usePaginatedQuery, useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -39,6 +39,7 @@ import {
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../convex/_generated/api"
 import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
@@ -46,6 +47,11 @@ import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
 type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void }
 
 export function DeckStatsScreen(props: Props) {
+  useFocusEffect(
+    useCallback(() => {
+      captureAnalytics("stats_viewed", { surface: "deck_stats" })
+    }, []),
+  )
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
       <Header title={props.deckName} leftTx="common:back" onLeftPress={props.onBack} />
