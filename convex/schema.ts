@@ -851,6 +851,7 @@ export default defineSchema({
     status: feedbackStatus,
     published: v.boolean(),
     votes: v.number(),
+    reports: v.number(),
     shippedIn: v.optional(v.string()),
     senderHash: v.string(),
     userId: v.optional(v.id("users")),
@@ -865,6 +866,13 @@ export default defineSchema({
     .index("by_user_and_updated_at", ["userId", "updatedAt"]),
 
   feedbackVotes: defineTable({
+    requestId: v.id("feedbackRequests"),
+    senderHash: v.string(),
+  })
+    .index("by_request_and_sender", ["requestId", "senderHash"])
+    .index("by_sender", ["senderHash"]),
+
+  feedbackReports: defineTable({
     requestId: v.id("feedbackRequests"),
     senderHash: v.string(),
   })

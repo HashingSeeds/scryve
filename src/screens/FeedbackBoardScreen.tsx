@@ -1,7 +1,9 @@
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { FilterChips } from "@/components/FilterChips"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -21,6 +23,7 @@ export interface FeedbackBoardScreenProps {
   onFilter: (filter: FeedbackFilter) => void
   onVote: (item: FeedbackBoardItem, voted: boolean) => void
   onOpen: (item: FeedbackBoardItem) => void
+  onReport: (item: FeedbackBoardItem) => void
   onSuggest: () => void
   onMine: () => void
   onBack: () => void
@@ -33,11 +36,13 @@ export function FeedbackBoardScreen({
   onFilter,
   onVote,
   onOpen,
+  onReport,
   onSuggest,
   onMine,
   onBack,
 }: FeedbackBoardScreenProps) {
   const { themed } = useAppTheme()
+  const [reporting, setReporting] = useState<FeedbackBoardItem>()
   return (
     <Screen
       preset="scroll"
@@ -74,9 +79,29 @@ export function FeedbackBoardScreen({
         <Text tx="feedback:board.empty" style={themed($muted)} />
       ) : (
         items?.map((item) => (
-          <FeedbackRow key={item._id} item={item} onVote={onVote} onOpen={onOpen} />
+          <FeedbackRow
+            key={item._id}
+            item={item}
+            onVote={onVote}
+            onOpen={onOpen}
+            onReport={setReporting}
+          />
         ))
       )}
+      <ConfirmDialog
+        visible={!!reporting}
+        title={translate("feedback:report.title")}
+        message={translate("feedback:report.body")}
+        confirmText={translate("feedback:report.confirm")}
+        cancelText={translate("common:cancel")}
+        destructive
+        backdropAccessibilityLabel={translate("common:cancel")}
+        onConfirm={() => {
+          if (reporting) onReport(reporting)
+          setReporting(undefined)
+        }}
+        onClose={() => setReporting(undefined)}
+      />
     </Screen>
   )
 }
@@ -85,10 +110,12 @@ function FeedbackRow({
   item,
   onVote,
   onOpen,
+  onReport,
 }: {
   item: FeedbackBoardItem
   onVote: FeedbackBoardScreenProps["onVote"]
   onOpen: FeedbackBoardScreenProps["onOpen"]
+  onReport: FeedbackBoardScreenProps["onReport"]
 }) {
   const { themed } = useAppTheme()
   const voteLabel = translate(item.voted ? "feedback:board.removeVote" : "feedback:board.vote", {
@@ -116,12 +143,26 @@ function FeedbackRow({
       >
         <Text text={item.title} weight="bold" />
         <Text text={item.body} size="xs" numberOfLines={3} style={themed($muted)} />
-        <Text
-          text={statusLabel(item)}
-          size="xxs"
-          weight="bold"
-          style={themed(item.status === "shipped" ? $shipped : $muted)}
-        />
+        <View style={themed($meta)}>
+          <Text
+            text={statusLabel(item)}
+            size="xxs"
+            weight="bold"
+            style={themed(item.status === "shipped" ? $shipped : $muted)}
+          />
+          {item.mine ? null : item.reported ? (
+            <Text tx="feedback:report.done" size="xxs" style={themed($muted)} />
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={translate("feedback:report.label", { title: item.title })}
+              hitSlop={8}
+              onPress={() => onReport(item)}
+            >
+              <Text tx="feedback:report.action" size="xxs" style={themed($muted)} />
+            </Pressable>
+          )}
+        </View>
       </Pressable>
     </View>
   )
@@ -163,5 +204,10 @@ const $vote: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $voted: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
 const $votedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $rowText: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxs })
+const $meta: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  gap: spacing.sm,
+})
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $shipped: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })

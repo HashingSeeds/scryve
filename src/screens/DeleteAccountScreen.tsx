@@ -17,7 +17,7 @@ export type AccountDeletionReceiptStatus = AccountDeletionStatus | "completed"
 
 const DELETE_CONFIRMATION = "DELETE"
 const STATUS_MARK = { failed: "!", completed: "✓", received: "…" } as const
-const DELETION_STEPS = ["cloud", "history", "local", "signOut"] as const
+const DELETION_STEPS = ["cloud", "history", "local", "feedback", "signOut"] as const
 
 export interface DeleteAccountScreenProps {
   email?: string

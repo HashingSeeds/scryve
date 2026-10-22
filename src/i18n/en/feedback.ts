@@ -22,6 +22,15 @@ const feedback = {
     shippedIn: "Shipped in {{version}}",
     declined: "Declined",
   },
+  report: {
+    action: "Report",
+    // Accessibility label on the Report button of a public request.
+    label: "Report {{title}}",
+    done: "Reported",
+    title: "Report this request?",
+    body: "We'll review it and hide it if it breaks the rules. The sender won't know who reported it.",
+    confirm: "Report",
+  },
   form: {
     title: "Send feedback",
     kind: "What is it?",

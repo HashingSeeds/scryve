@@ -16,6 +16,7 @@ const thread = {
     shippedIn: undefined,
     createdAt: 0,
     voted: false,
+    reported: false,
     mine: true,
     published: false,
     unread: true,

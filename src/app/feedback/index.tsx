@@ -24,6 +24,7 @@ function Board() {
   const args = key ? { key, ...(isFeedbackStatus(filter) ? { status: filter } : {}) } : null
   const items = useQuery(api.feedback.board, args ?? "skip")
   const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
+  const report = useMutation(api.feedback.report)
   const vote = useMutation(api.feedback.vote).withOptimisticUpdate(
     (store, { requestId, voted }) => {
       if (!args) return
@@ -50,6 +51,9 @@ function Board() {
         if (key) void vote({ key, requestId: item._id, voted }).catch(() => undefined)
       }}
       onOpen={(item) => router.push(`/feedback/${item._id}`)}
+      onReport={(item) => {
+        if (key) void report({ key, requestId: item._id }).catch(() => undefined)
+      }}
       onSuggest={() => router.push("/feedback/new")}
       onMine={() => router.push("/feedback/mine")}
       onBack={leaveFeedback}

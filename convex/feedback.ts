@@ -30,6 +30,7 @@ const limiter = new RateLimiter(components.rateLimiter, {
   feedbackSubmit: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
   feedbackMessage: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
   feedbackVote: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 30 },
+  feedbackReport: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
 })
 
 const BOARD_SIZE = 100
@@ -67,7 +68,7 @@ async function ownedRequest(ctx: Ctx, who: Viewer, requestId: Id<"feedbackReques
 
 async function limit(
   ctx: MutationCtx,
-  name: "feedbackSubmit" | "feedbackMessage" | "feedbackVote",
+  name: "feedbackSubmit" | "feedbackMessage" | "feedbackVote" | "feedbackReport",
   key: string,
 ) {
   const result = await limiter.limit(ctx, name, { key })
@@ -83,7 +84,10 @@ async function postCard(ctx: MutationCtx, requestId: Id<"feedbackRequests">) {
   await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, { requestId })
 }
 
-function boardItem(request: Doc<"feedbackRequests">, voted: boolean, mine: boolean) {
+function boardItem(
+  request: Doc<"feedbackRequests">,
+  { voted, reported, mine }: { voted: boolean; reported: boolean; mine: boolean },
+) {
   return {
     _id: request._id,
     kind: request.kind,
@@ -94,13 +98,14 @@ function boardItem(request: Doc<"feedbackRequests">, voted: boolean, mine: boole
     shippedIn: request.shippedIn,
     createdAt: request._creationTime,
     voted,
+    reported,
     mine,
   }
 }
 
 function ownItem(request: Doc<"feedbackRequests">) {
   return {
-    ...boardItem(request, false, true),
+    ...boardItem(request, { voted: false, reported: false, mine: true }),
     published: request.published,
     unread: request.unread,
     linked: request.userId !== undefined,
@@ -127,15 +132,19 @@ export const board = query({
       .take(BOARD_SIZE)
     return await Promise.all(
       requests.map(async (request) => {
-        const voted = who
-          ? !!(await ctx.db
-              .query("feedbackVotes")
-              .withIndex("by_request_and_sender", (q) =>
-                q.eq("requestId", request._id).eq("senderHash", who.hash),
-              )
-              .unique())
-          : false
-        return boardItem(request, voted, !!who && owns(request, who))
+        if (!who) return boardItem(request, { voted: false, reported: false, mine: false })
+        const bySender = (table: "feedbackVotes" | "feedbackReports") =>
+          ctx.db
+            .query(table)
+            .withIndex("by_request_and_sender", (q) =>
+              q.eq("requestId", request._id).eq("senderHash", who.hash),
+            )
+            .unique()
+        return boardItem(request, {
+          voted: !!(await bySender("feedbackVotes")),
+          reported: !!(await bySender("feedbackReports")),
+          mine: owns(request, who),
+        })
       }),
     )
   },
@@ -213,6 +222,7 @@ export const submit = mutation({
       status: "review",
       published: false,
       votes: vote ? 1 : 0,
+      reports: 0,
       senderHash: who.hash,
       userId,
       appVersion: args.appVersion?.slice(0, FEEDBACK_LIMITS.version),
@@ -244,6 +254,28 @@ export const vote = mutation({
     if (existing) await ctx.db.delete(existing._id)
     else await ctx.db.insert("feedbackVotes", { requestId, senderHash: who.hash })
     await ctx.db.patch(requestId, { votes: Math.max(0, request.votes + (voted ? 1 : -1)) })
+    return null
+  },
+})
+
+export const report = mutation({
+  args: { key: v.string(), requestId: v.id("feedbackRequests") },
+  handler: async (ctx, { key, requestId }) => {
+    const who = await viewer(ctx, key)
+    const request = await ctx.db.get(requestId)
+    if (!request || !request.published || owns(request, who))
+      throw new ConvexError({ code: "not_found", message: "Feedback not found" })
+    const existing = await ctx.db
+      .query("feedbackReports")
+      .withIndex("by_request_and_sender", (q) =>
+        q.eq("requestId", requestId).eq("senderHash", who.hash),
+      )
+      .unique()
+    if (existing) return null
+    await limit(ctx, "feedbackReport", who.hash)
+    await ctx.db.insert("feedbackReports", { requestId, senderHash: who.hash })
+    await ctx.db.patch(requestId, { reports: request.reports + 1 })
+    await postCard(ctx, requestId)
     return null
   },
 })
@@ -307,31 +339,38 @@ export const continueDeleteMine = internalMutation({
   },
 })
 
+async function deleteRequest(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
+  let done = true
+  for (const table of ["feedbackMessages", "feedbackVotes", "feedbackReports"] as const) {
+    const rows =
+      table === "feedbackMessages"
+        ? await ctx.db
+            .query(table)
+            .withIndex("by_request", (q) => q.eq("requestId", request._id))
+            .take(THREAD_SIZE)
+        : await ctx.db
+            .query(table)
+            .withIndex("by_request_and_sender", (q) => q.eq("requestId", request._id))
+            .take(THREAD_SIZE)
+    for (const row of rows) await ctx.db.delete(row._id)
+    if (rows.length === THREAD_SIZE) done = false
+  }
+  if (!done) return false
+  await ctx.db.delete(request._id)
+  await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, {
+    requestId: request._id,
+    deleted: true,
+  })
+  return true
+}
+
 async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
   const requests = await ctx.db
     .query("feedbackRequests")
     .withIndex("by_sender_and_updated_at", (q) => q.eq("senderHash", hash))
     .take(DELETE_BATCH)
-  for (const request of requests) {
-    const messages = await ctx.db
-      .query("feedbackMessages")
-      .withIndex("by_request", (q) => q.eq("requestId", request._id))
-      .take(THREAD_SIZE)
-    for (const message of messages) await ctx.db.delete(message._id)
-    const votes = await ctx.db
-      .query("feedbackVotes")
-      .withIndex("by_request_and_sender", (q) => q.eq("requestId", request._id))
-      .take(THREAD_SIZE)
-    for (const vote of votes) await ctx.db.delete(vote._id)
-    // why: a request with more messages or votes than one batch stays until the next pass.
-    if (messages.length < THREAD_SIZE && votes.length < THREAD_SIZE) {
-      await ctx.db.delete(request._id)
-      await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, {
-        requestId: request._id,
-        deleted: true,
-      })
-    }
-  }
+  let more = requests.length === DELETE_BATCH
+  for (const request of requests) if (!(await deleteRequest(ctx, request))) more = true
   const votes = await ctx.db
     .query("feedbackVotes")
     .withIndex("by_sender", (q) => q.eq("senderHash", hash))
@@ -341,8 +380,22 @@ async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
     const request = await ctx.db.get(vote.requestId)
     if (request) await ctx.db.patch(request._id, { votes: Math.max(0, request.votes - 1) })
   }
-  if (requests.length === DELETE_BATCH || votes.length === THREAD_SIZE)
+  const reports = await ctx.db
+    .query("feedbackReports")
+    .withIndex("by_sender", (q) => q.eq("senderHash", hash))
+    .take(THREAD_SIZE)
+  for (const report of reports) await ctx.db.delete(report._id)
+  if (more || votes.length === THREAD_SIZE || reports.length === THREAD_SIZE)
     await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
+}
+
+export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users">, batch: number) {
+  const linked = await ctx.db
+    .query("feedbackRequests")
+    .withIndex("by_user_and_updated_at", (q) => q.eq("userId", userId))
+    .take(batch)
+  for (const request of linked) await deleteRequest(ctx, request)
+  return linked.length
 }
 
 export const apolloCardInput = internalQuery({

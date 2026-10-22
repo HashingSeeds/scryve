@@ -1,7 +1,8 @@
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import { feedbackCard, unlinkUserFeedback } from "./lib/feedback"
+import { deleteAccountFeedback } from "./feedback"
+import { feedbackCard } from "./lib/feedback"
 
 const ME = "a".repeat(64)
 const OTHER = "b".repeat(64)
@@ -163,20 +164,38 @@ describe("feedback", () => {
     expect(await ana.query(api.feedback.mine, { key: OTHER })).toEqual([])
   })
 
-  it("keeps a deleted account's requests with the install that sent them", async () => {
+  it("deletes a deleted account's linked requests but not the ones sent without it", async () => {
     const t = makeConvexTest()
     const ana = await signedIn(t, "ana-subject")
-    await ana.mutation(api.feedback.submit, {
-      key: ME,
-      kind: "bug",
-      title: "Crash",
-      body: "On launch",
-      includeAccount: true,
-    })
+    const draft = { key: ME, kind: "bug" as const, title: "Crash", body: "On launch" }
+    await ana.mutation(api.feedback.submit, { ...draft, includeAccount: true })
+    const anonymous = await ana.mutation(api.feedback.submit, { ...draft, includeAccount: false })
     const user = await t.run((ctx) => ctx.db.query("users").first())
-    await t.run((ctx) => unlinkUserFeedback(ctx, user!._id, 10))
-    expect(await t.query(api.feedback.mine, { key: ME })).toMatchObject([{ linked: false }])
-    expect(await ana.query(api.feedback.mine, { key: OTHER })).toEqual([])
+    await t.run((ctx) => deleteAccountFeedback(ctx, user!._id, 10))
+    expect((await t.query(api.feedback.mine, { key: ME })).map(({ _id }) => _id)).toEqual([
+      anonymous,
+    ])
+  })
+
+  it("lets other players report a public request once, and tells Apollo", async () => {
+    const t = makeConvexTest()
+    const requestId = await submit(t)
+    await expect(t.mutation(api.feedback.report, { key: OTHER, requestId })).rejects.toThrow(
+      "Feedback not found",
+    )
+    await apollo(t, requestId, "publish")
+    await expect(t.mutation(api.feedback.report, { key: ME, requestId })).rejects.toThrow(
+      "Feedback not found",
+    )
+
+    await t.mutation(api.feedback.report, { key: OTHER, requestId })
+    await t.mutation(api.feedback.report, { key: OTHER, requestId })
+    expect(await t.query(api.feedback.board, { key: OTHER })).toMatchObject([{ reported: true }])
+    const input = await t.query(internal.feedback.apolloCardInput, { requestId })
+    expect(feedbackCard(input!)).toMatchObject({
+      phase: "player:1:reports:1",
+      meta: { reports: "1" },
+    })
   })
 
   it("deletes everything an install sent and takes back its votes", async () => {
@@ -255,6 +274,7 @@ describe("feedbackCard", () => {
     status: "review" as const,
     published: false,
     votes: 3,
+    reports: 0,
     senderHash: "h",
     unread: false,
     updatedAt: 0,
@@ -272,7 +292,7 @@ describe("feedbackCard", () => {
     expect(card).toMatchObject({
       key: "scryve:r1",
       kind: "approval",
-      phase: "player:2",
+      phase: "player:2:reports:0",
       title: "Request: See https://evil.test/x",
       meta: { status: "In review · private", votes: "3", from: "Anonymous" },
     })
@@ -294,7 +314,7 @@ describe("feedbackCard", () => {
     })
     expect(card).toMatchObject({
       kind: "update",
-      phase: "player:2",
+      phase: "player:2:reports:0",
       meta: { status: "Shipped in 2.2.0 · public" },
     })
     expect(card.actions[1]).toMatchObject({ id: "hide" })

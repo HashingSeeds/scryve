@@ -1,7 +1,6 @@
 import { ConvexError, v, type Infer } from "convex/values"
 
 import type { Doc, Id } from "../_generated/dataModel"
-import type { MutationCtx } from "../_generated/server"
 
 export const FEEDBACK_KINDS = ["feature", "bug"] as const
 export const FEEDBACK_STATUSES = ["review", "planned", "building", "shipped", "declined"] as const
@@ -91,14 +90,15 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     source: "feedback",
     key,
     kind: awaitingTeam ? "approval" : "update",
-    // why: a new phase pushes again, so only the player's own messages notify Matthew.
-    phase: `player:${playerTurns}`,
+    // why: a new phase pushes again, so only the player's own messages and new reports notify Matthew.
+    phase: `player:${playerTurns}:reports:${request.reports}`,
     push: "alert",
     title: clip(`${label}: ${request.title}`, 200),
     body,
     meta: {
       status: `${status}${request.published ? " · public" : " · private"}`,
       votes: String(request.votes),
+      ...(request.reports ? { reports: String(request.reports) } : {}),
       from: account ?? "Anonymous",
       ...(request.appVersion || request.platform
         ? { app: [request.appVersion, request.platform].filter(Boolean).join(" · ") }
@@ -115,13 +115,4 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
       { id: "declined", label: "Decline", style: "destructive", repeat: true },
     ],
   } as const
-}
-
-export async function unlinkUserFeedback(ctx: MutationCtx, userId: Id<"users">, batch: number) {
-  const linked = await ctx.db
-    .query("feedbackRequests")
-    .withIndex("by_user_and_updated_at", (q) => q.eq("userId", userId))
-    .take(batch)
-  for (const request of linked) await ctx.db.patch(request._id, { userId: undefined })
-  return linked.length
 }

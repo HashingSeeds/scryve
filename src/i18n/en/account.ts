@@ -240,6 +240,10 @@ const account = {
         title: "Local games stay on this device",
         body: "Offline game history is stored only on this device. It is not linked to your account and is not remotely erased.",
       },
+      feedback: {
+        title: "Feedback sent without your account stays",
+        body: "Feedback you included your account with is deleted. Anything sent without it stays with the device that sent it. To remove that, open Feature requests, then My requests, and tap Delete my feedback.",
+      },
       signOut: {
         title: "All devices are signed out",
         body: "This device and any other signed-in devices are signed out automatically.",
