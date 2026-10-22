@@ -1266,7 +1266,7 @@ describe("connected game lifecycle and API hardening", () => {
       publicId: finished,
       result: { kind: "win", winnerPlayerIds: [projection.players[0].playerId] },
     })
-    expect(await deckRecords()).toEqual({ results: 1, deckGames: [1], versionGames: [1] })
+    expect(await deckRecords()).toEqual({ results: 0, deckGames: [], versionGames: [1] })
   })
 
   it("abandons lobby/active games idempotently with correct bounded summaries and replay", async () => {

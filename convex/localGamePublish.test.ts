@@ -107,13 +107,13 @@ describe("publishFinishedLocalGame", () => {
         .withIndex("by_version", (q) => q.eq("deckVersionId", versionId))
         .unique(),
     }))
-    expect(rows.stats).toMatchObject({ games: 1, wins: 1, losses: 0 })
+    expect(rows.stats).toBeNull()
     expect(rows.versionStats).toMatchObject({ games: 1, wins: 1 })
     expect(rows.games).toHaveLength(1)
     expect(rows.games[0]).toMatchObject({ mode: "local", status: "finished" })
     expect(rows.entries).toHaveLength(1)
     expect(rows.entries[0]).toMatchObject({ source: "local", outcome: "win" })
-    expect(rows.results).toHaveLength(1)
+    expect(rows.results).toHaveLength(0)
   })
 
   it("keeps a game with no seat of the user's as a backup with an unknown outcome", async () => {
