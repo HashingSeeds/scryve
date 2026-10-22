@@ -1483,6 +1483,44 @@ describe("NewGameScreen", () => {
       })
     })
 
+    it("blocks seat changes until a deck pick has saved its fingerprint", async () => {
+      const local = saveGuestDeck({ name: "Burn", game: "mtg", format: "commander", cards: [] })
+      let resolvePin!: (fingerprint: string) => void
+      jest.mocked(deckFingerprint).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePin = resolve
+        }),
+      )
+      const onSavePlayers = jest.fn()
+      setup({
+        initialGame: existingGame(),
+        onSavePlayers,
+        account: { ownerId: "owner-a", decks: [] },
+      })
+      pick(local.localId)
+      expect(screen.getByTestId("me-seat")).toBeDisabled()
+      fireEvent.press(screen.getByTestId("me-seat"))
+      expect(screen.queryByTestId("me-seat-option-1")).toBeNull()
+      expect(onSavePlayers).not.toHaveBeenCalled()
+      await act(async () => resolvePin(fingerprint))
+      expect(screen.getByTestId("me-seat")).toBeEnabled()
+      fireEvent.press(screen.getByTestId("me-seat"))
+      fireEvent.press(screen.getByTestId("me-seat-option-1"))
+      expect(onSavePlayers).toHaveBeenCalledTimes(2)
+      expect(onSavePlayers.mock.calls.map(([, account]) => account)).toEqual([
+        expect.objectContaining({
+          meSeat: 0,
+          deckKey: local.localId,
+          deckFingerprint: fingerprint,
+        }),
+        expect.objectContaining({
+          meSeat: 1,
+          deckKey: local.localId,
+          deckFingerprint: fingerprint,
+        }),
+      ])
+    })
+
     it("keeps the existing pin when reselecting its deck", async () => {
       const onSavePlayers = jest.fn()
       const onStartLocal = jest.fn()
@@ -1571,7 +1609,10 @@ describe("NewGameScreen", () => {
             </ThemeProvider>,
           )
         } else {
-          pick(next === "clear" ? "none" : second.localId)
+          const picker = screen
+            .UNSAFE_getAllByType(SelectField)
+            .find((field) => field.props.testID === "me-deck")!
+          fireEvent(picker, "select", next === "clear" ? undefined : second.localId)
           await act(async () => undefined)
         }
         await act(async () => resolvePin(fingerprint))
@@ -1814,7 +1855,7 @@ it("offers matching local decks alongside synced decks and hashes only the chose
   expect(deckFingerprint).not.toHaveBeenCalled()
   await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
   expect(deckFingerprint).toHaveBeenCalledTimes(1)
-  expect(deckFingerprint).toHaveBeenCalledWith(cards)
+  expect(deckFingerprint).toHaveBeenCalledWith(cards.map((card) => ({ ...card, game: "mtg" })))
   expect(onStartLocal.mock.calls[0][2].account).toMatchObject({
     ownerId: "owner-a",
     meSeat: 0,

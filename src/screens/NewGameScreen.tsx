@@ -295,6 +295,7 @@ function NewGameForm({
       versionId: chosen.deckVersionId,
       deckKey: chosen.deckKey,
       deckFingerprint: chosen.deckFingerprint,
+      system: claimedGame.system,
       name: chosen.deckName ?? "Deck",
       startingValue: seat === undefined ? undefined : claimedGame.players[seat]?.startingLife,
     }
@@ -634,6 +635,7 @@ function NewGameForm({
     setPlayerSaveError(undefined)
     try {
       if (!accountInput || !onSavePlayers || !initialGame) return
+      setPinning(true)
       const pinned = selected
         ? await pinDeckChoice(selected, accountInput.ownerId)
         : {
@@ -653,7 +655,10 @@ function NewGameForm({
         cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
       )
     } finally {
-      if (pinningRef.current === request) pinningRef.current = undefined
+      if (pinningRef.current === request) {
+        pinningRef.current = undefined
+        setPinning(false)
+      }
     }
   }
 

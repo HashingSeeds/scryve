@@ -5,7 +5,13 @@ const mockLoadPending = jest.fn()
 const mockMappedVersionId = jest.fn((_versionId: string): string | undefined => undefined)
 const mockLoadCards = jest.fn()
 const mockLoadShelf = jest.fn(() => [
-  { _id: "server", syncId: "stable", deckKey: "synced-key", latestVersionId: "version" },
+  {
+    _id: "server",
+    syncId: "stable",
+    deckKey: "synced-key",
+    latestVersionId: "version",
+    game: "mtg",
+  },
 ])
 const mockLoadGuestDeck = jest.fn()
 
@@ -35,6 +41,15 @@ beforeEach(() => {
   mockLoadCards.mockReturnValue(undefined)
   mockLoadPending.mockReturnValue([])
   mockMappedVersionId.mockReset()
+  mockLoadShelf.mockReturnValue([
+    {
+      _id: "server",
+      syncId: "stable",
+      deckKey: "synced-key",
+      latestVersionId: "version",
+      game: "mtg",
+    },
+  ])
 })
 
 it("uses a local deck's explicit key and defaults older decks to localId without hashing", () => {
@@ -64,7 +79,7 @@ it("hashes only the selected synced version's cached cards and resolves its shel
   })
   expect(mockLoadCards).toHaveBeenCalledWith("version")
   expect(deckFingerprint).toHaveBeenCalledTimes(1)
-  expect(deckFingerprint).toHaveBeenCalledWith(cards)
+  expect(deckFingerprint).toHaveBeenCalledWith(cards.map((card) => ({ ...card, game: "mtg" })))
 })
 
 it("leaves an uncached synced list's fingerprint unknown", async () => {
@@ -147,7 +162,7 @@ it("pins the newest pending card write for the chosen version instead of its cac
     pending("Rename", 4, "version", "rename"),
   ])
   expect(chosenDeckCards({ name: "Burn", versionId: "version" }, "owner")).toEqual([
-    { name: "New", quantity: 1 },
+    { name: "New", quantity: 1, game: "mtg" },
   ])
 })
 
@@ -156,4 +171,37 @@ it("uses a queued edit under its acknowledged version id, including an empty lis
   mockMappedVersionId.mockImplementation((id) => (id === "provisional" ? "version" : undefined))
   mockLoadPending.mockReturnValue([{ versionId: "provisional", expectedRevision: 1, cards: [] }])
   expect(chosenDeckCards({ name: "Burn", versionId: "version" }, "owner")).toEqual([])
+})
+
+it.each([false, true])(
+  "fills missing card games from the synced deck with a pending edit: %s",
+  (pending) => {
+    const cards = [
+      { name: "Pikachu", cardId: "base1-58", quantity: 4 },
+      { name: "Raichu", cardId: "base1-14", quantity: 2, game: "pokemon" },
+    ]
+    mockLoadShelf.mockReturnValue([
+      {
+        _id: "server",
+        syncId: "stable",
+        deckKey: "synced-key",
+        latestVersionId: "version",
+        game: "pokemon",
+      },
+    ])
+    mockLoadCards.mockReturnValue({ cards })
+    if (pending)
+      mockLoadPending.mockReturnValue([{ versionId: "version", expectedRevision: 1, cards }])
+    expect(chosenDeckCards({ name: "Pikachu", versionId: "version" }, "owner")).toEqual(
+      cards.map((card) => ({ ...card, game: "pokemon" })),
+    )
+  },
+)
+
+it("uses the selected system when cards are cached without shelf metadata", () => {
+  mockLoadShelf.mockReturnValue([])
+  mockLoadCards.mockReturnValue({ cards: [{ name: "Pikachu", quantity: 4 }] })
+  expect(
+    chosenDeckCards({ name: "Pikachu", versionId: "version", system: "pokemon" }, "owner"),
+  ).toEqual([{ name: "Pikachu", quantity: 4, game: "pokemon" }])
 })

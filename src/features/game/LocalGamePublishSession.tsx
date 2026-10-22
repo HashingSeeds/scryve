@@ -33,13 +33,22 @@ function isPermanentRejection(cause: unknown) {
 const CLAIM_RETRY_DELAYS_MS = [5_000, 30_000, 300_000]
 
 function isDeckRejection(cause: unknown) {
-  return convexErrorCode(cause)?.startsWith("deck_") === true
+  const code = convexErrorCode(cause)
+  return code?.startsWith("deck_") === true || code?.startsWith("invalid_deck_") === true
 }
 
-function withoutDeckVersion(snapshot: ReturnType<typeof buildFinishedLocalGameSnapshot>) {
+function withoutDeck(snapshot: ReturnType<typeof buildFinishedLocalGameSnapshot>) {
   return {
     ...snapshot,
-    players: snapshot.players.map(({ deckVersionId: _deckVersionId, ...player }) => player),
+    players: snapshot.players.map(
+      ({
+        deckVersionId: _deckVersionId,
+        deckKey: _deckKey,
+        deckFingerprint: _deckFingerprint,
+        deckName: _deckName,
+        ...player
+      }) => player,
+    ),
   }
 }
 
@@ -59,6 +68,7 @@ function ActivePublish({
   const [finishCount, setFinishCount] = useState(0)
   const [claimCount, setClaimCount] = useState(0)
   const claimRetries = useRef(0)
+  const publishRetry = useRef<{ ownerId: string; at: number } | undefined>(undefined)
 
   useEffect(
     () => repository.onGameFinished(() => setFinishCount((count) => count + 1)),
@@ -67,14 +77,21 @@ function ActivePublish({
 
   useEffect(() => {
     if (!ready || !online || !ownerId) return
+    const retryDelay =
+      publishRetry.current?.ownerId === ownerId ? publishRetry.current.at - Date.now() : 0
+    if (retryDelay > 0) {
+      const timer = setTimeout(() => setFinishCount((count) => count + 1), retryDelay)
+      return () => clearTimeout(timer)
+    }
+    publishRetry.current = undefined
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const retryThrottled = (cause: unknown) => {
-      if (!cancelled && convexErrorCode(cause) === "rate_limited")
-        retryTimer = setTimeout(
-          () => setFinishCount((count) => count + 1),
-          Math.max(1_000, convexRetryAfterMs(cause) ?? 60_000),
-        )
+      if (!cancelled && convexErrorCode(cause) === "rate_limited") {
+        const delay = Math.max(1_000, convexRetryAfterMs(cause) ?? 60_000)
+        publishRetry.current = { ownerId, at: Date.now() + delay }
+        retryTimer = setTimeout(() => setFinishCount((count) => count + 1), delay)
+      }
     }
     void (async () => {
       for (const game of repository.pendingPublishes(ownerId)) {
@@ -89,16 +106,13 @@ function ActivePublish({
             retryThrottled(cause)
             return
           }
-          if (
-            !isDeckRejection(cause) ||
-            snapshot.players.every((player) => !player.deckVersionId)
-          ) {
+          if (!isDeckRejection(cause)) {
             repository.markPublishFailed(game.id)
             continue
           }
         }
         try {
-          await publish(withoutDeckVersion(snapshot))
+          await publish(withoutDeck(snapshot))
           repository.markPublished(game.id)
         } catch (cause) {
           if (!isPermanentRejection(cause)) {

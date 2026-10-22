@@ -23,6 +23,7 @@ export type SelectedDeck = Pick<
   DeckChoice,
   "versionId" | "deckKey" | "localId" | "name" | "startingValue"
 > & {
+  system?: string
   deckFingerprint?: string
 }
 
@@ -53,18 +54,28 @@ export function chosenDeckCards(
   if (deck.localId) {
     const local = loadGuestDeck(deck.localId)
     if (!local) throw new Error(translate("decks:detail.maybeDeleted"))
-    return local.deck.cards
+    return local.deck.cards.map((card) => ({
+      ...card,
+      game: card.game ?? local.deck.game ?? "mtg",
+    }))
   }
   if (!deck.versionId) return undefined
   const cache = new DeckVersionCacheRepository(ownerId, undefined, deploymentUrl)
   const pending = new DeckVersionWriteRepository(ownerId, undefined, deploymentUrl).loadPending()
-  return (
+  const cards =
     newestPendingCardWrite(
       pending,
       deck.versionId,
       (versionId) => cache.mappedVersionId(versionId) ?? versionId,
     )?.cards ?? cache.loadCards(deck.versionId)?.cards
-  )
+  if (cards === undefined) return undefined
+  const cachedDeck = new DeckSyncRepository(ownerId, undefined, deploymentUrl)
+    .loadShelf()
+    .find((candidate) => candidate.latestVersionId === deck.versionId)
+  return cards.map((card) => ({
+    ...card,
+    game: card.game ?? deck.system ?? cachedDeck?.game ?? "mtg",
+  }))
 }
 
 export function chosenDeckKey(
