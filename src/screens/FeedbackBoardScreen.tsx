@@ -1,190 +1,136 @@
-import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
-import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { FilterChips } from "@/components/FilterChips"
-import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { statusLabel, type FeedbackBoardItem } from "@/features/feedback/status"
+import { TextField } from "@/components/TextField"
+import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
+import { RequestMeta, VoteButton } from "@/features/feedback/RequestParts"
+import type { FeedbackBoardItem } from "@/features/feedback/status"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-const FILTERS = ["all", "review", "planned", "building", "shipped"] as const
-const VOTE_MARK = "▲"
-export type FeedbackFilter = (typeof FILTERS)[number]
+export const FEEDBACK_TABS = ["all", "features", "bugs", "shipped"] as const
+export type FeedbackTab = (typeof FEEDBACK_TABS)[number]
 
 export interface FeedbackBoardScreenProps {
   items: readonly FeedbackBoardItem[] | undefined
-  filter: FeedbackFilter
+  search: string
+  searched: string
+  tab: FeedbackTab
   unread: number
-  onFilter: (filter: FeedbackFilter) => void
+  offline: boolean
+  voteFailed: boolean
+  onSearch: (search: string) => void
+  onTab: (tab: FeedbackTab) => void
   onVote: (item: FeedbackBoardItem, voted: boolean) => void
   onOpen: (item: FeedbackBoardItem) => void
-  onReport: (item: FeedbackBoardItem) => void
-  onSuggest: () => void
+  onSuggest: (title?: string) => void
   onMine: () => void
   onBack: () => void
+  autoFocusSearch?: boolean
 }
 
 export function FeedbackBoardScreen({
   items,
-  filter,
+  search,
+  searched,
+  tab,
   unread,
-  onFilter,
+  offline,
+  voteFailed,
+  onSearch,
+  onTab,
   onVote,
   onOpen,
-  onReport,
   onSuggest,
   onMine,
   onBack,
+  autoFocusSearch,
 }: FeedbackBoardScreenProps) {
   const { themed } = useAppTheme()
-  const [reporting, setReporting] = useState<FeedbackBoardItem>()
+  const query = searched.trim()
   return (
-    <Screen
-      preset="scroll"
-      safeAreaEdges={["bottom"]}
-      header={{ titleTx: "feedback:board.title", leftTx: "common:back", onLeftPress: onBack }}
-      contentContainerStyle={themed($content)}
+    <FeedbackLayout
+      title={translate("feedback:board.title")}
+      offline={offline}
+      onBack={onBack}
+      footer={
+        <>
+          <Button tx="feedback:board.suggest" preset="reversed" onPress={() => onSuggest()} />
+          <Button
+            text={
+              unread
+                ? translate("feedback:board.mineUnread", { count: unread })
+                : translate("feedback:board.mine")
+            }
+            onPress={onMine}
+          />
+        </>
+      }
     >
+      <TextField
+        placeholderTx="feedback:board.search"
+        accessibilityLabel={translate("feedback:board.search")}
+        value={search}
+        onChangeText={onSearch}
+        autoFocus={autoFocusSearch}
+        autoCorrect={false}
+        returnKeyType="search"
+        clearable
+      />
       <FilterChips
-        chips={FILTERS.map((id) => ({
-          id,
-          label:
-            id === "all" ? translate("feedback:board.all") : translate(`feedback:status.${id}`),
-        }))}
-        selectedId={filter}
-        accessibilityLabel={translate("feedback:board.filters")}
+        chips={FEEDBACK_TABS.map((id) => ({ id, label: translate(`feedback:board.tabs.${id}`) }))}
+        selectedId={tab}
+        accessibilityLabel={translate("feedback:board.tabs.label")}
         onSelect={(id) => {
-          const next = FILTERS.find((candidate) => candidate === id)
-          if (next) onFilter(next)
+          const next = FEEDBACK_TABS.find((candidate) => candidate === id)
+          if (next) onTab(next)
         }}
       />
-      <View style={themed($actions)}>
-        <Button tx="feedback:board.suggest" preset="reversed" style={$grow} onPress={onSuggest} />
-        <Button
-          text={
-            unread
-              ? translate("feedback:board.mineUnread", { count: unread })
-              : translate("feedback:board.mine")
-          }
-          style={$grow}
-          onPress={onMine}
-        />
-      </View>
       {items?.length === 0 ? (
-        <Text tx="feedback:board.empty" style={themed($muted)} />
+        query ? (
+          <View style={themed($empty)}>
+            <Text
+              text={translate("feedback:board.noMatch", { query })}
+              size="xs"
+              style={themed($muted)}
+            />
+            <Button
+              text={translate("feedback:board.suggestQuery", { query })}
+              preset="reversed"
+              onPress={() => onSuggest(query)}
+            />
+          </View>
+        ) : (
+          <Text tx="feedback:board.empty" style={themed($muted)} />
+        )
       ) : (
         items?.map((item) => (
-          <FeedbackRow
-            key={item._id}
-            item={item}
-            onVote={onVote}
-            onOpen={onOpen}
-            onReport={setReporting}
-          />
-        ))
-      )}
-      <ConfirmDialog
-        visible={!!reporting}
-        title={translate("feedback:report.title")}
-        message={translate("feedback:report.body")}
-        confirmText={translate("feedback:report.confirm")}
-        cancelText={translate("common:cancel")}
-        destructive
-        backdropAccessibilityLabel={translate("common:cancel")}
-        onConfirm={() => {
-          if (reporting) onReport(reporting)
-          setReporting(undefined)
-        }}
-        onClose={() => setReporting(undefined)}
-      />
-    </Screen>
-  )
-}
-
-function FeedbackRow({
-  item,
-  onVote,
-  onOpen,
-  onReport,
-}: {
-  item: FeedbackBoardItem
-  onVote: FeedbackBoardScreenProps["onVote"]
-  onOpen: FeedbackBoardScreenProps["onOpen"]
-  onReport: FeedbackBoardScreenProps["onReport"]
-}) {
-  const { themed } = useAppTheme()
-  const voteLabel = translate(item.voted ? "feedback:board.removeVote" : "feedback:board.vote", {
-    title: item.title,
-    count: item.votes,
-  })
-  return (
-    <View style={themed($row)}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={voteLabel}
-        accessibilityState={{ selected: item.voted }}
-        hitSlop={8}
-        onPress={() => onVote(item, !item.voted)}
-        style={themed([$vote, item.voted && $voted])}
-      >
-        <Text text={VOTE_MARK} size="xxs" style={themed(item.voted ? $votedText : $muted)} />
-        <Text text={String(item.votes)} size="xs" weight="bold" />
-      </Pressable>
-      <Pressable
-        accessibilityRole={item.mine ? "button" : undefined}
-        disabled={!item.mine}
-        onPress={() => onOpen(item)}
-        style={themed($rowText)}
-      >
-        <Text text={item.title} weight="bold" />
-        <Text text={item.body} size="xs" numberOfLines={3} style={themed($muted)} />
-        <View style={themed($meta)}>
-          <Text
-            text={statusLabel(item)}
-            size="xxs"
-            weight="bold"
-            style={themed(item.status === "shipped" ? $shipped : $muted)}
-          />
-          {item.mine ? null : item.reported ? (
-            <Text tx="feedback:report.done" size="xxs" style={themed($muted)} />
-          ) : (
+          <View key={item._id} style={themed($row)}>
+            <VoteButton item={item} onVote={(voted) => onVote(item, voted)} />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={translate("feedback:report.label", { title: item.title })}
-              hitSlop={8}
-              onPress={() => onReport(item)}
+              onPress={() => onOpen(item)}
+              style={({ pressed }) => [themed($rowText), pressed && $pressed]}
             >
-              <Text tx="feedback:report.action" size="xxs" style={themed($muted)} />
+              <Text text={item.title} weight="bold" />
+              <Text text={item.body} size="xs" numberOfLines={2} style={themed($muted)} />
+              <RequestMeta item={item} yours={item.mine} />
             </Pressable>
-          )}
-        </View>
-      </Pressable>
-    </View>
+          </View>
+        ))
+      )}
+      {offline ? <Text tx="feedback:board.offlineVotes" size="xxs" style={themed($muted)} /> : null}
+      {voteFailed ? (
+        <Text tx="feedback:board.voteFailed" size="xs" accessibilityRole="alert" />
+      ) : null}
+    </FeedbackLayout>
   )
 }
 
-export function isFeedbackStatus(filter: FeedbackFilter): filter is Exclude<FeedbackFilter, "all"> {
-  return filter !== "all"
-}
-
-const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: "100%",
-  maxWidth: 680,
-  alignSelf: "center",
-  paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.lg,
-  gap: spacing.md,
-})
-const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.sm,
-})
-const $grow: ViewStyle = { flex: 1 }
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   gap: spacing.md,
@@ -192,22 +138,7 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderTopWidth: 1,
   borderColor: colors.separator,
 })
-const $vote: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: 44,
-  minHeight: 48,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderRadius: spacing.xs,
-  borderColor: colors.separator,
-})
-const $voted: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
-const $votedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $rowText: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxs })
-const $meta: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "space-between",
-  gap: spacing.sm,
-})
+const $pressed: ViewStyle = { opacity: 0.6 }
+const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $shipped: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })

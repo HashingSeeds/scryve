@@ -3,17 +3,26 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
-import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { Switch } from "@/components/Toggle/Switch"
-import { statusLabel, type FeedbackThread } from "@/features/feedback/status"
+import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
+import { RequestMeta } from "@/features/feedback/RequestParts"
+import type { FeedbackThread } from "@/features/feedback/status"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+export type UnsentReply = { operationId: string; body: string; reason?: string }
+
 export interface FeedbackThreadScreenProps {
   thread: FeedbackThread | null | undefined
-  onReply: (body: string) => Promise<void>
+  unsent: readonly UnsentReply[]
+  offline: boolean
+  error?: string
+  restore?: { id: number; text: string }
+  onReply: (body: string) => void
+  onDiscard: (operationId: string) => void
   onIncludeAccount: (included: boolean) => void
   onSignIn: () => void
   onBack: () => void
@@ -21,89 +30,60 @@ export interface FeedbackThreadScreenProps {
 
 export function FeedbackThreadScreen({
   thread,
+  unsent,
+  offline,
+  error,
+  restore,
   onReply,
+  onDiscard,
   onIncludeAccount,
   onSignIn,
   onBack,
 }: FeedbackThreadScreenProps) {
   const { themed } = useAppTheme()
   const [reply, setReply] = useState("")
-  const [sending, setSending] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [restored, setRestored] = useState<number>()
   const [showOriginal, setShowOriginal] = useState(false)
-
-  async function send() {
-    if (!reply.trim() || sending) return
-    setSending(true)
-    setFailed(false)
-    try {
-      await onReply(reply.trim())
-      setReply("")
-    } catch {
-      setFailed(true)
-    } finally {
-      setSending(false)
-    }
+  if (restore && restore.id !== restored) {
+    setRestored(restore.id)
+    setReply(restore.text)
   }
+  const request = thread?.request
 
   return (
-    <Screen
-      preset="scroll"
-      safeAreaEdges={["bottom"]}
-      header={{ titleTx: "feedback:thread.title", leftTx: "common:back", onLeftPress: onBack }}
-      contentContainerStyle={themed($content)}
+    <FeedbackLayout
+      title={request?.title ?? translate("feedback:mine.title")}
+      offline={offline}
+      onBack={onBack}
     >
       {thread === null ? <Text tx="feedback:thread.missing" style={themed($muted)} /> : null}
-      {thread ? (
+      {request ? (
         <>
-          <View style={themed($head)}>
-            <Text text={thread.request.title} preset="subheading" accessibilityRole="header" />
-            <Text
-              text={statusLabel(thread.request)}
-              size="xxs"
-              weight="bold"
-              style={themed($muted)}
-            />
-            <Text text={thread.request.body} />
-            {thread.request.original ? (
-              <View style={themed($original)}>
-                <View style={themed($originalHead)}>
-                  <Text
-                    tx="feedback:thread.edited"
-                    size="xxs"
-                    weight="bold"
-                    style={themed($muted)}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => setShowOriginal((shown) => !shown)}
-                  >
-                    <Text
-                      tx={
-                        showOriginal
-                          ? "feedback:thread.hideOriginal"
-                          : "feedback:thread.showOriginal"
-                      }
-                      size="xxs"
-                      style={themed($team)}
-                    />
-                  </Pressable>
-                </View>
-                {showOriginal ? (
-                  <>
-                    <Text
-                      text={thread.request.original.title}
-                      weight="bold"
-                      style={themed($muted)}
-                    />
-                    <Text text={thread.request.original.body} style={themed($muted)} />
-                  </>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-          {thread.messages.map((message) => (
+          <RequestMeta item={request} visibility={request.published ? "public" : "private"} />
+          <Text text={request.body} />
+          {request.original ? (
+            <View style={themed($original)}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showOriginal }}
+                hitSlop={8}
+                onPress={() => setShowOriginal((shown) => !shown)}
+              >
+                <Text
+                  tx={showOriginal ? "feedback:thread.editedHide" : "feedback:thread.editedShow"}
+                  size="xs"
+                  style={themed($muted)}
+                />
+              </Pressable>
+              {showOriginal ? (
+                <>
+                  <Text text={request.original.title} weight="bold" style={themed($muted)} />
+                  <Text text={request.original.body} style={themed($muted)} />
+                </>
+              ) : null}
+            </View>
+          ) : null}
+          {thread?.messages.map((message) => (
             <View key={message._id} style={themed($message)}>
               <Text
                 tx={message.from === "team" ? "feedback:thread.team" : "feedback:thread.you"}
@@ -112,6 +92,32 @@ export function FeedbackThreadScreen({
                 style={themed(message.from === "team" ? $team : $muted)}
               />
               <Text text={message.body} />
+            </View>
+          ))}
+          {unsent.map((send) => (
+            <View key={send.operationId} style={themed($message)}>
+              <Text tx="feedback:thread.you" size="xxs" weight="bold" style={themed($muted)} />
+              <Text text={send.body} />
+              {send.reason ? (
+                <>
+                  <Text
+                    text={translate("feedback:mine.notSent", { reason: send.reason })}
+                    size="xxs"
+                    accessibilityRole="alert"
+                  />
+                  <Button
+                    tx="feedback:mine.discard"
+                    style={themed($discard)}
+                    onPress={() => onDiscard(send.operationId)}
+                  />
+                </>
+              ) : (
+                <Text
+                  tx={offline ? "feedback:mine.waiting" : "feedback:mine.sending"}
+                  size="xxs"
+                  style={themed($muted)}
+                />
+              )}
             </View>
           ))}
           <TextField
@@ -123,53 +129,41 @@ export function FeedbackThreadScreen({
             onChangeText={setReply}
           />
           <Button
-            tx="feedback:thread.send"
+            tx={offline ? "feedback:thread.sendOffline" : "feedback:thread.send"}
             preset="reversed"
-            disabled={!reply.trim() || sending}
-            onPress={() => void send()}
+            disabled={!reply.trim()}
+            onPress={() => {
+              onReply(reply.trim())
+              setReply("")
+            }}
           />
-          {failed ? (
-            <Text tx="feedback:thread.sendFailed" accessibilityRole="alert" size="xs" />
-          ) : null}
-          {thread.request.canLink ? (
+          {error ? <Text text={error} accessibilityRole="alert" size="xs" /> : null}
+          {request.linkedElsewhere ? (
+            <Text tx="feedback:thread.linkedElsewhere" size="xs" style={themed($muted)} />
+          ) : request.canLink ? (
             <Switch
               testID="feedback-thread-account"
               labelTx="feedback:thread.includeAccount"
               helperTx="feedback:thread.includeAccountHelper"
-              value={thread.request.linked}
+              value={request.linked}
               onValueChange={onIncludeAccount}
             />
-          ) : thread.request.linked ? (
+          ) : request.linked ? (
             <Text tx="feedback:thread.linked" size="xs" style={themed($muted)} />
           ) : (
             <Button tx="feedback:thread.signInToKeep" onPress={onSignIn} />
           )}
         </>
       ) : null}
-    </Screen>
+    </FeedbackLayout>
   )
 }
 
-const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: "100%",
-  maxWidth: 680,
-  alignSelf: "center",
-  paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.lg,
-  gap: spacing.md,
-})
-const $head: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  gap: spacing.xs,
-  paddingBottom: spacing.md,
-  borderBottomWidth: 1,
-  borderColor: colors.separator,
-})
 const $original: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $originalHead: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "space-between",
-  gap: spacing.sm,
-})
 const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $discard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignSelf: "flex-start",
+  marginTop: spacing.xxs,
+})

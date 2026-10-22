@@ -22,6 +22,7 @@ import {
   reconnectConvexOnNetworkReturn,
 } from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
+import { FeedbackOutboxSession } from "@/features/feedback/FeedbackOutboxSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
 import { NearbyOnlyWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
 
@@ -124,6 +125,7 @@ export function ConfiguredAuth({
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <LocalGamePublishSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
+      <FeedbackOutboxSession />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       {/* why: the hinted user counts as the account, so Clerk confirming that user at launch does not remount the app. */}
       <RevenueCatProvider

@@ -1,73 +1,23 @@
 import { Linking, Platform } from "react-native"
 import * as Application from "expo-application"
 import Constants from "expo-constants"
-import * as ImagePicker from "expo-image-picker"
 import { router } from "expo-router"
-import * as Sentry from "@sentry/react-native"
+import { useQuery } from "convex/react"
 import Head from "expo-router/head"
 
 import { openAppleStandardEula } from "@/content/legalLinks"
+import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { translate } from "@/i18n/translate"
-import {
-  SupportScreen,
-  type SupportFeedback,
-  type SupportScreenshot,
-} from "@/screens/SupportScreen"
+import { SupportScreen } from "@/screens/SupportScreen"
 
-const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
+import { api } from "../../convex/_generated/api"
 
-async function pickScreenshot(): Promise<SupportScreenshot | null> {
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 })
-  if (result.canceled || !result.assets[0]) return null
-  const asset = result.assets[0]
-  if (asset.fileSize && asset.fileSize > MAX_SCREENSHOT_BYTES)
-    throw new Error("Screenshot too large")
-  const data =
-    Platform.OS === "web"
-      ? new Uint8Array(await (await fetch(asset.uri)).arrayBuffer())
-      : await Sentry.getDataFromUri(asset.uri)
-  if (!data || data.length > MAX_SCREENSHOT_BYTES) throw new Error("Screenshot unavailable")
-  return {
-    uri: asset.uri,
-    filename: asset.fileName ?? "screenshot.jpg",
-    contentType: asset.mimeType ?? "image/jpeg",
-    data,
-  }
-}
-
-function submitFeedback({ kind, message, email, screenshot }: SupportFeedback) {
-  if (!Sentry.getClient()) throw new Error("Sentry is unavailable")
-  Sentry.captureFeedback(
-    {
-      message,
-      email,
-      tags: {
-        kind,
-        platform: Platform.OS,
-        appVersion:
-          Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "unknown",
-        build: Application.nativeBuildVersion ?? "unknown",
-      },
-    },
-    {
-      includeReplay: false,
-      ...(screenshot
-        ? {
-            attachments: [
-              {
-                filename: screenshot.filename,
-                contentType: screenshot.contentType,
-                data: screenshot.data,
-              },
-            ],
-          }
-        : {}),
-    },
-  )
-}
+const SUPPORT_EMAIL = "mailto:support@sowinghope.how?subject=Scryve%20Support"
 
 export default function SupportRoute() {
   const pageTitle = translate("account:support.pageTitle")
+  const { configured } = useAuthAccess()
   return (
     <>
       {Platform.OS === "web" ? (
@@ -76,22 +26,35 @@ export default function SupportRoute() {
           <meta name="description" content={translate("account:support.pageDescription")} />
         </Head>
       ) : null}
-      <SupportScreen
-        onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-        onEmailSupport={() =>
-          void Linking.openURL("mailto:support@sowinghope.how?subject=Scryve%20Support")
-        }
-        onOpenFeedback={() => router.push("/feedback")}
-        onSubmitFeedback={submitFeedback}
-        onPickScreenshot={pickScreenshot}
-        onOpenPrivacy={() => router.push("/privacy")}
-        onOpenTerms={() => router.push("/terms")}
-        onOpenLicenseAgreement={
-          Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
-        }
-        onOpenCookiePolicy={() => router.push("/cookie-policy")}
-        appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
-      />
+      {configured ? <SupportWithUnread /> : <Support unread={0} />}
     </>
+  )
+}
+
+function SupportWithUnread() {
+  // why: opening Support shouldn't make a feedback key for someone who never sent any.
+  const key = useFeedbackKey({ create: false })
+  const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
+  return <Support unread={mine?.filter((item) => item.unread).length ?? 0} />
+}
+
+function Support({ unread }: { unread: number }) {
+  return (
+    <SupportScreen
+      unread={unread}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+      onSearch={(q) => router.push({ pathname: "/feedback", params: { q } })}
+      onAllRequests={() => router.push("/feedback")}
+      onYourRequests={() => router.push("/feedback/mine")}
+      onEmailSupport={() => void Linking.openURL(SUPPORT_EMAIL)}
+      onSuggest={() => router.push("/feedback/new")}
+      onOpenPrivacy={() => router.push("/privacy")}
+      onOpenTerms={() => router.push("/terms")}
+      onOpenLicenseAgreement={
+        Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
+      }
+      onOpenCookiePolicy={() => router.push("/cookie-policy")}
+      appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
+    />
   )
 }

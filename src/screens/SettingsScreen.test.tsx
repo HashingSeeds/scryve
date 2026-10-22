@@ -609,7 +609,7 @@ describe("SettingsScreen", () => {
       </ThemeProvider>,
     )
 
-    fireEvent.press(view.getByText("Help & support"))
+    fireEvent.press(view.getByText("Support"))
     expect(onOpenSupport).toHaveBeenCalledTimes(1)
   })
 

@@ -1,62 +1,67 @@
 import { useState } from "react"
-import { router } from "expo-router"
-import { useMutation, useQuery } from "convex/react"
+import { router, useLocalSearchParams } from "expo-router"
+import { useQuery } from "convex/react"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { FeedbackUnavailable } from "@/features/feedback/FeedbackUnavailable"
+import { useHeldOrder } from "@/features/feedback/heldOrder"
 import { leaveFeedback } from "@/features/feedback/navigation"
-import {
-  FeedbackBoardScreen,
-  isFeedbackStatus,
-  type FeedbackFilter,
-} from "@/screens/FeedbackBoardScreen"
+import { useDebounced } from "@/features/feedback/useDebounced"
+import { useFeedbackVote } from "@/features/feedback/useFeedbackVote"
+import { FeedbackBoardScreen, type FeedbackTab } from "@/screens/FeedbackBoardScreen"
 
 import { api } from "../../../convex/_generated/api"
+
+const SEARCH_DELAY_MS = 250
+
+const TAB_FILTERS = {
+  all: {},
+  features: { kind: "feature" },
+  bugs: { kind: "bug" },
+  shipped: { status: "shipped" },
+} as const satisfies Record<FeedbackTab, object>
 
 export default function FeedbackBoardRoute() {
   return useAuthAccess().configured ? <Board /> : <FeedbackUnavailable />
 }
 
 function Board() {
+  const { q } = useLocalSearchParams<{ q?: string }>()
   const key = useFeedbackKey()
-  const [filter, setFilter] = useState<FeedbackFilter>("all")
-  const args = key ? { key, ...(isFeedbackStatus(filter) ? { status: filter } : {}) } : null
-  const items = useQuery(api.feedback.board, args ?? "skip")
-  const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
-  const report = useMutation(api.feedback.report)
-  const vote = useMutation(api.feedback.vote).withOptimisticUpdate(
-    (store, { requestId, voted }) => {
-      if (!args) return
-      const current = store.getQuery(api.feedback.board, args)
-      if (!current) return
-      store.setQuery(
-        api.feedback.board,
-        args,
-        current.map((item) =>
-          item._id === requestId && item.voted !== voted
-            ? { ...item, voted, votes: item.votes + (voted ? 1 : -1) }
-            : item,
-        ),
-      )
-    },
+  const online = useConvexOnline()
+  const [tab, setTab] = useState<FeedbackTab>("all")
+  const [search, setSearch] = useState(q ?? "")
+  const searched = useDebounced(search.trim(), SEARCH_DELAY_MS)
+  const loaded = useQuery(
+    api.feedback.board,
+    key ? { key, ...TAB_FILTERS[tab], ...(searched ? { q: searched } : {}) } : "skip",
   )
+  const items = useHeldOrder(loaded, `${tab}|${searched}`)
+  const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
+  const { vote, failed } = useFeedbackVote(key)
   return (
     <FeedbackBoardScreen
       items={items}
-      filter={filter}
+      search={search}
+      searched={searched}
+      tab={tab}
       unread={mine?.filter((item) => item.unread).length ?? 0}
-      onFilter={setFilter}
-      onVote={(item, voted) => {
-        if (key) void vote({ key, requestId: item._id, voted }).catch(() => undefined)
-      }}
-      onOpen={(item) => router.push(`/feedback/${item._id}`)}
-      onReport={(item) => {
-        if (key) void report({ key, requestId: item._id }).catch(() => undefined)
-      }}
-      onSuggest={() => router.push("/feedback/new")}
+      offline={!online}
+      voteFailed={failed}
+      onSearch={setSearch}
+      onTab={setTab}
+      onVote={(item, voted) => vote(item._id, voted)}
+      onOpen={(item) =>
+        router.push(item.mine ? `/feedback/${item._id}` : `/feedback/request/${item._id}`)
+      }
+      onSuggest={(title) =>
+        router.push(title ? { pathname: "/feedback/new", params: { title } } : "/feedback/new")
+      }
       onMine={() => router.push("/feedback/mine")}
       onBack={leaveFeedback}
+      autoFocusSearch={!!q}
     />
   )
 }

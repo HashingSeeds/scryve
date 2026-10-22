@@ -2,16 +2,16 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { FeedbackBoardScreen } from "./FeedbackBoardScreen"
+import { FeedbackBoardScreen, type FeedbackBoardScreenProps } from "./FeedbackBoardScreen"
 import type { Id } from "../../convex/_generated/dataModel"
 
 const item = {
   _id: "r1" as Id<"feedbackRequests">,
   kind: "feature" as const,
-  title: "Sync timers",
-  body: "Keep the clock on every phone.",
+  title: "Timer for tournament rounds",
+  body: "A 50 minute round clock.",
   status: "shipped" as const,
-  votes: 4,
+  votes: 1,
   shippedIn: "2.1.0",
   createdAt: 0,
   voted: true,
@@ -19,59 +19,62 @@ const item = {
   mine: false,
 }
 
-function renderBoard(overrides: Partial<Parameters<typeof FeedbackBoardScreen>[0]> = {}) {
-  const props = {
+function renderBoard(overrides: Partial<FeedbackBoardScreenProps> = {}) {
+  const props: FeedbackBoardScreenProps = {
     items: [item],
-    filter: "all" as const,
+    search: "",
+    searched: "",
+    tab: "all",
     unread: 0,
-    onFilter: jest.fn(),
+    offline: false,
+    voteFailed: false,
+    onSearch: jest.fn(),
+    onTab: jest.fn(),
     onVote: jest.fn(),
     onOpen: jest.fn(),
-    onReport: jest.fn(),
     onSuggest: jest.fn(),
     onMine: jest.fn(),
     onBack: jest.fn(),
     ...overrides,
   }
-  return {
-    props,
-    view: render(
-      <ThemeProvider initialContext="dark">
-        <FeedbackBoardScreen {...props} />
-      </ThemeProvider>,
-    ),
-  }
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <FeedbackBoardScreen {...props} />
+    </ThemeProvider>,
+  )
+  return { props, view }
 }
 
 describe("FeedbackBoardScreen", () => {
-  it("shows the shipped version and takes back a vote", () => {
+  it("shows its heading, the shipped version, and takes back a vote with a singular label", () => {
     const { props, view } = renderBoard()
+    expect(view.getByRole("header", { name: "Feature requests" })).toBeTruthy()
     expect(view.getByText("Shipped in 2.1.0")).toBeTruthy()
-    fireEvent.press(view.getByLabelText("Remove your vote for Sync timers, 4 votes"))
+    fireEvent.press(view.getByLabelText("Remove your vote for Timer for tournament rounds, 1 vote"))
     expect(props.onVote).toHaveBeenCalledWith(item, false)
   })
 
-  it("asks before reporting someone else's request", () => {
+  it("opens any request from its text, with no report button on the row", () => {
     const { props, view } = renderBoard()
-    fireEvent.press(view.getByLabelText("Report Sync timers"))
-    expect(props.onReport).not.toHaveBeenCalled()
-    fireEvent.press(view.getAllByText("Report").at(-1)!)
-    expect(props.onReport).toHaveBeenCalledWith(item)
+    expect(view.queryByText("Report")).toBeNull()
+    fireEvent.press(view.getByText("Timer for tournament rounds"))
+    expect(props.onOpen).toHaveBeenCalledWith(item)
   })
 
-  it("counts unread replies on My requests", () => {
-    const { props, view } = renderBoard({ unread: 2 })
-    fireEvent.press(view.getByText("My requests · 2 new"))
+  it("turns a search with no results into a suggestion", () => {
+    const { props, view } = renderBoard({ items: [], search: "poison", searched: "poison" })
+    expect(view.getByText("Nothing matches “poison”.")).toBeTruthy()
+    fireEvent.press(view.getByText("Suggest “poison”"))
+    expect(props.onSuggest).toHaveBeenCalledWith("poison")
+  })
+
+  it("pins Suggest and Your requests with the unread count, and notes offline votes", () => {
+    const { props, view } = renderBoard({ unread: 1, offline: true })
+    fireEvent.press(view.getByText("Your requests · 1 new"))
     expect(props.onMine).toHaveBeenCalled()
-  })
-
-  it("opens only the player's own requests", () => {
-    const { props, view } = renderBoard({
-      items: [item, { ...item, _id: "r2" as Id<"feedbackRequests">, title: "Mine", mine: true }],
-    })
-    fireEvent.press(view.getByText("Sync timers"))
-    fireEvent.press(view.getByText("Mine"))
-    expect(props.onOpen).toHaveBeenCalledTimes(1)
-    expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ title: "Mine" }))
+    expect(
+      view.getByText("Offline. What you send waits and goes out when you're back."),
+    ).toBeTruthy()
+    expect(view.getByText("Votes count here now and sync when you're back.")).toBeTruthy()
   })
 })

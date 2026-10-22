@@ -232,7 +232,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "When you send feedback, a feature request, or a reply in Scryve, we keep what you write along with your app version and platform. We use it to answer you, decide what to build, and fix problems.",
+          text: "When you send feedback, a feature request, or a reply in Scryve, we keep what you write along with your app version and platform. We use it to answer you, decide what to build, and fix problems. A bug report also sends details about your device, and any screenshot you add, to Sentry, which stores them for us. Screenshots are never published.",
         },
         {
           type: "paragraph",

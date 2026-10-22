@@ -1,12 +1,10 @@
 import { useState } from "react"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { Image, View } from "react-native"
-import { Trans } from "react-i18next"
+import type { TextStyle, ViewStyle } from "react-native"
+import { Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
-import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { translate } from "@/i18n/translate"
@@ -17,32 +15,17 @@ const GETTING_STARTED = ["startGame", "choosePlay", "setUpTable"] as const
 
 const FAQS = ["restorePro", "manageSubscription", "gameTrouble", "accountPrivacy"] as const
 
-const SUPPORT_KINDS = ["bug", "help", "feedback"] as const
-
-const BRAND_EYEBROW = "SCRYVE"
 const COPYRIGHT = "© 2026 Hashing Seeds LLC"
-const EMAIL_PLACEHOLDER = "you@example.com"
-
-export type SupportFeedback = {
-  kind: (typeof SUPPORT_KINDS)[number]
-  message: string
-  email?: string
-  screenshot?: SupportScreenshot
-}
-
-export type SupportScreenshot = {
-  uri: string
-  filename: string
-  contentType: string
-  data: Uint8Array
-}
+const CHEVRON = "›"
 
 export interface SupportScreenProps {
+  unread: number
   onBack: () => void
+  onSearch: (search: string) => void
+  onAllRequests: () => void
+  onYourRequests: () => void
   onEmailSupport: () => void
-  onOpenFeedback: () => void
-  onSubmitFeedback: (feedback: SupportFeedback) => void
-  onPickScreenshot: () => Promise<SupportScreenshot | null>
+  onSuggest: () => void
   onOpenPrivacy: () => void
   onOpenTerms: () => void
   onOpenLicenseAgreement?: () => void
@@ -51,11 +34,13 @@ export interface SupportScreenProps {
 }
 
 export function SupportScreen({
+  unread,
   onBack,
+  onSearch,
+  onAllRequests,
+  onYourRequests,
   onEmailSupport,
-  onOpenFeedback,
-  onSubmitFeedback,
-  onPickScreenshot,
+  onSuggest,
   onOpenPrivacy,
   onOpenTerms,
   onOpenLicenseAgreement,
@@ -63,52 +48,8 @@ export function SupportScreen({
   appVersion,
 }: SupportScreenProps) {
   const { themed } = useAppTheme()
-  const [kind, setKind] = useState<SupportFeedback["kind"]>("bug")
-  const [message, setMessage] = useState("")
-  const [email, setEmail] = useState("")
-  const [screenshot, setScreenshot] = useState<SupportScreenshot | null>(null)
-  const [pickingScreenshot, setPickingScreenshot] = useState(false)
-  const [status, setStatus] = useState("")
-  const emailValid = /^[^\s@]+@(?:[^\s@.]+\.)+[^\s@.]+$/.test(email.trim())
-  // why: only help promises a reply, so it is the one kind that needs an email.
-  const canSubmit = !!message.trim() && (kind === "help" ? emailValid : !email.trim() || emailValid)
-  const copy = {
-    contactReason: translate("account:support.contactReason"),
-    selectedScreenshot: translate("account:support.selectedScreenshot"),
-    licenseAgreementHint: translate("account:legal.licenseAgreementHint"),
-  }
-
-  function submitFeedback() {
-    if (!canSubmit || pickingScreenshot) return
-    try {
-      onSubmitFeedback({
-        kind,
-        message: message.trim(),
-        ...(email.trim() ? { email: email.trim() } : {}),
-        ...(screenshot ? { screenshot } : {}),
-      })
-      setMessage("")
-      setScreenshot(null)
-      setStatus(translate("account:support.status.queued"))
-    } catch {
-      setStatus(translate("account:support.status.saveFailed"))
-    }
-  }
-
-  async function pickScreenshot() {
-    setPickingScreenshot(true)
-    try {
-      const picked = await onPickScreenshot()
-      if (picked) {
-        setScreenshot(picked)
-        setStatus("")
-      }
-    } catch {
-      setStatus(translate("account:support.status.screenshotFailed"))
-    } finally {
-      setPickingScreenshot(false)
-    }
-  }
+  const [search, setSearch] = useState("")
+  const copy = { licenseAgreementHint: translate("account:legal.licenseAgreementHint") }
 
   return (
     <Screen
@@ -116,105 +57,38 @@ export function SupportScreen({
       safeAreaEdges={["bottom"]}
       header={{ titleTx: "account:support.title", leftTx: "common:back", onLeftPress: onBack }}
       contentContainerStyle={themed($scrollContent)}
-      ScrollViewProps={{ testID: "support-scroll" }}
+      ScrollViewProps={{ testID: "support-scroll", keyboardShouldPersistTaps: "handled" }}
     >
       <View style={themed($content)}>
-        <View style={themed($hero)}>
-          <Text text={BRAND_EYEBROW} preset="formLabel" style={themed($eyebrow)} />
-          <Text
-            tx="account:support.title"
-            preset="heading"
-            accessibilityRole="header"
-            style={themed($title)}
-          />
-          <Text tx="account:support.subtitle" style={themed($subtitle)} />
-        </View>
-
-        <Button tx="feedback:board.title" onPress={onOpenFeedback} />
-
-        <View style={themed($contact)}>
-          <Text tx="account:support.contactUs" preset="subheading" accessibilityRole="header" />
-          <SegmentedControl
-            segments={SUPPORT_KINDS.map((id) => ({
-              id,
-              label: translate(`account:support.kind.${id}`),
-            }))}
-            selectedId={kind}
-            accessibilityLabel={copy.contactReason}
-            onSelect={(id) => {
-              const next = SUPPORT_KINDS.find((supportKind) => supportKind === id)
-              if (next) setKind(next)
-              setStatus("")
-            }}
-          />
+        <View style={themed($requests)}>
+          <Text tx="account:support.title" preset="heading" accessibilityRole="header" />
           <TextField
-            labelTx={`account:support.messageLabel.${kind}`}
-            placeholderTx={`account:support.messagePlaceholder.${kind}`}
-            multiline
-            value={message}
-            onChangeText={(value) => {
-              setMessage(value)
-              setStatus("")
+            placeholderTx="feedback:support.search"
+            accessibilityLabel={translate("feedback:support.search")}
+            value={search}
+            autoCorrect={false}
+            onChangeText={(text) => {
+              // why: typing hands off to the board's own search, so coming back finds this field empty.
+              if (text.trim()) {
+                onSearch(text)
+                setSearch("")
+              } else setSearch(text)
             }}
           />
-          <Text size="xs" style={themed($muted)}>
-            <Trans
-              i18nKey="account:support.translationNotice"
-              components={{
-                privacy: (
-                  <Text
-                    size="xs"
-                    accessibilityRole="link"
-                    style={themed($link)}
-                    onPress={onOpenPrivacy}
-                  />
-                ),
-              }}
+          <View>
+            <SupportRow tx="feedback:support.allRequests" onPress={onAllRequests} />
+            <SupportRow
+              tx="feedback:support.yourRequests"
+              badge={unread ? translate("feedback:support.newCount", { count: unread }) : undefined}
+              onPress={onYourRequests}
             />
-          </Text>
-          <TextField
-            labelTx={`account:support.emailLabel.${kind}`}
-            placeholder={EMAIL_PLACEHOLDER}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            value={email}
-            onChangeText={(value) => {
-              setEmail(value)
-              setStatus("")
-            }}
-            status={email.trim() && !emailValid ? "error" : undefined}
-            helperTx={email.trim() && !emailValid ? "account:support.emailInvalid" : undefined}
-          />
-          {kind === "help" ? (
-            <Text tx="account:support.replyTime" size="xs" style={themed($muted)} />
-          ) : null}
-          {screenshot ? (
-            <View style={themed($screenshot)}>
-              <Image
-                source={{ uri: screenshot.uri }}
-                style={$screenshotPreview}
-                accessibilityLabel={copy.selectedScreenshot}
-              />
-              <Button tx="account:support.removeScreenshot" onPress={() => setScreenshot(null)} />
-            </View>
-          ) : (
-            <Button
-              tx="account:support.addScreenshot"
-              disabled={pickingScreenshot}
-              onPress={() => void pickScreenshot()}
+            <SupportRow
+              tx="feedback:support.email"
+              detailTx="feedback:support.emailDetail"
+              onPress={onEmailSupport}
             />
-          )}
-          <Text tx="account:support.disclosure" size="xs" style={themed($muted)} />
-          <Button
-            tx="account:support.send"
-            preset="reversed"
-            disabled={!canSubmit || pickingScreenshot}
-            onPress={submitFeedback}
-          />
-          {status ? <Text text={status} accessibilityRole="alert" size="xs" /> : null}
-          <Text tx="account:support.preferEmail" size="xs" style={themed($muted)} />
-          <Button tx="account:support.emailSupport" onPress={onEmailSupport} />
+          </View>
+          <Button tx="feedback:support.suggest" preset="reversed" onPress={onSuggest} />
         </View>
 
         <View style={themed($section)}>
@@ -312,6 +186,34 @@ export function SupportScreen({
   )
 }
 
+function SupportRow({
+  tx,
+  detailTx,
+  badge,
+  onPress,
+}: {
+  tx: "feedback:support.allRequests" | "feedback:support.yourRequests" | "feedback:support.email"
+  detailTx?: "feedback:support.emailDetail"
+  badge?: string
+  onPress: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [themed($row), pressed && $pressed]}
+    >
+      <View style={themed($rowText)}>
+        <Text tx={tx} weight="medium" />
+        {detailTx ? <Text tx={detailTx} size="xs" style={themed($muted)} /> : null}
+      </View>
+      {badge ? <Text text={badge} size="xs" weight="bold" style={themed($badge)} /> : null}
+      <Text text={CHEVRON} style={themed($muted)} />
+    </Pressable>
+  )
+}
+
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   paddingHorizontal: spacing.lg,
@@ -324,26 +226,19 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xl,
 })
 
-const $hero: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $requests: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
+const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
   gap: spacing.sm,
-  paddingBottom: spacing.xl,
+  minHeight: 52,
+  paddingVertical: spacing.sm,
   borderBottomWidth: 1,
   borderColor: colors.separator,
 })
-const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.brandText,
-  letterSpacing: 3,
-})
-const $title: ThemedStyle<TextStyle> = () => ({ fontSize: 42, lineHeight: 46 })
-const $subtitle: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textDim,
-  fontSize: 18,
-  lineHeight: 25,
-})
-
-const $contact: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
-const $screenshot: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $screenshotPreview: ImageStyle = { width: 160, height: 280, resizeMode: "contain" }
+const $rowText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $pressed: ViewStyle = { opacity: 0.6 }
+const $badge: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $steps: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
@@ -382,7 +277,3 @@ const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $link: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.tint,
-  textDecorationLine: "underline",
-})

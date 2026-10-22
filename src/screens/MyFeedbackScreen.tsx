@@ -4,37 +4,72 @@ import { Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { statusLabel, type FeedbackOwnItem } from "@/features/feedback/status"
+import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
+import { RequestMeta } from "@/features/feedback/RequestParts"
+import type { FeedbackOwnItem } from "@/features/feedback/status"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+export type UnsentRequest = { operationId: string; title: string; reason?: string }
+
 export interface MyFeedbackScreenProps {
   items: readonly FeedbackOwnItem[] | undefined
+  unsent: readonly UnsentRequest[]
+  offline: boolean
   onOpen: (item: FeedbackOwnItem) => void
+  onDiscard: (operationId: string) => void
   onDeleteAll: () => void
   onBack: () => void
 }
 
-export function MyFeedbackScreen({ items, onOpen, onDeleteAll, onBack }: MyFeedbackScreenProps) {
+export function MyFeedbackScreen({
+  items,
+  unsent,
+  offline,
+  onOpen,
+  onDiscard,
+  onDeleteAll,
+  onBack,
+}: MyFeedbackScreenProps) {
   const { themed } = useAppTheme()
   const [confirming, setConfirming] = useState(false)
+  const empty = items?.length === 0 && unsent.length === 0
   return (
-    <Screen
-      preset="scroll"
-      safeAreaEdges={["bottom"]}
-      header={{ titleTx: "feedback:mine.title", leftTx: "common:back", onLeftPress: onBack }}
-      contentContainerStyle={themed($content)}
-    >
-      {items?.length === 0 ? <Text tx="feedback:mine.empty" style={themed($muted)} /> : null}
+    <FeedbackLayout title={translate("feedback:mine.title")} offline={offline} onBack={onBack}>
+      {empty ? <Text tx="feedback:mine.empty" style={themed($muted)} /> : null}
+      {unsent.map((send) => (
+        <View key={send.operationId} style={themed($row)}>
+          <Text text={send.title} weight="bold" numberOfLines={2} />
+          {send.reason ? (
+            <>
+              <Text
+                text={translate("feedback:mine.notSent", { reason: send.reason })}
+                size="xxs"
+                accessibilityRole="alert"
+              />
+              <Button
+                tx="feedback:mine.discard"
+                style={themed($discard)}
+                onPress={() => onDiscard(send.operationId)}
+              />
+            </>
+          ) : (
+            <Text
+              tx={offline ? "feedback:mine.waiting" : "feedback:mine.sending"}
+              size="xxs"
+              style={themed($muted)}
+            />
+          )}
+        </View>
+      ))}
       {items?.map((item) => (
         <Pressable
           key={item._id}
           accessibilityRole="button"
           onPress={() => onOpen(item)}
-          style={themed($row)}
+          style={({ pressed }) => [themed($row), pressed && $pressed]}
         >
           <View style={themed($rowHead)}>
             <Text text={item.title} weight="bold" style={$grow} numberOfLines={2} />
@@ -42,23 +77,15 @@ export function MyFeedbackScreen({ items, onOpen, onDeleteAll, onBack }: MyFeedb
               <Text tx="feedback:mine.unread" size="xxs" weight="bold" style={themed($new)} />
             ) : null}
           </View>
-          <Text
-            text={[
-              statusLabel(item),
-              ...(item.published ? [] : [translate("feedback:mine.private")]),
-            ].join(" · ")}
-            size="xxs"
-            style={themed($muted)}
-          />
+          <RequestMeta item={item} visibility={item.published ? "public" : "private"} />
         </Pressable>
       ))}
-      {items?.length ? (
-        <Button
-          tx="feedback:mine.deleteAll"
-          style={themed($delete)}
-          onPress={() => setConfirming(true)}
-        />
-      ) : null}
+      {empty || items === undefined ? null : (
+        <View style={themed($delete)}>
+          <Button tx="feedback:mine.deleteAll" onPress={() => setConfirming(true)} />
+          <Text tx="feedback:mine.deleteHint" size="xs" style={themed($muted)} />
+        </View>
+      )}
       <ConfirmDialog
         visible={confirming}
         title={translate("feedback:mine.deleteConfirmTitle")}
@@ -73,18 +100,10 @@ export function MyFeedbackScreen({ items, onOpen, onDeleteAll, onBack }: MyFeedb
         }}
         onClose={() => setConfirming(false)}
       />
-    </Screen>
+    </FeedbackLayout>
   )
 }
 
-const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: "100%",
-  maxWidth: 680,
-  alignSelf: "center",
-  paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.lg,
-  gap: spacing.md,
-})
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xxs,
   paddingTop: spacing.md,
@@ -97,6 +116,14 @@ const $rowHead: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
 })
 const $grow: TextStyle = { flex: 1 }
+const $pressed: ViewStyle = { opacity: 0.6 }
 const $new: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $delete: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginTop: spacing.lg })
+const $discard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignSelf: "flex-start",
+  marginTop: spacing.xxs,
+})
+const $delete: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  marginTop: spacing.xl,
+})

@@ -242,7 +242,8 @@ async function threadFor(ctx: QueryCtx, who: Viewer, request: Doc<"feedbackReque
     request: {
       ...ownItem(request),
       canLink: !!who.user,
-      linkedElsewhere: request.userId !== undefined && request.userId !== who.user?._id,
+      linkedElsewhere:
+        !!who.user && request.userId !== undefined && request.userId !== who.user._id,
       original: request.original ?? null,
     },
     messages: messages.map(({ _id, _creationTime, from, body }) => ({

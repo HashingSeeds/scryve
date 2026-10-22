@@ -25,17 +25,18 @@ export function loadFeedbackKey() {
   return loading
 }
 
-export function useFeedbackKey() {
+export function useFeedbackKey({ create = true }: { create?: boolean } = {}) {
   const [key, setKey] = useState<string>()
   useEffect(() => {
     let mounted = true
-    loadFeedbackKey().then(
-      (loaded) => mounted && setKey(loaded),
+    const load = create ? loadFeedbackKey() : keyStore.read()
+    load.then(
+      (loaded) => mounted && setKey(loaded ?? undefined),
       () => undefined,
     )
     return () => {
       mounted = false
     }
-  }, [])
+  }, [create])
   return key
 }
