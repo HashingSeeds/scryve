@@ -100,6 +100,9 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
       status: `${status}${request.published ? " · public" : " · private"}`,
       votes: String(request.votes),
       ...(request.reports ? { reports: String(request.reports) } : {}),
+      ...(request.sentryEventId
+        ? { sentry: `https://matthew-chisolm.sentry.io/issues/?query=${request.sentryEventId}` }
+        : {}),
       from: account ?? "Anonymous",
       ...(request.appVersion || request.platform
         ? { app: [request.appVersion, request.platform].filter(Boolean).join(" · ") }

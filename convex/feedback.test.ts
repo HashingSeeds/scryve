@@ -288,6 +288,103 @@ describe("feedback", () => {
   })
 })
 
+describe("feedback search, ids and retries", () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+  })
+
+  const send = (t: ConvexTestHarness, title: string, kind: "feature" | "bug" = "feature") =>
+    t.mutation(api.feedback.submit, {
+      key: ME,
+      kind,
+      title,
+      body: `${title} details`,
+      includeAccount: false,
+    })
+
+  it("searches published requests only, and keeps declined ones off the kind tabs", async () => {
+    const t = makeConvexTest()
+    const timer = await send(t, "Round timer")
+    const declined = await send(t, "Timer sounds")
+    await send(t, "Timer for drafts")
+    await apollo(t, timer, "publish")
+    await apollo(t, declined, "publish")
+    await apollo(t, declined, "declined")
+
+    const titles = async (args: { q?: string; kind?: "feature" | "bug" }) =>
+      (await t.query(api.feedback.board, args)).map(({ title }) => title).sort()
+    expect(await titles({ q: "timer" })).toEqual(["Round timer", "Timer sounds"])
+    expect(await titles({ q: "timer", kind: "feature" })).toEqual(["Round timer"])
+    expect(await titles({ kind: "feature" })).toEqual(["Round timer"])
+    expect(await titles({ q: "details" })).toEqual(["Round timer", "Timer sounds"])
+  })
+
+  it("returns null for ids that are malformed, unpublished or someone else's", async () => {
+    const t = makeConvexTest()
+    const requestId = await send(t, "Private one")
+    expect(await t.query(api.feedback.published, { requestId: "not-a-real-id" })).toBeNull()
+    expect(await t.query(api.feedback.published, { requestId })).toBeNull()
+    expect(
+      await t.query(api.feedback.threadById, { key: ME, requestId: "not-a-real-id" }),
+    ).toBeNull()
+    expect(await t.query(api.feedback.threadById, { key: OTHER, requestId })).toBeNull()
+    expect(await t.query(api.feedback.threadById, { key: ME, requestId })).toMatchObject({
+      request: { title: "Private one", linkedElsewhere: false },
+    })
+    await apollo(t, requestId, "publish")
+    expect(await t.query(api.feedback.published, { key: OTHER, requestId })).toMatchObject({
+      title: "Private one",
+      mine: false,
+    })
+  })
+
+  it("inserts a retried submit or reply once", async () => {
+    const t = makeConvexTest()
+    const args = {
+      key: ME,
+      kind: "bug" as const,
+      title: "Crash",
+      body: "On launch",
+      includeAccount: false,
+      clientId: "client-0001",
+      sentryEventId: "0123456789abcdef0123456789abcdef",
+    }
+    const first = await t.mutation(api.feedback.submit, args)
+    expect(await t.mutation(api.feedback.submit, args)).toBe(first)
+    const reply = { key: ME, requestId: first, body: "More", clientId: "client-0002" }
+    await t.mutation(api.feedback.reply, reply)
+    await t.mutation(api.feedback.reply, reply)
+
+    expect(await t.query(api.feedback.mine, { key: ME })).toHaveLength(1)
+    expect(
+      (await t.query(api.feedback.thread, { key: ME, requestId: first }))?.messages,
+    ).toHaveLength(1)
+    const input = await t.query(internal.feedback.apolloCardInput, { requestId: first })
+    expect(input?.request.sentryEventId).toBe(args.sentryEventId)
+    expect(feedbackCard(input!).meta).toMatchObject({
+      sentry: "https://matthew-chisolm.sentry.io/issues/?query=0123456789abcdef0123456789abcdef",
+    })
+  })
+
+  it("stops hiding on reports past the shared hourly cap, but still counts them", async () => {
+    const t = makeConvexTest()
+    const requestId = await send(t, "Popular")
+    const reporter = (n: number) => String(n).padStart(64, "c")
+    for (let n = 0; n < 20; n++) {
+      await apollo(t, requestId, "publish")
+      await t.mutation(api.feedback.report, { key: reporter(n), requestId })
+      expect(await t.query(api.feedback.published, { requestId })).toBeNull()
+    }
+    await apollo(t, requestId, "publish")
+    await t.mutation(api.feedback.report, { key: reporter(20), requestId })
+    expect(await t.query(api.feedback.published, { requestId })).toMatchObject({ title: "Popular" })
+    const input = await t.query(internal.feedback.apolloCardInput, { requestId })
+    expect(input?.request.reports).toBe(21)
+  })
+})
+
 describe("feedbackCard", () => {
   const request = {
     _id: "r1" as Id<"feedbackRequests">,

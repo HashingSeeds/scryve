@@ -858,13 +858,25 @@ export default defineSchema({
     userId: v.optional(v.id("users")),
     appVersion: v.optional(v.string()),
     platform: v.optional(v.string()),
+    clientId: v.optional(v.string()),
+    sentryEventId: v.optional(v.string()),
     unread: v.boolean(),
     updatedAt: v.number(),
   })
     .index("by_published_and_votes", ["published", "votes"])
     .index("by_published_and_status_and_votes", ["published", "status", "votes"])
+    .index("by_published_and_kind_and_votes", ["published", "kind", "votes"])
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
-    .index("by_user_and_updated_at", ["userId", "updatedAt"]),
+    .index("by_sender_and_client_id", ["senderHash", "clientId"])
+    .index("by_user_and_updated_at", ["userId", "updatedAt"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["published", "kind", "status"],
+    })
+    .searchIndex("search_body", {
+      searchField: "body",
+      filterFields: ["published", "kind", "status"],
+    }),
 
   feedbackVotes: defineTable({
     requestId: v.id("feedbackRequests"),
@@ -884,7 +896,10 @@ export default defineSchema({
     requestId: v.id("feedbackRequests"),
     from: v.union(v.literal("player"), v.literal("team")),
     body: v.string(),
-  }).index("by_request", ["requestId"]),
+    clientId: v.optional(v.string()),
+  })
+    .index("by_request", ["requestId"])
+    .index("by_request_and_client_id", ["requestId", "clientId"]),
 
   feedbackApolloCursor: defineTable({ after: v.number() }),
 })

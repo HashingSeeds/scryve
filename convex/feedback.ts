@@ -31,6 +31,8 @@ const limiter = new RateLimiter(components.rateLimiter, {
   feedbackMessage: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
   feedbackVote: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 30 },
   feedbackReport: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
+  // why: install keys are made by the client, so per-key limits alone let a script hide the whole board.
+  feedbackReportHide: { kind: "fixed window", rate: 20, period: HOUR },
 })
 
 const BOARD_SIZE = 100
@@ -38,6 +40,9 @@ const MINE_SIZE = 50
 const THREAD_SIZE = 200
 const DELETE_BATCH = 20
 const APOLLO_BATCH = 100
+const SEARCH_SIZE = 50
+const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
+const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 
 type Ctx = QueryCtx | MutationCtx
 type Viewer = { hash: string; user: Doc<"users"> | null }
@@ -113,40 +118,92 @@ function ownItem(request: Doc<"feedbackRequests">) {
   }
 }
 
+async function boardItems(ctx: QueryCtx, who: Viewer | null, requests: Doc<"feedbackRequests">[]) {
+  return await Promise.all(
+    requests.map(async (request) => {
+      if (!who) return boardItem(request, { voted: false, reported: false, mine: false })
+      const bySender = (table: "feedbackVotes" | "feedbackReports") =>
+        ctx.db
+          .query(table)
+          .withIndex("by_request_and_sender", (q) =>
+            q.eq("requestId", request._id).eq("senderHash", who.hash),
+          )
+          .unique()
+      return boardItem(request, {
+        voted: !!(await bySender("feedbackVotes")),
+        reported: !!(await bySender("feedbackReports")),
+        mine: owns(request, who),
+      })
+    }),
+  )
+}
+
+async function searchPublished(
+  ctx: QueryCtx,
+  text: string,
+  filter: { kind?: Doc<"feedbackRequests">["kind"]; status?: Doc<"feedbackRequests">["status"] },
+) {
+  const search = (index: "search_title" | "search_body", field: "title" | "body") =>
+    ctx.db
+      .query("feedbackRequests")
+      .withSearchIndex(index, (q) => {
+        const base = q.search(field, text).eq("published", true)
+        const kind = filter.kind ? base.eq("kind", filter.kind) : base
+        return filter.status ? kind.eq("status", filter.status) : kind
+      })
+      .take(SEARCH_SIZE)
+  const byTitle = await search("search_title", "title")
+  const byBody = await search("search_body", "body")
+  const seen = new Set(byTitle.map((request) => request._id))
+  return [...byTitle, ...byBody.filter((request) => !seen.has(request._id))]
+}
+
 export const board = query({
-  args: { key: v.optional(v.string()), status: v.optional(feedbackStatus) },
-  handler: async (ctx, { key, status }) => {
+  args: {
+    key: v.optional(v.string()),
+    status: v.optional(feedbackStatus),
+    kind: v.optional(feedbackKind),
+    q: v.optional(v.string()),
+  },
+  handler: async (ctx, { key, status, kind, q }) => {
     const who = key ? await viewer(ctx, key) : null
-    const requests = await (
-      status
-        ? ctx.db
-            .query("feedbackRequests")
-            .withIndex("by_published_and_status_and_votes", (q) =>
-              q.eq("published", true).eq("status", status),
-            )
-        : ctx.db
-            .query("feedbackRequests")
-            .withIndex("by_published_and_votes", (q) => q.eq("published", true))
-    )
-      .order("desc")
-      .take(BOARD_SIZE)
-    return await Promise.all(
-      requests.map(async (request) => {
-        if (!who) return boardItem(request, { voted: false, reported: false, mine: false })
-        const bySender = (table: "feedbackVotes" | "feedbackReports") =>
-          ctx.db
-            .query(table)
-            .withIndex("by_request_and_sender", (q) =>
-              q.eq("requestId", request._id).eq("senderHash", who.hash),
-            )
-            .unique()
-        return boardItem(request, {
-          voted: !!(await bySender("feedbackVotes")),
-          reported: !!(await bySender("feedbackReports")),
-          mine: owns(request, who),
-        })
-      }),
-    )
+    const text = q?.trim().slice(0, FEEDBACK_LIMITS.title)
+    const requests = text
+      ? await searchPublished(ctx, text, { kind, status })
+      : await (
+          status
+            ? ctx.db
+                .query("feedbackRequests")
+                .withIndex("by_published_and_status_and_votes", (q) =>
+                  q.eq("published", true).eq("status", status),
+                )
+            : kind
+              ? ctx.db
+                  .query("feedbackRequests")
+                  .withIndex("by_published_and_kind_and_votes", (q) =>
+                    q.eq("published", true).eq("kind", kind),
+                  )
+              : ctx.db
+                  .query("feedbackRequests")
+                  .withIndex("by_published_and_votes", (q) => q.eq("published", true))
+        )
+          .order("desc")
+          .take(BOARD_SIZE)
+    // why: declined requests stay on All only, so the Features and Bugs tabs show what's still open.
+    const shown =
+      kind && !status ? requests.filter((request) => request.status !== "declined") : requests
+    return await boardItems(ctx, who, shown)
+  },
+})
+
+export const published = query({
+  args: { key: v.optional(v.string()), requestId: v.string() },
+  handler: async (ctx, { key, requestId }) => {
+    const id = ctx.db.normalizeId("feedbackRequests", requestId)
+    const request = id ? await ctx.db.get(id) : null
+    if (!request?.published) return null
+    const [item] = await boardItems(ctx, key ? await viewer(ctx, key) : null, [request])
+    return item ?? null
   },
 })
 
@@ -175,27 +232,46 @@ export const mine = query({
   },
 })
 
+async function threadFor(ctx: QueryCtx, who: Viewer, request: Doc<"feedbackRequests"> | null) {
+  if (!request || !owns(request, who)) return null
+  const messages = await ctx.db
+    .query("feedbackMessages")
+    .withIndex("by_request", (q) => q.eq("requestId", request._id))
+    .take(THREAD_SIZE)
+  return {
+    request: {
+      ...ownItem(request),
+      canLink: !!who.user,
+      linkedElsewhere: request.userId !== undefined && request.userId !== who.user?._id,
+      original: request.original ?? null,
+    },
+    messages: messages.map(({ _id, _creationTime, from, body }) => ({
+      _id,
+      createdAt: _creationTime,
+      from,
+      body,
+    })),
+  }
+}
+
 export const thread = query({
   args: { key: v.string(), requestId: v.id("feedbackRequests") },
+  handler: async (ctx, { key, requestId }) =>
+    await threadFor(ctx, await viewer(ctx, key), await ctx.db.get(requestId)),
+})
+
+export const threadById = query({
+  args: { key: v.string(), requestId: v.string() },
   handler: async (ctx, { key, requestId }) => {
-    const who = await viewer(ctx, key)
-    const request = await ctx.db.get(requestId)
-    if (!request || !owns(request, who)) return null
-    const messages = await ctx.db
-      .query("feedbackMessages")
-      .withIndex("by_request", (q) => q.eq("requestId", requestId))
-      .take(THREAD_SIZE)
-    return {
-      request: { ...ownItem(request), canLink: !!who.user, original: request.original ?? null },
-      messages: messages.map(({ _id, _creationTime, from, body }) => ({
-        _id,
-        createdAt: _creationTime,
-        from,
-        body,
-      })),
-    }
+    const id = ctx.db.normalizeId("feedbackRequests", requestId)
+    return await threadFor(ctx, await viewer(ctx, key), id ? await ctx.db.get(id) : null)
   },
 })
+
+function checkClientId(clientId: string | undefined) {
+  if (clientId !== undefined && !CLIENT_ID.test(clientId))
+    throw new ConvexError({ code: "invalid_client_id", message: "Invalid client id" })
+}
 
 export const submit = mutation({
   args: {
@@ -206,9 +282,21 @@ export const submit = mutation({
     includeAccount: v.boolean(),
     appVersion: v.optional(v.string()),
     platform: v.optional(v.string()),
+    clientId: v.optional(v.string()),
+    sentryEventId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const who = await viewer(ctx, args.key)
+    checkClientId(args.clientId)
+    if (args.clientId) {
+      const sent = await ctx.db
+        .query("feedbackRequests")
+        .withIndex("by_sender_and_client_id", (q) =>
+          q.eq("senderHash", who.hash).eq("clientId", args.clientId),
+        )
+        .first()
+      if (sent) return sent._id
+    }
     const userId = args.includeAccount ? who.user?._id : undefined
     if (args.includeAccount && !userId)
       throw new ConvexError({ code: "unauthenticated", message: "Sign in to include your account" })
@@ -227,6 +315,11 @@ export const submit = mutation({
       userId,
       appVersion: args.appVersion?.slice(0, FEEDBACK_LIMITS.version),
       platform: args.platform?.slice(0, FEEDBACK_LIMITS.version),
+      clientId: args.clientId,
+      sentryEventId:
+        args.sentryEventId && SENTRY_EVENT_ID.test(args.sentryEventId)
+          ? args.sentryEventId
+          : undefined,
       unread: false,
       updatedAt: now,
     })
@@ -274,23 +367,44 @@ export const report = mutation({
     if (existing) return null
     await limit(ctx, "feedbackReport", who.hash)
     await ctx.db.insert("feedbackReports", { requestId, senderHash: who.hash })
-    // why: the terms promise action on every report within 24 hours, so a report hides the request until Matthew publishes it again.
-    await ctx.db.patch(requestId, { reports: request.reports + 1, published: false })
+    // why: the terms promise action on every report within 24 hours, so a report hides the request until Matthew publishes it again; past the shared cap it still reaches him but stays up.
+    const hide = (await limiter.limit(ctx, "feedbackReportHide")).ok
+    await ctx.db.patch(requestId, {
+      reports: request.reports + 1,
+      ...(hide ? { published: false } : {}),
+    })
     await postCard(ctx, requestId)
     return null
   },
 })
 
 export const reply = mutation({
-  args: { key: v.string(), requestId: v.id("feedbackRequests"), body: v.string() },
-  handler: async (ctx, { key, requestId, body }) => {
+  args: {
+    key: v.string(),
+    requestId: v.id("feedbackRequests"),
+    body: v.string(),
+    clientId: v.optional(v.string()),
+  },
+  handler: async (ctx, { key, requestId, body, clientId }) => {
     const who = await viewer(ctx, key)
     await ownedRequest(ctx, who, requestId)
+    checkClientId(clientId)
+    if (
+      clientId &&
+      (await ctx.db
+        .query("feedbackMessages")
+        .withIndex("by_request_and_client_id", (q) =>
+          q.eq("requestId", requestId).eq("clientId", clientId),
+        )
+        .first())
+    )
+      return null
     await limit(ctx, "feedbackMessage", who.hash)
     await ctx.db.insert("feedbackMessages", {
       requestId,
       from: "player",
       body: cleanText(body, FEEDBACK_LIMITS.message, "Message"),
+      clientId,
     })
     await ctx.db.patch(requestId, { updatedAt: Date.now() })
     await postCard(ctx, requestId)
