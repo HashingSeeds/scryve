@@ -186,7 +186,7 @@ export const thread = query({
       .withIndex("by_request", (q) => q.eq("requestId", requestId))
       .take(THREAD_SIZE)
     return {
-      request: { ...ownItem(request), canLink: !!who.user },
+      request: { ...ownItem(request), canLink: !!who.user, original: request.original ?? null },
       messages: messages.map(({ _id, _creationTime, from, body }) => ({
         _id,
         createdAt: _creationTime,
@@ -504,6 +504,25 @@ export const applyApolloEvent = internalMutation({
         })
         await ctx.db.patch(request._id, { unread: true, updatedAt: now })
         break
+      case "edit": {
+        const [title = "", ...rest] = (text ?? "").split("\n")
+        const edited = { title: title.trim(), body: rest.join("\n").trim() }
+        if (
+          !edited.title ||
+          !edited.body ||
+          edited.title.length > FEEDBACK_LIMITS.title ||
+          edited.body.length > FEEDBACK_LIMITS.body ||
+          (edited.title === request.title && edited.body === request.body)
+        )
+          return null
+        await ctx.db.patch(request._id, {
+          ...edited,
+          original: request.original ?? { title: request.title, body: request.body },
+          unread: true,
+          updatedAt: now,
+        })
+        break
+      }
       case "publish":
       case "hide":
         await ctx.db.patch(request._id, { published: action === "publish" })

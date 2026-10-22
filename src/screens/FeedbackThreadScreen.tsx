@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
@@ -30,6 +30,7 @@ export function FeedbackThreadScreen({
   const [reply, setReply] = useState("")
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(false)
 
   async function send() {
     if (!reply.trim() || sending) return
@@ -64,6 +65,43 @@ export function FeedbackThreadScreen({
               style={themed($muted)}
             />
             <Text text={thread.request.body} />
+            {thread.request.original ? (
+              <View style={themed($original)}>
+                <View style={themed($originalHead)}>
+                  <Text
+                    tx="feedback:thread.edited"
+                    size="xxs"
+                    weight="bold"
+                    style={themed($muted)}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => setShowOriginal((shown) => !shown)}
+                  >
+                    <Text
+                      tx={
+                        showOriginal
+                          ? "feedback:thread.hideOriginal"
+                          : "feedback:thread.showOriginal"
+                      }
+                      size="xxs"
+                      style={themed($team)}
+                    />
+                  </Pressable>
+                </View>
+                {showOriginal ? (
+                  <>
+                    <Text
+                      text={thread.request.original.title}
+                      weight="bold"
+                      style={themed($muted)}
+                    />
+                    <Text text={thread.request.original.body} style={themed($muted)} />
+                  </>
+                ) : null}
+              </View>
+            ) : null}
           </View>
           {thread.messages.map((message) => (
             <View key={message._id} style={themed($message)}>
@@ -125,6 +163,12 @@ const $head: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingBottom: spacing.md,
   borderBottomWidth: 1,
   borderColor: colors.separator,
+})
+const $original: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $originalHead: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  gap: spacing.sm,
 })
 const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })

@@ -77,6 +77,10 @@ const feedback = {
     includeAccount: "Include my account",
     includeAccountHelper: "Lets us see your username and keeps this thread on every device.",
     linked: "Sent with your account",
+    // Shown under a request the Scryve team reworded before or after publishing it.
+    edited: "Edited by Scryve",
+    showOriginal: "Show what you sent",
+    hideOriginal: "Hide what you sent",
     signInToKeep: "Sign in to keep this thread if you reinstall",
   },
   unavailable: "Feedback needs Scryve's cloud, which isn't set up in this build.",

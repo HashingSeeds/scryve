@@ -853,6 +853,7 @@ export default defineSchema({
     votes: v.number(),
     reports: v.number(),
     shippedIn: v.optional(v.string()),
+    original: v.optional(v.object({ title: v.string(), body: v.string() })),
     senderHash: v.string(),
     userId: v.optional(v.id("users")),
     appVersion: v.optional(v.string()),

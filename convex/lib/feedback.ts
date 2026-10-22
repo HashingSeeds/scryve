@@ -35,6 +35,7 @@ export const APOLLO_KEY_PREFIX = "scryve:"
 
 export const APOLLO_ACTIONS = [
   "reply",
+  "edit",
   "publish",
   "hide",
   "planned",
@@ -106,6 +107,13 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     },
     actions: [
       { id: "reply", label: "Reply", style: "primary", input: "text", repeat: true },
+      {
+        id: "edit",
+        label: "Edit",
+        input: "text",
+        repeat: true,
+        prefill: `${request.title}\n\n${request.body}`,
+      },
       request.published
         ? { id: "hide", label: "Hide", repeat: true }
         : { id: "publish", label: "Publish", repeat: true },

@@ -23,6 +23,7 @@ const thread = {
     linked: false,
     updatedAt: 0,
     canLink: false,
+    original: null,
   },
   messages: [
     {
@@ -54,5 +55,27 @@ describe("FeedbackThreadScreen", () => {
     fireEvent.press(view.getByText("Send"))
     await waitFor(() => expect(onReply).toHaveBeenCalledWith("Pixel 9"))
     expect(view.getByText("Sign in to keep this thread if you reinstall")).toBeTruthy()
+    expect(view.queryByText("Edited by Scryve")).toBeNull()
+  })
+
+  it("shows what the player sent before Scryve edited it", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <FeedbackThreadScreen
+          thread={{
+            ...thread,
+            request: { ...thread.request, original: { title: "crash!!", body: "it broke" } },
+          }}
+          onReply={jest.fn()}
+          onIncludeAccount={jest.fn()}
+          onSignIn={jest.fn()}
+          onBack={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Edited by Scryve")).toBeTruthy()
+    expect(view.queryByText("it broke")).toBeNull()
+    fireEvent.press(view.getByText("Show what you sent"))
+    expect(view.getByText("it broke")).toBeTruthy()
   })
 })

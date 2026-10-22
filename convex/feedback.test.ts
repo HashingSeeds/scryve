@@ -111,6 +111,27 @@ describe("feedback", () => {
     expect(await t.query(api.feedback.mine, { key: ME })).toMatchObject([{ unread: false }])
   })
 
+  it("lets Matthew edit a request and keeps what the player sent", async () => {
+    const t = makeConvexTest()
+    const requestId = await submit(t)
+    await apollo(t, requestId, "edit", "Sync the game clock\n\nShow one clock on every phone.")
+    await apollo(t, requestId, "edit", "Sync the game clock\n\nOne clock on every phone.")
+    await apollo(t, requestId, "edit", "Only a title")
+
+    const thread = await t.query(api.feedback.thread, { key: ME, requestId })
+    expect(thread?.request).toMatchObject({
+      title: "Sync the game clock",
+      body: "One clock on every phone.",
+      unread: true,
+      original: { title: "Sync timers", body: "Keep the clock on every phone." },
+    })
+    const input = await t.query(internal.feedback.apolloCardInput, { requestId })
+    expect(feedbackCard(input!).actions[1]).toMatchObject({
+      id: "edit",
+      prefill: "Sync the game clock\n\nOne clock on every phone.",
+    })
+  })
+
   it("ignores Apollo events for other keys and actions, but still moves past them", async () => {
     const t = makeConvexTest()
     const requestId = await submit(t)
@@ -302,6 +323,7 @@ describe("feedbackCard", () => {
     expect(card.body).toBe("Like ftp://files.test\n\nPlayer: http://a.test")
     expect(card.actions.map(({ id }) => id)).toEqual([
       "reply",
+      "edit",
       "publish",
       "planned",
       "building",
@@ -320,6 +342,6 @@ describe("feedbackCard", () => {
       phase: "player:2:reports:0",
       meta: { status: "Shipped in 2.2.0 · public" },
     })
-    expect(card.actions[1]).toMatchObject({ id: "hide" })
+    expect(card.actions[2]).toMatchObject({ id: "hide" })
   })
 })
