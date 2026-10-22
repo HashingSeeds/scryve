@@ -31,9 +31,7 @@ const limiter = new RateLimiter(components.rateLimiter, {
   feedbackMessage: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
   feedbackVote: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 30 },
   feedbackReport: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
-  // why: install keys are made by the client, so per-key limits alone let a script hide the whole board.
   feedbackReportHide: { kind: "fixed window", rate: 20, period: HOUR },
-  // why: the same reason caps every install's sends together, which also bounds alerts to Matthew.
   feedbackSubmitAll: { kind: "fixed window", rate: 200, period: HOUR },
 })
 
@@ -41,6 +39,8 @@ const BOARD_SIZE = 100
 const MINE_SIZE = 50
 const THREAD_SIZE = 200
 const DELETE_BATCH = 20
+// why: each request can delete 600 child rows, and Convex caps a mutation at 16,000 writes.
+const ACCOUNT_DELETE_BATCH = 10
 const APOLLO_BATCH = 100
 const SEARCH_SIZE = 50
 const BODY_EXCERPT = 280
@@ -122,7 +122,6 @@ function ownItem(request: Doc<"feedbackRequests">) {
   }
 }
 
-// why: list rows show two lines of the body, so a full board doesn't carry every body in full.
 const excerpt = (request: Doc<"feedbackRequests">) => ({
   ...request,
   body: request.body.slice(0, BODY_EXCERPT),
@@ -199,7 +198,6 @@ export const board = query({
         )
           .order("desc")
           .take(BOARD_SIZE)
-    // why: declined requests stay on All only, so the Features and Bugs tabs show what's still open.
     const shown =
       kind && !status ? requests.filter((request) => request.status !== "declined") : requests
     return await boardItems(ctx, who, shown.map(excerpt))
@@ -245,7 +243,6 @@ export const mine = query({
   },
 })
 
-// why: a long thread keeps showing its newest messages; the oldest drop off instead of new replies never appearing.
 async function latestMessages(ctx: QueryCtx, requestId: Id<"feedbackRequests">) {
   const newest = await ctx.db
     .query("feedbackMessages")
@@ -526,11 +523,11 @@ async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
     await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
 }
 
-export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users">, batch: number) {
+export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users">) {
   const linked = await ctx.db
     .query("feedbackRequests")
     .withIndex("by_user_and_updated_at", (q) => q.eq("userId", userId))
-    .take(batch)
+    .take(ACCOUNT_DELETE_BATCH)
   for (const request of linked) await deleteRequest(ctx, request)
   return linked.length
 }
@@ -700,7 +697,6 @@ export const pullApollo = internalAction({
     }
     const events: unknown = await response.json()
     if (!Array.isArray(events)) return null
-    // why: every event moves the cursor, even one this ignores, or the pull would read it forever.
     for (const event of events.slice(0, APOLLO_BATCH)) {
       if (typeof event !== "object" || event === null) continue
       const { seq, key, type, actionId, text } = event as Record<string, unknown>

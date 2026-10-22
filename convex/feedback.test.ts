@@ -206,7 +206,7 @@ describe("feedback", () => {
     await ana.mutation(api.feedback.submit, { ...draft, includeAccount: true })
     const anonymous = await ana.mutation(api.feedback.submit, { ...draft, includeAccount: false })
     const user = await t.run((ctx) => ctx.db.query("users").first())
-    await t.run((ctx) => deleteAccountFeedback(ctx, user!._id, 10))
+    await t.run((ctx) => deleteAccountFeedback(ctx, user!._id))
     expect((await t.query(api.feedback.mine, { key: ME })).map(({ _id }) => _id)).toEqual([
       anonymous,
     ])
@@ -411,6 +411,13 @@ describe("feedback search, ids and retries", () => {
     expect(await t.query(api.feedback.published, { requestId })).toMatchObject({ title: "Popular" })
     const input = await t.query(internal.feedback.apolloCardInput, { requestId })
     expect(input?.request.reports).toBe(21)
+  })
+
+  it("caps sends across every install, not just each one", async () => {
+    const t = makeConvexTest()
+    const sender = (n: number) => String(n).padStart(64, "d")
+    for (let n = 0; n < 200; n++) await submit(t, sender(n))
+    await expect(submit(t, sender(200))).rejects.toThrow("Try again in")
   })
 })
 

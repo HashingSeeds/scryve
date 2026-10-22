@@ -57,7 +57,6 @@ function clip(text: string, max: number) {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`
 }
 
-// why: when the thread outgrows the card, older text drops first, so the message that triggered the alert always shows.
 function clipOldestFirst(parts: string[], max: number) {
   const kept: string[] = []
   let room = max

@@ -34,7 +34,6 @@ export type FeedbackSend =
       title: string
       body: string
       includeAccount: boolean
-      // why: set from the signed-in account when the send is queued, so a later account never receives it.
       accountId?: string
       appVersion?: string
       platform?: string

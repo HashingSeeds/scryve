@@ -46,7 +46,6 @@ function LiveSupport() {
   const online = useConvexOnline()
   const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
   const loaded = useQuery(api.feedback.board, key && searched ? { key, q: searched } : "skip")
-  // why: a new search keeps the last results on screen until its own arrive, so typing doesn't blank the list.
   const [shown, setShown] = useState<{ q: string; items: NonNullable<typeof loaded> }>()
   if (!searched && shown) setShown(undefined)
   else if (searched && loaded && shown?.items !== loaded) setShown({ q: searched, items: loaded })
@@ -66,7 +65,6 @@ function LiveSupport() {
   )
 }
 
-// why: without Convex the page still searches its own answers.
 function StaticSupport() {
   const [search, setSearch] = useState("")
   return (

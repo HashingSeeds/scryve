@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Platform } from "react-native"
 import { router, useLocalSearchParams } from "expo-router"
 import { useQuery } from "convex/react"
@@ -57,6 +57,14 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
   const [sentry, setSentry] = useState<{ draft: string; eventId?: string }>()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
+  // why: a send waits up to 8 seconds; if the player left meanwhile, navigating would replace whatever screen they're on.
+  const mounted = useRef(true)
+  useEffect(
+    () => () => {
+      mounted.current = false
+    },
+    [],
+  )
   const matchText = useDebounced(title.trim(), MATCH_DELAY_MS)
   const matches = useQuery(
     api.feedback.board,
@@ -89,8 +97,9 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
         ...(sentryEventId ? { sentryEventId } : {}),
       })
       const requestId = online ? await outbox.waitFor(operationId, SEND_WAIT_MS) : undefined
-      router.replace(requestId ? `/feedback/${requestId}` : "/feedback/mine")
+      if (mounted.current) router.replace(requestId ? `/feedback/${requestId}` : "/feedback/mine")
     } catch (cause) {
+      if (!mounted.current) return
       setError(feedbackErrorMessage(cause, translate("feedback:suggest.sendFailed")))
       setSending(false)
     }

@@ -567,7 +567,7 @@ export const processUserLinkedData = internalMutation({
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
-      if (await deleteAccountFeedback(ctx, request.userId, USER_DATA_BATCH_SIZE)) {
+      if (await deleteAccountFeedback(ctx, request.userId)) {
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
