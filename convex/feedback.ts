@@ -274,7 +274,8 @@ export const report = mutation({
     if (existing) return null
     await limit(ctx, "feedbackReport", who.hash)
     await ctx.db.insert("feedbackReports", { requestId, senderHash: who.hash })
-    await ctx.db.patch(requestId, { reports: request.reports + 1 })
+    // why: the terms promise action on every report within 24 hours, so a report hides the request until Matthew publishes it again.
+    await ctx.db.patch(requestId, { reports: request.reports + 1, published: false })
     await postCard(ctx, requestId)
     return null
   },

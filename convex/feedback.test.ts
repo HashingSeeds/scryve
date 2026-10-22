@@ -177,7 +177,7 @@ describe("feedback", () => {
     ])
   })
 
-  it("lets other players report a public request once, and tells Apollo", async () => {
+  it("hides a public request on its first report until Matthew publishes it again", async () => {
     const t = makeConvexTest()
     const requestId = await submit(t)
     await expect(t.mutation(api.feedback.report, { key: OTHER, requestId })).rejects.toThrow(
@@ -189,13 +189,16 @@ describe("feedback", () => {
     )
 
     await t.mutation(api.feedback.report, { key: OTHER, requestId })
-    await t.mutation(api.feedback.report, { key: OTHER, requestId })
-    expect(await t.query(api.feedback.board, { key: OTHER })).toMatchObject([{ reported: true }])
+    expect(await t.query(api.feedback.board, {})).toEqual([])
     const input = await t.query(internal.feedback.apolloCardInput, { requestId })
     expect(feedbackCard(input!)).toMatchObject({
       phase: "player:1:reports:1",
-      meta: { reports: "1" },
+      meta: { status: "In review · private", reports: "1" },
     })
+
+    await apollo(t, requestId, "publish")
+    await t.mutation(api.feedback.report, { key: OTHER, requestId })
+    expect(await t.query(api.feedback.board, { key: OTHER })).toMatchObject([{ reported: true }])
   })
 
   it("deletes everything an install sent and takes back its votes", async () => {

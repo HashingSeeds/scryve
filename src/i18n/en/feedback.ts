@@ -28,7 +28,7 @@ const feedback = {
     label: "Report {{title}}",
     done: "Reported",
     title: "Report this request?",
-    body: "We'll review it and hide it if it breaks the rules. The sender won't know who reported it.",
+    body: "It comes off the board until we review it. The sender won't know who reported it.",
     confirm: "Report",
   },
   form: {
