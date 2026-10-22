@@ -1,5 +1,5 @@
 import { router } from "expo-router"
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import {
   applyGameCommand,
@@ -484,7 +484,7 @@ describe("new local game route while signed in", () => {
     localGameRepository.saveMeSeat(undefined)
   })
 
-  it("carries the picked seat and deck from a fresh New Game into the started game", () => {
+  it("carries the picked seat and deck from a fresh New Game into the started game", async () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <NewLocalGameRoute />
@@ -498,6 +498,7 @@ describe("new local game route while signed in", () => {
     fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
     fireEvent.press(view.getByTestId("start-game-button"))
 
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalled())
     const call = (router.dismissTo as jest.Mock).mock.calls.at(-1)?.[0] as {
       params: { prepared: string }
     }
@@ -517,7 +518,7 @@ describe("new local game route while signed in", () => {
     expect(localGameRepository.loadMeSeat()).toBe(1)
   })
 
-  it("persists seat and deck picks for a running game opened without the setup flag", () => {
+  it("persists seat and deck picks for a running game opened without the setup flag", async () => {
     const game = createLocalGame({
       startingLife: 40,
       system: "mtg",
@@ -538,12 +539,14 @@ describe("new local game route while signed in", () => {
     fireEvent.press(view.getByTestId("me-seat-option-0"))
     fireEvent.press(view.getByTestId("me-deck"))
     fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
-    expect(localGameRepository.loadActiveGame()?.account).toEqual({
-      ownerId: "owner-a",
-      mePlayerId: game.players[0].id,
-      deckVersionId: "v-atraxa",
-      deckName: "Atraxa",
-    })
+    await waitFor(() =>
+      expect(localGameRepository.loadActiveGame()?.account).toEqual({
+        ownerId: "owner-a",
+        mePlayerId: game.players[0].id,
+        deckVersionId: "v-atraxa",
+        deckName: "Atraxa",
+      }),
+    )
     fireEvent.changeText(view.getByTestId("player-name-2"), "Grace")
     fireEvent(view.getByTestId("player-name-2"), "blur")
     expect(localGameRepository.loadActiveGame()).toMatchObject({

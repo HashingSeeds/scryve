@@ -75,6 +75,7 @@ const mockVersionCardWriteState = {
   capacityBlocked: false,
 }
 jest.mock("@/features/decks/decksVersionWrites", () => ({
+  ...jest.requireActual("@/features/decks/decksVersionWrites"),
   DECK_VERSION_CONFLICT_REASON:
     "Deck cards changed on another device. Choose which card list to keep.",
   useDeckVersionWrites: () => ({

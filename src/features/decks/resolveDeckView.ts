@@ -7,7 +7,7 @@ import { cardDetailsKey, printingKey, type DeckCard } from "./deckCards"
 import { canChooseCommander, draftChanges, type DeckDraft } from "./deckDraft"
 import type { SyncedDeck } from "./decksSync"
 import type { DeckSyncWriteSnapshot } from "./decksSyncWrites"
-import type { DeckVersionWriteSnapshot, PendingVersionWrite } from "./decksVersionWrites"
+import { newestPendingCardWrite, type DeckVersionWriteSnapshot } from "./decksVersionWrites"
 import {
   DECK_CONFLICT_REASON,
   DECK_VERSION_CONFLICT_REASON,
@@ -76,30 +76,6 @@ export function deckQueryVersionId(
     : (mappedSelection as Id<"deckVersions">)
 }
 
-function newestPendingCardWrite(
-  input: DeckViewInput,
-  overlayVersionId: string | undefined,
-): PendingVersionWrite | undefined {
-  const { versionWrites, deckId } = input
-  const overlayIds = new Set<string>()
-  if (overlayVersionId) {
-    overlayIds.add(overlayVersionId)
-    overlayIds.add(versionWrites.mappedVersion(overlayVersionId))
-  }
-  return versionWrites.pending
-    .filter((write) => write.deckId === deckId && (write.op ?? "cards") === "cards")
-    .filter(
-      (write) =>
-        overlayIds.has(write.versionId) ||
-        overlayIds.has(versionWrites.mappedVersion(write.versionId)),
-    )
-    .reduce<PendingVersionWrite | undefined>(
-      (newest, action) =>
-        !newest || action.expectedRevision > newest.expectedRevision ? action : newest,
-      undefined,
-    )
-}
-
 export function resolveDeckView(input: DeckViewInput) {
   const { deckId, detail, draft, sync, metadataWrites, versionWrites, versionCache } = input
   const { selectedVersionId } = input
@@ -152,7 +128,11 @@ export function resolveDeckView(input: DeckViewInput) {
           expectedRevision: cachedVersion.revision,
         }
       : undefined
-  const pendingCardWrite = newestPendingCardWrite(input, selectedVersionId ?? activeVersionId)
+  const pendingCardWrite = newestPendingCardWrite(
+    pendingCards,
+    selectedVersionId ?? activeVersionId,
+    versionWrites.mappedVersion,
+  )
   const displayCards = pendingCardWrite
     ? mergedPrintings(pendingCardWrite.cards as DeckCard[])
     : storedCards.length > 0

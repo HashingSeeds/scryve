@@ -20,6 +20,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
       ? { match: { publicId: match.id, bestOf: match.bestOf, gameNumber: match.gameNumber } }
       : {}),
     publicId: game.id,
+    retriesThrottled: true,
     ruleset: game.format ?? NO_PLAY_SYSTEM,
     startingLife: game.startingLife,
     ...(isSystemId(game.system) ? { system: game.system } : {}),
@@ -38,6 +39,11 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
       ...(player.id === me && deckVersionId
         ? { deckVersionId: deckVersionId as Id<"deckVersions"> }
         : {}),
+      ...(player.id === me && game.account?.deckKey ? { deckKey: game.account.deckKey } : {}),
+      ...(player.id === me && game.account?.deckFingerprint
+        ? { deckFingerprint: game.account.deckFingerprint }
+        : {}),
+      ...(player.id === me && game.account?.deckName ? { deckName: game.account.deckName } : {}),
       ...(player.id !== me && game.seatPassHashes?.[player.id]
         ? { seatPassHash: game.seatPassHashes[player.id] }
         : {}),

@@ -3,6 +3,7 @@ import {
   asDeviceId,
   commanderDamageKey,
   createLocalGame,
+  createRematch,
   defaultCommandContext,
 } from "./domain"
 import {
@@ -604,6 +605,38 @@ describe("LocalGameRepository account ownership", () => {
     expect(repository.loadMeSeat()).toBe(2)
     repository.saveMeSeat(undefined)
     expect(repository.loadMeSeat()).toBe("none")
+  })
+
+  it("keeps a local deck pin through reload, archive, claims, and rematch", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const game = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+      account: {
+        ownerId: "owner-a",
+        meSeat: 1,
+        deckKey: "local-key",
+        deckName: "Local Burn",
+        deckFingerprint: `v1:${"d".repeat(64)}`,
+      },
+    })
+    repository.saveActiveGame(game)
+    expect(new LocalGameRepository(storage).loadActiveGame()?.account).toEqual(game.account)
+    repository.archiveGame(finished(game, 2), "game_menu", "owner-b")
+    repository.resolveClaims("owner-b", [{ id: game.id, claim: true, meSeat: 0 }])
+    expect(repository.loadHistory()[0].account).toEqual(game.account)
+    expect(repository.loadHistoryDetail(game.id)?.game.account).toEqual(game.account)
+    expect(createRematch(game, 3).account).toMatchObject({
+      ownerId: "owner-a",
+      deckKey: "local-key",
+      deckName: "Local Burn",
+      deckFingerprint: game.account?.deckFingerprint,
+    })
   })
 
   it("keeps a rejected game on the device without retrying it", () => {

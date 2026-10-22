@@ -14,7 +14,12 @@ const mockPublish = jest.fn(
   async (_args: {
     publicId: string
     result: { kind: string }
-    players: { deckVersionId?: string }[]
+    players: {
+      deckVersionId?: string
+      deckKey?: string
+      deckFingerprint?: string
+      deckName?: string
+    }[]
   }) => ({
     publicId: "x",
     summaryId: "s",
@@ -70,7 +75,14 @@ class MemoryStorage implements StringStorage {
 
 function finishedGame(
   now: number,
-  account?: { ownerId: string; meSeat: number; deckVersionId: string },
+  account?: {
+    ownerId: string
+    meSeat: number
+    deckVersionId?: string
+    deckKey?: string
+    deckFingerprint?: string
+    deckName?: string
+  },
 ) {
   const game = createLocalGame({
     now,
@@ -281,21 +293,115 @@ describe("LocalGamePublishSession rejections", () => {
     expect(repository.loadHistory().map((game) => game.publish)).toEqual(["published", "failed"])
   })
 
-  it("retries a deck rejection once without the deck", async () => {
+  it.each(["deck_version_not_found", "invalid_deck_key", "invalid_deck_fingerprint"])(
+    "retries %s once with all deck fields stripped",
+    async (code) => {
+      const repository = new LocalGameRepository(new MemoryStorage())
+      repository.archiveGame(
+        finishedGame(1, {
+          ownerId: "owner-a",
+          meSeat: 0,
+          ...(code === "deck_version_not_found" ? { deckVersionId: "gone" } : {}),
+          deckKey: "burn",
+          deckFingerprint: `v1:${"a".repeat(64)}`,
+          deckName: "Burn",
+        }),
+        "game_menu",
+        "owner-a",
+      )
+      mockPublish.mockRejectedValueOnce(new ConvexError({ code, message: "Deck rejected" }))
+
+      render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+      await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
+      expect(mockPublish).toHaveBeenCalledTimes(2)
+      expect(mockPublish.mock.calls[0][0].players[0].deckKey).toBe("burn")
+      expect(mockPublish.mock.calls[1][0].players[0]).toMatchObject({
+        localId: expect.any(String),
+        me: true,
+      })
+      for (const field of ["deckVersionId", "deckKey", "deckFingerprint", "deckName"])
+        expect(mockPublish.mock.calls[1][0].players[0]).not.toHaveProperty(field)
+    },
+  )
+
+  it("does not retry a rejected deck fallback again", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(
-      finishedGame(1, { ownerId: "owner-a", meSeat: 0, deckVersionId: "gone" }),
+      finishedGame(1, { ownerId: "owner-a", meSeat: 0, deckKey: "burn" }),
       "game_menu",
       "owner-a",
     )
-    mockPublish.mockRejectedValueOnce(
-      new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" }),
-    )
+    const rejection = new ConvexError({ code: "invalid_deck_key", message: "Deck rejected" })
+    mockPublish.mockRejectedValueOnce(rejection).mockRejectedValueOnce(rejection)
 
     render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
-    await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
+    await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("failed"))
     expect(mockPublish).toHaveBeenCalledTimes(2)
-    expect(mockPublish.mock.calls[0][0].players[0].deckVersionId).toBe("gone")
-    expect(mockPublish.mock.calls[1][0].players[0].deckVersionId).toBeUndefined()
   })
 })
+
+it("keeps the throttle deadline when another game finishes or the connection restarts", async () => {
+  jest.useFakeTimers()
+  jest.clearAllMocks()
+  resetConnectedProfileBootstrapForTests()
+  mockConnected = true
+  const repository = new LocalGameRepository(new MemoryStorage())
+  repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
+  mockPublish.mockRejectedValueOnce(
+    new ConvexError({ code: "rate_limited", message: "Wait", retryAfterMs: 90_000 }),
+  )
+  const view = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+  try {
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      jest.advanceTimersByTime(30_000)
+      repository.archiveGame(finishedGame(10), "game_menu", "owner-a")
+    })
+    expect(mockPublish).toHaveBeenCalledTimes(1)
+    mockConnected = false
+    view.rerender(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    mockConnected = true
+    view.rerender(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await act(async () => jest.advanceTimersByTime(59_999))
+    expect(mockPublish).toHaveBeenCalledTimes(1)
+    expect(repository.pendingPublishes("owner-a")).toHaveLength(2)
+    await act(async () => jest.advanceTimersByTime(1))
+    expect(mockPublish).toHaveBeenCalledTimes(3)
+    expect(repository.pendingPublishes("owner-a")).toHaveLength(0)
+  } finally {
+    view.unmount()
+    jest.useRealTimers()
+  }
+})
+
+it.each([undefined, 90_000])(
+  "retries throttled uploads after %s ms without failing the game",
+  async (retryAfterMs) => {
+    jest.useFakeTimers()
+    jest.clearAllMocks()
+    resetConnectedProfileBootstrapForTests()
+    mockConnected = true
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
+    mockPublish.mockRejectedValueOnce(
+      new ConvexError({ code: "rate_limited", message: "Wait", retryAfterMs }),
+    )
+    const view = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
+    expect(repository.loadHistory()[0].publish).toBe("pending")
+    await act(async () => {
+      jest.advanceTimersByTime(60_000)
+    })
+    if (retryAfterMs) {
+      expect(repository.loadHistory()[0].publish).toBe("pending")
+      expect(mockPublish).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        jest.advanceTimersByTime(retryAfterMs - 60_000)
+      })
+    }
+    await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
+    expect(mockPublish).toHaveBeenCalledTimes(2)
+    view.unmount()
+    jest.useRealTimers()
+  },
+)

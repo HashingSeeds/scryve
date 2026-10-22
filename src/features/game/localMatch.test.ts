@@ -41,7 +41,14 @@ function matchGame(bestOf: 1 | 3 | 5 = 3, now = 1) {
       { name: "Ada", color: "#000" },
       { name: "Grace", color: "#111" },
     ],
-    account: { ownerId: "owner", meSeat: 0, deckVersionId: "v1", deckName: "Burn" },
+    account: {
+      ownerId: "owner",
+      meSeat: 0,
+      deckVersionId: "v1",
+      deckKey: "burn-key",
+      deckFingerprint: `v1:${"a".repeat(64)}`,
+      deckName: "Burn",
+    },
     match: { bestOf },
   })
 }
@@ -74,6 +81,10 @@ describe("local match", () => {
     expect(canContinueMatch(first)).toBe(true)
     const second = createNextMatchGame(first, 20)
     expect(second.match).toMatchObject({ id: first.match?.id, gameNumber: 2, wins: [1, 0] })
+    expect(second.account).toMatchObject({
+      deckKey: "burn-key",
+      deckFingerprint: first.account?.deckFingerprint,
+    })
     expect(second.account?.mePlayerId).toBe(second.players[0].id)
     expect(matchContextLabel(second)).toBe("Game 2 · 1-0")
 
@@ -114,6 +125,10 @@ describe("local match", () => {
     const rematch = createRematch(decided, 20)
     expect(rematch.match).toMatchObject({ bestOf: 1, gameNumber: 1, wins: [0, 0], draws: 0 })
     expect(rematch.match?.id).not.toBe(decided.match?.id)
+    expect(rematch.account).toMatchObject({
+      deckKey: "burn-key",
+      deckFingerprint: decided.account?.deckFingerprint,
+    })
   })
 
   it("survives a restart on the active game and on the archived summary", () => {
@@ -121,11 +136,14 @@ describe("local match", () => {
     const second = createNextMatchGame(finish(matchGame(), 1, 10), 20)
     repository.saveActiveGame(second)
     expect(repository.loadActiveGame()?.match).toEqual(second.match)
+    expect(repository.loadActiveGame()?.account).toEqual(second.account)
 
     const decided = finish(second, 1, 30)
     repository.archiveGame(decided, "game_menu")
     const [summary] = repository.loadHistory()
     expect(summary.match).toEqual(decided.match)
+    expect(summary.account).toEqual(decided.account)
+    expect(repository.loadHistoryDetail(decided.id)?.game.account).toEqual(decided.account)
     expect(summary.matchPublish).toBe("pending")
     expect(repository.loadHistoryDetail(decided.id)?.game.match).toEqual(decided.match)
   })

@@ -140,7 +140,7 @@ export function createLocalGame(input: {
   lifeStep?: number
   now?: number
   gameId?: GameId
-  account?: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string }
+  account?: Omit<LocalGameAccount, "mePlayerId"> & { meSeat?: number }
   match?: { bestOf: MatchBestOf }
   clock?: RoundClockSetup
 }): LocalGame {
@@ -293,14 +293,16 @@ export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
 
 export function localGameAccount(
   players: readonly GamePlayer[],
-  account: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string },
+  account: Omit<LocalGameAccount, "mePlayerId"> & { meSeat?: number },
 ): LocalGameAccount {
   const me = account.meSeat === undefined ? undefined : players[account.meSeat]
   return {
     ownerId: account.ownerId,
     ...(me ? { mePlayerId: me.id } : {}),
     ...(me && account.deckVersionId ? { deckVersionId: account.deckVersionId } : {}),
-    ...(me && account.deckVersionId && account.deckName ? { deckName: account.deckName } : {}),
+    ...(me && account.deckKey ? { deckKey: account.deckKey } : {}),
+    ...(me && account.deckFingerprint ? { deckFingerprint: account.deckFingerprint } : {}),
+    ...(me && account.deckName ? { deckName: account.deckName } : {}),
   }
 }
 

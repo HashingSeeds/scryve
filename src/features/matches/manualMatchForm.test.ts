@@ -148,3 +148,23 @@ describe("parseIsoDate", () => {
     expect(parseIsoDate("2026-02-30")).toBeUndefined()
   })
 })
+
+it("records a local deck key and fingerprint without a synced version", () => {
+  const built = buildManualMatchArgs(
+    draft(),
+    {
+      publicId: ids.publicId,
+      deckKey: "local-burn",
+      deckFingerprint: `v1:${"c".repeat(64)}`,
+      system: "mtg",
+      format: "modern",
+    },
+    today.getTime(),
+  )
+  expect(built.ok && built.args).toMatchObject({
+    system: "mtg",
+    format: "modern",
+    me: { deckKey: "local-burn", deckFingerprint: `v1:${"c".repeat(64)}`, outcome: "win" },
+  })
+  expect(built.ok && built.args.me).not.toHaveProperty("deckVersionId")
+})

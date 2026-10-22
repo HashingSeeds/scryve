@@ -18,27 +18,37 @@ import {
   setNearbyOwner,
   settleSeatClaim,
 } from "@/features/lan/nearbyAccount"
-import { convexErrorCode } from "@/utils/convexError"
+import { convexErrorCode, convexRetryAfterMs } from "@/utils/convexError"
 
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import { api } from "../../../convex/_generated/api"
 
-// why: the Convex client holds a mutation through disconnects, so a rejection is the server's verdict unless it is an auth hiccup.
+// why: the Convex client holds a mutation through disconnects; auth and throttling can still recover after a server rejection.
 function isPermanentRejection(cause: unknown) {
-  if (cause instanceof ConvexError) return convexErrorCode(cause) !== "unauthenticated"
+  if (cause instanceof ConvexError)
+    return !["unauthenticated", "rate_limited"].includes(convexErrorCode(cause) ?? "")
   return cause instanceof Error && cause.message.includes("Server Error")
 }
 
 const CLAIM_RETRY_DELAYS_MS = [5_000, 30_000, 300_000]
 
 function isDeckRejection(cause: unknown) {
-  return convexErrorCode(cause)?.startsWith("deck_") === true
+  const code = convexErrorCode(cause)
+  return code?.startsWith("deck_") === true || code?.startsWith("invalid_deck_") === true
 }
 
 function withoutDeck(snapshot: ReturnType<typeof buildFinishedLocalGameSnapshot>) {
   return {
     ...snapshot,
-    players: snapshot.players.map(({ deckVersionId: _deckVersionId, ...player }) => player),
+    players: snapshot.players.map(
+      ({
+        deckVersionId: _deckVersionId,
+        deckKey: _deckKey,
+        deckFingerprint: _deckFingerprint,
+        deckName: _deckName,
+        ...player
+      }) => player,
+    ),
   }
 }
 
@@ -58,6 +68,7 @@ function ActivePublish({
   const [finishCount, setFinishCount] = useState(0)
   const [claimCount, setClaimCount] = useState(0)
   const claimRetries = useRef(0)
+  const publishRetry = useRef<{ ownerId: string; at: number } | undefined>(undefined)
 
   useEffect(
     () => repository.onGameFinished(() => setFinishCount((count) => count + 1)),
@@ -66,7 +77,22 @@ function ActivePublish({
 
   useEffect(() => {
     if (!ready || !online || !ownerId) return
+    const retryDelay =
+      publishRetry.current?.ownerId === ownerId ? publishRetry.current.at - Date.now() : 0
+    if (retryDelay > 0) {
+      const timer = setTimeout(() => setFinishCount((count) => count + 1), retryDelay)
+      return () => clearTimeout(timer)
+    }
+    publishRetry.current = undefined
     let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const retryThrottled = (cause: unknown) => {
+      if (!cancelled && convexErrorCode(cause) === "rate_limited") {
+        const delay = Math.max(1_000, convexRetryAfterMs(cause) ?? 60_000)
+        publishRetry.current = { ownerId, at: Date.now() + delay }
+        retryTimer = setTimeout(() => setFinishCount((count) => count + 1), delay)
+      }
+    }
     void (async () => {
       for (const game of repository.pendingPublishes(ownerId)) {
         if (cancelled) return
@@ -76,11 +102,11 @@ function ActivePublish({
           repository.markPublished(game.id)
           continue
         } catch (cause) {
-          if (!isPermanentRejection(cause)) return
-          if (
-            !isDeckRejection(cause) ||
-            snapshot.players.every((player) => !player.deckVersionId)
-          ) {
+          if (!isPermanentRejection(cause)) {
+            retryThrottled(cause)
+            return
+          }
+          if (!isDeckRejection(cause)) {
             repository.markPublishFailed(game.id)
             continue
           }
@@ -89,7 +115,10 @@ function ActivePublish({
           await publish(withoutDeck(snapshot))
           repository.markPublished(game.id)
         } catch (cause) {
-          if (!isPermanentRejection(cause)) return
+          if (!isPermanentRejection(cause)) {
+            retryThrottled(cause)
+            return
+          }
           repository.markPublishFailed(game.id)
         }
       }
@@ -101,13 +130,17 @@ function ActivePublish({
           await finishMatch(buildMatchFinishSnapshot(game))
           repository.markMatchPublished(game.id)
         } catch (cause) {
-          if (!isPermanentRejection(cause)) return
+          if (!isPermanentRejection(cause)) {
+            retryThrottled(cause)
+            return
+          }
           repository.markMatchPublishFailed(game.id)
         }
       }
     })()
     return () => {
       cancelled = true
+      clearTimeout(retryTimer)
     }
   }, [finishCount, finishMatch, online, ownerId, publish, ready, repository])
 

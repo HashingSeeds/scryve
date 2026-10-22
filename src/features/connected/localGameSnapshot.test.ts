@@ -190,10 +190,18 @@ describe("buildFinishedLocalGameSnapshot", () => {
       createdAt: 100,
       finishedAt: 200,
       result: { kind: "win", winnerPlayerIds: [game.players[1].id] },
-      account: { ownerId: "owner", mePlayerId: game.players[1].id, deckVersionId: "version-1" },
+      account: {
+        ownerId: "owner",
+        mePlayerId: game.players[1].id,
+        deckVersionId: "version-1",
+        deckKey: "key",
+        deckFingerprint: `v1:${"b".repeat(64)}`,
+        deckName: "Burn",
+      },
     })
     expect(snapshot).toMatchObject({
       publicId: game.id,
+      retriesThrottled: true,
       system: "mtg",
       format: "commander",
       ruleset: "commander",
@@ -208,7 +216,14 @@ describe("buildFinishedLocalGameSnapshot", () => {
       [3, 40],
     ])
     expect(snapshot.players[0].me).toBeUndefined()
-    expect(snapshot.players[1]).toMatchObject({ me: true, deckVersionId: "version-1" })
+    expect(snapshot.players[1]).toMatchObject({
+      me: true,
+      deckVersionId: "version-1",
+      deckKey: "key",
+      deckFingerprint: `v1:${"b".repeat(64)}`,
+      deckName: "Burn",
+    })
+    expect(snapshot.players[0].deckKey).toBeUndefined()
     expect(snapshot.players[2].deckVersionId).toBeUndefined()
   })
 
@@ -248,4 +263,27 @@ describe("buildFinishedLocalGameSnapshot", () => {
       1_000_000, -1_000_000, 40,
     ])
   })
+})
+
+it("uploads a local deck without a synced version", () => {
+  const game = commanderGame()
+  const snapshot = buildFinishedLocalGameSnapshot({
+    ...game,
+    status: "finished",
+    eventCount: 1,
+    finishedAt: 100,
+    account: {
+      ownerId: "owner",
+      mePlayerId: game.players[0].id,
+      deckKey: "local",
+      deckName: "Local Burn",
+      deckFingerprint: `v1:${"a".repeat(64)}`,
+    },
+  })
+  expect(snapshot.players[0]).toMatchObject({
+    deckKey: "local",
+    deckName: "Local Burn",
+    deckFingerprint: `v1:${"a".repeat(64)}`,
+  })
+  expect(snapshot.players[0]).not.toHaveProperty("deckVersionId")
 })
