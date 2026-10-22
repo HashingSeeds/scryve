@@ -83,12 +83,6 @@ export default {
       unavailable:
         "이 빌드에서는 사용 정보 공유를 사용할 수 없습니다. PostHog 이벤트가 전송되지 않습니다.",
     },
-    accountData: {
-      description:
-        "Scryve 계정에 연결된 클라우드 데이터를 관리합니다. 로컬 게임은 이 기기에 남습니다.",
-      requestDeletion: "계정 삭제 요청",
-      requestDeletionHint: "계정 삭제 요청 페이지를 엽니다",
-    },
     help: {
       heading: "도움말",
       support: "도움말 및 지원",

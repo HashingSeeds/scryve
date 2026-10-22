@@ -7,6 +7,7 @@ import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useAccountEntry } from "@/features/auth/useAccountEntry"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
@@ -76,6 +77,7 @@ export default function Index() {
     destination?: string
   }>()
   const auth = useAuthAccess()
+  const account = useAccountEntry()
   const { themed, theme } = useAppTheme()
   const [settings, setSettings] = useState(() => localGameRepository.loadSettings())
   const [dismissedGameId, setDismissedGameId] = useState<string>()
@@ -227,8 +229,8 @@ export default function Index() {
       onSetup={() => router.push("/game/new")}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
-      onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
-      accountEntry={auth.isSignedIn ? "account" : "signIn"}
+      onAccount={account.onAccount}
+      accountEntry={account.accountEntry}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}
       onGameAbandoned={() => router.replace({ pathname: "/", params: { destination: "play" } })}
       ownerId={auth.isSignedIn ? auth.userId : undefined}

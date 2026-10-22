@@ -3,6 +3,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
+import { useAccountEntry } from "@/features/auth/useAccountEntry"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { DecksScreen } from "@/screens/DecksScreen"
@@ -19,6 +20,7 @@ export default function DecksRoute() {
     }, []),
   )
   const auth = useAuthAccess()
+  const account = useAccountEntry()
   const hasCurrentGame = useMemo(() => localGameRepository.loadActiveGame() !== null, [])
   const screen = (access?: CloudAccess) => (
     <DecksScreen
@@ -32,8 +34,8 @@ export default function DecksRoute() {
       hasCurrentGame={hasCurrentGame}
       onHistory={() => router.push("/history")}
       onSettings={() => router.push("/settings")}
-      accountEntry={auth.isSignedIn ? "account" : "signIn"}
-      onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
+      accountEntry={account.accountEntry}
+      onAccount={account.onAccount}
       onAddDeck={() => router.push("/connected/decks/add")}
       onSelect={(deck) =>
         router.push({

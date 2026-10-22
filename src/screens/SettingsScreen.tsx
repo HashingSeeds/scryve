@@ -71,7 +71,6 @@ export interface SettingsScreenProps {
   initialSettings: LocalSettings
   onBack: () => void
   onSettingsChange: (settings: LocalSettings) => void
-  onRequestAccountDeletion?: () => void
   onOpenSupport?: () => void
   onOpenPrivacy?: () => void
   onOpenTerms?: () => void
@@ -86,7 +85,6 @@ export function SettingsScreen({
   initialSettings,
   onBack,
   onSettingsChange,
-  onRequestAccountDeletion,
   onOpenSupport,
   onOpenPrivacy,
   onOpenTerms,
@@ -137,7 +135,6 @@ export function SettingsScreen({
   const copy = {
     players: translate("account:settings.players"),
     game: translate("account:settings.game"),
-    requestDeletionHint: translate("account:settings.accountData.requestDeletionHint"),
     licenseAgreementHint: translate("account:legal.licenseAgreementHint"),
     analyticsId: translate("account:settings.appInfo.analyticsId", { id: currentAnalyticsId }),
   }
@@ -316,20 +313,6 @@ export function SettingsScreen({
           <Text size="xs" tx="account:settings.privacy.unavailable" />
         ) : null}
         {analyticsError ? <Text accessibilityRole="alert" size="xs" text={analyticsError} /> : null}
-        {onRequestAccountDeletion ? (
-          <View style={themed($accountSection)}>
-            <Text tx="account:accountData.label" preset="subheading" accessibilityRole="header" />
-            <Text tx="account:settings.accountData.description" size="xs" style={themed($muted)} />
-            <Button
-              testID="request-account-deletion-button"
-              tx="account:settings.accountData.requestDeletion"
-              accessibilityHint={copy.requestDeletionHint}
-              style={themed($dangerButton)}
-              textStyle={themed($dangerText)}
-              onPress={onRequestAccountDeletion}
-            />
-          </View>
-        ) : null}
         {BlockedPlayers}
         {onOpenSupport ? (
           <View>
@@ -523,15 +506,6 @@ const $gameValue: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginStart: spacing.md,
 })
 const $gameChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
-const $accountSection: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.sm,
-})
 const $copyButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
 })
-const $dangerButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  minHeight: 50,
-  borderColor: colors.error,
-  backgroundColor: colors.transparent,
-})
-const $dangerText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
