@@ -202,8 +202,22 @@ const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => undefined,
   useConvexConnectionState: () => mockConnectionState,
-  useQuery: (_reference: string, args: Record<string, unknown> | "skip") => {
+  useQuery: (reference: string, args: Record<string, unknown> | "skip") => {
     if (args === "skip") return undefined
+    if (reference === "decks.statsForKey") {
+      const record = mockDetail.value?.record as typeof loadedDetail.record | undefined
+      return record
+        ? {
+            all: {
+              ...record,
+              manualMatches: record.manual.matches,
+              manualGames: record.manual.games,
+              connectedMatches: undefined,
+            },
+            fingerprints: [],
+          }
+        : undefined
+    }
     queryArgs.push(args)
     if (mockDetail.error) throw mockDetail.error
     return mockDetail.value
@@ -247,6 +261,7 @@ jest.mock("../../convex/_generated/api", () => ({
   api: {
     decks: {
       detail: "decks.detail",
+      statsForKey: "decks.statsForKey",
       saveVersion: "decks.saveVersion",
       createVersion: "decks.createVersion",
       updateVersion: "decks.updateVersion",
@@ -1541,6 +1556,29 @@ describe("DeckDetailScreen", () => {
     expect(view.getByTestId("edit-deck-notes")).toBeDisabled()
     fireEvent.press(view.getByTestId("discard-deck-metadata"))
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("deleted-edit")
+  })
+
+  it("says the deck is gone when another device deleted or moved it", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [{ ...cachedMetadata, revision: 6, deleted: true }]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: true,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("This deck may have been deleted.")).toBeTruthy()
+    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
   })
 
   it("keeps same-name Pokemon reprints distinct when only original references identify them", () => {

@@ -25,6 +25,7 @@ export interface DeckSettingsDialogProps {
   error?: string
   onSubmit: (draft: DeckSettingsDraft) => void
   onDelete: () => void
+  onKeepOnDevice?: () => void
   onClose: () => void
 }
 
@@ -36,6 +37,7 @@ export function DeckSettingsDialog({
   error,
   onSubmit,
   onDelete,
+  onKeepOnDevice,
   onClose,
 }: DeckSettingsDialogProps) {
   const { themed } = useAppTheme()
@@ -86,6 +88,14 @@ export function DeckSettingsDialog({
           disabled={busy || !name.trim()}
           onPress={() => onSubmit({ name, format })}
         />
+        {onKeepOnDevice ? (
+          <Button
+            testID="move-deck-button"
+            tx="decks:settings.unsync"
+            disabled={busy}
+            onPress={onKeepOnDevice}
+          />
+        ) : null}
         <Button
           testID="delete-deck-button"
           tx="decks:settings.delete"

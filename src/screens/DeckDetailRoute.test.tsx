@@ -14,6 +14,10 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
 }))
 
+jest.mock("@/features/auth/AuthContext", () => ({
+  useAuthAccess: () => ({ configured: true }),
+}))
+
 jest.mock("@/features/auth/CloudScreen", () => ({
   CloudScreen: ({ children }: { children: () => React.ReactNode }) => children(),
 }))

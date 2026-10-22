@@ -41,7 +41,8 @@
       "lobby": "sala",
       "nearby": "cercana (partidas cercanas); permission: dispositivos cercanos",
       "layout": "diseño",
-      "sign in": "iniciar sesión"
+      "sign in": "iniciar sesión",
+      "device": "dispositivo (the phone or tablet the app runs on; never teléfono for \"device\")"
     }
   },
   "fr": {

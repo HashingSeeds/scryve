@@ -50,12 +50,14 @@ import {
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DECK_TAB_LABELS, deckTabs, DeckView, type DeckTab } from "@/features/decks/DeckView"
+import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import {
   deckQueryVersionId,
   isDeckKnownDeleted,
   resolveDeckView,
 } from "@/features/decks/resolveDeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -76,6 +78,7 @@ type DeckDialog =
   | "deleteVersion"
   | "settings"
   | "deleteDeck"
+  | "moveDeck"
   | "discard"
   | "syncConflict"
 
@@ -97,6 +100,7 @@ type DeckDetailScreenProps = {
   summary?: DeckDetailSummary
   onBack: () => void
   onAddMatch?: (versionId: Id<"deckVersions">, deckName: string) => void
+  onMovedToDevice?: (localId: string) => void
 }
 
 function DeckDetailPlaceholder({
@@ -258,6 +262,7 @@ function DeckDetailContent({
   summary,
   onBack,
   onAddMatch,
+  onMovedToDevice,
   access,
   reviewChanges,
 }: DeckDetailScreenProps) {
@@ -295,6 +300,15 @@ function DeckDetailContent({
         }
       : "skip",
   )
+  const deckMetadata = synced.metadata.find((deck) => deck.deckId === deckId)
+  const stats = useDeckKeyStats(
+    deckMetadata?.deckKey ??
+      detail?.deck.deckKey ??
+      deckMetadata?.id ??
+      detail?.deck.syncId ??
+      deckId,
+    access?.ready ?? true,
+  )
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
@@ -315,6 +329,7 @@ function DeckDetailContent({
   const deleteVersion = useMutation(api.decks.deleteVersion)
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
+  const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const [tab, setTab] = useState<DeckTab>("cards")
   const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
   const [draft, setDraftState] = useState(closedDeckDraft)
@@ -365,6 +380,13 @@ function DeckDetailContent({
     }
   }, [failedEdit, failedCardEdit])
   const writeMotion = versionWrites.pending.length + versionWrites.failures.length
+  // why: moving snapshots the server copy, so edits still queued on this device would be lost.
+  const hasQueuedEdits = [
+    ...metadataWrites.pending.map((write) => write.deckId),
+    ...metadataWrites.failures.map((failure) => failure.action.deckId),
+    ...versionWrites.pending.map((write) => write.deckId),
+    ...versionWrites.failures.map((failure) => failure.action.deckId),
+  ].includes(deckId as Id<"decks">)
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
   useEffect(() => {
@@ -731,6 +753,19 @@ function DeckDetailContent({
     }, translate("decks:detail.updateFailed"))
   }
 
+  function confirmKeepOnDevice() {
+    setDialog("moveDeck")
+  }
+
+  async function keepOnDevice() {
+    if (!onMovedToDevice) return
+    await run(async () => {
+      const localId = await moveToDevice(deckId as Id<"decks">)
+      setDialog("none")
+      onMovedToDevice(localId)
+    }, translate("decks:deckLimit.moveFailed"))
+  }
+
   async function deleteDeck() {
     await run(async () => {
       await archiveDeck({ deckId: deckId as Id<"decks"> })
@@ -739,7 +774,15 @@ function DeckDetailContent({
     }, translate("decks:detail.deleteFailed"))
   }
 
-  if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
+  if (!deck)
+    return (
+      <DeckDetailPlaceholder
+        summary={summary}
+        onBack={onBack}
+        access={access}
+        failure={knownDeleted ? { kind: "missing", retry: onBack } : undefined}
+      />
+    )
 
   const configuredSections = localizedDeckSections(deck.game, deck.format)
   const { accountMetadata, versionConflict, versionCardConflict, failureMessage } = view
@@ -782,9 +825,7 @@ function DeckDetailContent({
         onSave={save}
         onCancel={requestDiscard}
         stats={
-          detail?.record
-            ? { record: detail.record, source: statsSource, onSourceChange: setStatsSource }
-            : undefined
+          stats ? { record: stats, source: statsSource, onSourceChange: setStatsSource } : undefined
         }
         onAddMatch={
           onAddMatch && version && !knownDeleted
@@ -1159,6 +1200,7 @@ function DeckDetailContent({
           error={error}
           onSubmit={submitSettings}
           onDelete={() => setDialog("deleteDeck")}
+          {...(onMovedToDevice && !hasQueuedEdits ? { onKeepOnDevice: confirmKeepOnDevice } : {})}
           onClose={() => setDialog("none")}
         >
           {view.hasVersionRows ? (
@@ -1288,6 +1330,42 @@ function DeckDetailContent({
         </DialogCard>
       ) : null}
 
+      {dialog === "moveDeck" ? (
+        <DialogCard
+          visible
+          onClose={() => setDialog("none")}
+          closeDisabled={busy}
+          backdropAccessibilityLabel={translate("common:cancel")}
+          dialogTestID="move-deck-dialog"
+          dialogAccessibilityRole="alert"
+          accessibilityViewIsModal
+        >
+          <Text
+            preset="subheading"
+            tx="decks:deckLimit.confirmTitle"
+            txOptions={{ name: deck.name }}
+            style={themed($dialogText)}
+          />
+          <Text size="sm" tx="decks:deckLimit.moveBody" style={themed($dialogText)} />
+          {error ? <AlertNote text={error} /> : null}
+          <View style={themed($dialogActions)}>
+            <Button
+              tx="common:cancel"
+              style={themed($dialogButton)}
+              disabled={busy}
+              onPress={() => setDialog("none")}
+            />
+            <Button
+              tx={busy ? "decks:deckLimit.moving" : "decks:deckLimit.move"}
+              testID="move-deck-confirm"
+              preset="reversed"
+              style={themed($dialogButton)}
+              disabled={busy}
+              onPress={() => void keepOnDevice()}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
       {dialog === "deleteDeck" ? (
         <DialogCard
           visible

@@ -1,4 +1,4 @@
-import { Linking, Modal } from "react-native"
+import { Linking } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
@@ -359,84 +359,6 @@ describe("AddDeckScreen", () => {
     expect(loadGuestDeck(saved.localId)).toEqual(saved)
   })
 
-  it("imports saved guests after sign-in without losing the next deck draft", async () => {
-    const saved = saveGuestDeck({ name: "First deck", game: "mtg", format: "commander", cards: [] })
-    saveGuestDeck({ name: "Second deck", game: "mtg", format: "commander", cards: [] })
-    mockGuestImport.mockImplementation(({ localUpdatedAt }: { localUpdatedAt: number }) =>
-      Promise.resolve({ status: "imported", deckId: "remote", localUpdatedAt }),
-    )
-    const form = (ready: boolean) => (
-      <ThemeProvider initialContext="light">
-        <AddDeckScreen
-          onBack={jest.fn()}
-          onCreated={jest.fn()}
-          access={{
-            ready,
-            loading: false,
-            signedIn: ready,
-            ownerId: ready ? "owner" : undefined,
-            request: jest.fn(),
-          }}
-        />
-      </ThemeProvider>
-    )
-    const view = render(form(false))
-    chooseMode(view, "blank")
-    fireEvent.changeText(view.getByTestId("deck-name-input"), "Third deck")
-    fireEvent.press(view.getByText("Create deck"))
-    expect(view.getByText("2 decks saved on this device")).toBeTruthy()
-    view.rerender(form(true))
-    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
-    expect(mockGuestImport).toHaveBeenCalledTimes(2)
-    expect(mockGuestImport).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "First deck", localId: saved.localId }),
-    )
-    expect(view.getByTestId("deck-name-input").props.value).toBe("Third deck")
-    expect(view.getByText("Create deck")).toBeEnabled()
-    fireEvent.press(view.getByText("Create deck"))
-    await waitFor(() =>
-      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ name: "Third deck" })),
-    )
-  })
-
-  it("tells a signed-in player which guest decks did not fit and keeps them local", async () => {
-    const imported = saveGuestDeck({ name: "Fits", game: "mtg", format: "commander", cards: [] })
-    const kept = saveGuestDeck({ name: "No room", game: "mtg", format: "commander", cards: [] })
-    const capacity = { used: 2, limit: 2, premium: false, canCreate: false }
-    mockListMine.value = { ...readyShelf, capacity }
-    mockGuestImport.mockImplementation(
-      ({ localId, localUpdatedAt }: { localId: string; localUpdatedAt: number }) =>
-        Promise.resolve(
-          localId === imported.localId
-            ? { status: "imported", deckId: "remote", localUpdatedAt }
-            : { status: "limit_reached", capacity },
-        ),
-    )
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <AddDeckScreen
-          onBack={jest.fn()}
-          onCreated={jest.fn()}
-          access={{
-            ready: true,
-            loading: false,
-            signedIn: true,
-            ownerId: "owner",
-            request: jest.fn(),
-          }}
-        />
-      </ThemeProvider>,
-    )
-    chooseMode(view, "blank")
-    await waitFor(() =>
-      expect(
-        view.getByText("Synced 1 deck. 1 deck did not fit and is still saved on this device."),
-      ).toBeTruthy(),
-    )
-    expect(view.getByText("Make room")).toBeTruthy()
-    expect(loadGuestDecks()).toEqual([kept])
-  })
-
   it("puts unknown catalog sections in a visible deterministic fallback", () => {
     const sections = catalogPreviewSections(
       [
@@ -685,31 +607,6 @@ describe("AddDeckScreen", () => {
       expect(view.getByTestId("save-import-button")).toBeEnabled()
     },
   )
-
-  it("keeps guest replacement recovery available from the review", async () => {
-    const saved = saveGuestDeck({ name: "Keep me", game: "mtg", format: "commander", cards: [] })
-    saveGuestDeck({ name: "Keep me too", game: "mtg", format: "commander", cards: [] })
-    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <AddDeckScreen
-          onBack={jest.fn()}
-          onCreated={jest.fn()}
-          access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
-        />
-      </ThemeProvider>,
-    )
-    enterPasted(view)
-    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-    fireEvent.press(view.getByTestId("save-import-button"))
-    expect(view.getByText("Replace Keep me…")).toBeTruthy()
-    expect(view.getByText("Replace Keep me too…")).toBeTruthy()
-    expect(view.getByTestId("save-import-button")).toBeDisabled()
-    expect(loadGuestDeck(saved.localId)).toEqual(saved)
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
-    expect(view.getByLabelText("Deck list").props.value).toBe("2 Forest")
-    expect(loadGuestDeck(saved.localId)).toEqual(saved)
-  })
 
   it("shows loading on the review button until the deck is ready", async () => {
     let finish: ((result: typeof resolvedForest) => void) | undefined
@@ -1189,38 +1086,6 @@ describe("AddDeckScreen", () => {
       finish?.({ ...resolvedForest, cards: [{ ...resolvedForest.cards[0], quantity: 3 }] }),
     )
     expect(view.getByLabelText("3× Forest")).toBeTruthy()
-  })
-
-  it.each(["name", "format"])("refreshes guest replacement after editing %s", async (field) => {
-    saveGuestDeck({ name: "Original guest", game: "mtg", format: "commander", cards: [] })
-    saveGuestDeck({ name: "Other guest", game: "mtg", format: "commander", cards: [] })
-    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <AddDeckScreen
-          onBack={jest.fn()}
-          onCreated={jest.fn()}
-          access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
-        />
-      </ThemeProvider>,
-    )
-    enterPasted(view)
-    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-    fireEvent.press(view.getByTestId("save-import-button"))
-    expect(view.getByText("Replace Original guest…")).toBeTruthy()
-    fireEvent.press(view.getByRole("button", { name: /^(Edit|Done)$/ }))
-    if (field === "name") fireEvent.changeText(view.getByTestId("deck-name-input"), "Fresh name")
-    else chooseFormat(view, "modern")
-    expect(view.queryByText("Replace Original guest…")).toBeNull()
-    expect(view.getByTestId("save-import-button")).toBeEnabled()
-    fireEvent.press(view.getByTestId("save-import-button"))
-    fireEvent.press(view.getByText("Replace Original guest…"))
-    fireEvent.press(view.getByTestId("confirm-guest-replace-action"))
-    expect(loadGuestDecks()[1]?.deck.name).toBe("Other guest")
-    expect(loadGuestDecks()[0]?.deck).toMatchObject({
-      name: field === "name" ? "Fresh name" : "Reviewed deck",
-      format: field === "format" ? "modern" : "commander",
-    })
   })
 
   it("merges matching aliases while keeping sections and printings distinct", async () => {
@@ -1916,45 +1781,6 @@ describe("AddDeckScreen", () => {
     expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(loadGuestDecks()[0].localId))
   })
 
-  it("reveals guest replacement recovery when the device is full and disables save", () => {
-    const kept = saveGuestDeck({ name: "Kept", format: "commander", game: "mtg", cards: [] })
-    const existing = saveGuestDeck({
-      name: "Existing",
-      format: "commander",
-      game: "mtg",
-      cards: [],
-    })
-    const onCreated = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <AddDeckScreen
-          onBack={jest.fn()}
-          onCreated={onCreated}
-          access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
-        />
-      </ThemeProvider>,
-    )
-    chooseMode(view, "blank")
-    fireEvent.changeText(view.getByTestId("deck-name-input"), "New deck")
-    fireEvent.press(view.getByText("Create deck"))
-    expect(view.getByText("2 decks saved on this device")).toBeTruthy()
-    expect(view.getByText("Sign in, then upgrade to Pro")).toBeTruthy()
-    expect(view.getByText("Create deck")).toBeDisabled()
-
-    fireEvent.press(view.getByText("Replace Existing…"))
-    expect(view.getByText("Existing will be replaced.")).toBeTruthy()
-    fireEvent.press(view.getByTestId("cancel-guest-replace"))
-    expect(onCreated).not.toHaveBeenCalled()
-
-    fireEvent.press(view.getByText("Replace Existing…"))
-    fireEvent.press(view.getByTestId("confirm-guest-replace-action"))
-    const [first, replaced] = loadGuestDecks()
-    expect(first).toEqual(kept)
-    expect(replaced.localId).not.toBe(existing.localId)
-    expect(replaced.deck.name).toBe("New deck")
-    expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(replaced.localId))
-  })
-
   it("searches public official decks while guest access is ready", async () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -2347,58 +2173,21 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it("asks for room only when a full account saves, then finishes that save", async () => {
+  it("saves a full account's new deck on this device instead of blocking", async () => {
     atCapacity()
-    const view = renderAddDeck()
-    expect(view.queryByTestId("deck-limit-dialog")).toBeNull()
+    const onCreated = jest.fn()
+    const view = renderAddDeck(onCreated)
     chooseMode(view, "blank")
     continueSetup(view)
-    fireEvent.changeText(view.getByTestId("deck-name-input"), "Blocked Deck")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Local Deck")
+    expect(view.getByTestId("saves-on-device-note")).toBeTruthy()
     fireEvent.press(view.getByText("Create deck"))
-    expect(view.getByText("Deck limit reached")).toBeTruthy()
-    expect(mockCreate).not.toHaveBeenCalled()
-    fireEvent.press(view.getByText("Delete a deck"))
-    fireEvent.press(view.getByLabelText("Delete Existing Deck"))
-    fireEvent.press(view.getByTestId("deck-limit-cancel-delete"))
-    expect(mockArchive).not.toHaveBeenCalled()
-    fireEvent.press(view.getByLabelText("Delete Existing Deck"))
-    fireEvent.press(view.getByTestId("deck-limit-confirm-delete"))
-    await waitFor(() => expect(mockArchive).toHaveBeenCalledWith({ deckId: "existing-deck" }))
-    mockListMine.value = {
-      ...readyShelf,
-      capacity: { used: 1, limit: 2, premium: false, canCreate: true },
-    }
-    view.rerender(
-      <ThemeProvider initialContext="light">
-        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
-      </ThemeProvider>,
-    )
-    await waitFor(() =>
-      expect(mockCreate).toHaveBeenCalledWith({
-        name: "Blocked Deck",
-        format: "commander",
-        game: "mtg",
-      }),
-    )
-    expect(view.queryByTestId("deck-limit-dialog")).toBeNull()
-  })
 
-  it("offers Pro when a full free account imports a browsed deck", async () => {
-    atCapacity()
-    const view = renderAddDeck()
-    await act(async () => jest.advanceTimersByTime(400))
-    fireEvent.press(view.getByText("Explorers of the Deep"))
-    await waitFor(() => expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy())
-    await waitFor(() => expect(view.getByTestId("import-preview-button")).toBeEnabled())
-    fireEvent.press(view.getByTestId("import-preview-button"))
-    fireEvent.press(view.getByText("Upgrade to Pro"))
-    expect(mockPresentPaywall).not.toHaveBeenCalled()
-    const hiding = view.UNSAFE_getAllByType(Modal).find((modal) => modal.props.visible === false)
-    act(() => hiding?.props.onDismiss())
-    await waitFor(() => expect(mockPresentPaywall).toHaveBeenCalledTimes(1))
-    expect(mockImport).not.toHaveBeenCalled()
-    fireEvent.press(view.getByText("Not now"))
+    expect(mockCreate).not.toHaveBeenCalled()
     expect(view.queryByTestId("deck-limit-dialog")).toBeNull()
+    const [saved] = loadGuestDecks()
+    expect(saved?.deck).toMatchObject({ name: "Local Deck", format: "commander", game: "mtg" })
+    expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(saved.localId))
   })
 
   it("keeps entered data while the deck limit is still loading", () => {

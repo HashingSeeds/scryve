@@ -67,6 +67,7 @@ export function DeckView({
   onDecrement,
   undo,
   stats,
+  statsContent,
 }: {
   tab: DeckTab
   onTabChange: (tab: DeckTab) => void
@@ -100,6 +101,7 @@ export function DeckView({
   onIncrement: (card: DeckCard) => void
   onDecrement: (card: DeckCard) => void
   undo?: { name: string; restore: () => void }
+  statsContent?: ReactNode
   stats?: {
     record: DeckStatsRecord
     source: StatsSource
@@ -182,7 +184,7 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
-              {stats ? <DeckStats {...stats} /> : null}
+              {stats ? <DeckStats {...stats} /> : statsContent}
               {onAddMatch ? (
                 <TouchableOpacity
                   testID="add-match-result"

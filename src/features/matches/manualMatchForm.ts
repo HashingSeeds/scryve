@@ -131,6 +131,7 @@ export function buildManualMatchArgs(
     deckVersionId?: Id<"deckVersions">
     deckKey?: string
     deckFingerprint?: string
+    deckName?: string
     system?: string
     format?: string
   },
@@ -187,6 +188,7 @@ export function buildManualMatchArgs(
     ...(ids.deckVersionId ? { deckVersionId: ids.deckVersionId } : {}),
     ...(ids.deckKey ? { deckKey: ids.deckKey } : {}),
     ...(ids.deckFingerprint ? { deckFingerprint: ids.deckFingerprint } : {}),
+    ...(ids.deckName ? { deckName: ids.deckName } : {}),
     outcome: draft.outcome,
   }
   const scoreGiven = twoPlayer && Object.values(draft.score).some((value) => value.trim() !== "")

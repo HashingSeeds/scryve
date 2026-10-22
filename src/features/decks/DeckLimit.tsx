@@ -1,7 +1,7 @@
-import { useEffect, useEffectEvent, useState } from "react"
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Platform, ScrollView, TouchableOpacity, View } from "react-native"
-import { useMutation, useQuery } from "convex/react"
+import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { Button } from "@/components/Button"
@@ -15,6 +15,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { useDecksWithQueuedEdits, useLocalDeckSync } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../../convex/lib/policy"
@@ -135,25 +136,21 @@ function DeckLimitOptions({
 }) {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
-  const deleteDeck = useMutation(api.decks.archive)
+  const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const [step, setStep] = useState<Step>({ kind: "options" })
   const [error, setError] = useState<string>()
   const skip = access && !access.ready
   const capacity = useQuery(api.decks.capacity, skip ? "skip" : {})
-  const roomMade = useEffectEvent(() => onRoomMade?.())
-  useEffect(() => {
-    if (capacity?.canCreate) roomMade()
-  }, [capacity?.canCreate])
-
-  async function confirmDelete(deckId: Id<"decks">) {
+  async function confirmMove(deckId: Id<"decks">) {
     if (skip) return
     setBusy(true)
     setError(undefined)
     try {
-      await deleteDeck({ deckId })
+      await moveToDevice(deckId)
       setStep({ kind: "options" })
+      onRoomMade?.()
     } catch (cause) {
-      setError(convexErrorMessage(cause, translate("decks:deckLimit.deleteFailed")))
+      setError(convexErrorMessage(cause, translate("decks:deckLimit.moveFailed")))
     } finally {
       setBusy(false)
     }
@@ -185,8 +182,8 @@ function DeckLimitOptions({
               />
             )}
             <Button
-              testID="deck-limit-delete"
-              tx="decks:deckLimit.deleteADeck"
+              testID="deck-limit-move"
+              tx="decks:deckLimit.moveADeck"
               disabled={!capacity}
               onPress={() => setStep({ kind: "choose" })}
             />
@@ -203,7 +200,7 @@ function DeckLimitOptions({
       ) : null}
       {step.kind === "choose" ? (
         <>
-          <Text preset="subheading" tx="decks:deckLimit.deleteADeck" />
+          <Text preset="subheading" tx="decks:deckLimit.moveADeck" />
           <ConvexQueryBoundary
             fallback={({ retry }) => (
               <View style={themed($stack)}>
@@ -228,23 +225,23 @@ function DeckLimitOptions({
               tx="decks:deckLimit.confirmTitle"
               txOptions={{ name: step.name }}
             />
-            <Text size="sm" style={themed($dim)} tx="decks:deleteDeck.body" />
+            <Text size="sm" style={themed($dim)} tx="decks:deckLimit.moveBody" />
           </View>
           <View style={themed($row)}>
             <Button
-              testID="deck-limit-cancel-delete"
+              testID="deck-limit-cancel-move"
               tx="common:back"
               style={$flex1}
               disabled={busy}
               onPress={() => setStep({ kind: "choose" })}
             />
             <Button
-              testID="deck-limit-confirm-delete"
-              tx={busy ? "decks:deleting" : "common:delete"}
-              style={[$flex1, themed($destructive)]}
-              textStyle={themed($destructiveText)}
+              testID="deck-limit-confirm-move"
+              tx={busy ? "decks:deckLimit.moving" : "decks:deckLimit.move"}
+              preset="reversed"
+              style={$flex1}
               disabled={busy}
-              onPress={() => void confirmDelete(step.id)}
+              onPress={() => void confirmMove(step.id)}
             />
           </View>
         </>
@@ -265,20 +262,23 @@ function DeckChoices({
 }) {
   const { themed } = useAppTheme()
   const mine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
+  const queuedEdits = useDecksWithQueuedEdits(access?.ownerId, access?.ready ?? false)
   if (!mine) return <Text size="sm" style={themed($dim)} tx="decks:deckLimit.loading" />
   return (
     <ScrollView style={$choices} testID="deck-limit-choices">
-      {mine.decks.map((deck) => (
-        <TouchableOpacity
-          key={deck._id}
-          accessibilityRole="button"
-          accessibilityLabel={translate("decks:deckLimit.deleteNamed", { name: deck.name })}
-          style={themed($choice)}
-          onPress={() => onChoose(deck._id, deck.name)}
-        >
-          <Text numberOfLines={1} text={deck.name} />
-        </TouchableOpacity>
-      ))}
+      {mine.decks
+        .filter((deck) => !queuedEdits.has(deck._id))
+        .map((deck) => (
+          <TouchableOpacity
+            key={deck._id}
+            accessibilityRole="button"
+            accessibilityLabel={translate("decks:deckLimit.moveNamed", { name: deck.name })}
+            style={themed($choice)}
+            onPress={() => onChoose(deck._id, deck.name)}
+          >
+            <Text numberOfLines={1} text={deck.name} />
+          </TouchableOpacity>
+        ))}
     </ScrollView>
   )
 }
@@ -298,9 +298,3 @@ const $choice: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $count: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $destructive: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.errorBackground,
-  borderColor: colors.error,
-  borderWidth: 1,
-})
-const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
