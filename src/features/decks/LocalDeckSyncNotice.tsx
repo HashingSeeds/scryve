@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Platform, ScrollView, View } from "react-native"
+import { ScrollView, View } from "react-native"
 import { useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
@@ -16,10 +16,15 @@ import { convexErrorMessage } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import { useGuestDecks } from "./guestDeck"
-import { LocalDeckAccountDialog } from "./LocalDeckAccountDialog"
-import { useLocalDeckSync, type LocalDeckSyncResult } from "./localDeckSync"
+import { useLocalDeckSync } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import { MAX_PREMIUM_DECKS } from "../../../convex/lib/policy"
+
+function useUnsyncedDecks(excludedLocalIds?: ReadonlySet<string>) {
+  return useGuestDecks().filter(
+    (local) => !local.movedFromAccount && !excludedLocalIds?.has(local.localId),
+  )
+}
 
 function dismissedKey(ownerId: string) {
   return `scryve.decks.syncPickerDismissed.v1.${ownerId}`
@@ -34,7 +39,7 @@ export function LocalDeckSyncNotice({
 }) {
   const { themed } = useAppTheme()
   const ownerId = access.ownerId
-  const localDecks = useGuestDecks().filter((local) => !excludedLocalIds?.has(local.localId))
+  const localDecks = useUnsyncedDecks(excludedLocalIds)
   const capacity = useQuery(api.decks.capacity, access.ready && ownerId ? {} : "skip")
   const [dismissedOwner, setDismissedOwner] = useState<string>()
   const dismissed =
@@ -93,12 +98,9 @@ function LocalDeckSyncPicker({
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
   const { sync } = useLocalDeckSync(ownerId)
-  const localDecks = useGuestDecks().filter((local) => !excludedLocalIds?.has(local.localId))
+  const localDecks = useUnsyncedDecks(excludedLocalIds)
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [otherAccount, setOtherAccount] =
-    useState<Extract<LocalDeckSyncResult, { status: "other_account" }>>()
-  const [waitingForDismiss, setWaitingForDismiss] = useState<typeof otherAccount>()
   const [error, setError] = useState<string>()
 
   function toggle(localId: string) {
@@ -117,13 +119,12 @@ function LocalDeckSyncPicker({
     try {
       for (const localId of selected.slice(0, free)) {
         const result = await sync(localId)
-        if (result.status === "other_account") {
-          if (Platform.OS === "ios") setWaitingForDismiss(result)
-          else setOtherAccount(result)
-          return
-        }
         if (result.status !== "synced") {
-          setError(translate(`decks:localSync.${result.status}`))
+          setError(
+            translate(
+              `decks:localSync.${result.status === "other_account" ? "conflict" : result.status}`,
+            ),
+          )
           return
         }
         setSelected((current) => current.filter((id) => id !== localId))
@@ -136,27 +137,10 @@ function LocalDeckSyncPicker({
     }
   }
 
-  if (otherAccount)
-    return (
-      <LocalDeckAccountDialog
-        result={otherAccount}
-        onClose={() => setOtherAccount(undefined)}
-        onSynced={onClose}
-      />
-    )
-
   return (
     <DialogCard
-      visible={!waitingForDismiss}
+      visible
       onClose={onClose}
-      onDismissed={
-        waitingForDismiss
-          ? () => {
-              setOtherAccount(waitingForDismiss)
-              setWaitingForDismiss(undefined)
-            }
-          : undefined
-      }
       closeDisabled={busy}
       backdropAccessibilityLabel={translate("common:close")}
       dialogTestID="local-deck-sync-picker"
