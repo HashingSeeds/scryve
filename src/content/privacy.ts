@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-10-22",
-  effectiveDate: "October 22, 2026",
+  version: "2026-10-23",
+  effectiveDate: "October 23, 2026",
   sections: [
     {
       blocks: [
@@ -244,7 +244,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "You can delete feedback in two ways. Delete my feedback, under My requests, removes everything sent from that copy of Scryve. Deleting your account removes feedback you included your account with. Feedback sent without your account stays until you use Delete my feedback on each device you sent it from.",
+          text: "You can delete feedback in two ways. Delete my feedback, under My requests, removes everything sent from that copy of Scryve. Deleting your account removes feedback you included your account with. Feedback sent without your account stays until you use Delete my feedback on each device you sent it from. Neither removes bug report details or screenshots already sent to Sentry. To ask about those, email privacy@sowinghope.how.",
         },
       ],
     },
