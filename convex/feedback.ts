@@ -39,7 +39,6 @@ const BOARD_SIZE = 100
 const MINE_SIZE = 50
 const THREAD_SIZE = 200
 const DELETE_BATCH = 20
-// why: each request can delete 600 child rows, and Convex caps a mutation at 16,000 writes.
 const ACCOUNT_DELETE_BATCH = 10
 const APOLLO_BATCH = 100
 const SEARCH_SIZE = 50
