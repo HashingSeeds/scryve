@@ -83,12 +83,6 @@ export default {
       unavailable:
         "このビルドでは利用状況の共有は利用できません。PostHogイベントは送信されません。",
     },
-    accountData: {
-      description:
-        "Scryveアカウントに紐づくクラウドデータを管理します。ローカルゲームはこのデバイスに残ります。",
-      requestDeletion: "アカウント削除をリクエスト",
-      requestDeletionHint: "アカウント削除リクエストのページを開きます",
-    },
     help: {
       heading: "ヘルプ",
       support: "ヘルプとサポート",

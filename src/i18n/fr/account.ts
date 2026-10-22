@@ -85,12 +85,6 @@ export default {
       unavailable:
         "Le partage d'utilisation n'est pas disponible dans cette version. Aucun événement PostHog ne sera envoyé.",
     },
-    accountData: {
-      description:
-        "Gérez les données cloud liées à votre compte Scryve. Les parties locales restent sur cet appareil.",
-      requestDeletion: "Demander la suppression du compte",
-      requestDeletionHint: "Ouvre la page de demande de suppression du compte",
-    },
     help: {
       heading: "Aide",
       support: "Aide et assistance",

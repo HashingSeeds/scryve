@@ -83,12 +83,6 @@ const account = {
       saveFailed: "Could not save your choice. Please try again.",
       unavailable: "Usage sharing is unavailable in this build. No PostHog events will be sent.",
     },
-    accountData: {
-      description:
-        "Manage the cloud data tied to your Scryve account. Local games stay on this device.",
-      requestDeletion: "Request account deletion",
-      requestDeletionHint: "Opens the account deletion request page",
-    },
     help: {
       heading: "Help",
       support: "Help & support",

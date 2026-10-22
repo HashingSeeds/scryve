@@ -85,12 +85,6 @@ export default {
       unavailable:
         "Compartir el uso no está disponible en esta versión. No se enviarán eventos de PostHog.",
     },
-    accountData: {
-      description:
-        "Gestiona los datos en la nube vinculados a tu cuenta de Scryve. Las partidas locales se quedan en este dispositivo.",
-      requestDeletion: "Solicitar la eliminación de la cuenta",
-      requestDeletionHint: "Abre la página de solicitud de eliminación de la cuenta",
-    },
     help: {
       heading: "Ayuda",
       support: "Ayuda y soporte",

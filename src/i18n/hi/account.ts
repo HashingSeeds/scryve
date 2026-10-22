@@ -85,12 +85,6 @@ export default {
       unavailable:
         "इस बिल्ड में उपयोग साझा करना उपलब्ध नहीं है। कोई PostHog इवेंट नहीं भेजा जाएगा।",
     },
-    accountData: {
-      description:
-        "अपने Scryve खाते से जुड़ा क्लाउड डेटा मैनेज करें। लोकल गेम इसी डिवाइस पर रहते हैं।",
-      requestDeletion: "खाता हटाने का अनुरोध करें",
-      requestDeletionHint: "खाता हटाने के अनुरोध का पेज खोलता है",
-    },
     help: {
       heading: "सहायता",
       support: "सहायता और सपोर्ट",
