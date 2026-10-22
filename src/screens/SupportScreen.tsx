@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { Image, View } from "react-native"
+import { Trans } from "react-i18next"
 
 import { Button } from "@/components/Button"
 import { ListItem } from "@/components/ListItem"
@@ -16,12 +17,14 @@ const GETTING_STARTED = ["startGame", "choosePlay", "setUpTable"] as const
 
 const FAQS = ["restorePro", "manageSubscription", "gameTrouble", "accountPrivacy"] as const
 
+const SUPPORT_KINDS = ["bug", "help", "feedback"] as const
+
 const BRAND_EYEBROW = "SCRYVE"
 const COPYRIGHT = "© 2026 Hashing Seeds LLC"
 const EMAIL_PLACEHOLDER = "you@example.com"
 
 export type SupportFeedback = {
-  kind: "bug" | "help"
+  kind: (typeof SUPPORT_KINDS)[number]
   message: string
   email?: string
   screenshot?: SupportScreenshot
@@ -65,7 +68,8 @@ export function SupportScreen({
   const [pickingScreenshot, setPickingScreenshot] = useState(false)
   const [status, setStatus] = useState("")
   const emailValid = /^[^\s@]+@(?:[^\s@.]+\.)+[^\s@.]+$/.test(email.trim())
-  const canSubmit = !!message.trim() && (kind === "bug" ? !email.trim() || emailValid : emailValid)
+  // why: only help promises a reply, so it is the one kind that needs an email.
+  const canSubmit = !!message.trim() && (kind === "help" ? emailValid : !email.trim() || emailValid)
   const copy = {
     contactReason: translate("account:support.contactReason"),
     selectedScreenshot: translate("account:support.selectedScreenshot"),
@@ -127,14 +131,15 @@ export function SupportScreen({
         <View style={themed($contact)}>
           <Text tx="account:support.contactUs" preset="subheading" accessibilityRole="header" />
           <SegmentedControl
-            segments={[
-              { id: "bug", label: translate("account:support.kind.bug") },
-              { id: "help", label: translate("account:support.kind.help") },
-            ]}
+            segments={SUPPORT_KINDS.map((id) => ({
+              id,
+              label: translate(`account:support.kind.${id}`),
+            }))}
             selectedId={kind}
             accessibilityLabel={copy.contactReason}
             onSelect={(id) => {
-              setKind(id === "help" ? "help" : "bug")
+              const next = SUPPORT_KINDS.find((supportKind) => supportKind === id)
+              if (next) setKind(next)
               setStatus("")
             }}
           />
@@ -148,7 +153,21 @@ export function SupportScreen({
               setStatus("")
             }}
           />
-          <Text tx="account:support.translationNotice" size="xs" style={themed($muted)} />
+          <Text size="xs" style={themed($muted)}>
+            <Trans
+              i18nKey="account:support.translationNotice"
+              components={{
+                privacy: (
+                  <Text
+                    size="xs"
+                    accessibilityRole="link"
+                    style={themed($link)}
+                    onPress={onOpenPrivacy}
+                  />
+                ),
+              }}
+            />
+          </Text>
           <TextField
             labelTx={`account:support.emailLabel.${kind}`}
             placeholder={EMAIL_PLACEHOLDER}
@@ -359,3 +378,7 @@ const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $link: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.tint,
+  textDecorationLine: "underline",
+})

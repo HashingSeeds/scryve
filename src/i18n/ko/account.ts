@@ -128,23 +128,28 @@ export default {
     contactUs: "문의하기",
     contactReason: "문의 유형",
     kind: {
-      bug: "문제 신고",
+      bug: "버그 신고",
       help: "도움 요청",
+      feedback: "의견 보내기",
     },
     messageLabel: {
       bug: "어떤 일이 있었나요?",
       help: "무엇을 도와드릴까요?",
+      feedback: "어떤 생각이 있으신가요?",
     },
     messagePlaceholder: {
       bug: "어떤 일이 있었나요? 어떻게 되기를 기대했나요?",
       help: "도움이 필요한 내용을 알려 주세요",
+      feedback: "아이디어, 요청 또는 기타 의견",
     },
     emailLabel: {
       bug: "답변 받을 이메일 (선택)",
       help: "답변 받을 이메일",
+      feedback: "답변받을 이메일 (선택)",
     },
     emailInvalid: "올바른 이메일 주소를 입력하세요.",
-    translationNotice: "어떤 언어로든 작성하세요. AI 도구로 번역할 수 있습니다.",
+    translationNotice:
+      "어떤 언어로든 작성하세요. AI 도구로 번역할 수 있습니다. <privacy>개인정보 처리방침</privacy>을 확인하세요.",
     replyTime: "보통 영업일 기준 2일 이내에 답변드립니다.",
     selectedScreenshot: "선택한 스크린샷",
     removeScreenshot: "스크린샷 삭제",

@@ -129,23 +129,28 @@ const account = {
     contactUs: "Contact us",
     contactReason: "Contact reason",
     kind: {
-      bug: "Report a problem",
+      bug: "Report a bug",
       help: "Ask for help",
+      feedback: "Give feedback",
     },
     messageLabel: {
       bug: "What happened?",
       help: "How can we help?",
+      feedback: "What's on your mind?",
     },
     messagePlaceholder: {
       bug: "What happened? What did you expect?",
       help: "Tell us what you need help with",
+      feedback: "Ideas, requests, or anything else",
     },
     emailLabel: {
       bug: "Email for a reply (optional)",
       help: "Email for a reply",
+      feedback: "Email for a reply (optional)",
     },
     emailInvalid: "Enter a valid email address.",
-    translationNotice: "Write in any language. We may use AI tools to translate it.",
+    translationNotice:
+      "Write in any language. We may use AI tools to translate it. See our <privacy>Privacy Policy</privacy>.",
     replyTime: "We usually reply within two business days.",
     selectedScreenshot: "Selected screenshot",
     removeScreenshot: "Remove screenshot",

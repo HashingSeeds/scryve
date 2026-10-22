@@ -128,23 +128,28 @@ export default {
     contactUs: "お問い合わせ",
     contactReason: "お問い合わせの種類",
     kind: {
-      bug: "問題を報告",
+      bug: "不具合を報告",
       help: "ヘルプを依頼",
+      feedback: "フィードバックを送る",
     },
     messageLabel: {
       bug: "何が起きましたか?",
       help: "どのようなご用件ですか?",
+      feedback: "ご意見をお聞かせください",
     },
     messagePlaceholder: {
       bug: "何が起きましたか?どうなると思いましたか?",
       help: "お困りの内容をお知らせください",
+      feedback: "アイデア、ご要望など何でも",
     },
     emailLabel: {
       bug: "返信用メールアドレス(任意)",
       help: "返信用メールアドレス",
+      feedback: "返信用メールアドレス(任意)",
     },
     emailInvalid: "有効なメールアドレスを入力してください。",
-    translationNotice: "どの言語でも書けます。AIツールで翻訳する場合があります。",
+    translationNotice:
+      "どの言語でも書けます。AIツールで翻訳する場合があります。詳しくは<privacy>プライバシーポリシー</privacy>をご覧ください。",
     replyTime: "通常、2営業日以内に返信します。",
     selectedScreenshot: "選択したスクリーンショット",
     removeScreenshot: "スクリーンショットを削除",
