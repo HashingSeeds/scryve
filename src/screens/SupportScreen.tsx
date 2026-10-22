@@ -201,6 +201,9 @@ function SupportRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={[translate(tx), badge, detailTx ? translate(detailTx) : undefined]
+        .filter(Boolean)
+        .join(", ")}
       onPress={onPress}
       style={({ pressed }) => [themed($row), pressed && $pressed]}
     >

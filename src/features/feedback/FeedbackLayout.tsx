@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { ScrollView, useWindowDimensions, View } from "react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
@@ -25,6 +25,8 @@ export function FeedbackLayout({
 }) {
   const { themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
+  // why: at the largest text sizes a pinned footer covers most of the screen, so it scrolls with the content instead.
+  const pinFooter = useWindowDimensions().fontScale <= MAX_PINNED_FONT_SCALE
   return (
     <Screen
       preset="fixed"
@@ -42,7 +44,7 @@ export function FeedbackLayout({
         </View>
       ) : null}
       <ScrollView
-        style={$fill}
+        style={$grow}
         contentContainerStyle={themed($content)}
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
@@ -50,13 +52,17 @@ export function FeedbackLayout({
       >
         <Text text={title} preset="heading" accessibilityRole="header" />
         {children}
+        {footer && !pinFooter ? <View style={themed($inlineFooter)}>{footer}</View> : null}
       </ScrollView>
-      {footer ? <BottomActionBar>{footer}</BottomActionBar> : null}
+      {footer && pinFooter ? <BottomActionBar>{footer}</BottomActionBar> : null}
     </Screen>
   )
 }
 
+const MAX_PINNED_FONT_SCALE = 1.35
+
 const $fill: ViewStyle = { flex: 1, justifyContent: "flex-start" }
+const $grow: ViewStyle = { flex: 1 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 680,
@@ -64,6 +70,10 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.lg,
   paddingBottom: spacing.lg,
   gap: spacing.md,
+})
+const $inlineFooter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  marginTop: spacing.md,
 })
 const $offline: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingHorizontal: spacing.lg,
