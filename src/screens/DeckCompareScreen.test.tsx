@@ -1,10 +1,20 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { DeckCompareScreen } from "./DeckCompareScreen"
 import { deckStatsAccess, deckStatsParams, deckStatsSummary } from "../../test/fixtures/deckStats"
 
+let mockFocused = true
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
+
+jest.mock("expo-router", () => ({
+  useFocusEffect: (callback: () => void) =>
+    require("react").useEffect(() => {
+      if (mockFocused) return callback()
+    }, [callback, mockFocused]),
+}))
 let mockPremium = true
 let mockSummary = deckStatsSummary
 const mockLookup = jest.fn(async (_deckKey: string, fingerprint: string) =>
@@ -32,6 +42,7 @@ const screen = () => (
 )
 beforeEach(() => {
   jest.clearAllMocks()
+  mockFocused = true
   mockPremium = true
   mockSummary = deckStatsSummary
 })
@@ -93,4 +104,17 @@ it("reports a device read failure without stale card changes", async () => {
   const view = render(screen())
   await waitFor(() => expect(view.getByText("Could not load lists on this device.")).toBeTruthy())
   expect(view.queryByText("+4 Bolt")).toBeNull()
+})
+
+it("captures compare once per open, including returning to a mounted screen", async () => {
+  const view = render(screen())
+  await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
+  view.rerender(screen())
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("stats_viewed", { surface: "compare" })
+  mockFocused = false
+  view.rerender(screen())
+  mockFocused = true
+  view.rerender(screen())
+  expect(captureAnalytics).toHaveBeenCalledTimes(2)
 })

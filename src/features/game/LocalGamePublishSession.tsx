@@ -19,6 +19,7 @@ import {
   settleSeatClaim,
 } from "@/features/lan/nearbyAccount"
 import { convexErrorCode, convexRetryAfterMs } from "@/utils/convexError"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import { api } from "../../../convex/_generated/api"
@@ -67,6 +68,7 @@ function ActivePublish({
   const claimSeat = useMutation(api.games.claimNearbySeat)
   const [finishCount, setFinishCount] = useState(0)
   const [claimCount, setClaimCount] = useState(0)
+  const reported = useRef(new Set<string>())
   const claimRetries = useRef(0)
   const publishRetry = useRef<{ ownerId: string; at: number } | undefined>(undefined)
 
@@ -84,6 +86,21 @@ function ActivePublish({
       return () => clearTimeout(timer)
     }
     publishRetry.current = undefined
+    const report = (gameId: string, kind: "failed" | "deck_stripped", code: string) => {
+      const key = `${kind}:${gameId}`
+      if (reported.current.has(key)) return
+      reported.current.add(key)
+      const error = new Error(
+        kind === "failed"
+          ? "Finished game could not be published"
+          : "Game published without its deck",
+      )
+      error.name = kind === "failed" ? "LocalGamePublishFailed" : "LocalGamePublishDeckStripped"
+      reportCrash(error, ErrorType.HANDLED, {
+        tags: { code },
+        fingerprint: ["local-game-publish", kind],
+      })
+    }
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const retryThrottled = (cause: unknown) => {
@@ -97,6 +114,7 @@ function ActivePublish({
       for (const game of repository.pendingPublishes(ownerId)) {
         if (cancelled) return
         const snapshot = buildFinishedLocalGameSnapshot(game)
+        let deckRejectionCode = "unknown"
         try {
           await publish(snapshot)
           repository.markPublished(game.id)
@@ -108,18 +126,22 @@ function ActivePublish({
           }
           if (!isDeckRejection(cause)) {
             repository.markPublishFailed(game.id)
+            report(game.id, "failed", convexErrorCode(cause) ?? "server_error")
             continue
           }
+          deckRejectionCode = convexErrorCode(cause) ?? "unknown"
         }
         try {
           await publish(withoutDeck(snapshot))
           repository.markPublished(game.id)
+          report(game.id, "deck_stripped", deckRejectionCode)
         } catch (cause) {
           if (!isPermanentRejection(cause)) {
             retryThrottled(cause)
             return
           }
           repository.markPublishFailed(game.id)
+          report(game.id, "failed", convexErrorCode(cause) ?? "server_error")
         }
       }
       for (const game of repository.matchFinishesWithFailedGames(ownerId))

@@ -4,6 +4,7 @@ import { randomUUID } from "expo-crypto"
 import type { FunctionArgs } from "convex/server"
 
 import { translate } from "@/i18n/translate"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { saveString, storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
@@ -40,7 +41,33 @@ export type GuestDeck = {
   movedFromAccount?: boolean
 }
 
-export class GuestDeckStorageError extends Error {}
+export class GuestDeckStorageError extends Error {
+  constructor(
+    message: string,
+    readonly reason?: "read_failed" | "malformed" | "unsupported",
+  ) {
+    super(message)
+    this.name = "GuestDeckStorageError"
+  }
+}
+
+const reportedStorageFailures = new Set<string>()
+
+function reportStorageFailure(kind: "load" | "save", reason?: GuestDeckStorageError["reason"]) {
+  const key = `${kind}:${reason ?? "unknown"}`
+  if (reportedStorageFailures.has(key)) return
+  reportedStorageFailures.add(key)
+  const error = new Error(`Device deck store ${kind} failed`)
+  error.name = kind === "load" ? "GuestDeckLoadFailed" : "GuestDeckSaveFailed"
+  const tags = { platform: Platform.OS === "web" ? "web" : "native", ...(reason ? { reason } : {}) }
+  // why: the initial store read can run before the root initializes Sentry.
+  queueMicrotask(() => {
+    reportCrash(error, ErrorType.HANDLED, {
+      tags,
+      fingerprint: ["guest-deck-storage", kind],
+    })
+  })
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -125,7 +152,7 @@ function readRaw(key: string): string | null {
   try {
     return storage.getString(key) ?? null
   } catch {
-    throw new GuestDeckStorageError(translate("decks:guestStorage.readFailed"))
+    throw new GuestDeckStorageError(translate("decks:guestStorage.readFailed"), "read_failed")
   }
 }
 
@@ -134,9 +161,10 @@ function parseStored<T>(raw: string, valid: (value: unknown) => value is T): T {
   try {
     value = JSON.parse(raw)
   } catch {
-    throw new GuestDeckStorageError(translate("decks:guestStorage.malformed"))
+    throw new GuestDeckStorageError(translate("decks:guestStorage.malformed"), "malformed")
   }
-  if (!valid(value)) throw new GuestDeckStorageError(translate("decks:guestStorage.unsupported"))
+  if (!valid(value))
+    throw new GuestDeckStorageError(translate("decks:guestStorage.unsupported"), "unsupported")
   return value
 }
 
@@ -153,7 +181,10 @@ function readStore() {
 }
 
 function migrateLegacyDeck(decks: GuestDeck[]) {
-  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) return false
+  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) {
+    reportStorageFailure("save")
+    return false
+  }
   try {
     storage.delete(LEGACY_GUEST_DECK_KEY)
     return true
@@ -172,6 +203,7 @@ function readStored(): GuestDeck[] {
     store = readStore()
   } catch (cause) {
     loadError = cause
+    reportStorageFailure("load", cause instanceof GuestDeckStorageError ? cause.reason : undefined)
     return []
   }
   pendingLegacy = store.legacy && !migrateLegacyDeck(store.decks)
@@ -192,7 +224,10 @@ function writableDecks() {
 }
 
 function commit(decks: GuestDeck[], failure: string) {
-  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) throw new GuestDeckStorageError(failure)
+  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) {
+    reportStorageFailure("save")
+    throw new GuestDeckStorageError(failure)
+  }
   snapshot = decks
   if (pendingLegacy) {
     try {

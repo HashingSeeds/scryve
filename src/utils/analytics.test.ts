@@ -249,3 +249,99 @@ it("sends timed sync events as sync_timing only if sharing was on when they happ
     await tick()
   })
 })
+
+it("allowlists deck sync actions and outcomes without accepting content or connection actions", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  for (const action of ["sync", "move_to_device", "add_as_new"]) {
+    for (const outcome of [
+      "ok",
+      "conflict",
+      "limit",
+      "other_account",
+      "kept_newer_edits",
+      "failed",
+    ]) {
+      const properties = analyticsProperties("deck_sync", {
+        action,
+        outcome,
+        name: "private",
+        deckId: "private",
+        note: "private",
+      })
+      expect(properties).toEqual(expect.objectContaining({ action, outcome }))
+      expect(JSON.stringify(properties)).not.toContain("private")
+    }
+  }
+  expect(
+    analyticsProperties("deck_sync", { action: "create", outcome: "private" }),
+  ).not.toHaveProperty("action")
+  expect(
+    analyticsProperties("deck_sync", { action: "private", outcome: "private" }),
+  ).not.toHaveProperty("outcome")
+  expect(analyticsProperties("connection_attempt", { action: "sync" })).not.toHaveProperty("action")
+})
+
+it.each(["deck_stats", "compare"])(
+  "allowlists the %s stats surface without deck content",
+  (surface) => {
+    const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+    const properties = analyticsProperties("stats_viewed", {
+      surface,
+      deckName: "private",
+      deckKey: "private",
+      cardName: "private",
+    })
+    expect(properties).toEqual(expect.objectContaining({ surface }))
+    expect(JSON.stringify(properties)).not.toContain("private")
+    expect(analyticsProperties("stats_viewed", { surface: "private" })).not.toHaveProperty(
+      "surface",
+    )
+  },
+)
+
+it("accepts only boolean turn order coverage on game completion", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  for (const first_player_known of [true, false])
+    expect(analyticsProperties("game_completed", { first_player_known })).toEqual(
+      expect.objectContaining({ first_player_known }),
+    )
+  expect(
+    analyticsProperties("game_completed", { first_player_known: "private" }),
+  ).not.toHaveProperty("first_player_known")
+  expect(analyticsProperties("game_started", { first_player_known: true })).not.toHaveProperty(
+    "first_player_known",
+  )
+})
+
+it("sends local turn order coverage once per completed game without player or game ids", async () => {
+  jest.useFakeTimers()
+  global.fetch = fetchMock
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue({ status: 200, text: async () => "{}", json: async () => ({}) })
+  process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
+  process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
+  await jest.isolateModulesAsync(async () => {
+    const localStorage: typeof import("@/utils/storage") = require("@/utils/storage")
+    localStorage.storage.clearAll()
+    const analytics: typeof import("./analytics") = require("./analytics")
+    analytics.setAnalyticsEnabled(true)
+    for (const firstPlayerId of ["private-player", undefined]) {
+      const game = { id: `private-game-${firstPlayerId}`, firstPlayerId, playerCount: 2 }
+      analytics.captureGame("game_completed", game, "local")
+      analytics.captureGame("game_completed", game, "local")
+    }
+    analytics.captureGame(
+      "game_completed",
+      { id: "private-connected", playerCount: 2 },
+      "connected",
+    )
+    await tick(31_000)
+    const body = fetchMock.mock.calls.map(([, options]) => String(options.body)).join("")
+    expect(body.match(/"event":"game_completed"/g)).toHaveLength(3)
+    expect(body.match(/"first_player_known":true/g)).toHaveLength(1)
+    expect(body.match(/"first_player_known":false/g)).toHaveLength(1)
+    expect(body).not.toContain("private")
+    analytics.setAnalyticsEnabled(false)
+    await tick()
+  })
+})

@@ -1,9 +1,13 @@
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { DeckStatsScreen } from "./DeckStatsScreen"
 import { deckStatsAccess, deckStatsParams, deckStatsSummary } from "../../test/fixtures/deckStats"
+
+let mockFocused = true
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
 const mockPush = jest.fn()
 const mockLoadMore = jest.fn()
@@ -14,7 +18,13 @@ let mockSummary: typeof deckStatsSummary | undefined = deckStatsSummary
 let mockError = false
 let mockEmptyGames = false
 let mockGamesStatus = "CanLoadMore"
-jest.mock("expo-router", () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }))
+jest.mock("expo-router", () => ({
+  router: { push: (...args: unknown[]) => mockPush(...args) },
+  useFocusEffect: (callback: () => void) =>
+    require("react").useEffect(() => {
+      if (mockFocused) return callback()
+    }, [callback, mockFocused]),
+}))
 jest.mock("../../convex/_generated/api", () => ({
   api: { deckStats: { summary: "summary", games: "games" }, decks: { capacity: "capacity" } },
 }))
@@ -79,6 +89,7 @@ afterEach(() => {
 beforeEach(() => {
   jest.useFakeTimers()
   jest.clearAllMocks()
+  mockFocused = true
   mockSummary = deckStatsSummary
   mockPremium = true
   mockError = false
@@ -237,4 +248,16 @@ it("hides turn order when the selected source has no tracked results", () => {
   }
   view.rerender(screen())
   expect(view.queryByText("Turn order")).toBeNull()
+})
+
+it("captures deck_stats once per open, including returning to a mounted screen", async () => {
+  const view = render(screen())
+  view.rerender(screen())
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("stats_viewed", { surface: "deck_stats" })
+  mockFocused = false
+  view.rerender(screen())
+  mockFocused = true
+  view.rerender(screen())
+  expect(captureAnalytics).toHaveBeenCalledTimes(2)
 })
