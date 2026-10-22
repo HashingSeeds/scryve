@@ -254,14 +254,21 @@ export class FeedbackOutbox {
   discard(operationId: string) {
     this.store.dismissFailed(SCOPE, operationId)
     this.store.acknowledge(SCOPE, operationId)
-    this.controller.publish()
+    this.resume()
   }
 
   clear() {
     const { pending, failures } = this.controller.getSnapshot()
     for (const action of pending) this.store.acknowledge(SCOPE, action.operationId)
     for (const failure of failures) this.store.dismissFailed(SCOPE, failure.action.operationId)
+    this.resume()
+  }
+
+  // why: a full failure list stops the queue; freeing room must restart it without an app restart.
+  private resume() {
+    this.controller.unblock()
     this.controller.publish()
+    void this.controller.drain()
   }
 
   private async send(action: PendingFeedbackSend) {
