@@ -47,7 +47,7 @@ function statsPatch(
   return patch
 }
 
-export async function applyVersionStats(
+async function applyVersionStats(
   ctx: MutationCtx,
   result: Pick<DeckResult, "legacyDeckId" | "deckVersionId" | "deltas">,
   sign: 1 | -1,
@@ -161,16 +161,12 @@ function storedResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {
     .unique()
 }
 
-export async function addDeckResult(
-  ctx: MutationCtx,
-  result: DeckResult,
-  options?: { versionStatsAlreadyApplied: true },
-) {
+export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
   const existing = await storedResult(ctx, result.userId, result.resultId)
   if (!existing) {
     await ctx.db.insert("deckResults", result)
     await apply(ctx, result, 1)
-    if (!options?.versionStatsAlreadyApplied) await applyVersionStats(ctx, result, 1)
+    await applyVersionStats(ctx, result, 1)
     return
   }
   const legacy =
@@ -187,8 +183,7 @@ export async function addDeckResult(
   if (Object.keys({ ...legacy, ...adopted }).length)
     await ctx.db.patch(existing._id, { ...legacy, ...adopted })
   if (adoptedKey) await apply(ctx, { ...existing, ...adopted }, 1)
-  if (legacy.deckVersionId && !options?.versionStatsAlreadyApplied)
-    await applyVersionStats(ctx, { ...existing, ...legacy }, 1)
+  if (legacy.deckVersionId) await applyVersionStats(ctx, { ...existing, ...legacy }, 1)
 }
 
 export async function removeDeckResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {

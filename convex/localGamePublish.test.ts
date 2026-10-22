@@ -284,7 +284,7 @@ it.each(["player_a", "player_b", undefined])(
       const seat = { ...summary.players[1], userId: other._id, deckKey: "elves" }
       const { recordPlayerResult } =
         jest.requireActual<typeof import("./lib/results")>("./lib/results")
-      await recordPlayerResult(ctx, summary, seat, Date.now(), "local")
+      await recordPlayerResult(ctx, summary, seat, "local")
       const results = await ctx.db.query("deckResults").collect()
       expect(results).toHaveLength(2)
       expect(results.find((result) => result.userId === other._id)?.wentFirst).toBe(

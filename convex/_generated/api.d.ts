@@ -78,7 +78,6 @@ import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js";
 import type * as matches from "../matches.js";
 import type * as moderation from "../moderation.js";
 import type * as providerHealth from "../providerHealth.js";
-import type * as resultsBackfill from "../resultsBackfill.js";
 import type * as revenuecat from "../revenuecat.js";
 import type * as storeReleases from "../storeReleases.js";
 import type * as users from "../users.js";
@@ -160,7 +159,6 @@ declare const fullApi: ApiFromModules<{
   matches: typeof matches;
   moderation: typeof moderation;
   providerHealth: typeof providerHealth;
-  resultsBackfill: typeof resultsBackfill;
   revenuecat: typeof revenuecat;
   storeReleases: typeof storeReleases;
   users: typeof users;

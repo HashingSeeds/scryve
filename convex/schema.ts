@@ -543,9 +543,7 @@ export default defineSchema({
     userId: v.id("users"),
     outcome: resultOutcome,
     finishedAt: v.number(),
-  })
-    .index("by_deck_and_finished_at", ["deckId", "finishedAt"])
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   matches: defineTable(
     v.union(
@@ -575,10 +573,7 @@ export default defineSchema({
     source: v.union(v.literal("connected"), v.literal("manual")),
     outcome: resultOutcome,
     finishedAt: v.number(),
-  })
-    .index("by_deck_and_finished_at", ["deckId", "finishedAt"])
-    .index("by_deck_and_source_and_finished_at", ["deckId", "source", "finishedAt"])
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   deckVersionStats: defineTable({
     deckId: v.id("decks"),
@@ -628,7 +623,6 @@ export default defineSchema({
     deckVersionId: v.optional(v.id("deckVersions")),
   })
     .index("by_user_and_result_id", ["userId", "resultId"])
-    .index("by_legacy_deck_id", ["legacyDeckId"])
     .index("by_user_and_finished_at", ["userId", "finishedAt"])
     .index("by_user_and_deck_key_and_finished_at", ["userId", "deckKey", "finishedAt"]),
 
