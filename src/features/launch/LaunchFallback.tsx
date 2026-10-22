@@ -1,11 +1,15 @@
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, Image, View } from "react-native"
+import { ActivityIndicator, Image, Platform, View } from "react-native"
 // eslint-disable-next-line no-restricted-imports
 import { Text as NativeText } from "react-native"
 
 import { translate } from "@/i18n/translate"
 
-export const LAUNCH_MARK: number = require("../../../assets/images/app-icon-android-adaptive-foreground.png")
+// why: matches the native splash per platform so the handoff from it is seamless.
+export const LAUNCH_MARK: number = Platform.select({
+  ios: require("../../../assets/images/splash-ios.png"),
+  default: require("../../../assets/images/app-icon-android-adaptive-foreground.png"),
+})
 
 export function LaunchFallback() {
   const starting = translate("account:launch.starting")
