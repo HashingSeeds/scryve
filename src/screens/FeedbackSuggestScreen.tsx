@@ -9,7 +9,7 @@ import { TextField } from "@/components/TextField"
 import { Switch } from "@/components/Toggle/Switch"
 import type { BugScreenshot } from "@/features/feedback/bugReport"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
-import { RequestMeta, VoteButton } from "@/features/feedback/RequestParts"
+import { RequestRow } from "@/features/feedback/RequestParts"
 import type { FeedbackBoardItem } from "@/features/feedback/status"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -44,6 +44,7 @@ export interface FeedbackSuggestScreenProps {
   onOpenPrivacy: () => void
   onSend: () => void
   onVote: (item: FeedbackBoardItem, voted: boolean) => void
+  onOpen: (item: FeedbackBoardItem) => void
   onBack: () => void
 }
 
@@ -61,6 +62,7 @@ function TitleStep({
   onTitle,
   onContinue,
   onVote,
+  onOpen,
   onBack,
 }: FeedbackSuggestScreenProps) {
   const { themed } = useAppTheme()
@@ -68,6 +70,7 @@ function TitleStep({
   return (
     <FeedbackLayout
       title={translate("feedback:suggest.title")}
+      heading={false}
       offline={offline}
       onBack={onBack}
       footer={
@@ -105,13 +108,12 @@ function TitleStep({
         <>
           <Text tx="feedback:suggest.matchesIntro" size="xs" style={themed($muted)} />
           {matches.map((item) => (
-            <View key={item._id} style={themed($match)}>
-              <VoteButton item={item} onVote={(voted) => onVote(item, voted)} />
-              <View style={themed($matchText)}>
-                <Text text={item.title} size="xs" weight="bold" />
-                <RequestMeta item={item} yours={item.mine} />
-              </View>
-            </View>
+            <RequestRow
+              key={item._id}
+              item={item}
+              onVote={(voted) => onVote(item, voted)}
+              onOpen={() => onOpen(item)}
+            />
           ))}
           {offline ? (
             <Text tx="feedback:board.offlineVotes" size="xxs" style={themed($muted)} />
@@ -149,6 +151,7 @@ function DetailsStep({
   return (
     <FeedbackLayout
       title={translate("feedback:suggest.title")}
+      heading={false}
       offline={offline}
       onBack={onBack}
       footer={
@@ -224,14 +227,6 @@ function DetailsStep({
   )
 }
 
-const $match: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.md,
-  paddingTop: spacing.sm,
-  borderTopWidth: 1,
-  borderColor: colors.separator,
-})
-const $matchText: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxs })
 const $titleBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $editTitle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "flex-start",

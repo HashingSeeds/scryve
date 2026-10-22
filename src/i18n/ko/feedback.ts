@@ -3,7 +3,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   support: {
-    search: "요청 및 버그 검색",
+    search: "도움말 및 문의 검색",
     allRequests: "모든 요청",
     yourRequests: "내 요청",
     newCount_other: "새 항목 {{count}}개",

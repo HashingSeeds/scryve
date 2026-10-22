@@ -39,6 +39,32 @@ export function VoteButton({
   )
 }
 
+export function RequestRow({
+  item,
+  onVote,
+  onOpen,
+}: {
+  item: FeedbackBoardItem
+  onVote: (voted: boolean) => void
+  onOpen: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <View style={themed($row)}>
+      <VoteButton item={item} onVote={onVote} />
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={({ pressed }) => [themed($rowText), pressed && $pressed]}
+      >
+        <Text text={item.title} weight="bold" />
+        <Text text={item.body} size="xs" numberOfLines={2} style={themed($muted)} />
+        <RequestMeta item={item} yours={item.mine} />
+      </Pressable>
+    </View>
+  )
+}
+
 export function RequestMeta({
   item,
   yours,
@@ -79,6 +105,14 @@ const $vote: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $voted: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
 const $pressed: ViewStyle = { opacity: 0.6 }
+const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.md,
+  paddingTop: spacing.md,
+  borderTopWidth: 1,
+  borderColor: colors.separator,
+})
+const $rowText: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxs })
 const $meta: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",

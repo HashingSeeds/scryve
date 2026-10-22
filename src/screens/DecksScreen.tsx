@@ -523,6 +523,7 @@ export function DecksScreen({
   onAddDeck,
   onHistory,
   onSettings,
+  onSupport,
   onAccount,
   accountEntry = "account",
   unavailableMessage,
@@ -536,6 +537,7 @@ export function DecksScreen({
   onAddDeck: () => void
   onHistory: () => void
   onSettings: () => void
+  onSupport: () => void
   onAccount: () => void
   accountEntry?: AccountEntry
   unavailableMessage?: string
@@ -794,6 +796,7 @@ export function DecksScreen({
         accountEntry={accountEntry}
         onHistory={onHistory}
         onSettings={onSettings}
+        onSupport={onSupport}
         onAccount={onAccount}
       />
       <DialogCard

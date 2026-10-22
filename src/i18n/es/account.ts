@@ -85,10 +85,6 @@ export default {
       unavailable:
         "Compartir el uso no está disponible en esta versión. No se enviarán eventos de PostHog.",
     },
-    help: {
-      heading: "Ayuda",
-      support: "Soporte",
-    },
     appInfo: {
       heading: "Información de la app",
       analyticsId: "ID de analíticas: {{id}}",
@@ -155,7 +151,7 @@ export default {
       accountPrivacy: {
         question: "Preguntas sobre la cuenta o la privacidad",
         answer:
-          "Puedes gestionar tu cuenta desde la pantalla de cuenta de Scryve. Contáctanos si necesitas ayuda para acceder a tu cuenta o eliminarla.",
+          "Puedes gestionar tu cuenta desde la pantalla de cuenta de Scryve. Escribe al soporte por correo si necesitas ayuda para acceder a tu cuenta o eliminarla.",
       },
     },
     appVersion: "Scryve {{version}}",

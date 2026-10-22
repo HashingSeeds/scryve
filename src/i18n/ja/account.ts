@@ -83,10 +83,6 @@ export default {
       unavailable:
         "このビルドでは利用状況の共有は利用できません。PostHogイベントは送信されません。",
     },
-    help: {
-      heading: "ヘルプ",
-      support: "サポート",
-    },
     appInfo: {
       heading: "アプリ情報",
       analyticsId: "分析ID: {{id}}",
@@ -153,7 +149,7 @@ export default {
       accountPrivacy: {
         question: "アカウントやプライバシーについて",
         answer:
-          "アカウントはScryveのアカウント画面で管理できます。アカウントへのアクセスや削除でお困りの場合はお問い合わせください。",
+          "アカウントの管理は、Scryveのアカウント画面から行えます。アカウントへのアクセスや削除でお困りの場合は、サポートまでメールでご連絡ください。",
       },
     },
     appVersion: "Scryve {{version}}",

@@ -1,6 +1,6 @@
 const feedback = {
   support: {
-    search: "Search requests and bugs",
+    search: "Search help and requests",
     allRequests: "All requests",
     yourRequests: "Your requests",
     // Count of requests with a reply or status change the player hasn't opened.

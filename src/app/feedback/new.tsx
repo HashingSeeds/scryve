@@ -14,7 +14,7 @@ import {
 import { feedbackErrorMessage } from "@/features/feedback/errors"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { FeedbackUnavailable } from "@/features/feedback/FeedbackUnavailable"
-import { leaveFeedback } from "@/features/feedback/navigation"
+import { leaveFeedback, openRequest } from "@/features/feedback/navigation"
 import { useFeedbackOutbox } from "@/features/feedback/outbox"
 import { useDebounced } from "@/features/feedback/useDebounced"
 import { useFeedbackVote } from "@/features/feedback/useFeedbackVote"
@@ -129,6 +129,7 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
       onOpenPrivacy={() => router.push("/privacy")}
       onSend={() => void send()}
       onVote={(item, voted) => vote(item._id, voted)}
+      onOpen={openRequest}
       onBack={() => (step === 2 ? setStep(1) : leaveFeedback())}
     />
   )

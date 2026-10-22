@@ -42,6 +42,7 @@ export default function LanGameRoute() {
       onLeave={leaveGame}
       onBack={backToLobby}
       onSettings={() => router.push("/settings")}
+      onSupport={() => router.push("/support")}
     />
   )
 }

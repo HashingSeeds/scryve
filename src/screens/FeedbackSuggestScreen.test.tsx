@@ -44,6 +44,7 @@ function renderSuggest(overrides: Partial<FeedbackSuggestScreenProps> = {}) {
     onOpenPrivacy: jest.fn(),
     onSend: jest.fn(),
     onVote: jest.fn(),
+    onOpen: jest.fn(),
     onBack: jest.fn(),
     ...overrides,
   }
@@ -68,6 +69,8 @@ describe("FeedbackSuggestScreen", () => {
     expect(view.getByText("Already asked? Vote instead.")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Vote for Timer for tournament rounds, 4 votes"))
     expect(props.onVote).toHaveBeenCalledWith(match, true)
+    fireEvent.press(view.getByText("A 50 minute round clock."))
+    expect(props.onOpen).toHaveBeenCalledWith(match)
     fireEvent.press(view.getByText("Continue"))
     expect(props.onContinue).toHaveBeenCalled()
   })

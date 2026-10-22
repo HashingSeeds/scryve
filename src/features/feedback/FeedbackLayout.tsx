@@ -12,12 +12,14 @@ import type { ThemedStyle } from "@/theme/types"
 // why: the fixed preset never hides its nav title, so this collapses it itself; the in-body heading would show twice otherwise.
 export function FeedbackLayout({
   title,
+  heading = true,
   offline,
   onBack,
   footer,
   children,
 }: {
   title: string
+  heading?: boolean
   offline: boolean
   onBack: () => void
   footer?: ReactNode
@@ -32,7 +34,7 @@ export function FeedbackLayout({
       preset="fixed"
       safeAreaEdges={["bottom"]}
       header={{
-        title: titleVisible ? title : undefined,
+        title: titleVisible || !heading ? title : undefined,
         leftTx: "common:back",
         onLeftPress: onBack,
       }}
@@ -50,7 +52,7 @@ export function FeedbackLayout({
         scrollEventThrottle={16}
         onScroll={onScroll}
       >
-        <Text text={title} preset="heading" accessibilityRole="header" />
+        {heading ? <Text text={title} preset="heading" accessibilityRole="header" /> : null}
         {children}
         {footer && !pinFooter ? <View style={themed($inlineFooter)}>{footer}</View> : null}
       </ScrollView>

@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Linking, Platform } from "react-native"
 import * as Application from "expo-application"
 import Constants from "expo-constants"
@@ -7,12 +8,18 @@ import Head from "expo-router/head"
 
 import { openAppleStandardEula } from "@/content/legalLinks"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
+import { useHeldOrder } from "@/features/feedback/heldOrder"
+import { openRequest } from "@/features/feedback/navigation"
+import { useDebounced } from "@/features/feedback/useDebounced"
+import { useFeedbackVote } from "@/features/feedback/useFeedbackVote"
 import { translate } from "@/i18n/translate"
-import { SupportScreen } from "@/screens/SupportScreen"
+import { SupportScreen, type SupportScreenProps } from "@/screens/SupportScreen"
 
 import { api } from "../../convex/_generated/api"
 
+const SEARCH_DELAY_MS = 250
 const SUPPORT_EMAIL = "mailto:support@sowinghope.how?subject=Scryve%20Support"
 
 export default function SupportRoute() {
@@ -26,28 +33,69 @@ export default function SupportRoute() {
           <meta name="description" content={translate("account:support.pageDescription")} />
         </Head>
       ) : null}
-      {configured ? <SupportWithUnread /> : <Support unread={0} />}
+      {configured ? <LiveSupport /> : <StaticSupport />}
     </>
   )
 }
 
-function SupportWithUnread() {
-  // why: opening Support shouldn't make a feedback key for someone who never sent any.
-  const key = useFeedbackKey({ create: false })
+function LiveSupport() {
+  const [search, setSearch] = useState("")
+  const searched = useDebounced(search.trim(), SEARCH_DELAY_MS)
+  // why: opening Support shouldn't make a feedback key for someone who never sent any; searching requests does.
+  const key = useFeedbackKey({ create: !!searched })
+  const online = useConvexOnline()
   const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
-  return <Support unread={mine?.filter((item) => item.unread).length ?? 0} />
+  const loaded = useQuery(api.feedback.board, key && searched ? { key, q: searched } : "skip")
+  const results = useHeldOrder(loaded, searched)
+  const { vote, failed } = useFeedbackVote(key)
+  return (
+    <Support
+      unread={mine?.filter((item) => item.unread).length ?? 0}
+      search={search}
+      searched={searched}
+      results={results}
+      offline={!online}
+      voteFailed={failed}
+      onSearch={setSearch}
+      onVote={(item, voted) => vote(item._id, voted)}
+    />
+  )
 }
 
-function Support({ unread }: { unread: number }) {
+// why: without Convex the page still searches its own answers.
+function StaticSupport() {
+  const [search, setSearch] = useState("")
+  return (
+    <Support
+      unread={0}
+      search={search}
+      searched={search}
+      results={[]}
+      offline={false}
+      voteFailed={false}
+      onSearch={setSearch}
+      onVote={() => undefined}
+    />
+  )
+}
+
+function Support(
+  props: Pick<
+    SupportScreenProps,
+    "unread" | "search" | "searched" | "results" | "offline" | "voteFailed" | "onSearch" | "onVote"
+  >,
+) {
   return (
     <SupportScreen
-      unread={unread}
+      {...props}
       onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-      onSearch={(q) => router.push({ pathname: "/feedback", params: { q } })}
+      onOpen={openRequest}
       onAllRequests={() => router.push("/feedback")}
       onYourRequests={() => router.push("/feedback/mine")}
       onEmailSupport={() => void Linking.openURL(SUPPORT_EMAIL)}
-      onSuggest={() => router.push("/feedback/new")}
+      onSuggest={(title) =>
+        router.push(title ? { pathname: "/feedback/new", params: { title } } : "/feedback/new")
+      }
       onOpenPrivacy={() => router.push("/privacy")}
       onOpenTerms={() => router.push("/terms")}
       onOpenLicenseAgreement={

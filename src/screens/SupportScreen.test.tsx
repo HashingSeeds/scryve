@@ -3,12 +3,34 @@ import { fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import { SupportScreen, type SupportScreenProps } from "./SupportScreen"
+import type { Id } from "../../convex/_generated/dataModel"
+
+const request = {
+  _id: "r1" as Id<"feedbackRequests">,
+  kind: "feature" as const,
+  title: "Timer for tournament rounds",
+  body: "A 50 minute round clock.",
+  status: "planned" as const,
+  votes: 3,
+  shippedIn: undefined,
+  createdAt: 0,
+  voted: false,
+  reported: false,
+  mine: false,
+}
 
 function renderSupport(overrides: Partial<SupportScreenProps> = {}) {
   const props: SupportScreenProps = {
     unread: 0,
+    search: "",
+    searched: "",
+    results: undefined,
+    offline: false,
+    voteFailed: false,
     onBack: jest.fn(),
     onSearch: jest.fn(),
+    onVote: jest.fn(),
+    onOpen: jest.fn(),
     onAllRequests: jest.fn(),
     onYourRequests: jest.fn(),
     onEmailSupport: jest.fn(),
@@ -44,12 +66,23 @@ describe("SupportScreen", () => {
     expect(view.getByText("Restore Scryve Pro")).toBeTruthy()
   })
 
-  it("hands typing off to the board's search and clears its own field", () => {
-    const { props, view } = renderSupport()
-    const field = view.getByPlaceholderText("Search requests and bugs")
-    fireEvent.changeText(field, "t")
-    expect(props.onSearch).toHaveBeenCalledWith("t")
-    expect(view.getByPlaceholderText("Search requests and bugs").props.value).toBe("")
+  it("searches in place: answers and requests replace the page, and nothing found offers to suggest it", () => {
+    const { props, view } = renderSupport({
+      search: "restore",
+      searched: "restore",
+      results: [request],
+    })
+    expect(view.getByText("Restore Scryve Pro")).toBeTruthy()
+    expect(view.queryByText("Manage or cancel a subscription")).toBeNull()
+    expect(view.queryByText("All requests")).toBeNull()
+    fireEvent.press(view.getByText("A 50 minute round clock."))
+    expect(props.onOpen).toHaveBeenCalledWith(request)
+    fireEvent.press(view.getByLabelText("Vote for Timer for tournament rounds, 3 votes"))
+    expect(props.onVote).toHaveBeenCalledWith(request, true)
+
+    const empty = renderSupport({ search: "poison", searched: "poison", results: [] })
+    fireEvent.press(empty.view.getByText("Suggest “poison”"))
+    expect(empty.props.onSuggest).toHaveBeenCalledWith("poison")
   })
 
   it("opens the legal documents and shows the app version", () => {

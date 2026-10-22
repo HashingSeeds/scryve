@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { router, useLocalSearchParams } from "expo-router"
+import { router } from "expo-router"
 import { useQuery } from "convex/react"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -7,7 +7,7 @@ import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { FeedbackUnavailable } from "@/features/feedback/FeedbackUnavailable"
 import { useHeldOrder } from "@/features/feedback/heldOrder"
-import { leaveFeedback } from "@/features/feedback/navigation"
+import { leaveFeedback, openRequest } from "@/features/feedback/navigation"
 import { useDebounced } from "@/features/feedback/useDebounced"
 import { useFeedbackVote } from "@/features/feedback/useFeedbackVote"
 import { FeedbackBoardScreen, type FeedbackTab } from "@/screens/FeedbackBoardScreen"
@@ -28,11 +28,10 @@ export default function FeedbackBoardRoute() {
 }
 
 function Board() {
-  const { q } = useLocalSearchParams<{ q?: string }>()
   const key = useFeedbackKey()
   const online = useConvexOnline()
   const [tab, setTab] = useState<FeedbackTab>("all")
-  const [search, setSearch] = useState(q ?? "")
+  const [search, setSearch] = useState("")
   const searched = useDebounced(search.trim(), SEARCH_DELAY_MS)
   const loaded = useQuery(
     api.feedback.board,
@@ -53,15 +52,12 @@ function Board() {
       onSearch={setSearch}
       onTab={setTab}
       onVote={(item, voted) => vote(item._id, voted)}
-      onOpen={(item) =>
-        router.push(item.mine ? `/feedback/${item._id}` : `/feedback/request/${item._id}`)
-      }
+      onOpen={openRequest}
       onSuggest={(title) =>
         router.push(title ? { pathname: "/feedback/new", params: { title } } : "/feedback/new")
       }
       onMine={() => router.push("/feedback/mine")}
       onBack={leaveFeedback}
-      autoFocusSearch={!!q}
     />
   )
 }

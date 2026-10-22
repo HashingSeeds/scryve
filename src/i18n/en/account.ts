@@ -83,10 +83,6 @@ const account = {
       saveFailed: "Could not save your choice. Please try again.",
       unavailable: "Usage sharing is unavailable in this build. No PostHog events will be sent.",
     },
-    help: {
-      heading: "Help",
-      support: "Support",
-    },
     appInfo: {
       heading: "App information",
       analyticsId: "Analytics ID: {{id}}",
@@ -153,7 +149,7 @@ const account = {
       accountPrivacy: {
         question: "Account or privacy questions",
         answer:
-          "You can manage your account from Scryve’s account screen. Contact us if you need help accessing or deleting your account.",
+          "You can manage your account from Scryve’s account screen. Email support if you need help accessing or deleting your account.",
       },
     },
     appVersion: "Scryve {{version}}",

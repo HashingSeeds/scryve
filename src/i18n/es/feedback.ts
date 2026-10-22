@@ -3,7 +3,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   support: {
-    search: "Buscar solicitudes y errores",
+    search: "Buscar ayuda y solicitudes",
     allRequests: "Todas las solicitudes",
     yourRequests: "Tus solicitudes",
     newCount_one: "{{count}} nueva",
