@@ -100,12 +100,16 @@ export default {
     waiting: "연결을 기다리는 중입니다. 연결되면 전송됩니다.",
     sending: "보내는 중…",
     notSent: "전송되지 않았습니다. {{reason}}",
+    otherAccount: "전송되기 전에 계정을 전환했습니다",
     discard: "폐기",
     deleteAll: "내 피드백 삭제",
-    deleteHint: "이 기기에서 보낸 모든 내용을 삭제합니다.",
+    deleteHint:
+      "이 기기에서 보낸 내용을 삭제합니다. 이미 Sentry로 전송된 버그 상세 정보는 그대로 남습니다.",
     deleteConfirmTitle: "피드백을 삭제할까요?",
-    deleteConfirmBody: "이 기기에서 보낸 모든 내용과 답변, 투표가 삭제됩니다.",
+    deleteConfirmBody:
+      "이 기기에서 보낸 내용이 답글 및 투표와 함께 삭제됩니다. 이미 Sentry로 전송된 버그 상세 정보는 그대로 남습니다.",
     delete: "삭제",
+    deleteFailed: "피드백을 삭제하지 못했습니다. 온라인 상태일 때 다시 시도하세요.",
   },
   thread: {
     missing: "이 요청은 삭제되었습니다.",

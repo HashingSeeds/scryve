@@ -113,13 +113,16 @@ export default {
     waiting: "En attente de connexion. Envoi dès votre retour.",
     sending: "Envoi en cours…",
     notSent: "Non envoyé. {{reason}}",
+    otherAccount: "Vous avez changé de compte avant l'envoi",
     discard: "Supprimer",
     deleteAll: "Supprimer mes retours",
-    deleteHint: "Supprime tout ce qui a été envoyé depuis cet appareil.",
+    deleteHint:
+      "Supprime ce que cet appareil a envoyé. Les détails de bug déjà envoyés à Sentry y restent.",
     deleteConfirmTitle: "Supprimer vos retours ?",
     deleteConfirmBody:
-      "Cela supprime tout ce qui a été envoyé depuis cet appareil, ainsi que les réponses et les votes associés.",
+      "Cela supprime ce que cet appareil a envoyé, ainsi que les réponses et les votes associés. Les détails de bug déjà envoyés à Sentry y restent.",
     delete: "Supprimer",
+    deleteFailed: "Impossible de supprimer vos commentaires. Réessayez une fois en ligne.",
   },
   thread: {
     missing: "Cette demande n'existe plus.",

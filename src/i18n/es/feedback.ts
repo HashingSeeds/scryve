@@ -113,13 +113,17 @@ export default {
     waiting: "Esperando conexión. Se enviará cuando vuelvas.",
     sending: "Enviando…",
     notSent: "No enviada. {{reason}}",
+    otherAccount: "Cambiaste de cuenta antes de que se enviara",
     discard: "Descartar",
     deleteAll: "Eliminar mis comentarios",
-    deleteHint: "Elimina todo lo enviado desde este dispositivo.",
+    deleteHint:
+      "Elimina lo que envió este dispositivo. Los detalles de errores que ya se enviaron a Sentry se quedan allí.",
     deleteConfirmTitle: "¿Eliminar tus comentarios?",
     deleteConfirmBody:
-      "Se elimina todo lo enviado desde este dispositivo, junto con sus respuestas y votos.",
+      "Esto elimina lo que envió este dispositivo, junto con sus respuestas y votos. Los detalles de errores que ya se enviaron a Sentry se quedan allí.",
     delete: "Eliminar",
+    deleteFailed:
+      "No se pudieron eliminar tus comentarios. Inténtalo de nuevo cuando tengas conexión.",
   },
   thread: {
     missing: "Esta solicitud ya no existe.",

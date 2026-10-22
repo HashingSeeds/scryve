@@ -33,6 +33,8 @@ const limiter = new RateLimiter(components.rateLimiter, {
   feedbackReport: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
   // why: install keys are made by the client, so per-key limits alone let a script hide the whole board.
   feedbackReportHide: { kind: "fixed window", rate: 20, period: HOUR },
+  // why: the same reason caps every install's sends together, which also bounds alerts to Matthew.
+  feedbackSubmitAll: { kind: "fixed window", rate: 200, period: HOUR },
 })
 
 const BOARD_SIZE = 100
@@ -41,6 +43,7 @@ const THREAD_SIZE = 200
 const DELETE_BATCH = 20
 const APOLLO_BATCH = 100
 const SEARCH_SIZE = 50
+const BODY_EXCERPT = 280
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 
@@ -73,10 +76,11 @@ async function ownedRequest(ctx: Ctx, who: Viewer, requestId: Id<"feedbackReques
 
 async function limit(
   ctx: MutationCtx,
-  name: "feedbackSubmit" | "feedbackMessage" | "feedbackVote" | "feedbackReport",
-  key: string,
+  name:
+    "feedbackSubmit" | "feedbackSubmitAll" | "feedbackMessage" | "feedbackVote" | "feedbackReport",
+  key?: string,
 ) {
-  const result = await limiter.limit(ctx, name, { key })
+  const result = await limiter.limit(ctx, name, key ? { key } : {})
   if (!result.ok)
     throw new ConvexError({
       code: "rate_limited",
@@ -118,9 +122,15 @@ function ownItem(request: Doc<"feedbackRequests">) {
   }
 }
 
+// why: list rows show two lines of the body, so a full board doesn't carry every body in full.
+const excerpt = (request: Doc<"feedbackRequests">) => ({
+  ...request,
+  body: request.body.slice(0, BODY_EXCERPT),
+})
+
 async function boardItems(ctx: QueryCtx, who: Viewer | null, requests: Doc<"feedbackRequests">[]) {
   return await Promise.all(
-    requests.map(async (request) => {
+    requests.map(excerpt).map(async (request) => {
       if (!who) return boardItem(request, { voted: false, reported: false, mine: false })
       const bySender = (table: "feedbackVotes" | "feedbackReports") =>
         ctx.db
@@ -228,16 +238,26 @@ export const mine = query({
     return [...byId.values()]
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, MINE_SIZE)
-      .map(ownItem)
+      .map((request) => {
+        const { body: _body, ...item } = ownItem(request)
+        return item
+      })
   },
 })
 
+// why: a long thread keeps showing its newest messages; the oldest drop off instead of new replies never appearing.
+async function latestMessages(ctx: QueryCtx, requestId: Id<"feedbackRequests">) {
+  const newest = await ctx.db
+    .query("feedbackMessages")
+    .withIndex("by_request", (q) => q.eq("requestId", requestId))
+    .order("desc")
+    .take(THREAD_SIZE)
+  return newest.reverse()
+}
+
 async function threadFor(ctx: QueryCtx, who: Viewer, request: Doc<"feedbackRequests"> | null) {
   if (!request || !owns(request, who)) return null
-  const messages = await ctx.db
-    .query("feedbackMessages")
-    .withIndex("by_request", (q) => q.eq("requestId", request._id))
-    .take(THREAD_SIZE)
+  const messages = await latestMessages(ctx, request._id)
   return {
     request: {
       ...ownItem(request),
@@ -302,6 +322,7 @@ export const submit = mutation({
     if (args.includeAccount && !userId)
       throw new ConvexError({ code: "unauthenticated", message: "Sign in to include your account" })
     await limit(ctx, "feedbackSubmit", who.hash)
+    await limit(ctx, "feedbackSubmitAll")
     const now = Date.now()
     const vote = args.kind === "feature"
     const requestId = await ctx.db.insert("feedbackRequests", {
@@ -519,10 +540,7 @@ export const apolloCardInput = internalQuery({
   handler: async (ctx, { requestId }) => {
     const request = await ctx.db.get(requestId)
     if (!request) return null
-    const messages = await ctx.db
-      .query("feedbackMessages")
-      .withIndex("by_request", (q) => q.eq("requestId", requestId))
-      .take(THREAD_SIZE)
+    const messages = await latestMessages(ctx, requestId)
     const user = request.userId ? await ctx.db.get(request.userId) : null
     const account = user
       ? [
@@ -542,6 +560,8 @@ function apolloConfig() {
 }
 
 const APOLLO_RETRY_MS = [MINUTE, 10 * MINUTE] as const
+// why: a stalled Apollo would otherwise hold the action until Convex kills it, skipping the retry.
+const APOLLO_TIMEOUT_MS = 15_000
 
 export const postApolloCard = internalAction({
   args: {
@@ -560,6 +580,7 @@ export const postApolloCard = internalAction({
     const card = input ? feedbackCard(input) : deletedFeedbackCard(requestId)
     const status = await fetch(`${apollo.url}/v1/cards`, {
       method: "POST",
+      signal: AbortSignal.timeout(APOLLO_TIMEOUT_MS),
       headers: { "Authorization": `Bearer ${apollo.token}`, "Content-Type": "application/json" },
       body: JSON.stringify(card),
     }).then(
@@ -671,6 +692,7 @@ export const pullApollo = internalAction({
     const after = await ctx.runQuery(internal.feedback.apolloCursor, {})
     const response = await fetch(`${apollo.url}/v1/events?after=${after}&source=feedback`, {
       headers: { Authorization: `Bearer ${apollo.token}` },
+      signal: AbortSignal.timeout(APOLLO_TIMEOUT_MS),
     })
     if (!response.ok) {
       console.warn(`Apollo events failed: ${response.status}`)

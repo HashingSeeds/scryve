@@ -53,6 +53,20 @@ describe("feedback", () => {
     jest.useRealTimers()
   })
 
+  it("shows a long thread's newest messages in order", async () => {
+    const t = makeConvexTest()
+    const requestId = await submit(t)
+    await t.run(async (ctx) => {
+      for (let i = 1; i <= 205; i++)
+        await ctx.db.insert("feedbackMessages", { requestId, from: "player", body: `m${i}` })
+    })
+    const bodies = (await t.query(api.feedback.thread, { key: ME, requestId }))!.messages.map(
+      (message) => message.body,
+    )
+    expect(bodies).toHaveLength(200)
+    expect(bodies.slice(-2)).toEqual(["m204", "m205"])
+  })
+
   it("keeps a request private to its sender until it's published", async () => {
     const t = makeConvexTest()
     const requestId = await submit(t)

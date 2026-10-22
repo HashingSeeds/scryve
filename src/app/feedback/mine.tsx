@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { router } from "expo-router"
 import { useMutation, useQuery } from "convex/react"
 
@@ -22,6 +23,7 @@ function MyFeedback() {
   const { pending, failures } = useFeedbackSends()
   const items = useQuery(api.feedback.mine, key ? { key } : "skip")
   const deleteMine = useMutation(api.feedback.deleteMine)
+  const [deleteFailed, setDeleteFailed] = useState(false)
   const unsent = [
     ...pending.flatMap((send) =>
       send.type === "submit" ? [{ operationId: send.operationId, title: send.title }] : [],
@@ -37,12 +39,14 @@ function MyFeedback() {
       items={items}
       unsent={unsent}
       offline={!online}
+      deleteFailed={deleteFailed}
       onOpen={(item) => router.push(`/feedback/${item._id}`)}
       onDiscard={(operationId) => outbox.discard(operationId)}
       onDeleteAll={() => {
         // why: a send still waiting would otherwise go out after the player deleted their feedback.
         outbox.clear()
-        if (key) void deleteMine({ key }).catch(() => undefined)
+        setDeleteFailed(false)
+        if (key) void deleteMine({ key }).catch(() => setDeleteFailed(true))
       }}
       onBack={leaveFeedback}
     />

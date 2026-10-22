@@ -113,13 +113,16 @@ const feedback = {
     sending: "Sending…",
     // {{reason}} is a short error, e.g. "Sign in to include your account".
     notSent: "Not sent. {{reason}}",
+    // Reason a request queued with the player's account was held back after they switched accounts.
+    otherAccount: "You switched accounts before it sent",
     discard: "Discard",
     deleteAll: "Delete my feedback",
-    deleteHint: "Removes everything sent from this device.",
+    deleteHint: "Removes what this device sent. Bug details already sent to Sentry stay there.",
     deleteConfirmTitle: "Delete your feedback?",
     deleteConfirmBody:
-      "This removes everything sent from this device, along with its replies and votes.",
+      "This removes what this device sent, along with its replies and votes. Bug details already sent to Sentry stay there.",
     delete: "Delete",
+    deleteFailed: "Couldn't delete your feedback. Try again when you're online.",
   },
   thread: {
     missing: "This request is gone.",

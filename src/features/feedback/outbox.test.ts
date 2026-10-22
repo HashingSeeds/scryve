@@ -110,4 +110,18 @@ describe("FeedbackOutbox", () => {
     ])
     stop()
   })
+
+  it("never sends a request queued with one account under another", async () => {
+    const mutation = jest.fn(async (_reference: unknown, _args: unknown) => "request-1")
+    const { outbox, stop } = outboxWith(mutation)
+    outbox.setReady(false, "user_a")
+    outbox.enqueue({ ...submit, includeAccount: true })
+    outbox.setReady(true, "user_b")
+    await flush()
+    expect(mutation).not.toHaveBeenCalled()
+    expect(outbox.getSnapshot().failures).toMatchObject([
+      { reason: "You switched accounts before it sent", action: { accountId: "user_a" } },
+    ])
+    stop()
+  })
 })

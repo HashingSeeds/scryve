@@ -125,7 +125,7 @@ export function ConfiguredAuth({
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <LocalGamePublishSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
-      <FeedbackOutboxSession />
+      <FeedbackOutboxSession accountId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       {/* why: the hinted user counts as the account, so Clerk confirming that user at launch does not remount the app. */}
       <RevenueCatProvider

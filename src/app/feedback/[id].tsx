@@ -61,12 +61,19 @@ function Thread({ requestId, onSignIn }: { requestId: string; onSignIn: () => vo
       onReply={(body) => {
         if (!request) return
         setError(undefined)
-        const operationId = outbox.enqueue({ type: "reply", requestId: request._id, body })
-        if (!online) return
-        outbox.waitFor(operationId, SEND_WAIT_MS).catch((cause: unknown) => {
+        const fail = (cause: unknown) => {
           setError(feedbackErrorMessage(cause, translate("feedback:thread.sendFailed")))
           setRestore((last) => ({ id: (last?.id ?? 0) + 1, text: body }))
-        })
+        }
+        let operationId: string
+        try {
+          operationId = outbox.enqueue({ type: "reply", requestId: request._id, body })
+        } catch (cause) {
+          fail(cause)
+          return
+        }
+        if (!online) return
+        outbox.waitFor(operationId, SEND_WAIT_MS).catch(fail)
       }}
       onDiscard={(operationId) => outbox.discard(operationId)}
       onIncludeAccount={(included) => {

@@ -12,6 +12,7 @@ import {
   type DurableStringStorage,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
+import { translate } from "@/i18n/translate"
 import {
   convexErrorCode,
   convexErrorMessage,
@@ -33,6 +34,8 @@ export type FeedbackSend =
       title: string
       body: string
       includeAccount: boolean
+      // why: set from the signed-in account when the send is queued, so a later account never receives it.
+      accountId?: string
       appVersion?: string
       platform?: string
       sentryEventId?: string
@@ -77,6 +80,7 @@ function parsePending(value: unknown): PendingFeedbackSend | null {
     (value.kind === "feature" || value.kind === "bug") &&
     typeof value.title === "string" &&
     typeof value.includeAccount === "boolean" &&
+    optionalString(value.accountId) &&
     optionalString(value.appVersion) &&
     optionalString(value.platform) &&
     optionalString(value.sentryEventId)
@@ -113,12 +117,15 @@ const codec: DurableOutboxCodec<PendingFeedbackSend, FailedFeedbackSend> = {
     "title",
     "body",
     "includeAccount",
+    "accountId",
     "appVersion",
     "platform",
     "sentryEventId",
     "requestId",
   ],
 }
+
+class AccountChanged extends Error {}
 
 type Waiter = { resolve: (requestId: string | null) => void; reject: (cause: unknown) => void }
 
@@ -134,6 +141,7 @@ export class FeedbackOutbox {
   private sending: string | undefined
   private retryAfterMs = 0
   private ready = false
+  private account: string | undefined
 
   constructor(
     private readonly client: Pick<ConvexReactClient, "mutation">,
@@ -201,15 +209,20 @@ export class FeedbackOutbox {
   }
 
   // why: a send with the account made before auth settles would be refused as signed out.
-  setReady(ready: boolean) {
+  setReady(ready: boolean, account?: string) {
     this.ready = ready
+    this.account = account
     if (ready) void this.controller.drain()
   }
 
   enqueue(send: FeedbackSend) {
     const operationId = randomUUID()
+    const owned =
+      send.type === "submit" && send.includeAccount && this.account
+        ? { ...send, accountId: this.account }
+        : send
     const result = this.store.enqueue(
-      { ...send, schemaVersion: 1, operationId, queuedAt: this.now(), attempts: 0 },
+      { ...owned, schemaVersion: 1, operationId, queuedAt: this.now(), attempts: 0 },
       SCOPE,
     )
     if (!result.accepted) throw new Error("Too much feedback is waiting to send. Reconnect first.")
@@ -263,6 +276,7 @@ export class FeedbackOutbox {
           clientId: action.operationId,
         })
         .then(() => null)
+    if (action.includeAccount && action.accountId !== this.account) throw new AccountChanged()
     return await this.client.mutation(api.feedback.submit, {
       key,
       kind: action.kind,
@@ -280,6 +294,8 @@ export class FeedbackOutbox {
     const code = convexErrorCode(cause)
     const operationId = this.sending
     if (operationId) this.causes.set(operationId, cause)
+    if (cause instanceof AccountChanged)
+      return { kind: "reject", reason: translate("feedback:mine.otherAccount") } as const
     if (code === "rate_limited" && !(operationId && this.waiters.has(operationId))) {
       this.retryAfterMs = convexRetryAfterMs(cause) ?? 60_000
       return { kind: "retry" } as const

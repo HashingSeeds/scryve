@@ -18,6 +18,7 @@ export interface MyFeedbackScreenProps {
   items: readonly FeedbackOwnItem[] | undefined
   unsent: readonly UnsentRequest[]
   offline: boolean
+  deleteFailed?: boolean
   onOpen: (item: FeedbackOwnItem) => void
   onDiscard: (operationId: string) => void
   onDeleteAll: () => void
@@ -28,6 +29,7 @@ export function MyFeedbackScreen({
   items,
   unsent,
   offline,
+  deleteFailed,
   onOpen,
   onDiscard,
   onDeleteAll,
@@ -84,6 +86,9 @@ export function MyFeedbackScreen({
         <View style={themed($delete)}>
           <Button tx="feedback:mine.deleteAll" onPress={() => setConfirming(true)} />
           <Text tx="feedback:mine.deleteHint" size="xs" style={themed($muted)} />
+          {deleteFailed ? (
+            <Text tx="feedback:mine.deleteFailed" size="xs" accessibilityRole="alert" />
+          ) : null}
         </View>
       )}
       <ConfirmDialog

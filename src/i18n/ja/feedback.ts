@@ -100,12 +100,17 @@ export default {
     waiting: "接続待ちです。接続が戻ると送信されます。",
     sending: "送信中…",
     notSent: "送信できませんでした。{{reason}}",
+    otherAccount: "送信前にアカウントを切り替えました",
     discard: "破棄",
     deleteAll: "フィードバックを削除",
-    deleteHint: "このデバイスから送信したものをすべて削除します。",
+    deleteHint:
+      "このデバイスから送信した内容を削除します。Sentryに送信済みの不具合の詳細は残ります。",
     deleteConfirmTitle: "フィードバックを削除しますか?",
-    deleteConfirmBody: "このデバイスから送信したものをすべて、返信や投票とともに削除します。",
+    deleteConfirmBody:
+      "このデバイスから送信した内容を、返信や投票とともに削除します。Sentryに送信済みの不具合の詳細は残ります。",
     delete: "削除",
+    deleteFailed:
+      "フィードバックを削除できませんでした。オンラインのときにもう一度お試しください。",
   },
   thread: {
     missing: "このリクエストは削除されました。",
