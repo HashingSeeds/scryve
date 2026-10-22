@@ -18,6 +18,8 @@ const FAQS = ["restorePro", "manageSubscription", "gameTrouble", "accountPrivacy
 
 const COPYRIGHT = "© 2026 Hashing Seeds LLC"
 const CHEVRON = "›"
+const WORD_BREAK = /[^\p{L}\p{N}]+/u
+const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
 
 export interface SupportScreenProps {
   unread: number
@@ -85,16 +87,15 @@ export function SupportScreen({
         onChangeText={onSearch}
       />
       {search.trim() ? (
-        query ? (
-          <SearchResults
-            query={query}
-            results={results}
-            voteFailed={voteFailed}
-            onVote={onVote}
-            onOpen={onOpen}
-            onSuggest={onSuggest}
-          />
-        ) : null
+        <SearchResults
+          search={search}
+          query={query}
+          results={results}
+          voteFailed={voteFailed}
+          onVote={onVote}
+          onOpen={onOpen}
+          onSuggest={onSuggest}
+        />
       ) : (
         <View style={themed($sections)}>
           <View>
@@ -200,6 +201,7 @@ export function SupportScreen({
 }
 
 function SearchResults({
+  search,
   query,
   results,
   voteFailed,
@@ -207,6 +209,7 @@ function SearchResults({
   onOpen,
   onSuggest,
 }: {
+  search: string
   query: string
   results: readonly FeedbackBoardItem[] | undefined
   voteFailed: boolean
@@ -215,14 +218,13 @@ function SearchResults({
   onSuggest: (title?: string) => void
 }) {
   const { themed } = useAppTheme()
-  const needle = query.toLocaleLowerCase()
   const faqs = FAQS.filter((faq) =>
-    [
-      translate(`account:support.faq.${faq}.question`),
-      translate(`account:support.faq.${faq}.answer`),
-    ].some((text) => text.toLocaleLowerCase().includes(needle)),
+    matchesWords(
+      `${translate(`account:support.faq.${faq}.question`)} ${translate(`account:support.faq.${faq}.answer`)}`,
+      search,
+    ),
   )
-  if (results?.length === 0 && faqs.length === 0)
+  if (query && results?.length === 0 && faqs.length === 0)
     return (
       <View style={themed($section)}>
         <Text
@@ -239,9 +241,6 @@ function SearchResults({
     )
   return (
     <>
-      {faqs.map((faq) => (
-        <Faq key={faq} faq={faq} />
-      ))}
       {results?.map((item) => (
         <RequestRow
           key={item._id}
@@ -250,11 +249,30 @@ function SearchResults({
           onOpen={() => onOpen(item)}
         />
       ))}
+      {faqs.map((faq) => (
+        <View key={faq} style={themed($faqResult)}>
+          <Text tx={`account:support.faq.${faq}.question`} weight="bold" />
+          <Text tx={`account:support.faq.${faq}.answer`} size="xs" style={themed($answer)} />
+        </View>
+      ))}
       {voteFailed ? (
         <Text tx="feedback:board.voteFailed" size="xs" accessibilityRole="alert" />
       ) : null}
     </>
   )
+}
+
+// why: matching word starts keeps "ti" from finding "subscriptions"; Japanese has no spaces, so it matches anywhere.
+function matchesWords(text: string, search: string) {
+  const lower = text.toLocaleLowerCase()
+  const words = lower.split(WORD_BREAK)
+  return search
+    .toLocaleLowerCase()
+    .split(WORD_BREAK)
+    .filter(Boolean)
+    .every((part) =>
+      UNSPACED.test(part) ? lower.includes(part) : words.some((word) => word.startsWith(part)),
+    )
 }
 
 function Faq({ faq }: { faq: (typeof FAQS)[number] }) {
@@ -340,6 +358,12 @@ const $faqCard: ThemedStyle<ViewStyle> = ({ colors, isDark, spacing }) => ({
   borderRadius: spacing.md,
   borderColor: colors.separator,
   backgroundColor: isDark ? colors.palette.neutral300 : colors.palette.neutral100,
+})
+const $faqResult: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xxs,
+  paddingTop: spacing.md,
+  borderTopWidth: 1,
+  borderColor: colors.separator,
 })
 const $cardTitle: ThemedStyle<TextStyle> = () => ({ fontSize: 16, lineHeight: 22 })
 const $answer: ThemedStyle<TextStyle> = ({ colors }) => ({

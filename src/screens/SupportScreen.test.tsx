@@ -80,6 +80,12 @@ describe("SupportScreen", () => {
     fireEvent.press(view.getByLabelText("Vote for Timer for tournament rounds, 3 votes"))
     expect(props.onVote).toHaveBeenCalledWith(request, true)
 
+    expect(
+      renderSupport({ search: "ti", searched: "ti", results: [] }).view.queryByText(
+        "Manage or cancel a subscription",
+      ),
+    ).toBeNull()
+
     const empty = renderSupport({ search: "poison", searched: "poison", results: [] })
     fireEvent.press(empty.view.getByText("Suggest “poison”"))
     expect(empty.props.onSuggest).toHaveBeenCalledWith("poison")

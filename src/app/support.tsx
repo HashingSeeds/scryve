@@ -19,7 +19,7 @@ import { SupportScreen, type SupportScreenProps } from "@/screens/SupportScreen"
 
 import { api } from "../../convex/_generated/api"
 
-const SEARCH_DELAY_MS = 250
+const SEARCH_DELAY_MS = 150
 const SUPPORT_EMAIL = "mailto:support@sowinghope.how?subject=Scryve%20Support"
 
 export default function SupportRoute() {
@@ -41,12 +41,16 @@ export default function SupportRoute() {
 function LiveSupport() {
   const [search, setSearch] = useState("")
   const searched = useDebounced(search.trim(), SEARCH_DELAY_MS)
-  // why: opening Support shouldn't make a feedback key for someone who never sent any; searching requests does.
-  const key = useFeedbackKey({ create: !!searched })
+  // why: opening Support shouldn't make a feedback key for someone who never sent any; the first keystroke does, so it's ready when the search goes out.
+  const key = useFeedbackKey({ create: !!search.trim() })
   const online = useConvexOnline()
   const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
   const loaded = useQuery(api.feedback.board, key && searched ? { key, q: searched } : "skip")
-  const results = useHeldOrder(loaded, searched)
+  // why: a new search keeps the last results on screen until its own arrive, so typing doesn't blank the list.
+  const [shown, setShown] = useState<{ q: string; items: NonNullable<typeof loaded> }>()
+  if (!searched && shown) setShown(undefined)
+  else if (searched && loaded && shown?.items !== loaded) setShown({ q: searched, items: loaded })
+  const results = useHeldOrder(shown?.items, shown?.q ?? "")
   const { vote, failed } = useFeedbackVote(key)
   return (
     <Support
