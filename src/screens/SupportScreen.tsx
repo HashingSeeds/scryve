@@ -148,6 +148,7 @@ export function SupportScreen({
               setStatus("")
             }}
           />
+          <Text tx="account:support.translationNotice" size="xs" style={themed($muted)} />
           <TextField
             labelTx={`account:support.emailLabel.${kind}`}
             placeholder={EMAIL_PLACEHOLDER}

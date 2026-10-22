@@ -148,6 +148,8 @@ export default {
       help: "E-mail pour la réponse",
     },
     emailInvalid: "Saisissez une adresse e-mail valide.",
+    translationNotice:
+      "Écrivez dans la langue de votre choix. Nous pouvons utiliser des outils d'IA pour la traduire.",
     replyTime: "Nous répondons généralement sous deux jours ouvrés.",
     selectedScreenshot: "Capture d'écran sélectionnée",
     removeScreenshot: "Supprimer la capture d'écran",

@@ -145,6 +145,7 @@ const account = {
       help: "Email for a reply",
     },
     emailInvalid: "Enter a valid email address.",
+    translationNotice: "Write in any language. We may use AI tools to translate it.",
     replyTime: "We usually reply within two business days.",
     selectedScreenshot: "Selected screenshot",
     removeScreenshot: "Remove screenshot",
