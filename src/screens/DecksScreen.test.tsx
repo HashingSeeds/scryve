@@ -68,6 +68,7 @@ const pokemonDeck = {
 const mockConvexClient = {}
 
 const mockSetFavorite = jest.fn(async () => null)
+const mockTotalsQuery = jest.fn()
 
 const mockListMine: { value: ShelfState | undefined; error?: Error } = {
   value: {
@@ -86,7 +87,8 @@ let mockTotals:
       draws: number
       unknown: number
     }[]
-  | Error = []
+  | Error
+  | undefined = []
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexClient,
   useQuery: (reference: unknown, args?: unknown) => {
@@ -94,6 +96,7 @@ jest.mock("convex/react", () => ({
     if (mockListMine.error) throw mockListMine.error
     if (reference === "decks.capacity") return mockListMine.value?.capacity
     if (reference === "deckStats.totalsByKey") {
+      mockTotalsQuery()
       if (mockTotals instanceof Error) throw mockTotals
       return mockTotals
     }
@@ -258,11 +261,38 @@ describe("DecksScreen", () => {
     const view = renderShelf({ access })
     const row = () => within(view.getByTestId(`deck-card-${guestDeckRouteId(local.localId)}`))
     expect(row().getByText("3-1")).toBeTruthy()
+    mockTotals = undefined
+    view.rerender(shelf({ access: { ...access, ownerId: "owner-b" } }))
+    expect(row().queryByText("3-1")).toBeNull()
+    mockTotals = [{ deckKey: "local-key", games: 4, wins: 1, losses: 3, draws: 0, unknown: 0 }]
+    view.rerender(shelf({ access: { ...access, ownerId: "owner-b" } }))
+    expect(row().getByText("1-3")).toBeTruthy()
+    expect(row().queryByText("3-1")).toBeNull()
     view.rerender(
       shelf({ access: { ...access, ready: false, signedIn: false, ownerId: undefined } }),
     )
     expect(row().queryByText("3-1")).toBeNull()
+    expect(row().queryByText("1-3")).toBeNull()
     mockTotals = []
+  })
+
+  it("only queries key totals while device-only decks exist", () => {
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    renderShelf({ access })
+    expect(mockTotalsQuery).not.toHaveBeenCalled()
+    act(() => {
+      saveGuestDeck({ name: "Local", format: "commander", game: "mtg", cards: [] })
+    })
+    expect(mockTotalsQuery).toHaveBeenCalled()
+    mockTotalsQuery.mockClear()
+    act(() => clearGuestDecks())
+    expect(mockTotalsQuery).not.toHaveBeenCalled()
   })
 
   it("still lists local decks when their key totals fail to load", () => {
@@ -336,6 +366,7 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     mockListMine.error = undefined
+    mockTotals = []
   })
 
   it("puts app navigation at the bottom and returns to the active game", () => {

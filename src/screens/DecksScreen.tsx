@@ -781,8 +781,8 @@ export function DecksScreen({
           </ConvexQueryBoundary>
         )}
       </View>
-      {access?.ready && access.ownerId ? (
-        <ConvexQueryBoundary fallback={() => null}>
+      {access?.ready && access.ownerId && guestDecks.length > 0 ? (
+        <ConvexQueryBoundary key={access.ownerId} fallback={() => null}>
           <KeyTotalsQuery ownerId={access.ownerId} onTotals={setTotals} />
         </ConvexQueryBoundary>
       ) : null}

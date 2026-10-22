@@ -50,33 +50,31 @@ export function exactRecord(row: DeckSummary["all"], source: StatsSource): Recor
 export { recordText }
 
 export function honestRate(record: RecordCounts) {
+  const games = record.wins + record.losses + record.draws
   return {
     text:
-      record.games < MIN_RATED_GAMES
-        ? recordText(record)
-        : `${Math.round((record.wins / record.games) * 100)}%`,
-    tooFew: record.games < MIN_RATED_GAMES,
-    games: record.games,
+      games < MIN_RATED_GAMES ? recordText(record) : `${Math.round((record.wins / games) * 100)}%`,
+    tooFew: games < MIN_RATED_GAMES,
+    games,
   }
 }
 
 export function chanceRate(slices: readonly StatsSlice[], source: StatsSource = "all") {
-  let games = 0
-  let chance = 0
-  for (const slice of slices) {
-    if (
-      slice.podSize === null ||
-      slice.podSize <= 0 ||
-      (source !== "all" && slice.source !== source)
-    )
-      continue
-    games += slice.games
-    chance += slice.games / slice.podSize
-  }
-  return games ? chance / games : undefined
+  const pods = new Set(
+    slices.flatMap((slice) =>
+      slice.podSize !== null && slice.podSize > 0 && (source === "all" || slice.source === source)
+        ? [slice.podSize]
+        : [],
+    ),
+  )
+  const common = [...pods]
+    .map((podSize) => ({ podSize, record: sumSlices(slices, source, { podSize }) }))
+    .sort((a, b) => b.record.games - a.record.games)[0]
+  return common ? { ...common, expected: 1 / common.podSize } : undefined
 }
 
-export function likelyRange({ wins, games }: RecordCounts) {
+export function likelyRange({ wins, losses, draws }: RecordCounts) {
+  const games = wins + losses + draws
   if (!games) return undefined
   const z = 1.645
   const p = wins / games

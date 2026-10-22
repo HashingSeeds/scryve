@@ -228,18 +228,17 @@ function CompareRow({ label, left, right }: { label: string; left: ReactNode; ri
 function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] }) {
   const { themed } = useAppTheme()
   const range = likelyRange(record)
+  const games = record.wins + record.losses + record.draws
   return (
-    <View style={record.games < 10 ? $few : undefined}>
+    <View style={games < 10 ? $few : undefined}>
       <Text
-        text={
-          record.games ? `${Math.round((record.wins / record.games) * 100)}%` : recordText(record)
-        }
+        text={games ? `${Math.round((record.wins / games) * 100)}%` : recordText(record)}
         style={$numbers}
       />
       {range ? (
         <Text size="xxs" style={themed($dim)} tx="decks:stats.likely" txOptions={range} />
       ) : null}
-      {record.games < 10 ? <Text size="xxs" style={themed($dim)} tx="decks:stats.tooFew" /> : null}
+      {games < 10 ? <Text size="xxs" style={themed($dim)} tx="decks:stats.tooFew" /> : null}
     </View>
   )
 }

@@ -10,7 +10,7 @@ import { blockedUserIdsFor } from "./lib/moderation"
 import { boundedPaginationOptions } from "./lib/pagination"
 import { resultDeckKey } from "./lib/results"
 
-export const BREAKDOWN_SCAN = 1000
+export const BREAKDOWN_SCAN = 200
 const MAX_LISTS = 50
 const MAX_DECK_TOTALS = 1000
 const GAMES_PAGE_ROWS = 100

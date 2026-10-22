@@ -57,22 +57,42 @@ it("shows a record under ten games and a percentage from ten", () => {
   expect(honestRate(sumSlices([])).text).toBe("0-0")
 })
 
-it("weights chance by known games, ignoring unknown pods and other sources", () => {
+it("compares the most common pod size without blending sizes or sources", () => {
   const slices = [
     slice(),
-    slice({ games: 2, podSize: 2 }),
+    slice({ games: 2, wins: 1, losses: 1, podSize: 2 }),
     slice({ games: 100, podSize: null }),
-    slice({ source: "manual", games: 10, podSize: 2 }),
+    slice({ source: "manual", games: 10, wins: 6, losses: 4, podSize: 2 }),
   ]
-  expect(chanceRate(slices, "scryve")).toBeCloseTo(0.3)
+  expect(chanceRate(slices, "scryve")).toEqual({
+    podSize: 4,
+    expected: 0.25,
+    record: { games: 8, wins: 4, losses: 4, draws: 0 },
+  })
+  expect(chanceRate(slices, "all")).toEqual({
+    podSize: 2,
+    expected: 0.5,
+    record: { games: 12, wins: 7, losses: 5, draws: 0 },
+  })
   expect(chanceRate([slice({ podSize: null })])).toBeUndefined()
   expect(chanceRate([slice({ podSize: 0 })])).toBeUndefined()
 })
 
+it("excludes unknown outcomes from rates, sample thresholds and likely ranges", () => {
+  const known = slice({ games: 10, wins: 4, losses: 5, draws: 1 })
+  const withUnknown = { ...known, games: 30 }
+  expect(honestRate(withUnknown)).toEqual({ text: "40%", tooFew: false, games: 10 })
+  expect(honestRate(slice({ games: 30 }))).toEqual({ text: "4-4", tooFew: true, games: 8 })
+  expect(likelyRange(withUnknown)).toEqual(likelyRange(known))
+  const unknownOnly = { games: 30, wins: 0, losses: 0, draws: 0 }
+  expect(honestRate(unknownOnly)).toEqual({ text: "0-0", tooFew: true, games: 0 })
+  expect(likelyRange(unknownOnly)).toBeUndefined()
+})
+
 it("computes the 90 percent Wilson interval including zero and all wins", () => {
-  expect(likelyRange(slice({ games: 10, wins: 5 }))).toEqual({ low: 27, high: 73 })
-  expect(likelyRange(slice({ games: 10, wins: 0 }))).toEqual({ low: 0, high: 21 })
-  expect(likelyRange(slice({ games: 10, wins: 10 }))).toEqual({ low: 79, high: 100 })
+  expect(likelyRange(slice({ games: 10, wins: 5, losses: 5 }))).toEqual({ low: 27, high: 73 })
+  expect(likelyRange(slice({ games: 10, wins: 0, losses: 10 }))).toEqual({ low: 0, high: 21 })
+  expect(likelyRange(slice({ games: 10, wins: 10, losses: 0 }))).toEqual({ low: 79, high: 100 })
   expect(likelyRange(sumSlices([]))).toBeUndefined()
 })
 

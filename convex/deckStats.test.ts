@@ -172,6 +172,50 @@ it("pages a deck's games newest first with filters and the ids History opens", a
   expect(tracked.page).toHaveLength(2)
 })
 
+it("caps breakdowns at 200 recent results while keeping exact lifetime and list totals", async () => {
+  const { t, actor } = await signedIn()
+  await t.run(async (ctx) => {
+    const userId = (await ctx.db.query("users").first())!._id
+    for (let index = 0; index < 200; index++)
+      await addDeckResult(ctx, {
+        userId,
+        resultId: `game:${index}:1`,
+        deckKey: "burn",
+        fingerprint: list(1),
+        kind: "game",
+        source: "local",
+        outcome: "win",
+        podSize: 4,
+        finishedAt: T + index,
+        deltas: { games: { total: 1, wins: 1, losses: 0, draws: 0, unknown: 0 } },
+      })
+  })
+  expect((await actor.query(api.deckStats.summary, { deckKey: "burn" })).scannedAll).toBe(true)
+  await t.run(async (ctx) => {
+    await addDeckResult(ctx, {
+      userId: (await ctx.db.query("users").first())!._id,
+      resultId: "game:old:1",
+      deckKey: "burn",
+      fingerprint: list(1),
+      kind: "game",
+      source: "local",
+      outcome: "loss",
+      podSize: 2,
+      finishedAt: T - 1,
+      deltas: { games: { total: 1, wins: 0, losses: 1, draws: 0, unknown: 0 } },
+    })
+  })
+  const summary = await actor.query(api.deckStats.summary, { deckKey: "burn" })
+  expect(summary.scannedAll).toBe(false)
+  expect(summary.slices).toEqual([
+    expect.objectContaining({ games: 200, wins: 200, losses: 0, podSize: 4 }),
+  ])
+  expect(summary.all).toMatchObject({ games: 201, wins: 200, losses: 1 })
+  expect(summary.lists).toEqual([
+    expect.objectContaining({ fingerprint: list(1), games: 201, wins: 200, losses: 1 }),
+  ])
+})
+
 it("masks a blocked opponent's name the way History does", async () => {
   const { t, actor } = await signedIn()
   await actor.mutation(

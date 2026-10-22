@@ -156,12 +156,16 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                       })}
                     />
                   ) : null}
-                  {chance !== undefined ? (
+                  {chance && !honestRate(chance.record).tooFew ? (
                     <Text
                       size="xs"
                       style={themed($dim)}
                       tx="decks:stats.chance"
-                      txOptions={{ percent: Math.round(chance * 100) }}
+                      txOptions={{
+                        rate: honestRate(chance.record).text,
+                        podSize: chance.podSize,
+                        percent: Math.round(chance.expected * 100),
+                      }}
                     />
                   ) : null}
                   {range ? (
@@ -265,13 +269,17 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
           </>
         }
         ListEmptyComponent={
-          <Text
-            size="sm"
-            style={themed($dim)}
-            tx={
-              games.status === "LoadingFirstPage" ? "decks:stats.loading" : "decks:stats.noResults"
-            }
-          />
+          games.status === "LoadingFirstPage" || games.status === "Exhausted" ? (
+            <Text
+              size="sm"
+              style={themed($dim)}
+              tx={
+                games.status === "LoadingFirstPage"
+                  ? "decks:stats.loading"
+                  : "decks:stats.noResults"
+              }
+            />
+          ) : null
         }
         renderItem={({ item }) => {
           const letter = translate(
