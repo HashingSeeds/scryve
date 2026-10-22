@@ -82,6 +82,10 @@
       {
         "ios": {
           "enableSceneSupport": true
+        },
+        "android": {
+          "enableMinifyInReleaseBuilds": true,
+          "enableShrinkResourcesInReleaseBuilds": true
         }
       }
     ],
@@ -90,7 +94,10 @@
       {
         "url": "https://sentry.io/",
         "project": "scryve",
-        "organization": "matthew-chisolm"
+        "organization": "matthew-chisolm",
+        "experimental_android": {
+          "enableAndroidGradlePlugin": true
+        }
       }
     ]
   ],
