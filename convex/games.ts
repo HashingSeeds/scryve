@@ -733,7 +733,7 @@ async function terminalizeGame(
       outcome,
     })
   }
-  await recordGameResults(ctx, summary, now)
+  await recordGameResults(ctx, summary)
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players) await ctx.db.patch(player._id, { resumable: false })
   return summary
@@ -1652,7 +1652,7 @@ export const claimNearbySeat = mutation({
         claimedPlayer && player.playerId === seat._id ? claimedPlayer : player,
       ),
     })
-    if (claimedPlayer) await recordPlayerResult(ctx, summary, claimedPlayer, Date.now())
+    if (claimedPlayer) await recordPlayerResult(ctx, summary, claimedPlayer)
     await ctx.db.insert("gameHistoryEntries", {
       userId: user._id,
       source: "local",
