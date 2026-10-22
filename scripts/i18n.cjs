@@ -1,5 +1,6 @@
 const crypto = require("node:crypto")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const util = require("node:util")
 
@@ -320,6 +321,12 @@ async function check() {
 
 function loadApiKey() {
   if (process.env.ANTHROPIC_API_KEY) return
+  // why: agent shells route through ai-pool, which rejects Console keys with a 401.
+  const poolKey = path.join(os.homedir(), ".config/ai-pool/key")
+  if (process.env.ANTHROPIC_BASE_URL && fs.existsSync(poolKey)) {
+    process.env.ANTHROPIC_API_KEY = fs.readFileSync(poolKey, "utf8").trim()
+    return
+  }
   const envFile = path.join(ROOT, ".env.local")
   if (!fs.existsSync(envFile)) return
   const { ANTHROPIC_API_KEY } = util.parseEnv(fs.readFileSync(envFile, "utf8"))
@@ -428,8 +435,7 @@ function parseArgs(argv) {
 async function translate({ onlyNamespace, retranslate }) {
   loadApiKey()
   const { default: Anthropic } = require("@anthropic-ai/sdk")
-  // why: agent shells set ANTHROPIC_BASE_URL to a proxy that rejects Console keys with a 401.
-  const client = new Anthropic({ baseURL: "https://api.anthropic.com" })
+  const client = new Anthropic()
   const english = loadEnglish()
   const namespaces = Object.keys(english)
   if (onlyNamespace && !namespaces.includes(onlyNamespace))
