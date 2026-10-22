@@ -19,6 +19,9 @@ import {
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
+import { assertDeckKey, assertDeckFingerprint, deckKeyOf, pinnedDeck } from "./lib/deckKeys"
+import { limitResultRate } from "./lib/deckRateLimits"
+import { canonicalResultId } from "./lib/deckResults"
 import { deckStartingValue } from "./lib/deckStartingValue"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { gatedTableAction, gatedTableState, tableRelatedSeatId } from "./lib/gameEngine"
@@ -602,7 +605,14 @@ async function terminalizeGame(
     | { kind: "unknown" } = {
     kind: "unknown",
   },
-  options: { finishedAt?: number; historySource?: "local"; matchId?: Id<"matches"> } = {},
+  options: {
+    finishedAt?: number
+    historySource?: "local"
+    matchId?: Id<"matches">
+    clientGameId?: string
+    localIds?: Map<Id<"gamePlayers">, string>
+    deckNames?: Map<Id<"gamePlayers">, string>
+  } = {},
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
     .query("gameSummaries")
@@ -646,10 +656,26 @@ async function terminalizeGame(
         const deck = version ? await ctx.db.get(version.deckId) : null
         return {
           playerId: player._id,
+          resultId: canonicalResultId({
+            kind: "game",
+            publicId: game.publicId,
+            playerId: player._id,
+            clientGameId: options.clientGameId,
+            localId: options.localIds?.get(player._id),
+          }),
+          ...(options.localIds?.has(player._id)
+            ? { localId: options.localIds.get(player._id) }
+            : {}),
+          ...(player.deckKey ? { deckKey: player.deckKey } : {}),
+          ...(player.deckFingerprint ? { deckFingerprint: player.deckFingerprint } : {}),
           seat: player.seat,
           ...summaryIdentitySnapshotFor(player, user, game.mode === "local"),
           ...(player.userId ? { userId: player.userId } : {}),
-          ...(deck ? { deckId: deck._id, deckNameAtFinish: deck.name } : {}),
+          ...(deck
+            ? { deckId: deck._id, deckNameAtFinish: deck.name }
+            : player.deckKey && options.deckNames?.has(player._id)
+              ? { deckNameAtFinish: options.deckNames.get(player._id) }
+              : {}),
           ...(version
             ? { deckVersionId: version._id, deckVersionNumber: version.versionNumber }
             : {}),
@@ -661,6 +687,7 @@ async function terminalizeGame(
       }),
   )
   const summaryId = await ctx.db.insert("gameSummaries", {
+    clientGameId: options.clientGameId ?? game.publicId,
     gameId: game._id,
     publicId: game.publicId,
     ...(endedByUserId ? { finishedByUserId: endedByUserId } : {}),
@@ -1267,6 +1294,7 @@ const LOCAL_FINISH_CLOCK_SKEW_MS = 5 * 60 * 1000
 export const publishFinishedLocalGame = mutation({
   args: {
     publicId: v.string(),
+    retriesThrottled: v.optional(v.boolean()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),
     ruleset: v.string(),
@@ -1279,6 +1307,9 @@ export const publishFinishedLocalGame = mutation({
       localSnapshotPlayer.extend({
         me: v.optional(v.boolean()),
         deckVersionId: v.optional(v.id("deckVersions")),
+        deckKey: v.optional(v.string()),
+        deckFingerprint: v.optional(v.string()),
+        deckName: v.optional(v.string()),
         seatPassHash: v.optional(v.string()),
       }),
     ),
@@ -1311,7 +1342,12 @@ export const publishFinishedLocalGame = mutation({
       throw new Error("Event count is out of range")
     const meSeats = args.players.filter((player) => player.me)
     if (meSeats.length > 1) throw new Error("Only one seat can be yours")
-    if (args.players.some((player) => player.deckVersionId && !player.me))
+    if (
+      args.players.some(
+        (player) =>
+          (player.deckVersionId || player.deckKey || player.deckFingerprint) && !player.me,
+      )
+    )
       throw new Error("Only your seat can record a deck")
     const seatPassHashes = args.players.flatMap(({ seatPassHash }) => seatPassHash ?? [])
     if (
@@ -1348,25 +1384,49 @@ export const publishFinishedLocalGame = mutation({
       if (!summary) throw new Error("Published game is missing its summary")
       return { publicId: existing.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
     }
+    if (args.retriesThrottled === true) await limitResultRate(ctx, "localGamePublish", user._id)
     const me = meSeats[0]
+    if (me?.deckKey !== undefined) assertDeckKey(me.deckKey)
+    if (me?.deckFingerprint !== undefined) assertDeckFingerprint(me.deckFingerprint)
     let myDeck: Doc<"decks"> | undefined
+    let liveDeck = false
+    let listUnchangedSinceStart = false
     if (me?.deckVersionId) {
       const version = await ctx.db.get(me.deckVersionId)
+      listUnchangedSinceStart =
+        version !== null && (version.updatedAt ?? version.createdAt) <= args.startedAt
       const deck = version ? await ctx.db.get(version.deckId) : null
-      if (!version || !deck || deck.ownerUserId !== user._id)
+      if (deck && deck.ownerUserId !== user._id)
         throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
-      myDeck = deck
-      if ((deck.game ?? DEFAULT_DECK_GAME) !== gameSystem)
+      // why: legacy stats still count an archived deck's games, as installed clients expect.
+      if (deck) myDeck = deck
+      liveDeck = Boolean(version?.archivedAt === undefined && deck && deck.archivedAt === undefined)
+      if (deck && liveDeck && (deck.game ?? DEFAULT_DECK_GAME) !== gameSystem)
         throw new ConvexError({
           code: "deck_system_mismatch",
           message: "This deck belongs to another game system",
         })
-      if (deck.format !== (format ?? ruleset))
+      if (deck && liveDeck && deck.format !== (format ?? ruleset))
         throw new ConvexError({
           code: "deck_format_mismatch",
           message: "Choose a deck matching the game format",
         })
     }
+    const attribution =
+      me?.deckVersionId && !myDeck && !me.deckKey
+        ? {}
+        : {
+            ...(myDeck
+              ? { deckKey: deckKeyOf(myDeck) }
+              : me?.deckKey
+                ? { deckKey: me.deckKey }
+                : {}),
+            ...(me?.deckFingerprint
+              ? { deckFingerprint: me.deckFingerprint }
+              : me?.deckKey && liveDeck && listUnchangedSinceStart && me.deckVersionId
+                ? { deckFingerprint: (await pinnedDeck(ctx, me.deckVersionId)).deckFingerprint }
+                : {}),
+          }
     const gameId = await ctx.db.insert("games", {
       publicId,
       hostUserId: user._id,
@@ -1394,7 +1454,10 @@ export const publishFinishedLocalGame = mutation({
         gameId,
         seat: player.seat,
         ...(player.me ? { userId: user._id, usernameAtJoin: user.username } : {}),
-        ...(player.me && player.deckVersionId ? { deckVersionId: player.deckVersionId } : {}),
+        ...(player.me && myDeck && player.deckVersionId
+          ? { deckVersionId: player.deckVersionId }
+          : {}),
+        ...(player.me ? attribution : {}),
         ...(player.seatPassHash ? { seatPassHash: player.seatPassHash } : {}),
         displayName: assertDisplayName(player.displayName),
         color: player.color,
@@ -1414,7 +1477,13 @@ export const publishFinishedLocalGame = mutation({
           seats: args.players.map((player) => ({
             seat: player.seat,
             displayName: player.displayName,
-            ...(player.me ? { userId: user._id } : {}),
+            ...(player.me
+              ? {
+                  userId: user._id,
+                  ...attribution,
+                  ...(player.deckVersionId ? { deckVersionId: player.deckVersionId } : {}),
+                }
+              : {}),
             ...(player.me && myDeck && player.deckVersionId
               ? { deckId: myDeck._id, deckVersionId: player.deckVersionId, deckName: myDeck.name }
               : {}),
@@ -1423,6 +1492,17 @@ export const publishFinishedLocalGame = mutation({
       : undefined
     if (matchId && args.match)
       await ctx.db.patch(gameId, { matchId, matchGameNumber: args.match.gameNumber })
+    if (matchId) {
+      const match = await ctx.db.get(matchId)
+      for (const player of args.players) {
+        const locked = match?.seats.find((seat) => seat.seat === player.seat)
+        if (locked)
+          await ctx.db.patch(playerIdsByLocalId.get(player.localId)!, {
+            deckKey: locked.deckKey,
+            deckFingerprint: locked.deckFingerprint,
+          })
+      }
+    }
     const game = (await ctx.db.get(gameId))!
     const summary = await terminalizeGame(
       ctx,
@@ -1438,7 +1518,22 @@ export const publishFinishedLocalGame = mutation({
             ),
           }
         : args.result,
-      { finishedAt: args.finishedAt, historySource: "local", ...(matchId ? { matchId } : {}) },
+      {
+        finishedAt: args.finishedAt,
+        historySource: "local",
+        clientGameId: args.publicId,
+        localIds: new Map(
+          [...playerIdsByLocalId].map(([localId, playerId]) => [playerId, localId]),
+        ),
+        deckNames: new Map(
+          args.players.flatMap((player) =>
+            player.me && player.deckName?.trim()
+              ? [[playerIdsByLocalId.get(player.localId)!, player.deckName.trim().slice(0, 80)]]
+              : [],
+          ),
+        ),
+        ...(matchId ? { matchId } : {}),
+      },
     )
     if (!me)
       await ctx.db.insert("gameHistoryEntries", {
@@ -1520,7 +1615,12 @@ export const claimNearbySeat = mutation({
     const chosen = await claimableDeck(ctx, args.deckVersionId, user._id, game)
     await ctx.db.patch(seat._id, {
       ...identity,
-      ...(chosen ? { deckVersionId: chosen.version._id } : {}),
+      ...(chosen
+        ? {
+            deckVersionId: chosen.version._id,
+            deckKey: deckKeyOf(chosen.deck),
+          }
+        : {}),
     })
     const claimed = summary.players.find((player) => player.playerId === seat._id)
     const claimedPlayer = claimed && {
@@ -1530,6 +1630,7 @@ export const claimNearbySeat = mutation({
       ...(chosen
         ? {
             deckId: chosen.deck._id,
+            deckKey: deckKeyOf(chosen.deck),
             deckNameAtFinish: chosen.deck.name,
             deckVersionId: chosen.version._id,
             deckVersionNumber: chosen.version.versionNumber,
@@ -1541,7 +1642,7 @@ export const claimNearbySeat = mutation({
         claimedPlayer && player.playerId === seat._id ? claimedPlayer : player,
       ),
     })
-    if (claimedPlayer && chosen) await recordPlayerResult(ctx, summary, claimedPlayer, Date.now())
+    if (claimedPlayer) await recordPlayerResult(ctx, summary, claimedPlayer, Date.now())
     await ctx.db.insert("gameHistoryEntries", {
       userId: user._id,
       source: "local",
@@ -2039,7 +2140,11 @@ export const startGame = mutation({
         resumable: true,
         color: player.color,
         shape: player.shape,
-        ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
+        ...(invalidSinceSelection
+          ? { deckVersionId: undefined, deckKey: undefined, deckFingerprint: undefined }
+          : player.deckVersionId
+            ? await pinnedDeck(ctx, player.deckVersionId)
+            : {}),
         ...(deckLife === undefined ? {} : { currentLife: deckLife, startingLife: deckLife }),
         ...roles?.[index],
       })
@@ -2853,7 +2958,7 @@ async function startRematch(
       displayName: player.displayName,
       ...(player.avatarUrl ? { avatarUrl: player.avatarUrl } : {}),
       ...(player.usernameAtJoin ? { usernameAtJoin: player.usernameAtJoin } : {}),
-      ...(deckVersionId ? { deckVersionId } : {}),
+      ...(deckVersionId ? { deckVersionId, ...(await pinnedDeck(ctx, deckVersionId)) } : {}),
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
       ...(await rematchProMark(ctx, player)),

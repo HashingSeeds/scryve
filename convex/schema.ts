@@ -40,6 +40,8 @@ const matchSeat = v.object({
   deckId: v.optional(v.id("decks")),
   deckVersionId: v.optional(v.id("deckVersions")),
   deckName: v.optional(v.string()),
+  deckKey: v.optional(v.string()),
+  deckFingerprint: v.optional(v.string()),
   gamesWon: v.optional(v.number()),
   gamesDrawn: v.optional(v.number()),
   outcome: v.optional(resultOutcome),
@@ -147,6 +149,8 @@ export default defineSchema({
     avatarUrl: v.optional(v.string()),
     usernameAtJoin: v.optional(v.string()),
     deckVersionId: v.optional(v.id("deckVersions")),
+    deckKey: v.optional(v.string()),
+    deckFingerprint: v.optional(v.string()),
     deletedAt: v.optional(v.number()),
     color: v.string(),
     shape: v.optional(v.string()),
@@ -271,6 +275,7 @@ export default defineSchema({
     .index("by_resolved_by_user", ["resolvedByUserId"]),
 
   gameSummaries: defineTable({
+    clientGameId: v.optional(v.string()),
     gameId: v.id("games"),
     publicId: v.string(),
     finishedByUserId: v.optional(v.id("users")),
@@ -286,6 +291,10 @@ export default defineSchema({
     players: v.array(
       v.object({
         playerId: v.id("gamePlayers"),
+        localId: v.optional(v.string()),
+        resultId: v.optional(v.string()),
+        deckKey: v.optional(v.string()),
+        deckFingerprint: v.optional(v.string()),
         seat: v.number(),
         displayName: v.string(),
         userId: v.optional(v.id("users")),
@@ -344,6 +353,8 @@ export default defineSchema({
     .index("by_user_and_game", ["userId", "gameId"]),
 
   decks: defineTable({
+    deckKey: v.optional(v.string()),
+    movedToDeviceAt: v.optional(v.number()),
     ownerUserId: v.id("users"),
     syncId: v.optional(v.string()),
     syncRevision: v.optional(v.number()),
@@ -367,7 +378,8 @@ export default defineSchema({
       staged: true,
     })
     .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"])
-    .index("by_owner_and_sync_id", ["ownerUserId", "syncId"]),
+    .index("by_owner_and_sync_id", ["ownerUserId", "syncId"])
+    .index("by_owner_and_deck_key", ["ownerUserId", "deckKey"]),
 
   deckSyncReceipts: defineTable({
     ownerUserId: v.id("users"),
@@ -591,6 +603,45 @@ export default defineSchema({
     ...manualStatsFields,
     updatedAt: v.number(),
   }).index("by_deck", ["deckId"]),
+
+  deckResults: defineTable({
+    resultId: v.string(),
+    userId: v.id("users"),
+    deckKey: v.optional(v.string()),
+    fingerprint: v.optional(v.string()),
+    kind: v.union(v.literal("game"), v.literal("match")),
+    source: v.union(
+      v.literal("local"),
+      v.literal("nearby"),
+      v.literal("connected"),
+      v.literal("manual"),
+    ),
+    outcome: resultOutcome,
+    finishedAt: v.number(),
+    summaryId: v.optional(v.id("gameSummaries")),
+    matchId: v.optional(v.id("matches")),
+    deltas: v.object({ games: v.optional(manualRecordValidator), ...manualStatsFields }),
+    legacyDeckId: v.optional(v.id("decks")),
+    podSize: v.optional(v.number()),
+    deckVersionId: v.optional(v.id("deckVersions")),
+  })
+    .index("by_user_and_result_id", ["userId", "resultId"])
+    .index("by_legacy_deck_id", ["legacyDeckId"])
+    .index("by_user_and_finished_at", ["userId", "finishedAt"])
+    .index("by_user_and_deck_key_and_finished_at", ["userId", "deckKey", "finishedAt"]),
+
+  deckKeyStats: defineTable({
+    userId: v.id("users"),
+    deckKey: v.string(),
+    fingerprint: v.string(),
+    games: v.number(),
+    wins: v.number(),
+    losses: v.number(),
+    draws: v.number(),
+    unknown: v.number(),
+    ...manualStatsFields,
+    updatedAt: v.number(),
+  }).index("by_user_and_deck_key_and_fingerprint", ["userId", "deckKey", "fingerprint"]),
 
   cardReferences: defineTable({
     commanderEligibility: v.optional(

@@ -1,10 +1,13 @@
-import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter"
+import { DAY, MINUTE, RateLimiter } from "@convex-dev/rate-limiter"
 import { ConvexError } from "convex/values"
 
 import { components } from "../_generated/api"
-import type { ActionCtx } from "../_generated/server"
+import type { Doc } from "../_generated/dataModel"
+import type { ActionCtx, MutationCtx } from "../_generated/server"
 
 export const deckRateLimiter = new RateLimiter(components.rateLimiter, {
+  manualResult: { kind: "fixed window", rate: 50, period: DAY },
+  localGamePublish: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 20 },
   catalogRefresh: { kind: "token bucket", rate: 1, period: 5 * MINUTE, capacity: 1 },
   deckImport: { kind: "token bucket", rate: 6, period: MINUTE, capacity: 3 },
   guestDeckImport: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 20 },
@@ -48,4 +51,18 @@ export async function limitCardLookup(ctx: ActionCtx, deviceId?: string) {
     "searching",
     deviceId,
   )
+}
+
+export async function limitResultRate(
+  ctx: MutationCtx,
+  name: "manualResult" | "localGamePublish",
+  userId: Doc<"users">["_id"],
+) {
+  const result = await deckRateLimiter.limit(ctx, name, { key: userId })
+  if (!result.ok)
+    throw new ConvexError({
+      code: "rate_limited",
+      message: "Too many results. Try again later.",
+      retryAfterMs: result.retryAfter,
+    })
 }

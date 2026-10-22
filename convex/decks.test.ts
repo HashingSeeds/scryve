@@ -95,7 +95,7 @@ describe("premium deck tracking", () => {
       localId: "44444444-4444-4444-8444-444444444444",
       localUpdatedAt: 123,
     })
-    if (imported.status === "limit_reached") throw new Error("Unexpected deck limit")
+    if (imported.status !== "imported") throw new Error("Expected guest import")
     expect((await owner.query(api.decks.detail, { deckId: imported.deckId })).cards).toMatchObject([
       { commanderColor: "U" },
     ])
@@ -213,7 +213,7 @@ describe("premium deck tracking", () => {
     const args = { localId, localUpdatedAt: 123, name: "Scratch", format: "commander", cards: [] }
     const imported = await owner.mutation(api.decks.importGuest, args)
     expect(imported).toMatchObject({ status: "imported", localUpdatedAt: 123 })
-    if (imported.status === "limit_reached") throw new Error("unexpected capacity result")
+    if (imported.status !== "imported") throw new Error("Expected guest import")
     await expect(
       owner.mutation(api.decks.importGuest, { ...args, name: "Changed", localUpdatedAt: 456 }),
     ).resolves.toMatchObject({

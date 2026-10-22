@@ -67,6 +67,7 @@ export function useGuestDeckImport(access?: CloudAccess) {
             summary.limitReached += 1
             continue
           }
+          if (response.status === "other_account") continue
           summary.imported += 1
           const removed = acknowledgeGuestDeckImport(deck.localId, response.localUpdatedAt)
           if (!removed && loadGuestDeck(deck.localId))

@@ -1,5 +1,6 @@
 import { convexTest, type TestConvex } from "convex-test"
 
+import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
@@ -78,6 +79,7 @@ async function recordMatch(actor: ReturnType<TestConvex<typeof schema>["withIden
 describe("history.entries", () => {
   it("lists manual matches and Scryve games in one page, newest first", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, userId } = await signedIn(t, "history-owner", "Alice")
     await seedGame(t, userId)
     const { matchId } = await recordMatch(actor)
@@ -149,6 +151,7 @@ function scryveMatchGame(gameNumber: number, winner: "me" | "them") {
 describe("history.entries Scryve matches", () => {
   it("adds the match summary to every game of a Scryve match", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor } = await signedIn(t, "history-owner", "Alice")
     const page = async () =>
       (await actor.query(api.history.entries, { paginationOpts: { cursor: null, numItems: 10 } }))
@@ -205,6 +208,7 @@ describe("history.entries Scryve matches", () => {
 describe("history.manualMatch", () => {
   it("lets a player without a username save, open, and delete a result", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor, userId } = await signedIn(t, "history-no-username", "Jane")
     const user = await t.run((ctx) => ctx.db.get(userId))
     expect(user?.username).toBeUndefined()
@@ -224,6 +228,7 @@ describe("history.manualMatch", () => {
 
   it("returns the owner's match and hides it from everyone else", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const { actor } = await signedIn(t, "history-owner", "Alice")
     const stranger = (await signedIn(t, "history-stranger", "Mallory")).actor
     const { matchId } = await recordMatch(actor)

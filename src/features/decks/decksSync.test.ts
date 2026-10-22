@@ -156,6 +156,7 @@ describe("deck sync reads", () => {
           connected: { games: { total: 0, wins: 0, losses: 0, draws: 0, unknown: 0 } },
           manual: {},
         },
+        keyRecord: undefined,
         startingValue: undefined,
         versionCount: 2,
         cardQuantity: 100,

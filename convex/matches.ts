@@ -4,6 +4,9 @@ import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, type MutationCtx } from "./_generated/server"
 import { requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
+import { assertDeckKey, assertDeckFingerprint, deckKeyOf } from "./lib/deckKeys"
+import { limitResultRate } from "./lib/deckRateLimits"
+import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { assertGameSystem } from "./lib/integrations"
 import { assertGameScores, MAX_GAMES_PER_MATCH, type MatchBestOf } from "./lib/matchResults"
 import {
@@ -79,7 +82,13 @@ export const recordManualMatch = mutation({
     finishedAt: v.number(),
     eventName: v.optional(v.string()),
     roundNumber: v.optional(v.number()),
-    me: v.object({ ...seatResultFields, deckVersionId: v.optional(v.id("deckVersions")) }),
+    me: v.object({
+      ...seatResultFields,
+      deckVersionId: v.optional(v.id("deckVersions")),
+      deckKey: v.optional(v.string()),
+      deckFingerprint: v.optional(v.string()),
+      deckName: v.optional(v.string()),
+    }),
     opponents: v.array(
       v.object({
         ...seatResultFields,
@@ -100,6 +109,10 @@ export const recordManualMatch = mutation({
         throw new ConvexError({ code: "match_conflict", message: "Match already recorded" })
       return { matchId: existing._id }
     }
+    if (!(await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit)))
+      await limitResultRate(ctx, "manualResult", user._id)
+    if (args.me.deckKey !== undefined) assertDeckKey(args.me.deckKey)
+    if (args.me.deckFingerprint !== undefined) assertDeckFingerprint(args.me.deckFingerprint)
     const now = Date.now()
     const finishedAt = assertMatchFinishedAt(args.finishedAt, now)
     assertSeatNumbers([args.me, ...args.opponents])
@@ -131,12 +144,20 @@ export const recordManualMatch = mutation({
         displayName: user.displayName,
         userId: user._id,
         ...(attached
+          ? { deckKey: deckKeyOf(attached.deck) }
+          : args.me.deckKey
+            ? { deckKey: args.me.deckKey }
+            : {}),
+        ...(args.me.deckFingerprint ? { deckFingerprint: args.me.deckFingerprint } : {}),
+        ...(attached
           ? {
               deckId: attached.deck._id,
               deckVersionId: attached.version._id,
               deckName: attached.deck.name,
             }
-          : {}),
+          : args.me.deckKey && args.me.deckName?.trim()
+            ? { deckName: assertDeckName(args.me.deckName) }
+            : {}),
         ...scoreFields(args.me),
         outcome: args.me.outcome,
       },
@@ -205,7 +226,14 @@ export const publishedMatchValidator = v.object({
 
 export type PublishedMatchSeat = Pick<
   MatchSeat,
-  "seat" | "displayName" | "userId" | "deckId" | "deckVersionId" | "deckName"
+  | "seat"
+  | "displayName"
+  | "userId"
+  | "deckId"
+  | "deckVersionId"
+  | "deckName"
+  | "deckKey"
+  | "deckFingerprint"
 >
 
 function assertGameNumber(gameNumber: number) {
@@ -272,7 +300,13 @@ export async function linkPublishedGameToMatch(
     throw new Error("A match keeps the same seats for every game")
   const lockedSeat = meSeatOf(existing.seats)
   const mySeat = meSeatOf(game.seats)
-  if (lockedSeat?.seat !== mySeat?.seat || lockedSeat?.deckVersionId !== mySeat?.deckVersionId)
+  if (
+    lockedSeat?.seat !== mySeat?.seat ||
+    lockedSeat?.deckVersionId !== mySeat?.deckVersionId ||
+    (lockedSeat?.deckKey !== undefined &&
+      mySeat?.deckKey !== undefined &&
+      lockedSeat.deckKey !== mySeat.deckKey)
+  )
     throw new Error("A match keeps the same seat and deck for every game")
   if (existing.gameIds.includes(game.id)) return existing._id
   if (existing.gameIds.length >= MAX_GAMES_PER_MATCH)

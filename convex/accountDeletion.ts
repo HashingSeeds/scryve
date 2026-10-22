@@ -6,6 +6,7 @@ import { env, internalMutation, internalQuery, mutation, query } from "./_genera
 import type { MutationCtx } from "./_generated/server"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
+import { removeDeckResult, removeUserDeckStats } from "./lib/deckResults"
 import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
 
 const DELETED_PLAYER_NAME = "Deleted player"
@@ -184,6 +185,10 @@ function anonymizedSummaryPlayers(
           usernameAtFinish: undefined,
           deckId: undefined,
           deckVersionId: undefined,
+          deckKey: undefined,
+          deckFingerprint: undefined,
+          localId: undefined,
+          resultId: undefined,
           deckNameAtFinish: undefined,
           deckVersionNumber: undefined,
           deletedAt,
@@ -201,6 +206,8 @@ function anonymizedMatchSeats(match: Doc<"matches">, userId: Id<"users">, delete
           userId: undefined,
           deckId: undefined,
           deckVersionId: undefined,
+          deckKey: undefined,
+          deckFingerprint: undefined,
           deckName: undefined,
           deletedAt,
         }
@@ -239,6 +246,7 @@ async function anonymizeMembership(
     if (summary)
       await ctx.db.patch(summary._id, {
         players: anonymizedSummaryPlayers(summary, membership._id, deletedAt),
+        ...(summary.finishedByUserId === request.userId ? { clientGameId: undefined } : {}),
         ...(summary.finishedByUserId === request.userId ? { finishedByUserId: undefined } : {}),
       })
     if (game.hostUserId === request.userId) await ctx.db.patch(game._id, { hostUserId: undefined })
@@ -251,6 +259,8 @@ async function anonymizeMembership(
     avatarUrl: undefined,
     usernameAtJoin: undefined,
     deckVersionId: undefined,
+    deckKey: undefined,
+    deckFingerprint: undefined,
     seatPassHash: undefined,
     deletedAt,
     resumable: false,
@@ -477,6 +487,20 @@ export const processUserLinkedData = internalMutation({
     if (!request || request.status !== "processing" || !request.userId) return null
     try {
       await touchRequest(ctx, request)
+      const deckResults = await ctx.db
+        .query("deckResults")
+        .withIndex("by_user_and_finished_at", (q) => q.eq("userId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (deckResults.length) {
+        for (const result of deckResults)
+          await removeDeckResult(ctx, result.userId, result.resultId)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      if (await removeUserDeckStats(ctx, request.userId, USER_DATA_BATCH_SIZE)) {
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
       const history = await ctx.db
         .query("gameHistoryEntries")
         .withIndex("by_user_and_finished_at", (q) => q.eq("userId", request.userId!))
@@ -534,7 +558,10 @@ export const processUserLinkedData = internalMutation({
             .withIndex("by_game", (q) => q.eq("gameId", game._id))
             .unique()
           if (summary?.finishedByUserId === request.userId)
-            await ctx.db.patch(summary._id, { finishedByUserId: undefined })
+            await ctx.db.patch(summary._id, {
+              finishedByUserId: undefined,
+              clientGameId: undefined,
+            })
         }
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
