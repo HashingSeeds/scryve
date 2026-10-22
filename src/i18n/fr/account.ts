@@ -132,24 +132,28 @@ export default {
     contactUs: "Nous contacter",
     contactReason: "Motif du contact",
     kind: {
-      bug: "Signaler un problème",
+      bug: "Signaler un bug",
       help: "Demander de l'aide",
+      feedback: "Donner un avis",
     },
     messageLabel: {
       bug: "Que s'est-il passé ?",
       help: "Comment pouvons-nous vous aider ?",
+      feedback: "Qu'avez-vous en tête ?",
     },
     messagePlaceholder: {
       bug: "Que s'est-il passé ? À quoi vous attendiez-vous ?",
       help: "Dites-nous de quoi vous avez besoin",
+      feedback: "Idées, demandes ou autre chose",
     },
     emailLabel: {
       bug: "E-mail pour la réponse (facultatif)",
       help: "E-mail pour la réponse",
+      feedback: "E-mail pour une réponse (facultatif)",
     },
     emailInvalid: "Saisissez une adresse e-mail valide.",
     translationNotice:
-      "Écrivez dans la langue de votre choix. Nous pouvons utiliser des outils d'IA pour la traduire.",
+      "Écrivez dans la langue de votre choix. Nous pouvons utiliser des outils d'IA pour le traduire. Consultez notre <privacy>Politique de confidentialité</privacy>.",
     replyTime: "Nous répondons généralement sous deux jours ouvrés.",
     selectedScreenshot: "Capture d'écran sélectionnée",
     removeScreenshot: "Supprimer la capture d'écran",

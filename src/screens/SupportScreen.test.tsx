@@ -114,11 +114,13 @@ describe("SupportScreen", () => {
       view.getByText("Feedback queued. If you are offline, it will send when you reconnect."),
     ).toBeTruthy()
     fireEvent.press(view.getByText("Email support"))
-    fireEvent.press(view.getByText("Privacy Policy"))
+    fireEvent.press(view.getAllByText("Privacy Policy")[0])
     fireEvent.press(view.getByText("Terms of Use"))
     fireEvent.press(view.getByText("Cookie Policy"))
     expect(onEmailSupport).toHaveBeenCalledTimes(1)
     expect(onOpenPrivacy).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getAllByText("Privacy Policy")[1])
+    expect(onOpenPrivacy).toHaveBeenCalledTimes(2)
     expect(onOpenTerms).toHaveBeenCalledTimes(1)
     expect(onOpenCookiePolicy).toHaveBeenCalledTimes(1)
   })
@@ -179,6 +181,34 @@ describe("SupportScreen", () => {
 
     fireEvent.press(view.getByText("License Agreement"))
     expect(onOpenLicenseAgreement).toHaveBeenCalledTimes(1)
+  })
+
+  it("sends general feedback without an email", () => {
+    const onSubmitFeedback = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SupportScreen
+          onBack={jest.fn()}
+          onEmailSupport={jest.fn()}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => null)}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenCookiePolicy={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByText("Give feedback"))
+    fireEvent.changeText(
+      view.getByPlaceholderText("Ideas, requests, or anything else"),
+      "Add a poison counter",
+    )
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({
+      kind: "feedback",
+      message: "Add a poison counter",
+    })
   })
 
   it("requires a reply address for help and keeps the message after a failed save", () => {
