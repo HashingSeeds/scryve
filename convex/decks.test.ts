@@ -1041,13 +1041,13 @@ async function premiumVersions(t: ConvexTestHarness, clerkUserId: string) {
 }
 
 describe("deck versions", () => {
-  it("gives every new deck one named version slot", async () => {
+  it("starts every new deck with one named version and room for another", async () => {
     const t = makeConvexTest()
     const actor = await synced(t, "slot-owner", "Slot Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Slots", format: "commander" })
     await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
       versions: [{ versionNumber: 1, name: "Current", cardCount: 0 }],
-      capacity: { used: 1, limit: 1, premium: false, canCreate: false },
+      capacity: { used: 1, limit: 2, premium: false, canCreate: true },
     })
   })
 
@@ -1118,12 +1118,13 @@ describe("deck versions", () => {
     expect(after.cards.map((card) => card._id)).toEqual(before.cards.map((card) => card._id))
   })
 
-  it("keeps extra version slots premium and caps them at five", async () => {
+  it("gives free decks two versions, keeps more premium and caps them at five", async () => {
     const t = makeConvexTest()
     const actor = await synced(t, "version-owner", "Version Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Tuning", format: "commander" })
+    await actor.mutation(api.decks.createVersion, { deckId, name: "vs Control" })
     await expect(
-      actor.mutation(api.decks.createVersion, { deckId, name: "vs Control" }),
+      actor.mutation(api.decks.createVersion, { deckId, name: "vs Aggro" }),
     ).rejects.toMatchObject({
       data: {
         code: "version_limit_reached",
@@ -1131,7 +1132,7 @@ describe("deck versions", () => {
       },
     })
     await premiumVersions(t, "version-owner")
-    for (const name of ["vs Control", "vs Aggro", "Budget", "Spicy"])
+    for (const name of ["vs Aggro", "Budget", "Spicy"])
       await expect(actor.mutation(api.decks.createVersion, { deckId, name })).resolves.toBeDefined()
     await expect(
       actor.mutation(api.decks.createVersion, { deckId, name: "One too many" }),
