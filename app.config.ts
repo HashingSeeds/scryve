@@ -5,6 +5,7 @@ import {
   IOSConfig,
   withAndroidManifest,
   withDangerousMod,
+  withGradleProperties,
   withMainActivity,
   withXcodeProject,
 } from "expo/config-plugins"
@@ -261,8 +262,19 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     return config
   })
 
+  // why: R8 runs inside the Gradle daemon and runs out of heap at the template's 2 GB.
+  const withGradleHeap = withGradleProperties(withRotation, (config) => {
+    const jvmArgs = config.modResults.find(
+      (item) => item.type === "property" && item.key === "org.gradle.jvmargs",
+    )
+    const value = "-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+    if (jvmArgs?.type === "property") jvmArgs.value = value
+    else config.modResults.push({ type: "property", key: "org.gradle.jvmargs", value })
+    return config
+  })
+
   // why: expo-alternate-app-icons launches through activity aliases but copies only android.intentFilters, so with an alternate icon on, scheme links and Clerk's sign-in callback would reach no enabled activity.
-  return withAndroidManifest(withRotation, (config) => {
+  return withAndroidManifest(withGradleHeap, (config) => {
     const main = AndroidConfig.Manifest.getMainActivityOrThrow(config.modResults)
     const application = AndroidConfig.Manifest.getMainApplicationOrThrow(config.modResults)
     for (const alias of application["activity-alias"] ?? []) {
