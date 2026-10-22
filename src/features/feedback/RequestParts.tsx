@@ -107,6 +107,7 @@ const $voted: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.ti
 const $pressed: ViewStyle = { opacity: 0.6 }
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
+  alignItems: "flex-start",
   gap: spacing.md,
   paddingTop: spacing.md,
   borderTopWidth: 1,
