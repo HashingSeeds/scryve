@@ -1,0 +1,136 @@
+import { ConvexError, v, type Infer } from "convex/values"
+
+import type { Doc, Id } from "../_generated/dataModel"
+import type { MutationCtx } from "../_generated/server"
+
+export const FEEDBACK_KINDS = ["feature", "bug"] as const
+export const FEEDBACK_STATUSES = ["review", "planned", "building", "shipped", "declined"] as const
+
+export const feedbackKind = v.union(...FEEDBACK_KINDS.map((kind) => v.literal(kind)))
+export const feedbackStatus = v.union(...FEEDBACK_STATUSES.map((status) => v.literal(status)))
+export type FeedbackKind = Infer<typeof feedbackKind>
+export type FeedbackStatus = Infer<typeof feedbackStatus>
+
+export const FEEDBACK_LIMITS = { title: 120, body: 2000, message: 2000, version: 20 } as const
+
+const FEEDBACK_KEY = /^[A-Za-z0-9_-]{32,128}$/
+
+export async function senderHash(key: string) {
+  if (!FEEDBACK_KEY.test(key))
+    throw new ConvexError({ code: "invalid_key", message: "Invalid feedback key" })
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
+}
+
+export function cleanText(value: string, max: number, field: string) {
+  const text = value.trim()
+  if (!text || text.length > max)
+    throw new ConvexError({
+      code: "invalid_text",
+      message: `${field} must be 1 to ${max} characters`,
+    })
+  return text
+}
+
+export const APOLLO_KEY_PREFIX = "scryve:"
+
+export const APOLLO_ACTIONS = [
+  "reply",
+  "publish",
+  "hide",
+  "planned",
+  "building",
+  "shipped",
+  "declined",
+] as const
+export type ApolloAction = (typeof APOLLO_ACTIONS)[number]
+
+const STATUS_LABELS: Record<FeedbackStatus, string> = {
+  review: "In review",
+  planned: "Planned",
+  building: "In progress",
+  shipped: "Shipped",
+  declined: "Declined",
+}
+
+/**
+ * why: the Apollo token is scoped, and Apollo rejects a card whose text links outside its allowed
+ * prefixes. Player text can hold any link, so links are shown defanged (`https[:]//…`).
+ */
+export function defang(text: string) {
+  return text.replace(/([a-z][a-z0-9+.-]*):\/\//gi, "$1[:]//")
+}
+
+function clip(text: string, max: number) {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+}
+
+export type FeedbackCardInput = {
+  request: Doc<"feedbackRequests">
+  messages: Doc<"feedbackMessages">[]
+  account?: string
+}
+
+export function deletedFeedbackCard(requestId: Id<"feedbackRequests">) {
+  return {
+    source: "feedback",
+    key: `${APOLLO_KEY_PREFIX}${requestId}`,
+    kind: "update",
+    push: "none",
+    title: "Feedback deleted by the player",
+  } as const
+}
+
+export function feedbackCard({ request, messages, account }: FeedbackCardInput) {
+  const key = `${APOLLO_KEY_PREFIX}${request._id}`
+  const label = request.kind === "bug" ? "Bug" : "Request"
+  const playerTurns = 1 + messages.filter((message) => message.from === "player").length
+  const awaitingTeam = (messages.at(-1)?.from ?? "player") === "player"
+  const thread = messages
+    .slice(-6)
+    .map(
+      (message) => `**${message.from === "player" ? "Player" : "You"}:** ${defang(message.body)}`,
+    )
+  const body = clip([defang(request.body), ...thread].join("\n\n"), 4000)
+  const status =
+    request.status === "shipped" && request.shippedIn
+      ? `Shipped in ${request.shippedIn}`
+      : STATUS_LABELS[request.status]
+  return {
+    source: "feedback",
+    key,
+    kind: awaitingTeam ? "approval" : "update",
+    // why: a new phase pushes again, so only the player's own messages notify Matthew.
+    phase: `player:${playerTurns}`,
+    push: "alert",
+    title: clip(`${label}: ${defang(request.title)}`, 200),
+    body,
+    meta: {
+      status: `${status}${request.published ? " · public" : " · private"}`,
+      votes: String(request.votes),
+      from: account ?? "Anonymous",
+      ...(request.appVersion || request.platform
+        ? { app: [request.appVersion, request.platform].filter(Boolean).join(" · ") }
+        : {}),
+    },
+    actions: [
+      { id: "reply", label: "Reply", style: "primary", input: "text", repeat: true },
+      request.published
+        ? { id: "hide", label: "Hide", repeat: true }
+        : { id: "publish", label: "Publish", repeat: true },
+      { id: "planned", label: "Planned", repeat: true },
+      { id: "building", label: "Building", repeat: true },
+      { id: "shipped", label: "Shipped in…", input: "text", repeat: true },
+      { id: "declined", label: "Decline", style: "destructive", repeat: true },
+    ],
+  } as const
+}
+
+export async function unlinkUserFeedback(ctx: MutationCtx, userId: Id<"users">, batch: number) {
+  const linked = await ctx.db
+    .query("feedbackRequests")
+    .withIndex("by_user_and_updated_at", (q) => q.eq("userId", userId))
+    .take(batch)
+  for (const request of linked) await ctx.db.patch(request._id, { userId: undefined })
+  return linked.length
+}

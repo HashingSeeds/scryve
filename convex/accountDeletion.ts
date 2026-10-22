@@ -7,6 +7,7 @@ import type { MutationCtx } from "./_generated/server"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
 import { removeDeckResult, removeUserDeckStats } from "./lib/deckResults"
+import { unlinkUserFeedback } from "./lib/feedback"
 import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
 
 const DELETED_PLAYER_NAME = "Deleted player"
@@ -563,6 +564,10 @@ export const processUserLinkedData = internalMutation({
               clientGameId: undefined,
             })
         }
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      if (await unlinkUserFeedback(ctx, request.userId, USER_DATA_BATCH_SIZE)) {
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

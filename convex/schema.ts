@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
+import { feedbackKind, feedbackStatus } from "./lib/feedback"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { pokemonBoardValidator } from "./lib/table"
 import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
@@ -842,4 +843,39 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_deleted_identity_hash", ["deletedIdentityHash"]),
+
+  feedbackRequests: defineTable({
+    kind: feedbackKind,
+    title: v.string(),
+    body: v.string(),
+    status: feedbackStatus,
+    published: v.boolean(),
+    votes: v.number(),
+    shippedIn: v.optional(v.string()),
+    senderHash: v.string(),
+    userId: v.optional(v.id("users")),
+    appVersion: v.optional(v.string()),
+    platform: v.optional(v.string()),
+    unread: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_published_and_votes", ["published", "votes"])
+    .index("by_published_and_status_and_votes", ["published", "status", "votes"])
+    .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
+    .index("by_user_and_updated_at", ["userId", "updatedAt"]),
+
+  feedbackVotes: defineTable({
+    requestId: v.id("feedbackRequests"),
+    senderHash: v.string(),
+  })
+    .index("by_request_and_sender", ["requestId", "senderHash"])
+    .index("by_sender", ["senderHash"]),
+
+  feedbackMessages: defineTable({
+    requestId: v.id("feedbackRequests"),
+    from: v.union(v.literal("player"), v.literal("team")),
+    body: v.string(),
+  }).index("by_request", ["requestId"]),
+
+  feedbackApolloCursor: defineTable({ after: v.number() }),
 })
