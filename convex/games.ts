@@ -1416,10 +1416,10 @@ export const publishFinishedLocalGame = mutation({
       me?.deckVersionId && !myDeck && !me.deckKey
         ? {}
         : {
-            ...(me?.deckKey
-              ? { deckKey: me.deckKey }
-              : myDeck
-                ? { deckKey: deckKeyOf(myDeck) }
+            ...(myDeck
+              ? { deckKey: deckKeyOf(myDeck) }
+              : me?.deckKey
+                ? { deckKey: me.deckKey }
                 : {}),
             ...(me?.deckFingerprint
               ? { deckFingerprint: me.deckFingerprint }

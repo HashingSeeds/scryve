@@ -563,6 +563,7 @@ export const importResolved = mutation({
 export const importGuest = mutation({
   args: {
     deckKey: v.optional(v.string()),
+    movedFromAccount: v.optional(v.boolean()),
     localId: v.string(),
     localUpdatedAt: v.number(),
     name: v.string(),
@@ -605,6 +606,7 @@ export const importGuest = mutation({
       }
     }
     const live = args.deckKey ? await findDeckByKey(ctx, user._id, args.deckKey) : null
+    if (args.movedFromAccount && !live && !existing) return { status: "other_account" as const }
     if (live && live.archivedAt === undefined && !existing) {
       const latest = (await activeVersions(ctx, live._id)).at(-1)
       const game = args.game ?? DEFAULT_DECK_GAME
@@ -644,9 +646,7 @@ export const importGuest = mutation({
         createdAt: now,
         updatedAt: now,
       },
-      args.deckKey === args.localId
-        ? (existing?.deckKey ?? args.localId)
-        : (args.deckKey ?? existing?.deckKey ?? args.localId),
+      existing ? deckKeyOf(existing) : (args.deckKey ?? args.localId),
     )
     await writeInitialVersion(ctx, deckId, game, args.cards, now)
     return { status: "imported" as const, deckId, localUpdatedAt: args.localUpdatedAt }
@@ -1584,12 +1584,28 @@ export const stats = query({
 })
 
 export const moveToDevice = mutation({
-  args: { deckId: v.id("decks"), expectedRevision: v.number() },
+  args: {
+    deckId: v.id("decks"),
+    expectedRevision: v.number(),
+    expectedVersion: v.union(
+      v.null(),
+      v.object({ id: v.id("deckVersions"), updatedAt: v.number() }),
+    ),
+  },
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
     if (deck.movedToDeviceAt !== undefined) return syncedDeck(deck)
     if ((deck.syncRevision ?? 0) !== args.expectedRevision)
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
+    const current = (await activeVersions(ctx, deck._id)).at(-1)
+    if (
+      (current?._id ?? null) !== (args.expectedVersion?.id ?? null) ||
+      (current && (current.updatedAt ?? current.createdAt) !== args.expectedVersion?.updatedAt)
+    )
+      throw new ConvexError({
+        code: "sync_conflict",
+        message: "Deck cards changed on another device",
+      })
     const now = Date.now()
     await ctx.db.patch(deck._id, {
       archivedAt: now,

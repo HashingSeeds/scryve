@@ -1,8 +1,9 @@
-import type { FunctionArgs } from "convex/server"
+import type { FunctionArgs, FunctionReturnType } from "convex/server"
 import { convexTest } from "convex-test"
 
 import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
+import type { Id } from "./_generated/dataModel"
 import { deckFingerprint } from "./lib/deckFingerprint"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { addDeckResult, canonicalResultId, removeDeckResult } from "./lib/deckResults"
@@ -79,11 +80,34 @@ function manual(
     opponents: [{ seat: 2, displayName: "Them", outcome: "loss", gamesWon: 1, gamesDrawn: 1 }],
   }
 }
+async function comparisons(t: Tester) {
+  let cursor: string | null = null
+  const mismatches = []
+  for (;;) {
+    const page: FunctionReturnType<typeof internal.resultsBackfill.compareDeckKeyStats> =
+      await t.query(internal.resultsBackfill.compareDeckKeyStats, {
+        cursor,
+        batchSize: 100,
+      })
+    mismatches.push(...page.mismatches)
+    if (page.isDone) return mismatches
+    cursor = page.continueCursor
+  }
+}
 async function assertEqual(t: Tester) {
-  expect(
-    (await t.query(internal.resultsBackfill.compareDeckKeyStats, { cursor: null, batchSize: 100 }))
-      .mismatches,
-  ).toEqual([])
+  expect(await comparisons(t)).toEqual([])
+}
+async function moveVersion(t: Tester, deckId: Id<"decks">) {
+  return t.run(async (ctx) => {
+    const current = await ctx.db
+      .query("deckVersions")
+      .withIndex("by_deck_and_archived_at", (q) =>
+        q.eq("deckId", deckId).eq("archivedAt", undefined),
+      )
+      .collect()
+    const version = current.sort((a, b) => a.versionNumber - b.versionNumber).at(-1)
+    return version ? { id: version._id, updatedAt: version.updatedAt ?? version.createdAt } : null
+  })
 }
 async function allStats(t: Tester) {
   return await t.run(async (ctx) => ctx.db.query("deckKeyStats").collect())
@@ -287,7 +311,11 @@ it("counts a deckless result for the deck its seat is later claimed with", async
 it("keeps a new client's pinned key and deck name for a moved deck", async () => {
   const t = setup()
   const { actor, deckId, versionId } = await deck(t)
-  await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })
+  await actor.mutation(api.decks.moveToDevice, {
+    deckId,
+    expectedRevision: 0,
+    expectedVersion: await moveVersion(t, deckId),
+  })
   const args = publish()
   args.players[0] = {
     ...args.players[0],
@@ -331,7 +359,7 @@ it("leaves the list unknown when a synced deck changed after its uncached game s
   expect(result?.fingerprint).toBeUndefined()
 })
 
-it("comparison ignores games a deck played while it was only on a device", async () => {
+it("comparison reports games a deck played while it was only on a device", async () => {
   const t = setup()
   const { actor, versionId } = await deck(t)
   const synced = publish("synced-game-000000001")
@@ -343,7 +371,9 @@ it("comparison ignores games a deck played while it was only on a device", async
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 2,
   })
-  await assertEqual(t)
+  expect(await comparisons(t)).toEqual([
+    expect.objectContaining({ scope: "deck", reasons: ["device_only_results"] }),
+  ])
 })
 
 it("names a local deck's results from the name its device sends", async () => {
@@ -427,14 +457,26 @@ it("dual-writes local games and manual create/delete, and leaves totals intact w
   })
   const before = await allStats(t)
   await expect(
-    actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 99 }),
+    actor.mutation(api.decks.moveToDevice, {
+      deckId,
+      expectedRevision: 99,
+      expectedVersion: await moveVersion(t, deckId),
+    }),
   ).rejects.toThrow("Deck changed")
-  const moved = await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })
+  const moved = await actor.mutation(api.decks.moveToDevice, {
+    deckId,
+    expectedRevision: 0,
+    expectedVersion: await moveVersion(t, deckId),
+  })
   expect(moved.deleted).toBe(true)
   expect(moved.revision).toBe(1)
-  expect(await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })).toEqual(
-    moved,
-  )
+  expect(
+    await actor.mutation(api.decks.moveToDevice, {
+      deckId,
+      expectedRevision: 0,
+      expectedVersion: await moveVersion(t, deckId),
+    }),
+  ).toEqual(moved)
   expect(await allStats(t)).toEqual(before)
   await actor.mutation(api.matches.deleteManualMatch, { matchId: ack.matchId })
   await assertEqual(t)
@@ -528,7 +570,11 @@ it("imports guest localId, revives the same row by key and rejects live conflict
   await expect(
     actor.mutation(api.decks.create, { name: "Duplicate", format: "modern", deckKey: localId }),
   ).rejects.toThrow("live deck")
-  await actor.mutation(api.decks.moveToDevice, { deckId: ack.deckId, expectedRevision: 0 })
+  await actor.mutation(api.decks.moveToDevice, {
+    deckId: ack.deckId,
+    expectedRevision: 0,
+    expectedVersion: await moveVersion(t, ack.deckId),
+  })
   const revived = await actor.mutation(api.decks.importGuest, {
     ...args,
     name: "Revived",
@@ -584,17 +630,137 @@ it("statsForKey is authenticated and scoped to the caller, with at most 50 lists
   expect(stats.fingerprints).toHaveLength(50)
 })
 
-it("comparison flags a deck's legacy result filed under another key", async () => {
+it("local uploads use the resolved deck's key over the client's key", async () => {
   const t = setup()
   const { actor, versionId } = await deck(t)
   const args = publish()
   args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "some-other-key" }
   await actor.mutation(api.games.publishFinishedLocalGame, args)
-  const { mismatches } = await t.query(internal.resultsBackfill.compareDeckKeyStats, {
-    cursor: null,
-    batchSize: 100,
+  expect(await t.run(async (ctx) => ctx.db.query("deckResults").unique())).toMatchObject({
+    deckKey: "deck-key",
   })
-  expect(mismatches).toHaveLength(1)
+  expect((await actor.query(api.decks.statsForKey, { deckKey: "some-other-key" })).all).toBeNull()
+  await assertEqual(t)
+})
+
+it("manual matches use the resolved deck's key over the client's key", async () => {
+  const t = setup()
+  const { actor, versionId } = await deck(t)
+  const args = manual()
+  args.me = { ...args.me, deckVersionId: versionId, deckKey: "some-other-key" }
+  const ack = await actor.mutation(api.matches.recordManualMatch, args)
+  expect(await t.run(async (ctx) => ctx.db.get(ack.matchId))).toMatchObject({
+    seats: [expect.objectContaining({ deckKey: "deck-key" }), expect.anything()],
+  })
+  expect(await t.run(async (ctx) => ctx.db.query("deckResults").unique())).toMatchObject({
+    deckKey: "deck-key",
+  })
+  expect((await actor.query(api.decks.statsForKey, { deckKey: "some-other-key" })).all).toBeNull()
+  await assertEqual(t)
+})
+
+it("reimports an archived pre-backfill guest deck without duplicating its alias", async () => {
+  const t = setup()
+  const { actor, deckId } = await deck(t)
+  const localId = "00000000-0000-4000-8000-000000000001"
+  await t.run(async (ctx) =>
+    ctx.db.patch(deckId, { archivedAt: 1, deckKey: undefined, guestLocalId: localId }),
+  )
+  const args = {
+    deckKey: localId,
+    movedFromAccount: true,
+    localId,
+    localUpdatedAt: 1,
+    name: "Guest",
+    format: "modern",
+    cards: [],
+  }
+  await expect(actor.mutation(api.decks.importGuest, args)).resolves.toMatchObject({
+    status: "imported",
+    deckId,
+  })
+  expect(await t.run(async (ctx) => ctx.db.query("decks").collect())).toEqual([
+    expect.objectContaining({ _id: deckId, deckKey: String(deckId), guestLocalId: localId }),
+  ])
+  await expect(actor.mutation(api.decks.importGuest, args)).resolves.toMatchObject({
+    status: "already_imported",
+    deckId,
+  })
+  const game = publish()
+  game.players[0].deckKey = localId
+  await actor.mutation(api.games.publishFinishedLocalGame, game)
+  expect((await actor.query(api.decks.statsForKey, { deckKey: localId })).all?.games).toBe(1)
+})
+
+it("only restores a moved account copy for an account with its key or alias", async () => {
+  const t = setup()
+  const { actor: jane, deckId } = await deck(t)
+  const { actor: john } = await account(t, "john")
+  await jane.mutation(api.decks.moveToDevice, {
+    deckId,
+    expectedRevision: 0,
+    expectedVersion: await moveVersion(t, deckId),
+  })
+  const args = {
+    movedFromAccount: true,
+    deckKey: "deck-key",
+    localId: "00000000-0000-4000-8000-000000000001",
+    localUpdatedAt: 1,
+    name: "Burn",
+    format: "modern",
+    cards: [],
+  }
+  await expect(john.mutation(api.decks.importGuest, args)).resolves.toEqual({
+    status: "other_account",
+  })
+  expect(await t.run(async (ctx) => ctx.db.query("decks").collect())).toHaveLength(1)
+  await expect(jane.mutation(api.decks.importGuest, args)).resolves.toMatchObject({
+    status: "imported",
+    deckId,
+  })
+  await expect(
+    john.mutation(api.decks.importGuest, {
+      ...args,
+      movedFromAccount: undefined,
+      deckKey: "fresh-key",
+      localId: "00000000-0000-4000-8000-000000000002",
+    }),
+  ).resolves.toMatchObject({ status: "imported" })
+  expect(await t.run(async (ctx) => ctx.db.query("decks").collect())).toHaveLength(2)
+})
+
+it("rejects a move when a card save changed the version since detail was read", async () => {
+  const t = setup()
+  const { actor, deckId, versionId } = await deck(t)
+  const detail = await actor.query(api.decks.detail, { deckId })
+  const version = detail.version!
+  const expectedVersion = { id: version._id, updatedAt: version.updatedAt ?? version.createdAt }
+  jest.spyOn(Date, "now").mockReturnValue(expectedVersion.updatedAt + 1)
+  try {
+    await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      versionId,
+      cards: [
+        {
+          name: "Shock",
+          quantity: 4,
+          oracleId: "00000000-0000-4000-8000-000000000009",
+          scryfallId: "00000000-0000-4000-8000-000000000010",
+        },
+      ],
+    })
+    await expect(
+      actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0, expectedVersion }),
+    ).rejects.toThrow('"code":"sync_conflict"')
+    const stored = await t.run(async (ctx) => ctx.db.get(deckId))
+    expect(stored?.syncRevision ?? 0).toBe(0)
+    expect(stored?.archivedAt).toBeUndefined()
+    expect((await actor.query(api.decks.detail, { deckId })).cards).toEqual([
+      expect.objectContaining({ name: "Shock", quantity: 4 }),
+    ])
+  } finally {
+    jest.restoreAllMocks()
+  }
 })
 
 it("backfills in bounded pages, retries without duplication, and matches legacy totals", async () => {
@@ -646,6 +812,165 @@ it("backfills in bounded pages, retries without duplication, and matches legacy 
     `legacy:${ack.summaryId}:${(await t.run(async (ctx) => ctx.db.get(ack.summaryId)))!.players[0].playerId}`,
   )
 })
+
+it.each(["deckKeyStats", "deckVersionStats"] as const)(
+  "comparison reports a tampered %s row with its ids",
+  async (table) => {
+    const t = setup()
+    const { actor, deckId, versionId } = await deck(t)
+    const args = publish()
+    args.players[0] = { ...args.players[0], deckVersionId: versionId, deckFingerprint: fingerprint }
+    await actor.mutation(api.games.publishFinishedLocalGame, args)
+    await assertEqual(t)
+    const statsId = await t.run(async (ctx) => {
+      const row =
+        table === "deckKeyStats"
+          ? (await ctx.db.query(table).collect()).find((row) => row.fingerprint === "all")!
+          : (await ctx.db.query(table).unique())!
+      await ctx.db.patch(row._id, { games: 999 })
+      return row._id
+    })
+    expect(await comparisons(t)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining(
+          table === "deckKeyStats"
+            ? {
+                scope: "key",
+                reason: "totals_differ_from_results",
+                statsId,
+                deckKey: "deck-key",
+                expected: expect.objectContaining({ games: 1 }),
+              }
+            : {
+                scope: "version",
+                reason: "unexplained",
+                legacyStatsId: statsId,
+                deckId,
+                deckVersionId: versionId,
+                fingerprints: [{ fingerprint, stats: expect.objectContaining({ games: 1 }) }],
+              },
+        ),
+      ]),
+    )
+  },
+)
+
+it("comparison partitions a shared fingerprint by the legacy version on each result", async () => {
+  const t = setup()
+  const { actor, versionId } = await deck(t)
+  const secondVersion = await t.run(async (ctx) => {
+    const { _id: _, _creationTime: __, ...version } = (await ctx.db.get(versionId))!
+    return ctx.db.insert("deckVersions", { ...version, versionNumber: 2 })
+  })
+  for (const [index, deckVersionId] of [versionId, secondVersion].entries()) {
+    const args = publish(`shared-fingerprint-game-${index}`)
+    args.players[0] = { ...args.players[0], deckVersionId, deckFingerprint: fingerprint }
+    await actor.mutation(api.games.publishFinishedLocalGame, args)
+  }
+  await assertEqual(t)
+  expect((await allStats(t)).find((row) => row.fingerprint === fingerprint)?.games).toBe(2)
+})
+
+it("comparison checks device-only keys and reports missing totals", async () => {
+  const t = setup()
+  const { actor } = await account(t)
+  const args = publish()
+  args.players[0].deckKey = "device-only"
+  await actor.mutation(api.games.publishFinishedLocalGame, args)
+  await assertEqual(t)
+  await t.run(async (ctx) => {
+    const row = (await ctx.db.query("deckKeyStats").unique())!
+    await ctx.db.patch(row._id, { games: 999 })
+  })
+  expect(await comparisons(t)).toEqual([
+    expect.objectContaining({ scope: "key", reason: "totals_differ_from_results" }),
+  ])
+  await t.run(async (ctx) => ctx.db.delete((await ctx.db.query("deckKeyStats").unique())!._id))
+  expect(await comparisons(t)).toEqual([
+    expect.objectContaining({ scope: "result", reason: "missing_totals", deckKey: "device-only" }),
+  ])
+})
+
+it("comparison reports an oversized history instead of accepting a truncated sum", async () => {
+  const t = setup()
+  const { userId } = await account(t)
+  await t.run(async (ctx) => {
+    for (let i = 0; i < 2001; i++)
+      await addDeckResult(ctx, {
+        resultId: `game:large:${i}`,
+        userId,
+        deckKey: "large-history",
+        kind: "game",
+        source: "local",
+        outcome: "win",
+        finishedAt: i,
+        deltas: { games: tally },
+      })
+  })
+  const page = await t.query(internal.resultsBackfill.compareDeckKeyStats, {
+    cursor: "totals:",
+    batchSize: 100,
+  })
+  expect(page.mismatches).toEqual([
+    expect.objectContaining({
+      scope: "key",
+      reason: "comparison_limit",
+      userId,
+      deckKey: "large-history",
+      statsId: expect.any(String),
+    }),
+  ])
+  expect(page.isDone).toBe(false)
+})
+
+it.each(["abandoned", "duplicate", "clamped"] as const)(
+  "comparison reports the reason for %s legacy differences",
+  async (kind) => {
+    const t = setup()
+    const { actor, versionId } = await deck(t)
+    const args = publish()
+    args.players[0].deckVersionId = versionId
+    const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
+    await t.run(async (ctx) => {
+      if (kind === "abandoned") {
+        await ctx.db.patch(ack.summaryId, { terminalStatus: "abandoned" })
+        const row = (await ctx.db.query("deckResults").unique())!
+        await removeDeckResult(ctx, row.userId, row.resultId)
+      } else if (kind === "duplicate") {
+        const {
+          _id: _,
+          _creationTime: __,
+          ...row
+        } = (await ctx.db.query("deckGameResults").unique())!
+        await ctx.db.insert("deckGameResults", row)
+        const old = (await ctx.db.query("deckStats").unique())!
+        await ctx.db.patch(old._id, { games: 2, wins: 2 })
+      } else {
+        const old = (await ctx.db.query("deckStats").unique())!
+        await ctx.db.patch(old._id, { games: 0, wins: 0 })
+      }
+    })
+    expect(await comparisons(t)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          scope: "deck",
+          reason: {
+            abandoned: "abandoned_games_skipped",
+            duplicate: "duplicate_legacy_seats",
+            clamped: "legacy_zero_clamp_possible",
+          }[kind],
+          reasons: expect.arrayContaining([
+            {
+              abandoned: "abandoned_games_skipped",
+              duplicate: "duplicate_legacy_seats",
+              clamped: "legacy_zero_clamp_possible",
+            }[kind],
+          ]),
+        }),
+      ]),
+    )
+  },
+)
 
 it("abandoned cleanup reverses both writers exactly and retries safely", async () => {
   const t = setup()
@@ -732,7 +1057,11 @@ it("sync creation defaults to syncId and explicit keys revive archived rows with
   const created = await actor.mutation(api.decks.syncWrite, metadata)
   if ("status" in created) throw new Error("Expected write")
   expect(created).toMatchObject({ deckKey: id, revision: 1 })
-  const moved = await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })
+  const moved = await actor.mutation(api.decks.moveToDevice, {
+    deckId,
+    expectedRevision: 0,
+    expectedVersion: await moveVersion(t, deckId),
+  })
   const revived = await actor.mutation(api.decks.syncWrite, {
     ...metadata,
     deckKey: "deck-key",
@@ -748,7 +1077,11 @@ it("sync creation defaults to syncId and explicit keys revive archived rows with
     scryfallId: "00000000-0000-4000-8000-000000000010",
   }
   const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [card] })
-  await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 2 })
+  await actor.mutation(api.decks.moveToDevice, {
+    deckId,
+    expectedRevision: 2,
+    expectedVersion: await moveVersion(t, deckId),
+  })
   const revivedByKey = await actor.mutation(api.decks.syncWrite, {
     ...metadata,
     deckKey: "deck-key",
@@ -793,9 +1126,17 @@ it("revival replaces deck content without creating a duplicate version and requi
   const { actor, deckId, versionId } = await deck(t)
   const other = await account(t, "other")
   await expect(
-    other.actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 }),
+    other.actor.mutation(api.decks.moveToDevice, {
+      deckId,
+      expectedRevision: 0,
+      expectedVersion: await moveVersion(t, deckId),
+    }),
   ).rejects.toThrow("Deck not found")
-  await actor.mutation(api.decks.moveToDevice, { deckId, expectedRevision: 0 })
+  await actor.mutation(api.decks.moveToDevice, {
+    deckId,
+    expectedRevision: 0,
+    expectedVersion: await moveVersion(t, deckId),
+  })
   const card = {
     name: "Card",
     quantity: 4,
@@ -1057,7 +1398,11 @@ it("reviving by key preserves the sync id installed clients already use", async 
   }
   const created = await actor.mutation(api.decks.syncWrite, args)
   if ("status" in created) throw new Error("Expected write")
-  await actor.mutation(api.decks.moveToDevice, { deckId: created.deckId, expectedRevision: 1 })
+  await actor.mutation(api.decks.moveToDevice, {
+    deckId: created.deckId,
+    expectedRevision: 1,
+    expectedVersion: await moveVersion(t, created.deckId),
+  })
   const revived = await actor.mutation(api.decks.syncWrite, {
     ...args,
     id: "00000000-0000-4000-8000-000000000022",

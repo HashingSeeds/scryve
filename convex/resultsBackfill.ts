@@ -2,7 +2,8 @@ import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
-import type { Doc } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
+import type { QueryCtx } from "./_generated/server"
 import { internalMutation, internalQuery } from "./_generated/server"
 import { deckKeyOf } from "./lib/deckKeys"
 import { addDeckResult, canonicalResultId, gameResultId } from "./lib/deckResults"
@@ -155,7 +156,7 @@ export const backfillMatchResults = internalMutation({
   },
 })
 
-const MAX_COMPARED_RESULTS = 10_000
+const MAX_COMPARED_RESULTS = 2000
 type Tally = { total: number; wins: number; losses: number; draws: number; unknown: number }
 type Deltas = Doc<"deckResults">["deltas"]
 
@@ -192,43 +193,298 @@ function sumDeltas(all: Deltas[]) {
   }
 }
 
+type Counts = Pick<
+  Doc<"deckKeyStats">,
+  | "games"
+  | "wins"
+  | "losses"
+  | "draws"
+  | "unknown"
+  | "manualMatches"
+  | "manualGames"
+  | "connectedMatches"
+>
+
+function countDifferences(legacy: Counts | null, stats: Counts | null) {
+  const fields = ["games", "wins", "losses", "draws", "unknown"] as const
+  const lines = ["manualMatches", "manualGames", "connectedMatches"] as const
+  const tallyFields = ["total", "wins", "losses", "draws", "unknown"] as const
+  return [
+    ...fields.map((field) => ({ field, legacy: legacy?.[field] ?? 0, stats: stats?.[field] ?? 0 })),
+    ...lines.flatMap((line) =>
+      tallyFields.map((field) => ({
+        field: `${line}.${field}`,
+        legacy: legacy?.[line]?.[field] ?? 0,
+        stats: stats?.[line]?.[field] ?? 0,
+      })),
+    ),
+  ].filter((difference) => difference.legacy !== difference.stats)
+}
+
+async function legacyReasons(
+  ctx: QueryCtx,
+  deckId: Id<"decks">,
+  differences: ReturnType<typeof countDifferences>,
+  versionId?: Id<"deckVersions">,
+) {
+  const games = await ctx.db
+    .query("deckGameResults")
+    .withIndex("by_deck_and_finished_at", (q) => q.eq("deckId", deckId))
+    .take(MAX_COMPARED_RESULTS + 1)
+  const matches = await ctx.db
+    .query("deckMatchResults")
+    .withIndex("by_deck_and_finished_at", (q) => q.eq("deckId", deckId))
+    .take(MAX_COMPARED_RESULTS + 1)
+  const reasons = new Set<string>()
+  if (!versionId) {
+    const deck = await ctx.db.get(deckId)
+    if (deck) {
+      const results = await ctx.db
+        .query("deckResults")
+        .withIndex("by_user_and_deck_key_and_finished_at", (q) =>
+          q.eq("userId", deck.ownerUserId).eq("deckKey", deckKeyOf(deck)),
+        )
+        .take(MAX_COMPARED_RESULTS + 1)
+      if (results.some((result) => !result.legacyDeckId)) reasons.add("device_only_results")
+      if (results.length > MAX_COMPARED_RESULTS) reasons.add("legacy_reason_scan_limit")
+    }
+  }
+  const seen = new Set<string>()
+  const summaryIds: Id<"gameSummaries">[] = []
+  for (const game of games) {
+    if (versionId && game.deckVersionId !== versionId) continue
+    const summary = await ctx.db
+      .query("gameSummaries")
+      .withIndex("by_game", (q) => q.eq("gameId", game.gameId))
+      .unique()
+    if (summary && isAbandonedSummary(summary)) {
+      reasons.add("abandoned_games_skipped")
+      summaryIds.push(summary._id)
+    }
+    const player = summary?.players.find((player) => player.playerId === game.playerId)
+    const id = summary && player ? gameResultId(summary, player) : `${game.gameId}:${game.playerId}`
+    if (seen.has(id)) reasons.add("duplicate_legacy_seats")
+    seen.add(id)
+  }
+  for (const match of matches) {
+    if (versionId && match.deckVersionId !== versionId) continue
+    const id = `${match.matchId}:${match.userId}:${match.deckVersionId}`
+    if (seen.has(id)) reasons.add("duplicate_legacy_seats")
+    seen.add(id)
+  }
+  if (games.length > MAX_COMPARED_RESULTS || matches.length > MAX_COMPARED_RESULTS)
+    reasons.add("legacy_reason_scan_limit")
+  // why: old counters clamp at zero but retain no audit trail, so a zero discrepancy is only a candidate explanation.
+  if (differences.some((difference) => difference.legacy === 0))
+    reasons.add("legacy_zero_clamp_possible")
+  return { reasons: reasons.size ? [...reasons] : ["unexplained"], summaryIds }
+}
+
+const COMPARISON_PHASES = ["decks", "versions", "totals", "results"] as const
+
+/** why: each entity can read up to MAX_COMPARED_RESULTS results, so run it in small batches; oversized histories fail the gate explicitly. */
 export const compareDeckKeyStats = internalQuery({
   args: batchArgs,
   handler: async (ctx, args) => {
-    const page = await ctx.db
-      .query("decks")
-      .paginate({ cursor: args.cursor, numItems: batchSize(args.batchSize) })
-    const mismatches = []
-    for (const deck of page.page) {
-      const legacy = await ctx.db
-        .query("deckStats")
-        .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
-        .unique()
-      const mirrored = await ctx.db
-        .query("deckResults")
-        .withIndex("by_legacy_deck_id", (q) => q.eq("legacyDeckId", deck._id))
-        .take(MAX_COMPARED_RESULTS)
-      // why: installed clients will read this deck's record from its key, so a row filed elsewhere must show up.
-      const stats = sumDeltas(
-        mirrored
-          .filter(
-            (result) => result.userId === deck.ownerUserId && result.deckKey === deckKeyOf(deck),
-          )
-          .map((result) => result.deltas),
-      )
-      const fields = ["games", "wins", "losses", "draws", "unknown"] as const
-      const lines = ["manualMatches", "manualGames", "connectedMatches"] as const
-      const tallyFields = ["total", "wins", "losses", "draws", "unknown"] as const
-      if (
-        fields.some((field) => (legacy?.[field] ?? 0) !== (stats?.[field] ?? 0)) ||
-        lines.some((line) =>
-          tallyFields.some(
-            (field) => (legacy?.[line]?.[field] ?? 0) !== (stats?.[line]?.[field] ?? 0),
-          ),
-        )
-      )
-        mismatches.push({ deckId: deck._id, legacy, stats })
+    const phaseIndex = args.cursor
+      ? COMPARISON_PHASES.findIndex((phase) => args.cursor!.startsWith(`${phase}:`))
+      : 0
+    if (phaseIndex < 0) throw new Error("Invalid comparison cursor")
+    const phase = COMPARISON_PHASES[phaseIndex]
+    const cursor = args.cursor ? args.cursor.slice(phase.length + 1) || null : null
+    const pagination = { cursor, numItems: batchSize(args.batchSize) }
+    type Mismatch = {
+      scope: string
+      reason: string
+      userId?: Id<"users">
+      deckKey?: string
+      deckId?: Id<"decks">
+      deckVersionId?: Id<"deckVersions">
+      statsId?: Id<"deckKeyStats">
+      legacyStatsId?: Id<"deckStats"> | Id<"deckVersionStats">
+      resultId?: string
+      fingerprint?: string
+      legacy?: Counts | null
+      stats?: Counts | null
+      expected?: Counts
+      differences?: ReturnType<typeof countDifferences>
+      reasons?: string[]
+      summaryIds?: Id<"gameSummaries">[]
+      fingerprints?: { fingerprint: string | null; stats: Counts }[]
     }
-    return { mismatches, isDone: page.isDone, continueCursor: page.continueCursor }
+    const mismatches: Mismatch[] = []
+    const finish = (page: { isDone: boolean; continueCursor: string }) => {
+      const nextPhase = COMPARISON_PHASES[phaseIndex + 1]
+      return {
+        mismatches,
+        phase,
+        isDone: page.isDone && !nextPhase,
+        continueCursor: page.isDone
+          ? nextPhase
+            ? `${nextPhase}:`
+            : ""
+          : `${phase}:${page.continueCursor}`,
+      }
+    }
+    const keyStats = (userId: Id<"users">, deckKey: string, fingerprint = "all") =>
+      ctx.db
+        .query("deckKeyStats")
+        .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+          q.eq("userId", userId).eq("deckKey", deckKey).eq("fingerprint", fingerprint),
+        )
+        .unique()
+    const keyResults = (userId: Id<"users">, deckKey: string) =>
+      ctx.db
+        .query("deckResults")
+        .withIndex("by_user_and_deck_key_and_finished_at", (q) =>
+          q.eq("userId", userId).eq("deckKey", deckKey),
+        )
+        .take(MAX_COMPARED_RESULTS + 1)
+
+    if (phase === "decks") {
+      const page = await ctx.db.query("decks").paginate(pagination)
+      for (const deck of page.page) {
+        if (deck.archivedAt !== undefined) continue
+        const deckKey = deckKeyOf(deck)
+        const legacy = await ctx.db
+          .query("deckStats")
+          .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
+          .unique()
+        const stats = await keyStats(deck.ownerUserId, deckKey)
+        const differences = countDifferences(legacy, stats)
+        if (differences.length) {
+          const facts = await legacyReasons(ctx, deck._id, differences)
+          mismatches.push({
+            scope: "deck",
+            reason: facts.reasons[0],
+            userId: deck.ownerUserId,
+            deckId: deck._id,
+            deckKey,
+            legacyStatsId: legacy?._id,
+            statsId: stats?._id,
+            legacy,
+            stats,
+            differences,
+            ...facts,
+          })
+        }
+      }
+      return finish(page)
+    }
+    if (phase === "versions") {
+      const page = await ctx.db.query("deckVersionStats").paginate(pagination)
+      for (const legacy of page.page) {
+        const deck = await ctx.db.get(legacy.deckId)
+        const all = await ctx.db
+          .query("deckResults")
+          .withIndex("by_legacy_deck_id", (q) => q.eq("legacyDeckId", legacy.deckId))
+          .take(MAX_COMPARED_RESULTS + 1)
+        const ids = {
+          deckId: legacy.deckId,
+          deckVersionId: legacy.deckVersionId,
+          legacyStatsId: legacy._id,
+          userId: deck?.ownerUserId,
+          deckKey: deck ? deckKeyOf(deck) : undefined,
+        }
+        if (all.length > MAX_COMPARED_RESULTS) {
+          mismatches.push({ scope: "version", reason: "comparison_limit", ...ids })
+          continue
+        }
+        const results = all.filter(
+          (result) =>
+            result.deckVersionId === legacy.deckVersionId &&
+            result.userId === deck?.ownerUserId &&
+            result.deckKey === (deck && deckKeyOf(deck)),
+        )
+        const stats = sumDeltas(results.map((result) => result.deltas))
+        const differences = countDifferences(legacy, stats)
+        if (differences.length) {
+          const fingerprints = [...new Set(results.map((result) => result.fingerprint))].map(
+            (fingerprint) => ({
+              fingerprint: fingerprint ?? null,
+              stats: sumDeltas(
+                results
+                  .filter((result) => result.fingerprint === fingerprint)
+                  .map((result) => result.deltas),
+              ),
+            }),
+          )
+          const facts = await legacyReasons(ctx, legacy.deckId, differences, legacy.deckVersionId)
+          mismatches.push({
+            scope: "version",
+            reason: facts.reasons[0],
+            ...ids,
+            legacy,
+            stats,
+            differences,
+            fingerprints,
+            ...facts,
+          })
+        }
+      }
+      return finish(page)
+    }
+    if (phase === "totals") {
+      const page = await ctx.db.query("deckKeyStats").paginate(pagination)
+      for (const stats of page.page) {
+        const results = await keyResults(stats.userId, stats.deckKey)
+        const ids = {
+          userId: stats.userId,
+          deckKey: stats.deckKey,
+          fingerprint: stats.fingerprint,
+          statsId: stats._id,
+        }
+        if (results.length > MAX_COMPARED_RESULTS) {
+          mismatches.push({ scope: "key", reason: "comparison_limit", ...ids })
+          continue
+        }
+        const expected = sumDeltas(
+          results
+            .filter(
+              (result) => stats.fingerprint === "all" || result.fingerprint === stats.fingerprint,
+            )
+            .map((result) => result.deltas),
+        )
+        if (countDifferences(expected, stats).length)
+          mismatches.push({
+            scope: "key",
+            reason: "totals_differ_from_results",
+            ...ids,
+            stats,
+            expected,
+          })
+      }
+      return finish(page)
+    }
+    const page = await ctx.db.query("deckResults").paginate(pagination)
+    for (const result of page.page) {
+      if (!result.deckKey) continue
+      for (const fingerprint of result.fingerprint ? ["all", result.fingerprint] : ["all"])
+        if (!(await keyStats(result.userId, result.deckKey, fingerprint)))
+          mismatches.push({
+            scope: "result",
+            reason: "missing_totals",
+            userId: result.userId,
+            deckKey: result.deckKey,
+            resultId: result.resultId,
+            fingerprint,
+          })
+      if (
+        result.deckVersionId &&
+        !(await ctx.db
+          .query("deckVersionStats")
+          .withIndex("by_version", (q) => q.eq("deckVersionId", result.deckVersionId!))
+          .unique())
+      )
+        mismatches.push({
+          scope: "version",
+          reason: "missing_legacy_version_stats",
+          userId: result.userId,
+          deckKey: result.deckKey,
+          deckVersionId: result.deckVersionId,
+          resultId: result.resultId,
+        })
+    }
+    return finish(page)
   },
 })

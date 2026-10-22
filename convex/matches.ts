@@ -143,12 +143,10 @@ export const recordManualMatch = mutation({
         seat: args.me.seat,
         displayName: user.displayName,
         userId: user._id,
-        ...(args.me.deckKey
-          ? { deckKey: args.me.deckKey }
-          : attached
-            ? {
-                deckKey: deckKeyOf(attached.deck),
-              }
+        ...(attached
+          ? { deckKey: deckKeyOf(attached.deck) }
+          : args.me.deckKey
+            ? { deckKey: args.me.deckKey }
             : {}),
         ...(args.me.deckFingerprint ? { deckFingerprint: args.me.deckFingerprint } : {}),
         ...(attached
