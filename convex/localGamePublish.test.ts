@@ -297,16 +297,14 @@ it.each(["player_a", "player_b", undefined])(
   },
 )
 
-it("rejects a first player outside the game, including on a replay", async () => {
+it("keeps a game whose first player is outside it, without a first player", async () => {
   const t = convexTest(schema, modules)
   const owner = await synced(t, "owner", "Owner")
-  const args = finishedGame({ firstPlayerLocalId: "absent" })
-  await expect(owner.mutation(api.games.publishFinishedLocalGame, args)).rejects.toThrow(
-    "First player must belong to this game",
+  const ack = await owner.mutation(
+    api.games.publishFinishedLocalGame,
+    finishedGame({ firstPlayerLocalId: "absent" }),
   )
-  expect(await t.run(async (ctx) => ctx.db.query("games").collect())).toHaveLength(0)
-  await owner.mutation(api.games.publishFinishedLocalGame, finishedGame())
-  await expect(owner.mutation(api.games.publishFinishedLocalGame, args)).rejects.toThrow(
-    "First player must belong to this game",
-  )
+  const summary = await t.run(async (ctx) => ctx.db.get(ack.summaryId))
+  expect(summary).not.toBeNull()
+  expect(summary!.firstPlayerId).toBeUndefined()
 })

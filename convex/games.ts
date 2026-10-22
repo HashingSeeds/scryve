@@ -1328,8 +1328,10 @@ export const publishFinishedLocalGame = mutation({
     assertPublicId(args.publicId)
     const { gameSystem, ruleset, format } = await resolveLocalGameSetup(ctx, args)
     const { localIds } = assertSnapshotPlayers(args.players)
-    if (args.firstPlayerLocalId !== undefined && !localIds.has(args.firstPlayerLocalId))
-      throw new Error("First player must belong to this game")
+    const firstPlayerLocalId =
+      args.firstPlayerLocalId !== undefined && localIds.has(args.firstPlayerLocalId)
+        ? args.firstPlayerLocalId
+        : undefined
     const now = Date.now()
     if (
       !Number.isInteger(args.startedAt) ||
@@ -1527,8 +1529,8 @@ export const publishFinishedLocalGame = mutation({
         finishedAt: args.finishedAt,
         historySource: "local",
         clientGameId: args.publicId,
-        ...(args.firstPlayerLocalId !== undefined
-          ? { firstPlayerId: playerIdsByLocalId.get(args.firstPlayerLocalId)! }
+        ...(firstPlayerLocalId !== undefined
+          ? { firstPlayerId: playerIdsByLocalId.get(firstPlayerLocalId)! }
           : {}),
         localIds: new Map(
           [...playerIdsByLocalId].map(([localId, playerId]) => [playerId, localId]),
