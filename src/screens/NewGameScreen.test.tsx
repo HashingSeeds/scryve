@@ -1849,6 +1849,13 @@ it("offers matching local decks alongside synced decks and hashes only the chose
   fireEvent.press(screen.getByTestId("game-type-commander"))
   fireEvent.press(screen.getByTestId("me-deck"))
   expect(screen.getByTestId("me-deck-option-synced")).toBeTruthy()
+  expect(
+    within(screen.getByTestId("me-deck-option-synced")).queryByTestId("device-glyph"),
+  ).toBeNull()
+  expect(screen.getByLabelText("Local Burn, on this device")).toBeTruthy()
+  expect(
+    within(screen.getByTestId(`me-deck-option-${chosen.localId}`)).getByTestId("device-glyph"),
+  ).toBeTruthy()
   expect(screen.queryByText("Other format")).toBeNull()
   expect(screen.queryByText("Other system")).toBeNull()
   expect(deckFingerprint).not.toHaveBeenCalled()

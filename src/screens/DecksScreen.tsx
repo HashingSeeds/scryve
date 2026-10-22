@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
+import type { FunctionReturnType } from "convex/server"
 import Svg, { Path } from "react-native-svg"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -21,6 +22,7 @@ import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckCount } from "@/features/decks/DeckLimit"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncNotice } from "@/features/decks/LocalDeckSyncNotice"
@@ -118,6 +120,7 @@ function DeckRow({
 }) {
   const { theme, themed } = useAppTheme()
   const game = deck.game ?? DEFAULT_DECK_GAME
+  const local = guestDeckLocalId(String(deck._id)) !== undefined
   const favorite = deck.favoritedAt !== undefined
   const record = recordSummary(deck.keyRecord ?? deck.record)
   const versions =
@@ -135,13 +138,20 @@ function DeckRow({
         style={themed($openButton)}
         accessibilityRole="button"
         accessibilityLabel={
-          needsReview ? translate("decks:shelf.needsReview", { name: deck.name }) : deck.name
+          local
+            ? translate("decks:stats.onDeviceLabel", { name: deck.name })
+            : needsReview
+              ? translate("decks:shelf.needsReview", { name: deck.name })
+              : deck.name
         }
         activeOpacity={0.75}
         onPress={() => onPress()}
       >
         <View style={themed($rowCopy)}>
-          <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} />
+          <View style={$nameRow}>
+            <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} style={$name} />
+            {local ? <DeviceGlyph /> : null}
+          </View>
           <Text
             size="xxs"
             numberOfLines={1}
@@ -244,6 +254,24 @@ function selectLocalDeck(row: ShelfDeck, onSelect: (deck: DeckSelection) => void
     format: row.format,
     cardQuantity: row.cardQuantity,
   })
+}
+
+type KeyTotals = FunctionReturnType<typeof api.deckStats.totalsByKey>
+
+type OwnerTotals = { ownerId: string; rows: KeyTotals }
+
+function KeyTotalsQuery({
+  ownerId,
+  onTotals,
+}: {
+  ownerId: string
+  onTotals: (totals: OwnerTotals) => void
+}) {
+  const rows = useQuery(api.deckStats.totalsByKey, {})
+  useEffect(() => {
+    if (rows) onTotals({ ownerId, rows })
+  }, [rows, ownerId, onTotals])
+  return null
 }
 
 function LocalDeckList({
@@ -517,6 +545,13 @@ export function DecksScreen({
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
   const guestDecks = useGuestDecks()
+  const [totals, setTotals] = useState<OwnerTotals>()
+  const ownRows =
+    access?.ready && totals && totals.ownerId === access.ownerId ? totals.rows : undefined
+  const keyTotals = useMemo(
+    () => new Map((ownRows ?? []).map(({ deckKey, ...record }) => [deckKey, record])),
+    [ownRows],
+  )
   const [collection, setCollection] = useState<DeckCollection>("all")
   const [system, setSystem] = useState(
     DECK_GAME_LIST.find((game) => game.id === initialSystem)?.id ?? ALL_SYSTEMS,
@@ -548,6 +583,7 @@ export function DecksScreen({
     game: guest.deck.game ?? DEFAULT_DECK_GAME,
     format: guest.deck.format,
     cardQuantity: guest.deck.cards.reduce((total, card) => total + card.quantity, 0),
+    keyRecord: keyTotals.get(guest.deckKey ?? guest.localId),
   }))
   const visibleGuestRows = guestRows.filter(
     (guestRow) =>
@@ -745,6 +781,11 @@ export function DecksScreen({
           </ConvexQueryBoundary>
         )}
       </View>
+      {access?.ready && access.ownerId && guestDecks.length > 0 ? (
+        <ConvexQueryBoundary key={access.ownerId} fallback={() => null}>
+          <KeyTotalsQuery ownerId={access.ownerId} onTotals={setTotals} />
+        </ConvexQueryBoundary>
+      ) : null}
       <FloatingAppNavigation
         destination={{
           kind: onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play",
@@ -921,3 +962,6 @@ const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingVertical: spacing.xl,
 })
+
+const $nameRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
+const $name: TextStyle = { flexShrink: 1 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
-import { useFocusEffect, useNavigation } from "expo-router"
+import { router, useFocusEffect, useNavigation } from "expo-router"
 import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
@@ -301,14 +301,13 @@ function DeckDetailContent({
       : "skip",
   )
   const deckMetadata = synced.metadata.find((deck) => deck.deckId === deckId)
-  const stats = useDeckKeyStats(
+  const statsDeckKey =
     deckMetadata?.deckKey ??
-      detail?.deck.deckKey ??
-      deckMetadata?.id ??
-      detail?.deck.syncId ??
-      deckId,
-    access?.ready ?? true,
-  )
+    detail?.deck.deckKey ??
+    deckMetadata?.id ??
+    detail?.deck.syncId ??
+    deckId
+  const stats = useDeckKeyStats(statsDeckKey, access?.ready ?? true)
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
@@ -824,6 +823,17 @@ function DeckDetailContent({
         onEdit={startEditing}
         onSave={save}
         onCancel={requestDiscard}
+        onStats={() =>
+          router.push({
+            pathname: "/connected/decks/stats",
+            params: {
+              deckKey: statsDeckKey,
+              deckName: deck.name,
+              game: deck.game,
+              format: deck.format,
+            },
+          })
+        }
         stats={
           stats ? { record: stats, source: statsSource, onSourceChange: setStatsSource } : undefined
         }

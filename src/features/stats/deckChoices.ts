@@ -8,6 +8,7 @@ import { loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
 import { translate } from "@/i18n/translate"
 
 import { deckFingerprint } from "./deckFingerprint"
+import { saveListSnapshot } from "./listSnapshots"
 
 export type DeckChoice = {
   versionId?: string
@@ -93,11 +94,14 @@ export function chosenDeckKey(
 
 export async function pinDeckChoice(deck: SelectedDeck, ownerId: string) {
   const cards = deck.deckFingerprint ? undefined : chosenDeckCards(deck, ownerId)
+  const deckKey = chosenDeckKey(deck, ownerId)
+  const fingerprint =
+    deck.deckFingerprint ?? (cards === undefined ? undefined : await deckFingerprint(cards))
+  if (deckKey && fingerprint && cards) saveListSnapshot(deckKey, fingerprint, cards)
   return {
-    deckKey: chosenDeckKey(deck, ownerId),
+    deckKey,
     deckVersionId: deck.versionId,
     deckName: deck.name,
-    deckFingerprint:
-      deck.deckFingerprint ?? (cards === undefined ? undefined : await deckFingerprint(cards)),
+    deckFingerprint: fingerprint,
   }
 }

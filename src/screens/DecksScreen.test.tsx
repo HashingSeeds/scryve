@@ -68,6 +68,7 @@ const pokemonDeck = {
 const mockConvexClient = {}
 
 const mockSetFavorite = jest.fn(async () => null)
+const mockTotalsQuery = jest.fn()
 
 const mockListMine: { value: ShelfState | undefined; error?: Error } = {
   value: {
@@ -77,12 +78,28 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
   },
 }
 
+let mockTotals:
+  | {
+      deckKey: string
+      games: number
+      wins: number
+      losses: number
+      draws: number
+      unknown: number
+    }[]
+  | Error
+  | undefined = []
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexClient,
   useQuery: (reference: unknown, args?: unknown) => {
     if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error
     if (reference === "decks.capacity") return mockListMine.value?.capacity
+    if (reference === "deckStats.totalsByKey") {
+      mockTotalsQuery()
+      if (mockTotals instanceof Error) throw mockTotals
+      return mockTotals
+    }
     return mockListMine.value
   },
   useMutation: () => mockSetFavorite,
@@ -90,6 +107,7 @@ jest.mock("convex/react", () => ({
 
 jest.mock("../../convex/_generated/api", () => ({
   api: {
+    deckStats: { totalsByKey: "deckStats.totalsByKey" },
     decks: {
       capacity: "decks.capacity",
       listMine: "decks.listMine",
@@ -219,7 +237,73 @@ describe("DecksScreen", () => {
     const list = within(view.getByTestId("decks-list"))
     expect(list.getByText("On this device")).toBeTruthy()
     expect(list.getByText("Local 0")).toBeTruthy()
+    expect(list.getByLabelText("Local 0, on this device")).toBeTruthy()
+    expect(list.getAllByTestId("device-glyph").length).toBeGreaterThan(0)
+    expect(
+      within(view.getByTestId("deck-card-existing-deck")).queryByTestId("device-glyph"),
+    ).toBeNull()
     expect(list.getByText("Synced")).toBeTruthy()
+  })
+
+  it("shows a local deck's record from its key totals only while its account is signed in", () => {
+    const local = saveGuestDeck(
+      { name: "Local record", format: "commander", game: "mtg", cards: [] },
+      { deckKey: "local-key" },
+    )
+    mockTotals = [{ deckKey: "local-key", games: 4, wins: 3, losses: 1, draws: 0, unknown: 0 }]
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const view = renderShelf({ access })
+    const row = () => within(view.getByTestId(`deck-card-${guestDeckRouteId(local.localId)}`))
+    expect(row().getByText("3-1")).toBeTruthy()
+    mockTotals = undefined
+    view.rerender(shelf({ access: { ...access, ownerId: "owner-b" } }))
+    expect(row().queryByText("3-1")).toBeNull()
+    mockTotals = [{ deckKey: "local-key", games: 4, wins: 1, losses: 3, draws: 0, unknown: 0 }]
+    view.rerender(shelf({ access: { ...access, ownerId: "owner-b" } }))
+    expect(row().getByText("1-3")).toBeTruthy()
+    expect(row().queryByText("3-1")).toBeNull()
+    view.rerender(
+      shelf({ access: { ...access, ready: false, signedIn: false, ownerId: undefined } }),
+    )
+    expect(row().queryByText("3-1")).toBeNull()
+    expect(row().queryByText("1-3")).toBeNull()
+    mockTotals = []
+  })
+
+  it("only queries key totals while device-only decks exist", () => {
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    renderShelf({ access })
+    expect(mockTotalsQuery).not.toHaveBeenCalled()
+    act(() => {
+      saveGuestDeck({ name: "Local", format: "commander", game: "mtg", cards: [] })
+    })
+    expect(mockTotalsQuery).toHaveBeenCalled()
+    mockTotalsQuery.mockClear()
+    act(() => clearGuestDecks())
+    expect(mockTotalsQuery).not.toHaveBeenCalled()
+  })
+
+  it("still lists local decks when their key totals fail to load", () => {
+    saveGuestDeck(
+      { name: "Local despite totals", format: "commander", game: "mtg", cards: [] },
+      { deckKey: "local-key" },
+    )
+    mockTotals = new Error("totals unavailable")
+    const list = within(renderShelf().getByTestId("decks-list"))
+    expect(list.getByText("Local despite totals")).toBeTruthy()
+    mockTotals = []
   })
 
   it("leaves out the Synced label when only local decks exist", () => {
@@ -250,13 +334,14 @@ describe("DecksScreen", () => {
     })
     expect(view.getByText("Guest Commander")).toBeTruthy()
     expect(view.queryByText("Existing Deck")).toBeNull()
-    fireEvent.press(view.getByLabelText("Guest Modern"))
+    fireEvent.press(view.getByLabelText("Guest Modern, on this device"))
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ deckId: guestDeckRouteId(second.localId), name: "Guest Modern" }),
     )
     fireEvent.changeText(view.getByTestId("deck-search-input"), "modern")
     expect(view.queryByText("Guest Commander")).toBeNull()
     expect(view.getByText("Guest Modern")).toBeTruthy()
+    expect(view.getByLabelText("Guest Modern, on this device")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("deck-search-input"), "no match")
     expect(view.queryByText("Guest Commander")).toBeNull()
     expect(view.queryByText("Nothing matches")).toBeNull()
@@ -281,6 +366,7 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     mockListMine.error = undefined
+    mockTotals = []
   })
 
   it("puts app navigation at the bottom and returns to the active game", () => {
@@ -312,7 +398,7 @@ describe("DecksScreen", () => {
     const view = renderShelf({ onSelect })
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByText("3 versions")).toBeTruthy()
-    expect(view.getByText("60% of 5")).toBeTruthy()
+    expect(view.getByText("3-2")).toBeTruthy()
     expect(
       StyleSheet.flatten(view.getByTestId("deck-card-existing-deck").props.style),
     ).toMatchObject({
@@ -570,7 +656,7 @@ describe("DecksScreen", () => {
     const view = renderShelf()
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByText("3 versions")).toBeTruthy()
-    expect(view.getByText("75% of 4")).toBeTruthy()
+    expect(view.getByText("3-1")).toBeTruthy()
     expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
   })
 

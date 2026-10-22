@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import { useNavigation } from "expo-router"
+import { router, useNavigation } from "expo-router"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { Button } from "@/components/Button"
@@ -247,6 +247,20 @@ export function GuestDeckDetailScreen({
         note={current.note ?? ""}
         editing={editing}
         editingDisabled={syncing || syncingElsewhere}
+        onStats={
+          stored
+            ? () =>
+                router.push({
+                  pathname: "/connected/decks/stats",
+                  params: {
+                    deckKey: stored.deckKey ?? stored.localId,
+                    deckName: current.name,
+                    game,
+                    format: current.format,
+                  },
+                })
+            : undefined
+        }
         statsContent={
           access?.ready && stored ? (
             <ConvexQueryBoundary key={access.ownerId} fallback={() => null}>

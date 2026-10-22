@@ -238,7 +238,9 @@ jest.mock("convex/react", () => ({
   },
 }))
 
+const mockStatsPush = jest.fn()
 jest.mock("expo-router", () => ({
+  router: { push: (...args: unknown[]) => mockStatsPush(...args) },
   useFocusEffect: (callback: () => void) =>
     require("react").useEffect(() => {
       if (mockFocused) return callback()
@@ -2247,5 +2249,13 @@ describe("DeckDetailScreen", () => {
     mockDetail.value = { ...loadedDetail, version: null, cards: [] }
     view.rerender(screen())
     expect(view.queryByTestId("add-match-result")).toBeNull()
+  })
+  it("opens stats with the same key used for its totals", () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("open-deck-stats"))
+    expect(mockStatsPush).toHaveBeenCalledWith({
+      pathname: "/connected/decks/stats",
+      params: expect.objectContaining({ deckKey: "deck-1", deckName: "Existing Deck" }),
+    })
   })
 })

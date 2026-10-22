@@ -641,7 +641,9 @@ export default defineSchema({
     unknown: v.number(),
     ...manualStatsFields,
     updatedAt: v.number(),
-  }).index("by_user_and_deck_key_and_fingerprint", ["userId", "deckKey", "fingerprint"]),
+  })
+    .index("by_user_and_deck_key_and_fingerprint", ["userId", "deckKey", "fingerprint"])
+    .index("by_user_and_fingerprint", ["userId", "fingerprint"]),
 
   cardReferences: defineTable({
     commanderEligibility: v.optional(

@@ -17,6 +17,7 @@ import type * as cards from "../cards.js";
 import type * as crons from "../crons.js";
 import type * as deckCatalogs from "../deckCatalogs.js";
 import type * as deckImports from "../deckImports.js";
+import type * as deckStats from "../deckStats.js";
 import type * as decks from "../decks.js";
 import type * as entitlements from "../entitlements.js";
 import type * as externalApiRateLimits from "../externalApiRateLimits.js";
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   deckCatalogs: typeof deckCatalogs;
   deckImports: typeof deckImports;
+  deckStats: typeof deckStats;
   decks: typeof decks;
   entitlements: typeof entitlements;
   externalApiRateLimits: typeof externalApiRateLimits;
