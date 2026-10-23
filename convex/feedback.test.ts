@@ -184,6 +184,23 @@ describe("feedback", () => {
     expect(await t.run((ctx) => ctx.db.query("feedbackMessages").collect())).toEqual([])
   })
 
+  it("deletes long threads a few hundred messages at a time until they're gone", async () => {
+    const t = makeConvexTest()
+    const requestIds = [await submit(t), await submit(t)]
+    await t.run(async (ctx) => {
+      for (const requestId of requestIds)
+        for (let i = 0; i < 300; i++)
+          await ctx.db.insert("feedbackMessages", { requestId, from: "player", body: `m${i}` })
+    })
+
+    await t.mutation(api.feedback.deleteMine, { key: ME })
+    expect(await t.run((ctx) => ctx.db.query("feedbackMessages").collect())).toHaveLength(200)
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+
+    expect(await t.query(api.feedback.mine, { key: ME })).toEqual([])
+    expect(await t.run((ctx) => ctx.db.query("feedbackMessages").collect())).toEqual([])
+  })
+
   it("posts cards to Apollo and pulls Matthew's replies back", async () => {
     process.env.APOLLO_CLOUD_URL = "https://apollo.test/"
     process.env.APOLLO_FEEDBACK_TOKEN = "feedback-token"

@@ -34,6 +34,7 @@ const MINE_SIZE = 50
 const THREAD_SIZE = 200
 const DELETE_BATCH = 20
 const ACCOUNT_DELETE_BATCH = 10
+const DELETE_MESSAGES_PER_MUTATION = 400
 const APOLLO_BATCH = 100
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
@@ -286,19 +287,27 @@ export const continueDeleteMine = internalMutation({
   },
 })
 
-async function deleteRequest(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
-  const messages = await ctx.db
-    .query("feedbackMessages")
-    .withIndex("by_request", (q) => q.eq("requestId", request._id))
-    .take(THREAD_SIZE)
-  for (const message of messages) await ctx.db.delete(message._id)
-  if (messages.length === THREAD_SIZE) return false
-  await ctx.db.delete(request._id)
-  await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, {
-    requestId: request._id,
-    deleted: true,
-  })
-  return true
+async function deleteRequests(ctx: MutationCtx, requests: Doc<"feedbackRequests">[]) {
+  let budget = DELETE_MESSAGES_PER_MUTATION
+  let removed = 0
+  for (const request of requests) {
+    const limit = budget
+    if (limit === 0) break
+    const messages = await ctx.db
+      .query("feedbackMessages")
+      .withIndex("by_request", (q) => q.eq("requestId", request._id))
+      .take(limit)
+    for (const message of messages) await ctx.db.delete(message._id)
+    budget -= messages.length
+    if (messages.length === limit) break
+    await ctx.db.delete(request._id)
+    await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, {
+      requestId: request._id,
+      deleted: true,
+    })
+    removed += 1
+  }
+  return removed
 }
 
 async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
@@ -306,9 +315,9 @@ async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
     .query("feedbackRequests")
     .withIndex("by_sender_and_updated_at", (q) => q.eq("senderHash", hash))
     .take(DELETE_BATCH)
-  let more = requests.length === DELETE_BATCH
-  for (const request of requests) if (!(await deleteRequest(ctx, request))) more = true
-  if (more) await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
+  const removed = await deleteRequests(ctx, requests)
+  if (requests.length === DELETE_BATCH || removed < requests.length)
+    await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
 }
 
 export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users">) {
@@ -316,7 +325,7 @@ export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users"
     .query("feedbackRequests")
     .withIndex("by_user_and_updated_at", (q) => q.eq("userId", userId))
     .take(ACCOUNT_DELETE_BATCH)
-  for (const request of linked) await deleteRequest(ctx, request)
+  await deleteRequests(ctx, linked)
   return linked.length
 }
 
