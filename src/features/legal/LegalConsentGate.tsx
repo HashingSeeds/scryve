@@ -37,6 +37,8 @@ import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import { api } from "../../../convex/_generated/api"
 
 const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy", "/support"])
+// why: a store's TV shows /e/<code> signed out and read-only; nobody stands at it to accept terms.
+const isStoreDisplay = (pathname: string) => pathname.startsWith("/e/")
 
 export const ACCOUNT_CONSENT_TIMEOUT_MS = 4000
 
@@ -62,7 +64,7 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
   const behindSplashScreen = !hasDecidedOnce
   const auth = useAuthAccess()
   const pathname = usePathname()
-  const readingDocument = READABLE_WHILE_GATED.has(pathname)
+  const readingDocument = READABLE_WHILE_GATED.has(pathname) || isStoreDisplay(pathname)
   const anAccountHasUsedThisDevice = accountAcceptanceCache.hasAccountsOtherThan(undefined)
   const isLoadingAuth =
     auth.configured && !auth.isLoaded && !readingDocument && anAccountHasUsedThisDevice

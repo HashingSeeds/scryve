@@ -202,6 +202,11 @@ describe("LegalConsentGate", () => {
     expect(renderGate().getByText("APP CONTENT")).toBeTruthy()
   })
 
+  it("lets a store screen show an event without accepting terms", () => {
+    mockPathname = "/e/ABC123"
+    expect(renderGate().getByText("APP CONTENT")).toBeTruthy()
+  })
+
   it("opens the documents from the prompt", () => {
     const view = renderGate()
     fireEvent.press(view.getByText("Read the Terms of Use"))
