@@ -271,18 +271,22 @@ describe("feedback", () => {
     expect(await t.query(api.feedback.board, { key: OTHER })).toMatchObject([{ reported: true }])
   })
 
-  it("deletes everything an install sent and takes back its votes", async () => {
+  it("deletes everything an install sent and takes back its votes and reports", async () => {
     const t = makeConvexTest()
     const theirs = await submit(t, OTHER)
     await apollo(t, theirs, "publish")
     const mine = await submit(t)
     await t.mutation(api.feedback.reply, { key: ME, requestId: mine, body: "More detail" })
     await t.mutation(api.feedback.vote, { key: ME, requestId: theirs, voted: true })
+    await t.mutation(api.feedback.report, { key: ME, requestId: theirs })
 
     await t.mutation(api.feedback.deleteMine, { key: ME })
+    await apollo(t, theirs, "publish")
 
     expect(await t.query(api.feedback.mine, { key: ME })).toEqual([])
     expect(await t.query(api.feedback.board, {})).toMatchObject([{ _id: theirs, votes: 1 }])
+    const input = await t.query(internal.feedback.apolloCardInput, { requestId: theirs })
+    expect(input?.request.reports).toBe(0)
     expect(await t.run((ctx) => ctx.db.query("feedbackMessages").collect())).toEqual([])
   })
 

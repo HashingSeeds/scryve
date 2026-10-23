@@ -517,7 +517,11 @@ async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
     .query("feedbackReports")
     .withIndex("by_sender", (q) => q.eq("senderHash", hash))
     .take(THREAD_SIZE)
-  for (const report of reports) await ctx.db.delete(report._id)
+  for (const report of reports) {
+    await ctx.db.delete(report._id)
+    const request = await ctx.db.get(report.requestId)
+    if (request) await ctx.db.patch(request._id, { reports: Math.max(0, request.reports - 1) })
+  }
   if (more || votes.length === THREAD_SIZE || reports.length === THREAD_SIZE)
     await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
 }
