@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { View } from "react-native"
+import { TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useConvex } from "convex/react"
 
@@ -27,10 +27,12 @@ export function DeckAnalysisTab({
   game,
   format,
   cards,
+  onChooseCommander,
 }: {
   game: string
   format: string
   cards: DeckCard[]
+  onChooseCommander?: () => void
 }) {
   const { themed } = useAppTheme()
   const client = useConvex()
@@ -72,12 +74,25 @@ export function DeckAnalysisTab({
             />
           ) : null}
           {analysis.needsCommander ? (
-            <Text
-              size="xs"
-              style={themed($dim)}
-              tx="decks:analysis.noCommander"
-              testID="deck-analysis-no-commander"
-            />
+            <View style={$row}>
+              <Text
+                size="xs"
+                style={themed($dim)}
+                tx="decks:analysis.noCommander"
+                testID="deck-analysis-no-commander"
+              />
+              {onChooseCommander ? (
+                <TouchableOpacity
+                  testID="deck-analysis-choose-commander"
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("decks:cardRow.chooseCommander")}
+                  style={$choose}
+                  onPress={onChooseCommander}
+                >
+                  <Text size="xs" style={themed($action)} tx="decks:cardRow.choose" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -258,6 +273,13 @@ const $panel: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $group: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
+const $choose: ViewStyle = {
+  minWidth: 44,
+  minHeight: 44,
+  alignItems: "center",
+  justifyContent: "center",
+}
 const $curve: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "flex-end",

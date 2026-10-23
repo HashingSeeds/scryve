@@ -237,7 +237,12 @@ export function DeckView({
               ) : cards.length === 0 ? (
                 <Text style={themed($notes)} tx="decks:deckView.noCards" />
               ) : (
-                <DeckAnalysisTab game={game} format={format} cards={cards} />
+                <DeckAnalysisTab
+                  game={game}
+                  format={format}
+                  cards={cards}
+                  onChooseCommander={onChooseCommander}
+                />
               )
             ) : tab === "notes" ? (
               <View style={themed($notes)}>

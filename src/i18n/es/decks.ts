@@ -406,7 +406,7 @@ export default {
   },
   analysis: {
     incomplete: "{{count}} de {{size}} cartas. Las probabilidades usan las cartas de la lista.",
-    noCommander: "No has elegido comandante. Elige uno en la pestaña Cartas.",
+    noCommander: "No has elegido comandante.",
     curve: "Curva de maná",
     average: "Promedio {{value}}",
     lands: "Tierras",

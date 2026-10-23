@@ -394,7 +394,7 @@ const decks = {
   },
   analysis: {
     incomplete: "{{count}} of {{size}} cards. Odds use the cards listed.",
-    noCommander: "No commander chosen. Choose one on the Cards tab.",
+    noCommander: "No commander chosen.",
     curve: "Mana curve",
     average: "Average {{value}}",
     lands: "Lands",

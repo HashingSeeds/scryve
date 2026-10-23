@@ -413,7 +413,7 @@ export default {
   },
   analysis: {
     incomplete: "{{count}} cartes sur {{size}}. Les probabilités utilisent les cartes listées.",
-    noCommander: "Aucun commandant choisi. Choisissez-en un dans l'onglet Cartes.",
+    noCommander: "Aucun commandant choisi.",
     curve: "Courbe de mana",
     average: "Moyenne : {{value}}",
     lands: "Terrains",

@@ -381,7 +381,7 @@ export default {
   },
   analysis: {
     incomplete: "{{size}}枚中{{count}}枚。確率はリストにあるカードで計算しています。",
-    noCommander: "統率者が選ばれていません。カードタブで選んでください。",
+    noCommander: "統率者が選ばれていません。",
     curve: "マナカーブ",
     average: "平均 {{value}}",
     lands: "土地",
