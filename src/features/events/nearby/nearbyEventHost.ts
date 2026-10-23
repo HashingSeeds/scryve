@@ -30,6 +30,7 @@ export type HostStatus = "idle" | "starting" | "hosting" | "error"
 export interface NearbyHostState {
   readonly event: HubEvent | null
   readonly hostPlayerId: string | null
+  readonly importedEventId: string | null
   readonly status: HostStatus
   readonly error?: string
 }
@@ -38,13 +39,18 @@ interface Guest {
   playerId: string | null
 }
 
-function stored(): Pick<NearbyHostState, "event" | "hostPlayerId"> {
+type Stored = Pick<NearbyHostState, "event" | "hostPlayerId" | "importedEventId">
+
+function stored(): Stored {
   const value = load(STORAGE_KEY)
-  if (typeof value !== "object" || value === null || !("event" in value)) {
-    return { event: null, hostPlayerId: null }
+  if (typeof value !== "object" || value === null || !("event" in value))
+    return { event: null, hostPlayerId: null, importedEventId: null }
+  const saved = value as Partial<Stored> & { event: HubEvent }
+  return {
+    event: saved.event,
+    hostPlayerId: saved.hostPlayerId ?? null,
+    importedEventId: saved.importedEventId ?? null,
   }
-  const { event, hostPlayerId } = value as { event: HubEvent; hostPlayerId?: string | null }
-  return { event, hostPlayerId: hostPlayerId ?? null }
 }
 
 class NearbyEventHost {
@@ -65,10 +71,18 @@ class NearbyEventHost {
     for (const listener of this.listeners) listener()
   }
 
-  private commit(event: HubEvent, hostPlayerId = this.state.hostPlayerId) {
-    save(STORAGE_KEY, { event, hostPlayerId })
-    this.set({ event, hostPlayerId })
+  private commit(
+    event: HubEvent,
+    hostPlayerId = this.state.hostPlayerId,
+    importedEventId = this.state.importedEventId,
+  ) {
+    save(STORAGE_KEY, { event, hostPlayerId, importedEventId })
+    this.set({ event, hostPlayerId, importedEventId })
     this.broadcast()
+  }
+
+  markImported(eventId: string) {
+    if (this.state.event) this.commit(this.state.event, this.state.hostPlayerId, eventId)
   }
 
   async create(event: HubEvent, organizerPlays: { name: string } | null) {
@@ -86,7 +100,7 @@ class NearbyEventHost {
       hostPlayerId = joined.playerId
     }
     await this.stop()
-    this.commit(next, hostPlayerId)
+    this.commit(next, hostPlayerId, null)
     await this.start()
   }
 
@@ -122,7 +136,7 @@ class NearbyEventHost {
   async discard() {
     await this.stop()
     remove(STORAGE_KEY)
-    this.set({ event: null, hostPlayerId: null })
+    this.set({ event: null, hostPlayerId: null, importedEventId: null })
   }
 
   run(command: HubCommand) {

@@ -891,9 +891,11 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
     finishedAt: v.optional(v.number()),
+    nearbyId: v.optional(v.string()),
   })
     .index("by_code", ["code"])
-    .index("by_owner_user_and_status", ["ownerUserId", "status"]),
+    .index("by_owner_user_and_status", ["ownerUserId", "status"])
+    .index("by_owner_user_and_nearby_id", ["ownerUserId", "nearbyId"]),
 
   eventPlayers: defineTable({
     eventId: v.id("events"),

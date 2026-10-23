@@ -242,4 +242,73 @@ describe("events", () => {
     jest.clearAllTimers()
     jest.useRealTimers()
   })
+
+  describe("importing a nearby event", () => {
+    const nearby = {
+      nearbyId: "event_abc",
+      name: "Wifi Night",
+      format: "modern",
+      structure: "swiss" as const,
+      bestOf: 3 as const,
+      points: { win: 3, draw: 1, loss: 0 },
+      plannedRounds: 1,
+      roundMinutes: 50,
+      round: 1,
+      createdAt: 1,
+      finishedAt: 2,
+      players: [
+        { id: "p1", name: "Kim" },
+        { id: "p2", name: "Gus" },
+        { id: "p3", name: "Lin" },
+      ],
+      tables: [
+        {
+          round: 1,
+          table: 1,
+          playerIds: ["p1", "p2"],
+          status: "confirmed" as const,
+          result: { kind: "match" as const, gamesWon: [2, 1], gamesDrawn: 0 },
+          reportedBy: "p1",
+        },
+        {
+          round: 1,
+          table: 2,
+          playerIds: ["p3"],
+          status: "confirmed" as const,
+          result: { kind: "bye" as const },
+        },
+      ],
+      codeCandidates: ["NRB123", "NRB124"],
+    }
+
+    it("stores the finished event once, however often it's sent", async () => {
+      const { t, organizer } = await setup([])
+      const first = await organizer.mutation(api.events.importNearby, nearby)
+      const again = await organizer.mutation(api.events.importNearby, nearby)
+      expect(again.eventId).toBe(first.eventId)
+
+      const view = await t.query(api.events.view, { eventId: first.eventId })
+      expect(view).toMatchObject({ status: "finished", round: 1, name: "Wifi Night" })
+      const standings = await t.query(api.events.standings, {
+        eventId: first.eventId,
+        throughRound: 1,
+      })
+      expect(standings!.map((row) => [row.points, row.wins])).toEqual([
+        [3, 1],
+        [3, 1],
+        [0, 0],
+      ])
+    })
+
+    it("refuses tables that name players the event doesn't have", async () => {
+      const { organizer } = await setup([])
+      await expect(
+        organizer.mutation(api.events.importNearby, {
+          ...nearby,
+          nearbyId: "event_bad",
+          tables: [{ ...nearby.tables[0]!, playerIds: ["p1", "ghost"] }],
+        }),
+      ).rejects.toThrow("Unknown player")
+    })
+  })
 })
