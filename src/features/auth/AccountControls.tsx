@@ -13,7 +13,6 @@ import { writeSessionHint } from "./sessionHint"
 export function AccountProfile({
   onBack,
   onSigningOut,
-  onSignedOut,
   onOpenTerms,
   onOpenPrivacy,
   onOpenGameContentNotices,
@@ -22,14 +21,8 @@ export function AccountProfile({
   const clerk = useClerk()
   const { user } = useUser()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const [error, setError] = useState<string>()
-  const identity = {
-    name: user?.fullName || user?.username || undefined,
-    email: user?.primaryEmailAddress?.emailAddress,
-    avatarUrl: user?.imageUrl,
-  }
-  // why: Clerk drops the user before signOut resolves, so the screen keeps who it is signing out until the route leaves.
-  const [signingOutAs, setSigningOutAs] = useState<typeof identity>()
 
   // why: Clerk's profile sheet can sign out on its own and reports it to JS late, so the hint stays cleared until Clerk next confirms a session.
   function openProfile() {
@@ -40,11 +33,10 @@ export function AccountProfile({
   async function signOut() {
     try {
       setError(undefined)
-      setSigningOutAs(identity)
-      onSigningOut?.(true)
+      setIsSigningOut(true)
       writeSessionHint({ userId: null })
+      onSigningOut?.(true)
       await clerk.signOut()
-      onSignedOut?.()
     } catch (cause) {
       reportCrash(
         cause instanceof Error ? cause : new Error("Clerk sign-out failed"),
@@ -58,17 +50,20 @@ export function AccountProfile({
           },
         },
       )
-      setError(translate("account:profile.signOutFailed"))
-      setSigningOutAs(undefined)
       onSigningOut?.(false)
+      setError(translate("account:profile.signOutFailed"))
+    } finally {
+      setIsSigningOut(false)
     }
   }
 
   return (
     <View style={$fill}>
       <AccountScreen
-        {...(signingOutAs ?? identity)}
-        isSigningOut={signingOutAs !== undefined}
+        name={user?.fullName || user?.username || undefined}
+        email={user?.primaryEmailAddress?.emailAddress}
+        avatarUrl={user?.imageUrl}
+        isSigningOut={isSigningOut}
         error={error}
         accountControls={accountControls}
         onBack={onBack}

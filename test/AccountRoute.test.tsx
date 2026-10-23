@@ -1,30 +1,24 @@
 import { router } from "expo-router"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native"
 
-import type { AccountProfileProps } from "@/features/auth/accountProfileProps"
 import { ThemeProvider } from "@/theme/context"
 
 import AccountRoute from "../src/app/account"
 
 let mockReceiptToken: string | undefined
-let mockIsSignedIn = false
-let mockProfileProps: AccountProfileProps | undefined
+let mockSigningOut = false
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
 }))
-jest.mock("@/features/auth/AccountControls", () => ({
-  AccountProfile: (props: AccountProfileProps) => {
-    mockProfileProps = props
-    return null
-  },
-}))
+jest.mock("@/features/auth/AccountControls", () => ({ AccountProfile: () => null }))
 jest.mock("@/features/billing/SubscriptionControls", () => ({ SubscriptionControls: () => null }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({
     configured: true,
     isLoaded: true,
-    isSignedIn: mockIsSignedIn,
+    isSignedIn: false,
+    signingOut: mockSigningOut,
     openAuth: jest.fn(),
   }),
 }))
@@ -43,7 +37,7 @@ describe("account route while signed out", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockReceiptToken = undefined
-    mockIsSignedIn = false
+    mockSigningOut = false
   })
 
   it("hides account data without a deletion receipt", () => {
@@ -57,19 +51,12 @@ describe("account route while signed out", () => {
   })
 })
 
-describe("account route while signing out", () => {
-  it("keeps the profile up after Clerk drops the session", () => {
-    mockIsSignedIn = true
+describe("account route after signing out here", () => {
+  it("leaves for Play without flashing the sign-in prompt", () => {
+    mockSigningOut = true
     const view = renderRoute()
-    act(() => mockProfileProps?.onSigningOut?.(true))
-
-    mockIsSignedIn = false
-    view.rerender(
-      <ThemeProvider>
-        <AccountRoute />
-      </ThemeProvider>,
-    )
 
     expect(view.queryByText("Sign in before opening your profile.")).toBeNull()
+    expect(router.dismissTo).toHaveBeenCalledWith("/")
   })
 })

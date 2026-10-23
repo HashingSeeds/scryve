@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect } from "react"
 import { router } from "expo-router"
 
 import { Button } from "@/components/Button"
@@ -14,11 +14,20 @@ import { translate } from "@/i18n/translate"
 
 export default function AccountRoute() {
   const auth = useAuthAccess()
-  const [signingOut, setSigningOut] = useState(false)
   const leaveAccount = () => (router.canGoBack() ? router.back() : router.replace("/"))
   const openAccountData = () => router.push("/delete-account")
-  // why: Clerk reports signed out before signOut resolves; without this the signed-out prompt flashes before the route leaves.
-  if (!auth.configured || (!auth.isSignedIn && !signingOut)) {
+  const signedOutHere = auth.signingOut && !auth.isSignedIn
+  useEffect(() => {
+    if (signedOutHere) router.dismissTo("/")
+  }, [signedOutHere])
+  // why: Clerk drops the session before signOut resolves, which remounts this route; showing the sign-in prompt here flashed it on every sign out.
+  if (signedOutHere)
+    return (
+      <Screen preset="fixed">
+        <Header titleTx="account:profile.title" leftTx="common:back" />
+      </Screen>
+    )
+  if (!auth.configured || !auth.isSignedIn) {
     const hasDeletionReceipt = auth.configured && loadAccountDeletionReceiptToken() !== undefined
     const prompt = auth.configurationMessage || translate("account:profile.signInPrompt")
     return (
@@ -53,8 +62,7 @@ export default function AccountRoute() {
         onOpenTerms={() => router.push("/terms")}
         onOpenPrivacy={() => router.push("/privacy")}
         onOpenGameContentNotices={() => router.push("/game-content-notices")}
-        onSigningOut={setSigningOut}
-        onSignedOut={() => router.dismissTo("/")}
+        onSigningOut={auth.setSigningOut}
       />
     </Screen>
   )

@@ -38,6 +38,8 @@ interface AuthAccess {
   userId?: string
   sessionHint?: SessionHint
   authVisible: boolean
+  signingOut: boolean
+  setSigningOut: (signingOut: boolean) => void
   openAuth: () => void
   closeAuth: () => void
 }
@@ -47,6 +49,8 @@ const AuthAccessContext = createContext<AuthAccess>({
   isLoaded: true,
   isSignedIn: false,
   authVisible: false,
+  signingOut: false,
+  setSigningOut: () => undefined,
   openAuth: () => undefined,
   closeAuth: () => undefined,
 })
@@ -76,6 +80,8 @@ export function ConfiguredAuth({
   const { user } = useUser()
   const revenueCat = readRevenueCatConfig()
   const [visible, setVisible] = useState(false)
+  // why: lives above the keyed app tree, which remounts on sign out, so the remounted account route knows to leave instead of prompting sign in.
+  const [signingOut, setSigningOut] = useState(false)
   const [convexAuthRetryKey, setConvexAuthRetryKey] = useState(0)
   const sessionHint = useSessionHint({
     isLoaded: Boolean(isLoaded),
@@ -91,10 +97,15 @@ export function ConfiguredAuth({
       userId: user?.id,
       sessionHint,
       authVisible: visible,
-      openAuth: () => setVisible(true),
+      signingOut,
+      setSigningOut,
+      openAuth: () => {
+        setSigningOut(false)
+        setVisible(true)
+      },
       closeAuth: () => setVisible(false),
     }),
-    [isLoaded, isSignedIn, user?.id, sessionHint, visible],
+    [isLoaded, isSignedIn, user?.id, sessionHint, visible, signingOut],
   )
   const client = useMemo(
     () =>
@@ -154,6 +165,8 @@ export function CloudProviders({ children }: { children: ReactNode }) {
           isLoaded: true,
           isSignedIn: false,
           authVisible: false,
+          signingOut: false,
+          setSigningOut: () => undefined,
           openAuth: () => undefined,
           closeAuth: () => undefined,
         }}

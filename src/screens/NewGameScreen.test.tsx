@@ -629,6 +629,8 @@ describe("NewGameScreen", () => {
       isLoaded: true,
       isSignedIn,
       authVisible: false,
+      signingOut: false,
+      setSigningOut: jest.fn(),
       openAuth,
       closeAuth: jest.fn(),
     })
