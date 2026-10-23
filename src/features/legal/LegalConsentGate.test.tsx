@@ -564,6 +564,40 @@ describe("LegalConsentGate", () => {
     jest.useRealTimers()
   })
 
+  it("does not warn about a pending sync while the first save is still in flight", async () => {
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = []
+    const save = deferred<{ acceptedAt: number }>()
+    mockRecordAcceptance.mockReturnValueOnce(save.promise)
+    const view = renderGate()
+
+    await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
+
+    await act(async () => save.resolve({ acceptedAt: 0 }))
+    expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
+    expect(accountConsentSyncStore.read("user-a")).toEqual({})
+  })
+
+  it("warns once a first save stalls past the grace period", async () => {
+    jest.useFakeTimers()
+    try {
+      mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+      mockAccountAcceptances = []
+      mockRecordAcceptance.mockReturnValueOnce(deferred<{ acceptedAt: number }>().promise)
+      const view = renderGate()
+
+      await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
+      expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
+
+      act(() => void jest.advanceTimersByTime(ACCOUNT_CONSENT_TIMEOUT_MS))
+      expect(view.getByText("Agreement saved on this device. Account sync pending.")).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("replays an unsynced acceptance once the backend authenticates", async () => {
     jest.useFakeTimers()
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }

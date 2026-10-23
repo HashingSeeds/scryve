@@ -210,6 +210,7 @@ function ConfiguredConsentGate({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSyncingAcceptance, setIsSyncingAcceptance] = useState(false)
   const [retryFailed, setRetryFailed] = useState(false)
+  const [firstSaveInFlightUserId, setFirstSaveInFlightUserId] = useState<string>()
   const [recentlySyncedUserId, setRecentlySyncedUserId] = useState<string>()
   const currentUserId = useRef(userId)
   const syncAttemptedUserIds = useRef(new Set<string>())
@@ -340,19 +341,31 @@ function ConfiguredConsentGate({
     setRecentlySyncedUserId(syncingUserId)
   }, [backendReady, sendAcceptance, setPendingSync, userId])
 
-  const accept = useCallback(async () => {
-    setIsSubmitting(true)
+  const saveNewAcceptance = useCallback(async () => {
+    const savingUserId = userId
+    setFirstSaveInFlightUserId(savingUserId)
     setRetryFailed(false)
     keepAcceptanceOnThisDevice()
     markAcceptancePending()
-    try {
-      await syncAcceptance()
-    } catch {
-      return
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [keepAcceptanceOnThisDevice, markAcceptancePending, syncAcceptance])
+    await syncAcceptance().catch(() => undefined)
+    setFirstSaveInFlightUserId((current) => (current === savingUserId ? undefined : current))
+  }, [keepAcceptanceOnThisDevice, markAcceptancePending, syncAcceptance, userId])
+
+  useEffect(() => {
+    if (!firstSaveInFlightUserId) return
+    // why: an offline Convex mutation stays pending until reconnect, so a stalled save must still warn.
+    const timer = setTimeout(
+      () => setFirstSaveInFlightUserId(undefined),
+      ACCOUNT_CONSENT_TIMEOUT_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [firstSaveInFlightUserId])
+
+  const accept = useCallback(async () => {
+    setIsSubmitting(true)
+    await saveNewAcceptance()
+    setIsSubmitting(false)
+  }, [saveNewAcceptance])
 
   useEffect(() => {
     if (
@@ -364,19 +377,15 @@ function ConfiguredConsentGate({
       !backendReady
     )
       return
-    keepAcceptanceOnThisDevice()
-    markAcceptancePending()
-    void syncAcceptance().catch(() => undefined)
+    void saveNewAcceptance()
   }, [
     signedIn,
     userId,
     backendReady,
     cacheSaysAccepted,
     inheritsDeviceAcceptance,
-    keepAcceptanceOnThisDevice,
-    markAcceptancePending,
     pendingSyncIsCurrent,
-    syncAcceptance,
+    saveNewAcceptance,
   ])
 
   useEffect(() => {
@@ -458,7 +467,12 @@ function ConfiguredConsentGate({
           }}
         />
       ) : null}
-      {signedIn && !bypass && showContent && pendingSyncIsCurrent ? (
+      {/* why: the first save usually lands in a moment, so only warn once it has failed. */}
+      {signedIn &&
+      !bypass &&
+      showContent &&
+      pendingSyncIsCurrent &&
+      firstSaveInFlightUserId !== userId ? (
         <AccountConsentSyncStatus
           isSyncing={isSyncingAcceptance}
           retryFailed={retryFailed}
