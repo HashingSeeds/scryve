@@ -9,6 +9,7 @@ import { limitResultRate } from "./lib/deckRateLimits"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { assertGameSystem } from "./lib/integrations"
 import { assertGameScores, MAX_GAMES_PER_MATCH, type MatchBestOf } from "./lib/matchResults"
+import { assertDeckLabel, deckLabelValidator } from "./lib/opponentDecks"
 import {
   assertDeckName,
   assertDisplayName,
@@ -94,6 +95,7 @@ export const recordManualMatch = mutation({
         ...seatResultFields,
         displayName: v.string(),
         deckName: v.optional(v.string()),
+        deckLabel: v.optional(deckLabelValidator),
       }),
     ),
   },
@@ -167,6 +169,7 @@ export const recordManualMatch = mutation({
         ...(opponent.deckName === undefined || opponent.deckName.trim() === ""
           ? {}
           : { deckName: assertDeckName(opponent.deckName) }),
+        deckLabel: assertDeckLabel(opponent.deckLabel),
         ...scoreFields(opponent),
         outcome: opponent.outcome,
       })),
@@ -234,6 +237,7 @@ export type PublishedMatchSeat = Pick<
   | "deckName"
   | "deckKey"
   | "deckFingerprint"
+  | "deckLabel"
 >
 
 function assertGameNumber(gameNumber: number) {

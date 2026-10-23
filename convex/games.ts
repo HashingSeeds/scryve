@@ -48,6 +48,12 @@ import { playerGridLayoutValidator } from "./lib/layouts"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
+  assertDeckLabel,
+  deckIdentityOf,
+  deckLabelValidator,
+  type DeckLabel,
+} from "./lib/opponentDecks"
+import {
   boundedPaginationOptions,
   CONNECTED_EVENT_PAGE_MAX_ITEMS,
   CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS,
@@ -70,7 +76,7 @@ import {
   STALE_GAME_INACTIVITY_MS,
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
-import { recordGameResults, recordPlayerResult } from "./lib/results"
+import { recordGameResults, recordPlayerResult, refreshGameOpponents } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
 import { isCounterOut, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
 import {
@@ -593,6 +599,19 @@ async function inviteIsCurrent(
   return current?._id === invite._id
 }
 
+async function labelWithIdentity(
+  ctx: QueryCtx,
+  label: DeckLabel | undefined,
+  version: Doc<"deckVersions"> | null,
+  game: Doc<"games">,
+): Promise<DeckLabel | undefined> {
+  const identity =
+    version && version.archivedAt === undefined
+      ? await deckIdentityOf(ctx, version._id, ...gameDeckRules(game))
+      : undefined
+  return identity ? { ...label, identity } : label
+}
+
 async function terminalizeGame(
   ctx: MutationCtx,
   game: Doc<"games">,
@@ -655,6 +674,7 @@ async function terminalizeGame(
         const user = player.userId ? await ctx.db.get(player.userId) : null
         const version = player.deckVersionId ? await ctx.db.get(player.deckVersionId) : null
         const deck = version ? await ctx.db.get(version.deckId) : null
+        const deckLabel = await labelWithIdentity(ctx, player.deckLabel, version, game)
         return {
           playerId: player._id,
           resultId: canonicalResultId({
@@ -669,6 +689,7 @@ async function terminalizeGame(
             : {}),
           ...(player.deckKey ? { deckKey: player.deckKey } : {}),
           ...(player.deckFingerprint ? { deckFingerprint: player.deckFingerprint } : {}),
+          ...(deckLabel ? { deckLabel } : {}),
           seat: player.seat,
           ...summaryIdentitySnapshotFor(player, user, game.mode === "local"),
           ...(player.userId ? { userId: player.userId } : {}),
@@ -1313,6 +1334,7 @@ export const publishFinishedLocalGame = mutation({
         deckKey: v.optional(v.string()),
         deckFingerprint: v.optional(v.string()),
         deckName: v.optional(v.string()),
+        deckLabel: v.optional(deckLabelValidator),
         seatPassHash: v.optional(v.string()),
       }),
     ),
@@ -1434,6 +1456,9 @@ export const publishFinishedLocalGame = mutation({
                 ? { deckFingerprint: (await pinnedDeck(ctx, me.deckVersionId)).deckFingerprint }
                 : {}),
           }
+    const deckLabels = new Map(
+      args.players.map((player) => [player.localId, assertDeckLabel(player.deckLabel)]),
+    )
     const gameId = await ctx.db.insert("games", {
       publicId,
       hostUserId: user._id,
@@ -1457,6 +1482,7 @@ export const publishFinishedLocalGame = mutation({
       args.players,
       ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
     )) {
+      const deckLabel = deckLabels.get(player.localId)
       const playerId = await ctx.db.insert("gamePlayers", {
         gameId,
         seat: player.seat,
@@ -1466,6 +1492,7 @@ export const publishFinishedLocalGame = mutation({
           : {}),
         ...(player.me ? attribution : {}),
         ...(player.seatPassHash ? { seatPassHash: player.seatPassHash } : {}),
+        ...(deckLabel ? { deckLabel } : {}),
         displayName: assertDisplayName(player.displayName),
         color: player.color,
         shape: player.shape,
@@ -1484,6 +1511,7 @@ export const publishFinishedLocalGame = mutation({
           seats: args.players.map((player) => ({
             seat: player.seat,
             displayName: player.displayName,
+            deckLabel: deckLabels.get(player.localId),
             ...(player.me
               ? {
                   userId: user._id,
@@ -1633,6 +1661,8 @@ export const claimNearbySeat = mutation({
         : {}),
     })
     const claimed = summary.players.find((player) => player.playerId === seat._id)
+    const deckLabel =
+      chosen && (await labelWithIdentity(ctx, claimed?.deckLabel, chosen.version, game))
     const claimedPlayer = claimed && {
       ...claimed,
       ...summaryIdentitySnapshotFor({ ...seat, ...identity }, user, true),
@@ -1644,6 +1674,7 @@ export const claimNearbySeat = mutation({
             deckNameAtFinish: chosen.deck.name,
             deckVersionId: chosen.version._id,
             deckVersionNumber: chosen.version.versionNumber,
+            ...(deckLabel ? { deckLabel } : {}),
           }
         : {}),
     }
@@ -1652,7 +1683,10 @@ export const claimNearbySeat = mutation({
         claimedPlayer && player.playerId === seat._id ? claimedPlayer : player,
       ),
     })
-    if (claimedPlayer) await recordPlayerResult(ctx, summary, claimedPlayer, Date.now())
+    if (claimedPlayer) {
+      await recordPlayerResult(ctx, summary, claimedPlayer, Date.now())
+      await refreshGameOpponents(ctx, (await ctx.db.get(summary._id))!)
+    }
     await ctx.db.insert("gameHistoryEntries", {
       userId: user._id,
       source: "local",
@@ -1841,6 +1875,7 @@ export const lobbyProjection = query({
             shape: appearanceOf(p).shape,
             ...(p.proShape ? { proShape: p.proShape } : {}),
             ...(p.foil ? { foil: true } : {}),
+            ...(isHost && p.deckLabel ? { deckLabel: p.deckLabel } : {}),
             currentLife: p.currentLife,
             ...(commanderDamage
               ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
@@ -2208,6 +2243,26 @@ export const updateMySeat = mutation({
     }
     await ctx.db.patch(player._id, { displayName, color })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
+  },
+})
+
+export const labelGuestSeatDeck = mutation({
+  args: {
+    publicId: v.string(),
+    seat: v.number(),
+    deckLabel: v.union(deckLabelValidator, v.null()),
+  },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    const user = await requireHost(ctx, game)
+    if (game.status !== "lobby" && game.status !== "active")
+      throw new Error("Only a lobby or an active game can label a seat")
+    await limitGameRate(ctx, "gameWrite", user._id)
+    const player = (await playersForGame(ctx, game._id)).find(({ seat }) => seat === args.seat)
+    if (!player || player.userId) throw new Error("Only a guest seat can be labeled")
+    await ctx.db.patch(player._id, { deckLabel: assertDeckLabel(args.deckLabel ?? undefined) })
+    await ctx.db.patch(game._id, { updatedAt: Date.now() })
+    return null
   },
 })
 
@@ -2969,6 +3024,7 @@ async function startRematch(
       ...(player.avatarUrl ? { avatarUrl: player.avatarUrl } : {}),
       ...(player.usernameAtJoin ? { usernameAtJoin: player.usernameAtJoin } : {}),
       ...(deckVersionId ? { deckVersionId, ...(await pinnedDeck(ctx, deckVersionId)) } : {}),
+      ...(player.deckLabel ? { deckLabel: player.deckLabel } : {}),
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),
       ...(await rematchProMark(ctx, player)),

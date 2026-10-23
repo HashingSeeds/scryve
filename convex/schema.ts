@@ -3,6 +3,7 @@ import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
 import { playerGridLayoutValidator } from "./lib/layouts"
+import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { pokemonBoardValidator } from "./lib/table"
 import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
 
@@ -42,6 +43,7 @@ const matchSeat = v.object({
   deckName: v.optional(v.string()),
   deckKey: v.optional(v.string()),
   deckFingerprint: v.optional(v.string()),
+  deckLabel: v.optional(deckLabelValidator),
   gamesWon: v.optional(v.number()),
   gamesDrawn: v.optional(v.number()),
   outcome: v.optional(resultOutcome),
@@ -151,6 +153,7 @@ export default defineSchema({
     deckVersionId: v.optional(v.id("deckVersions")),
     deckKey: v.optional(v.string()),
     deckFingerprint: v.optional(v.string()),
+    deckLabel: v.optional(deckLabelValidator),
     deletedAt: v.optional(v.number()),
     color: v.string(),
     shape: v.optional(v.string()),
@@ -296,6 +299,7 @@ export default defineSchema({
         resultId: v.optional(v.string()),
         deckKey: v.optional(v.string()),
         deckFingerprint: v.optional(v.string()),
+        deckLabel: v.optional(deckLabelValidator),
         seat: v.number(),
         displayName: v.string(),
         userId: v.optional(v.id("users")),
@@ -626,6 +630,8 @@ export default defineSchema({
     legacyDeckId: v.optional(v.id("decks")),
     podSize: v.optional(v.number()),
     deckVersionId: v.optional(v.id("deckVersions")),
+    // why: an embedded array is safe because a game or match holds at most MAX_PLAYERS seats.
+    opponents: v.optional(v.array(resultOpponentValidator)),
   })
     .index("by_user_and_result_id", ["userId", "resultId"])
     .index("by_legacy_deck_id", ["legacyDeckId"])
