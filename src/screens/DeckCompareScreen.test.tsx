@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 import { captureAnalytics } from "@/utils/analytics"
@@ -21,6 +21,9 @@ const mockLookup = jest.fn(async (_deckKey: string, fingerprint: string) =>
   fingerprint === "current" ? [{ name: "Bolt", quantity: 4 }] : [{ name: "Land", quantity: 2 }],
 )
 const mockPaywall = jest.fn(async () => undefined)
+jest.mock("@/features/stats/useListCards", () => ({
+  useListCards: () => ({ currentFingerprint: "current", cards: new Map() }),
+}))
 jest.mock("../../convex/_generated/api", () => ({
   api: { deckStats: { summary: "summary" }, decks: { capacity: "capacity" } },
 }))
@@ -50,7 +53,9 @@ beforeEach(() => {
 it("defaults to current versus previous with exact records and card changes", async () => {
   const view = render(screen())
   expect(view.getByText("Current ▾")).toBeTruthy()
-  expect(view.getByText("Previous ▾")).toBeTruthy()
+  expect(within(view.getByTestId("compare-pick-right")).getByText(/▾$/)).not.toHaveTextContent(
+    "Current",
+  )
   expect(view.getByText("4-4")).toBeTruthy()
   expect(view.getByText("8-4")).toBeTruthy()
   expect(view.getByText("50%")).toBeTruthy()

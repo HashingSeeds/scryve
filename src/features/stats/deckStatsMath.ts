@@ -103,18 +103,5 @@ export function listStats(summary: DeckSummary, source: StatsSource = "all") {
       sortAt: lastAt ?? 0,
     }
   })
-  rows.sort((a, b) => b.sortAt - a.sortAt)
-  let trackedIndex = 0
-  return rows.map((row) => {
-    const index = row.fingerprint === null ? undefined : trackedIndex++
-    const label =
-      index === undefined
-        ? ("untracked" as const)
-        : index === 0
-          ? ("current" as const)
-          : index === 1
-            ? ("previous" as const)
-            : ("dated" as const)
-    return { ...row, label }
-  })
+  return rows.sort((a, b) => b.sortAt - a.sortAt)
 }

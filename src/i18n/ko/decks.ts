@@ -27,7 +27,7 @@ export default {
     podSize: "플레이어 수",
     sources: "출처",
     current: "현재",
-    previous: "이전",
+    moreChanges: "{{count}}개 더 보기",
     notTracked: "기록 없음",
     dateSpan: "{{first}}~{{last}}",
     players_other: "{{count}}명",

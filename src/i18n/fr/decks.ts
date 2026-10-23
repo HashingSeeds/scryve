@@ -31,7 +31,7 @@ export default {
     podSize: "Taille de table",
     sources: "Source",
     current: "Actuelle",
-    previous: "Précédente",
+    moreChanges: "{{count}} de plus",
     notTracked: "Non suivi",
     dateSpan: "{{first}} à {{last}}",
     players_one: "{{count}} joueur",

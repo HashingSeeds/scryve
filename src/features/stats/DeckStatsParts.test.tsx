@@ -5,7 +5,8 @@ import { DialogCard } from "@/components/DialogCard"
 import { ThemeProvider } from "@/theme/context"
 
 import { listStats } from "./deckStatsMath"
-import { DeckComparePrompt, listDateSpan, listLabel } from "./DeckStatsParts"
+import { DeckComparePrompt, listDateSpan, listDetail, listLabel } from "./DeckStatsParts"
+import { labelLists } from "./listLabels"
 import { deckStatsSummary } from "../../../test/fixtures/deckStats"
 
 const mockPaywall = jest.fn(async () => undefined)
@@ -13,15 +14,38 @@ jest.mock("@/features/billing/RevenueCatContext", () => ({
   useRevenueCat: () => ({ configured: true, isLoading: false, presentPaywall: mockPaywall }),
 }))
 
-it("labels current, previous and untracked lists with localized date spans", () => {
-  const lists = listStats(deckStatsSummary, "scryve")
-  expect(lists.map(listLabel)).toEqual(["Current", "Previous", "Not tracked"])
-  const sep10 = new Date(2026, 8, 10, 12).getTime()
-  const oct1 = new Date(2026, 9, 1, 12).getTime()
-  expect(listDateSpan({ ...lists[0], firstAt: sep10, lastAt: oct1 })).toContain(" to ")
-  expect(listDateSpan({ ...lists[0], firstAt: oct1, lastAt: oct1 + 60_000 })).not.toContain(" to ")
-  expect(listDateSpan({ ...lists[0], firstAt: undefined })).toBe("Dates not tracked")
-  expect(listLabel({ ...lists[0], label: "dated" })).toBe(listDateSpan(lists[0]))
+it("names only the deck's current list Current, dates the rest and keeps untracked clear", () => {
+  const lists = labelLists(listStats(deckStatsSummary), {
+    currentFingerprint: "previous",
+    cards: new Map(),
+  })
+  expect(lists.map((list) => [list.fingerprint, listLabel(list)])).toEqual([
+    ["current", listDateSpan(lists[0])],
+    ["previous", "Current"],
+    [null, "Not tracked"],
+  ])
+  expect(listDetail(lists[0])).toBe("")
+  expect(listDetail(lists[1])).toBe(listDateSpan(lists[1]))
+})
+
+it("summarizes card changes against the previous list, and caps long summaries", () => {
+  const cards = new Map([
+    ["current", [{ name: "Forest", quantity: 2 }]],
+    [
+      "previous",
+      [
+        { name: "Forest", quantity: 1 },
+        { name: "Plains", quantity: 1 },
+      ],
+    ],
+  ])
+  const [current] = labelLists(listStats(deckStatsSummary), { cards })
+  expect(listDetail(current)).toBe("+1 Forest, −1 Plains")
+  const many = {
+    ...current,
+    changes: ["A", "B", "C", "D", "E"].map((name) => ({ name, quantity: 1 })),
+  }
+  expect(listDetail(many)).toBe("+1 A, +1 B, +1 C, 2 more")
 })
 
 it("presents the Pro paywall after dismissing the iOS prompt", async () => {
