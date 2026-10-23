@@ -37,15 +37,14 @@ import {
 import { createCalculators, hasCalculator } from "./yugioh"
 
 // The game menu button, ported from the app's dark keystone shape
-// (src/components/GameMenuButtonShape.tsx) and three-bar glyph (GameRadialMenu.tsx),
-// which the app draws at 80px. Keep the geometry in sync with those files.
+// (src/components/GameMenuButtonShape.tsx) and three-bar glyph (GameRadialMenu.tsx).
+// Keep the geometry in sync with those files.
 const PENTAGON_VIEWBOX = 100
 const PENTAGON_RADIUS = 46
 const PENTAGON_STROKE_WIDTH = 7
 const PENTAGON_BORDER = "#000000"
 const PENTAGON_FACE = { top: "#46434E", bottom: "#26242C" } as const
 const PENTAGON_GLYPH = "#FFFFFF"
-const PENTAGON_GLYPH_PX_PER_UNIT = 0.8
 
 // The app's softened corners (buildSoftCorners): each corner is a quadratic curve that starts and
 // ends `cornerRadius` along its two sides, so the pentagon is rounded, not pointy.
@@ -76,12 +75,15 @@ function softPentagonPath(radius: number, cornerRadius: number): string {
 const PENTAGON_PATH = softPentagonPath(PENTAGON_RADIUS, PENTAGON_CORNER_RADIUS)
 const FACE_PATH = softPentagonPath(PENTAGON_RADIUS - PENTAGON_STROKE_WIDTH / 2, FACE_CORNER_RADIUS)
 
-// The app's glyph is 16x2px bars spaced 5px apart; convert to viewBox units.
-const GLYPH_BARS = [-5, 0, 5]
-  .map((offsetPx) => {
-    const unit = (px: number) => px / PENTAGON_GLYPH_PX_PER_UNIT
+// The app's glyph keeps splash-ios-source.svg's bars (GameRadialMenu SPLASH_MENU_GLYPH), scaled
+// from the splash pentagon's radius to this one.
+const SPLASH_MENU_GLYPH = { pentagonRadius: 92, barWidth: 70, barHeight: 10, pitch: 26 } as const
+const GLYPH_BARS = [-1, 0, 1]
+  .map((row) => {
+    const unit = (splash: number) => (splash * PENTAGON_RADIUS) / SPLASH_MENU_GLYPH.pentagonRadius
+    const { barWidth, barHeight, pitch } = SPLASH_MENU_GLYPH
     const center = PENTAGON_VIEWBOX / 2
-    return `<rect x="${center - unit(8)}" y="${center + unit(offsetPx) - unit(1)}" width="${unit(16)}" height="${unit(2)}" rx="${unit(1)}" fill="${PENTAGON_GLYPH}"/>`
+    return `<rect x="${center - unit(barWidth / 2)}" y="${center + unit(row * pitch - barHeight / 2)}" width="${unit(barWidth)}" height="${unit(barHeight)}" rx="${unit(barHeight / 2)}" fill="${PENTAGON_GLYPH}"/>`
   })
   .join("")
 
