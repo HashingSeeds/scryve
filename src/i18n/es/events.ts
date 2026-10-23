@@ -139,6 +139,23 @@ export default {
     clear: "Borrar resultado",
     twoWinners: "Solo un jugador puede ganar el encuentro",
   },
+  nearby: {
+    title: "Eventos cercanos",
+    host: "Organizar en este dispositivo",
+    yourEvent: "Tu evento",
+    searching: "Buscando eventos en esta Wi-Fi. Todos deben estar en la misma red.",
+    denied: "Permite el acceso a la red local en Ajustes para encontrar eventos en esta Wi-Fi.",
+    name: "Tu nombre",
+    join: "Unirse",
+    joining: "Uniéndote…",
+    reconnecting: "Reconectando con el organizador…",
+    rejected: {
+      code: "El código de ese evento cambió. Vuelve a elegirlo.",
+      protocol: "El organizador necesita la misma versión de Scryve que tú.",
+      closed: "Ese evento terminó.",
+      invalid: "El organizador rechazó este dispositivo.",
+    },
+  },
   settings: {
     rounds: "Rondas",
     suggested: "Sugerido para {{count}} jugadores: {{rounds}}",

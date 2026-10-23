@@ -54,8 +54,9 @@ const zeroconf = () => (zeroconfInstance ??= new Zeroconf())
 export const checkLocalNetworkAccess = () =>
   zeroconf().checkLocalNetworkAccess({ type: LAN_SERVICE_TYPE, protocol: LAN_PROTOCOL })
 
-// why: react-native-zeroconf advertises a throwaway service of our type while it checks permission.
-export const isLanGameService = (service: Service) => !service.name.startsWith("rnzeroconf-")
+// why: react-native-zeroconf advertises a throwaway service of our type while it checks permission, and nearby events share our type.
+export const isLanGameService = (service: Service) =>
+  !service.name.startsWith("rnzeroconf-") && !service.name.startsWith("event-")
 
 // why: a USB or VPN link-local address resolves too, but other players usually cannot reach it.
 export function lanAddresses(service: Service) {

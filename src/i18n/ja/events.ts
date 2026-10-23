@@ -135,6 +135,24 @@ export default {
     clear: "結果を消去",
     twoWinners: "マッチの勝者は1人だけです",
   },
+  nearby: {
+    title: "近くのイベント",
+    host: "この端末で主催",
+    yourEvent: "あなたのイベント",
+    searching: "このWi-Fiでイベントを探しています。全員が同じネットワークにいる必要があります。",
+    denied:
+      "このWi-Fiでイベントを探すには、設定でローカルネットワークへのアクセスを許可してください。",
+    name: "あなたの名前",
+    join: "参加",
+    joining: "参加中…",
+    reconnecting: "主催者に再接続しています…",
+    rejected: {
+      code: "イベントのコードが変わりました。もう一度選んでください。",
+      protocol: "主催者とScryveのバージョンをそろえてください。",
+      closed: "そのイベントは終了しました。",
+      invalid: "主催者がこの端末を拒否しました。",
+    },
+  },
   settings: {
     rounds: "ラウンド数",
     suggested: "{{count}}人のおすすめ: {{rounds}}",
