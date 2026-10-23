@@ -18,7 +18,6 @@ import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { getCommanderWarnings, selectCommander } from "@/features/decks/commanderSelection"
 import { cardDetailsKey, printingKey } from "@/features/decks/deckCards"
 import { addCommanderCard, canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
-import type { StatsSource } from "@/features/decks/deckStatLines"
 import { DeckStats } from "@/features/decks/DeckStats"
 import { DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
@@ -536,6 +535,5 @@ const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
 function LocalDeckStats({ deckKey }: { deckKey: string }) {
   const record = useDeckKeyStats(deckKey, true)
-  const [source, setSource] = useState<StatsSource>("scryve")
-  return record ? <DeckStats record={record} source={source} onSourceChange={setSource} /> : null
+  return record ? <DeckStats record={record} /> : null
 }

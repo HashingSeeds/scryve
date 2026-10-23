@@ -307,6 +307,33 @@ it("lists each of the caller's deck keys with its total record", async () => {
   expect(await other.query(api.deckStats.totalsByKey, {})).toEqual([])
 })
 
+it("includes manual match totals in each deck key's total", async () => {
+  const { t, actor } = await signedIn()
+  await t.run(async (ctx) => {
+    await addDeckResult(ctx, {
+      userId: (await ctx.db.query("users").first())!._id,
+      resultId: "match:manual:0",
+      deckKey: "burn",
+      kind: "match",
+      source: "manual",
+      outcome: "loss",
+      finishedAt: T,
+      deltas: { manualMatches: { total: 1, wins: 0, losses: 1, draws: 0, unknown: 0 } },
+    })
+  })
+  expect(await actor.query(api.deckStats.totalsByKey, {})).toEqual([
+    {
+      deckKey: "burn",
+      games: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      unknown: 0,
+      manualMatches: { total: 1, wins: 0, losses: 1, draws: 0, unknown: 0 },
+    },
+  ])
+})
+
 it("separates true, false and untracked turn order slices and combines game filters", async () => {
   const { t, actor } = await signedIn()
   for (const [index, firstPlayerLocalId] of ["seat-0", "seat-1", undefined].entries()) {

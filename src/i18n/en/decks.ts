@@ -54,10 +54,8 @@ const decks = {
     snapshotFailed: "Could not load lists on this device.",
     manual: "Manual",
     all: "All",
-    matches: "Matches",
     games: "Games",
     matchesRecord: "Matches {{record}}",
-    gamesRecord: "Games {{record}}",
     noResults: "No results yet",
   },
   commander: {

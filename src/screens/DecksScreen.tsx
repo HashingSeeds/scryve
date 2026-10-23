@@ -16,12 +16,12 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckCount } from "@/features/decks/DeckLimit"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { allRecord, keyStatsRecord, type DeckStatsRecord } from "@/features/decks/deckStatLines"
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
@@ -52,8 +52,8 @@ type ShelfDeck = {
   cardQuantity?: number
   lastPlayedAt?: number
   favoritedAt?: number
-  record?: DeckRecord
-  keyRecord?: DeckRecord
+  record?: DeckStatsRecord
+  keyRecord?: DeckStatsRecord
 }
 
 export type DeckSelection = {
@@ -122,7 +122,8 @@ function DeckRow({
   const game = deck.game ?? DEFAULT_DECK_GAME
   const local = guestDeckLocalId(String(deck._id)) !== undefined
   const favorite = deck.favoritedAt !== undefined
-  const record = recordSummary(deck.keyRecord ?? deck.record)
+  const allResults = deck.keyRecord ?? deck.record
+  const record = allResults && recordSummary(allRecord(allResults))
   const versions =
     deck.versionCount && deck.versionCount > 1
       ? translate("decks:shelf.versionCount", { count: deck.versionCount })
@@ -549,7 +550,7 @@ export function DecksScreen({
   const ownRows =
     access?.ready && totals && totals.ownerId === access.ownerId ? totals.rows : undefined
   const keyTotals = useMemo(
-    () => new Map((ownRows ?? []).map(({ deckKey, ...record }) => [deckKey, record])),
+    () => new Map((ownRows ?? []).map((row) => [row.deckKey, keyStatsRecord(row)])),
     [ownRows],
   )
   const [collection, setCollection] = useState<DeckCollection>("all")

@@ -23,7 +23,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
-import { cardCountLabel, deckVersionLabel } from "@/features/decks/deckCopy"
+import { cardCountLabel, deckVersionLabel, recordText } from "@/features/decks/deckCopy"
 import {
   addDraftCard,
   addDraftCommander,
@@ -42,7 +42,7 @@ import {
 } from "@/features/decks/deckDraft"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
-import { deckStatLines, statLineSummary, type StatsSource } from "@/features/decks/deckStatLines"
+import { allRecord } from "@/features/decks/deckStatLines"
 import { useDeckVersionWrites } from "@/features/decks/decksVersionWrites"
 import {
   cachedCardIdentity,
@@ -330,7 +330,6 @@ function DeckDetailContent({
   const archiveDeck = useMutation(api.decks.archive)
   const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const [tab, setTab] = useState<DeckTab>("cards")
-  const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
   const [draft, setDraftState] = useState(closedDeckDraft)
   // why: search taps can land before a re-render, so limit checks read this ref, which every draft write updates first.
   const latestDraft = useRef(draft)
@@ -834,9 +833,7 @@ function DeckDetailContent({
             },
           })
         }
-        stats={
-          stats ? { record: stats, source: statsSource, onSourceChange: setStatsSource } : undefined
-        }
+        stats={stats}
         onAddMatch={
           onAddMatch && version && !knownDeleted
             ? () => onAddMatch(version._id, deck.name)
@@ -1237,11 +1234,9 @@ function DeckDetailContent({
               {view.versionRows.map((candidate) => {
                 const selected = candidate._id === activeVersionId
                 // Live records only; cached rows must not present unknown stats as fresh.
-                const recordLines = candidate.record
-                  ? deckStatLines(candidate.record, statsSource)
-                  : []
-                const candidateRecord = recordLines.length
-                  ? recordLines.map(statLineSummary)
+                const candidateCounts = candidate.record ? allRecord(candidate.record) : undefined
+                const candidateRecord = candidateCounts?.games
+                  ? [recordText(candidateCounts)]
                   : detail
                     ? [translate("decks:detail.unplayed")]
                     : []

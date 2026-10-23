@@ -7,7 +7,6 @@ import { Button } from "@/components/Button"
 import { DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
-import { STATS_SOURCES, statsSourceLabel, type StatsSource } from "@/features/decks/deckStatLines"
 import { i18n } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -33,36 +32,6 @@ export function listLabel(row: ReturnType<typeof listStats>[number]) {
   return row.label === "dated"
     ? listDateSpan(row)
     : translate(`decks:stats.${row.label === "untracked" ? "notTracked" : row.label}`)
-}
-
-export function SourceTabs({
-  source,
-  onChange,
-}: {
-  source: StatsSource
-  onChange: (source: StatsSource) => void
-}) {
-  const { themed } = useAppTheme()
-  return (
-    <View style={themed($sourceTabs)} accessibilityRole="tablist">
-      {STATS_SOURCES.map((value) => (
-        <TouchableOpacity
-          key={value}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: value === source }}
-          testID={`stats-source-${value}`}
-          style={[themed($tab), value === source && themed($selectedTab)]}
-          onPress={() => onChange(value)}
-        >
-          <Text
-            size="sm"
-            text={statsSourceLabel(value)}
-            style={value === source ? undefined : themed($dim)}
-          />
-        </TouchableOpacity>
-      ))}
-    </View>
-  )
 }
 
 export function HonestRate({ record }: { record: RecordCounts }) {
@@ -195,16 +164,3 @@ const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.lg,
   minHeight: 44,
 })
-const $sourceTabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.lg,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $tab: ViewStyle = {
-  minHeight: 44,
-  justifyContent: "center",
-  borderBottomWidth: 2,
-  borderBottomColor: "transparent",
-}
-const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })

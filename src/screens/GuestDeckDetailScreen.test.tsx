@@ -335,7 +335,7 @@ test("shows lookup errors and retries when the saved card is reopened", async ()
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
 })
 
-test("renders signed-in local deck stats by key with the same source filters", () => {
+test("renders signed-in local deck stats by key as one record", () => {
   mockCurrent = { ...mockStored, deckKey: "stable-deck-key" }
   const view = render(
     <ThemeProvider initialContext="dark">
@@ -353,7 +353,7 @@ test("renders signed-in local deck stats by key with the same source filters", (
     </ThemeProvider>,
   )
   expect(mockStatsQuery).toHaveBeenCalledWith(expect.anything(), { deckKey: "stable-deck-key" })
-  expect(view.getByText("3-1-0")).toBeTruthy()
+  expect(view.getByText("4-2")).toBeTruthy()
   fireEvent.press(view.getByTestId("open-deck-stats"))
   expect(mockStatsPush).toHaveBeenCalledWith({
     pathname: "/connected/decks/stats",
@@ -364,8 +364,6 @@ test("renders signed-in local deck stats by key with the same source filters", (
       format: "commander",
     },
   })
-  fireEvent.press(view.getByTestId("deck-stats-source-manual"))
-  expect(view.getByText("1-1-0")).toBeTruthy()
 })
 
 test("does not query account stats while signed out", () => {

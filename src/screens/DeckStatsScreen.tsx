@@ -11,7 +11,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { statsSourceLabel, type StatsSource } from "@/features/decks/deckStatLines"
+import { statsSourceLabel } from "@/features/decks/deckStatLines"
 import {
   chanceRate,
   exactRecord,
@@ -30,7 +30,6 @@ import {
   DeckComparePrompt,
   listDateSpan,
   listLabel,
-  SourceTabs,
   statsDate,
   StatsRow,
   StatsSection,
@@ -75,8 +74,8 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
   const ready = access.ready && Boolean(deckKey)
   const summary = useQuery(api.deckStats.summary, ready ? { deckKey } : "skip")
   const capacity = useQuery(api.decks.capacity, ready ? {} : "skip")
-  const [source, setSource] = useState<StatsSource>("scryve")
   const [filter, setFilter] = useState<{
+    source?: "scryve" | "manual"
     fingerprint?: string | null
     podSize?: number
     wentFirst?: boolean | null
@@ -88,7 +87,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
     ready
       ? {
           deckKey,
-          ...(source === "all" ? {} : { source }),
+          ...(filter?.source ? { source: filter.source } : {}),
           ...(filter?.fingerprint !== undefined ? { fingerprint: filter.fingerprint } : {}),
           ...(filter?.podSize !== undefined ? { podSize: filter.podSize } : {}),
           ...(filter?.wentFirst !== undefined ? { wentFirst: filter.wentFirst } : {}),
@@ -103,20 +102,20 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
   }
   if (!ready) return <AlertNote tone="info" text={translate("decks:shelf.reconnect")} />
   if (!summary) return <Text tx="decks:stats.loading" />
-  const record = exactRecord(summary.all, source)
+  const record = exactRecord(summary.all, "all")
   const rate = honestRate(record)
   const range = likelyRange(record)
-  const chance = chanceRate(summary.slices, source)
-  const lists = listStats(summary, source)
-  const pods = [
-    ...new Set(
-      summary.slices
-        .filter((slice) => source === "all" || slice.source === source)
-        .map((slice) => slice.podSize),
-    ),
-  ].sort((a, b) => (b ?? 0) - (a ?? 0))
-  const manualMatches = source !== "scryve" ? summary.all?.manualMatches : undefined
-  const connectedMatches = source !== "manual" ? summary.all?.connectedMatches : undefined
+  const chance = chanceRate(summary.slices)
+  const lists = listStats(summary)
+  const pods = [...new Set(summary.slices.map((slice) => slice.podSize))].sort(
+    (a, b) => (b ?? 0) - (a ?? 0),
+  )
+  const manualMatches = summary.all?.manualMatches
+  const connectedMatches = summary.all?.connectedMatches
+  const sourceRecords = (["scryve", "manual"] as const).map((value) => ({
+    value,
+    record: exactRecord(summary.all, value),
+  }))
   return (
     <>
       <FlatList
@@ -133,13 +132,6 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
               text={[deckGame(game)?.shortLabel ?? game, deckFormatLabel(game, format)]
                 .filter(Boolean)
                 .join(" · ")}
-            />
-            <SourceTabs
-              source={source}
-              onChange={(value) => {
-                setSource(value)
-                setFilter(undefined)
-              }}
             />
             {!filter ? (
               <>
@@ -201,7 +193,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                           capacity?.premium
                             ? router.push({
                                 pathname: "/connected/decks/compare",
-                                params: { deckKey, deckName, game, format, source },
+                                params: { deckKey, deckName, game, format },
                               })
                             : setProPrompt(true)
                         }
@@ -232,7 +224,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                         ? translate("decks:stats.unknownPod")
                         : translate("decks:stats.players", { count: podSize })
                     }
-                    record={sumSlices(summary.slices, source, { podSize })}
+                    record={sumSlices(summary.slices, "all", { podSize })}
                     onPress={
                       podSize === null
                         ? undefined
@@ -244,10 +236,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                     }
                   />
                 ))}
-                {summary.slices.some(
-                  (slice) =>
-                    slice.wentFirst !== null && (source === "all" || slice.source === source),
-                ) ? (
+                {summary.slices.some((slice) => slice.wentFirst !== null) ? (
                   <>
                     <StatsSection title={translate("decks:stats.turnOrder")} />
                     {([true, false, null] as const).map((wentFirst) => {
@@ -263,25 +252,23 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                           key={String(wentFirst)}
                           testID={`stats-turn-order-${wentFirst}`}
                           label={label}
-                          record={sumSlices(summary.slices, source, { wentFirst })}
+                          record={sumSlices(summary.slices, "all", { wentFirst })}
                           onPress={() => showGames({ wentFirst, label })}
                         />
                       )
                     })}
                   </>
                 ) : null}
-                {source === "all" ? (
+                {sourceRecords.every((row) => row.record.games > 0) ? (
                   <>
                     <StatsSection title={translate("decks:stats.sources")} />
-                    {(["scryve", "manual"] as const).map((value) => (
+                    {sourceRecords.map(({ value, record: sourceRecord }) => (
                       <StatsRow
                         key={value}
+                        testID={`stats-source-${value}`}
                         label={statsSourceLabel(value)}
-                        record={sumSlices(summary.slices, value)}
-                        onPress={() => {
-                          setSource(value)
-                          setFilter(undefined)
-                        }}
+                        record={sourceRecord}
+                        onPress={() => showGames({ source: value, label: statsSourceLabel(value) })}
                       />
                     ))}
                   </>

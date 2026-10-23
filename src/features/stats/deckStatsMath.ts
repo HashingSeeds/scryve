@@ -85,7 +85,7 @@ export function likelyRange({ wins, losses, draws }: RecordCounts) {
   return { low: Math.round(100 * (center - radius)), high: Math.round(100 * (center + radius)) }
 }
 
-export function listStats(summary: DeckSummary, source: StatsSource) {
+export function listStats(summary: DeckSummary, source: StatsSource = "all") {
   const fingerprints = new Set([
     ...summary.lists.map((row) => row.fingerprint),
     ...summary.slices.map((slice) => slice.fingerprint),
