@@ -36,7 +36,7 @@ function LiveSupport() {
   // why: opening Support shouldn't make a feedback key for someone who never sent any.
   const key = useFeedbackKey({ create: false })
   const online = useConvexOnline()
-  const mine = useQuery(api.feedback.mine, key ? { key } : "skip")
+  const mine = useQuery(api.feedback.mine, key ? { key } : {})
   return <Support unread={mine?.filter((item) => item.unread).length ?? 0} offline={!online} />
 }
 

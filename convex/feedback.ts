@@ -13,6 +13,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
+import { hasAccountDeletion } from "./lib/auth"
 import { PREMIUM_FEATURES, hasFeature } from "./lib/entitlements"
 import {
   APOLLO_KEY_PREFIX,
@@ -40,23 +41,27 @@ const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 
 type Ctx = QueryCtx | MutationCtx
-type Viewer = { hash: string; user: Doc<"users"> | null }
+type Viewer = { hash: string | null; user: Doc<"users"> | null }
 
 async function signedInUser(ctx: Ctx) {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity) return null
+  if (!identity || (await hasAccountDeletion(ctx, identity.subject))) return null
   return await ctx.db
     .query("users")
     .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
     .unique()
 }
 
-async function viewer(ctx: Ctx, key: string): Promise<Viewer> {
+async function sender(ctx: Ctx, key: string) {
   return { hash: await senderHash(key), user: await signedInUser(ctx) }
 }
 
+async function viewer(ctx: Ctx, key: string | undefined): Promise<Viewer> {
+  return key ? await sender(ctx, key) : { hash: null, user: await signedInUser(ctx) }
+}
+
 function owns(request: Doc<"feedbackRequests">, { hash, user }: Viewer) {
-  return request.senderHash === hash || (!!user && request.userId === user._id)
+  return (!!hash && request.senderHash === hash) || (!!user && request.userId === user._id)
 }
 
 async function ownedRequest(ctx: Ctx, who: Viewer, requestId: Id<"feedbackRequests">) {
@@ -97,14 +102,17 @@ function ownItem(request: Doc<"feedbackRequests">) {
 }
 
 export const mine = query({
-  args: { key: v.string() },
+  args: { key: v.optional(v.string()) },
   handler: async (ctx, { key }) => {
     const who = await viewer(ctx, key)
-    const fromInstall = await ctx.db
-      .query("feedbackRequests")
-      .withIndex("by_sender_and_updated_at", (q) => q.eq("senderHash", who.hash))
-      .order("desc")
-      .take(MINE_SIZE)
+    const hash = who.hash
+    const fromInstall = hash
+      ? await ctx.db
+          .query("feedbackRequests")
+          .withIndex("by_sender_and_updated_at", (q) => q.eq("senderHash", hash))
+          .order("desc")
+          .take(MINE_SIZE)
+      : []
     const user = who.user
     const fromAccount = user
       ? await ctx.db
@@ -174,7 +182,7 @@ export const submit = mutation({
     sentryEventId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const who = await viewer(ctx, args.key)
+    const who = await sender(ctx, args.key)
     checkClientId(args.clientId)
     if (args.clientId) {
       const sent = await ctx.db
@@ -219,7 +227,7 @@ export const reply = mutation({
     clientId: v.optional(v.string()),
   },
   handler: async (ctx, { key, requestId, body, clientId }) => {
-    const who = await viewer(ctx, key)
+    const who = await sender(ctx, key)
     await ownedRequest(ctx, who, requestId)
     checkClientId(clientId)
     if (

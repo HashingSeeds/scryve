@@ -134,6 +134,50 @@ describe("feedback", () => {
     expect(await ana.query(api.feedback.mine, { key: OTHER })).toEqual([])
   })
 
+  it("won't link feedback to an account that is being deleted", async () => {
+    const t = makeConvexTest()
+    const ana = await signedIn(t, "ana-subject")
+    const linked = await ana.mutation(api.feedback.submit, {
+      key: ME,
+      kind: "bug",
+      body: "Crash on launch",
+      includeAccount: true,
+    })
+    await t.run((ctx) =>
+      ctx.db.insert("accountDeletionRequests", {
+        clerkUserId: "ana-subject",
+        status: "processing",
+        attempts: 0,
+        requestedAt: 0,
+        updatedAt: 0,
+      }),
+    )
+
+    await expect(
+      ana.mutation(api.feedback.submit, {
+        key: OTHER,
+        kind: "bug",
+        body: "Again",
+        includeAccount: true,
+      }),
+    ).rejects.toThrow("Sign in to include your account")
+    expect(await ana.query(api.feedback.mine, {})).toEqual([])
+    expect(await ana.query(api.feedback.mine, { key: ME })).toMatchObject([{ _id: linked }])
+  })
+
+  it("lists account feedback on a device that never sent any", async () => {
+    const t = makeConvexTest()
+    const ana = await signedIn(t, "ana-subject")
+    const linked = await ana.mutation(api.feedback.submit, {
+      key: ME,
+      kind: "feature",
+      body: "Sent from my phone",
+      includeAccount: true,
+    })
+    expect((await ana.query(api.feedback.mine, {})).map(({ _id }) => _id)).toEqual([linked])
+    expect(await t.query(api.feedback.mine, {})).toEqual([])
+  })
+
   it("deletes a deleted account's linked requests ten at a time, and no one else's", async () => {
     const t = makeConvexTest()
     const ana = await signedIn(t, "ana-subject")
