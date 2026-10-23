@@ -8,11 +8,12 @@ import { useFeedbackOutbox } from "./outbox"
 export function FeedbackOutboxSession({ accountId }: { accountId: string | undefined }) {
   const outbox = useFeedbackOutbox()
   const online = useConvexOnline()
-  const { isLoading } = useConvexAuth()
+  const { isLoading, isAuthenticated } = useConvexAuth()
+  const authSettled = !isLoading && (!accountId || isAuthenticated)
   useEffect(() => outbox.start(), [outbox])
   useEffect(
-    () => outbox.setReady(online && !isLoading, accountId),
-    [outbox, online, isLoading, accountId],
+    () => outbox.setReady(online && authSettled, accountId),
+    [outbox, online, authSettled, accountId],
   )
   return null
 }
