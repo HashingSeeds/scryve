@@ -51,6 +51,10 @@ describe("standingsThroughRound", () => {
     expect(standingsThroughRound(event())).toBe(1)
     expect(standingsThroughRound(event({ tables: [reported] }))).toBe(2)
   })
+
+  it("counts every recorded result once the event finishes", () => {
+    expect(standingsThroughRound(event({ status: "finished" }))).toBe(2)
+  })
 })
 
 describe("nextRoundBlocker", () => {

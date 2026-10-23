@@ -47,8 +47,9 @@ export function roundHasEveryResult({ round, tables }: RoundState) {
   )
 }
 
-export function standingsThroughRound(view: RoundState) {
+export function standingsThroughRound(view: RoundState & Pick<EventView, "status">) {
   if (view.round === 0) return 0
+  if (view.status === "finished") return view.round
   return roundHasEveryResult(view) ? view.round : view.round - 1
 }
 
