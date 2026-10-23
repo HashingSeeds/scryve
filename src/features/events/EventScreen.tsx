@@ -21,10 +21,13 @@ import { $action, $actions, $dim, $grow, $row, $section, EventFrame } from "./Ev
 import {
   canConfirm,
   canReport,
+  confirmingOpponents,
   eventErrorText,
   eventMeta,
   eventStatusText,
   firstTiebreaker,
+  isFinalRound,
+  myResultText,
   myTable,
   nextRoundBlocker,
   percent,
@@ -41,7 +44,7 @@ import { suggestedSwissRounds } from "../../../convex/lib/events/pairing"
 
 const TABS = ["round", "players", "standings"] as const
 type Tab = (typeof TABS)[number]
-type Confirming = "finish" | "remove" | "drop"
+type Confirming = "finish" | "remove" | "drop" | "replaceGame"
 
 function useCommand() {
   const [busy, setBusy] = useState(false)
@@ -86,14 +89,18 @@ export function EventScreen({
   source: EventSource
   onBack: () => void
   onRemoved: () => void
-  onStartMatch?: (view: EventView, table: EventTableView) => boolean
+  onStartMatch?: (view: EventView, table: EventTableView, replace: boolean) => boolean
 }) {
   const { themed } = useAppTheme()
   const { view } = source
   const command = useCommand()
-  const [tab, setTab] = useState<Tab>("round")
+  const [chosenTab, setTab] = useState<Tab>()
   const [editing, setEditing] = useState<string>()
   const [confirming, setConfirming] = useState<Confirming>()
+  const [matchTable, setMatchTable] = useState<EventTableView>()
+  // why: during registration the organizer's work (the join code, guests) is on Players.
+  const tab =
+    chosenTab ?? (view?.isOrganizer && view.status === "registration" ? "players" : "round")
 
   if (view === null)
     return (
@@ -108,24 +115,42 @@ export function EventScreen({
     )
 
   const blocker = view ? nextRoundBlocker(view) : undefined
+  const finalRound = view ? isFinalRound(view) : false
   const editingTable = view?.tables.find((table) => table.id === editing)
   const organizerFooter =
     view?.isOrganizer && view.status !== "finished" ? (
       <>
         {blocker ? <Text size="xs" style={themed($dim)} text={blockerText(blocker)} /> : null}
-        <Button
-          testID="start-round-button"
-          preset="reversed"
-          disabled={command.busy || blocker !== undefined}
-          tx="events:startRound"
-          txOptions={{ round: view.round + 1 }}
-          onPress={() => void command.run(source.startNextRound)}
-        />
+        {finalRound ? (
+          <Button
+            testID="finish-event-footer-button"
+            preset="reversed"
+            disabled={command.busy || blocker !== undefined}
+            tx="events:finish.action"
+            onPress={() => setConfirming("finish")}
+          />
+        ) : (
+          <Button
+            testID="start-round-button"
+            preset="reversed"
+            disabled={command.busy || blocker !== undefined}
+            tx="events:startRound"
+            txOptions={{ round: view.round + 1 }}
+            onPress={async () => {
+              if (await command.run(source.startNextRound)) setTab("round")
+            }}
+          />
+        )}
       </>
     ) : undefined
 
   async function confirmAction() {
     if (!view || !confirming) return
+    if (confirming === "replaceGame") {
+      setConfirming(undefined)
+      if (matchTable) onStartMatch?.(view, matchTable, true)
+      return
+    }
     const done = await command.run(async () => {
       if (confirming === "finish") await source.finish()
       else if (confirming === "remove") await source.remove()
@@ -182,10 +207,13 @@ export function EventScreen({
               onStartMatch={
                 onStartMatch &&
                 ((table) => {
-                  if (!onStartMatch(view, table)) command.setError(translate("events:activeGame"))
+                  if (onStartMatch(view, table, false)) return
+                  setMatchTable(table)
+                  setConfirming("replaceGame")
                 })
               }
               onAsk={setConfirming}
+              finalRound={finalRound}
             />
           ) : tab === "players" ? (
             <PlayersTab view={view} source={source} busy={command.busy} run={command.run} />
@@ -209,7 +237,7 @@ export function EventScreen({
             title={translate(`events:${confirming ?? "finish"}.title`)}
             message={translate(`events:${confirming ?? "finish"}.message`)}
             confirmText={translate(`events:${confirming ?? "finish"}.confirm`)}
-            destructive={confirming !== "finish"}
+            destructive={confirming !== "finish" && confirming !== "replaceGame"}
             busy={command.busy}
             confirmTestID="event-confirm-button"
             backdropAccessibilityLabel={translate("common:cancel")}
@@ -229,6 +257,7 @@ function RoundTab({
   onConfirm,
   onStartMatch,
   onAsk,
+  finalRound,
 }: {
   view: EventView
   busy: boolean
@@ -236,6 +265,7 @@ function RoundTab({
   onConfirm: (table: EventTableView) => void
   onStartMatch?: (table: EventTableView) => void
   onAsk: (action: Confirming) => void
+  finalRound: boolean
 }) {
   const { themed } = useAppTheme()
   const mine = myTable(view)
@@ -283,7 +313,7 @@ function RoundTab({
         </View>
       ) : null}
       <View style={themed($section)}>
-        {view.isOrganizer && view.status === "active" ? (
+        {view.isOrganizer && view.status === "active" && !finalRound ? (
           <Button
             testID="finish-event-button"
             tx="events:finish.action"
@@ -331,6 +361,7 @@ function MyTable({
   const bye = table.result?.kind === "bye"
   const opponents = table.playerIds.filter((id) => id !== view.myPlayerId)
   const reportedByMe = table.status === "reported" && table.reportedBy === view.myPlayerId
+  const confirmers = confirmingOpponents(view, table)
   return (
     <>
       <Text
@@ -345,9 +376,14 @@ function MyTable({
           bye ? translate("events:bye") : opponents.map((id) => playerName(view, id)).join(", ")
         }
       />
-      {bye ? null : <Text size="xs" testID="my-table-result" text={resultText(view, table)} />}
-      {reportedByMe && !view.isOrganizer ? (
-        <Text size="xs" style={themed($dim)} tx="events:waitingForConfirm" />
+      {bye ? null : <Text size="xs" testID="my-table-result" text={myResultText(view, table)} />}
+      {reportedByMe && !view.isOrganizer && confirmers > 0 ? (
+        <Text
+          size="xs"
+          style={themed($dim)}
+          tx="events:waitingForConfirm"
+          txOptions={{ count: confirmers }}
+        />
       ) : null}
       <View style={themed($actions)}>
         {onStartMatch && !bye && view.status === "active" && table.result === null ? (
@@ -373,7 +409,7 @@ function MyTable({
           testID="confirm-button"
           preset="reversed"
           disabled={busy}
-          text={translate("events:confirm", { result: resultText(view, table) })}
+          tx="events:confirm"
           onPress={() => onConfirm(table)}
         />
       ) : null}
@@ -428,6 +464,11 @@ function PlayersTab({
 }) {
   const { themed } = useAppTheme()
   const [guest, setGuest] = useState("")
+  async function addGuest() {
+    const name = guest.trim()
+    if (busy || !name) return
+    if (await run(() => source.addGuest(name))) setGuest("")
+  }
   const [rounds, setRounds] = useState<number>()
   const [minutes, setMinutes] = useState<number>()
   const managing = view.isOrganizer && view.status !== "finished"
@@ -443,15 +484,16 @@ function PlayersTab({
               labelTx="events:guestName"
               value={guest}
               maxLength={24}
+              returnKeyType="done"
+              submitBehavior="submit"
               onChangeText={setGuest}
+              onSubmitEditing={() => void addGuest()}
             />
             <Button
               testID="add-guest-button"
               tx="events:addGuest"
               disabled={busy || !guest.trim()}
-              onPress={async () => {
-                if (await run(() => source.addGuest(guest.trim()))) setGuest("")
-              }}
+              onPress={() => void addGuest()}
             />
           </View>
           <View style={themed($section)}>

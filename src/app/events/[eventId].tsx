@@ -5,6 +5,7 @@ import { matchSetupFor } from "@/features/events/eventLogic"
 import { EventScreen } from "@/features/events/EventScreen"
 import { useConvexEventSource } from "@/features/events/useConvexEventSource"
 import { startLocalGame } from "@/features/game/gameSetup"
+import { localGameRepository } from "@/features/game/localPersistence"
 
 const leave = () => (router.canGoBack() ? router.back() : router.replace("/events"))
 
@@ -16,7 +17,8 @@ function ConvexEvent({ access, eventId }: { access: CloudAccess; eventId: string
       source={source}
       onBack={leave}
       onRemoved={() => router.replace("/events")}
-      onStartMatch={(view, table) => {
+      onStartMatch={(view, table, replace) => {
+        if (replace) localGameRepository.clearActiveGame()
         const meSeat = view.myPlayerId ? table.playerIds.indexOf(view.myPlayerId) : -1
         return startLocalGame({
           ...matchSetupFor(view, table, Date.now()),

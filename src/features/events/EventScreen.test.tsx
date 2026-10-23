@@ -89,7 +89,7 @@ describe("EventScreen", () => {
     await waitFor(() => expect(screen.queryByTestId("result-dialog")).toBeNull())
   })
 
-  it("asks the other player to confirm a report", async () => {
+  it("shows the loser their loss before they confirm", async () => {
     const events = source(
       view({
         tables: [
@@ -104,7 +104,8 @@ describe("EventScreen", () => {
     )
     renderEvent(events)
 
-    fireEvent.press(screen.getByText("Confirm 2-0"))
+    expect(screen.getByTestId("my-table-result")).toHaveTextContent("You lost 0-2")
+    fireEvent.press(screen.getByText("Confirm result"))
 
     expect(events.confirm).toHaveBeenCalledWith("t1")
     await waitFor(() => expect(screen.getByTestId("confirm-button")).toBeEnabled())
@@ -117,5 +118,17 @@ describe("EventScreen", () => {
     expect(screen.getByText("Enter every result first")).toBeTruthy()
     expect(screen.getByTestId("start-round-button")).toBeDisabled()
     expect(screen.getByTestId("table-4")).toHaveTextContent(/Grace vs Ada/)
+  })
+
+  it("offers Finish instead of another round after the last planned round", () => {
+    const done = {
+      ...openTable,
+      status: "confirmed" as const,
+      result: { kind: "match" as const, gamesWon: [2, 1], gamesDrawn: 0 },
+    }
+    renderEvent(source(view({ isOrganizer: true, myPlayerId: null, round: 3, tables: [done] })))
+
+    expect(screen.queryByTestId("start-round-button")).toBeNull()
+    expect(screen.getByTestId("finish-event-footer-button")).toBeEnabled()
   })
 })

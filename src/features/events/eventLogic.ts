@@ -130,6 +130,27 @@ export function resultText(view: EventView, table: EventTableView) {
   }
 }
 
+export function myResultText(view: EventView, table: EventTableView) {
+  const { result } = table
+  const seat = view.myPlayerId ? table.playerIds.indexOf(view.myPlayerId) : -1
+  if (result?.kind !== "match" || seat < 0) return resultText(view, table)
+  const mine = result.gamesWon[seat] ?? 0
+  const theirs = Math.max(0, ...result.gamesWon.filter((_, index) => index !== seat))
+  const score = [mine, theirs, ...(result.gamesDrawn > 0 ? [result.gamesDrawn] : [])].join("-")
+  const outcome = mine > theirs ? "won" : mine < theirs ? "lost" : "drew"
+  return translate(`events:result.${outcome}`, { score })
+}
+
+export function confirmingOpponents(view: EventView, table: EventTableView) {
+  return table.playerIds.filter(
+    (id) =>
+      id !== view.myPlayerId && view.players.some((player) => player.id === id && !player.guest),
+  ).length
+}
+
+export const isFinalRound = (view: Pick<EventView, "status" | "round" | "plannedRounds">) =>
+  view.status === "active" && view.round >= view.plannedRounds
+
 export function tablePlayers(view: EventView, table: EventTableView) {
   const names = table.playerIds.map((id) => playerName(view, id))
   return names.length === 2

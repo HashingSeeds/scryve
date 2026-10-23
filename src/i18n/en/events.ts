@@ -119,16 +119,26 @@ const events = {
   waitingToStart: "Waiting for round 1",
   report: "Report result",
   changeReport: "Change result",
-  confirm: "Confirm {{result}}",
-  waitingForConfirm: "Waiting for the other players to confirm",
+  confirm: "Confirm result",
+  // {{count}} is how many players at the table still need to confirm the report.
+  waitingForConfirm_one: "Waiting for your opponent to confirm",
+  waitingForConfirm_other: "Waiting for the other players to confirm",
   startMatch: "Start match",
-  activeGame: "Finish your current game first",
+  replaceGame: {
+    title: "End your current game?",
+    message: "It ends without a result, then this match starts.",
+    confirm: "Start match",
+  },
   result: {
     title: "Table {{table}} result",
     // Games in this match that ended in a draw.
     drawnGames: "Drawn games",
     draw: "Draw",
     winner: "{{name}} wins",
+    // The signed-in player's own match result, e.g. "You won 2-1". {{score}} lists their games first.
+    won: "You won {{score}}",
+    lost: "You lost {{score}}",
+    drew: "You drew {{score}}",
     doubleLoss: "Double loss",
     save: "Save",
     clear: "Clear result",
