@@ -1,4 +1,7 @@
+import type { Infer } from "convex/values"
+
 import type { MatchBestOf } from "../matchResults"
+import type { eventTableResult } from "./validators"
 
 export const EVENT_STRUCTURES = ["swiss", "pods"] as const
 export type EventStructure = (typeof EVENT_STRUCTURES)[number]
@@ -20,11 +23,7 @@ export interface EventSettings {
   readonly points: EventPoints
 }
 
-export type TableResult =
-  | { readonly kind: "match"; readonly gamesWon: readonly number[]; readonly gamesDrawn: number }
-  | { readonly kind: "pod"; readonly winnerSeat: number | null }
-  | { readonly kind: "doubleLoss" }
-  | { readonly kind: "bye" }
+export type TableResult = Infer<typeof eventTableResult>
 
 export interface EventTableState {
   readonly round: number

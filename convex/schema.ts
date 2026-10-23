@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
+import { eventClock, eventPoints, eventTableResult } from "./lib/events/validators"
 import { feedbackKind } from "./lib/feedback"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
@@ -871,4 +872,48 @@ export default defineSchema({
   }).index("by_request", ["requestId"]),
 
   feedbackApolloCursor: defineTable({ after: v.number() }),
+  events: defineTable({
+    // why: optional so account deletion can detach an organizer without deleting other players' standings.
+    ownerUserId: v.optional(v.id("users")),
+    code: v.string(),
+    name: v.string(),
+    system: v.string(),
+    format: v.string(),
+    structure: v.union(v.literal("swiss"), v.literal("pods")),
+    bestOf: v.union(v.literal(1), v.literal(3), v.literal(5)),
+    points: eventPoints,
+    plannedRounds: v.number(),
+    roundMinutes: v.number(),
+    status: v.union(v.literal("registration"), v.literal("active"), v.literal("finished")),
+    round: v.number(),
+    clock: v.optional(eventClock),
+    playerCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_code", ["code"])
+    .index("by_owner_user_and_status", ["ownerUserId", "status"]),
+
+  eventPlayers: defineTable({
+    eventId: v.id("events"),
+    userId: v.optional(v.id("users")),
+    name: v.string(),
+    droppedAt: v.optional(v.number()),
+    joinedAt: v.number(),
+  })
+    .index("by_event", ["eventId"])
+    .index("by_event_and_user", ["eventId", "userId"])
+    .index("by_user", ["userId"]),
+
+  eventTables: defineTable({
+    eventId: v.id("events"),
+    round: v.number(),
+    table: v.number(),
+    playerIds: v.array(v.id("eventPlayers")),
+    status: v.union(v.literal("open"), v.literal("reported"), v.literal("confirmed")),
+    result: v.optional(eventTableResult),
+    reportedBy: v.optional(v.id("eventPlayers")),
+    updatedAt: v.number(),
+  }).index("by_event_and_round", ["eventId", "round"]),
 })

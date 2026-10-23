@@ -578,6 +578,33 @@ export const processUserLinkedData = internalMutation({
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
+      const ownedEvents = await ctx.db
+        .query("events")
+        .withIndex("by_owner_user_and_status", (q) => q.eq("ownerUserId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (ownedEvents.length) {
+        const now = Date.now()
+        for (const event of ownedEvents)
+          await ctx.db.patch(event._id, {
+            ownerUserId: undefined,
+            status: "finished",
+            clock: undefined,
+            finishedAt: event.finishedAt ?? now,
+            updatedAt: now,
+          })
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      const eventPlayers = await ctx.db
+        .query("eventPlayers")
+        .withIndex("by_user", (q) => q.eq("userId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (eventPlayers.length) {
+        for (const player of eventPlayers)
+          await ctx.db.patch(player._id, { userId: undefined, name: DELETED_PLAYER_NAME })
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
       const entitlements = await ctx.db
         .query("userEntitlements")
         .withIndex("by_user", (q) => q.eq("userId", request.userId!))
