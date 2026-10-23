@@ -49,10 +49,11 @@ const feedback = {
     // Marks a thread with a reply the player hasn't opened.
     unread: "New",
     deleteAll: "Delete my feedback",
-    deleteHint: "Removes what this device sent. Bug details already sent to Sentry stay there.",
+    deleteHint:
+      "Removes what this device sent and anything sent with your account. Bug details already sent to Sentry stay there.",
     deleteConfirmTitle: "Delete your feedback?",
     deleteConfirmBody:
-      "This removes what this device sent, along with its replies. Bug details already sent to Sentry stay there.",
+      "This removes what this device sent and anything sent with your account, along with the replies. Bug details already sent to Sentry stay there.",
     delete: "Delete",
     deleteFailed: "Couldn't delete your feedback. Try again when you're online.",
   },

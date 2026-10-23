@@ -228,6 +228,25 @@ describe("feedback", () => {
     expect(await t.run((ctx) => ctx.db.query("feedbackMessages").collect())).toEqual([])
   })
 
+  it("deletes account feedback from other devices too, when signed in", async () => {
+    const t = makeConvexTest()
+    const ana = await signedIn(t, "ana-subject")
+    await ana.mutation(api.feedback.submit, {
+      key: OTHER,
+      kind: "feature",
+      body: "Sent from my other phone",
+      includeAccount: true,
+    })
+    const anonymous = await submit(t, OTHER)
+
+    await ana.mutation(api.feedback.deleteMine, { key: ME })
+
+    expect(await ana.query(api.feedback.mine, { key: ME })).toEqual([])
+    expect((await t.query(api.feedback.mine, { key: OTHER })).map(({ _id }) => _id)).toEqual([
+      anonymous,
+    ])
+  })
+
   it("deletes long threads a few hundred messages at a time until they're gone", async () => {
     const t = makeConvexTest()
     const requestIds = [await submit(t), await submit(t)]

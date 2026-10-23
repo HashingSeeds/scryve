@@ -51,10 +51,10 @@ export default {
     unread: "Nuevo",
     deleteAll: "Eliminar mis comentarios",
     deleteHint:
-      "Elimina lo que envió este dispositivo. Los detalles de errores que ya se enviaron a Sentry se quedan allí.",
+      "Elimina lo que envió este dispositivo y todo lo que enviaste con tu cuenta. Los detalles de errores que ya se enviaron a Sentry se quedan allí.",
     deleteConfirmTitle: "¿Eliminar tus comentarios?",
     deleteConfirmBody:
-      "Esto elimina lo que envió este dispositivo, junto con sus respuestas. Los detalles de errores ya enviados a Sentry permanecen allí.",
+      "Esto elimina lo que envió este dispositivo y todo lo que enviaste con tu cuenta, junto con las respuestas. Los detalles de errores ya enviados a Sentry permanecen allí.",
     delete: "Eliminar",
     deleteFailed:
       "No se pudieron eliminar tus comentarios. Inténtalo de nuevo cuando tengas conexión.",

@@ -251,15 +251,16 @@ export const setAccount = mutation({
 export const deleteMine = mutation({
   args: { key: v.string() },
   handler: async (ctx, { key }) => {
-    await deleteSenderBatch(ctx, await senderHash(key))
+    const who = await sender(ctx, key)
+    await deleteMineBatch(ctx, who.hash, who.user?._id)
     return null
   },
 })
 
 export const continueDeleteMine = internalMutation({
-  args: { hash: v.string() },
-  handler: async (ctx, { hash }) => {
-    await deleteSenderBatch(ctx, hash)
+  args: { hash: v.string(), userId: v.optional(v.id("users")) },
+  handler: async (ctx, { hash, userId }) => {
+    await deleteMineBatch(ctx, hash, userId)
     return null
   },
 })
@@ -287,14 +288,25 @@ async function deleteRequests(ctx: MutationCtx, requests: Doc<"feedbackRequests"
   return removed
 }
 
-async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
-  const requests = await ctx.db
+async function deleteMineBatch(ctx: MutationCtx, hash: string, userId: Id<"users"> | undefined) {
+  const fromInstall = await ctx.db
     .query("feedbackRequests")
     .withIndex("by_sender_and_updated_at", (q) => q.eq("senderHash", hash))
     .take(DELETE_BATCH)
+  const fromAccount = userId
+    ? await ctx.db
+        .query("feedbackRequests")
+        .withIndex("by_user_and_updated_at", (q) => q.eq("userId", userId))
+        .take(DELETE_BATCH)
+    : []
+  const requests = [...new Map([...fromInstall, ...fromAccount].map((r) => [r._id, r])).values()]
   const removed = await deleteRequests(ctx, requests)
-  if (requests.length === DELETE_BATCH || removed < requests.length)
-    await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
+  if (
+    fromInstall.length === DELETE_BATCH ||
+    fromAccount.length === DELETE_BATCH ||
+    removed < requests.length
+  )
+    await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash, userId })
 }
 
 export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users">) {

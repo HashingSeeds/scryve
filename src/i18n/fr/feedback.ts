@@ -51,10 +51,10 @@ export default {
     unread: "Nouveau",
     deleteAll: "Supprimer mes retours",
     deleteHint:
-      "Supprime ce que cet appareil a envoyé. Les détails de bug déjà envoyés à Sentry y restent.",
+      "Supprime ce que cet appareil a envoyé et tout ce que vous avez envoyé avec votre compte. Les détails de bug déjà envoyés à Sentry y restent.",
     deleteConfirmTitle: "Supprimer vos retours ?",
     deleteConfirmBody:
-      "Cela supprime ce que cet appareil a envoyé, ainsi que les réponses. Les détails de bug déjà envoyés à Sentry y restent.",
+      "Cela supprime ce que cet appareil a envoyé et tout ce que vous avez envoyé avec votre compte, ainsi que les réponses. Les détails de bug déjà envoyés à Sentry y restent.",
     delete: "Supprimer",
     deleteFailed: "Impossible de supprimer vos commentaires. Réessayez une fois en ligne.",
   },

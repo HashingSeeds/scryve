@@ -56,6 +56,18 @@ describe("FeedbackThreadScreen", () => {
     expect(offline.props.onReply).not.toHaveBeenCalled()
   })
 
+  it("brings back a failed reply without losing what was typed since", () => {
+    const { props, view } = renderThread()
+    const field = () => view.getByPlaceholderText("Add a detail or answer a question")
+    fireEvent.changeText(field(), "Newer")
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <FeedbackThreadScreen {...props} restore={{ id: 1, text: "Failed" }} />
+      </ThemeProvider>,
+    )
+    expect(field().props.value).toBe("Failed\n\nNewer")
+  })
+
   it("hides the account switch when the request belongs to another account", () => {
     const { view } = renderThread({
       thread: {

@@ -38,7 +38,7 @@ export function FeedbackThreadScreen({
   const [restored, setRestored] = useState<number>()
   if (restore && restore.id !== restored) {
     setRestored(restore.id)
-    setReply(restore.text)
+    setReply((draft) => (draft.trim() ? `${restore.text}\n\n${draft}` : restore.text))
   }
   const request = thread?.request
 
