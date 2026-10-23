@@ -157,6 +157,64 @@ describe("deckStats.matchups", () => {
     expect(matchups.byIdentity.map((row) => row.key)).toEqual(["atraxa"])
   })
 
+  it("never returns a deck or guest name the name gate hides", async () => {
+    const t = makeConvexTest()
+    const { actor, userId } = await account(t, "owner")
+    await result(t, userId, {
+      opponents: [
+        { displayName: "kkk", deck: { name: "Hitler Youth", identity: atraxa } },
+        { displayName: "Bob", deck: { deckKey: "bobs", name: "Nazi Zombies" } },
+      ],
+    })
+    await result(t, userId, {
+      opponents: [{ displayName: "KKK crew", deck: { name: "pedo tribal" } }],
+    })
+
+    const matchups = await actor.query(api.deckStats.matchups, { deckKey: "burn" })
+
+    expect(JSON.stringify(matchups)).not.toMatch(/hitler|nazi|pedo|kkk/i)
+    expect(matchups.byDeck.map((row) => [row.key, row.name, row.games])).toEqual([
+      ["hidden", "Deck", 2],
+      ["deck:bobs", "Deck", 1],
+    ])
+    expect(matchups.byPlayer.map((row) => [row.key, row.displayName, row.games])).toEqual([
+      ["hidden", "Player", 2],
+      ["name:bob", "Bob", 1],
+    ])
+  })
+
+  it("shows a held opponent's placeholder, not the name stored on the result", async () => {
+    const t = makeConvexTest()
+    const { actor, userId } = await account(t, "owner")
+    const held = await account(t, "held")
+    await t.run((ctx) =>
+      ctx.db.patch(held.userId, {
+        username: "oldname",
+        moderationHold: {
+          placeholderUsername: "player-4821",
+          heldUsername: "oldname",
+          reason: "operator",
+          createdAt: T,
+        },
+      }),
+    )
+    await result(t, userId, {
+      opponents: [
+        {
+          displayName: "oldname",
+          userId: held.userId,
+          deck: { name: "Superfriends", identity: atraxa },
+        },
+      ],
+    })
+
+    const matchups = await actor.query(api.deckStats.matchups, { deckKey: "burn" })
+
+    expect(JSON.stringify(matchups)).not.toContain("oldname")
+    expect(matchups.byPlayer.map((row) => row.displayName)).toEqual(["player-4821"])
+    expect(matchups.byDeck.map((row) => row.name)).toEqual(["Superfriends"])
+  })
+
   it(`reads at most the ${MATCHUP_SCAN} most recent results`, async () => {
     const t = makeConvexTest()
     const { actor, userId } = await account(t, "owner")

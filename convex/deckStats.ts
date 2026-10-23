@@ -1,13 +1,13 @@
 import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
-import type { Doc, Id } from "./_generated/dataModel"
+import type { Doc } from "./_generated/dataModel"
 import { query, type QueryCtx } from "./_generated/server"
 import { maskSummaryPlayersForViewer } from "./games"
 import { requireUser } from "./lib/auth"
 import { assertDeckKey } from "./lib/deckKeys"
-import { blockedUserIdsFor } from "./lib/moderation"
-import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
+import { blockedUserIdsFor, publicUsernameFor } from "./lib/moderation"
+import { HIDDEN_DECK_NAME, HIDDEN_PLAYER_NAME, nameFailsGate } from "./lib/nameFilter"
 import type { DeckIdentity, ResultOpponent } from "./lib/opponentDecks"
 import { boundedPaginationOptions } from "./lib/pagination"
 import { resultDeckKey } from "./lib/results"
@@ -217,14 +217,30 @@ type Tally = {
 const normalized = (text: string) =>
   text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase()
 const identityKey = (identity: DeckIdentity) => identity.map(({ cardId }) => cardId).join("+")
-const shownDeckName = (name: string | undefined) =>
-  name === undefined ? null : nameFailsGate(name) ? HIDDEN_DECK_NAME : name
+const HIDDEN_KEY = "hidden"
 
-function opponentDeckKey(deck: ResultOpponent["deck"]) {
-  if (deck?.deckKey) return `deck:${deck.deckKey}`
-  if (deck?.name) return `name:${normalized(deck.name)}`
-  if (deck?.identity) return `identity:${identityKey(deck.identity)}`
+function opponentDeckGroup(deck: ResultOpponent["deck"]) {
+  if (!deck) return undefined
+  const hidden = deck.name !== undefined && nameFailsGate(deck.name)
+  const shown = {
+    opponentDeckKey: deck.deckKey ?? null,
+    name: deck.name === undefined ? null : hidden ? HIDDEN_DECK_NAME : deck.name,
+    identity: deck.identity ?? null,
+  }
+  if (deck.deckKey) return { key: `deck:${deck.deckKey}`, shown }
+  if (hidden) return { key: HIDDEN_KEY, shown: { ...shown, identity: null } }
+  if (deck.name) return { key: `name:${normalized(deck.name)}`, shown }
+  if (deck.identity) return { key: `identity:${identityKey(deck.identity)}`, shown }
   return undefined
+}
+
+function opponentPlayerGroup({ userId, displayName }: ResultOpponent) {
+  const hidden = nameFailsGate(displayName)
+  const key = userId ? `user:${userId}` : hidden ? HIDDEN_KEY : `name:${normalized(displayName)}`
+  return {
+    key,
+    shown: { userId: userId ?? null, displayName: hidden ? HIDDEN_PLAYER_NAME : displayName },
+  }
 }
 
 function grouping<Shown>() {
@@ -283,12 +299,8 @@ export const matchups = query({
     const scanned = await results.take(MATCHUP_SCAN + 1)
     const blocked = await blockedUserIdsFor(ctx, user._id)
     const byIdentity = grouping<{ identity: DeckIdentity }>()
-    const byDeck = grouping<{
-      opponentDeckKey: string | null
-      name: string | null
-      identity: DeckIdentity | null
-    }>()
-    const byPlayer = grouping<{ userId: Id<"users"> | null; displayName: string }>()
+    const byDeck = grouping<NonNullable<ReturnType<typeof opponentDeckGroup>>["shown"]>()
+    const byPlayer = grouping<ReturnType<typeof opponentPlayerGroup>["shown"]>()
     let counted = 0
     for (const result of scanned.slice(0, MATCHUP_SCAN)) {
       const { deckKey } = result
@@ -311,41 +323,29 @@ export const matchups = query({
       byDeck.add(
         mine,
         opponents.flatMap(({ deck, won, visible }) => {
-          const key = visible ? opponentDeckKey(deck) : undefined
-          return key
-            ? [
-                {
-                  key,
-                  won,
-                  shown: {
-                    opponentDeckKey: deck?.deckKey ?? null,
-                    name: shownDeckName(deck?.name),
-                    identity: deck?.identity ?? null,
-                  },
-                },
-              ]
-            : []
+          const group = visible ? opponentDeckGroup(deck) : undefined
+          return group ? [{ ...group, won }] : []
         }),
       )
       byPlayer.add(
         mine,
-        opponents.flatMap(({ userId, displayName, won, visible }) =>
-          visible
-            ? [
-                {
-                  key: userId ? `user:${userId}` : `name:${normalized(displayName)}`,
-                  won,
-                  shown: { userId: userId ?? null, displayName },
-                },
-              ]
-            : [],
+        opponents.flatMap((opponent) =>
+          opponent.visible ? [{ ...opponentPlayerGroup(opponent), won: opponent.won }] : [],
         ),
       )
     }
+    const players = byPlayer.rows()
+    const users = await Promise.all(
+      players.map(({ userId }) => (userId ? ctx.db.get(userId) : null)),
+    )
     return {
       byIdentity: byIdentity.rows(),
       byDeck: byDeck.rows(),
-      byPlayer: byPlayer.rows(),
+      byPlayer: players.map((row, index) => {
+        const user = users[index]
+        const name = user ? publicUsernameFor(user) : undefined
+        return name ? { ...row, displayName: name } : row
+      }),
       counted,
       scannedAll: scanned.length <= MATCHUP_SCAN,
     }
