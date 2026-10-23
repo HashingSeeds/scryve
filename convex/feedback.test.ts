@@ -212,10 +212,18 @@ describe("feedback", () => {
     ])
   })
 
-  it("deletes a deleted account's linked requests ten at a time", async () => {
+  it("deletes a deleted account's linked requests ten at a time, and no one else's", async () => {
     const t = makeConvexTest()
     await signedIn(t, "ana-subject")
     const user = await t.run((ctx) => ctx.db.query("users").first())
+    const other = await signedIn(t, "other-subject")
+    const kept = await other.mutation(api.feedback.submit, {
+      key: OTHER,
+      kind: "feature",
+      title: "Other request",
+      body: "Details",
+      includeAccount: true,
+    })
     await t.run(async (ctx) => {
       for (let n = 0; n < 11; n++)
         await ctx.db.insert("feedbackRequests", {
@@ -234,7 +242,9 @@ describe("feedback", () => {
     })
     expect(await t.run((ctx) => deleteAccountFeedback(ctx, user!._id))).toBe(10)
     expect(await t.run((ctx) => deleteAccountFeedback(ctx, user!._id))).toBe(1)
-    expect(await t.run((ctx) => ctx.db.query("feedbackRequests").collect())).toEqual([])
+    expect(
+      (await t.run((ctx) => ctx.db.query("feedbackRequests").collect())).map(({ _id }) => _id),
+    ).toEqual([kept])
   })
 
   it("hides a public request on its first report until Matthew publishes it again", async () => {
