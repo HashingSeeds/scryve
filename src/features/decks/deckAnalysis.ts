@@ -2,6 +2,7 @@ import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 
 import { readCardFaces } from "./cardFaces"
 import { cardSection, type DeckCard } from "./deckCards"
+import { formatDefinition } from "../../../convex/lib/systems"
 
 export const MANA_COLORS = ["W", "U", "B", "R", "G"] as const
 export type ManaColor = (typeof MANA_COLORS)[number]
@@ -157,7 +158,16 @@ export function chanceOfLands(
   return Math.min(1, chance)
 }
 
+function formatDeckSize(format: string) {
+  if (!formatDefinition("mtg", format)) return undefined
+  if (format === "commander") return 100
+  if (format === "limited") return 40
+  return 60
+}
+
 export type DeckAnalysis = {
+  incomplete?: { count: number; size: number }
+  needsCommander: boolean
   missing: number
   curve: number[]
   averageManaValue: number
@@ -263,7 +273,13 @@ export function analyzeDeck({
           : undefined
   const landDropCards = lands + modalLands
   const keep = library >= 7 ? chanceOfLands(library, landDropCards, 7, 2, 5) : undefined
+  const size = formatDeckSize(format)
   return {
+    ...(size !== undefined && deckSize < size ? { incomplete: { count: deckSize, size } } : {}),
+    needsCommander:
+      !hasCommanderZone &&
+      (formatDefinition("mtg", format)?.sections.some((section) => section.id === "commander") ??
+        false),
     missing,
     curve,
     averageManaValue,

@@ -386,6 +386,8 @@ export default {
     addCards: "+ कार्ड जोड़ें",
   },
   analysis: {
+    incomplete: "{{size}} में से {{count}} कार्ड। ऑड्स सूची में दिए गए कार्ड के आधार पर हैं।",
+    noCommander: "कोई कमांडर नहीं चुना गया।",
     curve: "मैना कर्व",
     average: "औसत {{value}}",
     lands: "लैंड",

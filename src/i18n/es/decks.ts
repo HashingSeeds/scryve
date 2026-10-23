@@ -407,6 +407,8 @@ export default {
     addCards: "+ Añadir cartas",
   },
   analysis: {
+    incomplete: "{{count}} de {{size}} cartas. Las probabilidades usan las cartas de la lista.",
+    noCommander: "No has elegido comandante.",
     curve: "Curva de maná",
     average: "Promedio {{value}}",
     lands: "Tierras",

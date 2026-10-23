@@ -376,6 +376,8 @@ export default {
     addCards: "+ 카드 추가",
   },
   analysis: {
+    incomplete: "{{size}}장 중 {{count}}장입니다. 확률은 목록에 있는 카드로 계산합니다.",
+    noCommander: "커맨더를 선택하지 않았습니다.",
     curve: "마나 커브",
     average: "평균 {{value}}",
     lands: "대지",
