@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { router } from "expo-router"
 
 import { Button } from "@/components/Button"
@@ -13,9 +14,11 @@ import { translate } from "@/i18n/translate"
 
 export default function AccountRoute() {
   const auth = useAuthAccess()
+  const [signingOut, setSigningOut] = useState(false)
   const leaveAccount = () => (router.canGoBack() ? router.back() : router.replace("/"))
   const openAccountData = () => router.push("/delete-account")
-  if (!auth.configured || !auth.isSignedIn) {
+  // why: Clerk reports signed out before signOut resolves; without this the signed-out prompt flashes before the route leaves.
+  if (!auth.configured || (!auth.isSignedIn && !signingOut)) {
     const hasDeletionReceipt = auth.configured && loadAccountDeletionReceiptToken() !== undefined
     const prompt = auth.configurationMessage || translate("account:profile.signInPrompt")
     return (
@@ -50,6 +53,7 @@ export default function AccountRoute() {
         onOpenTerms={() => router.push("/terms")}
         onOpenPrivacy={() => router.push("/privacy")}
         onOpenGameContentNotices={() => router.push("/game-content-notices")}
+        onSigningOut={setSigningOut}
         onSignedOut={() => router.dismissTo("/")}
       />
     </Screen>
