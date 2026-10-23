@@ -44,6 +44,7 @@ export default function ConnectedGameRoute() {
         onRules={(system, rule) => router.push(rulesHref(system, rule))}
         onDecks={() => router.push("/connected/decks")}
         onSettings={() => router.push("/settings")}
+        onSupport={() => router.push("/support")}
         accountEntry={account.accountEntry}
         onAccount={account.onAccount}
       />

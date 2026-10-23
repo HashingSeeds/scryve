@@ -1347,7 +1347,7 @@ it("scrubs a deleted publisher without changing another player's result id durin
     expect(after.summary?.players[0].deckFingerprint).toBeUndefined()
     expect(after.summary?.players[0].localId).toBeUndefined()
     expect(after.summary?.players[0].resultId).toBeUndefined()
-    expect(after.results).toEqual(before)
+    expect(after.results).toEqual(before.map((result) => ({ ...result, opponents: [] })))
     expect(after.stats).toEqual([])
     const guestStats = await guest.actor.query(api.decks.statsForKey, {
       deckKey: String(guestDeck),

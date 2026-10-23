@@ -1,3 +1,4 @@
+import { router } from "expo-router"
 import { act, render } from "@testing-library/react-native"
 
 import { clear, load } from "@/utils/storage"
@@ -10,7 +11,7 @@ let mockParams: { deckId?: string; reviewChanges?: string } = { deckId: "deck-fr
 
 jest.mock("expo-router", () => ({
   Redirect: () => null,
-  router: { back: jest.fn() },
+  router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn() },
   useLocalSearchParams: () => mockParams,
 }))
 
@@ -29,8 +30,27 @@ jest.mock("@/screens/DeckDetailScreen", () => ({
 describe("deck detail route", () => {
   beforeEach(() => {
     clear()
+    jest.clearAllMocks()
     mockDetailScreen.mockClear()
     mockParams = { deckId: "deck-from-route" }
+  })
+
+  it("goes back when the deck page has history", () => {
+    jest.mocked(router.canGoBack).mockReturnValue(true)
+    render(<DeckDetailRoute />)
+    const props = mockDetailScreen.mock.lastCall?.[0] as { onBack: () => void }
+    props.onBack()
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
+  })
+
+  it("falls back to the Decks list when the deck page was opened by link", () => {
+    jest.mocked(router.canGoBack).mockReturnValue(false)
+    render(<DeckDetailRoute />)
+    const props = mockDetailScreen.mock.lastCall?.[0] as { onBack: () => void }
+    props.onBack()
+    expect(router.back).not.toHaveBeenCalled()
+    expect(router.replace).toHaveBeenCalledWith("/connected/decks")
   })
 
   it("passes a shelf review request to the detail screen", () => {

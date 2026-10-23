@@ -7,6 +7,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
 
 import { Text } from "./Text"
 
@@ -79,7 +80,7 @@ export function FilterButton({
           stroke={accessibleForeground(theme.colors.tint)}
           strokeWidth={1.5}
           strokeLinecap="round"
-          accessible={false}
+          {...decorativeSvgProps({ accessible: false })}
         >
           <Path d="M4 7h5m4 0h7M4 17h11m4 0h1" />
           <Circle cx={11} cy={7} r={2} />

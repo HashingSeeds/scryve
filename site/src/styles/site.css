@@ -805,7 +805,8 @@ figure {
   height: 60%;
 }
 
-/* Assign mode covers the seat's contents, so it fades in over the seat's own color. */
+/* Assign mode covers the seat's contents, so it fades in over the seat's own color. It is only
+   shown, so a visitor's tap goes through to the seat beneath. */
 .cmd-overlay {
   --total: clamp(22px, calc(var(--u) * 0.26), 58px);
   position: absolute;
@@ -817,6 +818,7 @@ figure {
   background: var(--seat);
   color: #fff;
   opacity: 0;
+  pointer-events: none;
   scale: 0.98;
   transition:
     opacity 0.28s var(--ease),
@@ -926,6 +928,306 @@ figure {
   margin-top: 4px;
   font-size: clamp(10px, calc(var(--u) * 0.09), 18px);
   white-space: nowrap;
+}
+
+/* Yu-Gi-Oh! Life Points, mirroring the app's LifeCalculator and LifeCard's calculator button.
+   --app-pt is one of the app's points at the board's scale, so sizes match the app's own. */
+
+.calc-open,
+.calc {
+  --pt: var(--app-pt, 1px);
+}
+
+.calc-open {
+  position: absolute;
+  z-index: 1;
+  right: 7%;
+  bottom: 7%;
+  width: min(calc(var(--pt) * 40), 15cqmin);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.calc-open svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.calc-open:active,
+.calc-open.pressed {
+  opacity: 0.72;
+}
+
+.calc {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  inset: 0;
+  flex-direction: column;
+  padding: calc(var(--pt) * 12);
+  gap: calc(var(--pt) * 8);
+  background: var(--calc-bg);
+  color: var(--calc-ink);
+  font-size: calc(var(--pt) * 16);
+  opacity: 0;
+  transition: opacity 0.16s;
+}
+
+.calc.on {
+  opacity: 1;
+}
+
+.calc button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.calc button:focus-visible {
+  outline: 2px solid var(--calc-ink);
+  outline-offset: 1px;
+}
+
+.calc-head {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--pt) * 28);
+}
+
+.calc-head b {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calc[data-clear="left"] .calc-head {
+  margin-left: calc(var(--pt) * 44);
+}
+
+.calc[data-clear="right"] .calc-head {
+  margin-right: calc(var(--pt) * 44);
+}
+
+/* A menu at the middle of this edge sits between the name and the close button. */
+.calc[data-clear="top"] .calc-head b {
+  max-width: calc(50% - var(--pt) * 44);
+}
+
+.calc .calc-close {
+  position: relative;
+  width: calc(var(--pt) * 28);
+  height: calc(var(--pt) * 28);
+  margin-left: auto;
+}
+
+.calc-close::before,
+.calc-close::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--pt) * 18);
+  height: calc(var(--pt) * 2);
+  border-radius: 1px;
+  background: var(--calc-ink);
+  content: "";
+  rotate: 45deg;
+  translate: -50% -50%;
+}
+
+.calc-close::after {
+  rotate: -45deg;
+}
+
+.calc-readout {
+  display: flex;
+  min-height: calc(var(--pt) * 64);
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.calc-value {
+  font-size: calc(var(--pt) * 48);
+  font-variant-numeric: tabular-nums;
+  line-height: calc(var(--pt) * 56);
+}
+
+.calc-value.typed {
+  color: var(--tint);
+}
+
+.calc-hint {
+  font-size: calc(var(--pt) * 12);
+  line-height: calc(var(--pt) * 18);
+  opacity: 0.72;
+}
+
+.calc-trail {
+  display: flex;
+  align-self: stretch;
+  justify-content: safe center;
+  margin-top: calc(var(--pt) * 2);
+  gap: calc(var(--pt) * 7);
+  font-size: calc(var(--pt) * 12);
+  font-variant-numeric: tabular-nums;
+  line-height: calc(var(--pt) * 18);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.calc-trail > * {
+  flex-shrink: 0;
+}
+
+.calc-was {
+  opacity: 0.6;
+}
+
+.calc-trail .down {
+  color: var(--calc-trail-damage);
+}
+
+.calc-trail .up {
+  color: var(--calc-trail-gain);
+}
+
+.calc-keys {
+  display: grid;
+  min-height: 0;
+  flex-shrink: 1;
+  gap: calc(var(--pt) * 5);
+  grid-auto-rows: minmax(calc(var(--pt) * 28), calc(var(--pt) * 44));
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.calc .calc-keys button {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  border-radius: calc(var(--pt) * 8);
+  background: color-mix(in srgb, var(--calc-ink) 18%, transparent);
+  font-weight: 500;
+}
+
+.calc .calc-keys button:active,
+.calc .calc-keys button.pressed {
+  background: color-mix(in srgb, var(--calc-ink) 36%, transparent);
+}
+
+.calc-keys svg {
+  width: calc(var(--pt) * 22);
+  height: calc(var(--pt) * 22);
+}
+
+.calc-actions {
+  display: flex;
+  gap: calc(var(--pt) * 5);
+}
+
+.calc .calc-actions button {
+  min-width: 0;
+  min-height: calc(var(--pt) * 38);
+  flex: 1;
+  padding: 0 calc(var(--pt) * 4);
+  border-radius: calc(var(--pt) * 8);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.calc .calc-actions [data-calc="damage"] {
+  background: var(--calc-damage);
+  color: var(--calc-damage-ink);
+}
+
+.calc .calc-actions [data-calc="half"] {
+  border: calc(var(--pt) * 1.5) solid var(--tint);
+  color: var(--tint);
+}
+
+.calc .calc-actions [data-calc="gain"] {
+  background: var(--calc-gain);
+  color: var(--calc-gain-ink);
+}
+
+.calc .calc-actions button:active,
+.calc .calc-actions button.pressed {
+  opacity: 0.75;
+}
+
+.calc .calc-actions button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* A short seat puts the keypad beside the number, as the app does below 300 points. */
+.calc[data-layout="beside"] {
+  display: grid;
+  padding: calc(var(--pt) * 6) calc(var(--pt) * 8);
+  gap: calc(var(--pt) * 4) calc(var(--pt) * 8);
+  font-size: calc(var(--pt) * 14);
+  grid-template-areas:
+    "head head"
+    "readout keys"
+    "actions keys";
+  grid-template-columns: 1fr 1.15fr;
+  grid-template-rows: auto 1fr auto;
+}
+
+.calc[data-layout="beside"] .calc-head {
+  grid-area: head;
+}
+
+.calc[data-layout="beside"] .calc-readout {
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  grid-area: readout;
+  text-align: start;
+}
+
+.calc[data-layout="beside"] .calc-value {
+  font-size: calc(var(--pt) * 30);
+  line-height: calc(var(--pt) * 36);
+}
+
+.calc[data-layout="beside"] .calc-trail {
+  justify-content: flex-start;
+}
+
+.calc[data-layout="beside"] .calc-keys {
+  gap: calc(var(--pt) * 4);
+  grid-area: keys;
+  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.calc[data-layout="beside"] .calc-keys svg {
+  width: calc(var(--pt) * 18);
+  height: calc(var(--pt) * 18);
+}
+
+.calc[data-layout="beside"] .calc-actions {
+  grid-area: actions;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calc {
+    transition: none;
+  }
 }
 
 .hit {

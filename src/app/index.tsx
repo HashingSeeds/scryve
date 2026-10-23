@@ -229,6 +229,7 @@ export default function Index() {
       onSetup={() => router.push("/game/new")}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
+      onSupport={() => router.push("/support")}
       onAccount={account.onAccount}
       accountEntry={account.accountEntry}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}

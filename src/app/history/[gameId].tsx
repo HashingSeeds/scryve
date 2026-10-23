@@ -43,7 +43,9 @@ export default function GameSummaryRoute() {
               timeline={{ status: "unavailable" }}
               onBack={onBack}
               gameId={connectedId}
-              onOpenSupport={() => router.push("/support")}
+              onOpenSupport={() =>
+                router.push({ pathname: "/feedback/new", params: { kind: "bug" } })
+              }
             />
           )}
         >
@@ -54,7 +56,9 @@ export default function GameSummaryRoute() {
                 timeline={timeline}
                 onBack={onBack}
                 gameId={connectedId}
-                onOpenSupport={() => router.push("/support")}
+                onOpenSupport={() =>
+                  router.push({ pathname: "/feedback/new", params: { kind: "bug" } })
+                }
                 moderation={{ publicId: connectedId, viewerPlayerIds }}
               />
             )}
@@ -79,7 +83,7 @@ export default function GameSummaryRoute() {
       }
       onBack={onBack}
       gameId={typeof gameId === "string" ? gameId : undefined}
-      onOpenSupport={() => router.push("/support")}
+      onOpenSupport={() => router.push({ pathname: "/feedback/new", params: { kind: "bug" } })}
     />
   )
 }

@@ -10,10 +10,14 @@ import {
 } from "./board"
 import { center, HINT_PRESS_MS, seatAxis, showTapHint } from "./hint"
 import { createPokemonDemo, SAMPLE_PRIZES } from "./pokemon"
-import { SITE_SYSTEM_IDS } from "./systems"
+import { SITE_SYSTEM_IDS, type SiteSystemId } from "./systems"
+import { createYugiohDemo } from "./yugioh"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
+const SAMPLE_LIFE_POINTS = [8000, 5300, 6800, 2350, 7400, 4100] as const
+// Seats a game starts with when it's picked: the landing's Commander table, or a duel.
+const SEATS_FOR = { mtg: 5, ygo: 2, pokemon: 2 } as const satisfies Record<SiteSystemId, number>
 // Demo taps land far enough apart that each change shows on its own before the next.
 const DEMO_TAP_MS = 2600
 const PRESS_MS = 220
@@ -28,10 +32,11 @@ function startingLife(system: PlaySystemId) {
 function sampleValues(system: PlaySystemId, count: number): readonly number[] {
   if (system === "mtg") return SAMPLE_LIFE.slice(0, count)
   if (system === "pokemon") return SAMPLE_PRIZES.slice(0, count)
+  if (system === "ygo") return SAMPLE_LIFE_POINTS.slice(0, count)
   return []
 }
 
-const DEMOS = ["commander", "pokemon"] as const
+const DEMOS = ["commander", "yugioh", "pokemon"] as const
 // Leaving the demo step plays its changes back in reverse over about this long.
 const REWIND_MS = 1500
 const REWIND_MIN_STEP_MS = 30
@@ -39,6 +44,15 @@ const REWIND_MAX_STEP_MS = 220
 const VISITOR_TAP = "scryve:visitor-tap"
 const REWIND_MAX_FRAMES = Math.floor(REWIND_MS / REWIND_MIN_STEP_MS)
 type Demo = (typeof DEMOS)[number]
+// The demo the details step opens on for each game the site offers.
+const DEMO_FOR = { mtg: "commander", ygo: "yugioh", pokemon: "pokemon" } as const satisfies Record<
+  SiteSystemId,
+  Demo
+>
+function demoFor(system: string): Demo {
+  const id = SITE_SYSTEM_IDS.find((site) => site === system)
+  return id ? DEMO_FOR[id] : "commander"
+}
 
 function commanderSetup(count: number): DemoGameSetup {
   return {
@@ -113,19 +127,23 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     picker.addEventListener("click", (event) => {
       const value = picked(event)
       const id = SITE_SYSTEM_IDS.find((system) => system === value)
-      if (id)
-        game.reset({
-          system: id,
-          startingLife: startingLife(id),
-          values: sampleValues(id, game.setup.names.length),
-        })
+      if (!id) return
+      const count = SEATS_FOR[id]
+      game.reset({
+        system: id,
+        startingLife: startingLife(id),
+        names: NAMES.slice(0, count),
+        values: sampleValues(id, count),
+        layout: "auto",
+      })
     })
   })
   game.subscribe((event) => event.type === "reset" && syncPickers())
   syncPickers()
 
-  // The details step plays one demo at a time on the visitor's own table: Commander damage, or a
-  // Pokémon turn. Seats and layout stay theirs; only the game changes when the demo needs it. It
+  // The details step plays one demo at a time on the visitor's own table: Commander damage, a
+  // Yu-Gi-Oh! calculator turn, or a Pokémon turn. Seats and layout stay theirs; only the game
+  // changes when the demo needs it, and a Yu-Gi-Oh! duel seats two, as its copy says. It
   // opens on the visitor's game when that game has a demo, and the step's picker switches between
   // them. Each switch or replay starts again from the visitor's table. When the step leaves the
   // screen, the demo's changes play back in reverse until the visitor's table is back.
@@ -134,6 +152,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
       damage: SAMPLE_COMMANDER_DAMAGE,
       reducedMotion: prefersReducedMotion,
     }),
+    yugioh: createYugiohDemo(board, game, { reducedMotion: prefersReducedMotion }),
     pokemon: createPokemonDemo(board, game, { reducedMotion: prefersReducedMotion }),
   }
   const step = query<HTMLElement>(".steps [data-step='details']")
@@ -141,7 +160,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   let showing: Demo | undefined
   // The demo the step shows next. Picking a game anywhere on the page sets it, so the step's copy
   // already matches by the time it scrolls into view and never changes in front of the visitor.
-  let chosen: Demo = game.setup.system === "pokemon" ? "pokemon" : "commander"
+  let chosen: Demo = demoFor(game.setup.system)
   let borrowed: ReturnType<DemoGame["snapshot"]> | undefined
   // The table after each change the demo makes, for the rewind.
   let trail: ReturnType<DemoGame["snapshot"]>[] = []
@@ -262,8 +281,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   systemPickers.forEach((picker) =>
     picker.addEventListener("click", (event) => {
       const value = picked(event)
-      if (!borrowed && SITE_SYSTEM_IDS.some((system) => system === value))
-        choose(value === "pokemon" ? "pokemon" : "commander")
+      if (!borrowed && value) choose(demoFor(value))
     }),
   )
   query<HTMLElement>("[data-replay]", step).addEventListener("click", () => {
@@ -382,7 +400,7 @@ function setUpDeck(stage: HTMLElement) {
 // The next section takes over as its heading nears the copy's pin position.
 function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
-  const game = createDemoGame(commanderSetup(5))
+  const game = createDemoGame(commanderSetup(SEATS_FOR.mtg))
   const onFeatureStep = setUpFeatures(stage, game)
   setUpConnected(stage, game)
   const closeDeckSettings = setUpDeck(stage)
@@ -472,10 +490,11 @@ function setUpFullScreen(stage: HTMLElement) {
   narrow.addEventListener("change", () => narrow.matches || toggle(false))
 }
 
-// Until someone taps a total themselves, a ghostly hand taps a card every few seconds,
-// alternating plus and minus, so the change shows and the total never drifts. It taps the
-// lowest card that faces the viewer: Maya's with the phone on its side, Sam's standing up. While
-// the phone turns no card faces the viewer, so the demo waits.
+// Until someone taps a total or a calculator themselves, a ghostly hand taps a card every few
+// seconds, alternating plus and minus, so the change shows and the total never drifts. It taps the
+// lowest card that faces the viewer: Maya's with the phone on its side, Sam's standing up. When
+// none does, as with a duel's two seats on a phone on its side, it taps a card on its side. While
+// the phone turns no card sits square to the viewer, so the demo waits.
 function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   let direction: 1 | -1 = 1
   let pending: number | undefined
@@ -489,8 +508,14 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
     if (!showing()) return
     const board = query<HTMLElement>("[data-board='features']", stage)
     const facing = [...board.querySelectorAll<HTMLElement>(".seat[data-player]")]
-      .filter((seat) => Math.abs(seatAxis(seat) ?? 90) < 1)
-      .sort((a, b) => center(b).y - center(a).y)[0]
+      .flatMap((seat) => {
+        const axis = seatAxis(seat)
+        const square = axis !== undefined && Math.abs(axis - Math.round(axis / 90) * 90) < 1
+        return square ? [{ seat, upright: Math.abs(axis) < 1 }] : []
+      })
+      .sort(
+        (a, b) => Number(b.upright) - Number(a.upright) || center(b.seat).y - center(a.seat).y,
+      )[0]?.seat
     if (!facing) return
     const seat = Number(facing.dataset.player)
     const selector = `.hit[data-seat='${seat}'][data-dir='${direction}']`
@@ -516,7 +541,8 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
     window.clearTimeout(pending)
   }
   stage.addEventListener("click", (event) => {
-    if (event.isTrusted && (event.target as Element).closest(".hit, [data-pk]")) stopTaps()
+    if (event.isTrusted && (event.target as Element).closest(".hit, [data-pk], [data-calc]"))
+      stopTaps()
   })
   // The demo step's rewind replays a visitor's tap as a script click, so it says so itself.
   stage.addEventListener(VISITOR_TAP, stopTaps)

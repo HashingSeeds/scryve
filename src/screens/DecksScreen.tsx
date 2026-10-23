@@ -31,6 +31,7 @@ import { isSystemVisible } from "@/features/game/systemVisibility"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
+import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -205,7 +206,12 @@ function DeckRow({
 
 function StarIcon({ selected, color }: { selected: boolean; color: string }) {
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" accessibilityElementsHidden>
+    <Svg
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      {...decorativeSvgProps({ accessibilityElementsHidden: true })}
+    >
       <Path
         d="m12 2.6 2.86 5.8 6.4.93-4.63 4.51 1.09 6.38L12 17.2l-5.72 3.02 1.09-6.38-4.63-4.51 6.4-.93L12 2.6Z"
         fill={selected ? color : "none"}
@@ -524,6 +530,7 @@ export function DecksScreen({
   onAddDeck,
   onHistory,
   onSettings,
+  onSupport,
   onAccount,
   accountEntry = "account",
   unavailableMessage,
@@ -537,6 +544,7 @@ export function DecksScreen({
   onAddDeck: () => void
   onHistory: () => void
   onSettings: () => void
+  onSupport: () => void
   onAccount: () => void
   accountEntry?: AccountEntry
   unavailableMessage?: string
@@ -795,6 +803,7 @@ export function DecksScreen({
         accountEntry={accountEntry}
         onHistory={onHistory}
         onSettings={onSettings}
+        onSupport={onSupport}
         onAccount={onAccount}
       />
       <DialogCard

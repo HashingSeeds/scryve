@@ -85,10 +85,6 @@ export default {
       unavailable:
         "Le partage d'utilisation n'est pas disponible dans cette version. Aucun événement PostHog ne sera envoyé.",
     },
-    help: {
-      heading: "Aide",
-      support: "Aide et assistance",
-    },
     appInfo: {
       heading: "Informations sur l'app",
       analyticsId: "ID d'analyse : {{id}}",
@@ -117,51 +113,10 @@ export default {
     copyFailed: "Copie impossible. Réessayez.",
   },
   support: {
-    pageTitle: "Aide Scryve",
+    pageTitle: "Assistance Scryve",
     pageDescription:
-      "Découvrez comment démarrer avec Scryve, trouvez des réponses aux questions courantes ou contactez l'assistance.",
-    title: "Aide",
-    subtitle:
-      "Réponses sur les parties, les comptes et Scryve Pro. Envoyez-nous un message si vous avez besoin d'aide.",
-    contactUs: "Nous contacter",
-    contactReason: "Motif du contact",
-    kind: {
-      bug: "Signaler un bug",
-      help: "Demander de l'aide",
-      feedback: "Donner un avis",
-    },
-    messageLabel: {
-      bug: "Que s'est-il passé ?",
-      help: "Comment pouvons-nous vous aider ?",
-      feedback: "Qu'avez-vous en tête ?",
-    },
-    messagePlaceholder: {
-      bug: "Que s'est-il passé ? À quoi vous attendiez-vous ?",
-      help: "Dites-nous de quoi vous avez besoin",
-      feedback: "Idées, demandes ou autre chose",
-    },
-    emailLabel: {
-      bug: "E-mail pour la réponse (facultatif)",
-      help: "E-mail pour la réponse",
-      feedback: "E-mail pour une réponse (facultatif)",
-    },
-    emailInvalid: "Saisissez une adresse e-mail valide.",
-    translationNotice:
-      "Écrivez dans la langue de votre choix. Nous pouvons utiliser des outils d'IA pour le traduire. Consultez notre <privacy>Politique de confidentialité</privacy>.",
-    replyTime: "Nous répondons généralement sous deux jours ouvrés.",
-    selectedScreenshot: "Capture d'écran sélectionnée",
-    removeScreenshot: "Supprimer la capture d'écran",
-    addScreenshot: "Ajouter une capture d'écran",
-    disclosure:
-      "Envoie à Sentry votre message, votre e-mail si fourni, la version de l'app, le build, la plateforme et toute capture d'écran ajoutée.",
-    send: "Envoyer",
-    preferEmail: "Vous préférez l'e-mail ?",
-    emailSupport: "Assistance par e-mail",
-    status: {
-      queued: "Commentaire en attente. Si vous êtes hors ligne, il sera envoyé à la reconnexion.",
-      saveFailed: "Impossible d'enregistrer votre message. Réessayez ou écrivez-nous par e-mail.",
-      screenshotFailed: "Impossible d'ajouter cette capture d'écran. Essayez une autre image.",
-    },
+      "Prenez Scryve en main, trouvez des réponses aux questions courantes, suggérez des fonctionnalités ou contactez l'assistance.",
+    title: "Assistance",
     gettingStarted: {
       heading: "Pour commencer",
       startGame: {
@@ -197,7 +152,7 @@ export default {
       accountPrivacy: {
         question: "Questions sur le compte ou la confidentialité",
         answer:
-          "Vous pouvez gérer votre compte depuis l'écran de compte de Scryve. Contactez-nous si vous avez besoin d'aide pour accéder à votre compte ou le supprimer.",
+          "Vous pouvez gérer votre compte depuis l’écran de compte de Scryve. Écrivez au support si vous avez besoin d’aide pour accéder à votre compte ou le supprimer.",
       },
     },
     appVersion: "Scryve {{version}}",
@@ -243,6 +198,10 @@ export default {
       local: {
         title: "Les parties locales restent sur cet appareil",
         body: "L'historique des parties hors ligne est stocké uniquement sur cet appareil. Il n'est pas lié à votre compte et n'est pas effacé à distance.",
+      },
+      feedback: {
+        title: "Les retours envoyés sans votre compte sont conservés",
+        body: "Les retours d'expérience envoyés avec votre compte sont supprimés. Ceux envoyés sans compte restent sur l'appareil qui les a envoyés. Pour les supprimer, ouvrez Assistance, puis Vos retours, et touchez Supprimer mes retours.",
       },
       signOut: {
         title: "Tous les appareils sont déconnectés",
