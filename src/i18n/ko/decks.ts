@@ -54,10 +54,8 @@ export default {
     snapshotFailed: "이 기기의 목록을 불러올 수 없습니다.",
     manual: "수동",
     all: "전체",
-    matches: "매치",
     games: "게임",
     matchesRecord: "매치 {{record}}",
-    gamesRecord: "게임 {{record}}",
     noResults: "아직 결과 없음",
   },
   commander: {

@@ -10,7 +10,6 @@ export default function DeckCompareScreenRoute() {
     deckName?: string
     game?: string
     format?: string
-    source?: string
   }>()
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/connected/decks"))
   return (
@@ -23,7 +22,6 @@ export default function DeckCompareScreenRoute() {
           format={params.format ?? ""}
           access={access}
           onBack={leave}
-          source={params.source === "manual" || params.source === "all" ? params.source : "scryve"}
         />
       )}
     </CloudScreen>

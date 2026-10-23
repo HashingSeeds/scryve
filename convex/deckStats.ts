@@ -193,13 +193,14 @@ export const totalsByKey = query({
         q.eq("userId", user._id).eq("fingerprint", "all"),
       )
       .take(MAX_DECK_TOTALS)
-    return rows.map(({ deckKey, games, wins, losses, draws, unknown }) => ({
+    return rows.map(({ deckKey, games, wins, losses, draws, unknown, manualMatches }) => ({
       deckKey,
       games,
       wins,
       losses,
       draws,
       unknown,
+      ...(manualMatches ? { manualMatches } : {}),
     }))
   },
 })

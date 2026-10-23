@@ -16,7 +16,7 @@ import { DeckAnalysisTab } from "./DeckAnalysisTab"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
-import type { DeckStatsRecord, StatsSource } from "./deckStatLines"
+import type { DeckStatsRecord } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 import { systemDefinition } from "../../../convex/lib/systems"
@@ -106,11 +106,7 @@ export function DeckView({
   onDecrement: (card: DeckCard) => void
   undo?: { name: string; restore: () => void }
   statsContent?: ReactNode
-  stats?: {
-    record: DeckStatsRecord
-    source: StatsSource
-    onSourceChange: (source: StatsSource) => void
-  }
+  stats?: DeckStatsRecord
 }) {
   const { themed, theme } = useAppTheme()
   const sections = groupedCards(cards, localizedDeckSections(game, format))
@@ -188,7 +184,7 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
-              {stats ? <DeckStats {...stats} /> : statsContent}
+              {stats ? <DeckStats record={stats} /> : statsContent}
               {onStats && (stats || statsContent) ? (
                 <TouchableOpacity
                   testID="open-deck-stats"

@@ -97,39 +97,45 @@ beforeEach(() => {
   mockGamesStatus = "CanLoadMore"
 })
 
-it("uses exact totals, shows bounded breakdowns, and filters paginated list games", () => {
+it("shows one record with games and manual results together, and filters paginated games", () => {
   const view = render(screen())
   expect(view.getByTestId("stats-headline")).toHaveTextContent("60%")
+  expect(view.queryByTestId("stats-source-all")).toBeNull()
   expect(view.getByText("Breakdowns cover the latest 200 results.")).toBeTruthy()
   expect(within(view.getByTestId("stats-list-current")).getByText("4-4")).toBeTruthy()
-  expect(view.getAllByText("too few").length).toBeGreaterThan(0)
-  fireEvent.press(view.getByTestId("stats-list-current"))
-  expect(mockPagination).toHaveBeenLastCalledWith(
-    "games",
-    { deckKey: "key", source: "scryve", fingerprint: "current" },
-    { initialNumItems: 20 },
-  )
-  fireEvent.press(view.getByTestId("stats-source-manual"))
-  expect(view.getByTestId("stats-headline")).toHaveTextContent("3-2")
-  expect(view.getByText("Matches 3-2-0")).toBeTruthy()
-  expect(mockPagination).toHaveBeenLastCalledWith(
-    "games",
-    { deckKey: "key", source: "manual" },
-    { initialNumItems: 20 },
-  )
-  fireEvent.press(view.getByTestId("stats-source-all"))
-  expect(view.getByText("Source")).toBeTruthy()
   expect(mockPagination).toHaveBeenLastCalledWith(
     "games",
     { deckKey: "key" },
     { initialNumItems: 20 },
   )
+  fireEvent.press(view.getByTestId("stats-list-current"))
+  expect(mockPagination).toHaveBeenLastCalledWith(
+    "games",
+    { deckKey: "key", fingerprint: "current" },
+    { initialNumItems: 20 },
+  )
+  fireEvent.press(view.getByText("All"))
   fireEvent.press(view.getByTestId("stats-list-untracked"))
   expect(mockPagination).toHaveBeenLastCalledWith(
     "games",
     { deckKey: "key", fingerprint: null },
     { initialNumItems: 20 },
   )
+})
+
+it("breaks the record down by source once, and filters games by it", () => {
+  const view = render(screen())
+  expect(within(view.getByTestId("stats-source-scryve")).getByText("60%")).toBeTruthy()
+  expect(within(view.getByTestId("stats-source-manual")).getByText("3-2")).toBeTruthy()
+  fireEvent.press(view.getByTestId("stats-source-manual"))
+  expect(mockPagination).toHaveBeenLastCalledWith(
+    "games",
+    { deckKey: "key", source: "manual" },
+    { initialNumItems: 20 },
+  )
+  mockSummary = { ...deckStatsSummary, all: { ...deckStatsSummary.all!, manualMatches: undefined } }
+  view.rerender(screen())
+  expect(view.queryByTestId("stats-source-manual")).toBeNull()
 })
 
 it("names the most common pod size and compares its own rate against chance", () => {
@@ -144,8 +150,6 @@ it("names the most common pod size and compares its own rate against chance", ()
   }
   view.rerender(screen())
   expect(view.getByText("50% in 4-player games · chance 25%")).toBeTruthy()
-  fireEvent.press(view.getByTestId("stats-source-manual"))
-  expect(view.queryByText(/chance/)).toBeNull()
 })
 
 it.each(["CanLoadMore", "LoadingMore", "LoadingFirstPage", "Exhausted"])(
@@ -187,7 +191,7 @@ it("opens Compare for Pro and prompts other players", () => {
   fireEvent.press(view.getByTestId("stats-compare"))
   expect(mockPush).toHaveBeenCalledWith({
     pathname: "/connected/decks/compare",
-    params: { ...deckStatsParams, source: "scryve" },
+    params: deckStatsParams,
   })
   mockPremium = false
   view.rerender(screen())
@@ -231,16 +235,13 @@ it.each([true, false, null])("shows honest turn order rates and filters %s", (we
   fireEvent.press(view.getByTestId(`stats-turn-order-${wentFirst}`))
   expect(mockPagination).toHaveBeenLastCalledWith(
     "games",
-    { deckKey: "key", source: "scryve", wentFirst },
+    { deckKey: "key", wentFirst },
     { initialNumItems: 20 },
   )
 })
 
-it("hides turn order when the selected source has no tracked results", () => {
+it("hides turn order when no result tracked it", () => {
   const view = render(screen())
-  fireEvent.press(view.getByTestId("stats-source-manual"))
-  expect(view.queryByText("Turn order")).toBeNull()
-  fireEvent.press(view.getByTestId("stats-source-all"))
   expect(view.getByText("Turn order")).toBeTruthy()
   mockSummary = {
     ...deckStatsSummary,

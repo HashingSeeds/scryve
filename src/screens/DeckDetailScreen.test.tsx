@@ -1654,7 +1654,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Ramp into big spells")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-settings-button"))
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
-    expect(view.getByText("Games 3-1-0")).toBeTruthy()
+    expect(view.getByText("3-1")).toBeTruthy()
     expect(view.getAllByText("1 card").length).toBeGreaterThan(0)
     expect(
       StyleSheet.flatten(view.getByTestId("version-marker-version-main").props.style)
@@ -1663,18 +1663,12 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText(/Premium/)).toBeNull()
   })
 
-  it("filters deck and version stats by source", () => {
+  it("shows one record for the deck, games and manual results together", () => {
     const view = renderDetail()
-    expect(view.queryByTestId("deck-stats-line-matches")).toBeNull()
-    expect(view.getByText("3-3-0")).toBeTruthy()
-    fireEvent.press(view.getByTestId("deck-stats-source-manual"))
-    expect(view.getByText("1-1-0")).toBeTruthy()
-    expect(view.getByText("2-1-0")).toBeTruthy()
-    fireEvent.press(view.getByTestId("deck-stats-source-all"))
-    expect(view.getByText("1-1-0")).toBeTruthy()
-    expect(view.getByText("5-4-0")).toBeTruthy()
+    expect(within(view.getByTestId("deck-stats")).getByText("4-4")).toBeTruthy()
+    expect(view.queryByTestId("deck-stats-source-manual")).toBeNull()
     fireEvent.press(view.getByTestId("deck-settings-button"))
-    expect(view.getByText("Games 3-1-0")).toBeTruthy()
+    expect(view.getByText("3-1")).toBeTruthy()
     expect(view.getByText("Unplayed")).toBeTruthy()
   })
 

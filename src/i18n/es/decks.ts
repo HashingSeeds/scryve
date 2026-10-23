@@ -60,10 +60,8 @@ export default {
     snapshotFailed: "No se pudieron cargar las listas de este dispositivo.",
     manual: "Manual",
     all: "Todo",
-    matches: "Encuentros",
     games: "Juegos",
     matchesRecord: "Encuentros {{record}}",
-    gamesRecord: "Juegos {{record}}",
     noResults: "Aún no hay resultados",
   },
   commander: {

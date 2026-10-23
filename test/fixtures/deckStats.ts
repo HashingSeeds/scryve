@@ -17,11 +17,12 @@ const totals = {
   manualGames: { total: 12, wins: 7, losses: 5, draws: 0, unknown: 0 },
   manualMatches: { total: 5, wins: 3, losses: 2, draws: 0, unknown: 0 },
 }
+const { manualGames: _manualGames, manualMatches: _manualMatches, ...listTotals } = totals
 export const deckStatsSummary: DeckSummary = {
   all: totals,
   lists: [
-    { ...totals, fingerprint: "current", games: 8, wins: 4, losses: 4 },
-    { ...totals, fingerprint: "previous", games: 12, wins: 8, losses: 4 },
+    { ...listTotals, fingerprint: "current", games: 8, wins: 4, losses: 4 },
+    { ...listTotals, fingerprint: "previous", games: 12, wins: 8, losses: 4 },
   ],
   slices: [
     {

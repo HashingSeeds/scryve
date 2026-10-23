@@ -86,6 +86,13 @@ let mockTotals:
       losses: number
       draws: number
       unknown: number
+      manualMatches?: {
+        total: number
+        wins: number
+        losses: number
+        draws: number
+        unknown: number
+      }
     }[]
   | Error
   | undefined = []
@@ -273,6 +280,37 @@ describe("DecksScreen", () => {
     )
     expect(row().queryByText("3-1")).toBeNull()
     expect(row().queryByText("1-3")).toBeNull()
+    mockTotals = []
+  })
+
+  it("adds manual results to a deck's row so it matches the deck page", () => {
+    const local = saveGuestDeck(
+      { name: "Local record", format: "commander", game: "mtg", cards: [] },
+      { deckKey: "local-key" },
+    )
+    mockTotals = [
+      {
+        deckKey: "local-key",
+        games: 1,
+        wins: 1,
+        losses: 0,
+        draws: 0,
+        unknown: 0,
+        manualMatches: { total: 2, wins: 1, losses: 1, draws: 0, unknown: 0 },
+      },
+    ]
+    const view = renderShelf({
+      access: {
+        ready: true,
+        loading: false,
+        signedIn: true,
+        ownerId: "owner-a",
+        request: jest.fn(),
+      },
+    })
+    expect(
+      within(view.getByTestId(`deck-card-${guestDeckRouteId(local.localId)}`)).getByText("2-1"),
+    ).toBeTruthy()
     mockTotals = []
   })
 

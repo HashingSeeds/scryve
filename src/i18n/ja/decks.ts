@@ -54,10 +54,8 @@ export default {
     snapshotFailed: "この端末のリストを読み込めませんでした。",
     manual: "手動",
     all: "すべて",
-    matches: "マッチ",
     games: "ゲーム",
     matchesRecord: "マッチ {{record}}",
-    gamesRecord: "ゲーム {{record}}",
     noResults: "結果なし",
   },
   commander: {

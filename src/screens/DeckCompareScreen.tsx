@@ -13,7 +13,6 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import type { DeckCard } from "@/features/decks/deckCards"
-import type { StatsSource } from "@/features/decks/deckStatLines"
 import {
   likelyRange,
   listStats,
@@ -27,7 +26,6 @@ import {
   $statsRow,
   DeckComparePrompt,
   listLabel,
-  SourceTabs,
   StatsSection,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
@@ -39,7 +37,7 @@ import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../convex/_generated/api"
 
-type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void; source?: StatsSource }
+type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void }
 
 export function DeckCompareScreen(props: Props) {
   useFocusEffect(
@@ -80,16 +78,9 @@ function CompareQuery(props: Props) {
   return <CompareLists {...props} summary={summary} />
 }
 
-function CompareLists({
-  summary,
-  access,
-  deckKey,
-  deckName,
-  source: initialSource,
-}: Props & { summary: DeckSummary }) {
+function CompareLists({ summary, access, deckKey, deckName }: Props & { summary: DeckSummary }) {
   const { themed } = useAppTheme()
-  const [source, setSource] = useState<StatsSource>(initialSource ?? "scryve")
-  const lists = listStats(summary, source)
+  const lists = listStats(summary)
   const [leftId, setLeftId] = useState<string | null | undefined>()
   const [rightId, setRightId] = useState<string | null | undefined>()
   const [picking, setPicking] = useState<"left" | "right">()
@@ -129,7 +120,6 @@ function CompareLists({
   return (
     <ScrollView contentContainerStyle={themed($content)}>
       <Text text={deckName} preset="heading" />
-      <SourceTabs source={source} onChange={setSource} />
       {!summary.scannedAll ? (
         <Text size="xs" style={themed($dim)} tx="decks:stats.limited" />
       ) : null}

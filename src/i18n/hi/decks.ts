@@ -57,10 +57,8 @@ export default {
     snapshotFailed: "इस डिवाइस की सूचियाँ लोड नहीं हो सकीं।",
     manual: "मैन्युअल",
     all: "सभी",
-    matches: "मैच",
     games: "गेम",
     matchesRecord: "मैच {{record}}",
-    gamesRecord: "गेम {{record}}",
     noResults: "अभी तक कोई नतीजा नहीं",
   },
   commander: {
