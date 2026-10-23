@@ -117,8 +117,8 @@ export default {
   changeReport: "Modifier le résultat",
   confirm: "Confirmer le résultat",
   waitingForConfirm_one: "En attente de la confirmation de votre adversaire",
-  waitingForConfirm_many: "En attente de la confirmation des autres joueurs",
-  waitingForConfirm_other: "En attente de la confirmation des autres joueurs",
+  waitingForConfirm_many: "En attente de la confirmation d'un autre joueur",
+  waitingForConfirm_other: "En attente de la confirmation d'un autre joueur",
   startMatch: "Commencer le match",
   replaceGame: {
     title: "Terminer votre partie en cours ?",

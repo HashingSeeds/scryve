@@ -81,7 +81,7 @@ export function playerName(view: EventView, playerId: string) {
 const isBye = (table: EventTableView) => table.result?.kind === "bye"
 
 export function canReport(view: EventView, table: EventTableView) {
-  if (view.status === "registration" || isBye(table)) return false
+  if (view.status !== "active" || isBye(table)) return false
   if (view.isOrganizer) return true
   return (
     view.status === "active" &&

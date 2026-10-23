@@ -120,9 +120,9 @@ const events = {
   report: "Report result",
   changeReport: "Change result",
   confirm: "Confirm result",
-  // {{count}} is how many players at the table still need to confirm the report.
+  // {{count}} is how many players at the table could confirm the report; one confirmation is enough.
   waitingForConfirm_one: "Waiting for your opponent to confirm",
-  waitingForConfirm_other: "Waiting for the other players to confirm",
+  waitingForConfirm_other: "Waiting for another player to confirm",
   startMatch: "Start match",
   replaceGame: {
     title: "End your current game?",

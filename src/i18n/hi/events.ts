@@ -116,7 +116,7 @@ export default {
   changeReport: "नतीजा बदलें",
   confirm: "नतीजे की पुष्टि करें",
   waitingForConfirm_one: "आपके विरोधी की पुष्टि का इंतज़ार है",
-  waitingForConfirm_other: "बाकी खिलाड़ियों की पुष्टि का इंतज़ार है",
+  waitingForConfirm_other: "किसी दूसरे खिलाड़ी की पुष्टि का इंतज़ार है",
   startMatch: "मैच शुरू करें",
   replaceGame: {
     title: "मौजूदा गेम खत्म करें?",

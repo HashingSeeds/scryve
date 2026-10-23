@@ -34,6 +34,7 @@ import {
   playerName,
   resultText,
   type RoundBlocker,
+  standingsThroughRound,
   tablePlayers,
 } from "./eventLogic"
 import type { EventSource, EventTableView, EventView } from "./eventSource"
@@ -114,8 +115,10 @@ export function EventScreen({
       </EventFrame>
     )
 
-  const blocker = view ? nextRoundBlocker(view) : undefined
   const finalRound = view ? isFinalRound(view) : false
+  const nextRound = view ? nextRoundBlocker(view) : undefined
+  // why: finishing only needs every result in; a capped round count or a dropped field must not trap the organizer.
+  const blocker = finalRound && nextRound?.kind !== "results" ? undefined : nextRound
   const editingTable = view?.tables.find((table) => table.id === editing)
   const organizerFooter =
     view?.isOrganizer && view.status !== "finished" ? (
@@ -503,9 +506,9 @@ function PlayersTab({
               value={rounds ?? view.plannedRounds}
               min={Math.max(1, view.round)}
               max={MAX_EVENT_ROUNDS}
-              onChange={(plannedRounds) => {
+              onChange={async (plannedRounds) => {
                 setRounds(plannedRounds)
-                void run(() => source.update({ plannedRounds }))
+                if (!(await run(() => source.update({ plannedRounds })))) setRounds(undefined)
               }}
             />
             {view.structure === "swiss" && active >= 2 ? (
@@ -524,9 +527,9 @@ function PlayersTab({
               min={MIN_ROUND_MINUTES}
               max={MAX_ROUND_MINUTES}
               step={5}
-              onChange={(roundMinutes) => {
+              onChange={async (roundMinutes) => {
                 setMinutes(roundMinutes)
-                void run(() => source.update({ roundMinutes }))
+                if (!(await run(() => source.update({ roundMinutes })))) setMinutes(undefined)
               }}
             />
           </View>
@@ -570,7 +573,7 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
   const { themed } = useAppTheme()
   const tiebreaker = firstTiebreaker(view.system)
   const rows = source.standings
-  if (!rows || rows.length === 0 || view.round === 0)
+  if (!rows || rows.length === 0 || standingsThroughRound(view) === 0)
     return <Text style={themed($dim)} tx="events:standings.empty" />
   return (
     <View testID="standings">

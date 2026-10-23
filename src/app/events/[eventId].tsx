@@ -18,10 +18,21 @@ function ConvexEvent({ access, eventId }: { access: CloudAccess; eventId: string
       onBack={leave}
       onRemoved={() => router.replace("/events")}
       onStartMatch={(view, table, replace) => {
+        const setup = matchSetupFor(view, table, Date.now())
+        const active = localGameRepository.loadActiveGame()
+        // why: tapping Start match again for the match already running must resume it, not end it mid-match.
+        if (
+          active?.match &&
+          active.players.map((player) => player.name).join("\n") ===
+            setup.players.map((player) => player.name).join("\n")
+        ) {
+          router.push("/game/current")
+          return true
+        }
         if (replace) localGameRepository.clearActiveGame()
         const meSeat = view.myPlayerId ? table.playerIds.indexOf(view.myPlayerId) : -1
         return startLocalGame({
-          ...matchSetupFor(view, table, Date.now()),
+          ...setup,
           ...(access.ownerId && meSeat >= 0
             ? { account: { ownerId: access.ownerId, meSeat } }
             : {}),

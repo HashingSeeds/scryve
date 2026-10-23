@@ -131,4 +131,21 @@ describe("EventScreen", () => {
     expect(screen.queryByTestId("start-round-button")).toBeNull()
     expect(screen.getByTestId("finish-event-footer-button")).toBeEnabled()
   })
+
+  it("lets the organizer finish the last round after a drop leaves too few to pair", () => {
+    const done = {
+      ...openTable,
+      status: "confirmed" as const,
+      result: { kind: "match" as const, gamesWon: [2, 1], gamesDrawn: 0 },
+    }
+    const players = [
+      { id: "ada", name: "Ada", guest: false, dropped: true },
+      { id: "grace", name: "Grace", guest: false, dropped: false },
+    ]
+    renderEvent(
+      source(view({ isOrganizer: true, myPlayerId: null, round: 3, tables: [done], players })),
+    )
+
+    expect(screen.getByTestId("finish-event-footer-button")).toBeEnabled()
+  })
 })

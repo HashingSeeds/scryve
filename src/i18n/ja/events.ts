@@ -114,7 +114,7 @@ export default {
   report: "結果を報告",
   changeReport: "結果を変更",
   confirm: "結果を確認",
-  waitingForConfirm_other: "対戦相手の確認を待っています",
+  waitingForConfirm_other: "他のプレイヤーの確認を待っています",
   startMatch: "マッチを開始",
   replaceGame: {
     title: "現在のゲームを終了しますか？",

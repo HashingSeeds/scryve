@@ -114,7 +114,7 @@ export default {
   report: "결과 보고",
   changeReport: "결과 변경",
   confirm: "결과 확정",
-  waitingForConfirm_other: "상대의 확정을 기다리는 중",
+  waitingForConfirm_other: "다른 플레이어의 확정을 기다리는 중",
   startMatch: "매치 시작",
   replaceGame: {
     title: "진행 중인 게임을 끝낼까요?",
