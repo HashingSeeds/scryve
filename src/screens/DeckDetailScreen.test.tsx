@@ -1822,6 +1822,17 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText(/Premium/)).toBeNull()
   })
 
+  it("keeps the rename button beside the version row so web has no nested buttons", () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    expect(
+      within(view.getByTestId("version-picker-version-main")).queryByTestId(
+        "rename-version-button",
+      ),
+    ).toBeNull()
+    expect(view.getByTestId("rename-version-button")).toBeTruthy()
+  })
+
   it("deletes the selected version from the version editor behind a confirmation", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("deck-settings-button"))

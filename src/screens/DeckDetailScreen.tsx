@@ -1246,43 +1246,44 @@ function DeckDetailContent({
                     ? [translate("decks:detail.unplayed")]
                     : []
                 return (
-                  <TouchableOpacity
-                    key={candidate._id}
-                    testID={`version-picker-${candidate._id}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    style={themed($versionRow)}
-                    disabled={draft.editing}
-                    onPress={() => {
-                      chooseVersion(candidate._id)
-                      setDialog("none")
-                    }}
-                  >
-                    <View
-                      testID={`version-marker-${candidate._id}`}
-                      style={[themed($versionMark), selected && themed($versionMarkSelected)]}
-                    />
-                    <View style={themed($versionCopy)}>
-                      <Text weight="medium" text={deckVersionLabel(candidate)} />
-                      {candidate.note ? (
+                  <View key={candidate._id} style={themed($versionRow)}>
+                    <TouchableOpacity
+                      testID={`version-picker-${candidate._id}`}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={themed($versionSelect)}
+                      disabled={draft.editing}
+                      onPress={() => {
+                        chooseVersion(candidate._id)
+                        setDialog("none")
+                      }}
+                    >
+                      <View
+                        testID={`version-marker-${candidate._id}`}
+                        style={[themed($versionMark), selected && themed($versionMarkSelected)]}
+                      />
+                      <View style={themed($versionCopy)}>
+                        <Text weight="medium" text={deckVersionLabel(candidate)} />
+                        {candidate.note ? (
+                          <Text
+                            size="xxs"
+                            style={themed($dimmedText)}
+                            text={candidate.note}
+                            numberOfLines={2}
+                          />
+                        ) : null}
+                      </View>
+                      <View style={themed($versionContext)}>
+                        {candidateRecord.map((text) => (
+                          <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
+                        ))}
                         <Text
                           size="xxs"
                           style={themed($dimmedText)}
-                          text={candidate.note}
-                          numberOfLines={2}
+                          text={cardCountLabel(candidate.cardQuantity)}
                         />
-                      ) : null}
-                    </View>
-                    <View style={themed($versionContext)}>
-                      {candidateRecord.map((text) => (
-                        <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
-                      ))}
-                      <Text
-                        size="xxs"
-                        style={themed($dimmedText)}
-                        text={cardCountLabel(candidate.cardQuantity)}
-                      />
-                    </View>
+                      </View>
+                    </TouchableOpacity>
                     {selected && view.canManageVersion ? (
                       <TouchableOpacity
                         testID="rename-version-button"
@@ -1295,7 +1296,7 @@ function DeckDetailContent({
                         <Text size="lg" text="•••" />
                       </TouchableOpacity>
                     ) : null}
-                  </TouchableOpacity>
+                  </View>
                 )
               })}
             </View>
@@ -1513,6 +1514,13 @@ const $versionRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.xxs,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
+})
+const $versionSelect: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "stretch",
+  gap: spacing.sm,
 })
 const $versionMark: ThemedStyle<ViewStyle> = () => ({
   width: 5,
