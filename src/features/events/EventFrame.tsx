@@ -32,7 +32,7 @@ export function EventFrame({
   const blocked = access && !access.ready && !access.loading
   const waiting = loading || access?.loading
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$styles.flex1}>
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$frame}>
       <Header title={title} leftTx="common:back" onLeftPress={onBack} />
       {blocked ? (
         <EmptyState
@@ -65,6 +65,9 @@ export function EventFrame({
     </Screen>
   )
 }
+
+// why: the fixed preset bottom-aligns content, which dropped the header to the bottom while loading or signed out.
+const $frame: ViewStyle = { flex: 1, justifyContent: "flex-start" }
 
 export const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.lg,
