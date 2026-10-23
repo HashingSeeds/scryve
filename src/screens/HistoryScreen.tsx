@@ -56,6 +56,7 @@ export interface HistoryScreenProps {
   onSelectConnected: (publicId: string) => void
   onSelectManual: (publicId: string) => void
   onAddMatch?: () => void
+  onAddPastGames?: () => void
   connected?: ConnectedHistoryFeed
   initialSource?: HistorySource
 }
@@ -291,6 +292,7 @@ export function HistoryScreen({
   onSelectConnected,
   onSelectManual,
   onAddMatch,
+  onAddPastGames,
   connected,
   initialSource,
 }: HistoryScreenProps) {
@@ -431,6 +433,16 @@ export function HistoryScreen({
           <View style={themed($headerBlock)}>
             <Text preset="heading" tx="play:history.title" />
             <Text size="xs" style={themed($dimmedText)} text={countLabel} />
+            {onAddPastGames ? (
+              <TouchableOpacity
+                testID="history-add-past-games"
+                accessibilityRole="button"
+                style={$pastGames}
+                onPress={onAddPastGames}
+              >
+                <Text size="xs" style={themed($dimmedText)} tx="play:history.addPastGames" />
+              </TouchableOpacity>
+            ) : null}
             <View style={$chipRow}>
               <ScrollView
                 horizontal
@@ -795,4 +807,5 @@ const $dot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: DOT_SIZE / 2,
   backgroundColor: colors.separator,
 })
+const $pastGames: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

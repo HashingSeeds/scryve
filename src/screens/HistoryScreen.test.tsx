@@ -401,6 +401,16 @@ describe("unified history screen", () => {
     expect(screen.queryByText("Add result")).toBeNull()
   })
 
+  it("offers past games only when the route provides a way to add them", () => {
+    const onAddPastGames = jest.fn()
+    renderHistory({ onAddPastGames })
+    fireEvent.press(screen.getByText("Add past games"))
+    expect(onAddPastGames).toHaveBeenCalledTimes(1)
+
+    renderHistory()
+    expect(screen.queryByText("Add past games")).toBeNull()
+  })
+
   it("shows local games without a connected feed for signed-out players", () => {
     renderHistory()
 

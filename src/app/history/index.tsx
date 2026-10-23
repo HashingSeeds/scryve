@@ -7,7 +7,7 @@ import {
   ConnectedHistorySource,
   type ConnectedHistoryFeed,
 } from "@/features/connected/ConnectedHistorySource"
-import { localGameVisibleTo } from "@/features/game/localGameClaims"
+import { claimableLocalGames, localGameVisibleTo } from "@/features/game/localGameClaims"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { HistorySource } from "@/screens/historyEntries"
 import { HistoryScreen } from "@/screens/HistoryScreen"
@@ -74,6 +74,8 @@ export default function HistoryRoute() {
   const games = history.filter((game) =>
     localGameVisibleTo(game, signedIn ? auth.userId : undefined),
   )
+  const ownerId = signedIn ? auth.userId : undefined
+  const hasPastGames = ownerId !== undefined && claimableLocalGames(history, ownerId).length > 0
   const shared = {
     games,
     initialSource:
@@ -87,6 +89,9 @@ export default function HistoryRoute() {
       router.push({ pathname: "/history/[gameId]", params: { gameId, source: "connected" } }),
     onSelectManual: (publicId: string) =>
       router.push({ pathname: "/history/match/[publicId]", params: { publicId } }),
+    ...(ownerId !== undefined && hasPastGames
+      ? { onAddPastGames: () => localGameRepository.reopenClaims(ownerId) }
+      : {}),
     ...(signedIn ? { onAddMatch: () => router.push("/connected/decks/match") } : {}),
   }
   return (

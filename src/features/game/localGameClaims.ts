@@ -31,13 +31,16 @@ export function claimableLocalGames(
 export function claimableLocalUnits(
   games: readonly LocalGameSummary[],
   ownerId: string,
+  deferred: ReadonlySet<string> = new Set(),
 ): ClaimUnit[] {
   const units = new Map<string, LocalGameSummary[]>()
   for (const game of claimableLocalGames(games, ownerId)) {
     const id = claimUnitId(game)
     units.set(id, [...(units.get(id) ?? []), game])
   }
-  return [...units].map(([id, members]) => {
+  // why: a match with a new game since "Not now" comes back whole, or its earlier games would be left out.
+  const undecided = [...units].filter(([, members]) => members.some(({ id }) => !deferred.has(id)))
+  return undecided.map(([id, members]) => {
     const ordered = [...members].sort((left, right) => left.finishedAt - right.finishedAt)
     const latest = ordered[ordered.length - 1]
     return { id, games: ordered, ...(latest.match ? { match: latest.match } : {}) }

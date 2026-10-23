@@ -105,7 +105,9 @@ function ClaimPicker({
   repository: LocalGameRepository
 }) {
   const { themed } = useAppTheme()
-  const [candidates] = useState(() => claimableLocalUnits(repository.loadHistory(), ownerId))
+  const [candidates] = useState(() =>
+    claimableLocalUnits(repository.loadHistory(), ownerId, repository.loadDeferredClaims(ownerId)),
+  )
   const [open, setOpen] = useState(true)
   const [excluded, setExcluded] = useState<readonly string[]>([])
   const [allSeat, setAllSeat] = useState<number>()
@@ -124,6 +126,17 @@ function ClaimPicker({
     setExcluded((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     )
+  }
+
+  // why: a failed write only means the prompt may return, so it still closes.
+  function decideLater() {
+    try {
+      repository.deferClaims(
+        ownerId,
+        candidates.flatMap((unit) => unit.games.map((game) => game.id)),
+      )
+    } catch {}
+    setOpen(false)
   }
 
   function confirm() {
@@ -147,7 +160,7 @@ function ClaimPicker({
     <DialogCard
       visible
       wide
-      onClose={() => setOpen(false)}
+      onClose={decideLater}
       backdropTestID="claim-games-backdrop"
       backdropAccessibilityLabel={translate("board:claim.decideLater")}
       dialogTestID="claim-games-dialog"
@@ -217,7 +230,7 @@ function ClaimPicker({
           testID="claim-games-dismiss"
           tx="board:claim.notNow"
           style={themed($action)}
-          onPress={() => setOpen(false)}
+          onPress={decideLater}
         />
         <Button
           testID="claim-games-confirm"
@@ -303,6 +316,12 @@ function useLocalGameRunning(repository: LocalGameRepository) {
   return running
 }
 
+function useClaimsReopened(repository: LocalGameRepository) {
+  const [count, setCount] = useState(0)
+  useEffect(() => repository.onClaimsReopened(() => setCount((value) => value + 1)), [repository])
+  return count
+}
+
 function isLocalGameRunning(repository: LocalGameRepository) {
   const game = repository.loadActiveGame()
   return game !== null && hasLocalGameStarted(game)
@@ -316,6 +335,7 @@ export function LocalGameClaimPrompt({
   const auth = useAuthAccess()
   const consentSettled = useLegalConsentSettled()
   const running = useLocalGameRunning(repository)
+  const reopened = useClaimsReopened(repository)
   const ownerId = auth.configured && auth.isLoaded && auth.isSignedIn ? auth.userId : undefined
   useEffect(() => {
     if (!ownerId) return
@@ -324,7 +344,7 @@ export function LocalGameClaimPrompt({
     } catch {}
   }, [ownerId, repository])
   if (!ownerId || auth.authVisible || !consentSettled || running) return null
-  return <ClaimPicker key={ownerId} ownerId={ownerId} repository={repository} />
+  return <ClaimPicker key={`${ownerId}:${reopened}`} ownerId={ownerId} repository={repository} />
 }
 
 const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
