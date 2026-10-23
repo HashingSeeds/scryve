@@ -46,6 +46,7 @@ export function DeckView({
   busy,
   guest,
   cardsUnavailable,
+  cardsLoading,
   cardsCached,
   canAddOffline,
   addOfflineNote,
@@ -82,6 +83,7 @@ export function DeckView({
   busy?: boolean
   guest?: boolean
   cardsUnavailable?: boolean
+  cardsLoading?: boolean
   cardsCached?: boolean
   canAddOffline?: boolean
   addOfflineNote?: string
@@ -233,11 +235,21 @@ export function DeckView({
             </View>
             {tab === "analysis" ? (
               cardsUnavailable ? (
-                <Text style={themed($notes)} tx="decks:deckView.cardsUnavailable" />
+                <Text
+                  style={themed($notes)}
+                  tx={
+                    cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"
+                  }
+                />
               ) : cards.length === 0 ? (
                 <Text style={themed($notes)} tx="decks:deckView.noCards" />
               ) : (
-                <DeckAnalysisTab game={game} format={format} cards={cards} />
+                <DeckAnalysisTab
+                  game={game}
+                  format={format}
+                  cards={cards}
+                  onChooseCommander={onChooseCommander}
+                />
               )
             ) : tab === "notes" ? (
               <View style={themed($notes)}>
@@ -271,7 +283,12 @@ export function DeckView({
                 )}
               </View>
             ) : cardsUnavailable ? (
-              <Text style={themed($notes)} tx="decks:deckView.cardsUnavailable" />
+              <Text
+                style={themed($notes)}
+                tx={
+                  cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"
+                }
+              />
             ) : cards.length === 0 ? (
               <Text
                 style={themed($notes)}

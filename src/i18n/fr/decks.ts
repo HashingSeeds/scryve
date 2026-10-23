@@ -151,6 +151,7 @@ export default {
     currentVersion: "Version actuelle",
     current: "Actuelle ›",
     maybeDeleted: "Ce deck a peut-être été supprimé.",
+    newList: "Nouvelle liste. Les résultats précédents restent avec l'ancienne.",
     loadFailed: "Impossible de charger ce deck.",
     editList: "Modifier la liste",
     offlineCard:
@@ -403,6 +404,7 @@ export default {
     notePlaceholder: "Ajouter une note",
     noNotes: "Aucune note pour l'instant.",
     editNotes: "Modifier les notes",
+    cardsLoading: "Chargement des cartes…",
     cardsUnavailable: "Liste de cartes indisponible hors ligne.",
     noCards: "Aucune carte pour l'instant. Ajoutez votre première carte ci-dessous.",
     removed: "{{card}} retiré",
@@ -412,6 +414,8 @@ export default {
     addCards: "+ Ajouter des cartes",
   },
   analysis: {
+    incomplete: "{{count}} cartes sur {{size}}. Les probabilités utilisent les cartes listées.",
+    noCommander: "Aucun commandant choisi.",
     curve: "Courbe de mana",
     average: "Moyenne : {{value}}",
     lands: "Terrains",

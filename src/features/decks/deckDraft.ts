@@ -2,6 +2,7 @@ import { translate } from "@/i18n/translate"
 
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
+import { canonicalDecklist } from "../../../convex/lib/deckFingerprint"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import { identitySection } from "../../../convex/lib/systems"
 
@@ -58,6 +59,12 @@ export function draftChanges(draft: DeckDraft, savedNote: string | undefined) {
   const cards = draft.editing && !draft.fromCache && cardsChanged(draft.cards, draft.base)
   const note = draft.editing && draft.note !== (savedNote ?? "")
   return { cards, note, any: cards || note }
+}
+
+export function startsNewList(base: readonly DeckCard[], cards: readonly DeckCard[], game: string) {
+  const fingerprintCards = (list: readonly DeckCard[]) =>
+    list.map((card) => ({ ...card, game: card.game ?? game }))
+  return canonicalDecklist(fingerprintCards(base)) !== canonicalDecklist(fingerprintCards(cards))
 }
 
 export function cardsChanged(cards: readonly DeckCard[], base: readonly DeckCard[]) {

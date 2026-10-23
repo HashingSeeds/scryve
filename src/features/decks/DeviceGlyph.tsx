@@ -1,6 +1,7 @@
 import Svg, { Path, Rect } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
+import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
 
 export function DeviceGlyph() {
   const { theme } = useAppTheme()
@@ -12,7 +13,7 @@ export function DeviceGlyph() {
       fill="none"
       stroke={theme.colors.textDim}
       strokeWidth={1.4}
-      accessible={false}
+      {...decorativeSvgProps({ accessible: false })}
       testID="device-glyph"
     >
       <Rect x={4} y={1.5} width={8} height={13} rx={1.6} />
