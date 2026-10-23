@@ -200,7 +200,7 @@ export default {
       },
       feedback: {
         title: "Los comentarios enviados sin tu cuenta se conservan",
-        body: "Los comentarios que enviaste con tu cuenta se eliminan. Los que enviaste sin ella se quedan en el dispositivo que los envió. Para borrarlos, abre Solicitudes de funciones, luego Mis solicitudes y toca Eliminar mis comentarios.",
+        body: "Los comentarios que enviaste con tu cuenta se eliminan. Lo que se envió sin ella permanece en el dispositivo que lo envió. Para quitarlo, abre Soporte, luego Tus comentarios y toca Eliminar mis comentarios.",
       },
       signOut: {
         title: "Se cierra la sesión en todos los dispositivos",

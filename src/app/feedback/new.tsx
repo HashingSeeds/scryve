@@ -17,7 +17,6 @@ import { useFeedbackOutbox } from "@/features/feedback/outbox"
 import { translate } from "@/i18n/translate"
 import { FeedbackSuggestScreen, type SuggestKind } from "@/screens/FeedbackSuggestScreen"
 
-// why: past this the send keeps waiting in the outbox and the player sees it under Your feedback.
 const SEND_WAIT_MS = 8_000
 
 export default function NewFeedbackRoute() {
@@ -37,7 +36,6 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
   const [body, setBody] = useState(params.message ?? "")
   const [includeAccount, setIncludeAccount] = useState(false)
   const [screenshot, setScreenshot] = useState<BugScreenshot | null>(null)
-  // why: Sentry keeps the report and screenshot; a retry after a refused send reuses it rather than filing it twice.
   const [sentry, setSentry] = useState<{ draft: string; eventId?: string }>()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()

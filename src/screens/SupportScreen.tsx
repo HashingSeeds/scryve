@@ -212,8 +212,7 @@ function SearchResults({
   ))
 }
 
-// why: matching word starts keeps "ti" from finding "subscriptions"; Japanese has no spaces, so it matches anywhere.
-function matchesWords(text: string, search: string) {
+export function matchesWords(text: string, search: string) {
   const lower = text.toLocaleLowerCase()
   const words = lower.split(WORD_BREAK)
   return search

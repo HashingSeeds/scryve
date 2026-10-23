@@ -181,7 +181,6 @@ export class FeedbackOutbox {
         for (const operationId of result.failed) {
           const waiter = this.waiters.get(operationId)
           if (!waiter) continue
-          // why: a screen is waiting on this send and shows the error with the draft, so the failure isn't kept twice.
           this.store.dismissFailed(SCOPE, operationId)
           this.waiters.delete(operationId)
           waiter.reject(this.causes.get(operationId))

@@ -2,7 +2,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { SupportScreen, type SupportScreenProps } from "./SupportScreen"
+import { matchesWords, SupportScreen, type SupportScreenProps } from "./SupportScreen"
 
 function renderSupport(overrides: Partial<SupportScreenProps> = {}) {
   const props: SupportScreenProps = {
@@ -74,5 +74,11 @@ describe("SupportScreen", () => {
 
   it("hides the license agreement link without a handler", () => {
     expect(renderSupport().view.queryByText("License Agreement")).toBeNull()
+  })
+
+  it("matches word starts, but anywhere in text written without spaces", () => {
+    expect(matchesWords("Manage subscriptions", "ti")).toBe(false)
+    expect(matchesWords("Manage subscriptions", "sub")).toBe(true)
+    expect(matchesWords("サブスクリプションを管理", "スクリプ")).toBe(true)
   })
 })

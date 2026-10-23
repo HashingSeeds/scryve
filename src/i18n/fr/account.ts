@@ -201,7 +201,7 @@ export default {
       },
       feedback: {
         title: "Les retours envoyés sans votre compte sont conservés",
-        body: "Les retours associés à votre compte sont supprimés. Ceux envoyés sans compte restent sur l'appareil qui les a envoyés. Pour les supprimer, ouvrez Demandes de fonctionnalités, puis Mes demandes, et appuyez sur Supprimer mes retours.",
+        body: "Les retours d'expérience envoyés avec votre compte sont supprimés. Ceux envoyés sans compte restent sur l'appareil qui les a envoyés. Pour les supprimer, ouvrez Assistance, puis Vos retours, et touchez Supprimer mes retours.",
       },
       signOut: {
         title: "Tous les appareils sont déconnectés",

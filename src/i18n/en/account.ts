@@ -197,7 +197,7 @@ const account = {
       },
       feedback: {
         title: "Feedback sent without your account stays",
-        body: "Feedback you included your account with is deleted. Anything sent without it stays with the device that sent it. To remove that, open Feature requests, then My requests, and tap Delete my feedback.",
+        body: "Feedback you included your account with is deleted. Anything sent without it stays with the device that sent it. To remove that, open Support, then Your feedback, and tap Delete my feedback.",
       },
       signOut: {
         title: "All devices are signed out",
