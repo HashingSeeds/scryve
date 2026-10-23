@@ -33,6 +33,7 @@ jest.mock("@/features/game/localPersistence", () => ({
     loadHistory: () => [],
     loadHistoryDetail: () => null,
     onHistoryChanged: () => () => undefined,
+    hasRunningGame: () => false,
   },
 }))
 jest.mock("@/screens/GameSummaryScreen", () => {
