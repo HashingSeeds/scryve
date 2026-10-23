@@ -11,6 +11,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { MIN_RATED_GAMES } from "@/features/decks/deckCopy"
 import { statsSourceLabel } from "@/features/decks/deckStatLines"
 import {
   chanceRate,
@@ -107,19 +108,34 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
   if (!ready) return <AlertNote tone="info" text={translate("decks:shelf.reconnect")} />
   if (!summary) return <Text tx="decks:stats.loading" />
   const record = exactRecord(summary.all, "all")
+  const empty = record.games === 0
   const rate = honestRate(record)
   const range = likelyRange(record)
   const chance = chanceRate(summary.slices)
   const lists = labelLists(listRows, listContext)
-  const pods = [...new Set(summary.slices.map((slice) => slice.podSize))].sort(
-    (a, b) => (b ?? 0) - (a ?? 0),
-  )
-  const manualMatches = summary.all?.manualMatches
-  const connectedMatches = summary.all?.connectedMatches
-  const sourceRecords = (["scryve", "manual"] as const).map((value) => ({
+  const podRows = [...new Set(summary.slices.map((slice) => slice.podSize))]
+    .sort((a, b) => (b ?? 0) - (a ?? 0))
+    .map((podSize) => ({ podSize, record: sumSlices(summary.slices, "all", { podSize }) }))
+  const turnOrderRows = summary.slices.some((slice) => slice.wentFirst !== null)
+    ? ([true, false, null] as const).map((wentFirst) => ({
+        wentFirst,
+        record: sumSlices(summary.slices, "all", { wentFirst }),
+      }))
+    : []
+  const sourceRows = (["scryve", "manual"] as const).map((value) => ({
     value,
     record: exactRecord(summary.all, value),
   }))
+  const showSources = sourceRows.every((row) => row.record.games > 0)
+  const smallSample = [
+    record,
+    ...lists.map((list) => list.record),
+    ...podRows.map((row) => row.record),
+    ...turnOrderRows.map((row) => row.record),
+    ...(showSources ? sourceRows.map((row) => row.record) : []),
+  ].some((row) => row.games > 0 && honestRate(row).tooFew)
+  const manualMatches = summary.all?.manualMatches
+  const connectedMatches = summary.all?.connectedMatches
   return (
     <>
       <FlatList
@@ -137,7 +153,13 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 .filter(Boolean)
                 .join(" · ")}
             />
-            {!filter ? (
+            {empty ? (
+              <View style={$hero}>
+                <Text weight="medium" tx="decks:stats.noResults" />
+                <Text size="sm" style={themed($dim)} tx="decks:stats.emptyHint" />
+              </View>
+            ) : null}
+            {!filter && !empty ? (
               <>
                 <View style={$hero}>
                   <Text testID="stats-headline" text={rate.text} style={[$headline, $numbers]} />
@@ -145,7 +167,6 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                     text={[
                       rate.tooFew ? undefined : recordText(record),
                       translate("decks:stats.gameCount", { count: record.games }),
-                      rate.tooFew ? translate("decks:stats.tooFew") : undefined,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -180,70 +201,86 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                       txOptions={range}
                     />
                   ) : null}
+                  {smallSample ? (
+                    <Text
+                      size="xs"
+                      style={themed($dim)}
+                      tx="decks:stats.smallSample"
+                      txOptions={{ count: MIN_RATED_GAMES }}
+                    />
+                  ) : null}
                 </View>
                 {!summary.scannedAll ? (
                   <Text size="xs" style={themed($dim)} tx="decks:stats.limited" />
                 ) : null}
-                <StatsSection
-                  title={translate("decks:stats.lists")}
-                  action={
-                    lists.filter((list) => list.fingerprint !== null).length < 2 ? undefined : (
-                      <TouchableOpacity
-                        accessibilityRole="button"
-                        testID="stats-compare"
-                        disabled={!capacity}
-                        style={$actionTouch}
+                {lists.length ? (
+                  <>
+                    <StatsSection
+                      title={translate("decks:stats.lists")}
+                      action={
+                        lists.filter((list) => list.fingerprint !== null).length < 2 ? undefined : (
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            testID="stats-compare"
+                            disabled={!capacity}
+                            style={$actionTouch}
+                            onPress={() =>
+                              capacity?.premium
+                                ? router.push({
+                                    pathname: "/connected/decks/compare",
+                                    params: { deckKey, deckName, game, format },
+                                  })
+                                : setProPrompt(true)
+                            }
+                          >
+                            <Text tx="decks:stats.compare" size="sm" style={themed($action)} />
+                          </TouchableOpacity>
+                        )
+                      }
+                    />
+                    {lists.map((list) => (
+                      <StatsRow
+                        key={list.fingerprint ?? "untracked"}
+                        testID={`stats-list-${list.fingerprint ?? "untracked"}`}
+                        label={listLabel(list)}
+                        detail={listDetail(list)}
+                        record={list.record}
                         onPress={() =>
-                          capacity?.premium
-                            ? router.push({
-                                pathname: "/connected/decks/compare",
-                                params: { deckKey, deckName, game, format },
-                              })
-                            : setProPrompt(true)
+                          showGames({ fingerprint: list.fingerprint, label: listLabel(list) })
                         }
-                      >
-                        <Text tx="decks:stats.compare" size="sm" style={themed($action)} />
-                      </TouchableOpacity>
-                    )
-                  }
-                />
-                {lists.map((list) => (
-                  <StatsRow
-                    key={list.fingerprint ?? "untracked"}
-                    testID={`stats-list-${list.fingerprint ?? "untracked"}`}
-                    label={listLabel(list)}
-                    detail={listDetail(list)}
-                    record={list.record}
-                    onPress={() =>
-                      showGames({ fingerprint: list.fingerprint, label: listLabel(list) })
-                    }
-                  />
-                ))}
-                <StatsSection title={translate("decks:stats.podSize")} />
-                {pods.map((podSize) => (
-                  <StatsRow
-                    key={podSize ?? "unknown"}
-                    label={
-                      podSize === null
-                        ? translate("decks:stats.unknownPod")
-                        : translate("decks:stats.players", { count: podSize })
-                    }
-                    record={sumSlices(summary.slices, "all", { podSize })}
-                    onPress={
-                      podSize === null
-                        ? undefined
-                        : () =>
-                            showGames({
-                              podSize,
-                              label: translate("decks:stats.players", { count: podSize }),
-                            })
-                    }
-                  />
-                ))}
-                {summary.slices.some((slice) => slice.wentFirst !== null) ? (
+                      />
+                    ))}
+                  </>
+                ) : null}
+                {podRows.length ? (
+                  <>
+                    <StatsSection title={translate("decks:stats.podSize")} />
+                    {podRows.map(({ podSize, record: podRecord }) => (
+                      <StatsRow
+                        key={podSize ?? "unknown"}
+                        label={
+                          podSize === null
+                            ? translate("decks:stats.unknownPod")
+                            : translate("decks:stats.players", { count: podSize })
+                        }
+                        record={podRecord}
+                        onPress={
+                          podSize === null
+                            ? undefined
+                            : () =>
+                                showGames({
+                                  podSize,
+                                  label: translate("decks:stats.players", { count: podSize }),
+                                })
+                        }
+                      />
+                    ))}
+                  </>
+                ) : null}
+                {turnOrderRows.length ? (
                   <>
                     <StatsSection title={translate("decks:stats.turnOrder")} />
-                    {([true, false, null] as const).map((wentFirst) => {
+                    {turnOrderRows.map(({ wentFirst, record: turnRecord }) => {
                       const label = translate(
                         wentFirst === null
                           ? "decks:stats.turnOrderNotTracked"
@@ -256,17 +293,17 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                           key={String(wentFirst)}
                           testID={`stats-turn-order-${wentFirst}`}
                           label={label}
-                          record={sumSlices(summary.slices, "all", { wentFirst })}
+                          record={turnRecord}
                           onPress={() => showGames({ wentFirst, label })}
                         />
                       )
                     })}
                   </>
                 ) : null}
-                {sourceRecords.every((row) => row.record.games > 0) ? (
+                {showSources ? (
                   <>
                     <StatsSection title={translate("decks:stats.sources")} />
-                    {sourceRecords.map(({ value, record: sourceRecord }) => (
+                    {sourceRows.map(({ value, record: sourceRecord }) => (
                       <StatsRow
                         key={value}
                         testID={`stats-source-${value}`}
@@ -279,22 +316,24 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 ) : null}
               </>
             ) : null}
-            <StatsSection
-              title={
-                filter
-                  ? `${translate("decks:stats.games")} · ${filter.label}`
-                  : translate("decks:stats.games")
-              }
-              action={
-                filter ? (
-                  <Button tx="decks:stats.all" onPress={() => setFilter(undefined)} />
-                ) : undefined
-              }
-            />
+            {empty ? null : (
+              <StatsSection
+                title={
+                  filter
+                    ? `${translate("decks:stats.games")} · ${filter.label}`
+                    : translate("decks:stats.games")
+                }
+                action={
+                  filter ? (
+                    <Button tx="decks:stats.all" onPress={() => setFilter(undefined)} />
+                  ) : undefined
+                }
+              />
+            )}
           </>
         }
         ListEmptyComponent={
-          games.status === "LoadingFirstPage" || games.status === "Exhausted" ? (
+          !empty && (games.status === "LoadingFirstPage" || games.status === "Exhausted") ? (
             <Text
               size="sm"
               style={themed($dim)}

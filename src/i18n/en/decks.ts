@@ -12,7 +12,8 @@ const decks = {
   stats: {
     title: "Deck stats",
     compare: "Compare",
-    tooFew: "too few",
+    smallSample: "Under {{count}} results is a small sample.",
+    emptyHint: "Play a game with this deck, or add a match result on its page.",
     ofGames: "of {{count}}",
     gameCount_one: "{{count}} game",
     gameCount_other: "{{count}} games",

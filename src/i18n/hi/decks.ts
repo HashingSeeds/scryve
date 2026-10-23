@@ -15,7 +15,8 @@ export default {
   stats: {
     title: "डेक के आँकड़े",
     compare: "तुलना",
-    tooFew: "बहुत कम",
+    smallSample: "{{count}} से कम नतीजे बहुत छोटा सैंपल होते हैं।",
+    emptyHint: "इस डेक के साथ कोई गेम खेलें, या इसके पेज पर मैच का नतीजा जोड़ें।",
     ofGames: "{{count}} में से",
     gameCount_one: "{{count}} गेम",
     gameCount_other: "{{count}} गेम",

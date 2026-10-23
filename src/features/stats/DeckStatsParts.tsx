@@ -50,17 +50,15 @@ export function HonestRate({ record }: { record: RecordCounts }) {
   const { themed } = useAppTheme()
   const rate = honestRate(record)
   return (
-    <View style={$rate}>
+    <View style={rate.tooFew ? $fewRate : $rate}>
       <Text weight="medium" text={rate.text} style={$numbers} />
-      <Text
-        size="xxs"
-        style={themed($dim)}
-        text={
-          rate.tooFew
-            ? translate("decks:stats.tooFew")
-            : translate("decks:stats.ofGames", { count: rate.games })
-        }
-      />
+      {rate.tooFew ? null : (
+        <Text
+          size="xxs"
+          style={themed($dim)}
+          text={translate("decks:stats.ofGames", { count: rate.games })}
+        />
+      )}
     </View>
   )
 }
@@ -169,6 +167,7 @@ export const $statsRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $rate: ViewStyle = { alignItems: "flex-end" }
+const $fewRate: ViewStyle = { alignItems: "flex-end", opacity: 0.55 }
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

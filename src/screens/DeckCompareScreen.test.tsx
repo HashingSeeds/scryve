@@ -59,7 +59,8 @@ it("defaults to current versus previous with exact records and card changes", as
   expect(view.getByText("4-4")).toBeTruthy()
   expect(view.getByText("8-4")).toBeTruthy()
   expect(view.getByText("50%")).toBeTruthy()
-  expect(view.getByText("too few")).toBeTruthy()
+  expect(view.getAllByText("Under 10 results is a small sample.")).toHaveLength(1)
+  expect(view.queryByText("too few")).toBeNull()
   expect(view.getAllByText(/Likely/)).toHaveLength(2)
   await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
   expect(view.getByText("−2 Land")).toBeTruthy()
@@ -86,7 +87,7 @@ it("excludes unknown outcomes from comparison win rates", async () => {
   const view = render(screen())
   expect(view.getByText("50%")).toBeTruthy()
   expect(view.getByText("67%")).toBeTruthy()
-  expect(view.getByText("too few")).toBeTruthy()
+  expect(view.getAllByText("Under 10 results is a small sample.")).toHaveLength(1)
   await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
 })
 

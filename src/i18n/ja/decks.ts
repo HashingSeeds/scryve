@@ -14,7 +14,8 @@ export default {
   stats: {
     title: "デッキ統計",
     compare: "比較",
-    tooFew: "データ不足",
+    smallSample: "結果が{{count}}件未満の場合はサンプルが少ないです。",
+    emptyHint: "このデッキで対戦するか、デッキのページでマッチ結果を追加してください。",
     ofGames: "{{count}}件中",
     gameCount_other: "{{count}}ゲーム",
     chance: "{{podSize}}人戦で{{rate}} · 確率 {{percent}}%",

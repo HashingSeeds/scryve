@@ -14,7 +14,8 @@ export default {
   stats: {
     title: "덱 통계",
     compare: "비교",
-    tooFew: "기록 부족",
+    smallSample: "결과가 {{count}}건 미만이면 표본이 적습니다.",
+    emptyHint: "이 덱으로 게임을 플레이하거나 덱 페이지에서 매치 결과를 추가하세요.",
     ofGames: "{{count}}회 중",
     gameCount_other: "{{count}}게임",
     chance: "{{podSize}}인 게임 중 {{rate}} · 확률 {{percent}}%",
