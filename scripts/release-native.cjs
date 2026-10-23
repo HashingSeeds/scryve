@@ -1,5 +1,6 @@
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
 const root = path.join(path.dirname(require.resolve("./release-native.cjs")), "..")
@@ -148,36 +149,51 @@ function settleVersion() {
   return plan.version
 }
 
-// why: a version's builds come from its tagged commit, so differing runtimes mean the store build is ambiguous.
-function storeRuntime(platform, version) {
-  const builds = JSON.parse(
-    execFileSync(
-      "npx",
-      [
-        "--yes",
-        easCli,
-        "build:list",
-        "--platform",
-        platform,
-        "--build-profile",
-        "production",
-        "--status",
-        "finished",
-        "--app-version",
-        version,
-        "--limit",
-        "50",
-        "--json",
-      ],
-      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+// why: production builds come from their version's tag and local ones never reach EAS, so the tag's fingerprint is the store build's runtime.
+function tagRuntimes(version, platforms) {
+  const tag = `v${version}`
+  try {
+    git("fetch", "--quiet", "origin", "tag", tag)
+  } catch (error) {
+    throw new Error(`No ${tag} tag on origin; production builds tag the commit they build.`, {
+      cause: error,
+    })
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `scryve-${tag}-`))
+  try {
+    execFileSync("git", ["worktree", "add", "--quiet", "--detach", dir, tag], {
+      cwd: root,
+      env: { ...process.env, SCRYVE_SKIP_INSTALL: "1" },
+      stdio: ["ignore", "ignore", "inherit"],
+    })
+    execFileSync("pnpm", ["install", "--frozen-lockfile", "--silent"], {
+      cwd: dir,
+      stdio: ["ignore", "ignore", "inherit"],
+    })
+    const env = productionEnv(dir)
+    return platforms.map((platform) => {
+      const fingerprint = execFileSync(
+        "npx",
+        ["expo-updates", "fingerprint:generate", "--platform", platform],
+        { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      )
+      return { platform, runtimeVersion: JSON.parse(fingerprint).hash }
+    })
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+    git("worktree", "prune")
+  }
+}
+
+// why: the app config reads these, from the shell or a linked .env.local, so APP_VARIANT=preview would fingerprint the preview app.
+function productionEnv(dir) {
+  const eas = JSON.parse(fs.readFileSync(path.join(dir, "eas.json"), "utf8"))
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name]) => !/^(APP_VARIANT|EXPO_|EAS_|SCRYVE_|RELEASE_NOTES$|GITHUB_SHA$)/.test(name),
     ),
   )
-  const runtimes = [...new Set(builds.map((build) => build.runtime?.version).filter(Boolean))]
-  if (runtimes.length > 1)
-    throw new Error(
-      `${platform} builds of ${version} have different runtimes (${runtimes.join(", ")}). Record the store build's runtime with storeReleases:setLive by hand.`,
-    )
-  return runtimes[0] ?? null
+  return { ...env, ...eas.build.production.env, EXPO_NO_DOTENV: "1" }
 }
 
 function recordLive(args) {
@@ -186,12 +202,8 @@ function recordLive(args) {
   // why: recording mid-rollout sends players to a store page with no update for them, so it previews by default.
   const write = args.includes("--yes")
   let previewed = false
-  for (const platform of platforms.length ? platforms : ["android", "ios"]) {
-    const runtimeVersion = storeRuntime(platform, version)
-    if (!runtimeVersion) {
-      console.log(`${platform}: no finished production build of ${version} on EAS, skipped.`)
-      continue
-    }
+  const runtimes = tagRuntimes(version, platforms.length ? platforms : ["android", "ios"])
+  for (const { platform, runtimeVersion } of runtimes) {
     const record = JSON.stringify({ platform, version, runtimeVersion })
     if (!write) {
       console.log(`${platform}: would record ${record}`)
