@@ -12,7 +12,7 @@ export default {
     noMatch: "「{{query}}」に該当する回答はありません。",
     ask: "「{{query}}」について問い合わせる",
   },
-  offline: "オフラインです。送信した内容は、接続が戻ると送信されます。",
+  offline: "オフラインです。接続が戻るまで、下書きはここに残ります。",
   suggest: {
     title: "フィードバックを送信",
     kind: "種類を選択",
@@ -37,7 +37,6 @@ export default {
       "アカウントなしで送信されます。返信はこのデバイスに表示され、再インストールすると失われることがあります。",
     signInToKeep: "サインインして保持",
     send: "送信",
-    sendOffline: "オンライン時に送信",
     sendFailed: "送信できませんでした。もう一度お試しください。",
     rateLimited_other: "送信回数が多すぎます。{{count}}分後にもう一度お試しください。",
   },
@@ -45,11 +44,6 @@ export default {
     title: "あなたのフィードバック",
     empty: "このデバイスから送信したものはまだありません。",
     unread: "新着",
-    waiting: "接続待ちです。接続が戻ると送信されます。",
-    sending: "送信中…",
-    notSent: "送信できませんでした。{{reason}}",
-    otherAccount: "送信前にアカウントを切り替えました",
-    discard: "破棄",
     deleteAll: "フィードバックを削除",
     deleteHint:
       "このデバイスから送信した内容を削除します。Sentryに送信済みの不具合の詳細は残ります。",
@@ -67,7 +61,6 @@ export default {
     replyLabel: "返信",
     replyPlaceholder: "詳細の追加や質問への回答をどうぞ",
     send: "送信",
-    sendOffline: "オンライン時に送信",
     sendFailed: "送信できませんでした。もう一度お試しください。",
     includeAccount: "アカウントを含める",
     includeAccountHelper:

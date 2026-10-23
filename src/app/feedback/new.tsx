@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Platform } from "react-native"
 import { router, useLocalSearchParams } from "expo-router"
+import { useMutation } from "convex/react"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
@@ -11,13 +12,13 @@ import {
   type BugScreenshot,
 } from "@/features/feedback/bugReport"
 import { feedbackErrorMessage } from "@/features/feedback/errors"
+import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { FeedbackUnavailable } from "@/features/feedback/FeedbackUnavailable"
 import { leaveFeedback } from "@/features/feedback/navigation"
-import { useFeedbackOutbox } from "@/features/feedback/outbox"
 import { translate } from "@/i18n/translate"
 import { FeedbackSuggestScreen, type SuggestKind } from "@/screens/FeedbackSuggestScreen"
 
-const SEND_WAIT_MS = 8_000
+import { api } from "../../../convex/_generated/api"
 
 export default function NewFeedbackRoute() {
   const auth = useAuthAccess()
@@ -31,7 +32,8 @@ export default function NewFeedbackRoute() {
 function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => void }) {
   const params = useLocalSearchParams<{ message?: string; kind?: string }>()
   const online = useConvexOnline()
-  const outbox = useFeedbackOutbox()
+  const key = useFeedbackKey()
+  const submit = useMutation(api.feedback.submit)
   const [kind, setKind] = useState<SuggestKind>(params.kind === "bug" ? "bug" : "feature")
   const [body, setBody] = useState(params.message ?? "")
   const [includeAccount, setIncludeAccount] = useState(false)
@@ -39,7 +41,7 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
   const [sentry, setSentry] = useState<{ draft: string; eventId?: string }>()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
-  // why: a send waits up to 8 seconds; if the player left meanwhile, navigating would replace whatever screen they're on.
+  // why: if the player left while the send was out, navigating would replace whatever screen they're on.
   const mounted = useRef(true)
   useEffect(
     () => () => {
@@ -49,7 +51,7 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
   )
 
   async function send() {
-    if (sending || !body.trim()) return
+    if (sending || !body.trim() || !key || !online) return
     setSending(true)
     setError(undefined)
     const draft = [body.trim(), screenshot?.uri ?? ""].join("\n")
@@ -62,8 +64,8 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
       setSentry({ draft, eventId: sentryEventId })
     }
     try {
-      const operationId = outbox.enqueue({
-        type: "submit",
+      const requestId = await submit({
+        key,
         kind,
         body: body.trim(),
         includeAccount: signedIn && includeAccount,
@@ -71,8 +73,7 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
         platform: Platform.OS,
         ...(sentryEventId ? { sentryEventId } : {}),
       })
-      const requestId = online ? await outbox.waitFor(operationId, SEND_WAIT_MS) : undefined
-      if (mounted.current) router.replace(requestId ? `/feedback/${requestId}` : "/feedback/mine")
+      if (mounted.current) router.replace(`/feedback/${requestId}`)
     } catch (cause) {
       if (!mounted.current) return
       setError(feedbackErrorMessage(cause, translate("feedback:suggest.sendFailed")))

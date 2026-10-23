@@ -37,7 +37,6 @@ const DELETE_BATCH = 20
 const ACCOUNT_DELETE_BATCH = 10
 const DELETE_MESSAGES_PER_MUTATION = 400
 const APOLLO_BATCH = 100
-const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 
 type Ctx = QueryCtx | MutationCtx
@@ -165,11 +164,6 @@ export const thread = query({
   },
 })
 
-function checkClientId(clientId: string | undefined) {
-  if (clientId !== undefined && !CLIENT_ID.test(clientId))
-    throw new ConvexError({ code: "invalid_client_id", message: "Invalid client id" })
-}
-
 export const submit = mutation({
   args: {
     key: v.string(),
@@ -178,21 +172,10 @@ export const submit = mutation({
     includeAccount: v.boolean(),
     appVersion: v.optional(v.string()),
     platform: v.optional(v.string()),
-    clientId: v.optional(v.string()),
     sentryEventId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const who = await sender(ctx, args.key)
-    checkClientId(args.clientId)
-    if (args.clientId) {
-      const sent = await ctx.db
-        .query("feedbackRequests")
-        .withIndex("by_sender_and_client_id", (q) =>
-          q.eq("senderHash", who.hash).eq("clientId", args.clientId),
-        )
-        .first()
-      if (sent) return sent._id
-    }
     const userId = args.includeAccount ? who.user?._id : undefined
     if (args.includeAccount && !userId)
       throw new ConvexError({ code: "unauthenticated", message: "Sign in to include your account" })
@@ -206,7 +189,6 @@ export const submit = mutation({
       userId,
       appVersion: args.appVersion?.slice(0, FEEDBACK_LIMITS.version),
       platform: args.platform?.slice(0, FEEDBACK_LIMITS.version),
-      clientId: args.clientId,
       sentryEventId:
         args.sentryEventId && SENTRY_EVENT_ID.test(args.sentryEventId)
           ? args.sentryEventId
@@ -224,28 +206,15 @@ export const reply = mutation({
     key: v.string(),
     requestId: v.id("feedbackRequests"),
     body: v.string(),
-    clientId: v.optional(v.string()),
   },
-  handler: async (ctx, { key, requestId, body, clientId }) => {
+  handler: async (ctx, { key, requestId, body }) => {
     const who = await sender(ctx, key)
     await ownedRequest(ctx, who, requestId)
-    checkClientId(clientId)
-    if (
-      clientId &&
-      (await ctx.db
-        .query("feedbackMessages")
-        .withIndex("by_request_and_client_id", (q) =>
-          q.eq("requestId", requestId).eq("clientId", clientId),
-        )
-        .first())
-    )
-      return null
     await limit(ctx, "feedbackMessage", who.hash)
     await ctx.db.insert("feedbackMessages", {
       requestId,
       from: "player",
       body: cleanText(body, FEEDBACK_LIMITS.message, "Message"),
-      clientId,
     })
     await ctx.db.patch(requestId, { updatedAt: Date.now() })
     await postCard(ctx, requestId)

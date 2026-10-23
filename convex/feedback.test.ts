@@ -290,27 +290,16 @@ describe("feedback", () => {
     }
   })
 
-  it("inserts a retried submit or reply once", async () => {
+  it("links a bug's Sentry report on its Apollo card", async () => {
     const t = makeConvexTest()
-    const args = {
+    const requestId = await t.mutation(api.feedback.submit, {
       key: ME,
-      kind: "bug" as const,
+      kind: "bug",
       body: "Crash on launch",
       includeAccount: false,
-      clientId: "client-0001",
       sentryEventId: "0123456789abcdef0123456789abcdef",
-    }
-    const first = await t.mutation(api.feedback.submit, args)
-    expect(await t.mutation(api.feedback.submit, args)).toBe(first)
-    const reply = { key: ME, requestId: first, body: "More", clientId: "client-0002" }
-    await t.mutation(api.feedback.reply, reply)
-    await t.mutation(api.feedback.reply, reply)
-
-    expect(await t.query(api.feedback.mine, { key: ME })).toHaveLength(1)
-    expect(
-      (await t.query(api.feedback.thread, { key: ME, requestId: first }))?.messages,
-    ).toHaveLength(1)
-    const input = await t.query(internal.feedback.apolloCardInput, { requestId: first })
+    })
+    const input = await t.query(internal.feedback.apolloCardInput, { requestId })
     expect(feedbackCard(input!).meta).toMatchObject({
       sentry: "https://matthew-chisolm.sentry.io/issues/?query=0123456789abcdef0123456789abcdef",
     })

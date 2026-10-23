@@ -48,14 +48,14 @@ describe("FeedbackSuggestScreen", () => {
     expect(empty.props.onSend).not.toHaveBeenCalled()
   })
 
-  it("says the send waits while offline and shows a refusal", () => {
+  it("holds the send while offline and shows a refusal", () => {
     const { props, view } = renderSuggest({
       body: "Please",
       offline: true,
       error: "Too many sends. Try again in 12 minutes.",
     })
-    fireEvent.press(view.getByText("Send when online"))
-    expect(props.onSend).toHaveBeenCalled()
+    fireEvent.press(view.getByText("Send"))
+    expect(props.onSend).not.toHaveBeenCalled()
     expect(view.getByText("Too many sends. Try again in 12 minutes.")).toBeTruthy()
   })
 })

@@ -14,7 +14,7 @@ export default {
     noMatch: "Aucune réponse pour « {{query}} ».",
     ask: "Posez-nous une question sur « {{query}} »",
   },
-  offline: "Hors ligne. Ce que vous envoyez attend et part dès votre retour.",
+  offline: "Hors ligne. Votre brouillon reste ici jusqu'à votre retour.",
   suggest: {
     title: "Envoyer un retour",
     kind: "De quoi s'agit-il ?",
@@ -40,7 +40,6 @@ export default {
       "Envoyé sans votre compte. Les réponses s'affichent sur cet appareil, et une réinstallation peut les faire perdre.",
     signInToKeep: "Connectez-vous pour la conserver",
     send: "Envoyer",
-    sendOffline: "Envoyer une fois en ligne",
     sendFailed: "Envoi impossible. Réessayez.",
     rateLimited_one: "Trop d'envois. Réessayez dans {{count}} minute.",
     rateLimited_many: "Trop d'envois. Réessayez dans {{count}} de minutes.",
@@ -50,11 +49,6 @@ export default {
     title: "Vos retours",
     empty: "Rien n'a encore été envoyé depuis cet appareil.",
     unread: "Nouveau",
-    waiting: "En attente de connexion. Envoi dès votre retour.",
-    sending: "Envoi en cours…",
-    notSent: "Non envoyé. {{reason}}",
-    otherAccount: "Vous avez changé de compte avant l'envoi",
-    discard: "Supprimer",
     deleteAll: "Supprimer mes retours",
     deleteHint:
       "Supprime ce que cet appareil a envoyé. Les détails de bug déjà envoyés à Sentry y restent.",
@@ -71,7 +65,6 @@ export default {
     replyLabel: "Réponse",
     replyPlaceholder: "Ajoutez un détail ou répondez à une question",
     send: "Envoyer",
-    sendOffline: "Envoyer une fois en ligne",
     sendFailed: "Envoi impossible. Réessayez.",
     includeAccount: "Inclure mon compte",
     includeAccountHelper:

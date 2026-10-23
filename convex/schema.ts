@@ -851,23 +851,18 @@ export default defineSchema({
     userId: v.optional(v.id("users")),
     appVersion: v.optional(v.string()),
     platform: v.optional(v.string()),
-    clientId: v.optional(v.string()),
     sentryEventId: v.optional(v.string()),
     unread: v.boolean(),
     updatedAt: v.number(),
   })
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
-    .index("by_sender_and_client_id", ["senderHash", "clientId"])
     .index("by_user_and_updated_at", ["userId", "updatedAt"]),
 
   feedbackMessages: defineTable({
     requestId: v.id("feedbackRequests"),
     from: v.union(v.literal("player"), v.literal("team")),
     body: v.string(),
-    clientId: v.optional(v.string()),
-  })
-    .index("by_request", ["requestId"])
-    .index("by_request_and_client_id", ["requestId", "clientId"]),
+  }).index("by_request", ["requestId"]),
 
   feedbackApolloCursor: defineTable({ after: v.number() }),
 })

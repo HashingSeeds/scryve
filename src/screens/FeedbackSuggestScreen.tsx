@@ -64,9 +64,9 @@ export function FeedbackSuggestScreen({
       onBack={onBack}
       footer={
         <Button
-          tx={offline ? "feedback:suggest.sendOffline" : "feedback:suggest.send"}
+          tx="feedback:suggest.send"
           preset="reversed"
-          disabled={!body.trim() || sending}
+          disabled={!body.trim() || sending || offline}
           onPress={onSend}
         />
       }

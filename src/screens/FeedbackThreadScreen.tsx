@@ -12,16 +12,12 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export type UnsentReply = { operationId: string; body: string; reason?: string }
-
 export interface FeedbackThreadScreenProps {
   thread: FeedbackThread | null | undefined
-  unsent: readonly UnsentReply[]
   offline: boolean
   error?: string
   restore?: { id: number; text: string }
   onReply: (body: string) => void
-  onDiscard: (operationId: string) => void
   onIncludeAccount: (included: boolean) => void
   onSignIn: () => void
   onBack: () => void
@@ -29,12 +25,10 @@ export interface FeedbackThreadScreenProps {
 
 export function FeedbackThreadScreen({
   thread,
-  unsent,
   offline,
   error,
   restore,
   onReply,
-  onDiscard,
   onIncludeAccount,
   onSignIn,
   onBack,
@@ -56,9 +50,9 @@ export function FeedbackThreadScreen({
       footer={
         request ? (
           <Button
-            tx={offline ? "feedback:thread.sendOffline" : "feedback:thread.send"}
+            tx="feedback:thread.send"
             preset="reversed"
-            disabled={!reply.trim()}
+            disabled={!reply.trim() || offline}
             onPress={() => {
               onReply(reply.trim())
               setReply("")
@@ -86,32 +80,6 @@ export function FeedbackThreadScreen({
                 style={themed(message.from === "team" ? $team : $muted)}
               />
               <Text text={message.body} />
-            </View>
-          ))}
-          {unsent.map((send) => (
-            <View key={send.operationId} style={themed($message)}>
-              <Text tx="feedback:thread.you" size="xxs" weight="bold" style={themed($muted)} />
-              <Text text={send.body} />
-              {send.reason ? (
-                <>
-                  <Text
-                    text={translate("feedback:mine.notSent", { reason: send.reason })}
-                    size="xxs"
-                    accessibilityRole="alert"
-                  />
-                  <Button
-                    tx="feedback:mine.discard"
-                    style={themed($discard)}
-                    onPress={() => onDiscard(send.operationId)}
-                  />
-                </>
-              ) : (
-                <Text
-                  tx={offline ? "feedback:mine.waiting" : "feedback:mine.sending"}
-                  size="xxs"
-                  style={themed($muted)}
-                />
-              )}
             </View>
           ))}
           <TextField
@@ -147,7 +115,3 @@ export function FeedbackThreadScreen({
 const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $discard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  alignSelf: "flex-start",
-  marginTop: spacing.xxs,
-})

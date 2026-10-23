@@ -14,7 +14,7 @@ export default {
     noMatch: "No hay respuestas para “{{query}}”.",
     ask: "Pregúntanos sobre “{{query}}”",
   },
-  offline: "Sin conexión. Lo que envíes queda en espera y se enviará cuando vuelvas.",
+  offline: "Sin conexión. Tu borrador se queda aquí hasta que vuelvas.",
   suggest: {
     title: "Enviar comentarios",
     kind: "¿De qué se trata?",
@@ -40,7 +40,6 @@ export default {
       "Enviado sin tu cuenta. Las respuestas se muestran en este dispositivo y, si reinstalas la app, podrías perderlas.",
     signInToKeep: "Inicia sesión para conservarlo",
     send: "Enviar",
-    sendOffline: "Enviar al haber conexión",
     sendFailed: "No se pudo enviar. Inténtalo de nuevo.",
     rateLimited_one: "Demasiados envíos. Inténtalo de nuevo en {{count}} minuto.",
     rateLimited_many: "Demasiados envíos. Inténtalo de nuevo en {{count}} minutos.",
@@ -50,11 +49,6 @@ export default {
     title: "Tus comentarios",
     empty: "Aún no has enviado nada desde este dispositivo.",
     unread: "Nuevo",
-    waiting: "Esperando conexión. Se enviará cuando vuelvas.",
-    sending: "Enviando…",
-    notSent: "No enviada. {{reason}}",
-    otherAccount: "Cambiaste de cuenta antes de que se enviara",
-    discard: "Descartar",
     deleteAll: "Eliminar mis comentarios",
     deleteHint:
       "Elimina lo que envió este dispositivo. Los detalles de errores que ya se enviaron a Sentry se quedan allí.",
@@ -72,7 +66,6 @@ export default {
     replyLabel: "Respuesta",
     replyPlaceholder: "Añade un detalle o responde una pregunta",
     send: "Enviar",
-    sendOffline: "Enviar al haber conexión",
     sendFailed: "No se pudo enviar. Inténtalo de nuevo.",
     includeAccount: "Incluir mi cuenta",
     includeAccountHelper:

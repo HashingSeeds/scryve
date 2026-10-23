@@ -13,7 +13,7 @@ const feedback = {
     ask: "Ask us about “{{query}}”",
   },
   // Shown under the navigation bar while the app has no connection to Scryve's servers.
-  offline: "Offline. What you send waits and goes out when you're back.",
+  offline: "Offline. Your draft stays here until you're back.",
   suggest: {
     title: "Send feedback",
     kind: "What is it?",
@@ -38,7 +38,6 @@ const feedback = {
       "Sent without your account. Replies show on this device, and reinstalling may lose them.",
     signInToKeep: "Sign in to keep it",
     send: "Send",
-    sendOffline: "Send when online",
     sendFailed: "Couldn't send. Try again.",
     // Shown when a player sent too much feedback in a short time.
     rateLimited_one: "Too many sends. Try again in {{count}} minute.",
@@ -49,13 +48,6 @@ const feedback = {
     empty: "Nothing sent from this device yet.",
     // Marks a thread with a reply the player hasn't opened.
     unread: "New",
-    waiting: "Waiting for connection. Sends when you're back.",
-    sending: "Sending…",
-    // {{reason}} is a short error, e.g. "Sign in to include your account".
-    notSent: "Not sent. {{reason}}",
-    // Reason feedback queued with the player's account was held back after they switched accounts.
-    otherAccount: "You switched accounts before it sent",
-    discard: "Discard",
     deleteAll: "Delete my feedback",
     deleteHint: "Removes what this device sent. Bug details already sent to Sentry stay there.",
     deleteConfirmTitle: "Delete your feedback?",
@@ -71,7 +63,6 @@ const feedback = {
     replyLabel: "Reply",
     replyPlaceholder: "Add a detail or answer a question",
     send: "Send",
-    sendOffline: "Send when online",
     sendFailed: "Couldn't send. Try again.",
     includeAccount: "Include my account",
     includeAccountHelper: "Lets us see your username and keeps this thread on every device.",

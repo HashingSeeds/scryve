@@ -11,60 +11,29 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export type UnsentRequest = { operationId: string; body: string; reason?: string }
-
 export interface MyFeedbackScreenProps {
   items: readonly FeedbackOwnItem[] | undefined
-  unsent: readonly UnsentRequest[]
   offline: boolean
   deleteFailed?: boolean
   onOpen: (item: FeedbackOwnItem) => void
-  onDiscard: (operationId: string) => void
   onDeleteAll: () => void
   onBack: () => void
 }
 
 export function MyFeedbackScreen({
   items,
-  unsent,
   offline,
   deleteFailed,
   onOpen,
-  onDiscard,
   onDeleteAll,
   onBack,
 }: MyFeedbackScreenProps) {
   const { themed } = useAppTheme()
   const [confirming, setConfirming] = useState(false)
-  const empty = items?.length === 0 && unsent.length === 0
+  const empty = items?.length === 0
   return (
     <FeedbackLayout title={translate("feedback:mine.title")} offline={offline} onBack={onBack}>
       {empty ? <Text tx="feedback:mine.empty" style={themed($muted)} /> : null}
-      {unsent.map((send) => (
-        <View key={send.operationId} style={themed($row)}>
-          <Text text={send.body} numberOfLines={2} />
-          {send.reason ? (
-            <>
-              <Text
-                text={translate("feedback:mine.notSent", { reason: send.reason })}
-                size="xxs"
-                accessibilityRole="alert"
-              />
-              <Button
-                tx="feedback:mine.discard"
-                style={themed($discard)}
-                onPress={() => onDiscard(send.operationId)}
-              />
-            </>
-          ) : (
-            <Text
-              tx={offline ? "feedback:mine.waiting" : "feedback:mine.sending"}
-              size="xxs"
-              style={themed($muted)}
-            />
-          )}
-        </View>
-      ))}
       {items?.map((item) => (
         <Pressable
           key={item._id}
@@ -123,10 +92,6 @@ const $grow: TextStyle = { flex: 1 }
 const $pressed: ViewStyle = { opacity: 0.6 }
 const $new: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $discard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  alignSelf: "flex-start",
-  marginTop: spacing.xxs,
-})
 const $delete: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   marginTop: spacing.xl,

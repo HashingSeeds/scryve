@@ -23,10 +23,8 @@ const messages = [
 function renderThread(overrides: Partial<FeedbackThreadScreenProps> = {}) {
   const props: FeedbackThreadScreenProps = {
     thread: { request, messages },
-    unsent: [],
     offline: false,
     onReply: jest.fn(),
-    onDiscard: jest.fn(),
     onIncludeAccount: jest.fn(),
     onSignIn: jest.fn(),
     onBack: jest.fn(),
@@ -41,17 +39,21 @@ function renderThread(overrides: Partial<FeedbackThreadScreenProps> = {}) {
 }
 
 describe("FeedbackThreadScreen", () => {
-  it("shows what they sent, sends a reply, and shows one waiting offline", () => {
-    const { props, view } = renderThread({
-      offline: true,
-      unsent: [{ operationId: "op1", body: "Life only" }],
-    })
+  it("shows what they sent and sends a reply, but not while offline", () => {
+    const { props, view } = renderThread()
     expect(view.getByText(request.body)).toBeTruthy()
     expect(view.getByText("Poison too?")).toBeTruthy()
-    expect(view.getByText("Waiting for connection. Sends when you're back.")).toBeTruthy()
     fireEvent.changeText(view.getByPlaceholderText("Add a detail or answer a question"), "More")
-    fireEvent.press(view.getByText("Send when online"))
+    fireEvent.press(view.getByText("Send"))
     expect(props.onReply).toHaveBeenCalledWith("More")
+
+    const offline = renderThread({ offline: true })
+    fireEvent.changeText(
+      offline.view.getByPlaceholderText("Add a detail or answer a question"),
+      "More",
+    )
+    fireEvent.press(offline.view.getByText("Send"))
+    expect(offline.props.onReply).not.toHaveBeenCalled()
   })
 
   it("hides the account switch when the request belongs to another account", () => {
