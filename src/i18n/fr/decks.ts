@@ -16,7 +16,8 @@ export default {
   stats: {
     title: "Statistiques du deck",
     compare: "Comparer",
-    tooFew: "trop peu",
+    smallSample: "Moins de {{count}} résultats : échantillon réduit.",
+    emptyHint: "Jouez une partie avec ce deck, ou ajoutez un résultat de match sur sa page.",
     ofGames: "sur {{count}}",
     gameCount_one: "{{count}} partie",
     gameCount_many: "{{count}} de parties",

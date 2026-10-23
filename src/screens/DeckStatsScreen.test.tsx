@@ -151,6 +151,23 @@ it("calls a list Current only when it is the deck's current list, and says what 
   expect(view.getByText("+1 Forest, −1 Plains")).toBeTruthy()
 })
 
+it("explains small samples once and dims their rows instead of repeating too few", () => {
+  const view = render(screen())
+  expect(view.queryByText("too few")).toBeNull()
+  expect(view.queryByText("of 8")).toBeNull()
+  expect(view.getAllByText("Under 10 results is a small sample.")).toHaveLength(1)
+  const rated = { ...deckStatsSummary.lists[0], games: 20, wins: 10, losses: 10 }
+  mockSummary = {
+    ...deckStatsSummary,
+    all: { ...rated, fingerprint: "all" },
+    lists: [rated],
+    slices: [{ ...deckStatsSummary.slices[0], games: 20, wins: 10, losses: 10 }],
+  }
+  view.rerender(screen())
+  expect(within(view.getByTestId("stats-list-current")).getByText("of 20")).toBeTruthy()
+  expect(view.queryByText("Under 10 results is a small sample.")).toBeNull()
+})
+
 it("breaks the record down by source once, and filters games by it", () => {
   const view = render(screen())
   expect(within(view.getByTestId("stats-source-scryve")).getByText("60%")).toBeTruthy()
@@ -236,8 +253,11 @@ it("handles loading, empty, and disconnected states without inventing rates", ()
   expect(view.getByText("Loading stats…")).toBeTruthy()
   mockSummary = { all: null, lists: [], slices: [], scannedAll: true }
   view.rerender(screen())
-  expect(view.getByTestId("stats-headline")).toHaveTextContent("0-0")
-  expect(view.queryByText(/Chance/)).toBeNull()
+  expect(view.getByText("No results yet")).toBeTruthy()
+  expect(view.getByText(/Play a game with this deck/)).toBeTruthy()
+  for (const header of ["Lists", "Pod size", "Games", "Source"])
+    expect(view.queryByText(header)).toBeNull()
+  expect(view.queryByTestId("stats-headline")).toBeNull()
   view.rerender(screen({ ...deckStatsAccess, ready: false }))
   expect(view.getByText("Reconnect to load your decks.")).toBeTruthy()
   expect(mockPagination).toHaveBeenLastCalledWith("games", "skip", { initialNumItems: 20 })

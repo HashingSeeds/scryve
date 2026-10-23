@@ -13,8 +13,10 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import type { DeckCard } from "@/features/decks/deckCards"
+import { MIN_RATED_GAMES } from "@/features/decks/deckCopy"
 import { cardChanges, formatCardChange } from "@/features/stats/cardChanges"
 import {
+  honestRate,
   likelyRange,
   listStats,
   recordText,
@@ -161,6 +163,14 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
             left={<ComparisonRate record={left.record} />}
             right={<ComparisonRate record={right.record} />}
           />
+          {honestRate(left.record).tooFew || honestRate(right.record).tooFew ? (
+            <Text
+              size="xs"
+              style={themed($dim)}
+              tx="decks:stats.smallSample"
+              txOptions={{ count: MIN_RATED_GAMES }}
+            />
+          ) : null}
           <StatsSection title={translate("decks:stats.cardChanges")} />
           {cards.loading ? (
             <Text size="xs" style={themed($dim)} tx="decks:stats.loading" />
@@ -232,9 +242,9 @@ function CompareRow({ label, left, right }: { label: string; left: ReactNode; ri
 function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] }) {
   const { themed } = useAppTheme()
   const range = likelyRange(record)
-  const games = record.wins + record.losses + record.draws
+  const { games, tooFew } = honestRate(record)
   return (
-    <View style={games < 10 ? $few : undefined}>
+    <View style={tooFew ? $few : undefined}>
       <Text
         text={games ? `${Math.round((record.wins / games) * 100)}%` : recordText(record)}
         style={$numbers}
@@ -242,7 +252,6 @@ function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] 
       {range ? (
         <Text size="xxs" style={themed($dim)} tx="decks:stats.likely" txOptions={range} />
       ) : null}
-      {games < 10 ? <Text size="xxs" style={themed($dim)} tx="decks:stats.tooFew" /> : null}
     </View>
   )
 }

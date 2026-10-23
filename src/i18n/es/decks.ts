@@ -16,7 +16,8 @@ export default {
   stats: {
     title: "Estadísticas del mazo",
     compare: "Comparar",
-    tooFew: "muy pocas",
+    smallSample: "Menos de {{count}} resultados es una muestra pequeña.",
+    emptyHint: "Juega una partida con este deck o añade el resultado de un encuentro en su página.",
     ofGames: "de {{count}}",
     gameCount_one: "{{count}} partida",
     gameCount_many: "{{count}} de partidas",
