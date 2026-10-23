@@ -5,6 +5,8 @@ const events = {
   joinEvent: "Join event",
   loading: "Loading…",
   failed: "That didn't work. Try again.",
+  // Label above a web address the organizer opens on a store TV to show pairings, the clock, and standings.
+  storeScreen: "Store screen",
   errors: {
     nameRejected: "Choose a different name",
     eventLimit: "Finish one of your events first. You can run 5 at once.",

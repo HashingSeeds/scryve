@@ -7,6 +7,7 @@ export default {
   joinEvent: "イベントに参加",
   loading: "読み込み中…",
   failed: "うまくいきませんでした。もう一度お試しください。",
+  storeScreen: "ストア画面",
   errors: {
     nameRejected: "別の名前を選んでください",
     eventLimit: "先にイベントを1つ終了してください。同時に開催できるのは5件までです。",
