@@ -396,6 +396,7 @@ export default {
     notePlaceholder: "Añadir una nota",
     noNotes: "Aún no hay notas.",
     editNotes: "Editar notas",
+    cardsLoading: "Cargando cartas…",
     cardsUnavailable: "La lista de cartas no está disponible sin conexión.",
     noCards: "Aún no hay cartas. Añade tu primera carta abajo.",
     removed: "Se quitó {{card}}",

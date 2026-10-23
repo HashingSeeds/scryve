@@ -365,6 +365,7 @@ export default {
     notePlaceholder: "메모 추가",
     noNotes: "아직 메모가 없습니다.",
     editNotes: "메모 편집",
+    cardsLoading: "카드를 불러오는 중…",
     cardsUnavailable: "오프라인에서는 카드 목록을 볼 수 없습니다.",
     noCards: "아직 카드가 없습니다. 아래에서 첫 카드를 추가하세요.",
     removed: "{{card}} 제거됨",

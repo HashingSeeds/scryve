@@ -46,6 +46,7 @@ export function DeckView({
   busy,
   guest,
   cardsUnavailable,
+  cardsLoading,
   cardsCached,
   canAddOffline,
   addOfflineNote,
@@ -82,6 +83,7 @@ export function DeckView({
   busy?: boolean
   guest?: boolean
   cardsUnavailable?: boolean
+  cardsLoading?: boolean
   cardsCached?: boolean
   canAddOffline?: boolean
   addOfflineNote?: string
@@ -233,7 +235,12 @@ export function DeckView({
             </View>
             {tab === "analysis" ? (
               cardsUnavailable ? (
-                <Text style={themed($notes)} tx="decks:deckView.cardsUnavailable" />
+                <Text
+                  style={themed($notes)}
+                  tx={
+                    cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"
+                  }
+                />
               ) : cards.length === 0 ? (
                 <Text style={themed($notes)} tx="decks:deckView.noCards" />
               ) : (
@@ -271,7 +278,12 @@ export function DeckView({
                 )}
               </View>
             ) : cardsUnavailable ? (
-              <Text style={themed($notes)} tx="decks:deckView.cardsUnavailable" />
+              <Text
+                style={themed($notes)}
+                tx={
+                  cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"
+                }
+              />
             ) : cards.length === 0 ? (
               <Text
                 style={themed($notes)}

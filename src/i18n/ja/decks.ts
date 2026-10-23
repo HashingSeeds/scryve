@@ -371,6 +371,7 @@ export default {
     notePlaceholder: "メモを追加",
     noNotes: "メモはまだありません。",
     editNotes: "メモを編集",
+    cardsLoading: "カードを読み込み中…",
     cardsUnavailable: "オフラインではカードリストを利用できません。",
     noCards: "カードはまだありません。下から最初のカードを追加してください。",
     removed: "{{card}}を削除しました",
