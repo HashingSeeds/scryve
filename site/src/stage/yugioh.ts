@@ -225,6 +225,9 @@ export function createCalculators(board: HTMLElement, game: DemoGame) {
     inner.insertAdjacentHTML("beforeend", sheetHtml(context, besideFor(inner)))
     const sheet = inner.lastElementChild
     update(seat)
+    // Like the app's modal sheet, the seat's own controls under it are out of reach until it closes.
+    for (const sibling of inner.children)
+      if (sibling !== sheet) sibling.toggleAttribute("inert", true)
     // Mounted hidden, then faded in on the next style flush, like the app's FadeIn.
     if (sheet instanceof HTMLElement) {
       void sheet.offsetWidth
@@ -239,6 +242,7 @@ export function createCalculators(board: HTMLElement, game: DemoGame) {
     entries.delete(seat)
     if (!sheet) return
     const hadFocus = sheet.contains(document.activeElement)
+    for (const sibling of sheet.parentElement?.children ?? []) sibling.removeAttribute("inert")
     sheet.remove()
     if (hadFocus)
       board
@@ -370,7 +374,7 @@ export function createYugiohDemo(
   return {
     start() {
       active = true
-      if (game.setup.system === "ygo" && game.setup.names.length === 2) return script.later(0, play)
+      // Always a fresh duel, so the trail shows only the demo's own changes.
       game.reset({
         system: "ygo",
         startingLife: playSystemRules("ygo").counter.defaultValue,

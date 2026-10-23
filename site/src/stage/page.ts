@@ -490,8 +490,8 @@ function setUpFullScreen(stage: HTMLElement) {
   narrow.addEventListener("change", () => narrow.matches || toggle(false))
 }
 
-// Until someone taps a total themselves, a ghostly hand taps a card every few seconds,
-// alternating plus and minus, so the change shows and the total never drifts. It taps the
+// Until someone taps a total or a calculator themselves, a ghostly hand taps a card every few
+// seconds, alternating plus and minus, so the change shows and the total never drifts. It taps the
 // lowest card that faces the viewer: Maya's with the phone on its side, Sam's standing up. When
 // none does, as with a duel's two seats on a phone on its side, it taps a card on its side. While
 // the phone turns no card sits square to the viewer, so the demo waits.
@@ -541,7 +541,8 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
     window.clearTimeout(pending)
   }
   stage.addEventListener("click", (event) => {
-    if (event.isTrusted && (event.target as Element).closest(".hit, [data-pk]")) stopTaps()
+    if (event.isTrusted && (event.target as Element).closest(".hit, [data-pk], [data-calc]"))
+      stopTaps()
   })
   // The demo step's rewind replays a visitor's tap as a script click, so it says so itself.
   stage.addEventListener(VISITOR_TAP, stopTaps)
