@@ -151,6 +151,7 @@ export default {
     currentVersion: "Version actuelle",
     current: "Actuelle ›",
     maybeDeleted: "Ce deck a peut-être été supprimé.",
+    newList: "Nouvelle liste. Les résultats précédents restent avec l'ancienne.",
     loadFailed: "Impossible de charger ce deck.",
     editList: "Modifier la liste",
     offlineCard:

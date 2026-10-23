@@ -149,6 +149,7 @@ export default {
     currentVersion: "Versión actual",
     current: "Actual ›",
     maybeDeleted: "Puede que este mazo se haya eliminado.",
+    newList: "Lista nueva. Los resultados anteriores se quedan con la anterior.",
     loadFailed: "No se pudo cargar este mazo.",
     editList: "Editar lista",
     offlineCard: "Estás sin conexión. Se pueden añadir las cartas que ya están en tus mazos.",

@@ -1660,6 +1660,27 @@ describe("DeckDetailScreen", () => {
     expect(view.getByTestId("edit-deck-button")).toBeDisabled()
   })
 
+  it("says results start fresh after a save that changes the list", async () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getAllByText("+")[0])
+    fireEvent.press(view.getByTestId("save-version-button"))
+    await waitFor(() => expect(mockSaveVersion).toHaveBeenCalledTimes(1))
+    expect(await view.findByText("New list. Earlier results stay with the old one.")).toBeTruthy()
+  })
+
+  it("stays quiet after a save that only changes the note", async () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-tab-notes"))
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Updated note")
+    fireEvent.press(view.getByTestId("save-version-button"))
+    await waitFor(() => expect(mockUpdateDeck).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(view.getByTestId("edit-deck-button")).toBeTruthy())
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(view.queryByText("New list. Earlier results stay with the old one.")).toBeNull()
+  })
+
   it("saves combined card and note edits once after a rapid double submit", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))

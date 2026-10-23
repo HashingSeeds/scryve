@@ -138,6 +138,7 @@ const decks = {
     currentVersion: "Current version",
     current: "Current ›",
     maybeDeleted: "This deck may have been deleted.",
+    newList: "New list. Earlier results stay with the old one.",
     loadFailed: "Could not load this deck.",
     editList: "Edit list",
     offlineCard: "You’re offline. Cards already in your decks can be added.",
