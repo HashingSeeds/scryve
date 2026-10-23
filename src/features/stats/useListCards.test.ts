@@ -24,6 +24,13 @@ jest.mock("./listSnapshots", () => ({
   lookupListSnapshot: (...args: unknown[]) => mockLookup(...args),
 }))
 
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL
+
+afterEach(() => {
+  if (convexUrl === undefined) delete process.env.EXPO_PUBLIC_CONVEX_URL
+  else process.env.EXPO_PUBLIC_CONVEX_URL = convexUrl
+})
+
 beforeEach(() => {
   jest.clearAllMocks()
   mockLocals.mockReturnValue([])
