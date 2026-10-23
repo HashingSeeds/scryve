@@ -7,6 +7,7 @@ export default {
   joinEvent: "Rejoindre un événement",
   loading: "Chargement…",
   failed: "Cela n'a pas fonctionné. Réessayez.",
+  storeScreen: "Écran du magasin",
   errors: {
     nameRejected: "Choisissez un autre nom",
     eventLimit: "Terminez d'abord l'un de vos événements. Vous pouvez en gérer 5 à la fois.",

@@ -7,6 +7,7 @@ export default {
   joinEvent: "이벤트 참가",
   loading: "불러오는 중…",
   failed: "실패했습니다. 다시 시도하세요.",
+  storeScreen: "매장 화면",
   errors: {
     nameRejected: "다른 이름을 선택하세요",
     eventLimit: "먼저 진행 중인 이벤트 하나를 마치세요. 동시에 5개까지 운영할 수 있습니다.",

@@ -11,7 +11,9 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { readPublicCloudConfig } from "@/features/auth/config"
 import { InviteCard } from "@/features/connected/InviteCard"
+import { eventDisplayUrl } from "@/features/eventDisplay/display"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -476,11 +478,19 @@ function PlayersTab({
   const [minutes, setMinutes] = useState<number>()
   const managing = view.isOrganizer && view.status !== "finished"
   const active = view.players.filter((player) => !player.dropped).length
+  const cloud = readPublicCloudConfig()
+  const displayUrl = cloud.configured ? eventDisplayUrl(cloud.value.inviteOrigin, view.code) : null
   return (
     <>
       {managing ? (
         <>
           <InviteCard qrPayload={view.code} manualCode={view.code} />
+          {displayUrl ? (
+            <View style={themed($section)}>
+              <Text preset="formLabel" tx="events:storeScreen" />
+              <Text testID="store-screen-url" selectable text={displayUrl} />
+            </View>
+          ) : null}
           <View style={themed($section)}>
             <TextField
               testID="guest-name-input"
