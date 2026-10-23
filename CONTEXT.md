@@ -30,3 +30,28 @@ The player who creates a connected game; in a nearby game, also its authority.
 **Seat**:
 A player's place in a game; in a connected game, owned by one device.
 _Avoid_: Slot, player position
+
+**Event**:
+A tournament with rounds, pairings, and standings, run by an organizer at a store or a kitchen table.
+_Avoid_: Tournament (in code), league
+
+**Organizer**:
+The account that created an event and runs it.
+_Avoid_: TO, judge, admin
+
+**Guest**:
+An event player the organizer added by name, without an account.
+
+**Round**:
+One scheduled pairing period of an event, with its own clock.
+_Avoid_: Rematch counter (the nearby lobby's `round` is unrelated)
+
+**Table**:
+The players paired together in one round: two in a Swiss event, three to five in a pod event, or one for a bye.
+_Avoid_: Pairing (as a noun for the stored row), match (a match is the games played)
+
+**Pod**:
+A table of three to five players in a multiplayer event such as a Commander night.
+
+**Standings**:
+Players ranked by points and the system's tiebreakers.
