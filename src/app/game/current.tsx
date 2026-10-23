@@ -35,6 +35,7 @@ export default function CurrentLocalGameRoute() {
       onSetup={() => router.push("/game/new")}
       onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
+      onSupport={() => router.push("/support")}
       onAccount={() => router.push("/account")}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}
       onGameAbandoned={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}

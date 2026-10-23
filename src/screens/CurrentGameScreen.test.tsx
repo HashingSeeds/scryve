@@ -100,6 +100,7 @@ describe("CurrentGameScreen", () => {
           onDecks={jest.fn()}
           onHistory={jest.fn()}
           onSettings={jest.fn()}
+          onSupport={jest.fn()}
           onAccount={jest.fn()}
           onViewSummary={jest.fn()}
         />
@@ -142,6 +143,7 @@ describe("CurrentGameScreen", () => {
           onDecks={jest.fn()}
           onHistory={jest.fn()}
           onSettings={jest.fn()}
+          onSupport={jest.fn()}
           onAccount={jest.fn()}
           onViewSummary={jest.fn()}
         />
@@ -187,6 +189,7 @@ describe("CurrentGameScreen", () => {
           onHistory={jest.fn()}
           onRules={onRules}
           onSettings={jest.fn()}
+          onSupport={jest.fn()}
           onAccount={jest.fn()}
           onViewSummary={jest.fn()}
         />

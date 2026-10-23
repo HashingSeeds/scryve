@@ -71,7 +71,6 @@ export interface SettingsScreenProps {
   initialSettings: LocalSettings
   onBack: () => void
   onSettingsChange: (settings: LocalSettings) => void
-  onOpenSupport?: () => void
   onOpenPrivacy?: () => void
   onOpenTerms?: () => void
   onOpenLicenseAgreement?: () => void
@@ -85,7 +84,6 @@ export function SettingsScreen({
   initialSettings,
   onBack,
   onSettingsChange,
-  onOpenSupport,
   onOpenPrivacy,
   onOpenTerms,
   onOpenLicenseAgreement,
@@ -314,20 +312,6 @@ export function SettingsScreen({
         ) : null}
         {analyticsError ? <Text accessibilityRole="alert" size="xs" text={analyticsError} /> : null}
         {BlockedPlayers}
-        {onOpenSupport ? (
-          <View>
-            <Text
-              tx="account:settings.help.heading"
-              preset="subheading"
-              accessibilityRole="header"
-            />
-            <ListItem
-              tx="account:settings.help.support"
-              rightIcon="caretRight"
-              onPress={onOpenSupport}
-            />
-          </View>
-        ) : null}
         {onOpenPrivacy && onOpenTerms ? (
           <View>
             <Text tx="account:legal.heading" preset="subheading" accessibilityRole="header" />

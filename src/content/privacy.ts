@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-10-22",
-  effectiveDate: "October 22, 2026",
+  version: "2026-10-23",
+  effectiveDate: "October 23, 2026",
   sections: [
     {
       blocks: [
@@ -228,6 +228,23 @@ export const privacyContent = {
       ],
     },
     {
+      heading: "Feedback",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "When you send feedback or a reply in Scryve, we keep what you write along with your app version and platform. We use it to answer you, decide what to build, and fix problems. Only you and the Scryve team see it. A bug report also sends details about your device, and any screenshot you add, to Sentry, which stores them for us.",
+        },
+        {
+          type: "paragraph",
+          text: "Feedback is tied to the copy of Scryve you send it from, not to your account. You can choose to include your account. If you do, we see your username and whether you have Scryve Pro, and the conversation shows up on any device where you're signed in.",
+        },
+        {
+          type: "paragraph",
+          text: "You can delete feedback in two ways. Delete my feedback, under Your feedback, removes everything sent from that copy of Scryve, plus feedback you included your account with if you are signed in. Deleting your account removes feedback you included your account with. Feedback sent without your account stays until you use Delete my feedback on each device you sent it from. Neither removes bug report details or screenshots already sent to Sentry. To ask about those, email privacy@sowinghope.how.",
+        },
+      ],
+    },
+    {
       heading: "Information we receive from other sources",
       blocks: [
         {
@@ -379,7 +396,7 @@ export const privacyContent = {
           items: [
             "Clerk, for account registration, authentication, and account management.",
             "Convex, for application hosting, database storage, synchronization, and backend services.",
-            "Cloudflare, for website hosting, security, abuse prevention, and wait-list form verification.",
+            "Cloudflare, for website hosting, security, abuse prevention, wait-list form verification, and the inbox where we read and answer feedback.",
             "RevenueCat, for verifying purchases and managing subscription entitlements.",
             "Apple and Google, when you purchase a subscription or use their platform services.",
             "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",

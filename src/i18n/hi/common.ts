@@ -26,6 +26,7 @@ export default {
     history: "इतिहास",
     settings: "सेटिंग",
     settingsUpdateReady: "सेटिंग, अपडेट तैयार है",
+    support: "सहायता",
     account: "खाता",
     signIn: "साइन इन करें",
     closeMenu: "यूटिलिटी मेन्यू बंद करें",

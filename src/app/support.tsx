@@ -1,73 +1,24 @@
 import { Linking, Platform } from "react-native"
 import * as Application from "expo-application"
 import Constants from "expo-constants"
-import * as ImagePicker from "expo-image-picker"
 import { router } from "expo-router"
-import * as Sentry from "@sentry/react-native"
+import { useQuery } from "convex/react"
 import Head from "expo-router/head"
 
 import { openAppleStandardEula } from "@/content/legalLinks"
+import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { translate } from "@/i18n/translate"
-import {
-  SupportScreen,
-  type SupportFeedback,
-  type SupportScreenshot,
-} from "@/screens/SupportScreen"
+import { SupportScreen, type SupportScreenProps } from "@/screens/SupportScreen"
 
-const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
+import { api } from "../../convex/_generated/api"
 
-async function pickScreenshot(): Promise<SupportScreenshot | null> {
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 })
-  if (result.canceled || !result.assets[0]) return null
-  const asset = result.assets[0]
-  if (asset.fileSize && asset.fileSize > MAX_SCREENSHOT_BYTES)
-    throw new Error("Screenshot too large")
-  const data =
-    Platform.OS === "web"
-      ? new Uint8Array(await (await fetch(asset.uri)).arrayBuffer())
-      : await Sentry.getDataFromUri(asset.uri)
-  if (!data || data.length > MAX_SCREENSHOT_BYTES) throw new Error("Screenshot unavailable")
-  return {
-    uri: asset.uri,
-    filename: asset.fileName ?? "screenshot.jpg",
-    contentType: asset.mimeType ?? "image/jpeg",
-    data,
-  }
-}
-
-function submitFeedback({ kind, message, email, screenshot }: SupportFeedback) {
-  if (!Sentry.getClient()) throw new Error("Sentry is unavailable")
-  Sentry.captureFeedback(
-    {
-      message,
-      email,
-      tags: {
-        kind,
-        platform: Platform.OS,
-        appVersion:
-          Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "unknown",
-        build: Application.nativeBuildVersion ?? "unknown",
-      },
-    },
-    {
-      includeReplay: false,
-      ...(screenshot
-        ? {
-            attachments: [
-              {
-                filename: screenshot.filename,
-                contentType: screenshot.contentType,
-                data: screenshot.data,
-              },
-            ],
-          }
-        : {}),
-    },
-  )
-}
+const SUPPORT_EMAIL = "mailto:support@sowinghope.how?subject=Scryve%20Support"
 
 export default function SupportRoute() {
   const pageTitle = translate("account:support.pageTitle")
+  const { configured } = useAuthAccess()
   return (
     <>
       {Platform.OS === "web" ? (
@@ -76,21 +27,40 @@ export default function SupportRoute() {
           <meta name="description" content={translate("account:support.pageDescription")} />
         </Head>
       ) : null}
-      <SupportScreen
-        onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-        onEmailSupport={() =>
-          void Linking.openURL("mailto:support@sowinghope.how?subject=Scryve%20Support")
-        }
-        onSubmitFeedback={submitFeedback}
-        onPickScreenshot={pickScreenshot}
-        onOpenPrivacy={() => router.push("/privacy")}
-        onOpenTerms={() => router.push("/terms")}
-        onOpenLicenseAgreement={
-          Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
-        }
-        onOpenCookiePolicy={() => router.push("/cookie-policy")}
-        appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
-      />
+      {configured ? <LiveSupport /> : <StaticSupport />}
     </>
+  )
+}
+
+function LiveSupport() {
+  // why: opening Support shouldn't make a feedback key for someone who never sent any.
+  const key = useFeedbackKey({ create: false })
+  const online = useConvexOnline()
+  const mine = useQuery(api.feedback.mine, key ? { key } : {})
+  return <Support unread={mine?.filter((item) => item.unread).length ?? 0} offline={!online} />
+}
+
+function StaticSupport() {
+  return <Support unread={0} offline={false} />
+}
+
+function Support(props: Pick<SupportScreenProps, "unread" | "offline">) {
+  return (
+    <SupportScreen
+      {...props}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+      onYourFeedback={() => router.push("/feedback/mine")}
+      onEmailSupport={() => void Linking.openURL(SUPPORT_EMAIL)}
+      onSuggest={(message) =>
+        router.push(message ? { pathname: "/feedback/new", params: { message } } : "/feedback/new")
+      }
+      onOpenPrivacy={() => router.push("/privacy")}
+      onOpenTerms={() => router.push("/terms")}
+      onOpenLicenseAgreement={
+        Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
+      }
+      onOpenCookiePolicy={() => router.push("/cookie-policy")}
+      appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
+    />
   )
 }

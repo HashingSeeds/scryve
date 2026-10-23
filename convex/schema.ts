@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
+import { feedbackKind } from "./lib/feedback"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { pokemonBoardValidator } from "./lib/table"
@@ -848,4 +849,26 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_deleted_identity_hash", ["deletedIdentityHash"]),
+
+  feedbackRequests: defineTable({
+    kind: feedbackKind,
+    body: v.string(),
+    senderHash: v.string(),
+    userId: v.optional(v.id("users")),
+    appVersion: v.optional(v.string()),
+    platform: v.optional(v.string()),
+    sentryEventId: v.optional(v.string()),
+    unread: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
+    .index("by_user_and_updated_at", ["userId", "updatedAt"]),
+
+  feedbackMessages: defineTable({
+    requestId: v.id("feedbackRequests"),
+    from: v.union(v.literal("player"), v.literal("team")),
+    body: v.string(),
+  }).index("by_request", ["requestId"]),
+
+  feedbackApolloCursor: defineTable({ after: v.number() }),
 })
