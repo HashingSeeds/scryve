@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
@@ -6,8 +7,6 @@ import { ListItem } from "@/components/ListItem"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
-import { RequestRow } from "@/features/feedback/RequestParts"
-import type { FeedbackBoardItem } from "@/features/feedback/status"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -23,19 +22,11 @@ const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
 
 export interface SupportScreenProps {
   unread: number
-  search: string
-  searched: string
-  results: readonly FeedbackBoardItem[] | undefined
   offline: boolean
-  voteFailed: boolean
   onBack: () => void
-  onSearch: (search: string) => void
-  onVote: (item: FeedbackBoardItem, voted: boolean) => void
-  onOpen: (item: FeedbackBoardItem) => void
-  onAllRequests: () => void
-  onYourRequests: () => void
+  onYourFeedback: () => void
   onEmailSupport: () => void
-  onSuggest: (title?: string) => void
+  onSuggest: (message?: string) => void
   onOpenPrivacy: () => void
   onOpenTerms: () => void
   onOpenLicenseAgreement?: () => void
@@ -45,17 +36,9 @@ export interface SupportScreenProps {
 
 export function SupportScreen({
   unread,
-  search,
-  searched,
-  results,
   offline,
-  voteFailed,
   onBack,
-  onSearch,
-  onVote,
-  onOpen,
-  onAllRequests,
-  onYourRequests,
+  onYourFeedback,
   onEmailSupport,
   onSuggest,
   onOpenPrivacy,
@@ -66,7 +49,8 @@ export function SupportScreen({
 }: SupportScreenProps) {
   const { themed } = useAppTheme()
   const copy = { licenseAgreementHint: translate("account:legal.licenseAgreementHint") }
-  const query = searched.trim()
+  const [search, setSearch] = useState("")
+  const query = search.trim()
 
   return (
     <FeedbackLayout
@@ -84,26 +68,17 @@ export function SupportScreen({
         autoCorrect={false}
         returnKeyType="search"
         clearable
-        onChangeText={onSearch}
+        onChangeText={setSearch}
       />
-      {search.trim() ? (
-        <SearchResults
-          search={search}
-          query={query}
-          results={results}
-          voteFailed={voteFailed}
-          onVote={onVote}
-          onOpen={onOpen}
-          onSuggest={onSuggest}
-        />
+      {query ? (
+        <SearchResults query={query} onSuggest={onSuggest} />
       ) : (
         <View style={themed($sections)}>
           <View>
-            <SupportRow tx="feedback:support.allRequests" onPress={onAllRequests} />
             <SupportRow
-              tx="feedback:support.yourRequests"
+              tx="feedback:support.yourFeedback"
               badge={unread ? translate("feedback:support.newCount", { count: unread }) : undefined}
-              onPress={onYourRequests}
+              onPress={onYourFeedback}
             />
             <SupportRow
               tx="feedback:support.email"
@@ -201,65 +176,40 @@ export function SupportScreen({
 }
 
 function SearchResults({
-  search,
   query,
-  results,
-  voteFailed,
-  onVote,
-  onOpen,
   onSuggest,
 }: {
-  search: string
   query: string
-  results: readonly FeedbackBoardItem[] | undefined
-  voteFailed: boolean
-  onVote: (item: FeedbackBoardItem, voted: boolean) => void
-  onOpen: (item: FeedbackBoardItem) => void
-  onSuggest: (title?: string) => void
+  onSuggest: (message?: string) => void
 }) {
   const { themed } = useAppTheme()
   const faqs = FAQS.filter((faq) =>
     matchesWords(
       `${translate(`account:support.faq.${faq}.question`)} ${translate(`account:support.faq.${faq}.answer`)}`,
-      search,
+      query,
     ),
   )
-  if (query && results?.length === 0 && faqs.length === 0)
+  if (faqs.length === 0)
     return (
       <View style={themed($section)}>
         <Text
-          text={translate("feedback:board.noMatch", { query })}
+          text={translate("feedback:support.noMatch", { query })}
           size="xs"
           style={themed($muted)}
         />
         <Button
-          text={translate("feedback:board.suggestQuery", { query })}
+          text={translate("feedback:support.ask", { query })}
           preset="reversed"
           onPress={() => onSuggest(query)}
         />
       </View>
     )
-  return (
-    <>
-      {results?.map((item) => (
-        <RequestRow
-          key={item._id}
-          item={item}
-          onVote={(voted) => onVote(item, voted)}
-          onOpen={() => onOpen(item)}
-        />
-      ))}
-      {faqs.map((faq) => (
-        <View key={faq} style={themed($faqResult)}>
-          <Text tx={`account:support.faq.${faq}.question`} weight="bold" />
-          <Text tx={`account:support.faq.${faq}.answer`} size="xs" style={themed($answer)} />
-        </View>
-      ))}
-      {voteFailed ? (
-        <Text tx="feedback:board.voteFailed" size="xs" accessibilityRole="alert" />
-      ) : null}
-    </>
-  )
+  return faqs.map((faq) => (
+    <View key={faq} style={themed($faqResult)}>
+      <Text tx={`account:support.faq.${faq}.question`} weight="bold" />
+      <Text tx={`account:support.faq.${faq}.answer`} size="xs" style={themed($answer)} />
+    </View>
+  ))
 }
 
 // why: matching word starts keeps "ti" from finding "subscriptions"; Japanese has no spaces, so it matches anywhere.
@@ -296,7 +246,7 @@ function SupportRow({
   badge,
   onPress,
 }: {
-  tx: "feedback:support.allRequests" | "feedback:support.yourRequests" | "feedback:support.email"
+  tx: "feedback:support.yourFeedback" | "feedback:support.email"
   detailTx?: "feedback:support.emailDetail"
   badge?: string
   onPress: () => void

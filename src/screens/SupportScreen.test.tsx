@@ -3,36 +3,13 @@ import { fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import { SupportScreen, type SupportScreenProps } from "./SupportScreen"
-import type { Id } from "../../convex/_generated/dataModel"
-
-const request = {
-  _id: "r1" as Id<"feedbackRequests">,
-  kind: "feature" as const,
-  title: "Timer for tournament rounds",
-  body: "A 50 minute round clock.",
-  status: "planned" as const,
-  votes: 3,
-  shippedIn: undefined,
-  createdAt: 0,
-  voted: false,
-  reported: false,
-  mine: false,
-}
 
 function renderSupport(overrides: Partial<SupportScreenProps> = {}) {
   const props: SupportScreenProps = {
     unread: 0,
-    search: "",
-    searched: "",
-    results: undefined,
     offline: false,
-    voteFailed: false,
     onBack: jest.fn(),
-    onSearch: jest.fn(),
-    onVote: jest.fn(),
-    onOpen: jest.fn(),
-    onAllRequests: jest.fn(),
-    onYourRequests: jest.fn(),
+    onYourFeedback: jest.fn(),
     onEmailSupport: jest.fn(),
     onSuggest: jest.fn(),
     onOpenPrivacy: jest.fn(),
@@ -49,45 +26,35 @@ function renderSupport(overrides: Partial<SupportScreenProps> = {}) {
 }
 
 describe("SupportScreen", () => {
-  it("leads with requests, then email, and keeps the help content", () => {
+  it("leads with your feedback, then email, and keeps the help content", () => {
     const { props, view } = renderSupport({ unread: 2 })
     expect(view.getAllByText("Support").length).toBeGreaterThan(0)
     expect(view.queryByText("SCRYVE")).toBeNull()
     expect(view.queryByText("Contact us")).toBeNull()
-    fireEvent.press(view.getByText("All requests"))
     fireEvent.press(view.getByText("2 new"))
     fireEvent.press(view.getByText("Account, billing, or anything private"))
     fireEvent.press(view.getByText("Suggest a feature or report a bug"))
-    expect(props.onAllRequests).toHaveBeenCalledTimes(1)
-    expect(props.onYourRequests).toHaveBeenCalledTimes(1)
+    expect(props.onYourFeedback).toHaveBeenCalledTimes(1)
     expect(props.onEmailSupport).toHaveBeenCalledTimes(1)
     expect(props.onSuggest).toHaveBeenCalledTimes(1)
     expect(view.getByText("Getting started")).toBeTruthy()
     expect(view.getByText("Restore Scryve Pro")).toBeTruthy()
   })
 
-  it("searches in place: answers and requests replace the page, and nothing found offers to suggest it", () => {
-    const { props, view } = renderSupport({
-      search: "restore",
-      searched: "restore",
-      results: [request],
-    })
+  it("searches answers in place, and nothing found offers to ask us", () => {
+    const { view } = renderSupport()
+    const search = view.getByLabelText("Search help")
+    fireEvent.changeText(search, "restore")
     expect(view.getByText("Restore Scryve Pro")).toBeTruthy()
     expect(view.queryByText("Manage or cancel a subscription")).toBeNull()
-    expect(view.queryByText("All requests")).toBeNull()
-    fireEvent.press(view.getByText("A 50 minute round clock."))
-    expect(props.onOpen).toHaveBeenCalledWith(request)
-    fireEvent.press(view.getByLabelText("Vote for Timer for tournament rounds, 3 votes"))
-    expect(props.onVote).toHaveBeenCalledWith(request, true)
+    expect(view.queryByText("Your feedback")).toBeNull()
 
-    expect(
-      renderSupport({ search: "ti", searched: "ti", results: [] }).view.queryByText(
-        "Manage or cancel a subscription",
-      ),
-    ).toBeNull()
+    fireEvent.changeText(search, "ti")
+    expect(view.queryByText("Manage or cancel a subscription")).toBeNull()
 
-    const empty = renderSupport({ search: "poison", searched: "poison", results: [] })
-    fireEvent.press(empty.view.getByText("Suggest “poison”"))
+    const empty = renderSupport()
+    fireEvent.changeText(empty.view.getByLabelText("Search help"), "poison")
+    fireEvent.press(empty.view.getByText("Ask us about “poison”"))
     expect(empty.props.onSuggest).toHaveBeenCalledWith("poison")
   })
 

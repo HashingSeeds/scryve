@@ -31,7 +31,6 @@ export type FeedbackSend =
   | {
       type: "submit"
       kind: Kind
-      title: string
       body: string
       includeAccount: boolean
       accountId?: string
@@ -77,7 +76,6 @@ function parsePending(value: unknown): PendingFeedbackSend | null {
   if (
     value.type === "submit" &&
     (value.kind === "feature" || value.kind === "bug") &&
-    typeof value.title === "string" &&
     typeof value.includeAccount === "boolean" &&
     optionalString(value.accountId) &&
     optionalString(value.appVersion) &&
@@ -113,7 +111,6 @@ const codec: DurableOutboxCodec<PendingFeedbackSend, FailedFeedbackSend> = {
     "operationId",
     "type",
     "kind",
-    "title",
     "body",
     "includeAccount",
     "accountId",
@@ -286,7 +283,6 @@ export class FeedbackOutbox {
     return await this.client.mutation(api.feedback.submit, {
       key,
       kind: action.kind,
-      title: action.title,
       body: action.body,
       includeAccount: action.includeAccount,
       clientId: action.operationId,

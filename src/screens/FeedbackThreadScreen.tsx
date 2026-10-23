@@ -1,13 +1,12 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { Switch } from "@/components/Toggle/Switch"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
-import { RequestMeta } from "@/features/feedback/RequestParts"
 import type { FeedbackThread } from "@/features/feedback/status"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -43,7 +42,6 @@ export function FeedbackThreadScreen({
   const { themed } = useAppTheme()
   const [reply, setReply] = useState("")
   const [restored, setRestored] = useState<number>()
-  const [showOriginal, setShowOriginal] = useState(false)
   if (restore && restore.id !== restored) {
     setRestored(restore.id)
     setReply(restore.text)
@@ -51,38 +49,17 @@ export function FeedbackThreadScreen({
   const request = thread?.request
 
   return (
-    <FeedbackLayout
-      title={request?.title ?? translate("feedback:mine.title")}
-      offline={offline}
-      onBack={onBack}
-    >
+    <FeedbackLayout title={translate("feedback:mine.title")} offline={offline} onBack={onBack}>
       {thread === null ? <Text tx="feedback:thread.missing" style={themed($muted)} /> : null}
       {request ? (
         <>
-          <RequestMeta item={request} visibility={request.published ? "public" : "private"} />
+          <Text
+            tx={`feedback:suggest.${request.kind}`}
+            size="xxs"
+            weight="bold"
+            style={themed($muted)}
+          />
           <Text text={request.body} />
-          {request.original ? (
-            <View style={themed($original)}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: showOriginal }}
-                hitSlop={8}
-                onPress={() => setShowOriginal((shown) => !shown)}
-              >
-                <Text
-                  tx={showOriginal ? "feedback:thread.editedHide" : "feedback:thread.editedShow"}
-                  size="xs"
-                  style={themed($muted)}
-                />
-              </Pressable>
-              {showOriginal ? (
-                <>
-                  <Text text={request.original.title} weight="bold" style={themed($muted)} />
-                  <Text text={request.original.body} style={themed($muted)} />
-                </>
-              ) : null}
-            </View>
-          ) : null}
           {thread?.messages.map((message) => (
             <View key={message._id} style={themed($message)}>
               <Text
@@ -159,7 +136,6 @@ export function FeedbackThreadScreen({
   )
 }
 
-const $original: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

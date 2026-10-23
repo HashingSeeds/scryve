@@ -35,20 +35,17 @@ export async function pickScreenshot(): Promise<BugScreenshot | null> {
   }
 }
 
-// why: the screenshot stays in Sentry and never reaches Convex, so publishing a bug can't expose it.
 export function captureBugReport({
-  title,
   body,
   screenshot,
 }: {
-  title: string
   body: string
   screenshot?: BugScreenshot
 }) {
   if (!Sentry.getClient()) return undefined
   return Sentry.captureFeedback(
     {
-      message: `${title}\n\n${body}`,
+      message: body,
       tags: {
         kind: "bug",
         platform: Platform.OS,

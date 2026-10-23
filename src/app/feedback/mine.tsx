@@ -26,11 +26,11 @@ function MyFeedback() {
   const [deleteFailed, setDeleteFailed] = useState(false)
   const unsent = [
     ...pending.flatMap((send) =>
-      send.type === "submit" ? [{ operationId: send.operationId, title: send.title }] : [],
+      send.type === "submit" ? [{ operationId: send.operationId, body: send.body }] : [],
     ),
     ...failures.flatMap(({ action, reason }) =>
       action.type === "submit"
-        ? [{ operationId: action.operationId, title: action.title, reason }]
+        ? [{ operationId: action.operationId, body: action.body, reason }]
         : [],
     ),
   ]

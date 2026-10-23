@@ -25,8 +25,7 @@ const KEY = "k".repeat(64)
 const submit = {
   type: "submit" as const,
   kind: "feature" as const,
-  title: "Round timer",
-  body: "50 minutes",
+  body: "Round timer, 50 minutes",
   includeAccount: false,
 }
 const flush = async () => {
@@ -62,7 +61,7 @@ describe("FeedbackOutbox", () => {
     expect(mutation.mock.calls[0]?.[1]).toMatchObject({
       key: KEY,
       clientId: operationId,
-      title: "Round timer",
+      body: "Round timer, 50 minutes",
     })
     expect(second.outbox.getSnapshot().pending).toEqual([])
     second.stop()
@@ -96,7 +95,7 @@ describe("FeedbackOutbox", () => {
       .fn()
       .mockRejectedValueOnce(new Error("socket closed"))
       .mockRejectedValueOnce(
-        new ConvexError({ code: "invalid_text", message: "Title must be 1 to 120 characters" }),
+        new ConvexError({ code: "invalid_text", message: "Message must be 1 to 2000 characters" }),
       )
     const { outbox, stop } = outboxWith(mutation)
     outbox.enqueue(submit)
@@ -106,7 +105,7 @@ describe("FeedbackOutbox", () => {
     outbox.setReady(true)
     await flush()
     expect(outbox.getSnapshot().failures).toMatchObject([
-      { reason: "Title must be 1 to 120 characters", action: { title: "Round timer" } },
+      { reason: "Message must be 1 to 2000 characters", action: { body: submit.body } },
     ])
     stop()
   })

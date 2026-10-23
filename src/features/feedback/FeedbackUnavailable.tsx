@@ -9,7 +9,7 @@ export function FeedbackUnavailable() {
       preset="fixed"
       safeAreaEdges={["bottom"]}
       header={{
-        titleTx: "feedback:board.title",
+        titleTx: "feedback:mine.title",
         leftTx: "common:back",
         onLeftPress: () => (router.canGoBack() ? router.back() : router.replace("/")),
       }}

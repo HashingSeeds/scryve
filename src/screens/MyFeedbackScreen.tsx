@@ -6,13 +6,12 @@ import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Text } from "@/components/Text"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
-import { RequestMeta } from "@/features/feedback/RequestParts"
 import type { FeedbackOwnItem } from "@/features/feedback/status"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export type UnsentRequest = { operationId: string; title: string; reason?: string }
+export type UnsentRequest = { operationId: string; body: string; reason?: string }
 
 export interface MyFeedbackScreenProps {
   items: readonly FeedbackOwnItem[] | undefined
@@ -43,7 +42,7 @@ export function MyFeedbackScreen({
       {empty ? <Text tx="feedback:mine.empty" style={themed($muted)} /> : null}
       {unsent.map((send) => (
         <View key={send.operationId} style={themed($row)}>
-          <Text text={send.title} weight="bold" numberOfLines={2} />
+          <Text text={send.body} numberOfLines={2} />
           {send.reason ? (
             <>
               <Text
@@ -74,12 +73,12 @@ export function MyFeedbackScreen({
           style={({ pressed }) => [themed($row), pressed && $pressed]}
         >
           <View style={themed($rowHead)}>
-            <Text text={item.title} weight="bold" style={$grow} numberOfLines={2} />
+            <Text text={item.body} style={$grow} numberOfLines={2} />
             {item.unread ? (
               <Text tx="feedback:mine.unread" size="xxs" weight="bold" style={themed($new)} />
             ) : null}
           </View>
-          <RequestMeta item={item} visibility={item.published ? "public" : "private"} />
+          <Text tx={`feedback:suggest.${item.kind}`} size="xxs" style={themed($muted)} />
         </Pressable>
       ))}
       {empty || items === undefined ? null : (
