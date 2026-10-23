@@ -30,7 +30,7 @@ export type HostStatus = "idle" | "starting" | "hosting" | "error"
 export interface NearbyHostState {
   readonly event: HubEvent | null
   readonly hostPlayerId: string | null
-  readonly importedEventId: string | null
+  readonly importedFor: string | null
   readonly status: HostStatus
   readonly error?: string
 }
@@ -39,17 +39,17 @@ interface Guest {
   playerId: string | null
 }
 
-type Stored = Pick<NearbyHostState, "event" | "hostPlayerId" | "importedEventId">
+type Stored = Pick<NearbyHostState, "event" | "hostPlayerId" | "importedFor">
 
 function stored(): Stored {
   const value = load(STORAGE_KEY)
   if (typeof value !== "object" || value === null || !("event" in value))
-    return { event: null, hostPlayerId: null, importedEventId: null }
+    return { event: null, hostPlayerId: null, importedFor: null }
   const saved = value as Partial<Stored> & { event: HubEvent }
   return {
     event: saved.event,
     hostPlayerId: saved.hostPlayerId ?? null,
-    importedEventId: saved.importedEventId ?? null,
+    importedFor: saved.importedFor ?? null,
   }
 }
 
@@ -74,15 +74,15 @@ class NearbyEventHost {
   private commit(
     event: HubEvent,
     hostPlayerId = this.state.hostPlayerId,
-    importedEventId = this.state.importedEventId,
+    importedFor = this.state.importedFor,
   ) {
-    save(STORAGE_KEY, { event, hostPlayerId, importedEventId })
-    this.set({ event, hostPlayerId, importedEventId })
+    save(STORAGE_KEY, { event, hostPlayerId, importedFor })
+    this.set({ event, hostPlayerId, importedFor })
     this.broadcast()
   }
 
-  markImported(eventId: string) {
-    if (this.state.event) this.commit(this.state.event, this.state.hostPlayerId, eventId)
+  markImported(accountId: string) {
+    if (this.state.event) this.commit(this.state.event, this.state.hostPlayerId, accountId)
   }
 
   async create(event: HubEvent, organizerPlays: { name: string } | null) {
@@ -136,7 +136,7 @@ class NearbyEventHost {
   async discard() {
     await this.stop()
     remove(STORAGE_KEY)
-    this.set({ event: null, hostPlayerId: null, importedEventId: null })
+    this.set({ event: null, hostPlayerId: null, importedFor: null })
   }
 
   run(command: HubCommand) {
