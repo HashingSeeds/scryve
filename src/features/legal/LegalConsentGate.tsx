@@ -364,19 +364,15 @@ function ConfiguredConsentGate({
       !backendReady
     )
       return
-    keepAcceptanceOnThisDevice()
-    markAcceptancePending()
-    void syncAcceptance().catch(() => undefined)
+    void accept()
   }, [
     signedIn,
     userId,
     backendReady,
     cacheSaysAccepted,
     inheritsDeviceAcceptance,
-    keepAcceptanceOnThisDevice,
-    markAcceptancePending,
+    accept,
     pendingSyncIsCurrent,
-    syncAcceptance,
   ])
 
   useEffect(() => {
@@ -458,7 +454,8 @@ function ConfiguredConsentGate({
           }}
         />
       ) : null}
-      {signedIn && !bypass && showContent && pendingSyncIsCurrent ? (
+      {/* why: the first save usually lands in a moment, so only warn once it has failed. */}
+      {signedIn && !bypass && showContent && pendingSyncIsCurrent && !isSubmitting ? (
         <AccountConsentSyncStatus
           isSyncing={isSyncingAcceptance}
           retryFailed={retryFailed}
