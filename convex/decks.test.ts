@@ -1,5 +1,6 @@
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
+import { addDeckResult } from "./lib/deckResults"
 
 const inviteToken = "t".repeat(43)
 const hostDeviceId = "device-host-0001"
@@ -701,6 +702,74 @@ describe("premium deck tracking", () => {
     })
   })
 
+  it.each(["deckKey", "syncId", "_id"] as const)(
+    "serves legacy stats from the owner's deck key totals via %s",
+    async (identity) => {
+      const t = makeConvexTest()
+      const owner = await synced(t, "key-owner", "Owner")
+      await synced(t, "key-other", "Other")
+      const deckId = await owner.mutation(api.decks.create, { name: "Burn", format: "modern" })
+      const [empty] = (await owner.query(api.decks.listMine)).decks
+      expect(empty.record).toMatchObject({ games: 0, wins: 0 })
+      expect(empty.keyRecord).toEqual(empty.record)
+      expect(empty.lastPlayedAt).toBeUndefined()
+      expect((await owner.query(api.decks.detail, { deckId })).record).toEqual(empty.record)
+      expect(await owner.query(api.decks.stats, { deckId })).toMatchObject(empty.record)
+      await t.run(async (ctx) => {
+        const deck = (await ctx.db.get(deckId))!
+        const other = (await ctx.db
+          .query("users")
+          .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "key-other"))
+          .unique())!
+        const key = identity === "_id" ? String(deckId) : "device-key"
+        await ctx.db.patch(deckId, {
+          deckKey: identity === "deckKey" ? key : undefined,
+          syncId: identity === "syncId" ? key : undefined,
+        })
+        await ctx.db.insert("deckStats", {
+          deckId,
+          games: 99,
+          wins: 99,
+          losses: 0,
+          draws: 0,
+          unknown: 0,
+          updatedAt: 1,
+        })
+        const result = {
+          userId: deck.ownerUserId,
+          deckKey: key,
+          kind: "game" as const,
+          source: "local" as const,
+          outcome: "win" as const,
+          deltas: { games: { total: 1, wins: 1, losses: 0, draws: 0, unknown: 0 } },
+        }
+        await addDeckResult(ctx, { ...result, resultId: "newest", finishedAt: 20 })
+        await addDeckResult(ctx, { ...result, resultId: "older", finishedAt: 10 })
+        await addDeckResult(ctx, {
+          ...result,
+          resultId: "other-owner",
+          userId: other._id,
+          finishedAt: 30,
+        })
+        await addDeckResult(ctx, {
+          ...result,
+          resultId: "other-key",
+          deckKey: "unrelated",
+          finishedAt: 40,
+        })
+      })
+      const [listed] = (await owner.query(api.decks.listMine)).decks
+      expect(listed.record).toMatchObject({ games: 2, wins: 2 })
+      expect(listed.keyRecord).toEqual(listed.record)
+      expect(listed.lastPlayedAt).toBe(20)
+      expect((await owner.query(api.decks.detail, { deckId })).record).toEqual(listed.record)
+      expect(await owner.query(api.decks.stats, { deckId })).toMatchObject({
+        ...listed.record,
+        byVersion: [{ games: 0 }],
+      })
+    },
+  )
+
   it("returns manual match counters beside Scryve games without changing the game fields", async () => {
     const t = makeConvexTest()
     const owner = await synced(t, "manual-owner", "Owner")
@@ -737,7 +806,7 @@ describe("premium deck tracking", () => {
       byVersion: [{ deckVersionId, ...record }],
     })
     await expect(owner.query(api.decks.listMine)).resolves.toMatchObject({
-      decks: [{ _id: deckId, record }],
+      decks: [{ _id: deckId, record, lastPlayedAt: finishedAt }],
     })
   })
 
