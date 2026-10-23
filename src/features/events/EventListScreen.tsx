@@ -22,6 +22,7 @@ export function EventListScreen({
   onNew,
   onJoin,
   onOpen,
+  onNearby,
 }: {
   access: CloudAccess
   events: readonly EventListItem[] | undefined
@@ -29,10 +30,15 @@ export function EventListScreen({
   onNew: () => void
   onJoin: () => void
   onOpen: (eventId: string) => void
+  onNearby?: () => void
 }) {
   const { themed } = useAppTheme()
+  const nearby = onNearby ? (
+    <Button testID="nearby-events-button" tx="events:nearby.title" onPress={onNearby} />
+  ) : null
   return (
     <EventFrame
+      blockedAction={nearby}
       title={translate("events:title")}
       access={access}
       loading={events === undefined}
@@ -55,6 +61,7 @@ export function EventListScreen({
         </View>
       }
     >
+      {nearby}
       <View style={themed($section)}>
         {events?.length === 0 ? <Text style={themed($dim)} tx="events:list.empty" /> : null}
         {events?.map((event) => (

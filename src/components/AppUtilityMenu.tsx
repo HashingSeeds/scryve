@@ -54,7 +54,7 @@ export function AppUtilityMenu({
   const storeUpdate = useStoreUpdate()
   const nearbyOnly = useNearbyOnly()
   const testsNearby = lanPlayAvailable()
-  const showsEvents = readPublicCloudConfig().configured && !nearbyOnly
+  const showsEvents = nearbyOnly || readPublicCloudConfig().configured
   const itemCount =
     4 +
     Number(Boolean(onRules)) +
@@ -221,7 +221,7 @@ export function AppUtilityMenu({
               testID="utility-events-button"
               accessibilityRole="button"
               style={themed($item)}
-              onPress={() => choose(openEvents)}
+              onPress={() => choose(() => openEvents(nearbyOnly))}
             >
               <Text
                 tx="events:title"

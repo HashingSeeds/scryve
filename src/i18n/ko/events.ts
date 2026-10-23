@@ -135,6 +135,23 @@ export default {
     clear: "결과 지우기",
     twoWinners: "매치의 승자는 한 명만 될 수 있습니다",
   },
+  nearby: {
+    title: "근처 이벤트",
+    host: "이 기기에서 주최",
+    yourEvent: "내 이벤트",
+    searching: "이 Wi-Fi에서 이벤트를 찾는 중입니다. 모두 같은 네트워크에 있어야 합니다.",
+    denied: "이 Wi-Fi에서 이벤트를 찾으려면 설정에서 로컬 네트워크 접근을 허용하세요.",
+    name: "내 이름",
+    join: "참가",
+    joining: "참가 중…",
+    reconnecting: "주최자에 다시 연결하는 중…",
+    rejected: {
+      code: "이벤트 코드가 바뀌었습니다. 다시 선택하세요.",
+      protocol: "주최자와 같은 Scryve 버전이 필요합니다.",
+      closed: "그 이벤트는 끝났습니다.",
+      invalid: "주최자가 이 기기를 거부했습니다.",
+    },
+  },
   settings: {
     rounds: "라운드",
     suggested: "{{count}}명 권장: {{rounds}}",

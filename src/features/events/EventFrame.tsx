@@ -19,6 +19,7 @@ export function EventFrame({
   loading = false,
   onBack,
   footer,
+  blockedAction,
   children,
 }: {
   title: string
@@ -26,6 +27,7 @@ export function EventFrame({
   loading?: boolean
   onBack: () => void
   footer?: ReactNode
+  blockedAction?: ReactNode
   children: ReactNode
 }) {
   const { themed } = useAppTheme()
@@ -35,13 +37,16 @@ export function EventFrame({
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$frame}>
       <Header title={title} leftTx="common:back" onLeftPress={onBack} />
       {blocked ? (
-        <EmptyState
-          imageSource={null}
-          heading={translate("events:signIn")}
-          content={access.message}
-          button={access.actionLabel ?? translate("account:signIn")}
-          buttonOnPress={access.request}
-        />
+        <>
+          <EmptyState
+            imageSource={null}
+            heading={translate("events:signIn")}
+            content={access.message}
+            button={access.actionLabel ?? translate("account:signIn")}
+            buttonOnPress={access.request}
+          />
+          {blockedAction ? <View style={themed($content)}>{blockedAction}</View> : null}
+        </>
       ) : waiting ? (
         <View
           accessibilityRole="progressbar"

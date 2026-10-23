@@ -87,12 +87,16 @@ export function EventScreen({
   onBack,
   onRemoved,
   onStartMatch,
+  notice,
+  showStoreScreen = true,
 }: {
   access?: CloudAccess
   source: EventSource
   onBack: () => void
   onRemoved: () => void
   onStartMatch?: (view: EventView, table: EventTableView, replace: boolean) => boolean
+  notice?: string
+  showStoreScreen?: boolean
 }) {
   const { themed } = useAppTheme()
   const { view } = source
@@ -202,6 +206,7 @@ export function EventScreen({
             selectedId={tab}
             onSelect={(id) => setTab(TABS.find((value) => value === id) ?? "round")}
           />
+          {notice ? <AlertNote testID="event-notice" text={notice} /> : null}
           {command.error ? <AlertNote testID="event-error" text={command.error} /> : null}
           {tab === "round" ? (
             <RoundTab
@@ -221,7 +226,13 @@ export function EventScreen({
               finalRound={finalRound}
             />
           ) : tab === "players" ? (
-            <PlayersTab view={view} source={source} busy={command.busy} run={command.run} />
+            <PlayersTab
+              view={view}
+              source={source}
+              busy={command.busy}
+              run={command.run}
+              showStoreScreen={showStoreScreen}
+            />
           ) : (
             <StandingsTab view={view} source={source} />
           )}
@@ -461,11 +472,13 @@ function PlayersTab({
   source,
   busy,
   run,
+  showStoreScreen,
 }: {
   view: EventView
   source: EventSource
   busy: boolean
   run: (command: () => Promise<void>) => Promise<boolean>
+  showStoreScreen: boolean
 }) {
   const { themed } = useAppTheme()
   const [guest, setGuest] = useState("")
@@ -479,7 +492,10 @@ function PlayersTab({
   const managing = view.isOrganizer && view.status !== "finished"
   const active = view.players.filter((player) => !player.dropped).length
   const cloud = readPublicCloudConfig()
-  const displayUrl = cloud.configured ? eventDisplayUrl(cloud.value.inviteOrigin, view.code) : null
+  const displayUrl =
+    showStoreScreen && cloud.configured
+      ? eventDisplayUrl(cloud.value.inviteOrigin, view.code)
+      : null
   return (
     <>
       {managing ? (

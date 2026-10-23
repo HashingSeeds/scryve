@@ -139,6 +139,24 @@ export default {
     clear: "Effacer le résultat",
     twoWinners: "Un seul joueur peut gagner le match",
   },
+  nearby: {
+    title: "Événements à proximité",
+    host: "Organiser sur cet appareil",
+    yourEvent: "Votre événement",
+    searching: "Recherche d'événements sur ce Wi-Fi. Tout le monde doit être sur le même réseau.",
+    denied:
+      "Autorisez l'accès au réseau local dans Réglages pour trouver des événements sur ce Wi-Fi.",
+    name: "Votre nom",
+    join: "Rejoindre",
+    joining: "Connexion…",
+    reconnecting: "Reconnexion à l'organisateur…",
+    rejected: {
+      code: "Le code de cet événement a changé. Choisissez-le à nouveau.",
+      protocol: "L'organisateur doit avoir la même version de Scryve que vous.",
+      closed: "Cet événement est terminé.",
+      invalid: "L'organisateur a refusé cet appareil.",
+    },
+  },
   settings: {
     rounds: "Rondes",
     suggested: "Suggéré pour {{count}} joueurs : {{rounds}}",

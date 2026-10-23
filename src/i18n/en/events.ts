@@ -146,6 +146,25 @@ const events = {
     clear: "Clear result",
     twoWinners: "Only one player can win the match",
   },
+  // Events run by one device on the store's Wi-Fi, without internet.
+  nearby: {
+    title: "Nearby events",
+    host: "Host on this device",
+    yourEvent: "Your event",
+    // Shown while no events are found; some store guest networks keep devices from seeing each other.
+    searching: "Looking for events on this Wi-Fi. Everyone needs to be on the same network.",
+    denied: "Allow local network access in Settings to find events on this Wi-Fi.",
+    name: "Your name",
+    join: "Join",
+    joining: "Joining…",
+    reconnecting: "Reconnecting to the host…",
+    rejected: {
+      code: "That event's code changed. Pick it again.",
+      protocol: "The host needs the same Scryve version as you.",
+      closed: "That event has ended.",
+      invalid: "The host refused this device.",
+    },
+  },
   settings: {
     rounds: "Rounds",
     suggested: "Suggested for {{count}} players: {{rounds}}",
