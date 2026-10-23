@@ -1,13 +1,14 @@
 import { convexTest, type TestConvex } from "convex-test"
 
 import { registerRateLimiter } from "../test/registerRateLimiter"
-import { api } from "./_generated/api"
+import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
+  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
   "./events.ts": async () => jest.requireActual("./events"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
@@ -44,6 +45,25 @@ async function setup(players = ["ana", "ben", "cat"]) {
     actors.set(name, actor)
   }
   return { t, organizer, eventId, code, actors }
+}
+
+async function deleteAccount(t: TestConvex<typeof schema>, subject: string) {
+  const requestId = await t.run(async (ctx) => {
+    const user = (await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", subject))
+      .unique())!
+    return await ctx.db.insert("accountDeletionRequests", {
+      clerkUserId: subject,
+      userId: user._id,
+      status: "processing",
+      attempts: 0,
+      requestedAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+  })
+  for (let step = 0; step < 8; step += 1)
+    await t.mutation(internal.accountDeletion.processUserLinkedData, { requestId })
 }
 
 async function tablesOf(t: TestConvex<typeof schema>, eventId: Id<"events">) {
@@ -166,5 +186,60 @@ describe("events", () => {
     await expect(
       organizer.mutation(api.events.create, { ...swiss, codeCandidates: ["CODE05"] }),
     ).rejects.toThrow("Finish an event first")
+  })
+
+  it("refuses an unknown code once a player has guessed too many", async () => {
+    const { actors } = await setup(["ana"])
+    const ana = actors.get("ana")!
+    for (let guess = 0; guess < 9; guess += 1)
+      expect(await ana.mutation(api.events.join, { code: `ZZZZ${10 + guess}` })).toBeNull()
+    await expect(ana.mutation(api.events.join, { code: "ZZZZ99" })).rejects.toThrow(
+      "Too many requests",
+    )
+  })
+
+  it("keeps the organizer's controls from players", async () => {
+    const { actors, eventId } = await setup()
+    await expect(
+      actors.get("ana")!.mutation(api.events.startNextRound, { eventId }),
+    ).rejects.toThrow("Only the organizer")
+  })
+
+  it("starts the next round on a reported result without waiting for confirmation", async () => {
+    const { t, organizer, eventId, actors } = await setup(["ana", "ben"])
+    await organizer.mutation(api.events.startNextRound, { eventId })
+    const [table] = await tablesOf(t, eventId)
+    const reporter = [...actors.values()][0]!
+    await reporter.mutation(api.events.report, {
+      tableId: table!.id,
+      result: { kind: "match", gamesWon: [2, 0], gamesDrawn: 0 },
+    })
+
+    expect(await organizer.mutation(api.events.startNextRound, { eventId })).toBe(2)
+  })
+
+  it("detaches a deleted organizer and anonymizes a deleted player", async () => {
+    jest.useFakeTimers()
+    const { t, organizer, eventId } = await setup(["ana", "ben"])
+    await organizer.mutation(api.events.startNextRound, { eventId })
+    await deleteAccount(t, "organizer")
+    await deleteAccount(t, "ana")
+
+    const rows = await t.run(async (ctx) => ({
+      event: await ctx.db.get(eventId),
+      players: await ctx.db
+        .query("eventPlayers")
+        .withIndex("by_event", (q) => q.eq("eventId", eventId))
+        .collect(),
+    }))
+    expect(rows.event).toMatchObject({ status: "finished" })
+    expect(rows.event?.ownerUserId).toBeUndefined()
+    expect(rows.event?.clock).toBeUndefined()
+    expect(rows.players.map((player) => [player.name, player.userId === undefined])).toEqual([
+      ["Deleted player", true],
+      ["ben", false],
+    ])
+    jest.clearAllTimers()
+    jest.useRealTimers()
   })
 })
