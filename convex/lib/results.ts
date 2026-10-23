@@ -1,6 +1,13 @@
 import { deckKeyOf } from "./deckKeys"
-import { addDeckResult, removeDeckResult, canonicalResultId, gameResultId } from "./deckResults"
+import {
+  addDeckResult,
+  removeDeckResult,
+  canonicalResultId,
+  gameResultId,
+  setDeckResultOpponents,
+} from "./deckResults"
 import type { MatchOutcome } from "./matchResults"
+import { resultOpponents, summarySeats } from "./opponentDecks"
 import { MAX_PLAYERS } from "./policy"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
@@ -124,6 +131,10 @@ export async function recordPlayerResult(
     summaryId: summary._id,
     matchId: summary.matchId,
     podSize: summary.players.length,
+    opponents: resultOpponents(summarySeats(summary.players), {
+      seat: player.seat,
+      userId: player.userId,
+    }),
     ...(summary.firstPlayerId !== undefined
       ? { wentFirst: summary.firstPlayerId === player.playerId }
       : {}),
@@ -235,6 +246,7 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
       finishedAt: match.finishedAt,
       matchId: match._id,
       podSize: match.seats.length,
+      opponents: resultOpponents(match.seats, { seat: seat.seat, userId: seat.userId }),
       deltas: matchDeltas(match, seat),
       ...(owner?.seat === seat.seat
         ? { legacyDeckId: owner.deckId, deckVersionId: owner.deckVersionId }
@@ -275,6 +287,30 @@ export async function removeMatchResult(ctx: MutationCtx, match: Doc<"matches">,
     .take(MAX_ROWS_PER_MATCH)
   for (const result of results) await ctx.db.delete(result._id)
   await applyStats(ctx, owner.deckId, owner.deckVersionId, matchDeltas(match, owner), -1, now)
+}
+
+/** why: a nearby claim or an account deletion changes a seat after the other seats' results were written. */
+export async function refreshGameOpponents(ctx: MutationCtx, summary: Doc<"gameSummaries">) {
+  const seats = summarySeats(summary.players)
+  for (const player of summary.players)
+    if (player.userId)
+      await setDeckResultOpponents(
+        ctx,
+        player.userId,
+        gameResultId(summary, player),
+        resultOpponents(seats, { seat: player.seat, userId: player.userId }),
+      )
+}
+
+export async function refreshMatchOpponents(ctx: MutationCtx, match: Doc<"matches">) {
+  for (const seat of match.seats)
+    if (seat.userId)
+      await setDeckResultOpponents(
+        ctx,
+        seat.userId,
+        canonicalResultId({ kind: "match", publicId: match.publicId, seat: seat.seat }),
+        resultOpponents(match.seats, { seat: seat.seat, userId: seat.userId }),
+      )
 }
 
 export async function resultDeckKey(

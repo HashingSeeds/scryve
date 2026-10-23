@@ -116,9 +116,20 @@ export async function addDeckResult(ctx: MutationCtx, result: DeckResult) {
         ...(result.fingerprint ? { fingerprint: result.fingerprint } : {}),
       }
     : {}
-  if (Object.keys({ ...legacy, ...adopted }).length)
-    await ctx.db.patch(existing._id, { ...legacy, ...adopted })
+  const opponents = !existing.opponents && result.opponents ? { opponents: result.opponents } : {}
+  if (Object.keys({ ...legacy, ...adopted, ...opponents }).length)
+    await ctx.db.patch(existing._id, { ...legacy, ...adopted, ...opponents })
   if (adoptedKey) await apply(ctx, { ...existing, ...adopted }, 1)
+}
+
+export async function setDeckResultOpponents(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  resultId: string,
+  opponents: NonNullable<DeckResult["opponents"]>,
+) {
+  const result = await storedResult(ctx, userId, resultId)
+  if (result) await ctx.db.patch(result._id, { opponents })
 }
 
 export async function removeDeckResult(ctx: MutationCtx, userId: Id<"users">, resultId: string) {
