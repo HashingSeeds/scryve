@@ -1,4 +1,5 @@
 import {
+  eventErrorText,
   localClockFor,
   matchSetupFor,
   nextRoundBlocker,
@@ -6,6 +7,7 @@ import {
   standingsThroughRound,
 } from "./eventLogic"
 import type { EventTableView, EventView } from "./eventSource"
+import { eventError } from "../../../convex/lib/events/commands"
 
 const table = (overrides: Partial<EventTableView> = {}): EventTableView => ({
   id: "t1",
@@ -117,5 +119,12 @@ describe("matchSetupFor", () => {
       match: { bestOf: 1 },
       clock: { mode: "countdown", minutes: 30 },
     })
+  })
+})
+
+describe("eventErrorText", () => {
+  it("translates coded event failures and falls back for anything else", () => {
+    expect(eventErrorText(eventError("event_full", "full"))).toBe("This event is full")
+    expect(eventErrorText(new Error("Server Error"))).toBe("That didn't work. Try again.")
   })
 })

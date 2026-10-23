@@ -7,6 +7,17 @@ export default {
   joinEvent: "Unirse al evento",
   loading: "Cargando…",
   failed: "No funcionó. Inténtalo de nuevo.",
+  errors: {
+    nameRejected: "Elige otro nombre",
+    eventLimit: "Termina primero uno de tus eventos. Puedes tener 5 a la vez.",
+    eventFinished: "Este evento ha terminado",
+    eventFull: "Este evento está lleno",
+    resultsMissing: "Escribe todos los resultados antes de la siguiente ronda",
+    notEnoughPlayers: "No hay suficientes jugadores para empezar una ronda",
+    resultConfirmed: "Ese resultado ya se confirmó. Pide al organizador que lo cambie.",
+    nothingToConfirm: "Ese resultado cambió. Revísalo de nuevo.",
+    rateLimited: "Demasiados intentos. Espera un minuto e inténtalo de nuevo.",
+  },
   signIn: "Inicia sesión para organizar o unirte a eventos",
   notFound: "Este evento ya no existe",
   status: {

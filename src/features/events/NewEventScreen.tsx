@@ -15,6 +15,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 
 import { EventFrame, $section } from "./EventFrame"
+import { eventErrorText } from "./eventLogic"
 import { MAX_ROUND_MINUTES, MIN_ROUND_MINUTES } from "../../../convex/lib/events/commands"
 import {
   EVENT_STRUCTURES,
@@ -80,8 +81,8 @@ export function NewEventScreen({
         roundMinutes,
         joinAsPlayer,
       })
-    } catch {
-      setError(translate("events:failed"))
+    } catch (cause) {
+      setError(eventErrorText(cause))
       setBusy(false)
     }
   }

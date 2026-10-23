@@ -7,6 +7,17 @@ export default {
   joinEvent: "이벤트 참가",
   loading: "불러오는 중…",
   failed: "실패했습니다. 다시 시도하세요.",
+  errors: {
+    nameRejected: "다른 이름을 선택하세요",
+    eventLimit: "먼저 진행 중인 이벤트 하나를 마치세요. 동시에 5개까지 운영할 수 있습니다.",
+    eventFinished: "이미 종료된 이벤트입니다",
+    eventFull: "이벤트 정원이 가득 찼습니다",
+    resultsMissing: "다음 라운드 전에 모든 결과를 입력하세요",
+    notEnoughPlayers: "라운드를 시작하기에 플레이어가 부족합니다",
+    resultConfirmed: "이미 확정된 결과입니다. 주최자에게 변경을 요청하세요.",
+    nothingToConfirm: "결과가 변경되었습니다. 다시 확인하세요.",
+    rateLimited: "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요.",
+  },
   signIn: "로그인하여 이벤트를 진행하거나 참가하세요",
   notFound: "이 이벤트는 더 이상 존재하지 않습니다",
   status: {

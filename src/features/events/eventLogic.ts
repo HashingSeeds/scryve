@@ -3,6 +3,7 @@ import { defaultStartingLife, isPlaySystemId, playFormatLabel } from "@/features
 import type { LocalSetup } from "@/features/game/recentSetups"
 import { ROUND_CLOCK_MINUTES, type RoundClockSetup } from "@/features/game/roundClock"
 import { translate } from "@/i18n/translate"
+import { convexErrorCode } from "@/utils/convexError"
 
 import type { EventTableView, EventView } from "./eventSource"
 import {
@@ -10,6 +11,7 @@ import {
   clockRemainingMs,
   roundComplete,
   type EventClock,
+  type EventErrorCode,
 } from "../../../convex/lib/events/commands"
 import { MAX_EVENT_ROUNDS, MIN_POD_SIZE, type TableResult } from "../../../convex/lib/events/model"
 import { eventRules, type Tiebreaker } from "../../../convex/lib/events/rules"
@@ -176,3 +178,23 @@ export const firstTiebreaker = (system: string): Tiebreaker | undefined =>
   isPlaySystemId(system) ? eventRules(system).tiebreakers[0] : undefined
 
 export const percent = (value: number) => `${(value * 100).toFixed(1)}%`
+
+const ERROR_TEXT: Record<EventErrorCode | "rate_limited", () => string> = {
+  name_rejected: () => translate("events:errors.nameRejected"),
+  event_limit: () => translate("events:errors.eventLimit"),
+  event_finished: () => translate("events:errors.eventFinished"),
+  event_full: () => translate("events:errors.eventFull"),
+  results_missing: () => translate("events:errors.resultsMissing"),
+  not_enough_players: () => translate("events:errors.notEnoughPlayers"),
+  result_confirmed: () => translate("events:errors.resultConfirmed"),
+  nothing_to_confirm: () => translate("events:errors.nothingToConfirm"),
+  rate_limited: () => translate("events:errors.rateLimited"),
+}
+
+const hasErrorText = (code: string): code is keyof typeof ERROR_TEXT =>
+  Object.hasOwn(ERROR_TEXT, code)
+
+export function eventErrorText(cause: unknown) {
+  const code = convexErrorCode(cause)
+  return code && hasErrorText(code) ? ERROR_TEXT[code]() : translate("events:failed")
+}

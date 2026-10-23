@@ -12,6 +12,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { EventFrame } from "./EventFrame"
+import { eventErrorText } from "./eventLogic"
 
 const CODE_EXAMPLE = "ABC123"
 
@@ -45,8 +46,8 @@ export function JoinEventScreen({
     setError(undefined)
     try {
       if ((await onJoin(normalized)) === "notFound") setError(translate("events:join.notFound"))
-    } catch {
-      setError(translate("events:failed"))
+    } catch (cause) {
+      setError(eventErrorText(cause))
     } finally {
       setBusy(false)
     }

@@ -7,6 +7,17 @@ export default {
   joinEvent: "イベントに参加",
   loading: "読み込み中…",
   failed: "うまくいきませんでした。もう一度お試しください。",
+  errors: {
+    nameRejected: "別の名前を選んでください",
+    eventLimit: "先にイベントを1つ終了してください。同時に開催できるのは5件までです。",
+    eventFinished: "このイベントは終了しました",
+    eventFull: "このイベントは満員です",
+    resultsMissing: "次のラウンドの前に、すべての結果を入力してください",
+    notEnoughPlayers: "ラウンドを開始するには参加者が足りません",
+    resultConfirmed: "その結果はすでに確定しています。変更は主催者に依頼してください。",
+    nothingToConfirm: "その結果は変更されました。もう一度確認してください。",
+    rateLimited: "試行回数が多すぎます。1分ほど待ってから、もう一度お試しください。",
+  },
   signIn: "イベントを開催・参加するにはサインインしてください",
   notFound: "このイベントは存在しません",
   status: {

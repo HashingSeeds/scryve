@@ -5,6 +5,17 @@ const events = {
   joinEvent: "Join event",
   loading: "Loading…",
   failed: "That didn't work. Try again.",
+  errors: {
+    nameRejected: "Choose a different name",
+    eventLimit: "Finish one of your events first. You can run 5 at once.",
+    eventFinished: "This event has finished",
+    eventFull: "This event is full",
+    resultsMissing: "Enter every result before the next round",
+    notEnoughPlayers: "Not enough players to start a round",
+    resultConfirmed: "That result was already confirmed. Ask the organizer to change it.",
+    nothingToConfirm: "That result changed. Check it again.",
+    rateLimited: "Too many tries. Wait a minute and try again.",
+  },
   signIn: "Sign in to run or join events",
   notFound: "This event no longer exists",
   status: {

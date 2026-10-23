@@ -21,6 +21,7 @@ import { $action, $actions, $dim, $grow, $row, $section, EventFrame } from "./Ev
 import {
   canConfirm,
   canReport,
+  eventErrorText,
   eventMeta,
   eventStatusText,
   firstTiebreaker,
@@ -29,8 +30,8 @@ import {
   percent,
   playerName,
   resultText,
-  tablePlayers,
   type RoundBlocker,
+  tablePlayers,
 } from "./eventLogic"
 import type { EventSource, EventTableView, EventView } from "./eventSource"
 import { ResultDialog } from "./ResultDialog"
@@ -51,8 +52,8 @@ function useCommand() {
     try {
       await command()
       return true
-    } catch {
-      setError(translate("events:failed"))
+    } catch (cause) {
+      setError(eventErrorText(cause))
       return false
     } finally {
       setBusy(false)
