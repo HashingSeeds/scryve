@@ -93,6 +93,7 @@ function detail(cards = [row("Island", 2)]): NonNullable<DeckViewInput["detail"]
   return {
     deck: {
       _id: deckId,
+      deckKey: "deck-key",
       _creationTime: 0,
       ownerUserId: "user-1" as Id<"users">,
       name: "Talrand",

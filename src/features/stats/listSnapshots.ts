@@ -56,10 +56,8 @@ export async function lookupListSnapshot(
   const local = loadGuestDecks().find((deck) => (deck.deckKey ?? deck.localId) === deckKey)
   if (local && (await deckFingerprint(local.deck.cards)) === fingerprint) return local.deck.cards
   const sync = new DeckSyncRepository(ownerId, undefined, deploymentUrl)
-  const metadata = sync.loadMetadata().find((deck) => (deck.deckKey ?? deck.id) === deckKey)
-  const shelf = sync
-    .loadShelf()
-    .find((deck) => (deck.deckKey ?? deck.syncId ?? String(deck._id)) === deckKey)
+  const metadata = sync.loadMetadata().find((deck) => deck.deckKey === deckKey)
+  const shelf = sync.loadShelf().find((deck) => deck.deckKey === deckKey)
   const deckId = metadata?.deckId ?? shelf?._id
   if (!deckId) return undefined
   const cache = new DeckVersionCacheRepository(ownerId, undefined, deploymentUrl)

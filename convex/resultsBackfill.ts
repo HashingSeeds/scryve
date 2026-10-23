@@ -5,7 +5,6 @@ import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import type { QueryCtx } from "./_generated/server"
 import { internalMutation, internalQuery } from "./_generated/server"
-import { deckKeyOf } from "./lib/deckKeys"
 import { addDeckResult, canonicalResultId, gameResultId } from "./lib/deckResults"
 import { resultOpponents, summarySeats } from "./lib/opponentDecks"
 import {
@@ -81,8 +80,6 @@ export const backfillDeckKeys = internalMutation({
     const page = await ctx.db
       .query("decks")
       .paginate({ cursor: args.cursor, numItems: batchSize(args.batchSize) })
-    for (const deck of page.page)
-      if (!deck.deckKey) await ctx.db.patch(deck._id, { deckKey: deck.syncId ?? String(deck._id) })
     return { isDone: page.isDone, continueCursor: page.continueCursor }
   },
 })
@@ -286,7 +283,7 @@ async function legacyReasons(
       const results = await ctx.db
         .query("deckResults")
         .withIndex("by_user_and_deck_key_and_finished_at", (q) =>
-          q.eq("userId", deck.ownerUserId).eq("deckKey", deckKeyOf(deck)),
+          q.eq("userId", deck.ownerUserId).eq("deckKey", deck.deckKey),
         )
         .take(MAX_COMPARED_RESULTS + 1)
       if (results.some((result) => !result.legacyDeckId)) reasons.add("device_only_results")
@@ -389,7 +386,7 @@ export const compareDeckKeyStats = internalQuery({
       const page = await ctx.db.query("decks").paginate(pagination)
       for (const deck of page.page) {
         if (deck.archivedAt !== undefined) continue
-        const deckKey = deckKeyOf(deck)
+        const deckKey = deck.deckKey
         const legacy = await ctx.db
           .query("deckStats")
           .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
@@ -428,7 +425,7 @@ export const compareDeckKeyStats = internalQuery({
           deckVersionId: legacy.deckVersionId,
           legacyStatsId: legacy._id,
           userId: deck?.ownerUserId,
-          deckKey: deck ? deckKeyOf(deck) : undefined,
+          deckKey: deck ? deck.deckKey : undefined,
         }
         if (all.length > MAX_COMPARED_RESULTS) {
           mismatches.push({ scope: "version", reason: "comparison_limit", ...ids })
@@ -438,7 +435,7 @@ export const compareDeckKeyStats = internalQuery({
           (result) =>
             result.deckVersionId === legacy.deckVersionId &&
             result.userId === deck?.ownerUserId &&
-            result.deckKey === (deck && deckKeyOf(deck)),
+            result.deckKey === (deck && deck.deckKey),
         )
         const stats = sumDeltas(results.map((result) => result.deltas))
         const differences = countDifferences(legacy, stats)

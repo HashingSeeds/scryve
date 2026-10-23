@@ -1,4 +1,3 @@
-import { deckKeyOf } from "./deckKeys"
 import {
   addDeckResult,
   removeDeckResult,
@@ -325,12 +324,12 @@ export async function resultDeckKey(
           q.eq("ownerUserId", seat.userId!).eq("guestLocalId", seat.deckKey),
         )
         .unique()
-      if (alias) return deckKeyOf(alias)
+      if (alias) return alias.deckKey
     }
     return seat.deckKey
   }
   const deck = seat.deckId ? await ctx.db.get(seat.deckId) : null
-  return deck ? deckKeyOf(deck) : undefined
+  return deck ? deck.deckKey : undefined
 }
 
 export async function gameResultSource(ctx: MutationCtx, summary: Doc<"gameSummaries">) {

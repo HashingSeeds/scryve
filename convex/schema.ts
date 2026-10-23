@@ -359,7 +359,7 @@ export default defineSchema({
     .index("by_user_and_game", ["userId", "gameId"]),
 
   decks: defineTable({
-    deckKey: v.optional(v.string()),
+    deckKey: v.string(),
     movedToDeviceAt: v.optional(v.number()),
     ownerUserId: v.id("users"),
     syncId: v.optional(v.string()),

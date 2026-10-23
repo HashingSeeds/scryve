@@ -305,12 +305,7 @@ function DeckDetailContent({
       : "skip",
   )
   const deckMetadata = synced.metadata.find((deck) => deck.deckId === deckId)
-  const statsDeckKey =
-    deckMetadata?.deckKey ??
-    detail?.deck.deckKey ??
-    deckMetadata?.id ??
-    detail?.deck.syncId ??
-    deckId
+  const statsDeckKey = deckMetadata?.deckKey ?? detail?.deck.deckKey
   const stats = useDeckKeyStats(statsDeckKey, access?.ready ?? true)
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false

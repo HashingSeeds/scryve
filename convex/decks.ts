@@ -18,7 +18,6 @@ import {
   assertDeckKey,
   createOrReviveDeck,
   deckForKey,
-  deckKeyOf,
   findDeckByKey,
   pinnedDeck,
 } from "./lib/deckKeys"
@@ -400,7 +399,7 @@ async function keyRecord(ctx: QueryCtx, deck: Doc<"decks">) {
   const stats = await ctx.db
     .query("deckKeyStats")
     .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
-      q.eq("userId", deck.ownerUserId).eq("deckKey", deckKeyOf(deck)).eq("fingerprint", "all"),
+      q.eq("userId", deck.ownerUserId).eq("deckKey", deck.deckKey).eq("fingerprint", "all"),
     )
     .unique()
   return stats ? statsRecord(stats) : undefined
@@ -593,7 +592,7 @@ export const importGuest = mutation({
     if (
       existing &&
       args.deckKey !== undefined &&
-      args.deckKey !== deckKeyOf(existing) &&
+      args.deckKey !== existing.deckKey &&
       args.deckKey !== args.localId
     )
       throw new ConvexError({ code: "deck_key_conflict", message: "Deck key cannot change" })
@@ -621,10 +620,7 @@ export const importGuest = mutation({
         localUpdatedAt: sameDeck ? args.localUpdatedAt : null,
       }
     }
-    // why: results may already be filed under the key the backfill gives this row.
-    if (existing && !existing.deckKey)
-      await ctx.db.patch(existing._id, { deckKey: deckKeyOf(existing) })
-    await deckForKey(ctx, user._id, existing ? deckKeyOf(existing) : (args.deckKey ?? args.localId))
+    await deckForKey(ctx, user._id, existing ? existing.deckKey : (args.deckKey ?? args.localId))
     const capacity = await deckCapacity(ctx, user)
     if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
     const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
@@ -646,7 +642,7 @@ export const importGuest = mutation({
         createdAt: now,
         updatedAt: now,
       },
-      existing ? deckKeyOf(existing) : (args.deckKey ?? args.localId),
+      existing ? existing.deckKey : (args.deckKey ?? args.localId),
     )
     await writeInitialVersion(ctx, deckId, game, args.cards, now)
     return { status: "imported" as const, deckId, localUpdatedAt: args.localUpdatedAt }
@@ -1082,7 +1078,7 @@ export const syncWrite = mutation({
       if (args.returnConflict && deck) return { status: "conflict", deck: syncedDeck(deck) }
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
     }
-    if (deck && args.deckKey && args.deckKey !== deckKeyOf(deck))
+    if (deck && args.deckKey && args.deckKey !== deck.deckKey)
       throw new ConvexError({ code: "deck_key_conflict", message: "Deck key cannot change" })
     if (deck?.archivedAt !== undefined && !args.deleted && args.deckKey !== undefined) {
       await requireDeckCapacity(ctx, user)
@@ -1110,7 +1106,6 @@ export const syncWrite = mutation({
       }
     } else {
       deckId = deck._id
-      if (!deck.deckKey) await ctx.db.patch(deckId, { deckKey: deck.syncId ?? String(deckId) })
       if (args.deleted) await ctx.runMutation(api.decks.archive, { deckId })
       else await ctx.runMutation(api.decks.update, { deckId, ...metadata })
     }

@@ -134,6 +134,7 @@ describe("deck sync reads", () => {
     repository.saveShelf([
       {
         _id: deckId,
+        deckKey: "deck-key",
         _creationTime: 1,
         name: "Old name",
         format: "commander",
