@@ -7,6 +7,9 @@ import { guestDeckLocalId, guestDeckRouteId } from "@/features/decks/guestDeck"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { DeckDetailScreen, type DeckDetailSummary } from "@/screens/DeckDetailScreen"
 import { GuestDeckDetailScreen } from "@/screens/GuestDeckDetailScreen"
+import { goBack } from "@/utils/navigation"
+
+const leaveDeck = () => goBack("/connected/decks")
 
 export default function DeckDetailRoute() {
   const { deckId, deckName, deckGame, deckFormat, deckCardQuantity, reviewChanges } =
@@ -36,14 +39,14 @@ export default function DeckDetailRoute() {
         }
       : undefined
   return (
-    <CloudScreen onBack={() => router.back()}>
+    <CloudScreen onBack={leaveDeck}>
       {(access) => (
         <DeckDetailScreen
           access={access}
           deckId={deckId}
           summary={summary}
           reviewChanges={reviewChanges === "true"}
-          onBack={() => router.back()}
+          onBack={leaveDeck}
           onMovedToDevice={(localId) =>
             router.replace({
               pathname: "/connected/decks/[deckId]",
@@ -65,15 +68,14 @@ export default function DeckDetailRoute() {
 // why: CloudScreen blocks builds without sign-in, and a local deck must stay usable there.
 function LocalDeckDetailRoute({ localId }: { localId: string }) {
   const auth = useAuthAccess()
-  if (!auth.configured)
-    return <GuestDeckDetailScreen localId={localId} onBack={() => router.back()} />
+  if (!auth.configured) return <GuestDeckDetailScreen localId={localId} onBack={leaveDeck} />
   return (
-    <CloudScreen onBack={() => router.back()}>
+    <CloudScreen onBack={leaveDeck}>
       {(access) => (
         <GuestDeckDetailScreen
           localId={localId}
           access={access}
-          onBack={() => router.back()}
+          onBack={leaveDeck}
           onSynced={(deckId) =>
             router.replace({ pathname: "/connected/decks/[deckId]", params: { deckId } })
           }
