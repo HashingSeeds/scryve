@@ -223,6 +223,7 @@ export default {
   history: {
     title: "기록",
     addResult: "결과 추가",
+    addPastGames: "지난 게임 추가",
     source: {
       all: "전체",
       local: "로컬",

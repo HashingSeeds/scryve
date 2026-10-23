@@ -228,6 +228,7 @@ export default {
   history: {
     title: "इतिहास",
     addResult: "नतीजा जोड़ें",
+    addPastGames: "पिछले गेम जोड़ें",
     source: {
       all: "सभी",
       local: "लोकल",

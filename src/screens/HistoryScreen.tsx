@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 
+import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
@@ -56,6 +57,7 @@ export interface HistoryScreenProps {
   onSelectConnected: (publicId: string) => void
   onSelectManual: (publicId: string) => void
   onAddMatch?: () => void
+  onAddPastGames?: () => void
   connected?: ConnectedHistoryFeed
   initialSource?: HistorySource
 }
@@ -291,6 +293,7 @@ export function HistoryScreen({
   onSelectConnected,
   onSelectManual,
   onAddMatch,
+  onAddPastGames,
   connected,
   initialSource,
 }: HistoryScreenProps) {
@@ -302,6 +305,7 @@ export function HistoryScreen({
   })
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [expandedMatches, setExpandedMatches] = useState<string[]>([])
+  const [pastGamesFailed, setPastGamesFailed] = useState(false)
   const connectedPage = connected?.page
 
   const entries = useMemo(() => {
@@ -323,6 +327,15 @@ export function HistoryScreen({
     ),
   }))
   const options = useMemo(() => filterOptions(entries), [entries])
+
+  function addPastGames() {
+    try {
+      onAddPastGames?.()
+      setPastGamesFailed(false)
+    } catch {
+      setPastGamesFailed(true)
+    }
+  }
   const formats = formatChoices(options.formats, filters.systems)
   const record = tallyOutcomes(visible)
   const filterCount = activeFilterCount(filters)
@@ -431,6 +444,17 @@ export function HistoryScreen({
           <View style={themed($headerBlock)}>
             <Text preset="heading" tx="play:history.title" />
             <Text size="xs" style={themed($dimmedText)} text={countLabel} />
+            {onAddPastGames ? (
+              <TouchableOpacity
+                testID="history-add-past-games"
+                accessibilityRole="button"
+                style={$pastGames}
+                onPress={addPastGames}
+              >
+                <Text size="xs" style={themed($dimmedText)} tx="play:history.addPastGames" />
+              </TouchableOpacity>
+            ) : null}
+            {pastGamesFailed ? <AlertNote text={translate("board:claim.saveFailed")} /> : null}
             <View style={$chipRow}>
               <ScrollView
                 horizontal
@@ -795,4 +819,5 @@ const $dot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: DOT_SIZE / 2,
   backgroundColor: colors.separator,
 })
+const $pastGames: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

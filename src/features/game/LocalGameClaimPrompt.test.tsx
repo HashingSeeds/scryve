@@ -253,7 +253,7 @@ describe("LocalGameClaimPrompt", () => {
     expect(repository.pendingPublishes("owner-a")).toHaveLength(3)
   })
 
-  it("changes nothing when dismissed", () => {
+  it("changes no game when dismissed", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(finishedGame(1))
     const before = repository.loadHistory()
@@ -261,5 +261,39 @@ describe("LocalGameClaimPrompt", () => {
     fireEvent.press(screen.getByTestId("claim-games-dismiss"))
     expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
     expect(repository.loadHistory()).toEqual(before)
+  })
+
+  it("stays away after Not now or Decide later until a new game can be added", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    repository.archiveGame(finishedGame(1))
+    const first = setup(repository)
+    fireEvent.press(screen.getByTestId("claim-games-dismiss"))
+    first.unmount()
+
+    const reloaded = new LocalGameRepository(storage)
+    const second = setup(reloaded)
+    expect(second.queryByTestId("claim-games-dialog")).toBeNull()
+    second.unmount()
+
+    reloaded.archiveGame(finishedGame(10, ["Katherine", "Dorothy"]))
+    const third = setup(reloaded)
+    expect(screen.getByText("Add 1 game")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("claim-games-backdrop"))
+    third.unmount()
+    expect(setup(new LocalGameRepository(storage)).queryByTestId("claim-games-dialog")).toBeNull()
+  })
+
+  it("reopens on request, but only for the account that asked", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(finishedGame(1))
+    const view = setup(repository)
+    fireEvent.press(screen.getByTestId("claim-games-dismiss"))
+    expect(view.queryByTestId("claim-games-dialog")).toBeNull()
+
+    act(() => repository.reopenClaims("owner-b"))
+    expect(view.queryByTestId("claim-games-dialog")).toBeNull()
+    act(() => repository.reopenClaims("owner-a"))
+    expect(view.getByTestId("claim-games-dialog")).toBeTruthy()
   })
 })

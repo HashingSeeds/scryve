@@ -10,6 +10,7 @@ import {
   asOperationId,
   asPlayerId,
   createClientId,
+  hasLocalGameStarted,
   isLifeDelta,
   localGameAccount,
   MAX_COMMANDER_DAMAGE,
@@ -68,6 +69,7 @@ export const LOCAL_KEYS = {
   meSeat: "count.local.meSeat.v1",
   pendingMatchEnd: "count.local.matchEnd.v1",
   recentSetups: "count.local.recentSetups.v1",
+  deferredClaims: "count.local.claims.deferred.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
@@ -607,6 +609,7 @@ export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
 export class LocalGameRepository {
   private readonly finishListeners = new Set<() => void>()
   private readonly historyListeners = new Set<() => void>()
+  private readonly claimListeners = new Set<() => void>()
 
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
 
@@ -621,6 +624,13 @@ export class LocalGameRepository {
     this.historyListeners.add(listener)
     return () => {
       this.historyListeners.delete(listener)
+    }
+  }
+
+  onClaimsReopened(listener: () => void): () => void {
+    this.claimListeners.add(listener)
+    return () => {
+      this.claimListeners.delete(listener)
     }
   }
 
@@ -749,6 +759,11 @@ export class LocalGameRepository {
     }
     const game = parseGame(raw.game, committedEvents(events, layout.tail))
     return game?.status === "active" ? game : null
+  }
+
+  hasRunningGame(): boolean {
+    const game = this.loadActiveGame()
+    return game !== null && hasLocalGameStarted(game)
   }
 
   hasNewerActiveGame(): boolean {
@@ -881,6 +896,40 @@ export class LocalGameRepository {
         this.finishListeners.forEach((listener) => listener())
       if (changed) this.notifyHistoryChanged()
     }
+  }
+
+  loadDeferredClaims(ownerId: string): Set<string> {
+    return new Set(this.readDeferredClaims()[ownerId])
+  }
+
+  /** why: ids of games that left history are dropped on each write, so the list never outgrows it. */
+  deferClaims(ownerId: string, gameIds: readonly string[]): void {
+    const live = new Set<string>(this.loadHistory().map((game) => game.id))
+    const deferred = this.readDeferredClaims()
+    const merged = [...new Set([...(deferred[ownerId] ?? []), ...gameIds])].filter((id) =>
+      live.has(id),
+    )
+    this.writeDeferredClaims({ ...deferred, [ownerId]: merged })
+  }
+
+  reopenClaims(ownerId: string): void {
+    const kept = Object.entries(this.readDeferredClaims()).filter(([id]) => id !== ownerId)
+    this.writeDeferredClaims(Object.fromEntries(kept))
+    this.claimListeners.forEach((listener) => listener())
+  }
+
+  private readDeferredClaims(): Record<string, string[]> {
+    const raw = parseJson(this.storage.getString(LOCAL_KEYS.deferredClaims))
+    if (!isRecord(raw)) return {}
+    return Object.fromEntries(
+      Object.entries(raw).flatMap(([ownerId, ids]) =>
+        Array.isArray(ids) ? [[ownerId, ids.filter((id) => typeof id === "string")]] : [],
+      ),
+    )
+  }
+
+  private writeDeferredClaims(deferred: Record<string, string[]>): void {
+    this.storage.set(LOCAL_KEYS.deferredClaims, JSON.stringify(deferred))
   }
 
   repairClaimedDetails(ownerId: string): void {

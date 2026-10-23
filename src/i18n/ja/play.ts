@@ -224,6 +224,7 @@ export default {
   history: {
     title: "履歴",
     addResult: "結果を追加",
+    addPastGames: "過去の対戦を追加",
     source: {
       all: "すべて",
       local: "ローカル",

@@ -231,6 +231,7 @@ const play = {
   history: {
     title: "History",
     addResult: "Add result",
+    addPastGames: "Add past games",
     source: {
       all: "All",
       local: "Local",

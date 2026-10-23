@@ -233,6 +233,7 @@ export default {
   history: {
     title: "Historique",
     addResult: "Ajouter un résultat",
+    addPastGames: "Ajouter des parties passées",
     source: {
       all: "Toutes",
       local: "Locales",

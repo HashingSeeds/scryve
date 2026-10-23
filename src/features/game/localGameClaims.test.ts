@@ -97,6 +97,14 @@ describe("match units", () => {
     expect(units[1].match).toEqual(second.match)
   })
 
+  it("brings back a whole match when only some of its games were deferred", () => {
+    const deferred = new Set(["m-game-1"])
+    expect(claimableLocalUnits([first, second], "a", deferred)).toEqual([
+      expect.objectContaining({ id: "match-1", games: [first, second] }),
+    ])
+    expect(claimableLocalUnits([first, second], "a", new Set(["m-game-1", "m-game-2"]))).toEqual([])
+  })
+
   it("claims every game of the match with one seat and queues the match result", () => {
     const next = applyClaimDecisions([single, second, first], "a", [
       { id: "match-1", claim: true, meSeat: 1 },
