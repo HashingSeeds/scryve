@@ -412,6 +412,8 @@ export default {
     addCards: "+ Ajouter des cartes",
   },
   analysis: {
+    incomplete: "{{count}} cartes sur {{size}}. Les probabilités utilisent les cartes listées.",
+    noCommander: "Aucun commandant choisi. Choisissez-en un dans l'onglet Cartes.",
     curve: "Courbe de mana",
     average: "Moyenne : {{value}}",
     lands: "Terrains",

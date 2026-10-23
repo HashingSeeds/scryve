@@ -60,6 +60,28 @@ export function DeckAnalysisTab({
 
   return (
     <View testID="deck-analysis" style={themed($panel)}>
+      {analysis.incomplete || analysis.needsCommander ? (
+        <View style={themed($group)}>
+          {analysis.incomplete ? (
+            <Text
+              size="xs"
+              style={themed($dim)}
+              tx="decks:analysis.incomplete"
+              txOptions={analysis.incomplete}
+              testID="deck-analysis-incomplete"
+            />
+          ) : null}
+          {analysis.needsCommander ? (
+            <Text
+              size="xs"
+              style={themed($dim)}
+              tx="decks:analysis.noCommander"
+              testID="deck-analysis-no-commander"
+            />
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={themed($group)}>
         <View style={$between}>
           <Text size="sm" weight="medium" tx="decks:analysis.curve" />
