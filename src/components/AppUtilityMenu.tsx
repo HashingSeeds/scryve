@@ -8,6 +8,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { readPublicCloudConfig } from "@/features/auth/config"
+import { openEvents } from "@/features/events/openEvents"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
@@ -52,8 +54,13 @@ export function AppUtilityMenu({
   const storeUpdate = useStoreUpdate()
   const nearbyOnly = useNearbyOnly()
   const testsNearby = lanPlayAvailable()
+  const showsEvents = readPublicCloudConfig().configured && !nearbyOnly
   const itemCount =
-    4 + Number(Boolean(onRules)) + Number(testsNearby) + Number(Boolean(storeUpdate))
+    4 +
+    Number(Boolean(onRules)) +
+    Number(testsNearby) +
+    Number(Boolean(storeUpdate)) +
+    Number(showsEvents)
   const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
@@ -209,6 +216,21 @@ export function AppUtilityMenu({
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
             />
           </Pressable>
+          {showsEvents ? (
+            <Pressable
+              testID="utility-events-button"
+              accessibilityRole="button"
+              style={themed($item)}
+              onPress={() => choose(openEvents)}
+            >
+              <Text
+                tx="events:title"
+                weight="medium"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+              />
+            </Pressable>
+          ) : null}
           {testsNearby ? (
             <Pressable
               testID="utility-nearby-only-button"
