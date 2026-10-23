@@ -351,6 +351,16 @@ function ConfiguredConsentGate({
     setFirstSaveInFlightUserId((current) => (current === savingUserId ? undefined : current))
   }, [keepAcceptanceOnThisDevice, markAcceptancePending, syncAcceptance, userId])
 
+  useEffect(() => {
+    if (!firstSaveInFlightUserId) return
+    // why: an offline Convex mutation stays pending until reconnect, so a stalled save must still warn.
+    const timer = setTimeout(
+      () => setFirstSaveInFlightUserId(undefined),
+      ACCOUNT_CONSENT_TIMEOUT_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [firstSaveInFlightUserId])
+
   const accept = useCallback(async () => {
     setIsSubmitting(true)
     await saveNewAcceptance()
