@@ -17,6 +17,7 @@ export function FloatingAppNavigation({
   onRules,
   onHistory,
   onSettings,
+  onSupport,
   onAccount,
   accountEntry = "account",
 }: {
@@ -24,6 +25,7 @@ export function FloatingAppNavigation({
   onRules?: () => void
   onHistory: () => void
   onSettings: () => void
+  onSupport: () => void
   onAccount: () => void
   accountEntry?: AccountEntry
 }) {
@@ -49,6 +51,7 @@ export function FloatingAppNavigation({
           onRules={onRules}
           onHistory={onHistory}
           onSettings={onSettings}
+          onSupport={onSupport}
           onAccount={onAccount}
           onOpenHeightChange={setUtilityHeight}
         />

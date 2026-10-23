@@ -17,7 +17,6 @@ export default function SettingsRoute() {
     <SettingsScreen
       initialSettings={localGameRepository.loadSettings()}
       onBack={() => router.back()}
-      onOpenSupport={() => router.push("/support")}
       onOpenPrivacy={() => router.push("/privacy")}
       onOpenTerms={() => router.push("/terms")}
       onOpenLicenseAgreement={

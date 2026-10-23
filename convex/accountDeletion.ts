@@ -4,6 +4,7 @@ import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import { env, internalMutation, internalQuery, mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
+import { deleteAccountFeedback } from "./feedback"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
 import { removeDeckResult, removeUserDeckStats } from "./lib/deckResults"
@@ -563,6 +564,10 @@ export const processUserLinkedData = internalMutation({
               clientGameId: undefined,
             })
         }
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      if (await deleteAccountFeedback(ctx, request.userId)) {
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

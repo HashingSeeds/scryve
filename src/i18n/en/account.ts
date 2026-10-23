@@ -83,10 +83,6 @@ const account = {
       saveFailed: "Could not save your choice. Please try again.",
       unavailable: "Usage sharing is unavailable in this build. No PostHog events will be sent.",
     },
-    help: {
-      heading: "Help",
-      support: "Help & support",
-    },
     appInfo: {
       heading: "App information",
       analyticsId: "Analytics ID: {{id}}",
@@ -114,51 +110,10 @@ const account = {
     copyFailed: "Could not copy. Try again.",
   },
   support: {
-    pageTitle: "Scryve Help",
+    pageTitle: "Scryve Support",
     pageDescription:
-      "Learn how to get started with Scryve, find answers to common questions, or contact support.",
-    title: "Help",
-    subtitle:
-      "Answers about games, accounts, and Scryve Pro. Send us a message when you need help.",
-    contactUs: "Contact us",
-    contactReason: "Contact reason",
-    kind: {
-      bug: "Report a bug",
-      help: "Ask for help",
-      feedback: "Give feedback",
-    },
-    messageLabel: {
-      bug: "What happened?",
-      help: "How can we help?",
-      feedback: "What's on your mind?",
-    },
-    messagePlaceholder: {
-      bug: "What happened? What did you expect?",
-      help: "Tell us what you need help with",
-      feedback: "Ideas, requests, or anything else",
-    },
-    emailLabel: {
-      bug: "Email for a reply (optional)",
-      help: "Email for a reply",
-      feedback: "Email for a reply (optional)",
-    },
-    emailInvalid: "Enter a valid email address.",
-    translationNotice:
-      "Write in any language. We may use AI tools to translate it. See our <privacy>Privacy Policy</privacy>.",
-    replyTime: "We usually reply within two business days.",
-    selectedScreenshot: "Selected screenshot",
-    removeScreenshot: "Remove screenshot",
-    addScreenshot: "Add screenshot",
-    disclosure:
-      "Sends your message, email if provided, app version, build, platform, and any screenshot you add to Sentry.",
-    send: "Send",
-    preferEmail: "Prefer email?",
-    emailSupport: "Email support",
-    status: {
-      queued: "Feedback queued. If you are offline, it will send when you reconnect.",
-      saveFailed: "Could not save your message. Try again or email us.",
-      screenshotFailed: "Could not add that screenshot. Try another image.",
-    },
+      "Get started with Scryve, find answers to common questions, suggest features, or contact support.",
+    title: "Support",
     gettingStarted: {
       heading: "Getting started",
       startGame: {
@@ -194,7 +149,7 @@ const account = {
       accountPrivacy: {
         question: "Account or privacy questions",
         answer:
-          "You can manage your account from Scryve’s account screen. Contact us if you need help accessing or deleting your account.",
+          "You can manage your account from Scryve’s account screen. Email support if you need help accessing or deleting your account.",
       },
     },
     appVersion: "Scryve {{version}}",
@@ -239,6 +194,10 @@ const account = {
       local: {
         title: "Local games stay on this device",
         body: "Offline game history is stored only on this device. It is not linked to your account and is not remotely erased.",
+      },
+      feedback: {
+        title: "Feedback sent without your account stays",
+        body: "Feedback you included your account with is deleted. Anything sent without it stays with the device that sent it. To remove that, open Feature requests, then My requests, and tap Delete my feedback.",
       },
       signOut: {
         title: "All devices are signed out",
