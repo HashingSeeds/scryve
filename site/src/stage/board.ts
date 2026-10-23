@@ -23,6 +23,7 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 import { HINT_PRESS_MS, showTapHint } from "./hint"
+import { createDemoScript } from "./script"
 import {
   createPokemonSeats,
   demoId,
@@ -33,6 +34,7 @@ import {
   type MenuSpot,
   type PokemonTableEvent,
 } from "./pokemon"
+import { createCalculators, hasCalculator } from "./yugioh"
 
 // The game menu button, ported from the app's dark keystone shape
 // (src/components/GameMenuButtonShape.tsx) and three-bar glyph (GameRadialMenu.tsx),
@@ -165,6 +167,15 @@ export function createDemoGame(initial: DemoGameSetup) {
   function emit(event: GameEvent) {
     listeners.forEach((listener) => listener(event))
   }
+  // Changes a total by any amount, floored at zero.
+  function adjust(seat: number, delta: number) {
+    const current = life[seat] ?? 0
+    const next = Math.max(0, current + delta)
+    if (next === current) return
+    life = life.map((value, index) => (index === seat ? next : value))
+    history.push({ seat, delta: next - current })
+    emit({ type: "change", seat, delta: next - current })
+  }
 
   return {
     get setup() {
@@ -181,13 +192,12 @@ export function createDemoGame(initial: DemoGameSetup) {
       return () => listeners.delete(listener)
     },
     change(seat: number, direction: 1 | -1) {
-      const delta = direction * playSystemRules(setup.system).counter.tapStep
-      const current = life[seat] ?? 0
-      const next = Math.max(0, current + delta)
-      if (next === current) return
-      life = life.map((value, index) => (index === seat ? next : value))
-      history.push({ seat, delta: next - current })
-      emit({ type: "change", seat, delta: next - current })
+      adjust(seat, direction * playSystemRules(setup.system).counter.tapStep)
+    },
+    adjust,
+    // A seat's changes since the game last reset, oldest first, for the calculator's trail.
+    lifeChanges(seat: number) {
+      return history.flatMap((change) => (change.seat === seat ? change.delta : []))
     },
     undo() {
       const last = history.pop()
@@ -237,11 +247,16 @@ export function createDemoGame(initial: DemoGameSetup) {
     },
     // The whole game as it stands, for `restore` to put back after a demo borrows the board.
     snapshot() {
-      return { setup, life, table }
+      return { setup, life, table, history: [...history] }
     },
-    restore(saved: { setup: typeof setup; life: typeof life; table: typeof table }) {
+    restore(saved: {
+      setup: typeof setup
+      life: typeof life
+      table: typeof table
+      history: typeof history
+    }) {
       ;({ setup, life, table } = saved)
-      history.length = 0
+      history.splice(0, history.length, ...saved.history)
       emit({ type: "reset" })
     },
   }
@@ -430,30 +445,25 @@ export interface CommanderDemoOptions {
 // Plays the commander damage sequence on `board` while armed with `start()`, and puts the
 // board back with `stop()`. It layers markup over the board's seats instead of re-rendering,
 // so everything can fade. It replays whenever the game resets (the pickers change the board),
-// and hands back the life it took so replaying always starts from the same board.
+// and hands back the life it took so replaying always starts from the same board. The visitor's
+// own tap ends assign mode where it stands, with the damage dealt so far on each seat's strip.
 export function createCommanderDemo(
   board: HTMLElement,
   game: DemoGame,
   { damage, reducedMotion }: CommanderDemoOptions,
 ) {
   let active = false
-  const timers = new Set<number>()
   const owed = new Map<number, number>()
-
-  const later = (ms: number, run: () => void) => {
-    const id = window.setTimeout(() => {
-      timers.delete(id)
-      run()
-    }, ms)
-    timers.add(id)
-  }
-  const clearTimers = () => {
-    timers.forEach((id) => window.clearTimeout(id))
-    timers.clear()
-  }
+  // Leaves assign mode with the damage dealt so far, while a run is still in it.
+  let finish: (() => void) | undefined
+  const script = createDemoScript(board, {
+    onHalt() {
+      finish?.()
+      finish = undefined
+    },
+  })
+  const later = script.later
   const layers = () => board.querySelectorAll<HTMLElement>(".cmd-overlay, .cmd-strip")
-  // The hand fades on its own, so leftovers are simply dropped.
-  const dropHints = () => board.querySelectorAll(".tap-hint").forEach((hint) => hint.remove())
   const seatEl = (seat: number) => board.querySelector<HTMLElement>(`.seat[data-player="${seat}"]`)
 
   // Mounts markup hidden, then fades it in on the next style flush.
@@ -482,15 +492,15 @@ export function createCommanderDemo(
     return owed.size > 0
   }
   function play() {
-    clearTimers()
+    script.start()
+    finish = undefined
     layers().forEach((el) => el.remove())
-    dropHints()
     while (owed.size > 0) giveBack()
     const rows = seatRows(game)
     const seats = rows.flat()
     const count = game.setup.names.length
     const source = seats.filter(({ rotation }) => rotation === 0).at(-1) ?? seats.at(-1)
-    if (!active || game.setup.system !== "mtg" || !source) return
+    if (!active || game.setup.system !== "mtg" || !source) return script.end()
 
     // Opponents in seat order starting after the source, so the damage lands across the board.
     const targets = Array.from(
@@ -527,7 +537,7 @@ export function createCommanderDemo(
         for (let tap = 0; tap < (damage[index] ?? 0); tap++) deal(seat)
       })
       showStrips()
-      return
+      return script.end()
     }
 
     const overlays = [
@@ -536,6 +546,10 @@ export function createCommanderDemo(
         mount(target.seat, commanderTarget(game, source, target), "inner"),
       ),
     ]
+    finish = () => {
+      overlays.forEach((el) => el && fadeOut(el))
+      showStrips()
+    }
     // The hand taps the attacker's mark to start assigning, as in the app, taps + on each
     // opponent for their damage, then taps Done. Each step lands on one of its presses.
     const hint = (at: number, target: Element | null | undefined, presses = 1) =>
@@ -569,15 +583,17 @@ export function createCommanderDemo(
     later(at, () => overlays[0]?.classList.add("pressed"))
     at += COMMANDER_DEMO_TAP_MS * 1.5
     later(at, () => {
-      overlays.forEach((el) => el && fadeOut(el))
-      showStrips()
+      script.end()
+      finish?.()
+      finish = undefined
     })
   }
 
   // A reset re-renders the board, which drops the layers and returns the life.
   game.subscribe((event) => {
     if (event.type !== "reset") return
-    clearTimers()
+    script.cancel()
+    finish = undefined
     owed.clear()
     if (active) later(0, play)
   })
@@ -589,8 +605,8 @@ export function createCommanderDemo(
     },
     stop() {
       active = false
-      clearTimers()
-      dropHints()
+      script.cancel()
+      finish = undefined
       layers().forEach(fadeOut)
     },
   }
@@ -617,7 +633,12 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
   const recent = new Map<number, { total: number; timer: number }>()
   const placements = new Map<number, SeatPlacement>()
   const pokemon = createPokemonSeats(game, (seat) => renderSeat(seat))
+  const calculators = createCalculators(el, game)
   const isPokemon = () => game.setup.system === "pokemon"
+  // The board is the app's 390 point wide screen, scaled, so the calculator can size in points.
+  new ResizeObserver(() => el.style.setProperty("--app-pt", `${el.offsetWidth / 390}px`)).observe(
+    el,
+  )
 
   function pokemonHtml(placement: SeatPlacement) {
     return pokemon.html({
@@ -630,8 +651,12 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
   function seatHtml(placement: SeatPlacement) {
     const { seat, rotation } = placement
     const inner = isPokemon() ? pokemonHtml(placement) : seatInnerHtml(game, seat, interactive)
+    const calculator =
+      interactive && !isPokemon() && hasCalculator(game.setup.system)
+        ? calculators.html({ ...placement, name: seatName(game, seat), color: seatColor(seat) })
+        : ""
     return `<div class="seat${isPokemon() ? " pk-seat" : ""}" data-player="${seat}" data-rotation="${rotation}" style="--seat:${seatColor(seat)}"${interactive ? "" : " inert"}>
-    <div class="seat-in">${inner}</div>
+    <div class="seat-in">${inner}${calculator}</div>
   </div>`
   }
 
@@ -693,6 +718,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
 
   function showChange(seat: number, delta: number) {
     if (isPokemon()) return renderSeat(seat)
+    calculators.onChange(seat)
     const life = el.querySelector<HTMLElement>(`[data-life="${seat}"]`)
     if (!life) return
     const value = String(game.life[seat] ?? 0)
@@ -715,9 +741,20 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     const target = event.target as Element
     const control = target.closest<HTMLElement>("[data-pk]")
     if (control) return pokemon.click(control)
+    const calculator = target.closest<HTMLElement>("[data-calc]")
+    if (calculator) return calculators.click(calculator, event.isTrusted && event.detail === 0)
     const hit = target.closest<HTMLElement>(".hit")
     if (!hit) return
     game.change(Number(hit.dataset.seat), hit.dataset.dir === "1" ? 1 : -1)
+  })
+  // Escape closes a calculator before the page's own Escape handling sees it.
+  el.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Escape" &&
+      event.target instanceof Element &&
+      calculators.escape(event.target)
+    )
+      event.stopPropagation()
   })
   game.subscribe((event) => {
     if (event.type === "change") return showChange(event.seat, event.delta)
@@ -725,6 +762,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     recent.forEach(({ timer }) => window.clearTimeout(timer))
     recent.clear()
     pokemon.reset()
+    calculators.reset()
     render()
   })
   render()
