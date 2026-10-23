@@ -59,6 +59,7 @@ export interface HubEvent {
   readonly tables: readonly HubTable[]
   readonly createdAt: number
   readonly finishedAt?: number
+  readonly removedTokens?: readonly string[]
 }
 
 export type HubCommand =
@@ -134,6 +135,7 @@ export function joinHub(
 ): { event: HubEvent; playerId: string } {
   const existing = event.players.find((player) => player.token === device.token)
   if (existing) return { event, playerId: existing.id }
+  if (event.removedTokens?.includes(device.token)) throw new Error("You left this event")
   assertCanAddPlayer(event.status, event.players.length)
   const player: HubPlayer = {
     id: newPlayerId,
@@ -142,6 +144,27 @@ export function joinHub(
     token: device.token,
   }
   return { event: { ...event, players: [...event.players, player] }, playerId: player.id }
+}
+
+// why: a guest's result is untrusted; keeping only known fields stops junk from being stored and later failing the Convex import.
+function ownResult(result: unknown): TableResult {
+  if (typeof result !== "object" || result === null) throw new Error("Enter a valid result")
+  const value = result as Record<string, unknown>
+  switch (value.kind) {
+    case "match":
+      if (!Array.isArray(value.gamesWon) || typeof value.gamesDrawn !== "number") break
+      return {
+        kind: "match",
+        gamesWon: value.gamesWon.map((won) => (typeof won === "number" ? won : NaN)),
+        gamesDrawn: value.gamesDrawn,
+      }
+    case "pod":
+      if (value.winnerSeat !== null && typeof value.winnerSeat !== "number") break
+      return { kind: "pod", winnerSeat: value.winnerSeat }
+    case "doubleLoss":
+      return { kind: "doubleLoss" }
+  }
+  throw new Error("Enter a valid result")
 }
 
 function playerById(event: HubEvent, playerId: string) {
@@ -208,8 +231,15 @@ export function applyHubCommand(
       if (actor.kind === "player" && actor.playerId !== player.id)
         throw new Error("Only the organizer can drop another player")
       assertOpen(event)
+      // why: a removed player's device reconnects on its own, and its token must not bring them back.
       if (event.round === 0)
-        return { ...event, players: event.players.filter(({ id }) => id !== player.id) }
+        return {
+          ...event,
+          players: event.players.filter(({ id }) => id !== player.id),
+          removedTokens: player.token
+            ? [...(event.removedTokens ?? []), player.token]
+            : event.removedTokens,
+        }
       return player.droppedAt === undefined
         ? withPlayer(event, { ...player, droppedAt: now })
         : event
@@ -245,9 +275,9 @@ export function applyHubCommand(
     case "report": {
       const table = tableById(event, command.tableId)
       const result =
-        command.result && assertResult(table, command.result, settingsOf(event), eventRules("mtg"))
-      // why: a guest's message is untrusted, and assertResult returns nothing for a kind it doesn't know.
-      if (result === undefined) throw new Error("Enter a valid result")
+        command.result === null
+          ? null
+          : assertResult(table, ownResult(command.result), settingsOf(event), eventRules("mtg"))
       const patch = reportResult({ status: event.status, round: event.round, table }, actor, result)
       return withTable(event, { ...table, ...patch })
     }

@@ -26,7 +26,7 @@ export function NearbyEventsScreen({
   onOpenHosted,
   onJoin,
 }: {
-  hosted: { name: string; detail: string } | null
+  hosted: { name: string; detail: string; running: boolean } | null
   events: readonly Service[]
   denied: boolean
   name: string
@@ -63,6 +63,7 @@ export function NearbyEventsScreen({
           testID="host-nearby-event"
           tx="events:nearby.host"
           preset="reversed"
+          disabled={hosted?.running}
           onPress={onHost}
         />
       }

@@ -107,6 +107,43 @@ describe("nearby hub event", () => {
     ).toThrow("Enter a valid result")
   })
 
+  it("stores only the fields a result has, and refuses one that isn't there", () => {
+    const event = applyHubCommand(
+      withPlayers(swiss(), ["Ada", "Grace"]),
+      organizer,
+      { kind: "startRound" },
+      NOW,
+    )
+    const table = event.tables[0]!
+    const player = { kind: "player", playerId: table.playerIds[0]! } as const
+    const padded = { kind: "match", gamesWon: [2, 0], gamesDrawn: 0, junk: "x" } as unknown as null
+    const reported = applyHubCommand(
+      event,
+      player,
+      { kind: "report", tableId: table.id, result: padded },
+      NOW,
+    )
+
+    expect(reported.tables[0]!.result).toEqual({ kind: "match", gamesWon: [2, 0], gamesDrawn: 0 })
+    expect(() =>
+      applyHubCommand(
+        event,
+        player,
+        { kind: "report", tableId: table.id, result: false as unknown as null },
+        NOW,
+      ),
+    ).toThrow("Enter a valid result")
+  })
+
+  it("keeps a player removed before round 1 from rejoining on reconnect", () => {
+    const registered = withPlayers(swiss(), ["Ada", "Grace"])
+    const removed = applyHubCommand(registered, organizer, { kind: "drop", playerId: "p-Ada" }, NOW)
+
+    expect(() => joinHub(removed, { name: "Ada", token: "token-for-Ada-0000" }, "p-again")).toThrow(
+      "You left this event",
+    )
+  })
+
   it("removes a player who drops before round 1 and keeps one who drops later", () => {
     const registered = withPlayers(swiss(), ["Ada", "Grace", "Lin"])
     const left = applyHubCommand(

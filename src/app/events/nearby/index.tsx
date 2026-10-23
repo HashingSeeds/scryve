@@ -22,7 +22,15 @@ export default function NearbyEventsRoute() {
   const [name, setName] = useState(loadLanName)
   return (
     <NearbyEventsScreen
-      hosted={event ? { name: event.name, detail: eventStatusText(event) } : null}
+      hosted={
+        event
+          ? {
+              name: event.name,
+              detail: eventStatusText(event),
+              running: event.status !== "finished",
+            }
+          : null
+      }
       events={events}
       denied={denied}
       name={name}

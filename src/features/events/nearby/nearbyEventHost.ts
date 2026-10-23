@@ -72,6 +72,8 @@ class NearbyEventHost {
   }
 
   async create(event: HubEvent, organizerPlays: { name: string } | null) {
+    if (this.state.event && this.state.event.status !== "finished")
+      throw new Error("Finish the event this device is running first")
     let next = event
     let hostPlayerId: string | null = null
     if (organizerPlays) {
@@ -146,6 +148,7 @@ class NearbyEventHost {
     const { event } = this.state
     if (!event) return peer.sendAndClose({ t: "rejected", reason: "closed" })
     if (message.t === "hello") {
+      if (guest.playerId) return
       if (message.v !== NEARBY_EVENT_PROTOCOL)
         return peer.sendAndClose({ t: "rejected", reason: "protocol" })
       if (message.code.toUpperCase() !== event.code)
@@ -177,18 +180,32 @@ class NearbyEventHost {
     }
   }
 
-  private message(event: HubEvent, playerId: string | null): NearbyHostMessage {
-    const view = hubView(event, { organizer: false, playerId })
-    return { t: "view", view, standings: hubStandings(event, standingsThroughRound(view)) }
+  private sendView(
+    peer: LanConnection<NearbyHostMessage>,
+    guest: Guest,
+    standings = this.standings(),
+  ) {
+    const { event } = this.state
+    if (!event || !guest.playerId || !standings) return
+    peer.send({
+      t: "view",
+      view: hubView(event, { organizer: false, playerId: guest.playerId }),
+      standings,
+    })
   }
 
-  private sendView(peer: LanConnection<NearbyHostMessage>, guest: Guest) {
-    if (this.state.event && guest.playerId)
-      peer.send(this.message(this.state.event, guest.playerId))
+  private standings() {
+    const { event } = this.state
+    if (!event) return undefined
+    return hubStandings(
+      event,
+      standingsThroughRound(hubView(event, { organizer: true, playerId: null })),
+    )
   }
 
   private broadcast() {
-    for (const [peer, guest] of this.guests) this.sendView(peer, guest)
+    const standings = this.standings()
+    for (const [peer, guest] of this.guests) this.sendView(peer, guest, standings)
   }
 }
 
