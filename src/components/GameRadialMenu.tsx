@@ -40,6 +40,7 @@ import {
   GameMenuButtonShape,
   mixColorsInLinearLight,
   PENTAGON_BADGE_ANCHOR,
+  PENTAGON_RADIUS_SHARE,
 } from "./GameMenuButtonShape"
 import { Text } from "./Text"
 
@@ -632,6 +633,7 @@ function GameMenuAnchor({
         ) : null}
         <Animated.View style={barsStyle}>
           <MenuGlyph
+            buttonSize={compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE}
             color={colors.gameMenu.anchorGlyph}
             pose={menuOpen ? 1 : exitAction && !heldTool ? -1 : 0}
             animateFully={animateFully}
@@ -700,18 +702,33 @@ function SignalledMenuButtonShape({
 
 const GLYPH_MORPH_SPRING = { damping: 16, stiffness: 220, mass: 0.5 } as const
 
+// why: the splash hands off to this button, so the bars keep splash-ios-source.svg's proportions.
+const SPLASH_MENU_GLYPH = { pentagonRadius: 92, barWidth: 70, barHeight: 10, pitch: 26 } as const
+
+function menuGlyphSize(buttonSize: number) {
+  const splashUnit = (buttonSize * PENTAGON_RADIUS_SHARE) / SPLASH_MENU_GLYPH.pentagonRadius
+  return {
+    barWidth: SPLASH_MENU_GLYPH.barWidth * splashUnit,
+    barHeight: SPLASH_MENU_GLYPH.barHeight * splashUnit,
+    pitch: SPLASH_MENU_GLYPH.pitch * splashUnit,
+  }
+}
+
 function MenuGlyph({
+  buttonSize,
   color,
   pose,
   animateFully,
   reducedMotion,
 }: {
+  buttonSize: number
   color: string
   pose: -1 | 0 | 1
   animateFully: boolean
   reducedMotion: ReducedMotionPreference
 }) {
   const morph = useSharedValue(pose)
+  const { barWidth, barHeight, pitch } = menuGlyphSize(buttonSize)
 
   useEffect(() => {
     morph.value = animateFully
@@ -722,21 +739,41 @@ function MenuGlyph({
   }, [animateFully, morph, pose, reducedMotion])
 
   const topBar = useAnimatedStyle(() => ({
-    transform: [{ translateY: 5 * Math.abs(morph.value) }, { rotate: `${45 * morph.value}deg` }],
+    transform: [
+      { translateY: pitch * Math.abs(morph.value) },
+      { rotate: `${45 * morph.value}deg` },
+    ],
   }))
   const midBar = useAnimatedStyle(() => ({
     opacity: 1 - Math.abs(morph.value),
     transform: [{ scaleX: 1 - 0.6 * Math.abs(morph.value) }],
   }))
   const bottomBar = useAnimatedStyle(() => ({
-    transform: [{ translateY: -5 * Math.abs(morph.value) }, { rotate: `${-45 * morph.value}deg` }],
+    transform: [
+      { translateY: -pitch * Math.abs(morph.value) },
+      { rotate: `${-45 * morph.value}deg` },
+    ],
   }))
 
   return (
-    <View testID="game-menu-glyph" style={$menuGlyph}>
-      <Animated.View style={[$menuGlyphBar, { backgroundColor: color }, topBar]} />
-      <Animated.View style={[$menuGlyphBar, { backgroundColor: color }, midBar]} />
-      <Animated.View style={[$menuGlyphBar, { backgroundColor: color }, bottomBar]} />
+    <View
+      testID="game-menu-glyph"
+      style={[$menuGlyph, { width: barWidth, height: barWidth, gap: pitch - barHeight }]}
+    >
+      {[topBar, midBar, bottomBar].map((barStyle, index) => (
+        <Animated.View
+          key={index}
+          style={[
+            {
+              width: barWidth,
+              height: barHeight,
+              borderRadius: barHeight / 2,
+              backgroundColor: color,
+            },
+            barStyle,
+          ]}
+        />
+      ))}
     </View>
   )
 }
@@ -1159,16 +1196,8 @@ const $menuButtonPressed: ViewStyle = {
   transform: [{ scale: 0.93 }],
 }
 const $menuGlyph: ViewStyle = {
-  width: 24,
-  height: 24,
   alignItems: "center",
   justifyContent: "center",
-  gap: 3,
-}
-const $menuGlyphBar: ViewStyle = {
-  width: 16,
-  height: 2,
-  borderRadius: 1,
 }
 const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",

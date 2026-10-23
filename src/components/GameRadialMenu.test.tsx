@@ -116,14 +116,15 @@ describe("GameRadialMenu", () => {
     expect(view.queryByTestId("game-menu-bevel")).toBeNull()
   })
 
-  it("keeps the menu glyph in centered square bounds", () => {
+  it("draws the menu glyph at the splash's proportions", () => {
     const view = render(menu(false))
     const glyph = view.getByTestId("game-menu-glyph")
     const glyphStyle = StyleSheet.flatten(glyph.props.style)
 
     expect(glyphStyle).toMatchObject({
-      width: 24,
-      height: 24,
+      width: 28,
+      height: 28,
+      gap: 6.4,
       alignItems: "center",
       justifyContent: "center",
     })
