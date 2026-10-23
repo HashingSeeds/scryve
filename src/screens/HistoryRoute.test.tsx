@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react-native"
 
+import HistoryRoute from "@/app/history/index"
 import {
   applyGameCommand,
   asDeviceId,
@@ -9,8 +10,6 @@ import {
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { HistoryScreen } from "@/screens/HistoryScreen"
 import { storage } from "@/utils/storage"
-
-import HistoryRoute from "./index"
 
 const mockHistoryProps = jest.fn()
 jest.mock("@/features/auth/AuthContext", () => ({
