@@ -136,6 +136,7 @@ export default {
     currentVersion: "現在のバージョン",
     current: "現在 ›",
     maybeDeleted: "このデッキは削除された可能性があります。",
+    newList: "新しいリストです。これまでの結果は以前のリストに残ります。",
     loadFailed: "このデッキを読み込めませんでした。",
     editList: "リストを編集",
     offlineCard: "オフラインです。デッキに入っているカードは追加できます。",

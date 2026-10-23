@@ -18,6 +18,7 @@ import {
   reseedDeckDraft,
   restoreDraftUndo,
   setDraftNote,
+  startsNewList,
 } from "./deckDraft"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 
@@ -255,5 +256,25 @@ describe("planDeckSave", () => {
         canQueueNote: true,
       }),
     ).toEqual({ cards: "mutation", note: "queue", immediate: false })
+  })
+})
+
+describe("startsNewList", () => {
+  const base = [card("Forest", { cardId: "forest", quantity: 4 })]
+
+  it.each([
+    ["a quantity change", [card("Forest", { cardId: "forest", quantity: 5 })]],
+    ["a new card", [...base, card("Island", { cardId: "island" })]],
+    ["a section move", [card("Forest", { cardId: "forest", quantity: 4, board: "sideboard" })]],
+    ["a commander color", [card("Forest", { cardId: "forest", quantity: 4, commanderColor: "G" })]],
+  ])("is true for %s", (_, cards) => {
+    expect(startsNewList(base, cards, "mtg")).toBe(true)
+  })
+
+  it("is false when only the printing changes", () => {
+    const reprint = [
+      card("Forest", { cardId: "forest", quantity: 4, scryfallId: "other-printing" }),
+    ]
+    expect(startsNewList(base, reprint, "mtg")).toBe(false)
   })
 })

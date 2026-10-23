@@ -38,6 +38,7 @@ import {
   reseedDeckDraft,
   restoreDraftUndo,
   setDraftNote,
+  startsNewList,
   type DeckDraft,
 } from "@/features/decks/deckDraft"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
@@ -81,6 +82,8 @@ type DeckDialog =
   | "moveDeck"
   | "discard"
   | "syncConflict"
+
+const NEW_LIST_NOTICE_MS = 8_000
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -348,6 +351,7 @@ function DeckDetailContent({
   const [choosingCommander, setChoosingCommander] = useState(false)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
   const [error, setError] = useState<string>()
+  const [newListNotice, setNewListNotice] = useState(false)
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
   const metadataSaveStarted = useRef(false)
@@ -389,6 +393,11 @@ function DeckDetailContent({
     ...versionWrites.pending.map((write) => write.deckId),
     ...versionWrites.failures.map((failure) => failure.action.deckId),
   ].includes(deckId as Id<"decks">)
+  useEffect(() => {
+    if (!newListNotice) return
+    const timeout = setTimeout(() => setNewListNotice(false), NEW_LIST_NOTICE_MS)
+    return () => clearTimeout(timeout)
+  }, [newListNotice])
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
   useEffect(() => {
@@ -481,6 +490,7 @@ function DeckDetailContent({
     if (knownDeleted) return
     metadataSaveStarted.current = false
     pinVersionTarget()
+    setNewListNotice(false)
     setDraft(
       openDeckDraft({
         cards: displayCards,
@@ -584,8 +594,10 @@ function DeckDetailContent({
       canQueueCards: view.canQueueVersions && Boolean(cardTarget),
       canQueueNote: view.canQueueMetadata && noteRevision !== undefined,
     })
+    const newList = plan.cards !== "none" && startsNewList(draft.base, draft.cards, game)
     const finish = () => {
       captureAnalytics("deck_used", { feature: "saved" })
+      setNewListNotice(newList)
       setDraft(closeDeckDraft)
     }
     if (plan.immediate) {
@@ -627,6 +639,7 @@ function DeckDetailContent({
   }
 
   function chooseVersion(versionId: string) {
+    setNewListNotice(false)
     setSelectedVersionId(versionId as Id<"deckVersions">)
   }
 
@@ -878,9 +891,12 @@ function DeckDetailContent({
             : undefined
         }
         error={
-          dialog === "none" && (error || syncError) ? (
+          dialog === "none" && (error || syncError || newListNotice) ? (
             <View style={themed($syncFailure)}>
               {error ? <AlertNote text={error} /> : null}
+              {newListNotice ? (
+                <AlertNote tone="info" text={translate("decks:detail.newList")} />
+              ) : null}
               {syncError}
             </View>
           ) : undefined

@@ -133,6 +133,7 @@ export default {
     currentVersion: "현재 버전",
     current: "현재 ›",
     maybeDeleted: "이 덱이 삭제되었을 수 있습니다.",
+    newList: "새 리스트입니다. 이전 결과는 기존 리스트에 그대로 남습니다.",
     loadFailed: "이 덱을 불러오지 못했습니다.",
     editList: "목록 편집",
     offlineCard: "오프라인 상태입니다. 내 덱에 이미 있는 카드만 추가할 수 있습니다.",
