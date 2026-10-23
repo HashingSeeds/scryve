@@ -1,6 +1,6 @@
 import { clear, save } from "@/utils/storage"
 
-import { cardChanges, lookupListSnapshot, saveListSnapshot } from "./listSnapshots"
+import { lookupListSnapshot, saveListSnapshot } from "./listSnapshots"
 
 const mockLocals = jest.fn(
   () =>
@@ -66,32 +66,4 @@ it("ignores malformed persisted snapshots", async () => {
     { fingerprint: "bad", cards: [{ name: "Bolt", quantity: -1 }] },
   ])
   expect(await lookupListSnapshot("key", "bad", "owner")).toBeUndefined()
-})
-
-it("diffs quantities and sections without treating printing changes as card changes", () => {
-  expect(
-    cardChanges(
-      [
-        { name: "Bolt", oracleId: "bolt", scryfallId: "new", quantity: 4 },
-        { name: "Ring", quantity: 1 },
-      ],
-      [
-        { name: "Bolt", oracleId: "bolt", scryfallId: "old", quantity: 2 },
-        { name: "Land", quantity: 1 },
-      ],
-    ),
-  ).toEqual([
-    { name: "Bolt", quantity: 2 },
-    { name: "Ring", quantity: 1 },
-    { name: "Land", quantity: -1 },
-  ])
-  expect(
-    cardChanges(
-      [{ name: "Bolt", quantity: 2 }],
-      [
-        { name: "Bolt", quantity: 1 },
-        { name: "Bolt", quantity: 1 },
-      ],
-    ),
-  ).toEqual([])
 })

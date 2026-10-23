@@ -31,7 +31,7 @@ export default {
     podSize: "Tamaño de mesa",
     sources: "Origen",
     current: "Actual",
-    previous: "Anterior",
+    moreChanges: "{{count}} más",
     notTracked: "Sin registrar",
     dateSpan: "{{first}} a {{last}}",
     players_one: "{{count}} jugador",

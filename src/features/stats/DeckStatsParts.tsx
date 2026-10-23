@@ -12,7 +12,9 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { formatCardChange } from "./cardChanges"
 import { honestRate, type listStats, type RecordCounts } from "./deckStatsMath"
+import type { LabeledList } from "./listLabels"
 
 export type DeckStatsParams = { deckKey: string; deckName: string; game: string; format: string }
 
@@ -28,10 +30,20 @@ export function listDateSpan(row: ReturnType<typeof listStats>[number]) {
   return first === last ? first : translate("decks:stats.dateSpan", { first, last })
 }
 
-export function listLabel(row: ReturnType<typeof listStats>[number]) {
-  return row.label === "dated"
-    ? listDateSpan(row)
-    : translate(`decks:stats.${row.label === "untracked" ? "notTracked" : row.label}`)
+export function listLabel(row: LabeledList) {
+  if (row.kind === "dated") return listDateSpan(row)
+  return translate(row.kind === "current" ? "decks:stats.current" : "decks:stats.notTracked")
+}
+
+const SHOWN_CHANGES = 3
+
+export function listDetail(row: LabeledList) {
+  const shown = row.changes.slice(0, SHOWN_CHANGES).map(formatCardChange)
+  const more = row.changes.length - shown.length
+  const changes = [...shown, more > 0 ? translate("decks:stats.moreChanges", { count: more }) : ""]
+    .filter(Boolean)
+    .join(", ")
+  return [row.kind === "dated" ? "" : listDateSpan(row), changes].filter(Boolean).join(" · ")
 }
 
 export function HonestRate({ record }: { record: RecordCounts }) {

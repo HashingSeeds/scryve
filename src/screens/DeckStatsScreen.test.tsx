@@ -13,6 +13,11 @@ const mockPush = jest.fn()
 const mockLoadMore = jest.fn()
 const mockPaywall = jest.fn(async () => undefined)
 const mockPagination = jest.fn()
+let mockListCards: {
+  currentFingerprint?: string
+  cards: Map<string, { name: string; quantity: number }[]>
+} = { cards: new Map() }
+jest.mock("@/features/stats/useListCards", () => ({ useListCards: () => mockListCards }))
 let mockPremium = true
 let mockSummary: typeof deckStatsSummary | undefined = deckStatsSummary
 let mockError = false
@@ -95,6 +100,7 @@ beforeEach(() => {
   mockError = false
   mockEmptyGames = false
   mockGamesStatus = "CanLoadMore"
+  mockListCards = { cards: new Map() }
 })
 
 it("shows one record with games and manual results together, and filters paginated games", () => {
@@ -121,6 +127,28 @@ it("shows one record with games and manual results together, and filters paginat
     { deckKey: "key", fingerprint: null },
     { initialNumItems: 20 },
   )
+})
+
+it("calls a list Current only when it is the deck's current list, and says what changed", () => {
+  const view = render(screen())
+  expect(view.queryByText("Current")).toBeNull()
+  mockListCards = {
+    currentFingerprint: "previous",
+    cards: new Map([
+      ["current", [{ name: "Forest", quantity: 2 }]],
+      [
+        "previous",
+        [
+          { name: "Forest", quantity: 1 },
+          { name: "Plains", quantity: 1 },
+        ],
+      ],
+    ]),
+  }
+  view.rerender(screen())
+  expect(within(view.getByTestId("stats-list-previous")).getByText("Current")).toBeTruthy()
+  expect(within(view.getByTestId("stats-list-current")).queryByText("Current")).toBeNull()
+  expect(view.getByText("+1 Forest, −1 Plains")).toBeTruthy()
 })
 
 it("breaks the record down by source once, and filters games by it", () => {

@@ -27,7 +27,7 @@ export default {
     podSize: "プレイヤー数",
     sources: "記録元",
     current: "現在",
-    previous: "前回",
+    moreChanges: "他{{count}}件",
     notTracked: "未記録",
     dateSpan: "{{first}}〜{{last}}",
     players_other: "{{count}}人",

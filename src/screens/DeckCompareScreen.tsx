@@ -13,6 +13,7 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import type { DeckCard } from "@/features/decks/deckCards"
+import { cardChanges, formatCardChange } from "@/features/stats/cardChanges"
 import {
   likelyRange,
   listStats,
@@ -29,7 +30,9 @@ import {
   StatsSection,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
-import { cardChanges, lookupListSnapshot } from "@/features/stats/listSnapshots"
+import { fingerprintsToRead, labelLists, type LabeledList } from "@/features/stats/listLabels"
+import { lookupListSnapshot } from "@/features/stats/listSnapshots"
+import { useListCards } from "@/features/stats/useListCards"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -80,7 +83,11 @@ function CompareQuery(props: Props) {
 
 function CompareLists({ summary, access, deckKey, deckName }: Props & { summary: DeckSummary }) {
   const { themed } = useAppTheme()
-  const lists = listStats(summary)
+  const listRows = listStats(summary)
+  const lists = labelLists(
+    listRows,
+    useListCards(deckKey, access.ownerId, fingerprintsToRead(listRows)),
+  )
   const [leftId, setLeftId] = useState<string | null | undefined>()
   const [rightId, setRightId] = useState<string | null | undefined>()
   const [picking, setPicking] = useState<"left" | "right">()
@@ -166,7 +173,7 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
                   key={`${change.name}:${index}`}
                   size="sm"
                   style={themed(change.quantity > 0 ? $added : $removed)}
-                  text={`${change.quantity > 0 ? "+" : "−"}${Math.abs(change.quantity)} ${change.name}`}
+                  text={formatCardChange(change)}
                 />
               ))
             ) : (
@@ -253,7 +260,7 @@ const $added: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success 
 const $removed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
 const PICKER_SIDES = ["left", "right"] as const
-function pickerLabel(list: ReturnType<typeof listStats>[number]) {
+function pickerLabel(list: LabeledList) {
   return `${listLabel(list)} ▾`
 }
 

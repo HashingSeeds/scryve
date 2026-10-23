@@ -29,7 +29,7 @@ export default {
     podSize: "खिलाड़ियों की संख्या",
     sources: "स्रोत",
     current: "वर्तमान",
-    previous: "पिछली",
+    moreChanges: "{{count}} और",
     notTracked: "दर्ज नहीं",
     dateSpan: "{{first}} से {{last}}",
     players_one: "{{count}} खिलाड़ी",

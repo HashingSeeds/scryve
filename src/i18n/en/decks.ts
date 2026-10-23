@@ -26,7 +26,7 @@ const decks = {
     podSize: "Pod size",
     sources: "Source",
     current: "Current",
-    previous: "Previous",
+    moreChanges: "{{count}} more",
     notTracked: "Not tracked",
     dateSpan: "{{first}} to {{last}}",
     players_one: "{{count}} player",

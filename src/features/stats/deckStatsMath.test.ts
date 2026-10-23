@@ -110,23 +110,23 @@ it("counts manual results as matches, like the breakdown rows", () => {
   expect(exactRecord(row, "manual")).toEqual({ games: 5, wins: 3, losses: 2, draws: 0 })
 })
 
-it("orders tracked lists by last played and gives untracked its own label", () => {
+it("orders lists by last played, untracked results included", () => {
   const summary: DeckSummary = {
     all: null,
     lists: [],
     scannedAll: true,
     slices: [
       slice({ fingerprint: "old", lastAt: 10 }),
-      slice({ fingerprint: "current", lastAt: 30 }),
+      slice({ fingerprint: "newest", lastAt: 30 }),
       slice({ fingerprint: null, lastAt: 40 }),
-      slice({ fingerprint: "previous", lastAt: 20 }),
+      slice({ fingerprint: "middle", lastAt: 20 }),
     ],
   }
-  expect(listStats(summary, "all").map(({ fingerprint, label }) => [fingerprint, label])).toEqual([
-    [null, "untracked"],
-    ["current", "current"],
-    ["previous", "previous"],
-    ["old", "dated"],
+  expect(listStats(summary).map(({ fingerprint }) => fingerprint)).toEqual([
+    null,
+    "newest",
+    "middle",
+    "old",
   ])
 })
 

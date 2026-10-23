@@ -28,13 +28,15 @@ import {
   $numbers,
   $statsRow,
   DeckComparePrompt,
-  listDateSpan,
+  listDetail,
   listLabel,
   statsDate,
   StatsRow,
   StatsSection,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
+import { fingerprintsToRead, labelLists } from "@/features/stats/listLabels"
+import { useListCards } from "@/features/stats/useListCards"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -95,6 +97,8 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
       : "skip",
     { initialNumItems: 20 },
   )
+  const listRows = summary ? listStats(summary) : []
+  const listContext = useListCards(deckKey, access.ownerId, fingerprintsToRead(listRows))
   const listRef = useRef<FlatList<(typeof games.results)[number]>>(null)
   function showGames(next: NonNullable<typeof filter>) {
     setFilter(next)
@@ -106,7 +110,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
   const rate = honestRate(record)
   const range = likelyRange(record)
   const chance = chanceRate(summary.slices)
-  const lists = listStats(summary)
+  const lists = labelLists(listRows, listContext)
   const pods = [...new Set(summary.slices.map((slice) => slice.podSize))].sort(
     (a, b) => (b ?? 0) - (a ?? 0),
   )
@@ -208,7 +212,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                     key={list.fingerprint ?? "untracked"}
                     testID={`stats-list-${list.fingerprint ?? "untracked"}`}
                     label={listLabel(list)}
-                    detail={list.label === "dated" ? undefined : listDateSpan(list)}
+                    detail={listDetail(list)}
                     record={list.record}
                     onPress={() =>
                       showGames({ fingerprint: list.fingerprint, label: listLabel(list) })
