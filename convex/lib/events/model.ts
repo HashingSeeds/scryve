@@ -16,12 +16,10 @@ export interface EventPoints {
 
 export interface EventSettings {
   readonly structure: EventStructure
-  /** Pod events play one game per round. */
   readonly bestOf: MatchBestOf
   readonly points: EventPoints
 }
 
-/** Seats index into the table's `playerIds`. */
 export type TableResult =
   | { readonly kind: "match"; readonly gamesWon: readonly number[]; readonly gamesDrawn: number }
   | { readonly kind: "pod"; readonly winnerSeat: number | null }
@@ -44,23 +42,19 @@ export type TableOutcome = "win" | "loss" | "draw"
 
 export interface PlayerStanding {
   readonly playerId: string
-  /** Players with identical points and tiebreakers share a rank. */
   readonly rank: number
   readonly points: number
   readonly wins: number
   readonly losses: number
   readonly draws: number
-  /** In the order of the system's `EventRules.tiebreakers`, each 0 to 1. */
   readonly tiebreakers: readonly number[]
 }
 
 export interface PairingInput {
   readonly players: readonly EventPlayerState[]
-  /** Every earlier table of the event, finished or not. */
   readonly tables: readonly EventTableState[]
   readonly settings: EventSettings
   readonly random: () => number
 }
 
-/** Each entry is one table's player ids in seat order. A bye is a one-player table and comes last. */
 export type RoundPairings = readonly (readonly string[])[]
