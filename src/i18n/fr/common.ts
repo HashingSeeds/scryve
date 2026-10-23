@@ -26,6 +26,7 @@ export default {
     history: "Historique",
     settings: "Réglages",
     settingsUpdateReady: "Réglages, mise à jour prête",
+    support: "Assistance",
     account: "Compte",
     signIn: "Se connecter",
     closeMenu: "Fermer le menu des utilitaires",

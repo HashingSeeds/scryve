@@ -128,6 +128,7 @@ function shelf(
         onAddDeck={jest.fn()}
         onHistory={jest.fn()}
         onSettings={jest.fn()}
+        onSupport={jest.fn()}
         onAccount={jest.fn()}
         {...props}
       />
@@ -752,6 +753,7 @@ describe("DecksScreen", () => {
           onAddDeck={jest.fn()}
           onHistory={jest.fn()}
           onSettings={jest.fn()}
+          onSupport={jest.fn()}
           onAccount={jest.fn()}
         />
       </ThemeProvider>,

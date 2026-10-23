@@ -23,6 +23,7 @@ const common = {
     history: "History",
     settings: "Settings",
     settingsUpdateReady: "Settings, update ready",
+    support: "Support",
     account: "Account",
     signIn: "Sign in",
     closeMenu: "Close utility menu",

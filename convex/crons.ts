@@ -54,6 +54,12 @@ crons.interval(
   {},
 )
 crons.interval("prune old receipts", { hours: 24 }, internal.crons.pruneOldReceipts, {})
+crons.interval(
+  "pull feedback answers from Apollo",
+  { minutes: 1 },
+  internal.feedback.pullApollo,
+  {},
+)
 
 crons.interval("refresh deck catalogs", { hours: 6 }, internal.deckCatalogs.refreshScheduled, {})
 

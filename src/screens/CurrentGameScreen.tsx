@@ -71,6 +71,7 @@ export interface CurrentGameScreenProps {
   onSetup?: () => void
   onConnect?: () => void
   onSettings?: () => void
+  onSupport?: () => void
   onAccount?: () => void
   accountEntry?: AccountEntry
   onViewSummary: (gameId: string) => void
@@ -89,6 +90,7 @@ export function CurrentGameScreen({
   onSetup,
   onConnect,
   onSettings,
+  onSupport,
   onAccount,
   accountEntry = "account",
   onViewSummary,
@@ -472,12 +474,13 @@ export function CurrentGameScreen({
             onClose: closeMenu,
           }}
           windowOverlay={
-            menuOpen && onHistory && onSettings && onAccount ? (
+            menuOpen && onHistory && onSettings && onSupport && onAccount ? (
               <FloatingAppNavigation
                 accountEntry={accountEntry}
                 onRules={openGameRules}
                 onHistory={onHistory}
                 onSettings={onSettings}
+                onSupport={onSupport}
                 onAccount={onAccount}
               />
             ) : null

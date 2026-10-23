@@ -29,6 +29,7 @@ export function AppUtilityMenu({
   onRules,
   onHistory,
   onSettings,
+  onSupport,
   onAccount,
   onOpenHeightChange,
   accountEntry = "account",
@@ -39,6 +40,7 @@ export function AppUtilityMenu({
   onRules?: () => void
   onHistory: () => void
   onSettings: () => void
+  onSupport: () => void
   onAccount: () => void
   onOpenHeightChange?: (height: number) => void
   accountEntry?: AccountEntry
@@ -51,7 +53,7 @@ export function AppUtilityMenu({
   const nearbyOnly = useNearbyOnly()
   const testsNearby = lanPlayAvailable()
   const itemCount =
-    3 + Number(Boolean(onRules)) + Number(testsNearby) + Number(Boolean(storeUpdate))
+    4 + Number(Boolean(onRules)) + Number(testsNearby) + Number(Boolean(storeUpdate))
   const openWidth = compact ? (testsNearby ? 176 : 148) : 188
   const progress = useSharedValue(0)
 
@@ -231,6 +233,19 @@ export function AppUtilityMenu({
           >
             <Text
               tx={`common:appMenu.${accountEntry}`}
+              weight="medium"
+              numberOfLines={1}
+              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            />
+          </Pressable>
+          <Pressable
+            testID="utility-support-button"
+            accessibilityRole="button"
+            style={themed($item)}
+            onPress={() => choose(onSupport)}
+          >
+            <Text
+              tx="common:appMenu.support"
               weight="medium"
               numberOfLines={1}
               maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
