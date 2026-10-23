@@ -11,6 +11,7 @@ import {
   assertSettings,
   changeClock,
   confirmResult,
+  eventError,
   reportResult,
   startRound,
   type EventActor,
@@ -65,7 +66,7 @@ function codeOrUndefined(code: string) {
 
 function assertName(raw: string, assert: (name: string) => string) {
   const name = assert(raw)
-  if (nameFailsGate(name)) throw new Error("Choose a different name")
+  if (nameFailsGate(name)) throw eventError("name_rejected", "Choose a different name")
   return name
 }
 
@@ -171,7 +172,10 @@ export const create = mutation({
           .take(MAX_OPEN_EVENTS)
       ).length
     if (open >= MAX_OPEN_EVENTS)
-      throw new Error(`Finish an event first; you can run ${MAX_OPEN_EVENTS} at once`)
+      throw eventError(
+        "event_limit",
+        `Finish an event first; you can run ${MAX_OPEN_EVENTS} at once`,
+      )
     assertManualCodeCandidates(args.codeCandidates)
     let code: string | undefined
     for (const candidate of args.codeCandidates) {
@@ -221,7 +225,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const event = await loadEvent(ctx, args.eventId)
     await requireOrganizer(ctx, event)
-    if (event.status === "finished") throw new Error("This event has finished")
+    if (event.status === "finished") throw eventError("event_finished", "This event has finished")
     const name = args.name === undefined ? undefined : assertName(args.name, assertEventName)
     if (name === "") throw new Error("Name the event")
     await ctx.db.patch(event._id, {
@@ -277,7 +281,7 @@ export const dropPlayer = mutation({
     const user = await requireUser(ctx)
     if (event.ownerUserId !== user._id && player.userId !== user._id)
       throw new Error("Only the organizer can drop another player")
-    if (event.status === "finished") throw new Error("This event has finished")
+    if (event.status === "finished") throw eventError("event_finished", "This event has finished")
     const now = Date.now()
     if (event.round === 0) {
       await ctx.db.delete(player._id)
@@ -297,7 +301,7 @@ export const undropPlayer = mutation({
     if (!player) throw new Error("Player not found")
     const event = await loadEvent(ctx, player.eventId)
     await requireOrganizer(ctx, event)
-    if (event.status === "finished") throw new Error("This event has finished")
+    if (event.status === "finished") throw eventError("event_finished", "This event has finished")
     await ctx.db.patch(player._id, { droppedAt: undefined })
     return null
   },

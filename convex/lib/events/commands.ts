@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values"
+
 import { winsNeeded } from "../matchResults"
 import {
   MAX_EVENT_PLAYERS,
@@ -33,6 +35,22 @@ export interface EventTable extends EventTableState {
   readonly reportedBy?: string
 }
 
+export const EVENT_ERROR_CODES = [
+  "name_rejected",
+  "event_limit",
+  "event_finished",
+  "event_full",
+  "results_missing",
+  "not_enough_players",
+  "result_confirmed",
+  "nothing_to_confirm",
+] as const
+export type EventErrorCode = (typeof EVENT_ERROR_CODES)[number]
+
+/** why: Convex hides plain Error messages in production, so failures players can hit by racing each other carry a code the app translates. */
+export const eventError = (code: EventErrorCode, message: string) =>
+  new ConvexError({ code, message })
+
 export const MIN_ROUND_MINUTES = 5
 export const MAX_ROUND_MINUTES = 180
 const MAX_CLOCK_ADJUST_MINUTES = 60
@@ -61,9 +79,9 @@ export function assertSettings(settings: EventSettings) {
 }
 
 export function assertCanAddPlayer(status: EventStatus, playerCount: number) {
-  if (status === "finished") throw new Error("This event has finished")
+  if (status === "finished") throw eventError("event_finished", "This event has finished")
   if (playerCount >= MAX_EVENT_PLAYERS)
-    throw new Error(`An event can have at most ${MAX_EVENT_PLAYERS} players`)
+    throw eventError("event_full", `An event can have at most ${MAX_EVENT_PLAYERS} players`)
 }
 
 export const roundComplete = (tables: readonly EventTable[]) =>
@@ -77,15 +95,19 @@ export function startRound(state: {
   settings: EventSettings
   random: () => number
 }): { round: number; tables: EventTable[] } {
-  if (state.status === "finished") throw new Error("This event has finished")
+  if (state.status === "finished") throw eventError("event_finished", "This event has finished")
   if (state.round >= MAX_EVENT_ROUNDS)
     throw new Error(`An event can have at most ${MAX_EVENT_ROUNDS} rounds`)
   const current = state.tables.filter((table) => table.round === state.round)
-  if (!roundComplete(current)) throw new Error("Enter every result before the next round")
+  if (!roundComplete(current))
+    throw eventError("results_missing", "Enter every result before the next round")
   const active = state.players.filter((player) => !player.dropped)
   const minimum = state.settings.structure === "pods" ? MIN_POD_SIZE : 2
   if (active.length < minimum)
-    throw new Error(`At least ${minimum} players are needed to start a round`)
+    throw eventError(
+      "not_enough_players",
+      `At least ${minimum} players are needed to start a round`,
+    )
   const pair = state.settings.structure === "pods" ? pairPodRound : pairSwissRound
   const pairings = pair({
     players: state.players,
@@ -170,11 +192,11 @@ export function reportResult(
     return result === null
       ? { result: undefined, status: "open", reportedBy: undefined }
       : { result, status: "confirmed", reportedBy: undefined }
-  if (state.status !== "active") throw new Error("This event has finished")
+  if (state.status !== "active") throw eventError("event_finished", "This event has finished")
   if (seatOf(table, actor) < 0) throw new Error("You can only report your own table")
   if (table.round !== state.round) throw new Error("Only the organizer can change an earlier round")
   if (table.status === "confirmed")
-    throw new Error("Ask the organizer to change a confirmed result")
+    throw eventError("result_confirmed", "Ask the organizer to change a confirmed result")
   if (result === null) throw new Error("Only the organizer can clear a result")
   return { result, status: "reported", reportedBy: actor.playerId }
 }
@@ -185,7 +207,8 @@ export function confirmResult(
 ): TablePatch {
   const { table } = state
   if (state.status !== "active") throw new Error("This event isn't running a round")
-  if (table.status !== "reported" || !table.result) throw new Error("There's no result to confirm")
+  if (table.status !== "reported" || !table.result)
+    throw eventError("nothing_to_confirm", "There's no result to confirm")
   if (actor.kind === "player") {
     if (seatOf(table, actor) < 0) throw new Error("You can only confirm your own table")
     if (table.reportedBy === actor.playerId)
