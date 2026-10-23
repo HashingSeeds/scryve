@@ -1288,6 +1288,8 @@ function DeckDetailContent({
                       <TouchableOpacity
                         testID="rename-version-button"
                         accessibilityRole="button"
+                        accessibilityLabel={translate("decks:detail.versionDetails")}
+                        style={$versionMore}
                         onPress={() => {
                           if (!draft.editing) pinVersionTarget()
                           setDialog("renameVersion")
@@ -1522,6 +1524,12 @@ const $versionSelect: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "stretch",
   gap: spacing.sm,
 })
+const $versionMore: ViewStyle = {
+  minWidth: 44,
+  minHeight: 44,
+  alignItems: "center",
+  justifyContent: "center",
+}
 const $versionMark: ThemedStyle<ViewStyle> = () => ({
   width: 5,
   height: 34,
