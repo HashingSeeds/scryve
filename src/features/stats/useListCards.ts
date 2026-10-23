@@ -8,9 +8,13 @@ import { chosenDeckCards } from "./deckChoices"
 import { deckFingerprint } from "./deckFingerprint"
 import { lookupListSnapshot } from "./listSnapshots"
 
-async function currentListFingerprint(deckKey: string, ownerId: string) {
+async function currentListFingerprint(
+  deckKey: string,
+  ownerId: string,
+  deploymentUrl = process.env.EXPO_PUBLIC_CONVEX_URL?.trim(),
+) {
   const local = loadGuestDecks().find((deck) => (deck.deckKey ?? deck.localId) === deckKey)
-  const versionId = new DeckSyncRepository(ownerId)
+  const versionId = new DeckSyncRepository(ownerId, undefined, deploymentUrl)
     .loadShelf()
     .find((deck) => (deck.deckKey ?? deck.syncId ?? String(deck._id)) === deckKey)?.latestVersionId
   const cards = local

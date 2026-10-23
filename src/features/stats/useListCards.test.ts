@@ -1,5 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react-native"
 
+import { DeckSyncRepository } from "@/features/decks/decksSync"
+
 import { useListCards } from "./useListCards"
 
 const mockLocals = jest.fn(
@@ -39,6 +41,7 @@ it("fingerprints a device deck's current cards", async () => {
 })
 
 it("fingerprints a synced deck's latest version, and leaves current unknown without cards", async () => {
+  process.env.EXPO_PUBLIC_CONVEX_URL = "https://deck.convex.cloud"
   mockShelf.mockReturnValue([{ deckKey: "key", _id: "deck", latestVersionId: "latest" }])
   mockChosenCards.mockReturnValue([{ name: "synced" }])
   const { result, rerender } = renderHook(
@@ -46,6 +49,7 @@ it("fingerprints a synced deck's latest version, and leaves current unknown with
     { initialProps: { fingerprints: ["a"] } },
   )
   await waitFor(() => expect(result.current.currentFingerprint).toBe("synced"))
+  expect(DeckSyncRepository).toHaveBeenCalledWith("owner", undefined, "https://deck.convex.cloud")
   expect(mockChosenCards).toHaveBeenCalledWith({ versionId: "latest", name: "" }, "owner")
   mockChosenCards.mockReturnValue(undefined)
   rerender({ fingerprints: ["b"] })
