@@ -23,6 +23,7 @@ import {
 } from "../../../convex/lib/table"
 import type { DemoGame } from "./board"
 import { HINT_PRESS_MS, showTapHint } from "./hint"
+import { createDemoScript } from "./script"
 
 const RULES = playTableRules("pokemon").pokemon ?? { benchSize: 5, damageStep: 10 }
 // PokemonSeatCard's FOCUS_MS and KNOCKOUT_TOAST_MS, and LifeCard's DELTA_VISIBLE_MS.
@@ -122,9 +123,9 @@ const CONTENT_EDGES: Record<number, Record<Edge, Edge>> = {
   180: { top: "bottom", right: "left", bottom: "top", left: "right" },
 }
 
-// pokemonCardLayout's benchMenuClearance: the bench sits on the inner edge, so it steps aside
-// from the pentagon when the pentagon touches that edge.
-function benchClearance(rotation: number, spot: MenuSpot | undefined) {
+// pokemonCardLayout's benchMenuClearance: what sits on the seat content's inner (top) edge, the
+// bench or the calculator's header, steps aside from the pentagon when the pentagon touches it.
+export function innerEdgeClearance(rotation: number, spot: MenuSpot | undefined) {
   const edges = CONTENT_EDGES[rotation] ?? CONTENT_EDGES[0]
   if (!edges || !spot) return undefined
   if (spot.edgeCenter === edges.top) return "top"
@@ -413,7 +414,7 @@ export function createPokemonSeats(game: DemoGame, refresh: (seat: number) => vo
     const focusedId = focus.get(seat)
     const focused = board.bench.find(({ id }) => id === focusedId)
     const shown = focused ?? board.active
-    const clear = benchClearance(context.rotation, context.menu)
+    const clear = innerEdgeClearance(context.rotation, context.menu)
     const clearance = clear
       ? ` data-clear="${clear}" style="--clear:${(PENTAGON_SHARE * MENU_CLEARANCE * context.rowLength * 100).toFixed(1)}cqw"`
       : ""
@@ -450,6 +451,7 @@ const firstBench = (seat: number) => inSeat(seat, '[data-pk="bench"]')
 // facing a phone on its side: she damages her Active, then taps a bench Pokémon and knocks it
 // out. With more than one opponent she picks Devon to take the prize. Each tap clicks the real
 // control, and a tap whose control isn't there (the visitor's own board may differ) does nothing.
+// The visitor's own tap ends the run.
 const POKEMON_DEMO_SCRIPT = [
   { tap: damageIn(0), hint: inSeat(0, '[data-glyph="0:-1"]'), presses: 3 },
   { tap: firstBench(0), presses: 1 },
@@ -469,62 +471,50 @@ export function createPokemonDemo(
   { reducedMotion }: PokemonDemoOptions,
 ) {
   let active = false
-  const timers = new Set<number>()
-  const later = (ms: number, run: () => void) => {
-    const id = window.setTimeout(() => {
-      timers.delete(id)
-      run()
-    }, ms)
-    timers.add(id)
-  }
-  const clearTimers = () => {
-    timers.forEach((id) => window.clearTimeout(id))
-    timers.clear()
-  }
-  const dropHints = () => board.querySelectorAll(".tap-hint").forEach((hint) => hint.remove())
+  const script = createDemoScript(board)
   // Pokémon seats redraw on each change, so the pressed look goes on the redrawn control.
   const press = (selector: string) => {
     board.querySelector<HTMLElement>(selector)?.click()
     const pressed = board.querySelector<HTMLElement>(`${selector}.hit`)
     pressed?.classList.add("pressed")
-    later(POKEMON_DEMO_TAP_MS * 0.6, () => pressed?.classList.remove("pressed"))
+    script.later(POKEMON_DEMO_TAP_MS * 0.6, () => pressed?.classList.remove("pressed"))
   }
 
   function play() {
-    clearTimers()
-    dropHints()
-    if (!active || game.setup.system !== "pokemon") return
+    script.start()
+    if (!active || game.setup.system !== "pokemon") return script.end()
     if (reducedMotion.matches) {
       POKEMON_DEMO_SCRIPT.forEach(({ tap, presses }) => {
         for (let count = 0; count < presses; count++) press(tap)
       })
-      return
+      return script.end()
     }
     let at = POKEMON_DEMO_START_MS
     for (const step of POKEMON_DEMO_SCRIPT) {
       const hintAt = at - HINT_PRESS_MS
-      later(hintAt, () => {
+      script.later(hintAt, () => {
         const target = board.querySelector(("hint" in step ? step.hint : undefined) ?? step.tap)
         if (target) showTapHint(target, { presses: step.presses, every: POKEMON_DEMO_TAP_MS })
       })
       for (let count = 0; count < step.presses; count++) {
-        later(at, () => press(step.tap))
+        script.later(at, () => press(step.tap))
         at += POKEMON_DEMO_TAP_MS
       }
       at += POKEMON_DEMO_PAUSE_MS
     }
+    script.later(at - POKEMON_DEMO_PAUSE_MS, script.end)
   }
 
   game.subscribe((event) => {
     if (event.type !== "reset") return
-    clearTimers()
-    if (active) later(0, play)
+    script.cancel()
+    if (active) script.later(0, play)
   })
 
   return {
     start() {
       active = true
-      if (game.setup.system === "pokemon") return later(0, play)
+      if (game.setup.system === "pokemon") return script.later(0, play)
       const count = game.setup.names.length
       game.reset({
         system: "pokemon",
@@ -534,8 +524,7 @@ export function createPokemonDemo(
     },
     stop() {
       active = false
-      clearTimers()
-      dropHints()
+      script.cancel()
     },
   }
 }
