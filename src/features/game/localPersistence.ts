@@ -10,6 +10,7 @@ import {
   asOperationId,
   asPlayerId,
   createClientId,
+  hasLocalGameStarted,
   isLifeDelta,
   localGameAccount,
   MAX_COMMANDER_DAMAGE,
@@ -758,6 +759,11 @@ export class LocalGameRepository {
     }
     const game = parseGame(raw.game, committedEvents(events, layout.tail))
     return game?.status === "active" ? game : null
+  }
+
+  hasRunningGame(): boolean {
+    const game = this.loadActiveGame()
+    return game !== null && hasLocalGameStarted(game)
   }
 
   hasNewerActiveGame(): boolean {

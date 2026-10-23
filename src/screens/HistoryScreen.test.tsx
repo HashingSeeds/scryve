@@ -411,6 +411,15 @@ describe("unified history screen", () => {
     expect(screen.queryByText("Add past games")).toBeNull()
   })
 
+  it("says so when reopening past games fails", () => {
+    const onAddPastGames = jest.fn(() => {
+      throw new Error("disk full")
+    })
+    renderHistory({ onAddPastGames })
+    fireEvent.press(screen.getByText("Add past games"))
+    expect(screen.getByText("Could not save your choice. Try again.")).toBeTruthy()
+  })
+
   it("shows local games without a connected feed for signed-out players", () => {
     renderHistory()
 

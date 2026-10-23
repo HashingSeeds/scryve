@@ -19,7 +19,7 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { hasLocalGameStarted, matchScoreAfter, matchScoreLabel, PLAYER_COLORS } from "./domain"
+import { matchScoreAfter, matchScoreLabel, PLAYER_COLORS } from "./domain"
 import { claimableLocalUnits, type ClaimUnit } from "./localGameClaims"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { GamePlayer } from "./types"
@@ -305,13 +305,13 @@ function SeatMarks({
 function useLocalGameRunning(repository: LocalGameRepository) {
   const pathname = usePathname()
   const [finishCount, setFinishCount] = useState(0)
-  const [running, setRunning] = useState(() => isLocalGameRunning(repository))
+  const [running, setRunning] = useState(() => repository.hasRunningGame())
   useEffect(
     () => repository.onGameFinished(() => setFinishCount((count) => count + 1)),
     [repository],
   )
   useEffect(() => {
-    setRunning(isLocalGameRunning(repository))
+    setRunning(repository.hasRunningGame())
   }, [finishCount, pathname, repository])
   return running
 }
@@ -320,11 +320,6 @@ function useClaimsReopened(repository: LocalGameRepository) {
   const [count, setCount] = useState(0)
   useEffect(() => repository.onClaimsReopened(() => setCount((value) => value + 1)), [repository])
   return count
-}
-
-function isLocalGameRunning(repository: LocalGameRepository) {
-  const game = repository.loadActiveGame()
-  return game !== null && hasLocalGameStarted(game)
 }
 
 export function LocalGameClaimPrompt({

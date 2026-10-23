@@ -62,6 +62,13 @@ export default function HistoryRoute() {
     }, []),
   )
   const auth = useAuthAccess()
+  // why: the claim picker stays closed while a game is running, so the link would do nothing.
+  const [gameRunning, setGameRunning] = useState(() => localGameRepository.hasRunningGame())
+  useFocusEffect(
+    useCallback(() => {
+      setGameRunning(localGameRepository.hasRunningGame())
+    }, []),
+  )
   const [connected, setConnected] = useState<{ ownerId?: string; feed: ConnectedHistoryFeed }>()
   const signedIn = auth.configured && auth.isSignedIn
   const { source } = useLocalSearchParams<{ source?: string }>()
@@ -75,7 +82,8 @@ export default function HistoryRoute() {
     localGameVisibleTo(game, signedIn ? auth.userId : undefined),
   )
   const ownerId = signedIn ? auth.userId : undefined
-  const hasPastGames = ownerId !== undefined && claimableLocalGames(history, ownerId).length > 0
+  const hasPastGames =
+    ownerId !== undefined && !gameRunning && claimableLocalGames(history, ownerId).length > 0
   const shared = {
     games,
     initialSource:
