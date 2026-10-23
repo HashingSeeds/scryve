@@ -10,7 +10,7 @@ import { getClerkAppearance } from "./clerkAppearance"
 
 export function AccountProfile({
   onBack,
-  onSignedOut,
+  onSigningOut,
   onOpenTerms,
   onOpenPrivacy,
   onOpenGameContentNotices,
@@ -32,16 +32,17 @@ export function AccountProfile({
     setError(undefined)
     try {
       clerk.closeUserProfile()
+      onSigningOut?.(true)
       await clerk.signOut()
-      onSignedOut?.()
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : translate("account:profile.signOutFailedShort"),
       )
     } finally {
       setIsSigningOut(false)
+      onSigningOut?.(false)
     }
-  }, [clerk, onSignedOut])
+  }, [clerk, onSigningOut])
 
   return (
     <AccountScreen

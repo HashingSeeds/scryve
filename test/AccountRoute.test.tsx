@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/theme/context"
 import AccountRoute from "../src/app/account"
 
 let mockReceiptToken: string | undefined
+let mockSigningOut = false
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -17,6 +18,7 @@ jest.mock("@/features/auth/AuthContext", () => ({
     configured: true,
     isLoaded: true,
     isSignedIn: false,
+    signingOut: mockSigningOut,
     openAuth: jest.fn(),
   }),
 }))
@@ -31,12 +33,13 @@ const renderRoute = () =>
     </ThemeProvider>,
   )
 
-describe("account route while signed out", () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    mockReceiptToken = undefined
-  })
+beforeEach(() => {
+  jest.clearAllMocks()
+  mockReceiptToken = undefined
+  mockSigningOut = false
+})
 
+describe("account route while signed out", () => {
   it("hides account data without a deletion receipt", () => {
     expect(renderRoute().queryByTestId("account-data-button")).toBeNull()
   })
@@ -45,5 +48,28 @@ describe("account route while signed out", () => {
     mockReceiptToken = "e".repeat(64)
     fireEvent.press(renderRoute().getByTestId("account-data-button"))
     expect(router.push).toHaveBeenCalledWith("/delete-account")
+  })
+})
+
+describe("account route after signing out here", () => {
+  it("leaves for Play without flashing the sign-in prompt", () => {
+    mockSigningOut = true
+    const view = renderRoute()
+
+    expect(view.queryByText("Sign in before opening your profile.")).toBeNull()
+    expect(router.dismissTo).toHaveBeenCalledWith("/")
+  })
+
+  it("keeps leaving after the sign-out settles", () => {
+    mockSigningOut = true
+    const view = renderRoute()
+    mockSigningOut = false
+    view.rerender(
+      <ThemeProvider>
+        <AccountRoute />
+      </ThemeProvider>,
+    )
+
+    expect(view.queryByText("Sign in before opening your profile.")).toBeNull()
   })
 })

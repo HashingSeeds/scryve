@@ -12,7 +12,7 @@ import { writeSessionHint } from "./sessionHint"
 
 export function AccountProfile({
   onBack,
-  onSignedOut,
+  onSigningOut,
   onOpenTerms,
   onOpenPrivacy,
   onOpenGameContentNotices,
@@ -35,8 +35,8 @@ export function AccountProfile({
       setError(undefined)
       setIsSigningOut(true)
       writeSessionHint({ userId: null })
+      onSigningOut?.(true)
       await clerk.signOut()
-      onSignedOut?.()
     } catch (cause) {
       reportCrash(
         cause instanceof Error ? cause : new Error("Clerk sign-out failed"),
@@ -53,6 +53,7 @@ export function AccountProfile({
       setError(translate("account:profile.signOutFailed"))
     } finally {
       setIsSigningOut(false)
+      onSigningOut?.(false)
     }
   }
 

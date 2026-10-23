@@ -76,18 +76,21 @@ describe("AccountControls", () => {
     expect(mockWriteSessionHint).toHaveBeenCalledTimes(1)
   })
 
-  it("owns sign out and reports it to the route", async () => {
-    const onSignedOut = jest.fn()
+  it("tells the route a sign out is in flight before Clerk drops the session", async () => {
+    const onSigningOut = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AccountProfile onSignedOut={onSignedOut} {...legalProps} />
+        <AccountProfile onSigningOut={onSigningOut} {...legalProps} />
       </ThemeProvider>,
     )
 
     fireEvent.press(view.getByTestId("sign-out-button"))
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1))
-    expect(onSignedOut).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onSigningOut.mock.calls).toEqual([[true], [false]]))
+    expect(onSigningOut.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0],
+    )
     expect(mockWriteSessionHint).toHaveBeenCalledWith({ userId: null })
     expect(mockWriteSessionHint.mock.invocationCallOrder[0]).toBeLessThan(
       mockSignOut.mock.invocationCallOrder[0],
@@ -100,17 +103,17 @@ describe("AccountControls", () => {
       errors: [{ code: "authentication_invalid" }, { code: "session_not_found" }],
     })
     mockSignOut.mockRejectedValueOnce(failure)
-    const onSignedOut = jest.fn()
+    const onSigningOut = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AccountProfile onSignedOut={onSignedOut} {...legalProps} />
+        <AccountProfile onSigningOut={onSigningOut} {...legalProps} />
       </ThemeProvider>,
     )
 
     fireEvent.press(view.getByTestId("sign-out-button"))
 
     await waitFor(() => expect(view.getByText("Could not sign out. Try again.")).toBeTruthy())
-    expect(onSignedOut).not.toHaveBeenCalled()
+    expect(onSigningOut.mock.calls).toEqual([[true], [false]])
     expect(mockReportCrash).toHaveBeenCalledWith(failure, "Handled", {
       tags: { area: "auth.signOut", clerkCodes: "authentication_invalid,session_not_found" },
     })

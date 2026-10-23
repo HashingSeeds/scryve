@@ -31,7 +31,9 @@ describe("web AccountControls", () => {
     })
   })
 
-  const renderProfile = (props: Partial<{ onBack: () => void; onSignedOut: () => void }> = {}) =>
+  const renderProfile = (
+    props: Partial<{ onBack: () => void; onSigningOut: (signingOut: boolean) => void }> = {},
+  ) =>
     render(
       <ThemeProvider initialContext="light">
         <AccountProfile
@@ -60,25 +62,25 @@ describe("web AccountControls", () => {
     expect(mockOpenUserProfile).toHaveBeenCalledTimes(1)
   })
 
-  it("signs out and hands navigation back to the caller", async () => {
-    const onSignedOut = jest.fn()
-    const view = renderProfile({ onSignedOut })
+  it("signs out and tells the caller it is in flight", async () => {
+    const onSigningOut = jest.fn()
+    const view = renderProfile({ onSigningOut })
 
     fireEvent.press(view.getByTestId("sign-out-button"))
 
-    await waitFor(() => expect(onSignedOut).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onSigningOut.mock.calls).toEqual([[true], [false]]))
     expect(mockCloseUserProfile).toHaveBeenCalledTimes(1)
-    expect(mockSignOut).toHaveBeenCalledTimes(1)
   })
 
   it("reports a failed sign out and stays on the screen", async () => {
     mockSignOut.mockRejectedValue(new Error("Network down"))
-    const onSignedOut = jest.fn()
-    const view = renderProfile({ onSignedOut })
+    const onSigningOut = jest.fn()
+    const view = renderProfile({ onSigningOut })
 
     fireEvent.press(view.getByTestId("sign-out-button"))
 
     await waitFor(() => expect(view.getByText("Network down")).toBeTruthy())
-    expect(onSignedOut).not.toHaveBeenCalled()
+    expect(onSigningOut.mock.calls).toEqual([[true], [false]])
   })
 })
