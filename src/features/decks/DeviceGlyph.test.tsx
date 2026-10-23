@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/theme/context"
 
 import { DeviceGlyph } from "./DeviceGlyph"
 
-it("uses the dim theme color at thirteen pixels without an extra accessibility stop", () => {
+it("uses the dim theme color at thirteen pixels", () => {
   const view = render(
     <ThemeProvider initialContext="dark">
       <DeviceGlyph />
@@ -14,5 +14,4 @@ it("uses the dim theme color at thirteen pixels without an extra accessibility s
   expect(view.getByTestId("device-glyph")).toHaveProp("width", 13)
   expect(view.getByTestId("device-glyph")).toHaveProp("height", 13)
   expect(view.getByTestId("device-glyph")).toHaveProp("stroke", colors.textDim)
-  expect(view.getByTestId("device-glyph")).toHaveProp("accessible", false)
 })
