@@ -40,7 +40,7 @@ Results from local and manual play are self-reported. Each summary and match sto
 - Eliminations, saved as they happen. When an accepted action takes a seat past a threshold the system tracks (life, commander damage, poison), the game stores the order, time, cause, and the causing seat when known: the commander for commander damage, the prize-taker for a Pokémon knockout. An undo, or a correction that brings the seat back, removes that elimination. Seats eliminated by the same action share an order. Local games use the device clock and cloud games use server time. These observations travel with the archived game and its upload. Concessions and losses the app can't see stay unknown.
 - How the game ended, when a tracked threshold decided it: last seat standing, commander damage, poison, prizes, or lore. A race win such as prizes or lore can end the game for several opponents at once. Choosing winners by hand records an unknown ending. An optional prompt at the end covers alternate wins and concessions.
 - The Commander bracket, as a new optional deck field, copied onto each result.
-- An optional opponent deck label per seat, a commander or deck name and never a full list. A seat that picked a deck fills it in automatically.
+- An optional opponent deck label per seat, a commander or deck name and never a full list. A seat that picked a deck fills it in automatically. Each result keeps a copy of its opponents and their labels. Matchups count a player's newest 500 results instead of keeping totals, because their groups have no fixed keys and an opponent can change after a result is written: a nearby guest claims their seat, or an account is deleted.
 
 Turns stay out until a turn tracker exists.
 
