@@ -636,6 +636,7 @@ function DeckDetailContent({
   }
 
   function chooseVersion(versionId: string) {
+    setNewListNotice(false)
     setSelectedVersionId(versionId as Id<"deckVersions">)
   }
 

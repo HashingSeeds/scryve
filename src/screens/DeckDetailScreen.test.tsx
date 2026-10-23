@@ -1669,6 +1669,69 @@ describe("DeckDetailScreen", () => {
     expect(await view.findByText("New list. Earlier results stay with the old one.")).toBeTruthy()
   })
 
+  describe("new list notice", () => {
+    const notice = "New list. Earlier results stay with the old one."
+
+    function renderQueuedSave() {
+      mockDeckSyncState.enabled = true
+      mockDeckSyncState.metadata = [cachedMetadata]
+      mockMetadataWriteState.metadata = [cachedMetadata]
+      mockConnectionState.isWebSocketConnected = false
+      mockVersionCacheState.version = {
+        deckId: "deck-1",
+        versionId: "version-main",
+        revision: 2,
+        versionNumber: 1,
+        name: "Main",
+        note: "",
+        fingerprint: "f1",
+        cardCount: 1,
+        cardQuantity: 1,
+        deleted: false,
+        updatedAt: 1,
+      }
+      mockVersionCacheState.versions = [mockVersionCacheState.version]
+      mockVersionCacheState.cards = [solRing]
+      const view = renderDetail(offlineAccess)
+      fireEvent.press(view.getByTestId("edit-deck-button"))
+      fireEvent.press(view.getByLabelText("Increase Sol Ring"))
+      fireEvent.press(view.getByTestId("save-version-button"))
+      return view
+    }
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it("shows after a queued save and clears itself after eight seconds", () => {
+      jest.useFakeTimers()
+      const view = renderQueuedSave()
+      expect(mockVersionCardUpdate).toHaveBeenCalledTimes(1)
+      expect(view.getByText(notice)).toBeTruthy()
+
+      act(() => {
+        jest.advanceTimersByTime(7_999)
+      })
+      expect(view.getByText(notice)).toBeTruthy()
+      act(() => {
+        jest.advanceTimersByTime(1)
+      })
+      expect(view.queryByText(notice)).toBeNull()
+    })
+
+    it("clears when another version is chosen", async () => {
+      const view = renderDetail()
+      fireEvent.press(view.getByTestId("edit-deck-button"))
+      fireEvent.press(view.getAllByText("+")[0])
+      fireEvent.press(view.getByTestId("save-version-button"))
+      expect(await view.findByText(notice)).toBeTruthy()
+
+      fireEvent.press(view.getByTestId("deck-settings-button"))
+      fireEvent.press(view.getByTestId("version-picker-version-sideboard"))
+      expect(view.queryByText(notice)).toBeNull()
+    })
+  })
+
   it("stays quiet after a save that only changes the note", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
