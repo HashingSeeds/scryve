@@ -50,10 +50,10 @@ export function AccountProfile({
           },
         },
       )
-      onSigningOut?.(false)
       setError(translate("account:profile.signOutFailed"))
     } finally {
       setIsSigningOut(false)
+      onSigningOut?.(false)
     }
   }
 

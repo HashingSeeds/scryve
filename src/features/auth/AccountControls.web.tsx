@@ -35,12 +35,12 @@ export function AccountProfile({
       onSigningOut?.(true)
       await clerk.signOut()
     } catch (cause) {
-      onSigningOut?.(false)
       setError(
         cause instanceof Error ? cause.message : translate("account:profile.signOutFailedShort"),
       )
     } finally {
       setIsSigningOut(false)
+      onSigningOut?.(false)
     }
   }, [clerk, onSigningOut])
 

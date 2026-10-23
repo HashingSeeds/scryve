@@ -69,7 +69,7 @@ describe("web AccountControls", () => {
     fireEvent.press(view.getByTestId("sign-out-button"))
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1))
-    expect(onSigningOut.mock.calls).toEqual([[true]])
+    await waitFor(() => expect(onSigningOut.mock.calls).toEqual([[true], [false]]))
     expect(mockCloseUserProfile).toHaveBeenCalledTimes(1)
   })
 

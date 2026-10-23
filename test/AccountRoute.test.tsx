@@ -7,7 +7,6 @@ import AccountRoute from "../src/app/account"
 
 let mockReceiptToken: string | undefined
 let mockSigningOut = false
-const mockSetSigningOut = jest.fn()
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -20,7 +19,6 @@ jest.mock("@/features/auth/AuthContext", () => ({
     isLoaded: true,
     isSignedIn: false,
     signingOut: mockSigningOut,
-    setSigningOut: mockSetSigningOut,
     openAuth: jest.fn(),
   }),
 }))
@@ -60,13 +58,18 @@ describe("account route after signing out here", () => {
 
     expect(view.queryByText("Sign in before opening your profile.")).toBeNull()
     expect(router.dismissTo).toHaveBeenCalledWith("/")
-    expect(mockSetSigningOut).not.toHaveBeenCalled()
   })
 
-  it("clears the sign-out once the screen is gone so later visits stay", () => {
+  it("keeps leaving after the sign-out settles", () => {
     mockSigningOut = true
-    renderRoute().unmount()
+    const view = renderRoute()
+    mockSigningOut = false
+    view.rerender(
+      <ThemeProvider>
+        <AccountRoute />
+      </ThemeProvider>,
+    )
 
-    expect(mockSetSigningOut).toHaveBeenCalledWith(false)
+    expect(view.queryByText("Sign in before opening your profile.")).toBeNull()
   })
 })

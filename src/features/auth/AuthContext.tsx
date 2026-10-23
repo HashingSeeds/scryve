@@ -99,10 +99,7 @@ export function ConfiguredAuth({
       authVisible: visible,
       signingOut,
       setSigningOut,
-      openAuth: () => {
-        setSigningOut(false)
-        setVisible(true)
-      },
+      openAuth: () => setVisible(true),
       closeAuth: () => setVisible(false),
     }),
     [isLoaded, isSignedIn, user?.id, sessionHint, visible, signingOut],
