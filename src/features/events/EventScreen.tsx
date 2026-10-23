@@ -1,0 +1,561 @@
+import { useState } from "react"
+import type { TextStyle, ViewStyle } from "react-native"
+import { TouchableOpacity, View } from "react-native"
+
+import { AlertNote } from "@/components/AlertNote"
+import { Button } from "@/components/Button"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { EmptyState } from "@/components/EmptyState"
+import { SegmentedControl } from "@/components/SegmentedControl"
+import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
+import { ValueField } from "@/components/ValueField"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { InviteCard } from "@/features/connected/InviteCard"
+import { translate } from "@/i18n/translate"
+import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
+
+import { EventClockRow } from "./EventClockRow"
+import { $action, $actions, $dim, $grow, $row, $section, EventFrame } from "./EventFrame"
+import {
+  canConfirm,
+  canReport,
+  eventMeta,
+  eventStatusText,
+  firstTiebreaker,
+  myTable,
+  nextRoundBlocker,
+  percent,
+  playerName,
+  resultText,
+  tablePlayers,
+  type RoundBlocker,
+} from "./eventLogic"
+import type { EventSource, EventTableView, EventView } from "./eventSource"
+import { ResultDialog } from "./ResultDialog"
+import { MAX_ROUND_MINUTES, MIN_ROUND_MINUTES } from "../../../convex/lib/events/commands"
+import { MAX_EVENT_ROUNDS } from "../../../convex/lib/events/model"
+import { suggestedSwissRounds } from "../../../convex/lib/events/pairing"
+
+const TABS = ["round", "players", "standings"] as const
+type Tab = (typeof TABS)[number]
+type Confirming = "finish" | "remove" | "drop"
+
+function useCommand() {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  async function run(command: () => Promise<void>) {
+    setBusy(true)
+    setError(undefined)
+    try {
+      await command()
+      return true
+    } catch {
+      setError(translate("events:failed"))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { busy, error, setError, run }
+}
+
+function blockerText(blocker: RoundBlocker) {
+  switch (blocker.kind) {
+    case "players":
+      return translate("events:blocked.players", { count: blocker.count })
+    case "results":
+      return translate("events:blocked.results")
+    case "maxRounds":
+      return translate("events:blocked.maxRounds")
+    case "finished":
+      return translate("events:status.finished")
+  }
+}
+
+export function EventScreen({
+  access,
+  source,
+  onBack,
+  onRemoved,
+  onStartMatch,
+}: {
+  access?: CloudAccess
+  source: EventSource
+  onBack: () => void
+  onRemoved: () => void
+  onStartMatch?: (view: EventView, table: EventTableView) => boolean
+}) {
+  const { themed } = useAppTheme()
+  const { view } = source
+  const command = useCommand()
+  const [tab, setTab] = useState<Tab>("round")
+  const [editing, setEditing] = useState<string>()
+  const [confirming, setConfirming] = useState<Confirming>()
+
+  if (view === null)
+    return (
+      <EventFrame title={translate("events:title")} access={access} onBack={onBack}>
+        <EmptyState
+          imageSource={null}
+          heading={translate("events:notFound")}
+          buttonTx="common:back"
+          buttonOnPress={onBack}
+        />
+      </EventFrame>
+    )
+
+  const blocker = view ? nextRoundBlocker(view) : undefined
+  const editingTable = view?.tables.find((table) => table.id === editing)
+  const organizerFooter =
+    view?.isOrganizer && view.status !== "finished" ? (
+      <>
+        {blocker ? <Text size="xs" style={themed($dim)} text={blockerText(blocker)} /> : null}
+        <Button
+          testID="start-round-button"
+          preset="reversed"
+          disabled={command.busy || blocker !== undefined}
+          tx="events:startRound"
+          txOptions={{ round: view.round + 1 }}
+          onPress={() => void command.run(source.startNextRound)}
+        />
+      </>
+    ) : undefined
+
+  async function confirmAction() {
+    if (!view || !confirming) return
+    const done = await command.run(async () => {
+      if (confirming === "finish") await source.finish()
+      else if (confirming === "remove") await source.remove()
+      else if (view.myPlayerId) await source.dropPlayer(view.myPlayerId)
+    })
+    setConfirming(undefined)
+    if (done && confirming === "remove") onRemoved()
+  }
+
+  return (
+    <EventFrame
+      title={view?.name ?? translate("events:title")}
+      access={access}
+      loading={view === undefined}
+      onBack={onBack}
+      footer={organizerFooter}
+    >
+      {view ? (
+        <>
+          <Text
+            size="xs"
+            text={[
+              eventMeta(view),
+              view.status === "active"
+                ? translate("events:roundOf", { round: view.round, planned: view.plannedRounds })
+                : eventStatusText(view),
+            ].join(" · ")}
+          />
+          {view.status === "active" && view.clock ? (
+            <EventClockRow
+              clock={view.clock}
+              busy={command.busy}
+              onAction={
+                view.isOrganizer
+                  ? (action) => void command.run(() => source.adjustClock(action))
+                  : undefined
+              }
+            />
+          ) : null}
+          <SegmentedControl
+            testID="event-tabs"
+            accessibilityLabel={view.name}
+            segments={TABS.map((id) => ({ id, label: translate(`events:tabs.${id}`) }))}
+            selectedId={tab}
+            onSelect={(id) => setTab(TABS.find((value) => value === id) ?? "round")}
+          />
+          {command.error ? <AlertNote testID="event-error" text={command.error} /> : null}
+          {tab === "round" ? (
+            <RoundTab
+              view={view}
+              busy={command.busy}
+              onEdit={setEditing}
+              onConfirm={(table) => void command.run(() => source.confirm(table.id))}
+              onStartMatch={
+                onStartMatch &&
+                ((table) => {
+                  if (!onStartMatch(view, table)) command.setError(translate("events:activeGame"))
+                })
+              }
+              onAsk={setConfirming}
+            />
+          ) : tab === "players" ? (
+            <PlayersTab view={view} source={source} busy={command.busy} run={command.run} />
+          ) : (
+            <StandingsTab view={view} source={source} />
+          )}
+          {editingTable ? (
+            <ResultDialog
+              view={view}
+              table={editingTable}
+              busy={command.busy}
+              onClose={() => setEditing(undefined)}
+              onSave={async (result) => {
+                if (await command.run(() => source.report(editingTable.id, result)))
+                  setEditing(undefined)
+              }}
+            />
+          ) : null}
+          <ConfirmDialog
+            visible={confirming !== undefined}
+            title={translate(`events:${confirming ?? "finish"}.title`)}
+            message={translate(`events:${confirming ?? "finish"}.message`)}
+            confirmText={translate(`events:${confirming ?? "finish"}.confirm`)}
+            destructive={confirming !== "finish"}
+            busy={command.busy}
+            confirmTestID="event-confirm-button"
+            backdropAccessibilityLabel={translate("common:cancel")}
+            onConfirm={() => void confirmAction()}
+            onClose={() => setConfirming(undefined)}
+          />
+        </>
+      ) : null}
+    </EventFrame>
+  )
+}
+
+function RoundTab({
+  view,
+  busy,
+  onEdit,
+  onConfirm,
+  onStartMatch,
+  onAsk,
+}: {
+  view: EventView
+  busy: boolean
+  onEdit: (tableId: string) => void
+  onConfirm: (table: EventTableView) => void
+  onStartMatch?: (table: EventTableView) => void
+  onAsk: (action: Confirming) => void
+}) {
+  const { themed } = useAppTheme()
+  const mine = myTable(view)
+  const me = view.players.find((player) => player.id === view.myPlayerId)
+  return (
+    <>
+      {me ? (
+        <View testID="my-table" style={themed($section)}>
+          <Text preset="subheading" accessibilityRole="header" tx="events:myTable" />
+          {mine ? (
+            <MyTable
+              view={view}
+              table={mine}
+              busy={busy}
+              onEdit={onEdit}
+              onConfirm={onConfirm}
+              onStartMatch={onStartMatch}
+            />
+          ) : (
+            <Text
+              style={themed($dim)}
+              tx={
+                view.status === "registration"
+                  ? "events:waitingToStart"
+                  : me.dropped
+                    ? "events:dropped"
+                    : "events:noTable"
+              }
+            />
+          )}
+        </View>
+      ) : view.status === "registration" ? (
+        <Text style={themed($dim)} tx="events:waitingToStart" />
+      ) : null}
+      {view.isOrganizer && view.tables.length > 0 ? (
+        <View style={themed($section)}>
+          {view.tables.map((table) => (
+            <TableRow
+              key={table.id}
+              view={view}
+              table={table}
+              onPress={canReport(view, table) ? () => onEdit(table.id) : undefined}
+            />
+          ))}
+        </View>
+      ) : null}
+      <View style={themed($section)}>
+        {view.isOrganizer && view.status === "active" ? (
+          <Button
+            testID="finish-event-button"
+            tx="events:finish.action"
+            disabled={busy}
+            onPress={() => onAsk("finish")}
+          />
+        ) : null}
+        {view.isOrganizer && view.round === 0 ? (
+          <Button
+            testID="remove-event-button"
+            tx="events:remove.action"
+            disabled={busy}
+            onPress={() => onAsk("remove")}
+          />
+        ) : null}
+        {me && !me.dropped && view.status !== "finished" ? (
+          <Button
+            testID="drop-button"
+            tx="events:drop.action"
+            disabled={busy}
+            onPress={() => onAsk("drop")}
+          />
+        ) : null}
+      </View>
+    </>
+  )
+}
+
+function MyTable({
+  view,
+  table,
+  busy,
+  onEdit,
+  onConfirm,
+  onStartMatch,
+}: {
+  view: EventView
+  table: EventTableView
+  busy: boolean
+  onEdit: (tableId: string) => void
+  onConfirm: (table: EventTableView) => void
+  onStartMatch?: (table: EventTableView) => void
+}) {
+  const { themed } = useAppTheme()
+  const bye = table.result?.kind === "bye"
+  const opponents = table.playerIds.filter((id) => id !== view.myPlayerId)
+  const reportedByMe = table.status === "reported" && table.reportedBy === view.myPlayerId
+  return (
+    <>
+      <Text
+        preset="heading"
+        testID="my-table-number"
+        tx="events:table"
+        txOptions={{ table: table.table }}
+      />
+      <Text
+        weight="medium"
+        text={
+          bye ? translate("events:bye") : opponents.map((id) => playerName(view, id)).join(", ")
+        }
+      />
+      {bye ? null : <Text size="xs" testID="my-table-result" text={resultText(view, table)} />}
+      {reportedByMe && !view.isOrganizer ? (
+        <Text size="xs" style={themed($dim)} tx="events:waitingForConfirm" />
+      ) : null}
+      <View style={themed($actions)}>
+        {onStartMatch && !bye && view.status === "active" && table.result === null ? (
+          <Button
+            testID="start-match-button"
+            tx="events:startMatch"
+            style={$action}
+            onPress={() => onStartMatch(table)}
+          />
+        ) : null}
+        {canReport(view, table) ? (
+          <Button
+            testID="report-button"
+            tx={table.result ? "events:changeReport" : "events:report"}
+            disabled={busy}
+            style={$action}
+            onPress={() => onEdit(table.id)}
+          />
+        ) : null}
+      </View>
+      {canConfirm(view, table) && !reportedByMe ? (
+        <Button
+          testID="confirm-button"
+          preset="reversed"
+          disabled={busy}
+          text={translate("events:confirm", { result: resultText(view, table) })}
+          onPress={() => onConfirm(table)}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function TableRow({
+  view,
+  table,
+  onPress,
+}: {
+  view: EventView
+  table: EventTableView
+  onPress?: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <TouchableOpacity
+      testID={`table-${table.table}`}
+      accessibilityRole="button"
+      disabled={!onPress}
+      activeOpacity={0.75}
+      style={themed($row)}
+      onPress={onPress}
+    >
+      <Text size="xs" weight="bold" style={themed($tableNumber)} text={String(table.table)} />
+      <Text style={$grow} numberOfLines={2} text={tablePlayers(view, table)} />
+      <Text
+        size="xs"
+        style={table.status === "open" ? themed($dim) : undefined}
+        text={
+          table.result
+            ? `${resultText(view, table)}${table.status === "reported" ? ` · ${translate("events:tableStatus.reported")}` : ""}`
+            : translate("events:tableStatus.open")
+        }
+      />
+    </TouchableOpacity>
+  )
+}
+
+function PlayersTab({
+  view,
+  source,
+  busy,
+  run,
+}: {
+  view: EventView
+  source: EventSource
+  busy: boolean
+  run: (command: () => Promise<void>) => Promise<boolean>
+}) {
+  const { themed } = useAppTheme()
+  const [guest, setGuest] = useState("")
+  const [rounds, setRounds] = useState<number>()
+  const [minutes, setMinutes] = useState<number>()
+  const managing = view.isOrganizer && view.status !== "finished"
+  const active = view.players.filter((player) => !player.dropped).length
+  return (
+    <>
+      {managing ? (
+        <>
+          <InviteCard qrPayload={view.code} manualCode={view.code} />
+          <View style={themed($section)}>
+            <TextField
+              testID="guest-name-input"
+              labelTx="events:guestName"
+              value={guest}
+              maxLength={24}
+              onChangeText={setGuest}
+            />
+            <Button
+              testID="add-guest-button"
+              tx="events:addGuest"
+              disabled={busy || !guest.trim()}
+              onPress={async () => {
+                if (await run(() => source.addGuest(guest.trim()))) setGuest("")
+              }}
+            />
+          </View>
+          <View style={themed($section)}>
+            <ValueField
+              testID="planned-rounds"
+              label={translate("events:settings.rounds")}
+              value={rounds ?? view.plannedRounds}
+              min={Math.max(1, view.round)}
+              max={MAX_EVENT_ROUNDS}
+              onChange={(plannedRounds) => {
+                setRounds(plannedRounds)
+                void run(() => source.update({ plannedRounds }))
+              }}
+            />
+            {view.structure === "swiss" && active >= 2 ? (
+              <Text
+                size="xs"
+                text={translate("events:settings.suggested", {
+                  count: active,
+                  rounds: suggestedSwissRounds(active),
+                })}
+              />
+            ) : null}
+            <ValueField
+              testID="round-minutes"
+              label={translate("events:settings.roundMinutes")}
+              value={minutes ?? view.roundMinutes}
+              min={MIN_ROUND_MINUTES}
+              max={MAX_ROUND_MINUTES}
+              step={5}
+              onChange={(roundMinutes) => {
+                setMinutes(roundMinutes)
+                void run(() => source.update({ roundMinutes }))
+              }}
+            />
+          </View>
+        </>
+      ) : null}
+      <View style={themed($section)}>
+        {view.players.map((player) => (
+          <View key={player.id} testID={`player-${player.id}`} style={themed($row)}>
+            <Text style={$grow} numberOfLines={1} text={player.name} />
+            {player.guest || player.dropped ? (
+              <Text
+                size="xs"
+                style={themed($dim)}
+                text={[
+                  ...(player.guest ? [translate("events:guest")] : []),
+                  ...(player.dropped ? [translate("events:dropped")] : []),
+                ].join(" · ")}
+              />
+            ) : null}
+            {managing ? (
+              <Button
+                testID={`${player.dropped ? "undrop" : "drop"}-${player.id}`}
+                tx={player.dropped ? "events:undrop" : "events:drop.action"}
+                disabled={busy}
+                style={$rowButton}
+                onPress={() =>
+                  void run(() =>
+                    player.dropped ? source.undropPlayer(player.id) : source.dropPlayer(player.id),
+                  )
+                }
+              />
+            ) : null}
+          </View>
+        ))}
+      </View>
+    </>
+  )
+}
+
+function StandingsTab({ view, source }: { view: EventView; source: EventSource }) {
+  const { themed } = useAppTheme()
+  const tiebreaker = firstTiebreaker(view.system)
+  const rows = source.standings
+  if (!rows || rows.length === 0 || view.round === 0)
+    return <Text style={themed($dim)} tx="events:standings.empty" />
+  return (
+    <View testID="standings">
+      <View style={themed($row)}>
+        <Text size="xxs" style={themed([$dim, $rank])} tx="events:standings.rank" />
+        <Text size="xxs" style={themed([$dim, $grow])} tx="events:standings.player" />
+        <Text size="xxs" style={themed([$dim, $stat])} tx="events:standings.points" />
+        <Text size="xxs" style={themed([$dim, $stat])} tx="events:standings.record" />
+        {tiebreaker ? (
+          <Text size="xxs" style={themed([$dim, $stat])} tx={`events:tiebreaker.${tiebreaker}`} />
+        ) : null}
+      </View>
+      {rows.map((row) => (
+        <View key={row.playerId} testID={`standing-${row.playerId}`} style={themed($row)}>
+          <Text size="xs" style={$rank} text={String(row.rank)} />
+          <Text size="xs" style={$grow} numberOfLines={1} text={playerName(view, row.playerId)} />
+          <Text size="xs" weight="bold" style={$stat} text={String(row.points)} />
+          <Text size="xs" style={$stat} text={`${row.wins}-${row.losses}-${row.draws}`} />
+          {tiebreaker ? (
+            <Text size="xs" style={$stat} text={percent(row.tiebreakers[0] ?? 0)} />
+          ) : null}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+const $tableNumber: ThemedStyle<TextStyle> = () => ({ width: 28 })
+const $rank: TextStyle = { width: 28 }
+const $stat: TextStyle = { width: 56, textAlign: "right" }
+const $rowButton: ViewStyle = { minHeight: 36, paddingVertical: 4 }
