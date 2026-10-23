@@ -15,34 +15,26 @@ import {
 } from "./_generated/server"
 import { PREMIUM_FEATURES, hasFeature } from "./lib/entitlements"
 import {
-  APOLLO_ACTIONS,
   APOLLO_KEY_PREFIX,
   FEEDBACK_LIMITS,
   cleanText,
   deletedFeedbackCard,
   feedbackCard,
   feedbackKind,
-  feedbackStatus,
   senderHash,
 } from "./lib/feedback"
 
 const limiter = new RateLimiter(components.rateLimiter, {
   feedbackSubmit: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
   feedbackMessage: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
-  feedbackVote: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 30 },
-  feedbackReport: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
-  feedbackReportHide: { kind: "fixed window", rate: 20, period: HOUR },
   feedbackSubmitAll: { kind: "fixed window", rate: 200, period: HOUR },
 })
 
-const BOARD_SIZE = 100
 const MINE_SIZE = 50
 const THREAD_SIZE = 200
 const DELETE_BATCH = 20
 const ACCOUNT_DELETE_BATCH = 10
 const APOLLO_BATCH = 100
-const SEARCH_SIZE = 50
-const BODY_EXCERPT = 280
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 
@@ -75,8 +67,7 @@ async function ownedRequest(ctx: Ctx, who: Viewer, requestId: Id<"feedbackReques
 
 async function limit(
   ctx: MutationCtx,
-  name:
-    "feedbackSubmit" | "feedbackSubmitAll" | "feedbackMessage" | "feedbackVote" | "feedbackReport",
+  name: "feedbackSubmit" | "feedbackSubmitAll" | "feedbackMessage",
   key?: string,
 ) {
   const result = await limiter.limit(ctx, name, key ? { key } : {})
@@ -92,127 +83,17 @@ async function postCard(ctx: MutationCtx, requestId: Id<"feedbackRequests">) {
   await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, { requestId })
 }
 
-function boardItem(
-  request: Doc<"feedbackRequests">,
-  { voted, reported, mine }: { voted: boolean; reported: boolean; mine: boolean },
-) {
+function ownItem(request: Doc<"feedbackRequests">) {
   return {
     _id: request._id,
     kind: request.kind,
-    title: request.title,
     body: request.body,
-    status: request.status,
-    votes: request.votes,
-    shippedIn: request.shippedIn,
-    createdAt: request._creationTime,
-    voted,
-    reported,
-    mine,
-  }
-}
-
-function ownItem(request: Doc<"feedbackRequests">) {
-  return {
-    ...boardItem(request, { voted: false, reported: false, mine: true }),
-    published: request.published,
     unread: request.unread,
     linked: request.userId !== undefined,
+    createdAt: request._creationTime,
     updatedAt: request.updatedAt,
   }
 }
-
-const excerpt = (request: Doc<"feedbackRequests">) => ({
-  ...request,
-  body: request.body.slice(0, BODY_EXCERPT),
-})
-
-async function boardItems(ctx: QueryCtx, who: Viewer | null, requests: Doc<"feedbackRequests">[]) {
-  return await Promise.all(
-    requests.map(async (request) => {
-      if (!who) return boardItem(request, { voted: false, reported: false, mine: false })
-      const bySender = (table: "feedbackVotes" | "feedbackReports") =>
-        ctx.db
-          .query(table)
-          .withIndex("by_request_and_sender", (q) =>
-            q.eq("requestId", request._id).eq("senderHash", who.hash),
-          )
-          .unique()
-      return boardItem(request, {
-        voted: !!(await bySender("feedbackVotes")),
-        reported: !!(await bySender("feedbackReports")),
-        mine: owns(request, who),
-      })
-    }),
-  )
-}
-
-async function searchPublished(
-  ctx: QueryCtx,
-  text: string,
-  filter: { kind?: Doc<"feedbackRequests">["kind"]; status?: Doc<"feedbackRequests">["status"] },
-) {
-  const search = (index: "search_title" | "search_body", field: "title" | "body") =>
-    ctx.db
-      .query("feedbackRequests")
-      .withSearchIndex(index, (q) => {
-        const base = q.search(field, text).eq("published", true)
-        const kind = filter.kind ? base.eq("kind", filter.kind) : base
-        return filter.status ? kind.eq("status", filter.status) : kind
-      })
-      .take(SEARCH_SIZE)
-  const byTitle = await search("search_title", "title")
-  const byBody = await search("search_body", "body")
-  const seen = new Set(byTitle.map((request) => request._id))
-  return [...byTitle, ...byBody.filter((request) => !seen.has(request._id))]
-}
-
-export const board = query({
-  args: {
-    key: v.optional(v.string()),
-    status: v.optional(feedbackStatus),
-    kind: v.optional(feedbackKind),
-    q: v.optional(v.string()),
-  },
-  handler: async (ctx, { key, status, kind, q }) => {
-    const who = key ? await viewer(ctx, key) : null
-    const text = q?.trim().slice(0, FEEDBACK_LIMITS.title)
-    const requests = text
-      ? await searchPublished(ctx, text, { kind, status })
-      : await (
-          status
-            ? ctx.db
-                .query("feedbackRequests")
-                .withIndex("by_published_and_status_and_votes", (q) =>
-                  q.eq("published", true).eq("status", status),
-                )
-            : kind
-              ? ctx.db
-                  .query("feedbackRequests")
-                  .withIndex("by_published_and_kind_and_votes", (q) =>
-                    q.eq("published", true).eq("kind", kind),
-                  )
-              : ctx.db
-                  .query("feedbackRequests")
-                  .withIndex("by_published_and_votes", (q) => q.eq("published", true))
-        )
-          .order("desc")
-          .take(BOARD_SIZE)
-    const shown =
-      kind && !status ? requests.filter((request) => request.status !== "declined") : requests
-    return await boardItems(ctx, who, shown.map(excerpt))
-  },
-})
-
-export const published = query({
-  args: { key: v.optional(v.string()), requestId: v.string() },
-  handler: async (ctx, { key, requestId }) => {
-    const id = ctx.db.normalizeId("feedbackRequests", requestId)
-    const request = id ? await ctx.db.get(id) : null
-    if (!request?.published) return null
-    const [item] = await boardItems(ctx, key ? await viewer(ctx, key) : null, [request])
-    return item ?? null
-  },
-})
 
 export const mine = query({
   args: { key: v.string() },
@@ -235,10 +116,7 @@ export const mine = query({
     return [...byId.values()]
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, MINE_SIZE)
-      .map((request) => {
-        const { body: _body, ...item } = ownItem(request)
-        return item
-      })
+      .map(ownItem)
   },
 })
 
@@ -260,7 +138,6 @@ async function threadFor(ctx: QueryCtx, who: Viewer, request: Doc<"feedbackReque
       canLink: !!who.user,
       linkedElsewhere:
         !!who.user && request.userId !== undefined && request.userId !== who.user._id,
-      original: request.original ?? null,
     },
     messages: messages.map(({ _id, _creationTime, from, body }) => ({
       _id,
@@ -272,12 +149,6 @@ async function threadFor(ctx: QueryCtx, who: Viewer, request: Doc<"feedbackReque
 }
 
 export const thread = query({
-  args: { key: v.string(), requestId: v.id("feedbackRequests") },
-  handler: async (ctx, { key, requestId }) =>
-    await threadFor(ctx, await viewer(ctx, key), await ctx.db.get(requestId)),
-})
-
-export const threadById = query({
   args: { key: v.string(), requestId: v.string() },
   handler: async (ctx, { key, requestId }) => {
     const id = ctx.db.normalizeId("feedbackRequests", requestId)
@@ -294,7 +165,6 @@ export const submit = mutation({
   args: {
     key: v.string(),
     kind: feedbackKind,
-    title: v.string(),
     body: v.string(),
     includeAccount: v.boolean(),
     appVersion: v.optional(v.string()),
@@ -320,15 +190,9 @@ export const submit = mutation({
     await limit(ctx, "feedbackSubmit", who.hash)
     await limit(ctx, "feedbackSubmitAll")
     const now = Date.now()
-    const vote = args.kind === "feature"
     const requestId = await ctx.db.insert("feedbackRequests", {
       kind: args.kind,
-      title: cleanText(args.title, FEEDBACK_LIMITS.title, "Title"),
-      body: cleanText(args.body, FEEDBACK_LIMITS.body, "Details"),
-      status: "review",
-      published: false,
-      votes: vote ? 1 : 0,
-      reports: 0,
+      body: cleanText(args.body, FEEDBACK_LIMITS.body, "Message"),
       senderHash: who.hash,
       userId,
       appVersion: args.appVersion?.slice(0, FEEDBACK_LIMITS.version),
@@ -341,58 +205,8 @@ export const submit = mutation({
       unread: false,
       updatedAt: now,
     })
-    if (vote) await ctx.db.insert("feedbackVotes", { requestId, senderHash: who.hash })
     await postCard(ctx, requestId)
     return requestId
-  },
-})
-
-export const vote = mutation({
-  args: { key: v.string(), requestId: v.id("feedbackRequests"), voted: v.boolean() },
-  handler: async (ctx, { key, requestId, voted }) => {
-    const who = await viewer(ctx, key)
-    const request = await ctx.db.get(requestId)
-    if (!request || (!request.published && !owns(request, who)))
-      throw new ConvexError({ code: "not_found", message: "Feedback not found" })
-    await limit(ctx, "feedbackVote", who.hash)
-    const existing = await ctx.db
-      .query("feedbackVotes")
-      .withIndex("by_request_and_sender", (q) =>
-        q.eq("requestId", requestId).eq("senderHash", who.hash),
-      )
-      .unique()
-    if (voted === !!existing) return null
-    if (existing) await ctx.db.delete(existing._id)
-    else await ctx.db.insert("feedbackVotes", { requestId, senderHash: who.hash })
-    await ctx.db.patch(requestId, { votes: Math.max(0, request.votes + (voted ? 1 : -1)) })
-    return null
-  },
-})
-
-export const report = mutation({
-  args: { key: v.string(), requestId: v.id("feedbackRequests") },
-  handler: async (ctx, { key, requestId }) => {
-    const who = await viewer(ctx, key)
-    const request = await ctx.db.get(requestId)
-    if (!request || !request.published || owns(request, who))
-      throw new ConvexError({ code: "not_found", message: "Feedback not found" })
-    const existing = await ctx.db
-      .query("feedbackReports")
-      .withIndex("by_request_and_sender", (q) =>
-        q.eq("requestId", requestId).eq("senderHash", who.hash),
-      )
-      .unique()
-    if (existing) return null
-    await limit(ctx, "feedbackReport", who.hash)
-    await ctx.db.insert("feedbackReports", { requestId, senderHash: who.hash })
-    // why: the terms promise action on every report within 24 hours, so a report hides the request until Matthew publishes it again; past the shared cap it still reaches him but stays up.
-    const hide = (await limiter.limit(ctx, "feedbackReportHide")).ok
-    await ctx.db.patch(requestId, {
-      reports: request.reports + 1,
-      ...(hide ? { published: false } : {}),
-    })
-    await postCard(ctx, requestId)
-    return null
   },
 })
 
@@ -473,22 +287,12 @@ export const continueDeleteMine = internalMutation({
 })
 
 async function deleteRequest(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
-  let done = true
-  for (const table of ["feedbackMessages", "feedbackVotes", "feedbackReports"] as const) {
-    const rows =
-      table === "feedbackMessages"
-        ? await ctx.db
-            .query(table)
-            .withIndex("by_request", (q) => q.eq("requestId", request._id))
-            .take(THREAD_SIZE)
-        : await ctx.db
-            .query(table)
-            .withIndex("by_request_and_sender", (q) => q.eq("requestId", request._id))
-            .take(THREAD_SIZE)
-    for (const row of rows) await ctx.db.delete(row._id)
-    if (rows.length === THREAD_SIZE) done = false
-  }
-  if (!done) return false
+  const messages = await ctx.db
+    .query("feedbackMessages")
+    .withIndex("by_request", (q) => q.eq("requestId", request._id))
+    .take(THREAD_SIZE)
+  for (const message of messages) await ctx.db.delete(message._id)
+  if (messages.length === THREAD_SIZE) return false
   await ctx.db.delete(request._id)
   await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, {
     requestId: request._id,
@@ -504,26 +308,7 @@ async function deleteSenderBatch(ctx: MutationCtx, hash: string) {
     .take(DELETE_BATCH)
   let more = requests.length === DELETE_BATCH
   for (const request of requests) if (!(await deleteRequest(ctx, request))) more = true
-  const votes = await ctx.db
-    .query("feedbackVotes")
-    .withIndex("by_sender", (q) => q.eq("senderHash", hash))
-    .take(THREAD_SIZE)
-  for (const vote of votes) {
-    await ctx.db.delete(vote._id)
-    const request = await ctx.db.get(vote.requestId)
-    if (request) await ctx.db.patch(request._id, { votes: Math.max(0, request.votes - 1) })
-  }
-  const reports = await ctx.db
-    .query("feedbackReports")
-    .withIndex("by_sender", (q) => q.eq("senderHash", hash))
-    .take(THREAD_SIZE)
-  for (const report of reports) {
-    await ctx.db.delete(report._id)
-    const request = await ctx.db.get(report.requestId)
-    if (request) await ctx.db.patch(request._id, { reports: Math.max(0, request.reports - 1) })
-  }
-  if (more || votes.length === THREAD_SIZE || reports.length === THREAD_SIZE)
-    await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
+  if (more) await ctx.scheduler.runAfter(0, internal.feedback.continueDeleteMine, { hash })
 }
 
 export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users">) {
@@ -626,59 +411,14 @@ export const applyApolloEvent = internalMutation({
       ? ctx.db.normalizeId("feedbackRequests", event.key.slice(APOLLO_KEY_PREFIX.length))
       : null
     const request = requestId ? await ctx.db.get(requestId) : null
-    const action = APOLLO_ACTIONS.find((id) => id === event.actionId)
-    if (!request || !action) return null
     const text = event.text?.trim()
-    const now = Date.now()
-    switch (action) {
-      case "reply":
-        if (!text) return null
-        await ctx.db.insert("feedbackMessages", {
-          requestId: request._id,
-          from: "team",
-          body: text.slice(0, FEEDBACK_LIMITS.message),
-        })
-        await ctx.db.patch(request._id, { unread: true, updatedAt: now })
-        break
-      case "edit": {
-        const [title = "", ...rest] = (text ?? "").split("\n")
-        const edited = { title: title.trim(), body: rest.join("\n").trim() }
-        if (
-          !edited.title ||
-          !edited.body ||
-          edited.title.length > FEEDBACK_LIMITS.title ||
-          edited.body.length > FEEDBACK_LIMITS.body ||
-          (edited.title === request.title && edited.body === request.body)
-        )
-          return null
-        await ctx.db.patch(request._id, {
-          ...edited,
-          original: request.original ?? { title: request.title, body: request.body },
-          unread: true,
-          updatedAt: now,
-        })
-        break
-      }
-      case "publish":
-      case "hide":
-        await ctx.db.patch(request._id, { published: action === "publish" })
-        break
-      case "shipped":
-        await ctx.db.patch(request._id, {
-          status: "shipped",
-          shippedIn: text ? text.slice(0, FEEDBACK_LIMITS.version) : undefined,
-          unread: true,
-          updatedAt: now,
-        })
-        break
-      default:
-        await ctx.db.patch(request._id, {
-          status: action,
-          shippedIn: undefined,
-          unread: true,
-          updatedAt: now,
-        })
-    }
+    if (!request || event.actionId !== "reply" || !text) return null
+    await ctx.db.insert("feedbackMessages", {
+      requestId: request._id,
+      from: "team",
+      body: text.slice(0, FEEDBACK_LIMITS.message),
+    })
+    await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
     await postCard(ctx, request._id)
     return null
   },
