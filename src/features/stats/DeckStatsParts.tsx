@@ -13,7 +13,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { formatCardChange } from "./cardChanges"
-import { honestRate, type listStats, type RecordCounts } from "./deckStatsMath"
+import { honestRate, recordText, type listStats, type RecordCounts } from "./deckStatsMath"
 import type { LabeledList } from "./listLabels"
 
 export type DeckStatsParams = { deckKey: string; deckName: string; game: string; format: string }
@@ -44,6 +44,48 @@ export function listDetail(row: LabeledList) {
     .filter(Boolean)
     .join(", ")
   return [row.kind === "dated" ? "" : listDateSpan(row), changes].filter(Boolean).join(" · ")
+}
+
+function PreviewRow({ label, values }: { label: string; values: string[] }) {
+  const { themed } = useAppTheme()
+  return (
+    <View style={themed($previewRow)}>
+      <Text size="xs" text={label} style={[$flex, themed($dim)]} />
+      {values.map((value, index) => (
+        <Text key={index} size="sm" text={value} style={[$previewValue, $numbers]} />
+      ))}
+    </View>
+  )
+}
+
+function ComparePreview({ lists }: { lists: ComparePreviewLists }) {
+  const { themed } = useAppTheme()
+  return (
+    <View testID="compare-preview" style={themed($preview)}>
+      <View style={themed($previewRow)}>
+        <View style={$flex} />
+        {lists.map((list) => (
+          <Text key={list.fingerprint} size="xs" style={$previewValue} text={listLabel(list)} />
+        ))}
+      </View>
+      <PreviewRow
+        label={translate("decks:stats.games")}
+        values={lists.map((list) => String(list.record.games))}
+      />
+      <PreviewRow
+        label={translate("decks:stats.record")}
+        values={lists.map((list) => recordText(list.record))}
+      />
+      <Text size="xs" tx="decks:stats.cardChanges" style={themed($dim)} />
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {PREVIEW_CHANGE_WIDTHS.map((width) => (
+          <View key={width} style={themed($previewChange)}>
+            <View style={[themed($previewBar), { width: `${width}%` }]} />
+          </View>
+        ))}
+      </View>
+    </View>
+  )
 }
 
 export function HonestRate({ record }: { record: RecordCounts }) {
@@ -111,7 +153,15 @@ export function StatsSection({ title, action }: { title: string; action?: ReactN
   )
 }
 
-export function DeckComparePrompt({ onClose }: { onClose: () => void }) {
+export type ComparePreviewLists = readonly [LabeledList, LabeledList]
+
+export function DeckComparePrompt({
+  onClose,
+  preview,
+}: {
+  onClose: () => void
+  preview?: ComparePreviewLists
+}) {
   const billing = useRevenueCat()
   const [state, setState] = useState<"prompt" | "dismiss" | "paywall">("prompt")
   const [error, setError] = useState<string>()
@@ -135,6 +185,7 @@ export function DeckComparePrompt({ onClose }: { onClose: () => void }) {
       accessibilityViewIsModal
     >
       <Text tx="decks:stats.comparePro" />
+      {preview ? <ComparePreview lists={preview} /> : null}
       {error ? <AlertNote text={error} /> : null}
       <Button
         tx="decks:localSync.seePro"
@@ -174,4 +225,24 @@ const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "space-between",
   marginTop: spacing.lg,
   minHeight: 44,
+})
+const PREVIEW_CHANGE_WIDTHS = [70, 45, 60]
+const $preview: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs, width: "100%" })
+const $previewRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingVertical: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $previewValue: TextStyle = { flex: 1, textAlign: "right" }
+const $previewChange: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  height: spacing.lg,
+  justifyContent: "center",
+})
+const $previewBar: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: colors.separator,
 })

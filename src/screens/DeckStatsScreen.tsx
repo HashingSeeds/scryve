@@ -126,6 +126,8 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
     value,
     record: exactRecord(summary.all, value),
   }))
+  const [newest, previous] = lists.filter((list) => list.fingerprint !== null)
+  const comparePreview = newest && previous ? ([newest, previous] as const) : undefined
   const showSources = sourceRows.every((row) => row.record.games > 0)
   const smallSample = [
     record,
@@ -426,7 +428,9 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
           ) : null
         }
       />
-      {proPrompt ? <DeckComparePrompt onClose={() => setProPrompt(false)} /> : null}
+      {proPrompt ? (
+        <DeckComparePrompt preview={comparePreview} onClose={() => setProPrompt(false)} />
+      ) : null}
     </>
   )
 }
