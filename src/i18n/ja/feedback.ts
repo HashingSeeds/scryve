@@ -7,7 +7,7 @@ export default {
     yourFeedback: "あなたのフィードバック",
     newCount_other: "新着{{count}}件",
     email: "サポートにメール",
-    emailDetail: "アカウント、お支払い、非公開の内容について",
+    emailDetail: "アカウントや支払いに関する質問",
     suggest: "機能の提案・バグの報告",
     noMatch: "「{{query}}」に該当する回答はありません。",
     ask: "「{{query}}」について問い合わせる",

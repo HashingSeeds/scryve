@@ -6,7 +6,7 @@ const feedback = {
     newCount_one: "{{count}} new",
     newCount_other: "{{count}} new",
     email: "Email support",
-    emailDetail: "Account, billing, or anything private",
+    emailDetail: "Account or billing questions",
     suggest: "Suggest a feature or report a bug",
     // {{query}} is what the player typed in search.
     noMatch: "No answers for “{{query}}”.",

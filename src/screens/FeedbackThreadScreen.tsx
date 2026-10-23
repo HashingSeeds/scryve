@@ -49,7 +49,24 @@ export function FeedbackThreadScreen({
   const request = thread?.request
 
   return (
-    <FeedbackLayout title={translate("feedback:mine.title")} offline={offline} onBack={onBack}>
+    <FeedbackLayout
+      title={translate("feedback:mine.title")}
+      offline={offline}
+      onBack={onBack}
+      footer={
+        request ? (
+          <Button
+            tx={offline ? "feedback:thread.sendOffline" : "feedback:thread.send"}
+            preset="reversed"
+            disabled={!reply.trim()}
+            onPress={() => {
+              onReply(reply.trim())
+              setReply("")
+            }}
+          />
+        ) : undefined
+      }
+    >
       {thread === null ? <Text tx="feedback:thread.missing" style={themed($muted)} /> : null}
       {request ? (
         <>
@@ -104,15 +121,6 @@ export function FeedbackThreadScreen({
             maxLength={2000}
             value={reply}
             onChangeText={setReply}
-          />
-          <Button
-            tx={offline ? "feedback:thread.sendOffline" : "feedback:thread.send"}
-            preset="reversed"
-            disabled={!reply.trim()}
-            onPress={() => {
-              onReply(reply.trim())
-              setReply("")
-            }}
           />
           {error ? <Text text={error} accessibilityRole="alert" size="xs" /> : null}
           {request.linkedElsewhere ? (

@@ -32,7 +32,7 @@ describe("SupportScreen", () => {
     expect(view.queryByText("SCRYVE")).toBeNull()
     expect(view.queryByText("Contact us")).toBeNull()
     fireEvent.press(view.getByText("2 new"))
-    fireEvent.press(view.getByText("Account, billing, or anything private"))
+    fireEvent.press(view.getByText("Account or billing questions"))
     fireEvent.press(view.getByText("Suggest a feature or report a bug"))
     expect(props.onYourFeedback).toHaveBeenCalledTimes(1)
     expect(props.onEmailSupport).toHaveBeenCalledTimes(1)

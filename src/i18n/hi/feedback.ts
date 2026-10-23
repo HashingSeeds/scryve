@@ -8,7 +8,7 @@ export default {
     newCount_one: "{{count}} नया",
     newCount_other: "{{count}} नए",
     email: "सपोर्ट को ईमेल करें",
-    emailDetail: "खाता, बिलिंग या कोई भी निजी बात",
+    emailDetail: "खाते या बिलिंग से जुड़े सवाल",
     suggest: "कोई फ़ीचर सुझाएँ या बग बताएँ",
     noMatch: "“{{query}}” के लिए कोई जवाब नहीं मिला।",
     ask: "हमसे “{{query}}” के बारे में पूछें",

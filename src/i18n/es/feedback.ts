@@ -9,7 +9,7 @@ export default {
     newCount_many: "{{count}} nuevos",
     newCount_other: "{{count}} nuevos",
     email: "Escribir al soporte",
-    emailDetail: "Cuenta, facturación o cualquier asunto privado",
+    emailDetail: "Preguntas sobre la cuenta o la facturación",
     suggest: "Sugerir una función o informar de un error",
     noMatch: "No hay respuestas para “{{query}}”.",
     ask: "Pregúntanos sobre “{{query}}”",

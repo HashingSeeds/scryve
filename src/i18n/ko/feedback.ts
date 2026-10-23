@@ -7,7 +7,7 @@ export default {
     yourFeedback: "내 피드백",
     newCount_other: "새 답변 {{count}}개",
     email: "이메일 문의",
-    emailDetail: "계정, 결제 또는 비공개 문의",
+    emailDetail: "계정 또는 결제 문의",
     suggest: "기능 제안 또는 버그 신고",
     noMatch: "“{{query}}”에 대한 답변이 없습니다.",
     ask: "“{{query}}” 문의하기",
