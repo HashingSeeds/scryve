@@ -1,30 +1,36 @@
-import { useEffect } from "react"
-import { useMutation } from "convex/react"
+import { useEffect, useState } from "react"
+import { useConvexAuth, useMutation } from "convex/react"
 
-import { useAuthAccess } from "@/features/auth/AuthContext"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
+import { convexRetryAfterMs } from "@/utils/convexError"
 
 import { nearbyImport } from "./hubEvent"
 import { nearbyEventHost, useNearbyEventHost } from "./nearbyEventHost"
 import { api } from "../../../../convex/_generated/api"
 
-// why: Convex holds a mutation until it is back online, so a store without internet saves the finished event when the connection returns.
 export function useNearbyImport() {
   const { event, importedEventId } = useNearbyEventHost()
-  const { isSignedIn } = useAuthAccess()
+  // why: Clerk can say signed in before Convex holds the token, and an import sent then fails as unauthenticated.
+  const { isAuthenticated } = useConvexAuth()
   const importNearby = useMutation(api.events.importNearby)
+  const [attempt, setAttempt] = useState(0)
   const finished = event?.status === "finished" ? event : null
   useEffect(() => {
-    if (!finished || importedEventId || !isSignedIn) return
+    if (!finished || importedEventId || !isAuthenticated) return
     let current = true
+    let retry: ReturnType<typeof setTimeout> | undefined
     void createLobbyIdentifiers()
       .then(({ manualCodeCandidates }) =>
         importNearby(nearbyImport(finished, manualCodeCandidates)),
       )
       .then(({ eventId }) => current && nearbyEventHost.markImported(eventId))
-      .catch(() => undefined)
+      .catch((cause: unknown) => {
+        const wait = convexRetryAfterMs(cause)
+        if (current && wait) retry = setTimeout(() => setAttempt((count) => count + 1), wait)
+      })
     return () => {
       current = false
+      clearTimeout(retry)
     }
-  }, [finished, importedEventId, isSignedIn, importNearby])
+  }, [finished, importedEventId, isAuthenticated, importNearby, attempt])
 }

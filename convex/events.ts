@@ -471,7 +471,6 @@ const nearbyTable = v.object({
   reportedBy: v.optional(v.string()),
 })
 
-/** why: a nearby event's authority was the host device, so its finished record arrives whole instead of replaying player writes; importing twice returns the first copy. */
 export const importNearby = mutation({
   args: {
     nearbyId: v.string(),

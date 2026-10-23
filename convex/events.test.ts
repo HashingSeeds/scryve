@@ -310,5 +310,49 @@ describe("events", () => {
         }),
       ).rejects.toThrow("Unknown player")
     })
+
+    it.each([
+      [
+        "a player listed twice",
+        { players: [...nearby.players, { id: "p1", name: "Kim again" }] },
+        "Duplicate player",
+      ],
+      [
+        "a player seated twice in a round",
+        { tables: [nearby.tables[0]!, { ...nearby.tables[1]!, playerIds: ["p1"] }] },
+        "appears twice",
+      ],
+      [
+        "a table number used twice in a round",
+        { tables: [nearby.tables[0]!, { ...nearby.tables[1]!, table: 1 }] },
+        "appears twice",
+      ],
+      [
+        "a table in a round that wasn't played",
+        { tables: [{ ...nearby.tables[0]!, round: 2 }] },
+        "wasn't played",
+      ],
+      [
+        "a bye shared by two players",
+        { tables: [{ ...nearby.tables[1]!, playerIds: ["p1", "p3"] }] },
+        "lone player",
+      ],
+    ])("refuses %s", async (_case, change, message) => {
+      const { organizer } = await setup([])
+      await expect(
+        organizer.mutation(api.events.importNearby, { ...nearby, nearbyId: "event_x", ...change }),
+      ).rejects.toThrow(message)
+    })
+
+    it("gives each organizer their own copy of the same nearby event", async () => {
+      const { t, organizer } = await setup([])
+      const other = await account(t, "other-organizer")
+      const mine = await organizer.mutation(api.events.importNearby, nearby)
+      const theirs = await other.mutation(api.events.importNearby, {
+        ...nearby,
+        codeCandidates: ["NRB125", "NRB126"],
+      })
+      expect(theirs.eventId).not.toBe(mine.eventId)
+    })
   })
 })
