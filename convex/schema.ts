@@ -897,7 +897,6 @@ export default defineSchema({
 
   eventPlayers: defineTable({
     eventId: v.id("events"),
-    // why: guests have no account; account players' names resolve from `users` at read time.
     userId: v.optional(v.id("users")),
     name: v.string(),
     droppedAt: v.optional(v.number()),
