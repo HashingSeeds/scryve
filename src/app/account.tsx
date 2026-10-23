@@ -17,9 +17,13 @@ export default function AccountRoute() {
   const leaveAccount = () => (router.canGoBack() ? router.back() : router.replace("/"))
   const openAccountData = () => router.push("/delete-account")
   const signedOutHere = auth.signingOut && !auth.isSignedIn
+  const { setSigningOut } = auth
   useEffect(() => {
-    if (signedOutHere) router.dismissTo("/")
-  }, [signedOutHere])
+    if (!signedOutHere) return
+    router.dismissTo("/")
+    // why: clearing only once this screen is gone keeps a later visit, like opening a deletion receipt, from bouncing to Play.
+    return () => setSigningOut(false)
+  }, [signedOutHere, setSigningOut])
   // why: Clerk drops the session before signOut resolves, which remounts this route; showing the sign-in prompt here flashed it on every sign out.
   if (signedOutHere)
     return (
