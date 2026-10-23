@@ -148,6 +148,12 @@ describe("events", () => {
     })
   })
 
+  it("returns nothing for an unknown code instead of throwing", async () => {
+    const { t } = await setup([])
+    const stranger = await account(t, "stranger")
+    expect(await stranger.mutation(api.events.join, { code: "ZZZ999" })).toBeNull()
+  })
+
   it("caps how many unfinished events one organizer runs", async () => {
     const t = convexTest(schema, modules)
     registerRateLimiter(t)

@@ -250,7 +250,8 @@ export const join = mutation({
           .withIndex("by_code", (q) => q.eq("code", code))
           .first()
       : null
-    if (!event) throw new Error("No event has that code")
+    // why: returning keeps the spent rate-limit token; a throw would roll it back and let codes be guessed freely.
+    if (!event) return null
     const existing = await playerFor(ctx, event._id, user._id)
     if (existing) return { eventId: event._id, playerId: existing._id }
     const playerId = await addPlayer(ctx, event, { name: accountName(user), userId: user._id })
