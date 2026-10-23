@@ -375,6 +375,7 @@ export default {
     notePlaceholder: "नोट जोड़ें",
     noNotes: "अभी कोई नोट नहीं।",
     editNotes: "नोट्स संपादित करें",
+    cardsLoading: "कार्ड लोड हो रहे हैं…",
     cardsUnavailable: "ऑफ़लाइन कार्ड सूची उपलब्ध नहीं है।",
     noCards: "अभी कोई कार्ड नहीं है। नीचे अपना पहला कार्ड जोड़ें।",
     removed: "{{card}} हटाया गया",

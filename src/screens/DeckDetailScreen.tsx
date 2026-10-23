@@ -291,9 +291,10 @@ function DeckDetailContent({
     mappedSelection,
     versionCache.versions,
   )
+  const detailQueryActive = (access?.ready ?? true) && !knownDeleted
   const detail = useQuery(
     api.decks.detail,
-    (access?.ready ?? true) && !knownDeleted
+    detailQueryActive
       ? {
           deckId: deckId as Id<"decks">,
           ...(queryVersionId ? { versionId: queryVersionId } : {}),
@@ -310,6 +311,8 @@ function DeckDetailContent({
   const stats = useDeckKeyStats(statsDeckKey, access?.ready ?? true)
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
+  const firstConnectionPending =
+    offline && connection?.hasEverConnected !== true && connection?.connectionRetries === 0
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
   const recordVersionCapacity = versionCache.recordCapacity
   useEffect(() => {
@@ -810,6 +813,7 @@ function DeckDetailContent({
         dirty={view.changes.any}
         busy={busy}
         cardsUnavailable={cardsUnavailable}
+        cardsLoading={detailQueryActive ? !offline || firstConnectionPending : access?.loading}
         cardsCached={cardsCached}
         canAddOffline={offlineCandidates.length > 0}
         addOfflineNote={

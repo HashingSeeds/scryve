@@ -403,6 +403,7 @@ export default {
     notePlaceholder: "Ajouter une note",
     noNotes: "Aucune note pour l'instant.",
     editNotes: "Modifier les notes",
+    cardsLoading: "Chargement des cartes…",
     cardsUnavailable: "Liste de cartes indisponible hors ligne.",
     noCards: "Aucune carte pour l'instant. Ajoutez votre première carte ci-dessous.",
     removed: "{{card}} retiré",

@@ -384,6 +384,7 @@ const decks = {
     notePlaceholder: "Add a note",
     noNotes: "No notes yet.",
     editNotes: "Edit notes",
+    cardsLoading: "Loading cards…",
     cardsUnavailable: "Card list unavailable offline.",
     noCards: "No cards yet. Add your first card below.",
     removed: "Removed {{card}}",

@@ -197,7 +197,11 @@ const mockDetail = {
   error: undefined as Error | undefined,
 }
 
-const mockConnectionState = { isWebSocketConnected: true }
+const mockConnectionState: {
+  isWebSocketConnected: boolean
+  hasEverConnected?: boolean
+  connectionRetries?: number
+} = { isWebSocketConnected: true }
 
 jest.mock("convex/react", () => ({
   useConvex: () => undefined,
@@ -325,6 +329,8 @@ describe("DeckDetailScreen", () => {
     mockVersionCacheState.capacity = undefined
     mockVersionCacheState.knownCards = {}
     mockConnectionState.isWebSocketConnected = true
+    mockConnectionState.hasEverConnected = undefined
+    mockConnectionState.connectionRetries = undefined
     mockVersionCardUpdate.mockClear()
     mockVersionCacheRefresh.mockClear()
     mockMappedVersion.mockImplementation((versionId: string) => versionId)
@@ -656,6 +662,45 @@ describe("DeckDetailScreen", () => {
     expect(empty.getByText("No cards yet. Add your first card below.")).toBeTruthy()
     expect(empty.queryByText("Card list unavailable offline.")).toBeNull()
   })
+
+  it.each([
+    ["while the first connection is still opening", false, false, 0, "Loading cards…"],
+    ["while connected and the deck is still loading", true, true, 0, "Loading cards…"],
+    ["after the first connection attempt fails", false, false, 1, "Card list unavailable offline."],
+    ["after a connection drops", false, true, 0, "Card list unavailable offline."],
+  ])(
+    "shows the uncached card list %s",
+    (_, isWebSocketConnected, hasEverConnected, connectionRetries, expected) => {
+      mockDeckSyncState.enabled = true
+      mockDeckSyncState.metadata = [cachedMetadata]
+      mockMetadataWriteState.metadata = [cachedMetadata]
+      mockDetail.value = undefined
+      mockVersionCacheState.version = undefined
+      mockVersionCacheState.versions = []
+      Object.assign(mockConnectionState, {
+        isWebSocketConnected,
+        hasEverConnected,
+        connectionRetries,
+      })
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <DeckDetailScreen
+            deckId="deck-1"
+            onBack={jest.fn()}
+            access={{
+              ready: true,
+              loading: false,
+              signedIn: true,
+              ownerId: "owner-a",
+              request: jest.fn(),
+            }}
+          />
+        </ThemeProvider>,
+      )
+      expect(view.getByText(expected)).toBeTruthy()
+      expect(view.getByTestId("deck-add-cards")).toBeDisabled()
+    },
+  )
 
   it("switches among previously cached versions while offline", () => {
     mockDeckSyncState.enabled = true
