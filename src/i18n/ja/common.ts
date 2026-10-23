@@ -26,6 +26,7 @@ export default {
     history: "履歴",
     settings: "設定",
     settingsUpdateReady: "設定、アップデートあり",
+    support: "サポート",
     account: "アカウント",
     signIn: "サインイン",
     closeMenu: "ユーティリティメニューを閉じる",

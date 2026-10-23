@@ -26,6 +26,7 @@ export default {
     history: "기록",
     settings: "설정",
     settingsUpdateReady: "설정, 업데이트 준비됨",
+    support: "지원",
     account: "계정",
     signIn: "로그인",
     closeMenu: "유틸리티 메뉴 닫기",

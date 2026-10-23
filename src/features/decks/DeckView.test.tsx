@@ -4,6 +4,11 @@ import { ThemeProvider } from "@/theme/context"
 
 import { DeckView } from "./DeckView"
 
+jest.mock("convex/react", () => ({
+  useConvex: () => ({ query: jest.fn() }),
+  useConvexConnectionState: () => ({ isWebSocketConnected: false }),
+}))
+
 it("keeps the back action available in read-only mode", () => {
   const onBack = jest.fn()
   const noop = jest.fn()
@@ -80,3 +85,48 @@ it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)
     expect(onFocus).toHaveBeenCalledWith(expect.objectContaining({ scryfallId: "forest" }))
   },
 )
+
+describe("analysis commander nudge", () => {
+  const renderAnalysis = (onChooseCommander?: () => void) => {
+    const noop = jest.fn()
+    return render(
+      <ThemeProvider initialContext="dark">
+        <DeckView
+          tab="analysis"
+          onTabChange={noop}
+          name="No commander"
+          game="mtg"
+          format="commander"
+          cards={[{ name: "Forest", quantity: 1, scryfallId: "forest" }]}
+          note=""
+          editing={false}
+          dirty={false}
+          onBack={noop}
+          onEdit={noop}
+          onSave={noop}
+          onCancel={noop}
+          onDetails={noop}
+          onAdd={noop}
+          onChooseCommander={onChooseCommander}
+          onNoteChange={noop}
+          onFocus={noop}
+          onIncrement={noop}
+          onDecrement={noop}
+        />
+      </ThemeProvider>,
+    )
+  }
+
+  it("opens the commander chooser", () => {
+    const onChooseCommander = jest.fn()
+    const view = renderAnalysis(onChooseCommander)
+    fireEvent.press(view.getByLabelText("Choose commander"))
+    expect(onChooseCommander).toHaveBeenCalledTimes(1)
+  })
+
+  it("is plain text when the deck cannot be edited", () => {
+    const view = renderAnalysis()
+    expect(view.getByTestId("deck-analysis-no-commander")).toBeTruthy()
+    expect(view.queryByTestId("deck-analysis-choose-commander")).toBeNull()
+  })
+})

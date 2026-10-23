@@ -25,6 +25,8 @@ import type { DataModel } from "./dataModel.js";
  * Typesafe environment variables declared in `convex.config.ts`.
  */
 type Env = {
+  readonly APOLLO_CLOUD_URL: string | undefined;
+  readonly APOLLO_FEEDBACK_TOKEN: string | undefined;
   readonly CARD_CATALOG_SYNC: string | undefined;
   readonly CLERK_SECRET_KEY: string | undefined;
   readonly CLERK_WEBHOOK_SIGNING_SECRET: string | undefined;

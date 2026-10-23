@@ -4,10 +4,12 @@ import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import { env, internalMutation, internalQuery, mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
+import { deleteAccountFeedback } from "./feedback"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
 import { removeDeckResult, removeUserDeckStats } from "./lib/deckResults"
 import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
+import { refreshGameOpponents, refreshMatchOpponents } from "./lib/results"
 
 const DELETED_PLAYER_NAME = "Deleted player"
 const MEMBERSHIP_BATCH_SIZE = 5
@@ -187,6 +189,7 @@ function anonymizedSummaryPlayers(
           deckVersionId: undefined,
           deckKey: undefined,
           deckFingerprint: undefined,
+          deckLabel: undefined,
           localId: undefined,
           resultId: undefined,
           deckNameAtFinish: undefined,
@@ -208,6 +211,7 @@ function anonymizedMatchSeats(match: Doc<"matches">, userId: Id<"users">, delete
           deckVersionId: undefined,
           deckKey: undefined,
           deckFingerprint: undefined,
+          deckLabel: undefined,
           deckName: undefined,
           deletedAt,
         }
@@ -228,6 +232,7 @@ async function anonymizeMatchSeats(
     seats: anonymizedMatchSeats(match, userId, deletedAt),
     updatedAt: deletedAt,
   })
+  await refreshMatchOpponents(ctx, (await ctx.db.get(match._id))!)
 }
 
 async function anonymizeMembership(
@@ -243,12 +248,14 @@ async function anonymizeMembership(
       .query("gameSummaries")
       .withIndex("by_game", (q) => q.eq("gameId", game._id))
       .unique()
-    if (summary)
+    if (summary) {
       await ctx.db.patch(summary._id, {
         players: anonymizedSummaryPlayers(summary, membership._id, deletedAt),
         ...(summary.finishedByUserId === request.userId ? { clientGameId: undefined } : {}),
         ...(summary.finishedByUserId === request.userId ? { finishedByUserId: undefined } : {}),
       })
+      await refreshGameOpponents(ctx, (await ctx.db.get(summary._id))!)
+    }
     if (game.hostUserId === request.userId) await ctx.db.patch(game._id, { hostUserId: undefined })
     if (game.matchId) await anonymizeMatchSeats(ctx, game.matchId, request.userId!, deletedAt)
   }
@@ -261,6 +268,7 @@ async function anonymizeMembership(
     deckVersionId: undefined,
     deckKey: undefined,
     deckFingerprint: undefined,
+    deckLabel: undefined,
     seatPassHash: undefined,
     deletedAt,
     resumable: false,
@@ -563,6 +571,10 @@ export const processUserLinkedData = internalMutation({
               clientGameId: undefined,
             })
         }
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      if (await deleteAccountFeedback(ctx, request.userId)) {
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

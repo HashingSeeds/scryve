@@ -63,6 +63,8 @@ jest.mock("react-native-keyboard-controller", () => ({
   KeyboardAwareScrollView: jest.requireActual("react-native").ScrollView,
   KeyboardProvider: ({ children }: { children: ReactNode }) => children,
   KeyboardAvoidingView: jest.requireActual("react-native").View,
+  useKeyboardState: <T>(select: (state: { isVisible: boolean; height: number }) => T) =>
+    select({ isVisible: false, height: 0 }),
 }))
 
 jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"))

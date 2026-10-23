@@ -286,4 +286,60 @@ describe("analyzeDeck", () => {
       suggest("standard", [card("Forest", 10), card("Grizzly Bears", 20)]).suggestedLands,
     ).toBe(undefined)
   })
+
+  describe("unfinished decks", () => {
+    const run = (format: string, cards: DeckCard[]) =>
+      analyzeDeck({ format, cards, details: (entry) => byName[entry.name] })
+
+    it("flags a Commander deck below 100 and computes odds from the cards listed", () => {
+      const analysis = run("commander", [card("Forest", 17), card("Grizzly Bears", 20)])
+      expect(analysis.incomplete).toEqual({ count: 37, size: 100 })
+      expect(analysis.needsCommander).toBe(true)
+      expect(analysis.mulligans?.keep).toBeCloseTo(chanceOfLands(37, 17, 7, 2, 5))
+    })
+
+    it("counts the commander toward the 100 and clears the nudge", () => {
+      const analysis = run("commander", [
+        card("Grizzly Bears", 1, "commander"),
+        card("Forest", 40),
+        card("Grizzly Bears", 59),
+      ])
+      expect(analysis.incomplete).toBeUndefined()
+      expect(analysis.needsCommander).toBe(false)
+    })
+
+    it.each([
+      ["standard", 59, true],
+      ["standard", 60, false],
+      ["standard", 75, false],
+      ["limited", 39, true],
+      ["limited", 40, false],
+      ["brawl", 59, true],
+    ])("%s with %i main cards is incomplete: %s", (format, count, incomplete) => {
+      const analysis = run(format, [
+        card("Grizzly Bears", count),
+        card("Grizzly Bears", 9, "sideboard"),
+      ])
+      expect(analysis.incomplete !== undefined).toBe(incomplete)
+    })
+
+    it("only asks for a commander in formats that have one", () => {
+      expect(run("standard", [card("Forest", 20)]).needsCommander).toBe(false)
+      expect(run("brawl", [card("Forest", 20)]).needsCommander).toBe(true)
+    })
+
+    it("does not guess a size for an unknown format", () => {
+      expect(run("mystery", [card("Forest", 20)]).incomplete).toBeUndefined()
+    })
+  })
+
+  it("orders colors W, U, B, R, G regardless of card order", () => {
+    const cost = (symbol: string) => ({ manaCost: `{${symbol}}`, typeLine: "Creature" })
+    const colors = analyzeDeck({
+      format: "standard",
+      cards: ["G", "R", "B", "U", "W"].map((symbol) => card(symbol, 1)),
+      details: (entry) => cost(entry.name),
+    }).colors.map(({ color }) => color)
+    expect(colors).toEqual(["W", "U", "B", "R", "G"])
+  })
 })

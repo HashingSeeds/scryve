@@ -6,7 +6,9 @@ import { query, type QueryCtx } from "./_generated/server"
 import { maskSummaryPlayersForViewer } from "./games"
 import { requireUser } from "./lib/auth"
 import { assertDeckKey } from "./lib/deckKeys"
-import { blockedUserIdsFor } from "./lib/moderation"
+import { blockedUserIdsFor, publicUsernameFor } from "./lib/moderation"
+import { HIDDEN_DECK_NAME, HIDDEN_PLAYER_NAME, nameFailsGate } from "./lib/nameFilter"
+import type { DeckIdentity, ResultOpponent } from "./lib/opponentDecks"
 import { boundedPaginationOptions } from "./lib/pagination"
 import { resultDeckKey } from "./lib/results"
 
@@ -14,6 +16,8 @@ export const BREAKDOWN_SCAN = 200
 const MAX_LISTS = 50
 const MAX_DECK_TOTALS = 1000
 const GAMES_PAGE_ROWS = 100
+export const MATCHUP_SCAN = 500
+export const MAX_MATCHUP_GROUPS = 200
 
 type Result = Doc<"deckResults">
 
@@ -198,5 +202,153 @@ export const totalsByKey = query({
       unknown,
       ...(manualMatches ? { manualMatches } : {}),
     }))
+  },
+})
+
+type Tally = {
+  games: number
+  wins: number
+  losses: number
+  draws: number
+  expectedWins: number
+  theirWins: number
+  lastPlayedAt: number
+}
+
+const normalized = (text: string) =>
+  text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase()
+const identityKey = (identity: DeckIdentity) => identity.map(({ cardId }) => cardId).join("+")
+const HIDDEN_KEY = "hidden"
+
+function opponentDeckGroup(deck: ResultOpponent["deck"]) {
+  if (!deck) return undefined
+  const hidden = deck.name !== undefined && nameFailsGate(deck.name)
+  const shown = {
+    opponentDeckKey: deck.deckKey ?? null,
+    name: deck.name === undefined ? null : hidden ? HIDDEN_DECK_NAME : deck.name,
+    identity: deck.identity ?? null,
+  }
+  if (deck.deckKey) return { key: `deck:${deck.deckKey}`, shown }
+  if (hidden) return { key: HIDDEN_KEY, shown: { ...shown, identity: null } }
+  if (deck.name) return { key: `name:${normalized(deck.name)}`, shown }
+  if (deck.identity) return { key: `identity:${identityKey(deck.identity)}`, shown }
+  return undefined
+}
+
+function opponentPlayerGroup({ userId, displayName }: ResultOpponent) {
+  const hidden = nameFailsGate(displayName)
+  const key = userId ? `user:${userId}` : hidden ? HIDDEN_KEY : `name:${normalized(displayName)}`
+  return {
+    key,
+    shown: { userId: userId ?? null, displayName: hidden ? HIDDEN_PLAYER_NAME : displayName },
+  }
+}
+
+function grouping<Shown>() {
+  const groups = new Map<string, Shown & Tally & { deckKey: string; key: string }>()
+  return {
+    add(
+      result: Pick<Result, "outcome" | "finishedAt"> & { deckKey: string; podSize: number },
+      matched: { key: string; won: boolean; shown: Shown }[],
+    ) {
+      const byKey = new Map<string, (typeof matched)[number]>()
+      for (const entry of matched)
+        byKey.set(entry.key, { ...entry, won: entry.won || Boolean(byKey.get(entry.key)?.won) })
+      for (const { key, won, shown } of byKey.values()) {
+        const id = `${result.deckKey}\n${key}`
+        const current = groups.get(id) ?? {
+          ...shown,
+          deckKey: result.deckKey,
+          key,
+          games: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          expectedWins: 0,
+          theirWins: 0,
+          lastPlayedAt: result.finishedAt,
+        }
+        groups.set(id, {
+          ...current,
+          games: current.games + 1,
+          wins: current.wins + (result.outcome === "win" ? 1 : 0),
+          losses: current.losses + (result.outcome === "loss" ? 1 : 0),
+          draws: current.draws + (result.outcome === "draw" ? 1 : 0),
+          expectedWins: current.expectedWins + 1 / result.podSize,
+          theirWins: current.theirWins + (won ? 1 : 0),
+        })
+      }
+    },
+    rows: () =>
+      [...groups.values()]
+        .sort((left, right) => right.games - left.games || right.lastPlayedAt - left.lastPlayedAt)
+        .slice(0, MAX_MATCHUP_GROUPS),
+  }
+}
+
+export const matchups = query({
+  args: { deckKey: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    const results =
+      args.deckKey === undefined
+        ? ctx.db
+            .query("deckResults")
+            .withIndex("by_user_and_finished_at", (q) => q.eq("userId", user._id))
+            .order("desc")
+        : resultsFor(ctx, await callerKey(ctx, args.deckKey))
+    const scanned = await results.take(MATCHUP_SCAN + 1)
+    const blocked = await blockedUserIdsFor(ctx, user._id)
+    const byIdentity = grouping<{ identity: DeckIdentity }>()
+    const byDeck = grouping<NonNullable<ReturnType<typeof opponentDeckGroup>>["shown"]>()
+    const byPlayer = grouping<ReturnType<typeof opponentPlayerGroup>["shown"]>()
+    let counted = 0
+    for (const result of scanned.slice(0, MATCHUP_SCAN)) {
+      const { deckKey } = result
+      if (!deckKey || !countsOnce(result) || !result.opponents?.length) continue
+      counted += 1
+      const mine = { ...result, deckKey, podSize: result.podSize ?? result.opponents.length + 1 }
+      const opponents = result.opponents.map((opponent) => ({
+        ...opponent,
+        won: opponent.outcome === "win",
+        visible: !opponent.userId || !blocked.has(opponent.userId),
+      }))
+      byIdentity.add(
+        mine,
+        opponents.flatMap(({ deck, won }) =>
+          deck?.identity
+            ? [{ key: identityKey(deck.identity), won, shown: { identity: deck.identity } }]
+            : [],
+        ),
+      )
+      byDeck.add(
+        mine,
+        opponents.flatMap(({ deck, won, visible }) => {
+          const group = visible ? opponentDeckGroup(deck) : undefined
+          return group ? [{ ...group, won }] : []
+        }),
+      )
+      byPlayer.add(
+        mine,
+        opponents.flatMap((opponent) =>
+          opponent.visible ? [{ ...opponentPlayerGroup(opponent), won: opponent.won }] : [],
+        ),
+      )
+    }
+    const players = byPlayer.rows()
+    const users = await Promise.all(
+      players.map(({ userId }) => (userId ? ctx.db.get(userId) : null)),
+    )
+    return {
+      byIdentity: byIdentity.rows(),
+      byDeck: byDeck.rows(),
+      byPlayer: players.map((row, index) => {
+        const user = users[index]
+        const name = user ? publicUsernameFor(user) : undefined
+        return name ? { ...row, displayName: name } : row
+      }),
+      counted,
+      scannedAll: scanned.length <= MATCHUP_SCAN,
+    }
   },
 })

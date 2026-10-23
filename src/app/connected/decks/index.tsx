@@ -34,6 +34,7 @@ export default function DecksRoute() {
       hasCurrentGame={hasCurrentGame}
       onHistory={() => router.push("/history")}
       onSettings={() => router.push("/settings")}
+      onSupport={() => router.push("/support")}
       accountEntry={account.accountEntry}
       onAccount={account.onAccount}
       onAddDeck={() => router.push("/connected/decks/add")}

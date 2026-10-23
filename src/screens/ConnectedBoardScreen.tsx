@@ -110,6 +110,7 @@ type ConnectedBoardScreenProps = {
   onRules?: (system: SystemId, ruleId?: string) => void
   onDecks?: () => void
   onSettings?: () => void
+  onSupport?: () => void
   onAccount?: () => void
   accountEntry?: AccountEntry
 }
@@ -259,6 +260,7 @@ type ConnectedBoardReadyProps = {
   onRules?: (system: SystemId, ruleId?: string) => void
   onDecks?: () => void
   onSettings?: () => void
+  onSupport?: () => void
   onAccount?: () => void
   accountEntry?: AccountEntry
   onGameEnded?: (publicId: string) => void
@@ -343,6 +345,7 @@ interface ConnectedBoardRuntimeProps {
   onRules?: (system: SystemId, ruleId?: string) => void
   onDecks?: () => void
   onSettings?: () => void
+  onSupport?: () => void
   onAccount?: () => void
   accountEntry?: AccountEntry
   ownerId: string
@@ -392,6 +395,7 @@ export function ConnectedBoardWithRuntime({
   onRules,
   onDecks,
   onSettings,
+  onSupport,
   onAccount,
   accountEntry,
   ownerId,
@@ -545,6 +549,7 @@ export function ConnectedBoardWithRuntime({
               onRules={onRules}
               onDecks={onDecks}
               onSettings={onSettings}
+              onSupport={onSupport}
               onAccount={onAccount}
               accountEntry={accountEntry}
               onGameEnded={onGameEnded}
@@ -574,6 +579,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onRules,
   onDecks,
   onSettings,
+  onSupport,
   onAccount,
   accountEntry,
   onGameEnded,
@@ -1064,12 +1070,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onClose: closeMenu,
         }}
         windowOverlay={
-          menuOpen && onHistory && onSettings && onAccount ? (
+          menuOpen && onHistory && onSettings && onSupport && onAccount ? (
             <FloatingAppNavigation
               accountEntry={accountEntry}
               onRules={openGameRules}
               onHistory={onHistory}
               onSettings={onSettings}
+              onSupport={onSupport}
               onAccount={onAccount}
             />
           ) : null

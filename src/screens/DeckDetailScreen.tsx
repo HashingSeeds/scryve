@@ -38,6 +38,7 @@ import {
   reseedDeckDraft,
   restoreDraftUndo,
   setDraftNote,
+  startsNewList,
   type DeckDraft,
 } from "@/features/decks/deckDraft"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
@@ -81,6 +82,8 @@ type DeckDialog =
   | "moveDeck"
   | "discard"
   | "syncConflict"
+
+const NEW_LIST_NOTICE_MS = 8_000
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -291,9 +294,10 @@ function DeckDetailContent({
     mappedSelection,
     versionCache.versions,
   )
+  const detailQueryActive = (access?.ready ?? true) && !knownDeleted
   const detail = useQuery(
     api.decks.detail,
-    (access?.ready ?? true) && !knownDeleted
+    detailQueryActive
       ? {
           deckId: deckId as Id<"decks">,
           ...(queryVersionId ? { versionId: queryVersionId } : {}),
@@ -310,6 +314,8 @@ function DeckDetailContent({
   const stats = useDeckKeyStats(statsDeckKey, access?.ready ?? true)
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
+  const firstConnectionPending =
+    offline && connection?.hasEverConnected !== true && connection?.connectionRetries === 0
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
   const recordVersionCapacity = versionCache.recordCapacity
   useEffect(() => {
@@ -344,6 +350,7 @@ function DeckDetailContent({
   const [choosingCommander, setChoosingCommander] = useState(false)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
   const [error, setError] = useState<string>()
+  const [newListNotice, setNewListNotice] = useState(false)
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
   const metadataSaveStarted = useRef(false)
@@ -385,6 +392,11 @@ function DeckDetailContent({
     ...versionWrites.pending.map((write) => write.deckId),
     ...versionWrites.failures.map((failure) => failure.action.deckId),
   ].includes(deckId as Id<"decks">)
+  useEffect(() => {
+    if (!newListNotice) return
+    const timeout = setTimeout(() => setNewListNotice(false), NEW_LIST_NOTICE_MS)
+    return () => clearTimeout(timeout)
+  }, [newListNotice])
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
   useEffect(() => {
@@ -477,6 +489,7 @@ function DeckDetailContent({
     if (knownDeleted) return
     metadataSaveStarted.current = false
     pinVersionTarget()
+    setNewListNotice(false)
     setDraft(
       openDeckDraft({
         cards: displayCards,
@@ -580,8 +593,10 @@ function DeckDetailContent({
       canQueueCards: view.canQueueVersions && Boolean(cardTarget),
       canQueueNote: view.canQueueMetadata && noteRevision !== undefined,
     })
+    const newList = plan.cards !== "none" && startsNewList(draft.base, draft.cards, game)
     const finish = () => {
       captureAnalytics("deck_used", { feature: "saved" })
+      setNewListNotice(newList)
       setDraft(closeDeckDraft)
     }
     if (plan.immediate) {
@@ -623,6 +638,7 @@ function DeckDetailContent({
   }
 
   function chooseVersion(versionId: string) {
+    setNewListNotice(false)
     setSelectedVersionId(versionId as Id<"deckVersions">)
   }
 
@@ -809,6 +825,7 @@ function DeckDetailContent({
         dirty={view.changes.any}
         busy={busy}
         cardsUnavailable={cardsUnavailable}
+        cardsLoading={detailQueryActive ? !offline || firstConnectionPending : access?.loading}
         cardsCached={cardsCached}
         canAddOffline={offlineCandidates.length > 0}
         addOfflineNote={
@@ -871,9 +888,12 @@ function DeckDetailContent({
             : undefined
         }
         error={
-          dialog === "none" && (error || syncError) ? (
+          dialog === "none" && (error || syncError || newListNotice) ? (
             <View style={themed($syncFailure)}>
               {error ? <AlertNote text={error} /> : null}
+              {newListNotice ? (
+                <AlertNote tone="info" text={translate("decks:detail.newList")} />
+              ) : null}
               {syncError}
             </View>
           ) : undefined
@@ -1241,47 +1261,50 @@ function DeckDetailContent({
                     ? [translate("decks:detail.unplayed")]
                     : []
                 return (
-                  <TouchableOpacity
-                    key={candidate._id}
-                    testID={`version-picker-${candidate._id}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    style={themed($versionRow)}
-                    disabled={draft.editing}
-                    onPress={() => {
-                      chooseVersion(candidate._id)
-                      setDialog("none")
-                    }}
-                  >
-                    <View
-                      testID={`version-marker-${candidate._id}`}
-                      style={[themed($versionMark), selected && themed($versionMarkSelected)]}
-                    />
-                    <View style={themed($versionCopy)}>
-                      <Text weight="medium" text={deckVersionLabel(candidate)} />
-                      {candidate.note ? (
+                  <View key={candidate._id} style={themed($versionRow)}>
+                    <TouchableOpacity
+                      testID={`version-picker-${candidate._id}`}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={themed($versionSelect)}
+                      disabled={draft.editing}
+                      onPress={() => {
+                        chooseVersion(candidate._id)
+                        setDialog("none")
+                      }}
+                    >
+                      <View
+                        testID={`version-marker-${candidate._id}`}
+                        style={[themed($versionMark), selected && themed($versionMarkSelected)]}
+                      />
+                      <View style={themed($versionCopy)}>
+                        <Text weight="medium" text={deckVersionLabel(candidate)} />
+                        {candidate.note ? (
+                          <Text
+                            size="xxs"
+                            style={themed($dimmedText)}
+                            text={candidate.note}
+                            numberOfLines={2}
+                          />
+                        ) : null}
+                      </View>
+                      <View style={themed($versionContext)}>
+                        {candidateRecord.map((text) => (
+                          <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
+                        ))}
                         <Text
                           size="xxs"
                           style={themed($dimmedText)}
-                          text={candidate.note}
-                          numberOfLines={2}
+                          text={cardCountLabel(candidate.cardQuantity)}
                         />
-                      ) : null}
-                    </View>
-                    <View style={themed($versionContext)}>
-                      {candidateRecord.map((text) => (
-                        <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
-                      ))}
-                      <Text
-                        size="xxs"
-                        style={themed($dimmedText)}
-                        text={cardCountLabel(candidate.cardQuantity)}
-                      />
-                    </View>
+                      </View>
+                    </TouchableOpacity>
                     {selected && view.canManageVersion ? (
                       <TouchableOpacity
                         testID="rename-version-button"
                         accessibilityRole="button"
+                        accessibilityLabel={translate("decks:detail.versionDetails")}
+                        style={$versionMore}
                         onPress={() => {
                           if (!draft.editing) pinVersionTarget()
                           setDialog("renameVersion")
@@ -1290,7 +1313,7 @@ function DeckDetailContent({
                         <Text size="lg" text="•••" />
                       </TouchableOpacity>
                     ) : null}
-                  </TouchableOpacity>
+                  </View>
                 )
               })}
             </View>
@@ -1509,6 +1532,19 @@ const $versionRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
+const $versionSelect: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "stretch",
+  gap: spacing.sm,
+})
+const $versionMore: ViewStyle = {
+  minWidth: 44,
+  minHeight: 44,
+  alignItems: "center",
+  justifyContent: "center",
+}
 const $versionMark: ThemedStyle<ViewStyle> = () => ({
   width: 5,
   height: 34,
