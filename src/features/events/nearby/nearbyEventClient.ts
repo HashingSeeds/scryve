@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values"
 import type { Service } from "react-native-zeroconf"
 
 import { createClientId } from "@/features/game/domain"
-import { connectLan, type LanConnection } from "@/features/lan/lanTransport"
+import { connectLan, resolveLanService, type LanConnection } from "@/features/lan/lanTransport"
 import { loadString, saveString } from "@/utils/storage"
 
 import type { HubCommand } from "./hubEvent"
@@ -88,12 +88,14 @@ class NearbyEventClient {
     this.pending.clear()
   }
 
-  private async connect() {
+  private async connect(resolve = false) {
     const target = this.target
     if (!target) return
     try {
+      // why: a host that restarts publishes on a new port, so a retry looks the event up again by name.
+      const service = resolve ? await resolveLanService(target.service.name) : target.service
       const connection = await connectLan<NearbyHostMessage, NearbyGuestMessage>(
-        target.service,
+        service,
         parseHostMessage,
         {
           onMessage: (message) => this.receive(message),
@@ -121,7 +123,7 @@ class NearbyEventClient {
     if (!this.target || this.state.status === "rejected") return
     this.set({ status: this.state.status === "connecting" ? "connecting" : "lost" })
     clearTimeout(this.retry)
-    this.retry = setTimeout(() => void this.connect(), RECONNECT_MS)
+    this.retry = setTimeout(() => void this.connect(true), RECONNECT_MS)
   }
 
   private receive(message: NearbyHostMessage) {
