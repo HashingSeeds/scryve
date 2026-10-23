@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import {
+  Platform,
   useWindowDimensions,
   View,
   type LayoutChangeEvent,
   type TextStyle,
   type ViewStyle,
 } from "react-native"
-import { useKeepAwake } from "expo-keep-awake"
+import { activateKeepAwakeAsync, useKeepAwake } from "expo-keep-awake"
 import { useLocalSearchParams } from "expo-router"
 import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -51,7 +52,7 @@ export default function EventDisplayScreen() {
   const auth = useAuthAccess()
   const insets = useSafeAreaInsetsStyle(["top", "bottom", "left", "right"])
   const s = useDisplayStyles()
-  useKeepAwake("event-display", { suppressDeactivateWarnings: true })
+  useStoreKeepAwake()
   return (
     <View style={[s.screen, insets]}>
       {auth.configured ? (
@@ -61,6 +62,22 @@ export default function EventDisplayScreen() {
       )}
     </View>
   )
+}
+
+const KEEP_AWAKE_TAG = "event-display"
+
+function useStoreKeepAwake() {
+  useKeepAwake(KEEP_AWAKE_TAG, { suppressDeactivateWarnings: true })
+  useEffect(() => {
+    if (Platform.OS !== "web") return
+    // why: browsers drop the screen wake lock whenever the tab is hidden, so a TV whose tab was switched away and back would sleep mid-round.
+    const relock = () => {
+      if (document.visibilityState === "visible")
+        void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined)
+    }
+    document.addEventListener("visibilitychange", relock)
+    return () => document.removeEventListener("visibilitychange", relock)
+  }, [])
 }
 
 function useDisplayStyles() {
@@ -73,7 +90,7 @@ function EventByCode({ code, s }: { code: string; s: Styles }) {
   const eventId = useQuery(api.events.byCode, { code })
   if (eventId === undefined) return null
   if (eventId === null) return <Message text={translate("eventDisplay:notFound")} s={s} />
-  return <EventBoard eventId={eventId} s={s} />
+  return <EventBoard key={eventId} eventId={eventId} s={s} />
 }
 
 function Message({ text, s }: { text: string; s: Styles }) {
@@ -197,6 +214,7 @@ function useNow(ticking: boolean) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     if (!ticking) return
+    setNow(Date.now())
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [ticking])
