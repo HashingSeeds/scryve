@@ -55,7 +55,6 @@ export function useLocalGame(
   const reduceMotion = useReducedMotion()
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
   const context = useMemo(() => defaultCommandContext(deviceId), [deviceId])
-  const settings = useMemo(() => repository.loadSettings(), [repository])
   const gameRef = useRef(game)
   gameRef.current = game
 
@@ -81,11 +80,11 @@ export function useLocalGame(
       const previous = gameRef.current
       const next = dispatch({ type: "commanderDamage.assign", fromPlayerId, toPlayerId, delta })
       if (next === previous) return
-      if (settings.hapticsEnabled && reduceMotion === false) {
+      if (reduceMotion === false && repository.hapticsEnabled()) {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)
       }
     },
-    [dispatch, reduceMotion, settings.hapticsEnabled],
+    [dispatch, reduceMotion, repository],
   )
 
   const changeBoard = useCallback(
@@ -133,11 +132,11 @@ export function useLocalGame(
   const changeLife = useCallback(
     (playerId: PlayerId, delta: LifeDelta) => {
       dispatch({ type: "life.change", playerId, delta })
-      if (settings.hapticsEnabled && reduceMotion === false) {
+      if (reduceMotion === false && repository.hapticsEnabled()) {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined)
       }
     },
-    [dispatch, reduceMotion, settings.hapticsEnabled],
+    [dispatch, reduceMotion, repository],
   )
 
   const tableActions = useMemo(

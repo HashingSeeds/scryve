@@ -256,6 +256,20 @@ describe("LocalGameRepository", () => {
     expect(repository.loadSettings()).toEqual(DEFAULT_LOCAL_SETTINGS)
   })
 
+  it("reads haptics without writing settings", () => {
+    const storage = new MemoryStorage()
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({ ...DEFAULT_LOCAL_SETTINGS, hapticsEnabled: false }),
+    )
+    const set = jest.spyOn(storage, "set")
+    const repository = new LocalGameRepository(storage)
+
+    expect(repository.hapticsEnabled()).toBe(false)
+    expect(new LocalGameRepository(new MemoryStorage()).hapticsEnabled()).toBe(true)
+    expect(set).not.toHaveBeenCalled()
+  })
+
   it("asks what you play only on a fresh install", () => {
     const fresh = new LocalGameRepository(new MemoryStorage())
     expect(fresh.loadSettings().askWhatYouPlay).toBe(true)

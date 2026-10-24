@@ -691,6 +691,11 @@ export class LocalGameRepository {
     return settings
   }
 
+  hapticsEnabled(): boolean {
+    const stored = parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.settings)))
+    return (stored ?? DEFAULT_LOCAL_SETTINGS).hapticsEnabled
+  }
+
   saveSettings(settings: LocalSettings): void {
     const valid = parseSettings(settings) ?? DEFAULT_LOCAL_SETTINGS
     // why: anything this build saves is past the one-time Brawl fix, so a 20 chosen afterward is never migrated again.
