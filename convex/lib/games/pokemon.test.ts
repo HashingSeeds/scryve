@@ -67,7 +67,7 @@ describe("TCGdex Pokemon cards", () => {
     fetchMock.mockRestore()
   })
 
-  describe("set code tie-break", () => {
+  describe("set code lookup", () => {
     const ctx = { runMutation: jest.fn(async () => 0) } as unknown as ActionCtx
     const candidate = (id: string, localId: string, name = "Riolu") => ({ id, localId, name })
 
@@ -161,28 +161,47 @@ describe("TCGdex Pokemon cards", () => {
       }
     })
 
-    it.each([
-      ["Lightning Energy", "MEE 12", "mee", ["mee-004"], "mee-004"],
-      ["Water Energy", "SVE 11", "sve", ["sve-003", "sve-011", "sve-019"], "sve-011"],
-    ])(
-      "finds %s %s by name within the set",
-      async (name, reference, setId, printings, expected) => {
+    describe("basic energy", () => {
+      it.each([
+        ["Lightning Energy", "MEE 12", "mee", ["mee-004"], "mee-004"],
+        ["Water Energy", "SVE 11", "sve", ["sve-003", "sve-011", "sve-019"], "sve-011"],
+      ])(
+        "finds %s %s by name within the set",
+        async (name, reference, setId, printings, expected) => {
+          const tcgdex = mockTcgdex({
+            [`/sets?abbreviation.official=eq%3A${reference.split(" ")[0]}`]: [{ id: setId }],
+            [`/cards?name=eq%3A${encodeURIComponent(name)}&set.id=eq%3A${setId}`]: printings.map(
+              (id) => candidate(id, id.split("-")[1] ?? "", name),
+            ),
+            [`/cards/${expected}`]: { ...riolu, id: expected, name },
+          })
+          try {
+            const result = await pokemonCardByReference(ctx, name, reference)
+
+            expect(result.cards.map((card) => card.cardId)).toEqual([expected])
+          } finally {
+            tcgdex.restore()
+          }
+        },
+      )
+
+      it("falls back to the set and number lookup when the set code is unknown", async () => {
         const tcgdex = mockTcgdex({
-          [`/sets?abbreviation.official=eq%3A${reference.split(" ")[0]}`]: [{ id: setId }],
-          [`/cards?name=eq%3A${encodeURIComponent(name)}&set.id=eq%3A${setId}`]: printings.map(
-            (id) => candidate(id, id.split("-")[1] ?? "", name),
-          ),
-          [`/cards/${expected}`]: { ...riolu, id: expected, name },
+          "/sets?abbreviation.official=eq%3APR-SV": [],
+          "/cards?name=Psychic%20Energy&localId=13": [
+            candidate("sve-013", "013", "Psychic Energy"),
+          ],
+          "/cards/sve-013": { ...riolu, id: "sve-013", name: "Psychic Energy" },
         })
         try {
-          const result = await pokemonCardByReference(ctx, name, reference)
+          const result = await pokemonCardByReference(ctx, "Psychic Energy", "PR-SV 13")
 
-          expect(result.cards.map((card) => card.cardId)).toEqual([expected])
+          expect(result.cards.map((card) => card.cardId)).toEqual(["sve-013"])
         } finally {
           tcgdex.restore()
         }
-      },
-    )
+      })
+    })
   })
 
   it("loads only bounded, filtered pages for deck catalog summaries", async () => {

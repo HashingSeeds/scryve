@@ -197,7 +197,7 @@ async function matchesSetCode(
 }
 
 const BASIC_ENERGY_NAME =
-  /^(?:grass|fire|water|lightning|psychic|fighting|darkness|metal|fairy) energy$/i
+  /^(?:Grass|Fire|Water|Lightning|Psychic|Fighting|Darkness|Metal|Fairy) Energy$/
 
 // why: PTCG Live numbers MEE basic energies 9-16 like SVE, while TCGdex numbers them 1-8, so basic energies resolve by name within the set and use the number only to pick between that set's printings.
 async function basicEnergyInSet(
@@ -209,7 +209,9 @@ async function basicEnergyInSet(
     ctx,
     `/sets?abbreviation.official=${encodeURIComponent(`eq:${reference.setCode}`)}`,
   )
-  if (!setsResponse.ok) return undefined
+  if (setsResponse.status === 404) return undefined
+  if (!setsResponse.ok)
+    throw Object.assign(new Error("TCGdex set lookup failed"), { response: setsResponse })
   const sets = (await setsResponse.json()) as unknown
   const setId = Array.isArray(sets) ? stringValue(objectRecord(sets[0])?.id) : undefined
   if (!setId) return undefined
@@ -217,7 +219,9 @@ async function basicEnergyInSet(
     ctx,
     `/cards?name=${encodeURIComponent(`eq:${name}`)}&set.id=${encodeURIComponent(`eq:${setId}`)}`,
   )
-  if (!cardsResponse.ok) return undefined
+  if (cardsResponse.status === 404) return undefined
+  if (!cardsResponse.ok)
+    throw Object.assign(new Error("TCGdex energy lookup failed"), { response: cardsResponse })
   const cards = normalizePokemonCards((await cardsResponse.json()) as unknown, false).filter(
     (card) => normalizeCardName(card.name) === normalizeCardName(name),
   )
