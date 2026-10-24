@@ -53,6 +53,7 @@ import {
   getPlayerGridRows,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
+import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
 export interface CommanderDamageGridBinding {
@@ -281,7 +282,7 @@ export function PlayerGrid({
   if (actedFor && actedFor !== commanderDamage?.armedPlayerId) setActedFor(null)
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
-  const layout = getPlayerGridLayout({
+  const layout = usePlayerGridLayout({
     playerCount: players.length,
     width,
     height,

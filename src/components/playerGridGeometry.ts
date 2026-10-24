@@ -149,10 +149,13 @@ export function getPlayerGridLayout(input: {
   height: number
   fontScale?: number
   layoutVariant?: PlayerGridLayoutVariant
+  // why: a book-style fold crosses the middle of the board's long side, so an even count of cells along that side keeps them off the crease.
+  spansHinge?: boolean
 }) {
   const landscape = input.width > input.height
   const tablet = Math.min(input.width, input.height) >= 600
   const largeText = (input.fontScale ?? 1) >= 1.4
+  const denseColumnCount = input.spansHinge ? (landscape ? 2 : 3) : landscape ? 3 : 2
   const automaticColumnCount =
     input.playerCount === 2
       ? landscape
@@ -160,8 +163,8 @@ export function getPlayerGridLayout(input: {
         : 1
       : input.playerCount === 3 && landscape
         ? 3
-        : input.playerCount >= 5 && landscape
-          ? 3
+        : input.playerCount >= 5
+          ? denseColumnCount
           : 2
   const variant = playerGridLayoutForCount(input.playerCount, input.layoutVariant)
   const columnCount =
