@@ -12,6 +12,7 @@ test("a bare target builds into build/", () => {
     build: true,
     upload: false,
     nas: false,
+    offMain: false,
     buildPath: path.join(root, "build", "ios-preview.ipa"),
   })
 })
@@ -68,4 +69,9 @@ test("ios:profile builds with Xcode under the preview environment and never goes
   assert.equal(buildCommand(options).at(-3), "preview")
   assert.deepEqual(nasCommand(options).slice(-2), ["--profile", "profile"])
   assert.throws(() => parseArgs(["ios:profile", "--ship"]), /cannot --upload/)
+})
+
+test("--off-main is only for production builds", () => {
+  assert.equal(parseArgs(["ios:production", "--off-main"]).offMain, true)
+  assert.throws(() => parseArgs(["ios:preview", "--off-main"]), /only applies to production/)
 })

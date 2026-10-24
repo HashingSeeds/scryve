@@ -178,6 +178,8 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
       ...config.experiments,
       ...(webExportBaseUrl ? { baseUrl: webExportBaseUrl } : {}),
     },
+    // why: an off-main production build takes its version from scripts/native.cjs, since it cannot commit a bump to main.
+    ...(process.env.SCRYVE_APP_VERSION ? { version: process.env.SCRYVE_APP_VERSION } : {}),
     name: getAppName(),
     slug: config.slug ?? "count",
     scheme: [getAppScheme(), getLegacyAppScheme()],
