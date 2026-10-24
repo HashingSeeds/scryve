@@ -3,6 +3,11 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   accountChanged: "Le consentement a été donné par un autre compte",
+  alreadyHosting:
+    "Vous hébergez déjà un salon ou une partie en cours ; reprenez-la avant d'en héberger une autre",
+  appearanceTaken: "Un autre joueur a déjà choisi cette couleur ou cette forme",
+  blockedPlayer:
+    "Vous ne pouvez pas rejoindre une partie avec un joueur que vous avez bloqué ou qui vous a bloqué",
   deckAlreadyArchived: "Deck déjà supprimé",
   deckArchived: "Ce deck a été supprimé",
   deckGameImmutable: "Créez un nouveau deck pour changer de jeu",
@@ -15,6 +20,7 @@ export default {
   detailsBatchTooLarge: "Trop de cartes demandées à la fois",
   emptyDeckList: "Aucune carte trouvée dans cette liste de deck",
   forbidden: "Partie indisponible",
+  gameFull: "Le salon est plein",
   gameMembershipRequired: "Appartenance à la partie requise",
   gameNotActive: "La partie n'est pas active",
   gameNotFound: "Partie introuvable",
@@ -26,6 +32,7 @@ export default {
   invalidDeckList: "Ce lien YDKE n'est pas valide",
   invalidDeckSection: "La section du deck n'est pas valide",
   invalidDeviceId: "Identifiant d'appareil invalide",
+  invalidInvite: "L'invitation est invalide, expirée ou révoquée",
   invalidLifeDelta:
     "La variation de points de vie doit être un entier non nul compris entre -999999 et 999999",
   invalidLocalId: "L'ID local invité doit être un UUID",
@@ -42,6 +49,8 @@ export default {
   preconInvalidResponse: "Le service de decks officiels a renvoyé une réponse non valide",
   queryTooLong: "Choisissez moins de filtres ou raccourcissez votre recherche.",
   scryfallRateLimited: "Les requêtes Scryfall sont suspendues. Réessayez dans un instant.",
+  seatAlreadyHeld: "Vous avez déjà une place dans cette partie",
+  seatTaken: "Place déjà prise",
   syncOwnerChanged: "Le compte connecté a changé",
   tooManyJoinAttempts:
     "Trop de tentatives pour rejoindre la partie ; attendez une minute et réessayez",

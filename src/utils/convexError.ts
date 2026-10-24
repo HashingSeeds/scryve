@@ -56,6 +56,11 @@ export function isArgumentValidationError(cause: unknown) {
   )
 }
 
+const gameGoneCodes = new Set(["forbidden", "game_not_found", "game_membership_required"])
+
+/** why: production redacts the message and keeps only ConvexError data; the message check covers backends from before coded game errors. */
 export function isGameUnavailableError(cause: unknown) {
+  const code = convexErrorCode(cause)
+  if (code !== undefined) return gameGoneCodes.has(code)
   return cause instanceof Error && cause.message.includes("Game unavailable")
 }

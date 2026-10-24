@@ -3,6 +3,11 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   accountChanged: "同意は別のアカウントで行われました",
+  alreadyHosting:
+    "すでにロビーまたは進行中のゲームをホストしています。別のゲームをホストする前に再開してください",
+  appearanceTaken: "その色または形は、ほかのプレイヤーがすでに使用しています",
+  blockedPlayer:
+    "ブロックしたプレイヤー、またはあなたをブロックしたプレイヤーがいるゲームには参加できません",
   deckAlreadyArchived: "デッキはすでに削除されています",
   deckArchived: "このデッキは削除されました",
   deckGameImmutable: "ゲームシステムを変更するには新しいデッキを作成してください",
@@ -15,6 +20,7 @@ export default {
   detailsBatchTooLarge: "一度にリクエストされたカードが多すぎます",
   emptyDeckList: "このデッキリストにカードが見つかりませんでした",
   forbidden: "ゲームを利用できません",
+  gameFull: "ロビーが満員です",
   gameMembershipRequired: "ゲームへの参加が必要です",
   gameNotActive: "ゲームは進行中ではありません",
   gameNotFound: "ゲームが見つかりません",
@@ -26,6 +32,7 @@ export default {
   invalidDeckList: "このYDKEリンクは無効です",
   invalidDeckSection: "デッキのセクションが無効です",
   invalidDeviceId: "デバイスIDが正しくありません",
+  invalidInvite: "招待が無効、期限切れ、または取り消されています",
   invalidLifeDelta: "ライフの増減は、-999999から999999までの0以外の整数にしてください",
   invalidLocalId: "ゲストのローカルIDはUUIDにしてください",
   invalidLocalUpdatedAt: "ゲストのタイムスタンプが無効です",
@@ -42,6 +49,8 @@ export default {
   queryTooLong: "フィルターを減らすか、検索語を短くしてください。",
   scryfallRateLimited:
     "Scryfallへのリクエストは一時停止中です。しばらくしてからもう一度お試しください。",
+  seatAlreadyHeld: "このゲームではすでに席についています",
+  seatTaken: "その席はすでに使用されています",
   syncOwnerChanged: "サインイン中のアカウントが変更されました",
   tooManyJoinAttempts: "参加の試行回数が多すぎます。1分ほど待ってから、もう一度お試しください",
   unauthenticated: "認証が必要です",

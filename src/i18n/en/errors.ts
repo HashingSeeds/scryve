@@ -1,5 +1,9 @@
 const errors = {
   accountChanged: "Consent was given by a different account",
+  alreadyHosting: "You already host a lobby or active game; resume it before hosting another",
+  // A player's marker on the game board: its color and its shape.
+  appearanceTaken: "Another player already claimed that color or shape",
+  blockedPlayer: "You cannot join a game with a player you blocked or who blocked you",
   deckAlreadyArchived: "Deck already deleted",
   deckArchived: "This deck was deleted",
   deckGameImmutable: "Create a new deck to change game systems",
@@ -12,6 +16,8 @@ const errors = {
   detailsBatchTooLarge: "Too many cards requested at once",
   emptyDeckList: "No cards were found in this deck list",
   forbidden: "Game unavailable",
+  // A lobby is the waiting room where players join before a connected game starts.
+  gameFull: "Lobby is full",
   gameMembershipRequired: "Game membership required",
   gameNotActive: "Game is not active",
   gameNotFound: "Game not found",
@@ -23,6 +29,8 @@ const errors = {
   invalidDeckList: "This YDKE link is invalid",
   invalidDeckSection: "Deck section is invalid",
   invalidDeviceId: "Invalid device identifier",
+  // An invite link or code to join a connected game.
+  invalidInvite: "Invite is invalid, expired, or revoked",
   invalidLifeDelta: "Life delta must be a non-zero whole number from -999999 to 999999",
   invalidLocalId: "Guest local ID must be a UUID",
   invalidLocalUpdatedAt: "Guest timestamp is invalid",
@@ -38,6 +46,10 @@ const errors = {
   preconInvalidResponse: "The official deck service returned an invalid response",
   queryTooLong: "Choose fewer filters or shorten your search.",
   scryfallRateLimited: "Scryfall requests are paused. Try again shortly.",
+  // A seat is one player's place in a connected game.
+  seatAlreadyHeld: "You already hold a seat in this game",
+  // Another player already took this seat in the connected game.
+  seatTaken: "Seat already claimed",
   syncOwnerChanged: "The signed-in account changed",
   // Attempts to join a connected game, not to sign in.
   tooManyJoinAttempts: "Too many join attempts; wait a minute and try again",
