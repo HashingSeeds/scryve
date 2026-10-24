@@ -206,9 +206,12 @@ const account = {
     },
     subscription: {
       heading: "Have a Scryve Pro subscription?",
-      body: "Deleting your account won't cancel it. You may keep being charged until you cancel through Apple or Google Play. You can still delete now, but you'll lose access to any paid time left.",
+      body: "Deleting your account won't cancel it. You may keep being charged until you cancel it where you subscribed. You can still delete now, but you'll lose access to any paid time left.",
       manageApple: "Manage Apple subscriptions",
       manageGoogle: "Manage Google Play subscriptions",
+      // Web purchases are managed in RevenueCat's customer portal. Its billing emails link there, and the portal can email a sign-in link, so this works after the account is gone.
+      web: "Subscribed on the web? Cancel in the customer portal. Every Scryve Pro billing email links to it.",
+      manageWeb: "Manage web subscription",
     },
     signedInAs: "Signed in as {{email}}",
     confirmLabel: "Type {{word}} to continue",

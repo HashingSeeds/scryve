@@ -153,6 +153,31 @@ function showPaywallFailure(message: string) {
   else Alert.alert(title, message)
 }
 
+export type ProSubscriptionManagement =
+  { store: "app_store" | "play_store" | "unknown" } | { store: "web"; url?: string }
+
+export function proSubscriptionManagement(
+  customerInfo: CustomerInfo | null,
+): ProSubscriptionManagement {
+  const entitlement = customerInfo?.entitlements.active[COUNT_PRO_ENTITLEMENT_ID]
+  switch (entitlement?.store) {
+    case "APP_STORE":
+    case "MAC_APP_STORE":
+      return { store: "app_store" }
+    case "PLAY_STORE":
+      return { store: "play_store" }
+    case "RC_BILLING":
+    case "STRIPE":
+    case "PADDLE": {
+      const url =
+        customerInfo?.subscriptionsByProductIdentifier[entitlement.productIdentifier]?.managementURL
+      return { store: "web", url: url?.startsWith("https://") ? url : undefined }
+    }
+    default:
+      return { store: "unknown" }
+  }
+}
+
 function mostRecentlyFetchedCustomerInfo(current: CustomerInfo | null, next: CustomerInfo) {
   return current && Date.parse(current.requestDate) > Date.parse(next.requestDate) ? current : next
 }
