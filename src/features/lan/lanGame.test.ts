@@ -322,6 +322,41 @@ describe("nearby rounds on the shared engine", () => {
     ])
   })
 
+  it("knocks a Pauper Commander guest out at 16 commander damage", () => {
+    const pauper = {
+      ...commander,
+      startingLife: 30,
+      ruleset: "pauperCommander",
+      format: "pauperCommander",
+    }
+    const claimed = write(
+      started(pauper),
+      "host",
+      op({
+        type: "commanderDamage.submitted",
+        operationId: "claim-operation-016",
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta: 16,
+      }),
+    ).next
+    const confirmed = write(
+      claimed,
+      "guest",
+      op({
+        type: "commanderDamage.resolved",
+        operationId: "resolve-operation-16",
+        claimOperationId: "claim-operation-016",
+        toPlayerId: "guest",
+        accepted: true,
+      }),
+    ).next
+
+    expect(
+      lanProjection(confirmed, "host").players.find(({ playerId }) => playerId === "guest"),
+    ).toMatchObject({ currentLife: 14, eliminatedByCommanderDamage: true })
+  })
+
   it("moves Pokémon prizes to the taker when the owner records a knockout", () => {
     const pokemon = {
       ...commander,
