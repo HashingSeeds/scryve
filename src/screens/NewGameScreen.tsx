@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
+import { BOTTOM_LINK_HEIGHT, BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import {
@@ -222,9 +222,8 @@ function NewGameForm({
 }) {
   const {
     themed,
-    theme: { colors, spacing },
+    theme: { colors },
   } = useAppTheme()
-  const { bottom } = useSafeAreaInsets()
   const { fontScale } = useWindowDimensions()
   // why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over.
   const [formatPicked, setFormatPicked] = useState(false)
@@ -918,18 +917,7 @@ function NewGameForm({
             </View>
           ) : null}
         </Screen>
-        <View
-          style={[
-            themed($footer),
-            {
-              // why: on iOS the status row's tap target can overlap the home indicator inset; Android's inset can be a tappable nav bar.
-              paddingBottom:
-                (statusText || joinInFooter) && Platform.OS === "ios"
-                  ? Math.max(bottom - STATUS_ROW_HEIGHT / 2, spacing.sm)
-                  : Math.max(bottom, spacing.sm),
-            },
-          ]}
-        >
+        <BottomActionBar endsWithLink={Boolean(statusText || joinInFooter)} style={themed($footer)}>
           <View style={themed($footerContent)}>
             <View style={themed(footerRow ? $footerActions : $footerStack)}>
               <Button
@@ -1083,7 +1071,7 @@ function NewGameForm({
               </View>
             ) : null}
           </View>
-        </View>
+        </BottomActionBar>
       </>
       <DialogCard
         visible={optionsOpen}
@@ -1498,10 +1486,9 @@ const FOOTER_ROW_MAX_FONT_SCALE = 1.4
 const FOOTER_MAX_FONT_SCALE = 2
 const $footerButtonText = { maxFontSizeMultiplier: FOOTER_MAX_FONT_SCALE }
 const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  borderTopWidth: 1,
-  borderTopColor: colors.separator,
   backgroundColor: colors.surface,
   paddingTop: spacing.sm,
+  paddingHorizontal: 0,
 })
 const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
@@ -1525,9 +1512,8 @@ const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   paddingVertical: spacing.xs,
 })
-const STATUS_ROW_HEIGHT = 44
 const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: STATUS_ROW_HEIGHT,
+  height: BOTTOM_LINK_HEIGHT,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,

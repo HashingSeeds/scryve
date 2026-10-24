@@ -1,8 +1,6 @@
 import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, useWindowDimensions, View } from "react-native"
-import { useKeyboardState } from "react-native-keyboard-controller"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
@@ -27,21 +25,15 @@ export function FeedbackLayout({
   footer?: ReactNode
   children: ReactNode
 }) {
-  const {
-    themed,
-    theme: { spacing },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
-  const { bottom } = useSafeAreaInsets()
-  const keyboardOpen = useKeyboardState((state) => state.isVisible)
   // why: at the largest text sizes a pinned footer covers most of the screen, so it scrolls with the content instead.
   const { fontScale } = useWindowDimensions()
   const pinFooter = Boolean(footer) && fontScale <= MAX_PINNED_FONT_SCALE
   return (
     <Screen
       preset="fixed"
-      // why: a pinned footer takes the home indicator or nav bar inset as its own bottom padding, rather than adding its padding on top of it.
-      safeAreaEdges={pinFooter ? [] : ["bottom"]}
+      safeAreaEdges={["bottom"]}
       header={{
         title: titleVisible || !heading ? title : undefined,
         leftTx: "common:back",
@@ -65,13 +57,7 @@ export function FeedbackLayout({
         {children}
         {footer && !pinFooter ? <View style={themed($inlineFooter)}>{footer}</View> : null}
       </ScrollView>
-      {pinFooter ? (
-        <BottomActionBar
-          style={{ paddingBottom: keyboardOpen ? spacing.sm : Math.max(bottom, spacing.sm) }}
-        >
-          {footer}
-        </BottomActionBar>
-      ) : null}
+      {pinFooter ? <BottomActionBar>{footer}</BottomActionBar> : null}
     </Screen>
   )
 }
