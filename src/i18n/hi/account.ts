@@ -293,6 +293,7 @@ export default {
     manageAccessibilityLabel: "Scryve {{plan}} सब्सक्रिप्शन प्रबंधित करें",
     viewOptions: "विकल्प देखें",
     viewOptionsAccessibilityLabel: "Scryve Pro के विकल्प देखें",
+    paywallFailedTitle: "Scryve Pro नहीं खुला",
     notConfigured: "Scryve Pro खरीदारी कॉन्फ़िगर नहीं है।",
     missingApiKey:
       "Scryve Pro खरीदारी उपलब्ध नहीं है क्योंकि RevenueCat की सार्वजनिक API कुंजी कॉन्फ़िगर नहीं है।",

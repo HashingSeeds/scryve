@@ -297,6 +297,7 @@ export default {
     manageAccessibilityLabel: "Gérer l’abonnement Scryve {{plan}}",
     viewOptions: "Voir les options",
     viewOptionsAccessibilityLabel: "Voir les options Scryve Pro",
+    paywallFailedTitle: "Scryve Pro ne s'est pas ouvert",
     notConfigured: "Les achats Scryve Pro ne sont pas configurés.",
     missingApiKey:
       "Les achats Scryve Pro sont indisponibles, car la clé API publique RevenueCat n’est pas configurée.",

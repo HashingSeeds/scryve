@@ -291,6 +291,7 @@ const account = {
     manageAccessibilityLabel: "Manage Scryve {{plan}} subscription",
     viewOptions: "View options",
     viewOptionsAccessibilityLabel: "View Scryve Pro options",
+    paywallFailedTitle: "Scryve Pro didn't open",
     notConfigured: "Scryve Pro purchases are not configured.",
     missingApiKey:
       "Scryve Pro purchases are unavailable because the RevenueCat public API key is not configured.",
