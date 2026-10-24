@@ -77,7 +77,7 @@ import {
   playFormatLabel,
   playSystemRules,
   storedPlaySystem,
-  supportsCommanderDamage,
+  playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
@@ -711,9 +711,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           game.layout,
           defaultConnectedLayout(players.length),
         )
-  const commanderDamageEnabled =
-    supportsCommanderDamage(system, game.format || game.ruleset) &&
-    game.commanderDamage !== undefined
+  const commanderLethal = playCommanderLethal(system, game.format || game.ruleset)
+  const commanderDamageEnabled = commanderLethal !== undefined && game.commanderDamage !== undefined
   const commanderTotals = game.commanderDamage?.totals ?? []
   const failedActionLabel = (event: PendingLifeAction["event"]) => {
     if (event.type === "life.changed")
@@ -1022,6 +1021,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               commanderDamageEnabled
                 ? {
                     incomingFor: incomingCommanderDamage,
+                    lethal: commanderLethal,
                     armedPlayerId: armedCommander?.playerId ?? null,
                     inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
                     staging: {

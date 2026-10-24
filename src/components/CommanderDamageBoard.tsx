@@ -1,7 +1,6 @@
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
-import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -30,6 +29,7 @@ export interface CommanderDamageBoardProps {
   columns: number
   contentRotation: LifeCardContentRotation
   incoming: Record<PlayerId, number>
+  lethal: number
   armedPlayerId?: PlayerId | null
   /** Space the card reserved for the board, already mapped onto the board's own axes. */
   maxSize?: { width: number; height: number }
@@ -57,6 +57,7 @@ export function CommanderDamageBoard({
   columns,
   contentRotation,
   incoming,
+  lethal,
   armedPlayerId,
   maxSize,
   compact,
@@ -188,7 +189,7 @@ export function CommanderDamageBoard({
               )
 
             const total = incoming[playerId] ?? 0
-            const lethal = total >= COMMANDER_LETHAL_DAMAGE
+            const lethalTotal = total >= lethal
             const fontSize = Math.max(9, Math.round(size * 0.6))
             return (
               <View
@@ -198,12 +199,12 @@ export function CommanderDamageBoard({
                   themed($cell),
                   { width: size, height: size, borderColor: overlayTint(foreground, 0.4) },
                   total === 0 && themed($cellIdle),
-                  lethal && { backgroundColor: overlayTint(foreground, 0.32) },
+                  lethalTotal && { backgroundColor: overlayTint(foreground, 0.32) },
                 ]}
               >
                 <Text
                   text={String(total)}
-                  weight={lethal ? "bold" : "medium"}
+                  weight={lethalTotal ? "bold" : "medium"}
                   numberOfLines={1}
                   maxFontSizeMultiplier={1.2}
                   style={[

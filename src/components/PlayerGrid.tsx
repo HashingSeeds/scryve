@@ -51,6 +51,7 @@ import { outReason, type OutReason, type OutState } from "../../convex/lib/outRe
 
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
+  lethal: number
   armedPlayerId: PlayerId | null
   inspection?: { playerId: PlayerId | null; onChange: (playerId: PlayerId | null) => void }
   /**
@@ -506,6 +507,7 @@ export function PlayerGrid({
                             rows: boardSeats.rows,
                             columns: boardSeats.columns,
                             incoming: commanderDamage.incomingFor(player),
+                            lethal: commanderDamage.lethal,
                             armedPlayerId: commanderDamage.armedPlayerId,
                             attackerName: armedPlayer?.name,
                             attacker: armedPlayer && {

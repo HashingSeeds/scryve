@@ -8,7 +8,7 @@ import {
   type MemoryWrite,
   type MemoryWriteResult,
 } from "../../../convex/lib/gameEngineMemory"
-import { isCommanderFormat, isCommanderLethal } from "../../../convex/lib/gameRules"
+import { commanderLethalDamage } from "../../../convex/lib/gameRules"
 import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
@@ -409,7 +409,7 @@ const playerTableOf = (seat: PlayerTable): PlayerTable => ({
   ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
 })
 
-function commanderProjection(memory: MemoryGame, viewerKey: string) {
+function commanderProjection(memory: MemoryGame, viewerKey: string, lethal: number) {
   const totals = commanderTotals(memory)
   return {
     totals,
@@ -425,9 +425,7 @@ function commanderProjection(memory: MemoryGame, viewerKey: string) {
         createdAt: claim.createdAt,
       })),
     eliminatedPlayerIds: [
-      ...new Set(
-        totals.filter((total) => isCommanderLethal(total.total)).map((total) => total.toPlayerId),
-      ),
+      ...new Set(totals.filter((total) => total.total >= lethal).map((total) => total.toPlayerId)),
     ],
   }
 }
@@ -436,10 +434,9 @@ function commanderProjection(memory: MemoryGame, viewerKey: string) {
 export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjection {
   const { setup, memory } = game
   const rules = tableRules(setup.system, setup.format)
+  const lethal = commanderLethalDamage(setup.system, setup.format)
   const commander =
-    memory && isCommanderFormat(setup.system, setup.format)
-      ? commanderProjection(memory, viewerKey)
-      : undefined
+    memory && lethal !== undefined ? commanderProjection(memory, viewerKey, lethal) : undefined
   const eliminated = new Set(commander?.eliminatedPlayerIds)
   const seatsOf = memory ? [...memory.seats.values()] : []
   const roleFor = (key: string) => {

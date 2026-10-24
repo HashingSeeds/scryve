@@ -1,4 +1,3 @@
-import { isCommanderLethal } from "./gameRules"
 import { isCounterOut, type CounterDefinition, type TableDefinition } from "./systems"
 import { counterValue, type TableState } from "./table"
 
@@ -7,28 +6,43 @@ export type OutReason<Id extends string = string> =
   | { readonly cause: "counter"; readonly counterId: string; readonly value: number }
   | { readonly cause: "life" }
 
+export interface CommanderTotal<Id extends string = string> {
+  readonly fromPlayerId: Id
+  readonly toPlayerId: Id
+  readonly total: number
+}
+
 export interface OutState<Id extends string = string> {
   readonly counter: CounterDefinition | undefined
   readonly tableRules: TableDefinition
   readonly table?: TableState
   readonly lives: readonly { readonly playerId: Id; readonly life: number }[]
-  readonly commanderDamage?: readonly {
-    readonly fromPlayerId: Id
-    readonly toPlayerId: Id
-    readonly total: number
-  }[]
+  readonly commanderDamage?: {
+    readonly lethal: number
+    readonly totals: readonly CommanderTotal<Id>[]
+  }
+}
+
+export function commanderOutState<Id extends string>(
+  lethal: number | undefined,
+  totals: readonly CommanderTotal<Id>[] | undefined,
+): OutState<Id>["commanderDamage"] {
+  return lethal === undefined || totals === undefined ? undefined : { lethal, totals }
 }
 
 export function outReason<Id extends string>(
   state: OutState<Id>,
   playerId: Id,
 ): OutReason<Id> | undefined {
-  const lethal = state.commanderDamage?.find(
-    (damage) =>
-      damage.toPlayerId === playerId &&
-      damage.fromPlayerId !== playerId &&
-      isCommanderLethal(damage.total),
-  )
+  const { commanderDamage } = state
+  const lethal =
+    commanderDamage &&
+    commanderDamage.totals.find(
+      (damage) =>
+        damage.toPlayerId === playerId &&
+        damage.fromPlayerId !== playerId &&
+        damage.total >= commanderDamage.lethal,
+    )
   if (lethal) {
     return { cause: "commanderDamage", fromPlayerId: lethal.fromPlayerId, total: lethal.total }
   }

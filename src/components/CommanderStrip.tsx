@@ -3,7 +3,6 @@ import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated from "react-native-reanimated"
 
-import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -35,6 +34,7 @@ export interface CommanderStripProps {
   players: readonly CommanderBoardPlayer[]
   seats: readonly CommanderBoardSeat[]
   incoming: Record<PlayerId, number>
+  lethal: number
   foreground: string
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
@@ -62,6 +62,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   players,
   seats,
   incoming,
+  lethal,
   foreground,
   contentRotation,
   contentInsets,
@@ -178,10 +179,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                     size,
                     { backgroundColor: player.color, borderColor: overlayTint(foreground, 0.5) },
                     total === 0 && themed($idleDisc),
-                    total >= COMMANDER_LETHAL_DAMAGE && [
-                      themed($lethalDisc),
-                      { borderColor: foreground },
-                    ],
+                    total >= lethal && [themed($lethalDisc), { borderColor: foreground }],
                   ]}
                 >
                   {total > 0 ? (

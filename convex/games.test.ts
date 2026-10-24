@@ -1591,6 +1591,38 @@ describe("connected commander damage claims", () => {
     expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(4)
   })
 
+  it("knocks a Pauper Commander seat out at 16 commander damage", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, {
+      system: "mtg",
+      ruleset: "pauperCommander",
+      startingLife: 30,
+    })
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-0016",
+        16,
+      ),
+    )
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-claim-0016",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_001,
+    })
+    const projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players[1]).toMatchObject({
+      currentLife: 14,
+      eliminatedByCommanderDamage: true,
+    })
+  })
+
   it("supports negative claims, declines without changing life, and projects lethal damage", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

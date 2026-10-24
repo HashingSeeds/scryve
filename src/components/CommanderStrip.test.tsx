@@ -27,6 +27,7 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
         players={players}
         seats={seats}
         incoming={{}}
+        lethal={21}
         foreground="#FFFFFF"
         contentRotation={0}
         open={false}

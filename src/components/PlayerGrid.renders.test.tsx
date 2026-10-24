@@ -31,6 +31,7 @@ const players = Array.from({ length: 4 }, (_, seat) => ({
 
 const commanderDamage = {
   incomingFor: () => ({}),
+  lethal: 21,
   armedPlayerId: null,
   onPressSword: jest.fn(),
   onStage: jest.fn(),

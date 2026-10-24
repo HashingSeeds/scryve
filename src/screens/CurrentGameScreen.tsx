@@ -41,7 +41,7 @@ import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
-import { supportsCommanderDamage } from "@/features/game/playSystems"
+import { playCommanderLethal } from "@/features/game/playSystems"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import type {
   GamePlayer,
@@ -208,7 +208,8 @@ export function CurrentGameScreen({
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
-  const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
+  const commanderLethal = playCommanderLethal(system, runtime.game.format)
+  const commanderDamageEnabled = commanderLethal !== undefined
   const outState = useMemo(() => localOutState(runtime.game), [runtime.game])
 
   function toggleSword(player: GamePlayer) {
@@ -435,6 +436,7 @@ export function CurrentGameScreen({
                 commanderDamageEnabled
                   ? {
                       incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
+                      lethal: commanderLethal,
                       armedPlayerId,
                       inspection: { playerId: inspectedPlayerId, onChange: inspectCommanderDamage },
                       onPressSword: toggleSword,

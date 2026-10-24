@@ -36,6 +36,7 @@ function board(
         columns={columns}
         contentRotation={0}
         incoming={{} as Record<PlayerId, number>}
+        lethal={21}
         foreground="#FFFFFF"
         seatNumber={owner + 1}
         {...overrides}

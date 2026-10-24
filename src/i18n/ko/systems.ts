@@ -54,6 +54,7 @@ export default {
   formatBlurb: {
     mtg: {
       commander: "100장, 싱글턴",
+      pauperCommander: "커먼, 언커먼 커맨더",
       standard: "최근 세트",
       pioneer: "라브니카로의 귀환 이후",
       modern: "8판 이후",

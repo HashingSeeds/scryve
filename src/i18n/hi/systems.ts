@@ -54,6 +54,7 @@ export default {
   formatBlurb: {
     mtg: {
       commander: "100 कार्ड, सिंगलटन",
+      pauperCommander: "कॉमन्स, अनकॉमन कमांडर",
       standard: "हाल के सेट",
       pioneer: "Return to Ravnica से आगे",
       modern: "8th Edition से आगे",
