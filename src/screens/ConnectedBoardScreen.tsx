@@ -666,9 +666,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
   }, [])
-  const toggleMenu = useCallback(() => {
+  const toggleMenu = () => {
+    sendCommanderDamage()
     setMenuOpen((current) => !current)
-  }, [])
+  }
   const closeMenu = useCallback(() => {
     setMenuOpen(false)
   }, [])
@@ -777,8 +778,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     const changes = Object.entries(armedCommander.staged).flatMap(([toPlayerId, delta]) =>
       delta === undefined || delta === 0 ? [] : [{ toPlayerId, delta }],
     )
-    if (!changes.length) return
-    controls.submitCommanderDamage(armedCommander.playerId, changes)
+    if (changes.length) controls.submitCommanderDamage(armedCommander.playerId, changes)
     setArmedCommander(null)
     setInspectedPlayerId(null)
   }
@@ -957,13 +957,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onPress: closeDice,
             ...(diceArmed ? { heldTool: diceArmed } : {}),
           }
-        : armedCommander || inspectedPlayerId
+        : inspectedPlayerId
           ? {
               label: translate("connected:board.menu.exitCommanderDamage"),
               onPress: exitCommanderDamage,
             }
           : undefined,
-    [armedCommander, closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderDamage],
+    [closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderDamage],
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
@@ -1030,7 +1030,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                         ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
                         : 0,
                       onSend: sendCommanderDamage,
-                      onCancel: () => setArmedCommander(null),
                     },
                     pendingFor: (player) =>
                       controlled.has(player.id)
