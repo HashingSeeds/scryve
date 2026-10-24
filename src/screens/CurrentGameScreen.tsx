@@ -13,7 +13,7 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
-import type { FirstPlayerOffer } from "@/components/FirstPlayerChips"
+import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import type { GameMenuActions } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
@@ -24,7 +24,7 @@ import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
-import { systemDice } from "@/features/game/dice"
+import { CLAIM_CHIP, systemDice, type DiceSeatChip } from "@/features/game/dice"
 import {
   canContinueMatch,
   drawsLabel,
@@ -99,10 +99,7 @@ export function CurrentGameScreen({
   ownerId,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const { isFoil } = useRevenueCat()
@@ -160,29 +157,22 @@ export function CurrentGameScreen({
     }
     if (loser && loserSeat !== undefined)
       return {
-        color: loser.color,
-        glyph: { seatNumber: loserSeat + 1, shape: loser.shape },
-        label: translate("board:firstPlayer.chip.loserChooses", { name: loser.name }),
+        glyph: { seatNumber: loserSeat + 1, shape: loser.shape, color: loser.color },
         accessibilityLabel: translate("board:firstPlayer.loserChooses", { name: loser.name }),
         onPress: offer(() => diceAsk(loser.id, "loss")),
       }
     if (systemDice(system).twoPlayerCoinFlip && playerCount === 2)
       return {
-        color: colors.gameMenu.actions.dice,
         glyph: { tool: "coin" },
-        label: translate("board:firstPlayer.chip.flip"),
         accessibilityLabel: translate("board:firstPlayer.flip"),
         onPress: offer(diceFlip),
       }
     return {
-      color: colors.gameMenu.actions.dice,
       glyph: { tool: die },
-      label: translate("board:firstPlayer.chip.roll"),
       accessibilityLabel: translate("board:firstPlayer.roll"),
       onPress: offer(diceRollOff),
     }
   }, [
-    colors.gameMenu.actions.dice,
     diceAsk,
     diceFlip,
     die,
@@ -195,6 +185,17 @@ export function CurrentGameScreen({
     playerCount,
     system,
   ])
+  // why: while the offer stands, every seat carries an empty 1st that claims first in one tap.
+  const claimingGrid = firstPlayer
+    ? {
+        ...dice.grid,
+        chipsFor: (player: GamePlayer) => [...dice.grid.chipsFor(player), CLAIM_CHIP],
+        onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
+          if (chip.kind === "claim") markFirstPlayerUsed()
+          dice.grid.onPressChip(player, chip)
+        },
+      }
+    : dice.grid
   // why: rolling by hand means the players skipped the first-player offer.
   const diceTools = useMemo(
     () =>
@@ -450,7 +451,7 @@ export function CurrentGameScreen({
                   : undefined
               }}
               table={runtime.tableRuntime}
-              dice={dice.grid}
+              dice={claimingGrid}
               onChange={runtime.changeLife}
             />
           )}

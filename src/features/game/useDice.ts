@@ -9,6 +9,7 @@ import { useStableCallbacks } from "@/utils/useStableCallbacks"
 
 import {
   armTool,
+  claimFirst,
   clearFirst,
   clearResult,
   defaultTool,
@@ -19,7 +20,6 @@ import {
   diceSeatView,
   EMPTY_DICE,
   firstPlayerSeat,
-  flipForFirst,
   offerChoice,
   pickFirst,
   rerollTies,
@@ -28,6 +28,7 @@ import {
   rollOffAnnouncement,
   settleFirst,
   settleResult,
+  startFlip,
   startRollOff,
   systemDice,
   toolLabel,
@@ -38,7 +39,7 @@ import {
 } from "./dice"
 import type { GamePlayer, PlayerId } from "./types"
 
-const BLOOM_MS = { roll: 2300, first: 2500 } as const
+const BLOOM_MS = { roll: 2300, first: 2500, flip: 1100, tie: 1600 } as const
 const FIRST_HOLD = "first"
 const FADE_HOLD = "fade"
 
@@ -199,10 +200,33 @@ export function useDice(
   })
 
   const flip = stable("flip", () => {
-    const winner = flipForFirst(seatIds())
-    announce(translate("board:dice.wonFlipGoFirstOrSecond", { name: name(winner) }))
-    set(offerChoice(dice, winner, "flip"))
+    const next = startFlip(dice, seatIds())
+    if (next.first?.kind === "flip")
+      announce(translate("board:dice.wonFlipGoFirstOrSecond", { name: name(next.first.seatId) }))
+    set(hold(FIRST_HOLD, BLOOM_MS.flip, settleFirst)(next))
   })
+
+  const claim = stable("claim", (player: GamePlayer) => {
+    dropHold(FIRST_HOLD)
+    announce(translate("board:dice.goesFirst", { name: player.name }))
+    set(claimFirst(dice, player.id))
+  })
+
+  const rerollTied = stable("rerollTied", () => {
+    const next = rerollTies(dice)
+    if (next === dice) return
+    const message = rollOffAnnouncement(next.first, players)
+    if (message) announce(message)
+    set(holdFirst(next))
+  })
+  const { first } = dice
+  const tied = first?.kind === "rolloff" && first.pool.length > 1
+  // why: the table rerolls a tie on its own, after a beat to read who tied; a fresh tie restarts the beat.
+  useEffect(() => {
+    if (!tied) return
+    const timer = setTimeout(rerollTied, BLOOM_MS.tie)
+    return () => clearTimeout(timer)
+  }, [first, tied, rerollTied])
 
   const ask = stable("ask", (seatId: PlayerId, reason: ChoiceReason) => {
     announce(translate("board:dice.goFirstOrSecond", { name: name(seatId) }))
@@ -233,7 +257,7 @@ export function useDice(
       if (message) announce(message)
       return set(holdFirst(next))
     }
-    if (view?.kind === "rolloff" || view?.kind === "first") {
+    if (view?.kind === "rolloff" || view?.kind === "first" || view?.kind === "flip") {
       dropHold(FIRST_HOLD)
       return set(settleFirst(dice))
     }
@@ -251,7 +275,8 @@ export function useDice(
     set(crown(pickFirst(dice, winner, note)))
   })
 
-  const clearChip = stable("clearChip", (player: GamePlayer, chip: DiceSeatChip) => {
+  const pressChip = stable("pressChip", (player: GamePlayer, chip: DiceSeatChip) => {
+    if (chip.kind === "claim") return claim(player)
     set(chip.kind === "first" ? clearFirst(dice) : clearResult(dice, player.id))
   })
 
@@ -292,7 +317,7 @@ export function useDice(
       chipsFor: (player: GamePlayer) => diceSeatChips(dice, player.id),
       onPressSeat: pressSeat,
       onChoose: choose,
-      onClearChip: clearChip,
+      onPressChip: pressChip,
     },
   }
 }

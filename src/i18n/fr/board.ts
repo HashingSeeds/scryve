@@ -22,7 +22,7 @@ export default {
     unnamedPlayer: "Joueur",
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}} a fait {{value}}. Jouer en premier ou en second",
-    tieRollAgain: "Égalité à {{value}}, {{names}}. Relancer",
+    tieRollAgain: "Égalité à {{value}}, {{names}}. Nouveau lancer",
     nameSeparator: " et ",
     goesFirst: "{{name}} joue en premier",
     wonFlipGoFirstOrSecond: "{{name}} a gagné le tirage. Jouer en premier ou en second",
@@ -45,7 +45,8 @@ export default {
       first: "Jouer en premier",
       second: "Jouer en second",
     },
-    tieTapToRollAgain: "Égalité. Touchez pour relancer",
+    tie: "Égalité",
+    flippingForFirst: "Pile ou face pour décider qui commence",
     out: "Éliminé",
     choiceReason: {
       flip: "A gagné le lancer de pièce",
@@ -55,7 +56,7 @@ export default {
     rolloffLabel: {
       won: "{{name}} a fait {{value}}, joue en premier",
       chooses: "{{name}} a obtenu {{value}}, a gagné le lancer",
-      tied: "{{name}} a obtenu {{value}}, égalité, touchez pour relancer",
+      tied: "{{name}} a obtenu {{value}}, égalité, nouveau lancer",
       out: "{{name}} a obtenu {{value}}, éliminé",
       lost: "{{name}} a obtenu {{value}}",
     },
@@ -99,11 +100,7 @@ export default {
     loserChooses: "{{name}} a perdu la dernière partie. Choisissez qui joue en premier",
     flip: "Pile ou face pour jouer en premier",
     roll: "Lancer pour jouer en premier",
-    chip: {
-      roll: "Lancer pour jouer",
-      flip: "Pile ou face",
-      loserChooses: "{{name}} choisit",
-    },
+    claim: "Désigner {{name}} comme premier joueur",
   },
   layout: {
     balanced: "Équilibrée",

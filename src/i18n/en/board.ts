@@ -16,7 +16,7 @@ const board = {
     unnamedPlayer: "Player",
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}} rolled {{value}}. Go first or second",
-    tieRollAgain: "Tie at {{value}}, {{names}}. Roll again",
+    tieRollAgain: "Tie at {{value}}, {{names}}. Rolling again",
     nameSeparator: " and ",
     goesFirst: "{{name}} goes first",
     wonFlipGoFirstOrSecond: "{{name}} won the flip. Go first or second",
@@ -34,7 +34,9 @@ const board = {
     goesFirstHeadline: "Goes first",
     goesOrder: { first: "{{name}} goes first", second: "{{name}} goes second" },
     goOrder: { first: "Go first", second: "Go second" },
-    tieTapToRollAgain: "Tie. Tap to roll again",
+    // Tiny label under a tied roll; the tied seats reroll on their own.
+    tie: "Tie",
+    flippingForFirst: "Flipping for who goes first",
     out: "Out",
     choiceReason: {
       flip: "Won the flip",
@@ -44,7 +46,7 @@ const board = {
     rolloffLabel: {
       won: "{{name}} rolled {{value}}, goes first",
       chooses: "{{name}} rolled {{value}}, won the roll",
-      tied: "{{name}} rolled {{value}}, tied, tap to roll again",
+      tied: "{{name}} rolled {{value}}, tied, rolling again",
       out: "{{name}} rolled {{value}}, out",
       lost: "{{name}} rolled {{value}}",
     },
@@ -84,12 +86,7 @@ const board = {
     loserChooses: "{{name}} lost the last game. Choose who goes first",
     flip: "Flip for who goes first",
     roll: "Roll for who goes first",
-    // One line on a small pill: at most about 16 Latin or 9 CJK characters plus the name.
-    chip: {
-      roll: "Roll for first",
-      flip: "Flip for first",
-      loserChooses: "{{name}} picks who's first",
-    },
+    claim: "Mark {{name}} as going first",
   },
   layout: {
     balanced: "Balanced",

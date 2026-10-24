@@ -22,7 +22,7 @@ export default {
     unnamedPlayer: "खिलाड़ी",
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}} ने {{value}} रोल किया। पहले या बाद में खेलें",
-    tieRollAgain: "{{value}} पर बराबरी, {{names}}। फिर से फेंकें",
+    tieRollAgain: "{{value}} पर टाई, {{names}}। फिर से रोल कर रहे हैं",
     nameSeparator: " और ",
     goesFirst: "{{name}} पहले खेलेंगे",
     wonFlipGoFirstOrSecond: "{{name}} ने टॉस जीता। पहले या बाद में खेलें",
@@ -45,7 +45,8 @@ export default {
       first: "पहले खेलें",
       second: "दूसरे खेलें",
     },
-    tieTapToRollAgain: "बराबरी। फिर फेंकने के लिए टैप करें",
+    tie: "टाई",
+    flippingForFirst: "पहले कौन खेलेगा, इसके लिए टॉस हो रहा है",
     out: "बाहर",
     choiceReason: {
       flip: "सिक्का जीता",
@@ -55,7 +56,7 @@ export default {
     rolloffLabel: {
       won: "{{name}} ने {{value}} रोल किया, पहले खेलेंगे",
       chooses: "{{name}} ने {{value}} फेंका, रोल जीता",
-      tied: "{{name}} ने {{value}} फेंका, बराबरी, फिर फेंकने के लिए टैप करें",
+      tied: "{{name}} ने {{value}} रोल किया, टाई, फिर से रोल कर रहे हैं",
       out: "{{name}} ने {{value}} फेंका, बाहर",
       lost: "{{name}} ने {{value}} फेंका",
     },
@@ -98,11 +99,7 @@ export default {
     loserChooses: "{{name}} पिछला गेम हार गए। चुनें कि पहले कौन खेलेगा",
     flip: "पहले कौन खेलेगा, सिक्का उछालकर तय करें",
     roll: "पहले कौन खेलेगा, रोल करके तय करें",
-    chip: {
-      roll: "पहले के लिए रोल करें",
-      flip: "पहले के लिए टॉस करें",
-      loserChooses: "{{name}} चुनें कौन पहले",
-    },
+    claim: "{{name}} को पहले खेलने वाले के रूप में चिह्नित करें",
   },
   layout: {
     balanced: "संतुलित",

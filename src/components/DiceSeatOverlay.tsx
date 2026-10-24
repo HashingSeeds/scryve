@@ -41,7 +41,7 @@ export interface LifeCardDice {
   chips?: readonly DiceSeatChip[]
   onPress: () => void
   onChoose?: (order: "first" | "second") => void
-  onClearChip?: (chip: DiceSeatChip) => void
+  onPressChip?: (chip: DiceSeatChip) => void
 }
 
 export function diceCoversSeat(dice: LifeCardDice | undefined): boolean {
@@ -276,6 +276,7 @@ function passingFace(step: number, die: BagDie) {
 function rollingTool(view: DiceSeatView): DiceTool | undefined {
   if (view.kind === "roll") return view.roll.tool
   if (view.kind === "rolloff") return view.die
+  if (view.kind === "flip") return "coin"
   return undefined
 }
 
@@ -370,13 +371,20 @@ function Result({
             : view.status === "chooses"
               ? label(translate("board:dice.choiceReason.roll"))
               : view.status === "tied"
-                ? label(translate("board:dice.tieTapToRollAgain"))
+                ? label(translate("board:dice.tie"))
                 : view.status === "out"
                   ? label(translate("board:dice.out"))
                   : null}
       </>
     )
   if (view.kind === "waiting") return null
+  if (view.kind === "flip")
+    return (
+      <>
+        {label(translate("board:dice.tool.coin"))}
+        <FlippingCoin flip={tumble.flip} foreground={foreground} compact={compact} />
+      </>
+    )
   return (
     <>
       {label(toolLabel(view.roll.tool))}
@@ -429,6 +437,7 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
   if (view?.kind === "choice")
     return translate(`board:dice.choiceLabel.${view.reason}`, { name: playerName })
   if (view?.kind === "waiting") return translate("board:dice.waitingForChoice")
+  if (view?.kind === "flip") return translate("board:dice.flippingForFirst")
   if (view?.kind === "first")
     return translate(`board:dice.firstLabel.${view.status}`, { name: playerName })
   return armed === "coin"

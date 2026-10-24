@@ -22,7 +22,7 @@ export default {
     unnamedPlayer: "Jugador",
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}} sacó {{value}}. Jugar primero o segundo",
-    tieRollAgain: "Empate a {{value}}, {{names}}. Tirar de nuevo",
+    tieRollAgain: "Empate a {{value}}, {{names}}. Se tira de nuevo",
     nameSeparator: " y ",
     goesFirst: "{{name}} juega primero",
     wonFlipGoFirstOrSecond: "{{name}} ganó el lanzamiento. Jugar primero o segundo",
@@ -45,7 +45,8 @@ export default {
       first: "Jugar primero",
       second: "Ir segundo",
     },
-    tieTapToRollAgain: "Empate. Toca para tirar de nuevo",
+    tie: "Empate",
+    flippingForFirst: "Lanzando la moneda para decidir quién juega primero",
     out: "Fuera",
     choiceReason: {
       flip: "Ganó el lanzamiento",
@@ -55,7 +56,7 @@ export default {
     rolloffLabel: {
       won: "{{name}} sacó {{value}}, juega primero",
       chooses: "{{name}} sacó {{value}}, ganó la tirada",
-      tied: "{{name}} sacó {{value}}, empate, toca para tirar de nuevo",
+      tied: "{{name}} sacó {{value}}, empate, se tira de nuevo",
       out: "{{name}} sacó {{value}}, fuera",
       lost: "{{name}} sacó {{value}}",
     },
@@ -99,11 +100,7 @@ export default {
     loserChooses: "{{name}} perdió la última partida. Elige quién juega primero",
     flip: "Lanzar moneda para decidir quién juega primero",
     roll: "Tirar dado para decidir quién juega primero",
-    chip: {
-      roll: "Tirar dado",
-      flip: "Lanzar moneda",
-      loserChooses: "{{name}} elige quién va",
-    },
+    claim: "Marcar a {{name}} como quien juega primero",
   },
   layout: {
     balanced: "Equilibrado",

@@ -73,9 +73,9 @@ describe("CurrentGameScreen match mode", () => {
     endGame(view, 0)
     fireEvent.press(view.getByTestId("next-game-button"))
     const offer = "Grace lost the last game. Choose who goes first"
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(offer)
-    fireEvent.press(view.getByTestId("first-player-badge"))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(offer)
+    fireEvent.press(view.getByTestId("first-player-tab"))
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
 
     fireEvent.press(view.getByTestId("dice-go-first"))
     fireEvent.press(view.getByTestId("life-seat-1-1"))
@@ -84,7 +84,7 @@ describe("CurrentGameScreen match mode", () => {
     fireEvent.press(view.getByTestId("abandon-game-button"))
 
     expect(view.getByTestId("match-context")).toHaveTextContent(/^Game 2/)
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(offer)
+    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(offer)
   })
 
   it("offers the next match's first choice to the loser of the last game", () => {
@@ -97,7 +97,7 @@ describe("CurrentGameScreen match mode", () => {
     fireEvent.press(view.getByTestId("confirm-end-match-button"))
 
     expect(view.queryByTestId("end-match-dialog")).toBeNull()
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
       "Grace lost the last game. Choose who goes first",
     )
   })

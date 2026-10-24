@@ -748,14 +748,14 @@ export const LifeCard = memo(function LifeCard({
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
-            {diceChips?.length && dice?.onClearChip && !dice.view && !editorOpen ? (
+            {diceChips?.length && dice?.onPressChip && !dice.view && !editorOpen ? (
               <DiceChips
                 seatNumber={seatNumber}
                 playerName={displayName}
                 foreground={foreground}
                 compact={compact}
                 chips={diceChips}
-                onClear={dice.onClearChip}
+                onPress={dice.onPressChip}
                 bloomCenterInRow={
                   identityRowAt && cardSize.width > 0
                     ? {

@@ -22,7 +22,7 @@ export default {
     unnamedPlayer: "플레이어",
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}}님이 {{value}}이(가) 나왔습니다. 선공 또는 후공을 선택하세요",
-    tieRollAgain: "{{value}}로 동점: {{names}}. 다시 굴리기",
+    tieRollAgain: "{{value}} 동점, {{names}}. 다시 굴립니다",
     nameSeparator: " 및 ",
     goesFirst: "{{name}}님이 선공입니다",
     wonFlipGoFirstOrSecond: "{{name}}님이 코인 던지기에서 이겼습니다. 선공 또는 후공을 선택하세요",
@@ -45,7 +45,8 @@ export default {
       first: "선공",
       second: "후공",
     },
-    tieTapToRollAgain: "동점. 탭하여 다시 굴리기",
+    tie: "동점",
+    flippingForFirst: "선공을 정하기 위해 동전을 던집니다",
     out: "탈락",
     choiceReason: {
       flip: "동전 던지기 승리",
@@ -55,7 +56,7 @@ export default {
     rolloffLabel: {
       won: "{{name}}님이 {{value}}이(가) 나와 선공입니다",
       chooses: "{{name}}: {{value}} 나옴, 주사위 승리",
-      tied: "{{name}}: {{value}} 나옴, 동점, 탭하여 다시 굴리기",
+      tied: "{{name}} 님이 {{value}}이(가) 나와 동점입니다. 다시 굴립니다",
       out: "{{name}}: {{value}} 나옴, 탈락",
       lost: "{{name}}: {{value}} 나옴",
     },
@@ -97,11 +98,7 @@ export default {
     loserChooses: "{{name}}님이 지난 게임에서 패배했습니다. 선공을 정하세요",
     flip: "코인을 던져 선공 정하기",
     roll: "주사위를 굴려 선공 정하기",
-    chip: {
-      roll: "선공 주사위",
-      flip: "선공 동전 던지기",
-      loserChooses: "{{name}} 선공 선택",
-    },
+    claim: "{{name}} 님을 선공으로 표시하세요",
   },
   layout: {
     balanced: "균형",

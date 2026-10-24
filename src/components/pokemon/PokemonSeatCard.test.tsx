@@ -92,7 +92,7 @@ describe("PokemonSeatCard", () => {
     const dice = {
       chips: [{ kind: "roll", roll: { tool: "coin", value: "Heads" } }] as const,
       onPress: jest.fn(),
-      onClearChip: jest.fn(),
+      onPressChip: jest.fn(),
     }
     const { rerender } = render(<Seat harness={table} seat={0} />)
     const layout = { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 420 } } }
@@ -568,7 +568,7 @@ describe("PokemonSeatCard", () => {
     const dice = {
       chips: [{ kind: "roll", roll: { tool: "coin", value: "Heads" } }] as const,
       onPress: jest.fn(),
-      onClearChip: jest.fn(),
+      onPressChip: jest.fn(),
     }
     view.rerender(
       <Seat
