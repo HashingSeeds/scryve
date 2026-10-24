@@ -53,6 +53,7 @@ it("shows a record under ten games and a percentage from ten", () => {
     text: "40%",
     tooFew: false,
     games: 10,
+    percent: 40,
   })
   expect(recordText(slice({ draws: 1 }))).toBe("4-4-1")
   expect(honestRate(sumSlices([])).text).toBe("0-0")
@@ -82,7 +83,7 @@ it("compares the most common pod size without blending sizes or sources", () => 
 it("excludes unknown outcomes from rates, sample thresholds and likely ranges", () => {
   const known = slice({ games: 10, wins: 4, losses: 5, draws: 1 })
   const withUnknown = { ...known, games: 30 }
-  expect(honestRate(withUnknown)).toEqual({ text: "40%", tooFew: false, games: 10 })
+  expect(honestRate(withUnknown)).toEqual({ text: "40%", tooFew: false, games: 10, percent: 40 })
   expect(honestRate(slice({ games: 30 }))).toEqual({ text: "4-4", tooFew: true, games: 8 })
   expect(likelyRange(withUnknown)).toEqual(likelyRange(known))
   const unknownOnly = { games: 30, wins: 0, losses: 0, draws: 0 }

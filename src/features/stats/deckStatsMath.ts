@@ -1,6 +1,6 @@
 import type { FunctionReturnType } from "convex/server"
 
-import { MIN_RATED_GAMES, recordText } from "@/features/decks/deckCopy"
+import { honestRate, recordText } from "@/features/decks/deckCopy"
 import type { StatsSource } from "@/features/decks/deckStatLines"
 
 import type { api } from "../../../convex/_generated/api"
@@ -48,17 +48,7 @@ export function exactRecord(row: DeckSummary["all"], source: StatsSource): Recor
   }
 }
 
-export { recordText }
-
-export function honestRate(record: RecordCounts) {
-  const games = record.wins + record.losses + record.draws
-  return {
-    text:
-      games < MIN_RATED_GAMES ? recordText(record) : `${Math.round((record.wins / games) * 100)}%`,
-    tooFew: games < MIN_RATED_GAMES,
-    games,
-  }
-}
+export { honestRate, recordText }
 
 export function chanceRate(slices: readonly StatsSlice[], source: StatsSource = "all") {
   const pods = new Set(
