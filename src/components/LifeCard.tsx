@@ -13,6 +13,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated"
 
@@ -34,6 +35,7 @@ import {
   type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
+import type { CommanderFacing } from "./commanderDamageLayout"
 import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
@@ -82,6 +84,9 @@ export type LifeCardCommanderDamage = Omit<
   attackerName?: string
   attacker?: CommanderAttacker
   stagedAgainstOwner?: number
+  power?: number
+  onPowerStep?: (step: 1 | -1) => void
+  facing?: CommanderFacing
   onStage?: (step: number) => void
   armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
   pendingClaims?: readonly CommanderClaim[]
@@ -338,9 +343,9 @@ export const LifeCard = memo(function LifeCard({
           playerName: displayName,
           submit: commanderDamage.armBar ? "send" : "done",
           mark: { color, shape, seatNumber },
-          submitDisabled: commanderDamage.armBar?.stagedTargets === 0,
+          power: commanderDamage.power ?? 1,
+          onPowerStep: commanderDamage.onPowerStep ?? (() => {}),
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
-          onCancel: commanderDamage.armBar?.onCancel,
         }
       : commanderDamage && armedCommanderId
         ? {
@@ -351,9 +356,36 @@ export const LifeCard = memo(function LifeCard({
             total:
               (commanderDamage.incoming[armedCommanderId] ?? 0) +
               (commanderDamage.stagedAgainstOwner ?? 0),
+            power: commanderDamage.power ?? 1,
+            facing: commanderDamage.facing ?? {},
             onChange: (step) => commanderDamage.onStage?.(step),
           }
         : undefined
+  const attackerSide = commanderCardMode?.kind === "source"
+  const knock = useSharedValue(0)
+  const defenderTotal = commanderCardMode?.kind === "target" ? commanderCardMode.total : undefined
+  const knockFacing = commanderCardMode?.kind === "target" ? commanderCardMode.facing : undefined
+  const lastDefenderTotal = useRef(defenderTotal)
+  useEffect(() => {
+    const previous = lastDefenderTotal.current
+    lastDefenderTotal.current = defenderTotal
+    if (defenderTotal === undefined || previous === undefined || defenderTotal <= previous) return
+    if (reducedMotion !== false) return
+    knock.value = withSequence(
+      withTiming(1, { duration: 95 }),
+      withTiming(-0.25, { duration: 130 }),
+      withTiming(0, { duration: 155 }),
+    )
+  }, [defenderTotal, knock, reducedMotion])
+  const knockX = knockFacing?.x === "left" ? 1 : knockFacing?.x === "right" ? -1 : 0
+  const knockY = knockFacing?.y === "top" ? 1 : knockFacing?.y === "bottom" ? -1 : 0
+  const knockDistance = knockX && knockY ? KNOCKBACK / Math.SQRT2 : KNOCKBACK
+  const knockStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: knock.value * knockX * knockDistance },
+      { translateY: knock.value * knockY * knockDistance },
+    ],
+  }))
   const lifeControlsShown =
     !commanderCardMode &&
     !commanderOverviewOpen &&
@@ -450,7 +482,7 @@ export const LifeCard = memo(function LifeCard({
   }
 
   return (
-    <View
+    <Animated.View
       testID={`life-card-seat-${seatNumber}`}
       accessibilityLabel={[ownershipLabel, outLabel]
         .filter((part): part is string => Boolean(part))
@@ -466,6 +498,7 @@ export const LifeCard = memo(function LifeCard({
         staleSince !== undefined && themed($staleCard),
         { backgroundColor: color },
         style,
+        knockStyle,
       ]}
     >
       {shape && isProMarkShape(shape) && cardSize.height > 0 ? (
@@ -488,23 +521,16 @@ export const LifeCard = memo(function LifeCard({
           commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
         }
         accessibilityElementsHidden={
-          (!localCommander && commanderOverviewOpen) ||
-          !!commanderCardMode ||
-          tableSheetOpen ||
-          diceCovers
+          (!localCommander && commanderOverviewOpen) || attackerSide || tableSheetOpen || diceCovers
         }
         importantForAccessibility={
-          (!localCommander && commanderOverviewOpen) ||
-          commanderCardMode ||
-          tableSheetOpen ||
-          diceCovers
+          (!localCommander && commanderOverviewOpen) || attackerSide || tableSheetOpen || diceCovers
             ? "no-hide-descendants"
             : "auto"
         }
         style={[
           themed($content),
-          (commanderCardMode || (!localCommander && commanderOverviewOpen)) &&
-            themed($mutedContent),
+          (attackerSide || (!localCommander && commanderOverviewOpen)) && themed($mutedContent),
           localOverviewVisible && $overviewReadout,
         ]}
       >
@@ -660,12 +686,13 @@ export const LifeCard = memo(function LifeCard({
       {commanderCardMode ? (
         <CommanderDamageCardControls
           seatNumber={seatNumber}
+          playerName={displayName}
           foreground={foreground}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
+          menuCorner={menuCorner}
           compact={compact}
           mode={commanderCardMode}
-          life={localCommander ? life : undefined}
         />
       ) : lifeControlsShown ? (
         <LifeControls
@@ -922,9 +949,11 @@ export const LifeCard = memo(function LifeCard({
           onClose={() => setEditorOpen(false)}
         />
       ) : null}
-    </View>
+    </Animated.View>
   )
 }, structurallyEqual)
+
+const KNOCKBACK = 12
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,

@@ -398,10 +398,10 @@ export function CurrentGameScreen({
             onPress: closeDice,
             ...(diceArmed ? { heldTool: diceArmed } : {}),
           }
-        : armedPlayerId || inspectedPlayerId
+        : inspectedPlayerId
           ? { label: translate("board:menu.exitCommander"), onPress: exitCommanderMode }
           : undefined,
-    [armedPlayerId, closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderMode],
+    [closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderMode],
   )
 
   return (

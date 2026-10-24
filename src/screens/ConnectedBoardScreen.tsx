@@ -777,8 +777,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     const changes = Object.entries(armedCommander.staged).flatMap(([toPlayerId, delta]) =>
       delta === undefined || delta === 0 ? [] : [{ toPlayerId, delta }],
     )
-    if (!changes.length) return
-    controls.submitCommanderDamage(armedCommander.playerId, changes)
+    if (changes.length) controls.submitCommanderDamage(armedCommander.playerId, changes)
     setArmedCommander(null)
     setInspectedPlayerId(null)
   }
@@ -957,13 +956,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onPress: closeDice,
             ...(diceArmed ? { heldTool: diceArmed } : {}),
           }
-        : armedCommander || inspectedPlayerId
+        : inspectedPlayerId
           ? {
               label: translate("connected:board.menu.exitCommanderDamage"),
               onPress: exitCommanderDamage,
             }
           : undefined,
-    [armedCommander, closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderDamage],
+    [closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderDamage],
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen

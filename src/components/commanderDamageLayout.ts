@@ -62,3 +62,31 @@ export function commanderCellSize(input: {
   const fitted = Math.floor(Math.min(preferred, fitsWidth, fitsHeight))
   return Math.max(COMMANDER_MIN_CELL_SIZE, fitted)
 }
+
+export interface CommanderFacing {
+  x?: "left" | "right"
+  y?: "top" | "bottom"
+}
+
+function seatSpan(gridRows: readonly (number | null)[][], playerIndex: number) {
+  for (const [row, slots] of gridRows.entries()) {
+    const column = slots.indexOf(playerIndex)
+    if (column >= 0) return { row, left: column / slots.length, right: (column + 1) / slots.length }
+  }
+  return undefined
+}
+
+export function commanderFacing(
+  gridRows: readonly (number | null)[][],
+  attackerIndex: number,
+  defenderIndex: number,
+): CommanderFacing {
+  const attacker = seatSpan(gridRows, attackerIndex)
+  const defender = seatSpan(gridRows, defenderIndex)
+  if (!attacker || !defender || attackerIndex === defenderIndex) return {}
+  const x = attacker.left + attacker.right < defender.left + defender.right ? "left" : "right"
+  const y = attacker.row < defender.row ? "top" : "bottom"
+  if (attacker.row === defender.row) return { x }
+  const sharesColumn = attacker.left < defender.right && defender.left < attacker.right
+  return sharesColumn ? { y } : { x, y }
+}

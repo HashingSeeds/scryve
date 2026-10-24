@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { DiceSeatChip } from "@/features/game/dice"
+import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
@@ -17,7 +18,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
-import { commanderBoardSeats } from "./commanderDamageLayout"
+import { commanderBoardSeats, commanderFacing } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
@@ -30,6 +31,7 @@ import {
   LIFE_TARGET_SIZE,
   TUCKS_INTO_SCREEN_CORNERS,
   type LifeCardContentInsets,
+  type LifeCardContentRotation,
   type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
@@ -253,6 +255,7 @@ export function PlayerGrid({
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const stable = useStableCallbacks()
+  const [commanderPowers, setCommanderPowers] = useState<Partial<Record<PlayerId, number>>>({})
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
   const layout = getPlayerGridLayout({
@@ -305,6 +308,26 @@ export function PlayerGrid({
       )
     : null
   const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
+  const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
+  const armedPower = armedPlayer ? (commanderPowers[armedPlayer.id] ?? 1) : 1
+  const seatRotations = new Map<number, LifeCardContentRotation>()
+  rows.forEach((row, rowIndex) =>
+    row.forEach((slot, columnIndex) => {
+      const index = seatedRows[rowIndex][columnIndex]
+      if (slot === null || index === null) return
+      seatRotations.set(
+        index,
+        getPlayerContentRotation({
+          playerCount: players.length,
+          layout,
+          row,
+          rowIndex,
+          columnIndex,
+          slot,
+        }),
+      )
+    }),
+  )
   const commanderPlayers = players.map(({ id, name, color, shape }): CommanderBoardPlayer => ({
     id,
     name,
@@ -483,8 +506,23 @@ export function PlayerGrid({
                             attacker: armedPlayer && {
                               color: armedPlayer.color,
                               shape: armedPlayer.shape,
-                              seatNumber: players.indexOf(armedPlayer) + 1,
+                              seatNumber: armedIndex + 1,
+                              rotation: seatRotations.get(armedIndex),
                             },
+                            power: armedPower,
+                            onPowerStep: stable(`power:${player.id}`, (step: 1 | -1) =>
+                              setCommanderPowers((current) => ({
+                                ...current,
+                                [player.id]: Math.min(
+                                  MAX_COMMANDER_DAMAGE,
+                                  Math.max(1, (current[player.id] ?? 1) + step),
+                                ),
+                              })),
+                            ),
+                            facing:
+                              armedIndex >= 0
+                                ? commanderFacing(seatedRows, armedIndex, index)
+                                : undefined,
                             stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                             pendingClaims: commanderDamage.pendingFor?.(player),
                             onPressSword: stable(`sword:${player.id}`, () =>

@@ -1,7 +1,7 @@
 import { asPlayerId } from "@/features/game/domain"
 import type { PlayerId } from "@/features/game/types"
 
-import { commanderBoardGrid, commanderBoardSeats } from "./commanderDamageLayout"
+import { commanderBoardGrid, commanderBoardSeats, commanderFacing } from "./commanderDamageLayout"
 
 const playerIds = (count: number): PlayerId[] =>
   Array.from({ length: count }, (_, index) => asPlayerId(`player-${index}`))
@@ -40,5 +40,18 @@ describe("commander damage board layout", () => {
       [ids[0], null],
       [ids[1], ids[2]],
     ])
+  })
+
+  it("faces a neighbour's shared edge and only the corner of the seat across", () => {
+    expect(commanderFacing(GRIDS[4], 0, 1)).toEqual({ x: "left" })
+    expect(commanderFacing(GRIDS[4], 0, 2)).toEqual({ y: "top" })
+    expect(commanderFacing(GRIDS[4], 0, 3)).toEqual({ x: "left", y: "top" })
+    expect(commanderFacing(GRIDS[4], 3, 0)).toEqual({ x: "right", y: "bottom" })
+  })
+
+  it("treats a full-width seat as sharing a column with every seat below it", () => {
+    expect(commanderFacing(GRIDS[3], 0, 1)).toEqual({ y: "top" })
+    expect(commanderFacing(GRIDS[3], 2, 0)).toEqual({ y: "bottom" })
+    expect(commanderFacing(GRIDS[6], 0, 5)).toEqual({ x: "left", y: "top" })
   })
 })

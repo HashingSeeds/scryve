@@ -204,14 +204,31 @@ describe("ConnectedBoardScreen", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
     fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
-    fireEvent.press(screen.getByTestId("commander-stage-seat-1-1"))
-    fireEvent.press(screen.getByTestId("commander-send-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
+    fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
 
     await waitFor(() =>
       expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
         { toPlayerId: "player-2", delta: 1 },
       ]),
     )
+  })
+
+  it("leaves assignment without sending when nothing was staged", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
+
+    expect(screen.queryByTestId("commander-hit-seat-1")).toBeNull()
+    expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
   })
 
   it("stops staging where the recorded total would leave the supported range", async () => {
@@ -230,8 +247,8 @@ describe("ConnectedBoardScreen", () => {
 
     fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
     for (let press = 0; press < 5; press += 1)
-      fireEvent.press(screen.getByTestId("commander-stage-seat-1-1"))
-    fireEvent.press(screen.getByTestId("commander-send-seat-2"))
+      fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
+    fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
 
     await waitFor(() =>
       expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
