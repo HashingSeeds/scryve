@@ -325,7 +325,7 @@ function AttackerControls({
           ) : null}
         </BoardPressable>
         <View style={themed($power)}>
-          {mode.commanderName ? (
+          {mode.commanderName && !compact ? (
             <Text
               testID={`commander-name-seat-${seatNumber}`}
               text={mode.commanderName}

@@ -30,7 +30,6 @@ const LEADING_TITLE = new RegExp(
   `^(?:${TITLES.map((title) => title.replace(".", "\\.")).join("|")}) `,
 )
 
-/** why: a handful of popular commanders go by a name the rules below can't reach, keyed on the name before the comma so every printing matches. */
 const SPOKEN_NAMES: Record<string, string> = {
   "Elesh Norn": "Norn",
   "Nicol Bolas": "Bolas",
@@ -61,6 +60,7 @@ export function commanderShortName(cardName: string): string {
   if (spoken) return spoken
   if (base.startsWith("The ")) return base.slice(4)
   let name = base.replace(/\s*"[^"]*"/g, "").split(/ (?:the|of|and|&) /)[0]
+  if (TITLES.includes(name)) return base
   while (LEADING_TITLE.test(name)) name = name.replace(LEADING_TITLE, "")
   const words = name.split(" ")
   return words.length > 1 && words[0].length <= 3 ? words.slice(0, 2).join(" ") : words[0]

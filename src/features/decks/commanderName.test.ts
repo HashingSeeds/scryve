@@ -13,6 +13,7 @@ describe("commanderShortName", () => {
     ["Esika, God of the Tree // The Prismatic Bridge", "Esika"],
     ["Elesh Norn, Grand Cenobite", "Norn"],
     ["Sliver Overlord", "Sliver Overlord"],
+    ["Lord of Tresserhorn", "Lord of Tresserhorn"],
   ])("calls %s %s", (cardName, spoken) => {
     expect(commanderShortName(cardName)).toBe(spoken)
   })
