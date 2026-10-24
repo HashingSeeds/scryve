@@ -203,3 +203,76 @@ describe("users.syncCurrent usernames", () => {
     ])
   })
 })
+
+describe("users.syncCurrent profile", () => {
+  const avatarUrl = "https://img.clerk.com/avatar.png"
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(1_000)
+  })
+  afterEach(() => jest.useRealTimers())
+
+  it("leaves an unchanged profile unwritten and still applies stored Pro", async () => {
+    const t = makeConvexTest()
+    const player = t.withIdentity({ subject: "steady" })
+    await player.mutation(api.users.syncCurrent, { displayName: "Steady", avatarUrl })
+    const before = await storedUser(t, "steady")
+    await t.run((ctx) =>
+      ctx.db.insert("revenueCatCustomerStates", {
+        appUserId: "steady",
+        enabled: true,
+        environment: "PRODUCTION",
+        observedAt: 500,
+        updatedAt: 500,
+      }),
+    )
+
+    jest.setSystemTime(2_000)
+    await player.mutation(api.users.syncCurrent, { displayName: "Steady", avatarUrl })
+    expect(await storedUser(t, "steady")).toEqual(before)
+    const entitlements = await t.run((ctx) =>
+      ctx.db
+        .query("userEntitlements")
+        .withIndex("by_user", (q) => q.eq("userId", before!._id))
+        .collect(),
+    )
+    expect(entitlements).toContainEqual(
+      expect.objectContaining({ feature: "unlimited_decks", enabled: true }),
+    )
+  })
+
+  it("writes a changed name or avatar", async () => {
+    const t = makeConvexTest()
+    const player = t.withIdentity({ subject: "changer" })
+    await player.mutation(api.users.syncCurrent, { displayName: "Before", avatarUrl })
+
+    jest.setSystemTime(2_000)
+    await player.mutation(api.users.syncCurrent, { displayName: "After", avatarUrl })
+    expect(await storedUser(t, "changer")).toMatchObject({ displayName: "After", updatedAt: 2_000 })
+
+    jest.setSystemTime(3_000)
+    await player.mutation(api.users.syncCurrent, { displayName: "After" })
+    const user = await storedUser(t, "changer")
+    expect(user?.avatarUrl).toBeUndefined()
+    expect(user?.updatedAt).toBe(3_000)
+  })
+
+  it("rejects an unchanged sync while account deletion is in progress", async () => {
+    const t = makeConvexTest()
+    const player = t.withIdentity({ subject: "leaving" })
+    await player.mutation(api.users.syncCurrent, { displayName: "Leaving" })
+    await t.run((ctx) =>
+      ctx.db.insert("accountDeletionRequests", {
+        clerkUserId: "leaving",
+        status: "processing",
+        attempts: 0,
+        requestedAt: 1_000,
+        updatedAt: 1_000,
+      }),
+    )
+    await expect(
+      player.mutation(api.users.syncCurrent, { displayName: "Leaving" }),
+    ).rejects.toThrow("Account deletion is in progress")
+  })
+})
