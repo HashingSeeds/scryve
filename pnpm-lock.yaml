@@ -173,11 +173,11 @@ importers:
         specifier: 3.3.3
         version: 3.3.3(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       react-native-purchases:
-        specifier: ^10.7.0
-        version: 10.7.0(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+        specifier: ^10.15.1
+        version: 10.15.1(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       react-native-purchases-ui:
-        specifier: ^10.7.0
-        version: 10.7.0(react-native-purchases@10.7.0(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+        specifier: ^10.15.1
+        version: 10.15.1(react-native-purchases@10.15.1(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       react-native-qrcode-svg:
         specifier: 6.3.21
         version: 6.3.21(react-native-svg@15.16.0(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
@@ -2695,14 +2695,14 @@ packages:
   '@react-navigation/routers@7.6.0':
     resolution: {integrity: sha512-lblhDXfS75jLc7G2K7BZGM+7cjqQXk13X/MA4fq/12r62zM+fBhhreLzYflSitrDDXFRJpSvJXy0ziiGU04Xow==}
 
-  '@revenuecat/purchases-js-hybrid-mappings@18.29.0':
-    resolution: {integrity: sha512-ABSreDd+SL17GFVkuMydh6EP8AaIqitLYfMeA3k7qfRDLKgvINzW9TH1wt7lCdtMQa6+T/fk1egb6olPK51YCA==}
+  '@revenuecat/purchases-js-hybrid-mappings@19.14.1':
+    resolution: {integrity: sha512-Sj/sqXuQu0D3GKQQIhL8KQtAqpMUBGJjeXACrgzbvZBGbDu4AKPrnix0kwTOlGDoS4Cw5NZHJEnNU9D8jOxBmQ==}
 
-  '@revenuecat/purchases-js@1.49.1':
-    resolution: {integrity: sha512-eW5/zT0/Jyp0z2Sq1JTFFdlHrUn31fGLuL099/zee8SemHzszlzKOp1IPCOSolLscTUmFUwlalC65opsa365uw==}
+  '@revenuecat/purchases-js@1.71.0':
+    resolution: {integrity: sha512-FC118I8NvBh1gvFCw/JtL6oRoZwXws4TnfGtUY7YFPZIA39+kTpmWkGxQwSwn9XXqXPtBVD1b3Hvs7d+OgBpHQ==}
 
-  '@revenuecat/purchases-typescript-internal@18.29.0':
-    resolution: {integrity: sha512-A+gYvNhSi+Z5r1GdwiyuWq9b3kJYAeAHISGK3R5Ec3tKaF7hwI5LM49paw7YGcyYQalngimjpiVYpBeC/IekBg==}
+  '@revenuecat/purchases-typescript-internal@19.14.1':
+    resolution: {integrity: sha512-knMoRyyLvIG4+yvPXprjddxLB/Y05Ca7pjrAONNL1/7gaq6ezlVC+/YksK8dr/3LHP6kCbJ1tMF+YD6LW4O63Q==}
 
   '@rolldown/binding-android-arm-eabi@1.2.6':
     resolution: {integrity: sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ==}
@@ -6751,19 +6751,19 @@ packages:
       react: '*'
       react-native: '*'
 
-  react-native-purchases-ui@10.7.0:
-    resolution: {integrity: sha512-OafXS7ce9Rm0HcSIZRrfFmq6OGoXrvgBYyLl00rdn1Uj5NSw9mSZHvdIHOb8a8FSVyVadZtOiSWsS2S4ZgKpWw==}
+  react-native-purchases-ui@10.15.1:
+    resolution: {integrity: sha512-3ggic2R6UD7c4ACHNJlYFtqRfQFHpHXxifvHWW9fnjzVgXKMKVTAZHUgFvGbFSlpPjPWExq4H66HkIYKj9/ZRQ==}
     peerDependencies:
       react: '*'
       react-native: '>= 0.73.0'
-      react-native-purchases: 10.7.0
+      react-native-purchases: 10.15.1
       react-native-web: '*'
     peerDependenciesMeta:
       react-native-web:
         optional: true
 
-  react-native-purchases@10.7.0:
-    resolution: {integrity: sha512-+ow00d8foBDeLiJniXW94P+nUhmyzK91LxKnigwQ2YxAbaBugr/LWpWaSQTDnZ+dL9iJQODvldmIXUiRm9KrXw==}
+  react-native-purchases@10.15.1:
+    resolution: {integrity: sha512-ooyXWMdC1/BJnokE+Pro+6yWInxzkQbFN4lR3EOvkSPhYh3H/j0Esk/LRnQApCqzkIbWEpfUhPnQdq/CMGofHA==}
     peerDependencies:
       react: '>= 16.6.3'
       react-native: '>= 0.73.0'
@@ -10679,13 +10679,13 @@ snapshots:
       nanoid: 3.3.18
     optional: true
 
-  '@revenuecat/purchases-js-hybrid-mappings@18.29.0':
+  '@revenuecat/purchases-js-hybrid-mappings@19.14.1':
     dependencies:
-      '@revenuecat/purchases-js': 1.49.1
+      '@revenuecat/purchases-js': 1.71.0
 
-  '@revenuecat/purchases-js@1.49.1': {}
+  '@revenuecat/purchases-js@1.71.0': {}
 
-  '@revenuecat/purchases-typescript-internal@18.29.0': {}
+  '@revenuecat/purchases-typescript-internal@19.14.1': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.6':
     optional: true
@@ -15325,19 +15325,19 @@ snapshots:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
 
-  react-native-purchases-ui@10.7.0(react-native-purchases@10.7.0(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
+  react-native-purchases-ui@10.15.1(react-native-purchases@10.15.1(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
     dependencies:
-      '@revenuecat/purchases-typescript-internal': 18.29.0
+      '@revenuecat/purchases-typescript-internal': 19.14.1
       react: 19.3.0
       react-native: 0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
-      react-native-purchases: 10.7.0(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+      react-native-purchases: 10.15.1(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
     optionalDependencies:
       react-native-web: 0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
 
-  react-native-purchases@10.7.0(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
+  react-native-purchases@10.15.1(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
     dependencies:
-      '@revenuecat/purchases-js-hybrid-mappings': 18.29.0
-      '@revenuecat/purchases-typescript-internal': 18.29.0
+      '@revenuecat/purchases-js-hybrid-mappings': 19.14.1
+      '@revenuecat/purchases-typescript-internal': 19.14.1
       react: 19.3.0
       react-native: 0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
     optionalDependencies:
