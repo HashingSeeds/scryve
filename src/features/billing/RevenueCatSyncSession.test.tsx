@@ -92,6 +92,16 @@ it("leaves cached billing state intact when the server cannot sync", async () =>
   expect(mockCustomerInfo).toBe(cached)
 })
 
+it("does not report a sync that failed because the connection dropped", async () => {
+  mockSyncCurrent.mockRejectedValueOnce(
+    new Error("[CONVEX A(revenuecat:syncCurrent)] Connection lost while action was in flight"),
+  )
+  render(<RevenueCatSyncSession />)
+  await act(async () => undefined)
+  expect(mockSyncCurrent).toHaveBeenCalledTimes(1)
+  expect(reportCrash).not.toHaveBeenCalled()
+})
+
 it("retries a failed server sync and cancels the next retry when the profile goes offline", async () => {
   jest.useFakeTimers()
   try {
