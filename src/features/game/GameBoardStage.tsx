@@ -18,11 +18,11 @@ import {
 } from "@/components/GameRadialMenu"
 import {
   getPlayerGridFacings,
-  getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
+import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
@@ -79,10 +79,7 @@ function PinnedGameBoardStage({
   const holderAngle = pinned ? metrics.holderAngle : 0
   const fontScale = window.fontScale
 
-  const gridLayout = useMemo(
-    () => getPlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant }),
-    [playerCount, width, height, fontScale, layoutVariant],
-  )
+  const gridLayout = usePlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant })
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
@@ -158,10 +155,7 @@ function LegacyGameBoardStage({
 }: GameBoardStageProps) {
   const boardOrientation = useGameBoardOrientation()
   const { width, height, fontScale, rotation } = boardOrientation
-  const gridLayout = useMemo(
-    () => getPlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant }),
-    [playerCount, width, height, fontScale, layoutVariant],
-  )
+  const gridLayout = usePlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant })
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const topEdgeBand = useTopEdgeBand()
   const boardAnchor = useMemo(

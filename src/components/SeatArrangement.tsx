@@ -13,8 +13,9 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { getPlayerGridLayout, getPlayerGridRowFlex, getPlayerGridRows } from "./playerGridGeometry"
+import { getPlayerGridRowFlex, getPlayerGridRows } from "./playerGridGeometry"
 import { Text } from "./Text"
+import { usePlayerGridLayout } from "./usePlayerGridLayout"
 
 export function SeatArrangement({
   players,
@@ -35,7 +36,7 @@ export function SeatArrangement({
   const window = useWindowDimensions()
   const { width, height } = board ?? window
   const [pickedSlot, setPickedSlot] = useState<number>()
-  const layout = getPlayerGridLayout({ playerCount: players.length, width, height, layoutVariant })
+  const layout = usePlayerGridLayout({ playerCount: players.length, width, height, layoutVariant })
   const rows = getPlayerGridRows(players.length, layout)
   const aspectRatio = width / height
   const mapWidth = Math.min(

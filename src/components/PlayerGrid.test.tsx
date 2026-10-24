@@ -517,6 +517,21 @@ describe("PlayerGrid", () => {
     },
   )
 
+  it.each([
+    [5, 951, 669, 2, 3],
+    [6, 951, 669, 2, 3],
+    [5, 669, 951, 3, 2],
+    [6, 669, 951, 3, 2],
+  ])(
+    "lays out %i players at %ix%i across a fold as %i columns by %i rows, an even count along the long side",
+    (playerCount, width, height, columns, rows) => {
+      expect(getPlayerGridLayout({ playerCount, width, height, spansHinge: true })).toMatchObject({
+        columnCount: columns,
+        rowCount: rows,
+      })
+    },
+  )
+
   it("supports featured and even arrangements without dropping a player", () => {
     const inputs = [
       ["featured-first", [[0], [1, 2], [3, 4]]],
