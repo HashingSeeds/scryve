@@ -14,11 +14,8 @@ import {
 
 describe("system definitions", () => {
   it("plays Brawl from the command zone without the 21 commander damage loss", () => {
-    expect(formatDefinition("mtg", "brawl")).toMatchObject({
-      singleton: true,
-      hasCommanderDamage: false,
-      startingValue: 25,
-    })
+    expect(formatDefinition("mtg", "brawl")).toMatchObject({ singleton: true, startingValue: 25 })
+    expect(formatDefinition("mtg", "brawl")?.commanderDamage).toBeUndefined()
     expect(hasCommandZone("mtg", "brawl")).toBe(true)
   })
 
@@ -55,13 +52,13 @@ describe("system definitions", () => {
     expect(SYSTEMS.fab.counter).toMatchObject({ defaultValue: 40, goal: { kind: "survive" } })
   })
 
-  it("tracks commander damage only in Commander", () => {
+  it("tracks commander damage only in Commander formats, each with its own lethal amount", () => {
     const formats = SYSTEM_IDS.flatMap((system) =>
       SYSTEMS[system].formats.flatMap((format) =>
-        "hasCommanderDamage" in format && format.hasCommanderDamage ? [format.id] : [],
+        "commanderDamage" in format ? [[format.id, format.commanderDamage.lethal]] : [],
       ),
     )
-    expect(formats).toEqual(["commander"])
+    expect(formats).toEqual([["commander", 21]])
   })
 
   it("knocks a survivor out at 0 and ends a race when anyone reaches the goal", () => {

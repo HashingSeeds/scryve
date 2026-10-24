@@ -5,7 +5,6 @@ import {
   hasLocalGameStarted,
   commanderDamageBetween,
   commandToEvent,
-  COMMANDER_LETHAL_DAMAGE,
   incomingCommanderDamage,
   localOutReason,
   lastPlayerStanding,
@@ -465,12 +464,18 @@ describe("commander damage", () => {
     expect(reduceGameEvent(game, duplicate)).toBe(game)
   })
 
+  const commanderGame = (count: number, life: number, format = "commander"): LocalGame => ({
+    ...makeGame(count, life),
+    system: "mtg",
+    format,
+  })
+
   it.each([
-    [COMMANDER_LETHAL_DAMAGE - 1, false],
-    [COMMANDER_LETHAL_DAMAGE, true],
-    [COMMANDER_LETHAL_DAMAGE + 1, true],
-  ])("marks elimination at %i damage: %s", (damage, eliminated) => {
-    const game = assign(makeGame(4, 40), 0, 1, damage)
+    ["commander", 20, false],
+    ["commander", 21, true],
+    ["commander", 22, true],
+  ])("in %s, marks elimination at %i damage: %s", (format, damage, eliminated) => {
+    const game = assign(commanderGame(4, 40, format), 0, 1, damage)
     expect(localOutReason(game, game.players[1].id)).toEqual(
       eliminated
         ? { cause: "commanderDamage", fromPlayerId: game.players[0].id, total: damage }
@@ -480,14 +485,14 @@ describe("commander damage", () => {
   })
 
   it("does not eliminate on 21 spread across two commanders", () => {
-    let game = makeGame(4, 40)
+    let game = commanderGame(4, 40)
     game = assign(game, 0, 1, 11)
     game = assign(game, 2, 1, 10)
     expect(localOutReason(game, game.players[1].id)).toBeUndefined()
   })
 
   it("names the last player standing once life and commander damage knock out the rest", () => {
-    let game = assign(makeGame(3, 40), 0, 1, COMMANDER_LETHAL_DAMAGE)
+    let game = assign(commanderGame(3, 40), 0, 1, 21)
     expect(lastPlayerStanding(game)).toBeUndefined()
     game = applyGameCommand(
       game,

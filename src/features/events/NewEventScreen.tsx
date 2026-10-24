@@ -22,10 +22,10 @@ import {
   MAX_EVENT_ROUNDS,
   type EventStructure,
 } from "../../../convex/lib/events/model"
+import { isCommanderFormat } from "../../../convex/lib/gameRules"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../../convex/lib/matchResults"
 
 const EVENT_SYSTEM = "mtg" as const
-const POD_FORMATS = new Set(["commander"])
 const DEFAULT_ROUNDS = 3
 
 export interface NewEventInput {
@@ -64,7 +64,7 @@ export function NewEventScreen({
   function chooseFormat(id?: string) {
     if (!id) return
     setFormat(id)
-    setStructure(POD_FORMATS.has(id) ? "pods" : "swiss")
+    setStructure(isCommanderFormat(EVENT_SYSTEM, id) ? "pods" : "swiss")
   }
 
   async function create() {

@@ -30,18 +30,30 @@ describe("outReason", () => {
     const state = commander({
       lives: [{ playerId: "a", life: 0 }],
       table: { players: { a: { counters: { poison: 10 } } }, designations: {} },
-      commanderDamage: [{ fromPlayerId: "b", toPlayerId: "a", total: 21 }],
+      commanderDamage: { lethal: 21, totals: [{ fromPlayerId: "b", toPlayerId: "a", total: 21 }] },
     })
     expect(outReason(state, "a")).toEqual({
       cause: "commanderDamage",
       fromPlayerId: "b",
       total: 21,
     })
-    expect(outReason({ ...state, commanderDamage: [] }, "a")).toEqual({
+    expect(outReason({ ...state, commanderDamage: undefined }, "a")).toEqual({
       cause: "counter",
       counterId: "poison",
       value: 10,
     })
+  })
+
+  it("knocks a seat out at the format's own lethal commander damage", () => {
+    const at = (total: number) =>
+      outReason(
+        commander({
+          commanderDamage: { lethal: 16, totals: [{ fromPlayerId: "b", toPlayerId: "a", total }] },
+        }),
+        "a",
+      )
+    expect(at(15)).toBeUndefined()
+    expect(at(16)).toEqual({ cause: "commanderDamage", fromPlayerId: "b", total: 16 })
   })
 
   it("knocks out everyone else once a race game's seat reaches the goal", () => {

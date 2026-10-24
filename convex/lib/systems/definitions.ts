@@ -37,7 +37,7 @@ export type FormatDefinition = {
   readonly sections: readonly DeckSection[]
   readonly startingValue?: number
   readonly multiplayerStartingValue?: number
-  readonly hasCommanderDamage?: boolean
+  readonly commanderDamage?: { readonly lethal: number }
   readonly singleton?: boolean
 }
 
@@ -135,7 +135,7 @@ const MTG_COMMANDER_SECTIONS = [
   { id: "sideboard", label: "Sideboard" },
 ] as const
 
-const MTG_BRAWL_SECTIONS = [
+const MTG_COMMAND_ZONE_SECTIONS = [
   { id: "commander", label: "Commander" },
   { id: "main", label: "Main deck" },
   { id: "sideboard", label: "Sideboard" },
@@ -192,7 +192,7 @@ export const SYSTEMS = {
         blurb: "100 cards, singleton",
         sections: MTG_COMMANDER_SECTIONS,
         startingValue: 40,
-        hasCommanderDamage: true,
+        commanderDamage: { lethal: 21 },
         singleton: true,
       },
       {
@@ -230,10 +230,9 @@ export const SYSTEMS = {
         id: "brawl",
         label: "Brawl",
         blurb: "60 cards, singleton",
-        sections: MTG_BRAWL_SECTIONS,
+        sections: MTG_COMMAND_ZONE_SECTIONS,
         startingValue: 25,
         multiplayerStartingValue: 30,
-        hasCommanderDamage: false,
         singleton: true,
       },
       {

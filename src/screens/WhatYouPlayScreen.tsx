@@ -21,6 +21,8 @@ import { useFirstUseSharing } from "@/features/legal/useFirstUseSharing"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { isCommanderFormat } from "../../convex/lib/gameRules"
+
 const BRAND_EYEBROW = "SCRYVE"
 
 // why: Treachery is connected only, so a first local game can't start as it.
@@ -68,7 +70,10 @@ export function WhatYouPlayScreen({
           types={FIRST_GAME_TYPES}
           selectedId={chosen?.id}
           detail={(type) =>
-            gameTypeDetail(type, type.format === "commander" ? COMMANDER_SEATS : defaultPlayerCount)
+            gameTypeDetail(
+              type,
+              isCommanderFormat(type.system, type.format) ? COMMANDER_SEATS : defaultPlayerCount,
+            )
           }
           onChoose={setChosen}
         />

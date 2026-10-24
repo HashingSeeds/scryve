@@ -1,11 +1,11 @@
-import { playSystemRules, playTableRules } from "@/features/game/playSystems"
+import { playCommanderLethal, playSystemRules, playTableRules } from "@/features/game/playSystems"
 
 import type {
   ConnectedDisplayProjection,
   ConnectedPlayerProjection,
   ConnectedProjection,
 } from "./model"
-import { lastStanding, type OutState } from "../../../convex/lib/outReason"
+import { commanderOutState, lastStanding, type OutState } from "../../../convex/lib/outReason"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
 
@@ -51,7 +51,10 @@ export function connectedOutState(
     tableRules: playTableRules(system, format),
     table,
     lives,
-    commanderDamage: commanderDamage?.totals,
+    commanderDamage: commanderOutState(
+      playCommanderLethal(system, format),
+      commanderDamage?.totals,
+    ),
   }
 }
 

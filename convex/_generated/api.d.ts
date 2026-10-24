@@ -75,6 +75,7 @@ import type * as lib_moderation from "../lib/moderation.js";
 import type * as lib_moderationRetention from "../lib/moderationRetention.js";
 import type * as lib_nameFilter from "../lib/nameFilter.js";
 import type * as lib_opponentDecks from "../lib/opponentDecks.js";
+import type * as lib_outReason from "../lib/outReason.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_policy from "../lib/policy.js";
 import type * as lib_results from "../lib/results.js";
@@ -168,6 +169,7 @@ declare const fullApi: ApiFromModules<{
   "lib/moderationRetention": typeof lib_moderationRetention;
   "lib/nameFilter": typeof lib_nameFilter;
   "lib/opponentDecks": typeof lib_opponentDecks;
+  "lib/outReason": typeof lib_outReason;
   "lib/pagination": typeof lib_pagination;
   "lib/policy": typeof lib_policy;
   "lib/results": typeof lib_results;

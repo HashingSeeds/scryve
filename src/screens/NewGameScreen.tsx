@@ -93,6 +93,7 @@ import {
   withoutProMarks,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
+import { isCommanderFormat } from "../../convex/lib/gameRules"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
 import { identitySection, startingValueRange, systemDefinition } from "../../convex/lib/systems"
@@ -361,7 +362,7 @@ function NewGameForm({
   )
   const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
   const matchBestOf = matchOn
-    ? (chosenBestOf ?? (format === "commander" || playerCount > 2 ? 1 : 3))
+    ? (chosenBestOf ?? (isCommanderFormat(system, format) || playerCount > 2 ? 1 : 3))
     : undefined
   const clockMinutes = chosenClockMinutes ?? defaultRoundClockMinutes(system, matchBestOf)
   const clockSetup: RoundClockSetup | undefined =
