@@ -673,6 +673,7 @@ export const LifeCard = memo(function LifeCard({
           seatNumber={seatNumber}
           disabled={disabled}
           lockedReason={locked ? outLabel : undefined}
+          reducedMotion={reducedMotion}
           contrastCheckedForeground={foreground}
           compact={compact}
           contentRotation={contentRotation}

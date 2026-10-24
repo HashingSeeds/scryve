@@ -3300,6 +3300,33 @@ describe("Treachery", () => {
     expect(await outcome(guest)).toBeUndefined()
   })
 
+  it("counts a leader knocked out by commander damage toward the outcome", async () => {
+    const t = makeConvexTest()
+    const [host] = await treacheryGame(t)
+    const players = await t.run((ctx) => ctx.db.query("gamePlayers").collect())
+    const leader = players.find((player) => player.role === "leader")!
+    const attacker = players.find((player) => player !== leader)!
+
+    await t.run((ctx) =>
+      ctx.db.insert("gameCommanderDamage", {
+        gameId: leader.gameId,
+        fromPlayerId: attacker._id,
+        toPlayerId: leader._id,
+        total: 21,
+        updatedAt: Date.now(),
+      }),
+    )
+    expect(
+      (await host.client.query(api.games.lobbyProjection, { publicId, deviceId: host.deviceId }))
+        .treacheryOutcome,
+    ).toEqual({
+      kind: "win",
+      winnerPlayerIds: players
+        .filter((player) => player.role === "assassin")
+        .map((player) => player._id),
+    })
+  })
+
   it("deals fresh roles for a rematch", async () => {
     const t = makeConvexTest()
     const [{ client: host }] = await treacheryGame(t)

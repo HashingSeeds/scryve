@@ -15,7 +15,7 @@ import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { useReducedMotion } from "@/utils/useReducedMotion"
+import type { ReducedMotionPreference } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import {
@@ -35,6 +35,7 @@ export interface LifeControlsProps {
   disabled?: boolean
   /** why: an out seat still takes presses so it can say why nothing changed: the glyph bumps, the phone buzzes, and a screen reader hears this. */
   lockedReason?: string
+  reducedMotion?: ReducedMotionPreference
   contrastCheckedForeground?: string
   compact?: boolean
   contentRotation?: LifeCardContentRotation
@@ -104,6 +105,20 @@ function createRecentDeltaStore() {
   }
 }
 
+function bumpStyle(
+  progress: number,
+  direction: -1 | 1,
+  reducedMotion: ReducedMotionPreference,
+  contentRotation: LifeCardContentRotation,
+) {
+  "worklet"
+  if (reducedMotion !== false) return { opacity: 1 - 0.6 * progress }
+  const distance = BUMP_DISTANCE * progress
+  if (Math.abs(contentRotation) !== 90) return { transform: [{ translateX: direction * distance }] }
+  const towardTop = direction === (contentRotation === 90 ? -1 : 1)
+  return { transform: [{ translateY: towardTop ? -distance : distance }] }
+}
+
 function deltaText(delta: number) {
   return delta > 0 ? `+${delta}` : `-${Math.abs(delta)}`
 }
@@ -121,6 +136,7 @@ export function LifeControls({
   seatNumber = 1,
   disabled,
   lockedReason,
+  reducedMotion = null,
   contrastCheckedForeground: foreground = "#FFFFFF",
   compact,
   contentRotation = 0,
@@ -157,19 +173,16 @@ export function LifeControls({
   const rules = playSystemRules(system)
   const tapStep = lifeStep ?? rules.counter.tapStep
   const locked = lockedReason !== undefined && !disabled
-  const reducedMotion = useReducedMotion()
   const minusBump = useSharedValue(0)
   const plusBump = useSharedValue(0)
-  const bumpStyle = (bump: SharedValue<number>, direction: -1 | 1) => {
-    "worklet"
-    if (reducedMotion !== false) return { opacity: 1 - 0.6 * bump.value }
-    const distance = BUMP_DISTANCE * bump.value
-    if (!sideways) return { transform: [{ translateX: direction * distance }] }
-    const towardTop = direction === (contentRotation === 90 ? -1 : 1)
-    return { transform: [{ translateY: towardTop ? -distance : distance }] }
-  }
-  const minusBumpStyle = useAnimatedStyle(() => bumpStyle(minusBump, -1))
-  const plusBumpStyle = useAnimatedStyle(() => bumpStyle(plusBump, 1))
+  const minusBumpStyle = useAnimatedStyle(
+    () => bumpStyle(minusBump.value, -1, reducedMotion, contentRotation),
+    [reducedMotion, contentRotation],
+  )
+  const plusBumpStyle = useAnimatedStyle(
+    () => bumpStyle(plusBump.value, 1, reducedMotion, contentRotation),
+    [reducedMotion, contentRotation],
+  )
 
   function bump(value: SharedValue<number>) {
     value.set(withSequence(withTiming(1, { duration: 60 }), withTiming(0, { duration: 140 })))

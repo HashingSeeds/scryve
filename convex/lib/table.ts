@@ -225,17 +225,6 @@ export function findPokemon(
   return benched ? { pokemon: benched, slot: "bench" } : undefined
 }
 
-export function isOutByTableCounters(
-  table: TableState,
-  playerId: string,
-  rules: TableDefinition,
-): boolean {
-  return rules.counters.some(
-    (counter) =>
-      counter.losesAt !== undefined && counterValue(table, playerId, counter.id) >= counter.losesAt,
-  )
-}
-
 export function tableHasState(table: TableState | undefined): boolean {
   if (!table) return false
   return (
