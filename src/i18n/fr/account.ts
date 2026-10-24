@@ -210,9 +210,11 @@ export default {
     },
     subscription: {
       heading: "Vous avez un abonnement Scryve Pro ?",
-      body: "Supprimer votre compte ne l'annulera pas. Vous pourriez continuer à être facturé tant que vous n'annulez pas via Apple ou Google Play. Vous pouvez quand même supprimer maintenant, mais vous perdrez l'accès au temps payé restant.",
+      body: "Supprimer votre compte ne l'annulera pas. Vous pourriez continuer à être facturé tant que vous n'annulez pas l'abonnement là où vous vous êtes abonné. Vous pouvez quand même supprimer maintenant, mais vous perdrez l'accès au temps payé restant.",
       manageApple: "Gérer les abonnements Apple",
       manageGoogle: "Gérer les abonnements Google Play",
+      web: "Abonné sur le web ? Annulez dans le portail client. Chaque e-mail de facturation Scryve Pro contient un lien vers ce portail.",
+      manageWeb: "Gérer l'abonnement web",
     },
     signedInAs: "Connecté en tant que {{email}}",
     confirmLabel: "Saisissez {{word}} pour continuer",

@@ -209,9 +209,11 @@ export default {
     },
     subscription: {
       heading: "¿Tienes una suscripción a Scryve Pro?",
-      body: "Eliminar tu cuenta no la cancelará. Puede que se te siga cobrando hasta que la canceles en Apple o Google Play. Aún puedes eliminarla ahora, pero perderás el acceso al tiempo pagado que te quede.",
+      body: "Eliminar tu cuenta no la cancelará. Es posible que te sigan cobrando hasta que canceles la suscripción donde la contrataste. Aun así, puedes eliminarla ahora, pero perderás el tiempo pagado que te quede.",
       manageApple: "Administrar suscripciones de Apple",
       manageGoogle: "Administrar suscripciones de Google Play",
+      web: "¿Te suscribiste en la web? Cancela en el portal del cliente. Todos los correos de facturación de Scryve Pro incluyen un enlace.",
+      manageWeb: "Gestionar suscripción web",
     },
     signedInAs: "Sesión iniciada como {{email}}",
     confirmLabel: "Escribe {{word}} para continuar",

@@ -11,6 +11,7 @@ describe("DeleteAccountScreen", () => {
       <ThemeProvider initialContext="dark">
         <DeleteAccountScreen
           deletionStatus={undefined}
+          subscription={{ store: "unknown" }}
           isSubmitting={false}
           onBack={jest.fn()}
           onRequestDeletion={jest.fn()}
@@ -29,6 +30,7 @@ describe("DeleteAccountScreen", () => {
         <DeleteAccountScreen
           email="alice@example.com"
           deletionStatus={null}
+          subscription={{ store: "unknown" }}
           isSubmitting={false}
           onBack={jest.fn()}
           onRequestDeletion={onRequestDeletion}
@@ -50,6 +52,7 @@ describe("DeleteAccountScreen", () => {
       <ThemeProvider initialContext="dark">
         <DeleteAccountScreen
           deletionStatus={null}
+          subscription={{ store: "unknown" }}
           isSubmitting={false}
           onBack={jest.fn()}
           onRequestDeletion={jest.fn()}
@@ -59,32 +62,58 @@ describe("DeleteAccountScreen", () => {
     expect(view.getByText("All devices are signed out")).toBeTruthy()
   })
 
-  it("warns that billing continues and opens subscription management", () => {
-    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined)
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <DeleteAccountScreen
-          deletionStatus={null}
-          isSubmitting={false}
-          onBack={jest.fn()}
-          onRequestDeletion={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    expect(view.getByText("Have a Scryve Pro subscription?")).toBeTruthy()
-    expect(view.getByText(/Deleting your account won't cancel it/)).toBeTruthy()
-    fireEvent.press(view.getByText("Manage Apple subscriptions"))
-    expect(openURL).toHaveBeenCalledWith("https://apps.apple.com/account/subscriptions")
-    fireEvent.press(view.getByText("Manage Google Play subscriptions"))
-    expect(openURL).toHaveBeenCalledWith("https://play.google.com/store/account/subscriptions")
-    openURL.mockRestore()
-  })
+  const apple = { "Manage Apple subscriptions": "https://apps.apple.com/account/subscriptions" }
+  const google = {
+    "Manage Google Play subscriptions": "https://play.google.com/store/account/subscriptions",
+  }
+  const portal = "https://billing.revenuecat.com/manage/abc"
+  it.each([
+    ["App Store", { store: "app_store" }, apple, false],
+    ["Google Play", { store: "play_store" }, google, false],
+    ["web", { store: "web", url: portal }, { "Manage web subscription": portal }, true],
+    ["web without a portal URL", { store: "web" }, {}, true],
+    ["unknown", { store: "unknown" }, { ...apple, ...google }, true],
+  ] as const)(
+    "warns that billing continues and shows only the %s way to cancel",
+    (_, subscription, links: Record<string, string>, showsWebCopy) => {
+      const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined)
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <DeleteAccountScreen
+            deletionStatus={null}
+            subscription={subscription}
+            isSubmitting={false}
+            onBack={jest.fn()}
+            onRequestDeletion={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+      expect(view.getByText(/Deleting your account won't cancel it/)).toBeTruthy()
+      expect(view.queryByText(/Subscribed on the web\?/) !== null).toBe(showsWebCopy)
+      const labels = [
+        "Manage Apple subscriptions",
+        "Manage Google Play subscriptions",
+        "Manage web subscription",
+      ]
+      for (const label of labels) {
+        const url = links[label]
+        if (!url) {
+          expect(view.queryByText(label)).toBeNull()
+          continue
+        }
+        fireEvent.press(view.getByText(label))
+        expect(openURL).toHaveBeenLastCalledWith(url)
+      }
+      openURL.mockRestore()
+    },
+  )
 
   it("offers a retry after a failed deletion", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <DeleteAccountScreen
           deletionStatus="failed"
+          subscription={{ store: "unknown" }}
           isSubmitting={false}
           onBack={jest.fn()}
           onRequestDeletion={jest.fn()}
@@ -104,6 +133,7 @@ describe("DeleteAccountScreen", () => {
       <ThemeProvider initialContext="dark">
         <DeleteAccountScreen
           deletionStatus={deletionStatus}
+          subscription={{ store: "unknown" }}
           isSubmitting={false}
           onBack={jest.fn()}
           onRequestDeletion={jest.fn()}
