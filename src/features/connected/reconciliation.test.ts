@@ -144,6 +144,48 @@ describe("connected reconciliation", () => {
     },
   )
 
+  it("hides a claim from the defender once its resolution is queued", () => {
+    const claim = (operationId: string) => ({
+      claimId: operationId,
+      operationId,
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 3,
+      clientCreatedAt: 1,
+      createdAt: 1,
+    })
+    const withClaims: ConnectedProjection = {
+      ...projection,
+      commanderDamage: {
+        totals: [],
+        pendingClaims: [claim("claim-resolved-0001"), claim("claim-waiting-00001")],
+        eliminatedPlayerIds: [],
+      },
+    }
+    const resolution: PendingLifeAction = {
+      schemaVersion: 1,
+      event: {
+        type: "commanderDamage.resolved",
+        operationId: asOperationId("resolve-operation-1"),
+        claimOperationId: asOperationId("claim-resolved-0001"),
+        gameId: asGameId("game-public"),
+        toPlayerId: asPlayerId("player-1"),
+        accepted: true,
+        actorId: asActorId("user-1"),
+        deviceId: asDeviceId("device-1"),
+        clientCreatedAt: 2,
+      },
+      queuedAt: 2,
+      attempts: 0,
+    }
+
+    expect(
+      overlayPendingDeltas(withClaims, [resolution]).commanderDamage?.pendingClaims.map(
+        ({ operationId }) => operationId,
+      ),
+    ).toEqual(["claim-waiting-00001"])
+  })
+
   it("never lets an older or reordered subscription replace a newer projection", () => {
     const newer = { ...projection, eventSequence: 8, serverUpdatedAt: 200 }
     expect(mergeConfirmedProjection(newer, projection)).toBe(newer)

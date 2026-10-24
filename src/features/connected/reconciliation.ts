@@ -36,6 +36,7 @@ export function overlayPendingDeltas(
     deltas.set(playerId, (deltas.get(playerId) ?? 0) + delta)
   const rules = playTableRules(confirmed.system, confirmed.format)
   let table = confirmed.table ?? EMPTY_TABLE
+  const resolvingClaims = new Set<string>()
   for (const action of pending) {
     const { event } = action
     if (event.gameId !== confirmed.publicId) continue
@@ -56,9 +57,21 @@ export function overlayPendingDeltas(
     }
     // Commander damage only moves life once the defender confirms it, so queued
     // claims and resolutions contribute no optimistic delta.
+    if (event.type === "commanderDamage.resolved") resolvingClaims.add(event.claimOperationId)
   }
+  const { commanderDamage } = confirmed
   return {
     ...confirmed,
+    ...(commanderDamage && resolvingClaims.size > 0
+      ? {
+          commanderDamage: {
+            ...commanderDamage,
+            pendingClaims: commanderDamage.pendingClaims.filter(
+              (claim) => !resolvingClaims.has(claim.operationId),
+            ),
+          },
+        }
+      : {}),
     table,
     players: confirmed.players.map((player) => {
       const pendingDelta = deltas.get(player.playerId) ?? 0

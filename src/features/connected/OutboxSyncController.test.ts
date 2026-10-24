@@ -396,6 +396,63 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toBe("A commander cannot damage itself")
   })
 
+  it("queues one resolution when the defender taps Confirm twice", () => {
+    const { clock, controller } = harness()
+    const claim = {
+      claimId: "claim-1",
+      operationId: "commander-claim-000001",
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 4,
+      clientCreatedAt: clock.now(),
+      createdAt: clock.now(),
+    }
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.resolveCommanderDamage(claim, true)
+    controller.resolveCommanderDamage(claim, true)
+
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+  })
+
+  it("shows a claim again after its resolution is rejected, so it can be resolved again", async () => {
+    const { clock, controller } = harness({
+      send: async () => {
+        throw new Error("Game is not active")
+      },
+    })
+    const claim = {
+      claimId: "claim-1",
+      operationId: "commander-claim-000001",
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 4,
+      clientCreatedAt: clock.now(),
+      createdAt: clock.now(),
+    }
+    controller.onRemoteProjection({
+      ...projection(0, 20),
+      commanderDamage: { totals: [], pendingClaims: [claim], eliminatedPlayerIds: [] },
+    })
+    const shownClaims = () =>
+      controller
+        .getSnapshot()
+        .projection?.commanderDamage?.pendingClaims.map(({ operationId }) => operationId)
+
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.resolveCommanderDamage(claim, true)
+    expect(shownClaims()).toEqual([])
+
+    controller.setEnvironment(ONLINE)
+    await settle()
+    expect(controller.getSnapshot().failed).toHaveLength(1)
+    expect(shownClaims()).toEqual([claim.operationId])
+
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.resolveCommanderDamage(claim, true)
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+  })
+
   it("keeps a declined claim distinct from a confirmed one", () => {
     const { clock, controller } = harness()
     const claim = {

@@ -333,6 +333,14 @@ export class OutboxSyncController {
    * already on the server, so the resolution just replays when the socket returns.
    */
   resolveCommanderDamage = (claim: ConnectedCommanderDamageClaim, accepted: boolean): void => {
+    // why: the server keeps one resolution per claim, so a second tap before the banner hides would fail with sync_operation_mismatch.
+    if (
+      this.pending.some(
+        ({ event }) =>
+          event.type === "commanderDamage.resolved" && event.claimOperationId === claim.operationId,
+      )
+    )
+      return
     const now = this.now()
     const action: PendingLifeAction = {
       schemaVersion: 1,
