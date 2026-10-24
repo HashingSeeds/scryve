@@ -84,6 +84,8 @@ export default {
     commanderDamageRange:
       "Les modifications de blessures de commandant doivent être comprises entre 1 et {{max}}.",
     commanderSelfDamage: "Un commandant ne peut pas se blesser lui-même",
+    commanderClaimDeclined:
+      "Les {{delta}} blessures de commandant infligées à {{name}} n'ont pas été ajoutées. Si cette personne n'a pas encore répondu à votre dernière demande, renvoyez-la après sa réponse.",
     failureCapacity:
       "Les modifications échouées doivent être examinées avant de pouvoir conserver d’autres modifications rejetées. Ignorez les échecs examinés, puis relancez la synchronisation.",
     finish: {

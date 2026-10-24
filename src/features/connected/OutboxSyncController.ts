@@ -603,6 +603,8 @@ export class OutboxSyncController {
 
   private async sendAndAwaitProjection(action: PendingLifeAction): Promise<OutboxAcknowledgement> {
     const acknowledgement = await this.options.send(action)
+    if (action.event.type === "commanderDamage.submitted" && acknowledgement.status === "declined")
+      this.claimDeclined(action.event.toPlayerId, action.event.delta)
     if (!this.options.awaitProjectionBarrier) return acknowledgement
 
     const operationId = action.event.operationId
@@ -625,6 +627,14 @@ export class OutboxSyncController {
       }, this.options.projectionBarrierTimeoutMs ?? DEFAULT_PROJECTION_BARRIER_TIMEOUT_MS)
       this.resolveProjectionWaiter()
     })
+  }
+
+  private claimDeclined(toPlayerId: string, delta: number): void {
+    const name =
+      this.confirmed?.players.find((player) => player.playerId === toPlayerId)?.displayName ??
+      translate("connected:board.anotherSeat")
+    this.changeError = translate("connected:outbox.commanderClaimDeclined", { name, delta })
+    this.publish()
   }
 
   private projectionBarrierReached(operationId: string): boolean {

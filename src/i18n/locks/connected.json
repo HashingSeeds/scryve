@@ -41,6 +41,7 @@
   "outbox.queueFull": "26a75c8c1c9c",
   "outbox.commanderDamageRange": "3f1cc20276a1",
   "outbox.commanderSelfDamage": "6f93992f4f17",
+  "outbox.commanderClaimDeclined": "f36645002f94",
   "outbox.failureCapacity": "9f5f65609ac0",
   "outbox.finish.signIn": "4f9a22773bf9",
   "outbox.finish.pendingChanges": "401963549275",

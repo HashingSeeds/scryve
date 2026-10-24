@@ -2,6 +2,7 @@ import type { DurableFailResult, DurableFailedRecord, DurablePendingRecord } fro
 
 export interface OutboxAcknowledgement {
   operationId: string
+  status?: string
 }
 
 export interface DurableOutboxRepository<
