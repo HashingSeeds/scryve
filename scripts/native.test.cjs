@@ -11,6 +11,7 @@ test("a bare target builds into build/", () => {
     target: "ios:preview",
     build: true,
     upload: false,
+    offMain: false,
     buildPath: path.join(root, "build", "ios-preview.ipa"),
   })
 })
@@ -44,4 +45,9 @@ test("only iOS builds go through the pod warning filter", () => {
 test("unknown targets and flags print usage", () => {
   assert.throws(() => parseArgs(["ios:prod"]), /Usage/)
   assert.throws(() => parseArgs(["ios:preview", "--submit"]), /Unknown option/)
+})
+
+test("--off-main is only for production builds", () => {
+  assert.equal(parseArgs(["ios:production", "--off-main"]).offMain, true)
+  assert.throws(() => parseArgs(["ios:preview", "--off-main"]), /only applies to production/)
 })
