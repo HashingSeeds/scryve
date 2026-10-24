@@ -43,7 +43,7 @@ jest.mock("@/features/auth/config", () => ({
     },
   }),
 }))
-jest.mock("@clerk/expo/native", () => {
+jest.mock("@clerk/expo/native-components", () => {
   const NativeText = jest.requireActual("react-native").Text
   return { AuthView: () => <NativeText testID="native-auth-view">Auth</NativeText> }
 })

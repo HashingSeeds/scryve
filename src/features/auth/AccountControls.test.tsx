@@ -29,7 +29,7 @@ jest.mock("@clerk/expo", () => ({
   }),
 }))
 
-jest.mock("@clerk/expo/native", () => {
+jest.mock("@clerk/expo/native-components", () => {
   const { View } = jest.requireActual("react-native")
   return {
     UserProfileView: (props: object) => <View testID="native-user-profile" {...props} />,

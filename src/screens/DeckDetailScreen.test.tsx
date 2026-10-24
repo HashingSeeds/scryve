@@ -113,8 +113,8 @@ const mockPokemonCardByReference = jest.fn(async () => ({
   rarity: "common",
 }))
 const queryArgs: Array<Record<string, unknown>> = []
-let mockPreventRemoveCallback: ((options: { data: { action: object } }) => void) | undefined
-const mockNavigationDispatch = jest.fn()
+let mockPreventRemoveCallback: ((options: { repeat: () => void }) => void) | undefined
+const mockRepeatRemove = jest.fn()
 
 const solRing = {
   _id: "card-1",
@@ -250,16 +250,7 @@ jest.mock("expo-router", () => ({
     require("react").useEffect(() => {
       if (mockFocused) return callback()
     }, [callback, mockFocused]),
-  useNavigation: () => ({
-    dispatch: mockNavigationDispatch,
-  }),
-}))
-
-jest.mock("expo-router/react-navigation", () => ({
-  usePreventRemove: (
-    _preventRemove: boolean,
-    callback: (options: { data: { action: object } }) => void,
-  ) => {
+  usePreventRemove: (_preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
     mockPreventRemoveCallback = callback
   },
 }))
@@ -308,7 +299,7 @@ describe("DeckDetailScreen", () => {
     jest.clearAllMocks()
     queryArgs.length = 0
     mockPreventRemoveCallback = undefined
-    mockNavigationDispatch.mockClear()
+    mockRepeatRemove.mockClear()
     mockDetail.value = {
       ...loadedDetail,
       version: mainVersion,
@@ -1822,29 +1813,28 @@ describe("DeckDetailScreen", () => {
     expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
-  it("replays native navigation only after changed edits are discarded", () => {
+  it("continues native navigation only after changed edits are discarded", () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getAllByText("+")[0])
-    const action = { type: "GO_BACK" }
 
-    act(() => mockPreventRemoveCallback?.({ data: { action } }))
+    act(() => mockPreventRemoveCallback?.({ repeat: mockRepeatRemove }))
     expect(view.getByTestId("discard-edits-dialog")).toBeTruthy()
-    expect(mockNavigationDispatch).not.toHaveBeenCalled()
+    expect(mockRepeatRemove).not.toHaveBeenCalled()
 
     fireEvent.press(view.getByTestId("discard-edits-confirm"))
-    expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
+    expect(mockRepeatRemove).toHaveBeenCalledTimes(1)
   })
 
-  it("does not replay cancelled navigation after saving", async () => {
+  it("does not continue cancelled navigation after saving", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getAllByText("+")[0])
-    act(() => mockPreventRemoveCallback?.({ data: { action: { type: "GO_BACK" } } }))
+    act(() => mockPreventRemoveCallback?.({ repeat: mockRepeatRemove }))
     fireEvent.press(view.getByText("Keep editing"))
     fireEvent.press(view.getByText("Save"))
     await waitFor(() => expect(mockSaveVersion).toHaveBeenCalled())
-    expect(mockNavigationDispatch).not.toHaveBeenCalled()
+    expect(mockRepeatRemove).not.toHaveBeenCalled()
   })
 
   it("opens the shared card dialog with provider details for a Yu-Gi-Oh card", async () => {

@@ -28,16 +28,11 @@ jest.mock("convex/react", () => ({
 }))
 
 let mockPreventRemove = false
-let mockPreventRemoveCallback:
-  ((options: { data: { action: { type: string } } }) => void) | undefined
-const mockNavigationDispatch = jest.fn()
-const mockNavigation = { dispatch: mockNavigationDispatch }
+let mockPreventRemoveCallback: ((options: { repeat: () => void }) => void) | undefined
+const mockRepeatRemove = jest.fn()
 const mockStatsPush = jest.fn()
 jest.mock("expo-router", () => ({
-  useNavigation: () => mockNavigation,
   router: { push: (...args: unknown[]) => mockStatsPush(...args) },
-}))
-jest.mock("expo-router/react-navigation", () => ({
   usePreventRemove: (preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
     mockPreventRemove = preventRemove
     mockPreventRemoveCallback = callback
@@ -94,7 +89,7 @@ beforeEach(() => {
   mockConnectionState.isWebSocketConnected = true
   mockPreventRemove = false
   mockPreventRemoveCallback = undefined
-  mockNavigationDispatch.mockClear()
+  mockRepeatRemove.mockClear()
   mockCurrent = mockStored
   mockSaveFailure = false
   mockSaveGuestDeck.mockClear()
@@ -257,16 +252,15 @@ test("supports removing the last copy, Undo, and cancelling an edit", () => {
   expect(view.onBack).not.toHaveBeenCalled()
 })
 
-test("blocks system back and replays navigation after discard", () => {
+test("blocks system back and continues it after discard", () => {
   const view = renderScreen()
   editNote(view, "Unsaved")
-  const action = { type: "GO_BACK" }
-  act(() => mockPreventRemoveCallback?.({ data: { action } }))
+  act(() => mockPreventRemoveCallback?.({ repeat: mockRepeatRemove }))
   fireEvent.press(view.getByText("Keep editing"))
   expect(mockPreventRemove).toBe(true)
-  act(() => mockPreventRemoveCallback?.({ data: { action } }))
+  act(() => mockPreventRemoveCallback?.({ repeat: mockRepeatRemove }))
   fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
-  expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
+  expect(mockRepeatRemove).toHaveBeenCalledTimes(1)
 })
 
 test("searches new cards into Main deck by default and saves merged copies", async () => {
