@@ -33,12 +33,17 @@ export function deckNameWarning(name: string) {
     : undefined
 }
 
+export function honestRate(record: Pick<DeckRecord, "wins" | "losses" | "draws">) {
+  const games = record.wins + record.losses + record.draws
+  if (games < MIN_RATED_GAMES) return { text: recordText(record), tooFew: true as const, games }
+  const percent = Math.round((record.wins / games) * 100)
+  return { text: `${percent}%`, tooFew: false as const, games, percent }
+}
+
 export function recordSummary(record: DeckRecord | undefined) {
   if (!record) return undefined
   if (record.games === 0) return translate("decks:record.noGames")
-  if (record.games < MIN_RATED_GAMES) return recordText(record)
-  return translate("decks:record.winRate", {
-    percent: Math.round((record.wins / record.games) * 100),
-    games: record.games,
-  })
+  const rate = honestRate(record)
+  if (rate.tooFew) return rate.text
+  return translate("decks:record.winRate", { percent: rate.percent, games: rate.games })
 }
