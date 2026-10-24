@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { bumpPatch, planVersion } = require("./release-native.cjs")
+const { bumpPatch, planOffMainVersion, planVersion } = require("./release-native.cjs")
 
 test("the commit that built a version reuses it for the other platform", () => {
   assert.deepEqual(planVersion({ version: "1.2.3", taggedCommit: "abc", head: "abc" }), {
@@ -26,4 +26,9 @@ test("a newer commit bumps the patch past the released version", () => {
 
 test("only plain major.minor.patch versions bump", () => {
   assert.throws(() => bumpPatch("1.2.3-beta.1"), /major\.minor\.patch/)
+})
+
+test("an off-main build moves past a tagged version, which may already be live", () => {
+  assert.equal(planOffMainVersion({ version: "0.2.0", tagged: true }), "0.2.1")
+  assert.equal(planOffMainVersion({ version: "0.3.0", tagged: false }), "0.3.0")
 })
