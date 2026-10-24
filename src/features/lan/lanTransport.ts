@@ -45,7 +45,13 @@ export interface LanPeerHandlers<In> {
 export interface LanHost {
   name: string
   stop: () => Promise<void>
+  advertise: (status: string) => void
 }
+
+// why: a host keeps its finished table open for a rematch with the same players, and reconnecting guests find it by name, so lists hide it instead of the host unpublishing it.
+const STATUS_KEY = "status"
+
+export const isFinishedTable = (service: Service) => service.txt?.[STATUS_KEY] === "finished"
 
 // why: the constructor throws without the native module, so creating it on import crashes web.
 let zeroconfInstance: Zeroconf | undefined
@@ -137,6 +143,7 @@ export function hostLan<In, Out>(
   parse: (line: string) => In | null,
   onPeer: (peer: LanConnection<Out>) => LanPeerHandlers<In>,
   onServerClosed: () => void,
+  status?: string,
 ): Promise<LanHost> {
   return new Promise((resolve, reject) => {
     const server = TcpSocket.createServer((socket) => {
@@ -158,11 +165,16 @@ export function hostLan<In, Out>(
           protocol: LAN_PROTOCOL,
           name,
           port: address.port,
+          ...(status ? { txt: { [STATUS_KEY]: status } } : {}),
         })
         .then((published) => {
           listening = true
           resolve({
             name: published.name,
+            advertise: (next) =>
+              void zeroconf()
+                .updateService(published.name, { txt: { [STATUS_KEY]: next } })
+                .catch(() => null),
             stop: async () => {
               listening = false
               server.close()

@@ -35,7 +35,7 @@ beforeEach(() => {
   jest.useFakeTimers()
   jest.mocked(hostLan).mockImplementation(async (name, _parse, onPeer) => {
     accept = onPeer as Accept
-    return { name, stop: async () => {} }
+    return { name, advertise: () => {}, stop: async () => {} }
   })
 })
 

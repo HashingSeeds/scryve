@@ -47,13 +47,17 @@ const setup: LanSetup = {
   format: "commander",
 }
 let accept: Accept
+let advertise: jest.Mock
+let stop: jest.Mock
 
 beforeEach(() => {
   jest.clearAllMocks()
   jest.useFakeTimers()
   jest.mocked(hostLan).mockImplementation(async (name, _parse, onPeer) => {
     accept = onPeer as Accept
-    return { name, stop: async () => {} }
+    advertise = jest.fn()
+    stop = jest.fn(async () => {})
+    return { name, stop, advertise }
   })
 })
 
@@ -466,6 +470,27 @@ describe("nearby host", () => {
     await session.writes.finish()
     jest.advanceTimersByTime(50)
     expect(session.getState().projection?.status).toBe("finished")
+  })
+
+  it("advertises a finished table so nearby lists can hide it from new players", async () => {
+    const { session } = await startedGame()
+    expect(jest.mocked(hostLan).mock.calls[0][4]).toBe("lobby")
+
+    await session.finish()
+
+    expect(advertise).toHaveBeenLastCalledWith("finished")
+  })
+
+  it("closes a finished table when it hosts another, which starts empty", async () => {
+    const { session, alice } = await startedGame()
+    await session.finish()
+    const finishedStop = stop
+
+    await session.host(setup)
+
+    expect(finishedStop).toHaveBeenCalled()
+    expect(alice.sent.at(-1)).toMatchObject({ type: "state", lobby: { status: "abandoned" } })
+    expect(session.getState().lobby).toMatchObject({ status: "lobby", seats: [expect.anything()] })
   })
 
   it("turns away a socket that names another guest's seat or the host's", async () => {
