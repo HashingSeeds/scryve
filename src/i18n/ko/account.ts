@@ -206,9 +206,11 @@ export default {
     },
     subscription: {
       heading: "Scryve Pro를 구독 중인가요?",
-      body: "계정을 삭제해도 구독은 취소되지 않습니다. Apple 또는 Google Play에서 취소할 때까지 계속 결제될 수 있습니다. 지금 삭제할 수도 있지만 남은 유료 이용 기간은 사용할 수 없게 됩니다.",
+      body: "계정을 삭제해도 구독은 해지되지 않습니다. 구독하신 곳에서 해지하지 않으면 요금이 계속 청구될 수 있습니다. 지금 삭제할 수도 있지만, 남은 유료 이용 기간은 사용할 수 없게 됩니다.",
       manageApple: "Apple 구독 관리",
       manageGoogle: "Google Play 구독 관리",
+      web: "웹에서 구독하셨나요? 고객 포털에서 해지하세요. Scryve Pro 결제 이메일에는 모두 포털 링크가 포함되어 있습니다.",
+      manageWeb: "웹 구독 관리",
     },
     signedInAs: "{{email}} 계정으로 로그인됨",
     confirmLabel: "계속하려면 {{word}}을(를) 입력하세요",

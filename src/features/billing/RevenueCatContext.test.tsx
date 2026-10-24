@@ -3,7 +3,12 @@ import { Platform } from "react-native"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 import Purchases from "react-native-purchases"
 
-import { hasFoil, RevenueCatProvider, useRevenueCat } from "./RevenueCatContext"
+import {
+  hasFoil,
+  proSubscriptionManagement,
+  RevenueCatProvider,
+  useRevenueCat,
+} from "./RevenueCatContext"
 import { presentCountProPaywall } from "./revenueCatUi"
 
 const customerInfo = {
@@ -299,5 +304,37 @@ describe("hasFoil", () => {
     expect(hasFoil(entitledTo("yearly"))).toBe(false)
     expect(hasFoil(entitledTo("foil_yearly", "FAILED"))).toBe(false)
     expect(hasFoil(expiredCustomerInfo)).toBe(false)
+  })
+})
+
+describe("proSubscriptionManagement", () => {
+  const withPro = (store: string, managementURL: string | null = null) =>
+    ({
+      entitlements: { active: { "Count Pro": { store, productIdentifier: "foil_yearly" } } },
+      subscriptionsByProductIdentifier: { foil_yearly: { managementURL } },
+    }) as never
+
+  it.each([
+    ["APP_STORE", { store: "app_store" }],
+    ["PLAY_STORE", { store: "play_store" }],
+    ["STRIPE", { store: "unknown" }],
+    ["PROMOTIONAL", { store: "unknown" }],
+  ] as const)("maps %s to where it is cancelled", (store, management) => {
+    expect(proSubscriptionManagement(withPro(store))).toEqual(management)
+  })
+
+  it("links a Web Billing subscription to its customer portal", () => {
+    expect(
+      proSubscriptionManagement(withPro("RC_BILLING", "https://billing.revenuecat.com/m/1")),
+    ).toEqual({ store: "web", url: "https://billing.revenuecat.com/m/1" })
+    expect(proSubscriptionManagement(withPro("RC_BILLING", "javascript:alert(1)"))).toEqual({
+      store: "web",
+      url: undefined,
+    })
+  })
+
+  it("does not know the store before billing loads or without Pro", () => {
+    expect(proSubscriptionManagement(null)).toEqual({ store: "unknown" })
+    expect(proSubscriptionManagement(expiredCustomerInfo)).toEqual({ store: "unknown" })
   })
 })
