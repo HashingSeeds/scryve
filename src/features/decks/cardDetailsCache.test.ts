@@ -6,9 +6,11 @@ import {
   type CardDetailStore,
 } from "./cardDetailsCache"
 
-const mockPrefetch = jest.fn(async (_urls: string | string[]) => true)
+const mockPrefetch = jest.fn(async (_urls: string | string[], _cachePolicy?: string) => true)
 jest.mock("expo-image", () => ({
-  Image: { prefetch: (urls: string | string[]) => mockPrefetch(urls) },
+  Image: {
+    prefetch: (urls: string | string[], cachePolicy?: string) => mockPrefetch(urls, cachePolicy),
+  },
 }))
 
 function memoryStore(): CardDetailStore {
@@ -41,7 +43,7 @@ describe("card details cache", () => {
     expect(loadCardDetails(store)).toEqual({ ring: solRing })
   })
 
-  it("warms uncached version cards with one batch and prefetches images", async () => {
+  it("warms uncached version cards with one batch and prefetches images to disk", async () => {
     const store = memoryStore()
     const query = jest.fn(async () => [
       {
@@ -69,10 +71,10 @@ describe("card details cache", () => {
     })
     expect(readCardDetail("ring-id", store)).toMatchObject(solRing)
     expect(mockPrefetch).toHaveBeenCalledTimes(1)
-    expect(mockPrefetch).toHaveBeenCalledWith([
-      "https://cards.scryfall.io/normal/ring.jpg",
-      "https://cards.scryfall.io/small/ring.jpg",
-    ])
+    expect(mockPrefetch).toHaveBeenCalledWith(
+      ["https://cards.scryfall.io/normal/ring.jpg", "https://cards.scryfall.io/small/ring.jpg"],
+      "disk",
+    )
 
     await prefetchCardDetails(
       { query },
@@ -102,7 +104,10 @@ describe("card details cache", () => {
       store,
     )
     expect(readCardDetail("double-id", store)?.faceDetails).toBe(faceDetails)
-    expect(mockPrefetch).toHaveBeenCalledWith(["https://cards/front.jpg", "https://cards/back.jpg"])
+    expect(mockPrefetch).toHaveBeenCalledWith(
+      ["https://cards/front.jpg", "https://cards/back.jpg"],
+      "disk",
+    )
   })
 
   it("retries after a failed warm and skips fully warmed versions", async () => {
