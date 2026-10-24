@@ -46,7 +46,6 @@ export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
     if (!convex || !scryfallId || cached.power !== undefined) return
     if (refreshedThisSession.has(scryfallId)) return
     refreshedThisSession.add(scryfallId)
-    let active = true
     convex
       .action(api.cards.byId, {
         scryfallId,
@@ -54,12 +53,9 @@ export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
       })
       .then((reference) => {
         saveCardDetails({ [scryfallId]: { ...readCardDetail(scryfallId), ...reference } })
-        if (active) setFetched({ scryfallId, power: printedPower(reference.power) })
+        setFetched({ scryfallId, power: printedPower(reference.power) })
       })
       .catch(() => refreshedThisSession.delete(scryfallId))
-    return () => {
-      active = false
-    }
   }, [convex, scryfallId, cached.power])
 
   const power =
