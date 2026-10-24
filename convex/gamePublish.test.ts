@@ -340,7 +340,7 @@ describe("claiming an imported seat through claimSeat", () => {
         seat: 2,
         manualCode: created.manualCode,
       }),
-    ).rejects.toThrow("Seat already claimed")
+    ).rejects.toMatchObject({ data: { code: "seat_taken", message: "Seat already claimed" } })
     await expect(
       stranger.mutation(api.games.claimSeat, {
         seat: 2,
@@ -675,13 +675,13 @@ describe("imported game invite renewal and discovery", () => {
     )
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
-    ).rejects.toThrow("You cannot join a game with a player you blocked or who blocked you")
+    ).rejects.toMatchObject({ data: { code: "blocked_player" } })
     await expect(
       guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
       }),
-    ).rejects.toThrow("You cannot join a game with a player you blocked or who blocked you")
+    ).rejects.toMatchObject({ data: { code: "blocked_player" } })
   })
 
   it("restores the legacy no-username display fallback for owned seats", async () => {
@@ -730,7 +730,9 @@ describe("imported game invite renewal and discovery", () => {
         manualCode: created.manualCode,
         deviceId: "device-third-0003",
       }),
-    ).rejects.toThrow("You already hold a seat in this game")
+    ).rejects.toMatchObject({
+      data: { code: "seat_already_held", message: "You already hold a seat in this game" },
+    })
   })
 
   it("does not bypass authorization when a pre-claim operation is retried after a claim", async () => {
