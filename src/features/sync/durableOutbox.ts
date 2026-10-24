@@ -409,6 +409,19 @@ export class DurableOutbox<
     return updated
   }
 
+  rewriteUnattempted(
+    scopeId: string,
+    operationId: string,
+    rewrite: (action: Pending) => Pending | null,
+  ): Pending | null {
+    const key = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
+    const action = this.codec.parsePending(this.read(key))
+    if (!action || action.attempts > 0 || action.lastAttemptAt !== undefined) return null
+    const rewritten = rewrite(action)
+    if (rewritten) this.storage.set(key, this.serialize(rewritten))
+    return rewritten
+  }
+
   replacePending(scopeId: string, action: Pending): void {
     this.storage.set(
       this.keys.pendingRecord(scopeId, this.codec.operationId(action), this.ownerId),
