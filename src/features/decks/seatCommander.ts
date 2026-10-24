@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useReducer } from "react"
 import { useConvex } from "convex/react"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
@@ -31,15 +31,15 @@ export function seatCommander(
   }
 }
 
-const detailFor = (card: DeckCard) => readCardDetail(cardDetailsKey(card, "mtg"))
+const readDetail = () => (card: DeckCard) => readCardDetail(cardDetailsKey(card, "mtg"))
 const refreshedThisSession = new Set<string>()
 
 /** why: a game is often played offline, so the commander reads from the device's deck and card caches, and an online read refreshes the card so a printed power stored after the cache was filled still arrives. */
 export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
   const convex = useConvex()
   const cards = useSeatDeckCards(deck)
-  const cached = useMemo(() => seatCommander(cards, detailFor), [cards])
-  const [fetched, setFetched] = useState<{ scryfallId: string; power?: number }>()
+  const [detailFor, rereadDetails] = useReducer(readDetail, undefined, readDetail)
+  const cached = useMemo(() => seatCommander(cards, detailFor), [cards, detailFor])
   const scryfallId = cached.card?.scryfallId
 
   useEffect(() => {
@@ -53,12 +53,10 @@ export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
       })
       .then((reference) => {
         saveCardDetails({ [scryfallId]: { ...readCardDetail(scryfallId), ...reference } })
-        setFetched({ scryfallId, power: printedPower(reference.power) })
+        rereadDetails()
       })
       .catch(() => refreshedThisSession.delete(scryfallId))
   }, [convex, scryfallId, cached.power])
 
-  const power =
-    cached.power ?? (fetched && fetched.scryfallId === scryfallId ? fetched.power : undefined)
-  return { name: cached.name, power }
+  return { name: cached.name, power: cached.power }
 }
