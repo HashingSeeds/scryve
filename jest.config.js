@@ -17,9 +17,17 @@ module.exports = {
       cacheDirectory: "<rootDir>/.jest-cache",
       modulePathIgnorePatterns,
       setupFiles: ["<rootDir>/test/setup.ts"],
-      testPathIgnorePatterns: ["/node_modules/", "<rootDir>/test/config/", ...nodeTestDirectories],
+      // why: Reanimated 4.6+ splits files into .native/.web variants and only the web ones run under Jest.
+      resolver: "react-native-reanimated/jest/resolver",
+      // why: scripts/*.test.cjs run under node --test (test:scripts); Jest 30 matches .cjs by default.
+      testPathIgnorePatterns: [
+        "/node_modules/",
+        "<rootDir>/test/config/",
+        "<rootDir>/scripts/",
+        ...nodeTestDirectories,
+      ],
       transformIgnorePatterns: [
-        "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|@convex-dev|convex-test|react-native-purchases|react-native-purchases-ui|@revenuecat))",
+        "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry|native-base|@convex-dev|convex-test|react-native-purchases|react-native-purchases-ui|@revenuecat))",
         "/node_modules/react-native-reanimated/plugin/",
       ],
     },

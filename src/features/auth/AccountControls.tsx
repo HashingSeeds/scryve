@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Modal, View } from "react-native"
 import { isClerkAPIResponseError, useClerk, useUser } from "@clerk/expo"
-import { UserProfileView } from "@clerk/expo/native"
+import { UserProfileView } from "@clerk/expo/native-components"
 
 import { translate } from "@/i18n/translate"
 import { AccountScreen } from "@/screens/AccountScreen"
