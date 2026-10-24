@@ -415,6 +415,16 @@ export default {
   lifeCard: {
     now: "{{identity}}, ahora {{value}}",
     out: "eliminado: {{reason}}",
+    outLabel: "Fuera",
+    outFrom: "{{total}} de daño de comandante de {{name}}",
+    outOn: {
+      none: "vidas",
+      mtg: "vidas",
+      ygo: "LP",
+      pokemon: "cartas de Premio",
+      lorcana: "leyenda",
+      fab: "vidas",
+    },
     openCalculator: "Abrir la calculadora de {{identity}}",
   },
   lifeControls: {

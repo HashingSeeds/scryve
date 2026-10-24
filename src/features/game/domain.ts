@@ -50,11 +50,11 @@ import {
   MAX_LIFE_DELTA,
 } from "../../../convex/lib/gameRules"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
-import { flooredLifeDelta, isCounterOut, startingValueRange } from "../../../convex/lib/systems"
+import { lastStanding, outReason, type OutState } from "../../../convex/lib/outReason"
+import { flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
 import {
   applyTableAction,
   EMPTY_TABLE,
-  isOutByTableCounters,
   tableHasState,
   type TableAction,
 } from "../../../convex/lib/table"
@@ -371,22 +371,24 @@ export function incomingCommanderDamage(
   return incoming
 }
 
-export function isEliminatedByCommanderDamage(game: LocalGame, playerId: PlayerId): boolean {
-  return game.players.some(
-    (player) =>
-      player.id !== playerId &&
-      commanderDamageBetween(game, player.id, playerId) >= COMMANDER_LETHAL_DAMAGE,
-  )
+export function localOutState(game: LocalGame): OutState<PlayerId> {
+  return {
+    counter: playSystemRules(game.system).counter,
+    tableRules: localTableRules(game),
+    table: game.table,
+    lives: game.players.map(({ id, life }) => ({ playerId: id, life })),
+    commanderDamage: game.players.flatMap((from) =>
+      game.players.map((to) => ({
+        fromPlayerId: from.id,
+        toPlayerId: to.id,
+        total: commanderDamageBetween(game, from.id, to.id),
+      })),
+    ),
+  }
 }
 
-export function isPlayerOut(game: LocalGame, playerId: PlayerId): boolean {
-  const player = game.players.find(({ id }) => id === playerId)
-  const others = game.players.filter(({ id }) => id !== playerId).map(({ life }) => life)
-  return (
-    isCounterOut(playSystemRules(game.system).counter, player?.life ?? 0, others) ||
-    isEliminatedByCommanderDamage(game, playerId) ||
-    isOutByTableCounters(game.table ?? EMPTY_TABLE, playerId, localTableRules(game))
-  )
+export function localOutReason(game: LocalGame, playerId: PlayerId) {
+  return outReason(localOutState(game), playerId)
 }
 
 export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
@@ -420,9 +422,8 @@ export function applyLocalTableAction(
   }
 }
 
-export function lastPlayerStanding(game: LocalGame): PlayerId | undefined {
-  const standing = game.players.filter(({ id }) => !isPlayerOut(game, id))
-  return standing.length === 1 ? standing[0].id : undefined
+export function lastPlayerStanding(game: LocalGame) {
+  return lastStanding(localOutState(game))
 }
 
 type CompensatableEvent = LifeChangedEvent | CommanderDamageAssignedEvent

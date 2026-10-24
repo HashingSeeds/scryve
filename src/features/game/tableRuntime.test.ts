@@ -1,4 +1,4 @@
-import { applyLocalTableAction, createLocalGame, isPlayerOut, localTableRules } from "./domain"
+import { applyLocalTableAction, createLocalGame, localOutReason, localTableRules } from "./domain"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import { createTableActions } from "./tableRuntime"
 import type { LocalGame } from "./types"
@@ -107,7 +107,7 @@ describe("table runtime", () => {
     repository.saveActiveGame(game())
     const restored = repository.loadActiveGame()!
     expect(restored.table).toEqual(game().table)
-    expect(isPlayerOut(restored, me)).toBe(true)
+    expect(localOutReason(restored, me)).toBeDefined()
   })
 
   it("never knocks out on a damage step the reducer rejects", () => {

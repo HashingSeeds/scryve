@@ -46,6 +46,8 @@ import {
   connectedBoardView,
   connectedLastStanding,
   connectedLives,
+  connectedOutState,
+  type ConnectedOutGame,
   type ConnectedBoardSeat,
   type ConnectedBoardView,
 } from "@/features/connected/boardView"
@@ -1008,13 +1010,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
             }
-            isPlayerEliminated={(player) =>
-              commanderDamageEnabled &&
-              Boolean(
-                game.players.find((candidate) => candidate.playerId === player.id)
-                  ?.eliminatedByCommanderDamage,
-              )
-            }
+            outGame={game}
             getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
             getSeatDeck={(player) => {
               const versionId = controlled.has(player.id)
@@ -1514,15 +1510,27 @@ const FINISH_BLOCKERS = {
 
 function ConnectedLifeGrid({
   seats,
+  outGame,
   ...grid
-}: Omit<PlayerGridProps, "players"> & { seats: BoardSeat[] }) {
+}: Omit<PlayerGridProps, "players" | "outState"> & {
+  seats: BoardSeat[]
+  outGame: ConnectedOutGame
+}) {
   const lives = useContext(ConnectedLivesContext)
   const players = useMemo(
     () => seats.map((seat): GamePlayer => ({ ...seat, life: lives[seat.id] ?? 0 })),
     [lives, seats],
   )
   const table = useContext(ConnectedTableContext)
-  return <PlayerGrid {...grid} players={players} table={table} />
+  const outState = useMemo(
+    () =>
+      connectedOutState(
+        { ...outGame, table: table?.table },
+        players.map(({ id, life }) => ({ playerId: id, life })),
+      ),
+    [outGame, players, table],
+  )
+  return <PlayerGrid {...grid} players={players} table={table} outState={outState} />
 }
 
 function WinnerChoice({

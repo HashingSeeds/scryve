@@ -31,7 +31,7 @@ import {
   hasLocalGameStarted,
   hasPlayBegun,
   incomingCommanderDamage,
-  isEliminatedByCommanderDamage,
+  localOutState,
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
@@ -208,6 +208,7 @@ export function CurrentGameScreen({
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
+  const outState = useMemo(() => localOutState(runtime.game), [runtime.game])
 
   function toggleSword(player: GamePlayer) {
     markFirstPlayerUsed()
@@ -427,11 +428,7 @@ export function CurrentGameScreen({
               seatOrder={runtime.game.seatOrder}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
-              isPlayerEliminated={
-                commanderDamageEnabled
-                  ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)
-                  : undefined
-              }
+              outState={outState}
               commanderDamage={
                 commanderDamageEnabled
                   ? {

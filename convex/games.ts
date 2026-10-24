@@ -53,6 +53,7 @@ import {
   deckLabelValidator,
   type DeckLabel,
 } from "./lib/opponentDecks"
+import { outReason, type OutState } from "./lib/outReason"
 import {
   boundedPaginationOptions,
   CONNECTED_EVENT_PAGE_MAX_ITEMS,
@@ -78,11 +79,10 @@ import {
 } from "./lib/policy"
 import { recordGameResults, recordPlayerResult, refreshGameOpponents } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
-import { isCounterOut, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
+import { startingValueRange, systemDefinition, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
-  isOutByTableCounters,
   isValidTableSnapshot,
   remapTableState,
   tableActionDelta,
@@ -1817,7 +1817,7 @@ export const lobbyProjection = query({
     const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
     const decidedOutcome =
       isHost && game.status === "active" && game.variant === "treachery"
-        ? decidedTreacheryOutcome(game, players, eliminatedPlayerIds)
+        ? decidedTreacheryOutcome(game, players, commanderDamage?.totals)
         : undefined
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
@@ -1914,25 +1914,20 @@ function roleForViewer(
 function decidedTreacheryOutcome(
   game: Doc<"games">,
   players: Doc<"gamePlayers">[],
-  eliminatedByCommanderDamage: ReadonlySet<Id<"gamePlayers">>,
+  commanderDamage: OutState<Id<"gamePlayers">>["commanderDamage"],
 ) {
-  const counter = systemDefinition(game.system ?? game.game)?.counter
-  const rules = gameTableRules(game)
-  const table = tableProjection(game, players)
-  const isOut = (player: Doc<"gamePlayers">) =>
-    eliminatedByCommanderDamage.has(player._id) ||
-    isOutByTableCounters(table, player._id, rules) ||
-    (counter !== undefined &&
-      isCounterOut(
-        counter,
-        player.currentLife,
-        players.filter((other) => other !== player).map((other) => other.currentLife),
-      ))
+  const outState: OutState<Id<"gamePlayers">> = {
+    counter: systemDefinition(game.system ?? game.game)?.counter,
+    tableRules: gameTableRules(game),
+    table: tableProjection(game, players),
+    lives: players.map((player) => ({ playerId: player._id, life: player.currentLife })),
+    commanderDamage,
+  }
   return treacheryOutcome(
     players.flatMap((player) =>
       player.role === undefined
         ? []
-        : [{ playerId: player._id, role: player.role, inGame: !isOut(player) }],
+        : [{ playerId: player._id, role: player.role, inGame: !outReason(outState, player._id) }],
     ),
   )
 }

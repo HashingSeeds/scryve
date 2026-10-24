@@ -5,8 +5,7 @@ import type {
   ConnectedPlayerProjection,
   ConnectedProjection,
 } from "./model"
-import { isCounterOut } from "../../../convex/lib/systems"
-import { isOutByTableCounters } from "../../../convex/lib/table"
+import { lastStanding, type OutState } from "../../../convex/lib/outReason"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
 
@@ -43,23 +42,32 @@ export function connectedLives(
   )
 }
 
-export function connectedPlayerIsOut(
-  { players, system, format, table }: ConnectedProjection,
-  player: ConnectedPlayerProjection,
-) {
-  return (
-    isCounterOut(
-      playSystemRules(system).counter,
-      player.currentLife,
-      players.filter((other) => other !== player).map((other) => other.currentLife),
-    ) ||
-    player.eliminatedByCommanderDamage === true ||
-    (table !== undefined &&
-      isOutByTableCounters(table, player.playerId, playTableRules(system, format)))
+/** why: the board passes its optimistic lives and table, so a seat reads out the moment its own tap lands. */
+export function connectedOutState(
+  { system, format, table, commanderDamage }: ConnectedOutGame,
+  lives: OutState["lives"],
+): OutState {
+  return {
+    counter: playSystemRules(system).counter,
+    tableRules: playTableRules(system, format),
+    table,
+    lives,
+    commanderDamage: commanderDamage?.totals,
+  }
+}
+
+export type ConnectedOutGame = Pick<
+  ConnectedProjection,
+  "system" | "format" | "table" | "commanderDamage"
+>
+
+export function projectionOutState(projection: ConnectedProjection) {
+  return connectedOutState(
+    projection,
+    projection.players.map(({ playerId, currentLife }) => ({ playerId, life: currentLife })),
   )
 }
 
 export function connectedLastStanding(projection: ConnectedDisplayProjection): string | undefined {
-  const standing = projection.players.filter((player) => !connectedPlayerIsOut(projection, player))
-  return standing.length === 1 ? standing[0].playerId : undefined
+  return lastStanding(projectionOutState(projection))
 }
