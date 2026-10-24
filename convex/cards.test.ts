@@ -99,6 +99,31 @@ describe("card provider caching and health", () => {
     ).toEqual([{ key: id, details: expect.objectContaining(metadata) }])
   })
 
+  it("stores a fetched card's printed power and serves it with card details", async () => {
+    const id = "77777777-7777-7777-7777-777777777777"
+    const t = makeConvexTest()
+    jest.spyOn(global, "fetch").mockImplementation(() =>
+      response({
+        id,
+        oracle_id: id,
+        name: "Krenko, Mob Boss",
+        set_name: "Magic 2013",
+        type_line: "Legendary Creature — Goblin Warrior",
+        color_identity: ["R"],
+        legalities: { commander: "legal" },
+        keywords: [],
+        power: "3",
+        toughness: "3",
+      }),
+    )
+    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
+      power: "3",
+    })
+    expect(
+      await t.query(api.cards.detailsBatch, { game: "mtg", items: [{ key: id, scryfallId: id }] }),
+    ).toEqual([{ key: id, details: expect.objectContaining({ power: "3" }) }])
+  })
+
   it("refreshes Commander metadata older than a day and reports its cache timestamp", async () => {
     const id = "11111111-1111-1111-1111-111111111111"
     const t = makeConvexTest()
