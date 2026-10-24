@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
+import { NativeModulesProxy } from "expo-modules-core"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
@@ -77,9 +78,26 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-editor-step-1--5"))
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
-    expect(useKeepAwake).toHaveBeenCalledWith("count-local-game", {
+    expect(useKeepAwake).toHaveBeenCalledWith(undefined, {
       suppressDeactivateWarnings: true,
     })
+  })
+
+  it("stays awake while another board is still mounted", () => {
+    const awake = new Set<string>()
+    const native = NativeModulesProxy.ExpoKeepAwake
+    jest.mocked(native.activate).mockImplementation(async (tag: string) => void awake.add(tag))
+    jest.mocked(native.deactivate).mockImplementation(async (tag: string) => void awake.delete(tag))
+    jest
+      .mocked(useKeepAwake)
+      .mockImplementation(
+        jest.requireActual<typeof import("expo-keep-awake")>("expo-keep-awake").useKeepAwake,
+      )
+
+    renderGame()
+    renderGame().unmount()
+
+    expect(awake.size).toBe(1)
   })
 
   it.each(["commander", "standard"])("applies one navigation bottom inset in %s", (format) => {
