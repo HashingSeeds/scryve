@@ -160,6 +160,29 @@ describe("TCGdex Pokemon cards", () => {
         tcgdex.restore()
       }
     })
+
+    it.each([
+      ["Lightning Energy", "MEE 12", "mee", ["mee-004"], "mee-004"],
+      ["Water Energy", "SVE 11", "sve", ["sve-003", "sve-011", "sve-019"], "sve-011"],
+    ])(
+      "finds %s %s by name within the set",
+      async (name, reference, setId, printings, expected) => {
+        const tcgdex = mockTcgdex({
+          [`/sets?abbreviation.official=eq%3A${reference.split(" ")[0]}`]: [{ id: setId }],
+          [`/cards?name=eq%3A${encodeURIComponent(name)}&set.id=eq%3A${setId}`]: printings.map(
+            (id) => candidate(id, id.split("-")[1] ?? "", name),
+          ),
+          [`/cards/${expected}`]: { ...riolu, id: expected, name },
+        })
+        try {
+          const result = await pokemonCardByReference(ctx, name, reference)
+
+          expect(result.cards.map((card) => card.cardId)).toEqual([expected])
+        } finally {
+          tcgdex.restore()
+        }
+      },
+    )
   })
 
   it("loads only bounded, filtered pages for deck catalog summaries", async () => {
