@@ -1106,7 +1106,6 @@ const $overviewClose: ThemedStyle<ViewStyle> = () => ({
 
 const $mutedContent: ThemedStyle<ViewStyle> = () => ({ opacity: 0 })
 
-// why: an out-on-life overlay sits under the life controls so they stay bright; a locked one covers everything.
 const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 2,

@@ -42,7 +42,6 @@ export function connectedLives(
   )
 }
 
-/** why: the board passes its optimistic lives and table, so a seat reads out the moment its own tap lands. */
 export function connectedOutState(
   { system, format, table, commanderDamage }: ConnectedOutGame,
   lives: OutState["lives"],

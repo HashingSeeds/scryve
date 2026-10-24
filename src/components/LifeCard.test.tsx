@@ -1392,6 +1392,7 @@ describe("LifeCard", () => {
   })
 
   it("locks a card out on commander damage, and a press buzzes and says why", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     const onChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
@@ -1418,5 +1419,6 @@ describe("LifeCard", () => {
     expect(onChange).not.toHaveBeenCalled()
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(2)
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("13")
+    motion.mockRestore()
   })
 })

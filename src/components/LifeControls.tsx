@@ -10,6 +10,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated"
 
+import { localGameRepository } from "@/features/game/localPersistence"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
@@ -33,7 +34,6 @@ export interface LifeControlsProps {
   playerName: string
   seatNumber?: number
   disabled?: boolean
-  /** why: an out seat still takes presses so it can say why nothing changed: the glyph bumps, the phone buzzes, and a screen reader hears this. */
   lockedReason?: string
   reducedMotion?: ReducedMotionPreference
   contrastCheckedForeground?: string
@@ -186,7 +186,9 @@ export function LifeControls({
 
   function bump(value: SharedValue<number>) {
     value.set(withSequence(withTiming(1, { duration: 60 }), withTiming(0, { duration: 140 })))
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
+    if (reducedMotion === false && localGameRepository.loadSettings().hapticsEnabled) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
+    }
   }
 
   function labelFor(delta: LifeDelta) {
