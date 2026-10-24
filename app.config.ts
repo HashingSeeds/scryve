@@ -195,6 +195,8 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
         NSLocalNetworkUsageDescription:
           "Scryve uses your local network to find and join games on nearby devices.",
         NSBonjourServices: ["_scryve._tcp"],
+        // why: the dev menu's floating button lives in its own full-screen window, which overrides the board's hidden status bar.
+        ...(IS_DEV ? { EXDevMenuShowFloatingActionButton: false } : {}),
       },
       // This privacyManifests is to get you started.
       // See Expo's guide on apple privacy manifests here:
