@@ -84,7 +84,7 @@ export function DeckLimitDialog(props: DeckLimitDialogProps) {
 
   async function presentPaywall() {
     setPaywall("open")
-    await billing.presentPaywall()
+    await billing.presentPaywall({ showsErrorInline: true })
     setPaywall("closed")
   }
 

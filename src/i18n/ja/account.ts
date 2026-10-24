@@ -291,6 +291,7 @@ export default {
     manageAccessibilityLabel: "Scryve {{plan}}のサブスクリプションを管理",
     viewOptions: "オプションを見る",
     viewOptionsAccessibilityLabel: "Scryve Proのオプションを見る",
+    paywallFailedTitle: "Scryve Proを開けませんでした",
     notConfigured: "Scryve Proの購入は設定されていません。",
     missingApiKey: "RevenueCatの公開APIキーが設定されていないため、Scryve Proを購入できません。",
     errors: {

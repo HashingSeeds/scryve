@@ -69,7 +69,9 @@ export function SubscriptionControls() {
           style={themed($button)}
           textStyle={themed($buttonText)}
           onPress={() =>
-            void (billing.isCountPro ? billing.presentCustomerCenter() : billing.presentPaywall())
+            void (billing.isCountPro
+              ? billing.presentCustomerCenter()
+              : billing.presentPaywall({ showsErrorInline: true }))
           }
         />
       ) : null}

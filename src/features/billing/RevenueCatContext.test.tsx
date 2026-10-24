@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Platform } from "react-native"
+import { Alert, Platform } from "react-native"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 import Purchases from "react-native-purchases"
 
@@ -155,6 +155,72 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "failed" })
     })
     expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+  })
+
+  it("tells the player when a paywall tap fails before billing connects", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public">{children}</RevenueCatProvider>
+      ),
+    })
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("error")
+    })
+    expect(alert).toHaveBeenCalledTimes(1)
+    expect(alert).toHaveBeenCalledWith(
+      "Scryve Pro didn't open",
+      "Wait for billing to connect to your account, then try again.",
+    )
+  })
+
+  it("tells the player when the paywall itself errors, and stays quiet when they close it", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    jest.mocked(presentCountProPaywall).mockResolvedValueOnce("cancelled")
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("cancelled")
+    })
+    expect(alert).not.toHaveBeenCalled()
+    jest.mocked(presentCountProPaywall).mockResolvedValueOnce("error")
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("error")
+    })
+    expect(alert).toHaveBeenCalledWith(
+      "Scryve Pro didn't open",
+      "The Scryve Pro paywall could not complete the request.",
+    )
+    expect(result.current.error).toBe("The Scryve Pro paywall could not complete the request.")
+  })
+
+  it("leaves the message to callers that show billing errors inline", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    jest.mocked(presentCountProPaywall).mockResolvedValueOnce("error")
+    await act(async () => {
+      expect(await result.current.presentPaywall({ showsErrorInline: true })).toBe("error")
+    })
+    expect(alert).not.toHaveBeenCalled()
+    expect(result.current.error).toBe("The Scryve Pro paywall could not complete the request.")
+  })
+
+  it("uses the browser alert on web, where Alert.alert does nothing", async () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    const browserAlert = jest.fn()
+    globalThis.alert = browserAlert
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public">{children}</RevenueCatProvider>
+      ),
+    })
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("error")
+    })
+    expect(browserAlert).toHaveBeenCalledWith(
+      "Scryve Pro didn't open\n\nWait for billing to connect to your account, then try again.",
+    )
   })
 
   it("purchases web Foil only from its separate offering", async () => {
