@@ -315,6 +315,8 @@ describe("analyzeDeck", () => {
       ["limited", 39, true],
       ["limited", 40, false],
       ["brawl", 59, true],
+      ["pauperCommander", 99, true],
+      ["pauperCommander", 100, false],
     ])("%s with %i main cards is incomplete: %s", (format, count, incomplete) => {
       const analysis = run(format, [
         card("Grizzly Bears", count),
