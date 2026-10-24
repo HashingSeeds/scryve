@@ -134,7 +134,7 @@ export async function prefetchCardDetails(
       ),
     ]
     if (urls.length > 0 && typeof Image.prefetch === "function") {
-      await Image.prefetch(urls)
+      await Image.prefetch(urls, "disk")
     }
   } catch {
     warmedVersions.delete(versionKey)
