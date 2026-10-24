@@ -317,6 +317,7 @@ describe("proSubscriptionManagement", () => {
   it.each([
     ["APP_STORE", { store: "app_store" }],
     ["PLAY_STORE", { store: "play_store" }],
+    ["STRIPE", { store: "unknown" }],
     ["PROMOTIONAL", { store: "unknown" }],
   ] as const)("maps %s to where it is cancelled", (store, management) => {
     expect(proSubscriptionManagement(withPro(store))).toEqual(management)

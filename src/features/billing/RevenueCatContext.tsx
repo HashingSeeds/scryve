@@ -157,9 +157,7 @@ export function proSubscriptionManagement(
       return { store: "app_store" }
     case "PLAY_STORE":
       return { store: "play_store" }
-    case "RC_BILLING":
-    case "STRIPE":
-    case "PADDLE": {
+    case "RC_BILLING": {
       const url =
         customerInfo?.subscriptionsByProductIdentifier[entitlement.productIdentifier]?.managementURL
       return { store: "web", url: url?.startsWith("https://") ? url : undefined }
