@@ -1,5 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
+import { captureGame } from "@/utils/analytics"
+
 import type { PendingLifeAction } from "./model"
 import {
   useConnectedRuntime,
@@ -7,6 +9,8 @@ import {
   type ConnectedFeed,
   type ConnectedWrites,
 } from "./useConnectedRuntime"
+
+jest.mock("@/utils/analytics", () => ({ captureGame: jest.fn() }))
 
 const projection = {
   schemaVersion: 1,
@@ -120,5 +124,58 @@ describe("connected runtime without a projection barrier", () => {
 
     await waitFor(() => expect(result.current.projection?.status).toBe("abandoned"))
     expect(result.current.projection?.players[1].currentLife).toBe(12)
+  })
+})
+
+describe("connected runtime analytics", () => {
+  const writes: ConnectedWrites = {
+    send: async (action) => ({ operationId: action.event.operationId }),
+    finish: async () => undefined,
+    abandon: async () => undefined,
+  }
+  const renderGame = (publicId: string, remote: unknown) =>
+    renderHook(() => {
+      const session = useConnectedSession({
+        publicId,
+        ownerId: "seat-1",
+        scope: "cloud-test",
+        writes,
+        awaitProjectionBarrier: false,
+      })
+      return useConnectedRuntime(session, { remote, environment: reachable })
+    })
+  const started = () =>
+    jest.mocked(captureGame).mock.calls.filter(([event]) => event === "game_started")
+
+  it("records a rematch start once, since rematches skip the lobby", async () => {
+    const finished = renderGame("game-one", {
+      ...projection,
+      publicId: "game-one",
+      status: "finished",
+      rematchPublicId: "game-two",
+    })
+    await waitFor(() => expect(finished.result.current.status).toBe("ready"))
+    finished.unmount()
+
+    for (let mount = 0; mount < 2; mount += 1) {
+      const rematch = renderGame("game-two", { ...projection, publicId: "game-two" })
+      await waitFor(() => expect(rematch.result.current.status).toBe("ready"))
+      rematch.unmount()
+    }
+
+    expect(started()).toEqual([
+      [
+        "game_started",
+        { id: "game-two", system: "mtg", format: "standard", playerCount: 2 },
+        "connected",
+      ],
+    ])
+  })
+
+  it("does not record a start when resuming a game that was already active", async () => {
+    const resumed = renderGame("game-three", { ...projection, publicId: "game-three" })
+    await waitFor(() => expect(resumed.result.current.status).toBe("ready"))
+
+    expect(started().some(([, game]) => game.id === "game-three")).toBe(false)
   })
 })

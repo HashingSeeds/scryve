@@ -59,6 +59,8 @@ export type ConnectedGameRuntime = ConnectedGameRuntimeBase &
 
 export const CONNECTED_GAME_UNAVAILABLE_MS = 1_500
 
+const rematchesAwaitingStart = new Set<string>()
+
 export interface ConnectedWrites {
   send: (action: PendingLifeAction) => Promise<OutboxAcknowledgement>
   finish: (result?: ConnectedGameResult) => Promise<unknown>
@@ -139,22 +141,23 @@ export function useConnectedRuntime(
     const projection = snapshot.projection
     if (!projection) return
     const previous = observedGame.current
+    const gameProperties = {
+      id: projection.publicId,
+      system: projection.system,
+      format: projection.format,
+      playerCount: projection.playerCount,
+    }
+    if (projection.status === "finished" && projection.rematchPublicId)
+      rematchesAwaitingStart.add(projection.rematchPublicId)
+    if (projection.status === "active" && rematchesAwaitingStart.delete(projection.publicId))
+      captureGame("game_started", gameProperties, "connected")
     if (
       previous?.id === projection.publicId &&
       previous.status === "active" &&
       projection.status === "finished"
     ) {
       recordReviewCompletion(`connected:${projection.publicId}`)
-      captureGame(
-        "game_completed",
-        {
-          id: projection.publicId,
-          system: projection.system,
-          format: projection.format,
-          playerCount: projection.playerCount,
-        },
-        "connected",
-      )
+      captureGame("game_completed", gameProperties, "connected")
     }
     observedGame.current = { id: projection.publicId, status: projection.status }
   }, [snapshot.projection])
