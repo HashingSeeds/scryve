@@ -196,6 +196,47 @@ async function matchesSetCode(
   )
 }
 
+const BASIC_ENERGY_NAME =
+  /^(?:Grass|Fire|Water|Lightning|Psychic|Fighting|Darkness|Metal|Fairy) Energy$/
+
+// why: PTCG Live numbers MEE basic energies 9-16 like SVE, while TCGdex numbers them 1-8, so basic energies resolve by name within the set and use the number only to pick between that set's printings.
+async function basicEnergyInSet(
+  ctx: ActionCtx,
+  name: string,
+  reference: { setCode: string; collectorNumber: string },
+) {
+  const setsResponse = await request(
+    ctx,
+    `/sets?abbreviation.official=${encodeURIComponent(`eq:${reference.setCode}`)}`,
+  )
+  if (setsResponse.status === 404) return undefined
+  if (!setsResponse.ok)
+    throw Object.assign(new Error("TCGdex set lookup failed"), { response: setsResponse })
+  const sets = (await setsResponse.json()) as unknown
+  const setId = Array.isArray(sets) ? stringValue(objectRecord(sets[0])?.id) : undefined
+  if (!setId) return undefined
+  const cardsResponse = await request(
+    ctx,
+    `/cards?name=${encodeURIComponent(`eq:${name}`)}&set.id=${encodeURIComponent(`eq:${setId}`)}`,
+  )
+  if (cardsResponse.status === 404) return undefined
+  if (!cardsResponse.ok)
+    throw Object.assign(new Error("TCGdex energy lookup failed"), { response: cardsResponse })
+  const cards = normalizePokemonCards((await cardsResponse.json()) as unknown, false).filter(
+    (card) => normalizeCardName(card.name) === normalizeCardName(name),
+  )
+  const collectorNumber = normalizedCollectorNumber(reference.collectorNumber)
+  return (
+    cards.find((card) =>
+      card.printings.some(
+        (printing) =>
+          printing.collectorNumber !== undefined &&
+          normalizedCollectorNumber(printing.collectorNumber) === collectorNumber,
+      ),
+    ) ?? cards[0]
+  )
+}
+
 export async function pokemonCardByReference(
   ctx: ActionCtx,
   name: string,
@@ -204,6 +245,10 @@ export async function pokemonCardByReference(
 ) {
   const reference = parsedReference(originalReference)
   if (!reference) return { cards: [], status: 404 }
+  if (BASIC_ENERGY_NAME.test(name.trim())) {
+    const energy = await basicEnergyInSet(ctx, name.trim(), reference)
+    if (energy) return await pokemonCardById(ctx, energy.cardId, includeImages)
+  }
   const response = await request(
     ctx,
     `/cards?name=${encodeURIComponent(name)}&localId=${encodeURIComponent(reference.collectorNumber)}`,
