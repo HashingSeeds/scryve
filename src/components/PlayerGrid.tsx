@@ -4,6 +4,7 @@ import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import type { DiceSeatChip } from "@/features/game/dice"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
@@ -45,7 +46,6 @@ import {
   getPlayerGridRows,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
-import type { SeatDeck } from "./pokemon/usePokemonDeck"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
 export interface CommanderDamageGridBinding {
@@ -479,6 +479,7 @@ export function PlayerGrid({
                     ownership={ownership}
                     staleSince={getStaleSince?.(player)}
                     out={out && lifeCardOut(out, players, system, table)}
+                    deck={commanderDamage ? getSeatDeck?.(player) : undefined}
                     commanderDamage={
                       commanderDamage && boardSeats
                         ? {

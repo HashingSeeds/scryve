@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type {
   LayoutChangeEvent,
   LayoutRectangle,
@@ -17,6 +17,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { deckCommanderNames } from "@/features/decks/commanderName"
+import { useSeatDeckCards, type SeatDeck } from "@/features/decks/useSeatDeckCards"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
@@ -123,6 +125,7 @@ export interface LifeCardProps {
   out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
+  deck?: SeatDeck
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -152,6 +155,7 @@ export const LifeCard = memo(function LifeCard({
   staleSince,
   commanderDamage,
   dice,
+  deck,
   out,
   seatTable,
   onPlayStart,
@@ -336,6 +340,8 @@ export const LifeCard = memo(function LifeCard({
 
   const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
   const armedCommanderId = commanderDamage?.armedPlayerId
+  const deckCards = useSeatDeckCards(commanderDamage ? deck : undefined)
+  const commanderNames = useMemo(() => deckCommanderNames(deckCards), [deckCards])
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -343,6 +349,7 @@ export const LifeCard = memo(function LifeCard({
           playerName: displayName,
           submit: commanderDamage.armBar?.stagedTargets ? "send" : "done",
           mark: { color, shape, seatNumber },
+          commanderName: commanderNames.length === 1 ? commanderNames[0] : undefined,
           power: commanderDamage.power ?? 1,
           onPowerStep: commanderDamage.onPowerStep ?? (() => {}),
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
