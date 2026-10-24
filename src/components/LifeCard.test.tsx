@@ -740,6 +740,37 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
   })
 
+  it("moves the badge clear of a menu centred on the attacker's edge", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Grace"
+          seatNumber={2}
+          life={30}
+          color="#397B61"
+          menuEdgeCenter="bottom"
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[1],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: { [commanderIds[0]]: 4 },
+            armedPlayerId: commanderIds[0],
+            attackerName: "Ada",
+            facing: { y: "bottom" },
+            onStage: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    expect(StyleSheet.flatten(view.getByTestId("commander-edge-seat-2").props.style)).toMatchObject(
+      {
+        alignItems: "flex-start",
+      },
+    )
+  })
+
   it("keeps undo off the attacker's edge and out from under the menu", () => {
     const view = render(
       <ThemeProvider initialContext="dark">

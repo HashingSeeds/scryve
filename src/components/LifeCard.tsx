@@ -691,6 +691,7 @@ export const LifeCard = memo(function LifeCard({
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
           compact={compact}
           mode={commanderCardMode}
         />

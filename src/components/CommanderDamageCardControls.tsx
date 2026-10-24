@@ -26,6 +26,7 @@ import type {
   LifeCardContentInsets,
   LifeCardContentRotation,
   LifeCardMenuCorner,
+  LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { MarkArt, PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
@@ -67,6 +68,7 @@ export interface CommanderDamageCardControlsProps {
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
   compact?: boolean
   mode: CommanderDamageCardMode
 }
@@ -78,6 +80,7 @@ export function CommanderDamageCardControls({
   contentRotation,
   contentInsets,
   menuCorner,
+  menuEdgeCenter,
   compact,
   mode,
 }: CommanderDamageCardControlsProps) {
@@ -103,6 +106,7 @@ export function CommanderDamageCardControls({
           foreground={foreground}
           contentInsets={contentInsets}
           menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
           compact={compact}
           mode={mode}
         />
@@ -125,6 +129,7 @@ function DefenderControls({
   foreground,
   contentInsets,
   menuCorner,
+  menuEdgeCenter,
   compact,
   mode,
 }: {
@@ -133,6 +138,7 @@ function DefenderControls({
   foreground: string
   contentInsets?: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
   compact?: boolean
   mode: AssignmentTarget
 }) {
@@ -153,9 +159,12 @@ function DefenderControls({
     backgroundColor: attackerColor,
     borderColor: overlayTint(attackerForeground, 0.5),
   }
+  const menuOnStrip = !facing.y ? menuEdgeCenter === facing.x : menuEdgeCenter === facing.y
   const badgePlacement: ViewStyle = menuInCorner
     ? { justifyContent: awayFrom(facing.y), alignItems: awayFrom(facing.x) }
-    : $centered
+    : !facing.x !== !facing.y && menuOnStrip
+      ? stripStart(facing, contentInsets, theme.spacing.lg)
+      : $centered
 
   useEffect(() => {
     const previous = previousTotal.current
@@ -453,6 +462,17 @@ function UndoGlyph({ size, color }: { size: number; color: string }) {
   )
 }
 
+/** why: a menu centred on the strip's edge would cover a centred badge, so the badge moves to the strip's start. */
+function stripStart(
+  facing: CommanderFacing,
+  insets: LifeCardContentInsets | undefined,
+  gap: number,
+): ViewStyle {
+  return facing.x
+    ? { justifyContent: "flex-start", alignItems: "center", paddingTop: (insets?.top ?? 0) + gap }
+    : { justifyContent: "center", alignItems: "flex-start", paddingLeft: (insets?.left ?? 0) + gap }
+}
+
 function cornerName(x: "left" | "right", y: "top" | "bottom"): LifeCardMenuCorner {
   return `${y}${x === "left" ? "Left" : "Right"}`
 }
@@ -476,7 +496,6 @@ const CORNERS = [
   { x: "left", y: "top" },
 ] as const
 
-/** why: undo must stay off the attacker's colored edges and out from under the menu, whichever layout the seat is in. */
 function freeCorner(menuCorner: LifeCardMenuCorner | undefined, facing: CommanderFacing) {
   const free = CORNERS.filter(
     ({ x, y }) => x !== facing.x && y !== facing.y && cornerName(x, y) !== menuCorner,
