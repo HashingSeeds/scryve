@@ -187,18 +187,31 @@ describe("TCGdex Pokemon cards", () => {
 
       it("falls back to the set and number lookup when the set code is unknown", async () => {
         const tcgdex = mockTcgdex({
-          "/sets?abbreviation.official=eq%3APR-SV": [],
+          "/sets?abbreviation.official=eq%3AXYZ": [],
           "/cards?name=Psychic%20Energy&localId=13": [
             candidate("sve-013", "013", "Psychic Energy"),
           ],
           "/cards/sve-013": { ...riolu, id: "sve-013", name: "Psychic Energy" },
         })
         try {
-          const result = await pokemonCardByReference(ctx, "Psychic Energy", "PR-SV 13")
+          const result = await pokemonCardByReference(ctx, "Psychic Energy", "XYZ 13")
 
           expect(result.cards.map((card) => card.cardId)).toEqual(["sve-013"])
         } finally {
           tcgdex.restore()
+        }
+      })
+
+      it("reports a TCGdex outage instead of a missing card", async () => {
+        const fetchMock = jest
+          .spyOn(globalThis, "fetch")
+          .mockResolvedValue(new Response("{}", { status: 503 }))
+        try {
+          await expect(
+            pokemonCardByReference(ctx, "Lightning Energy", "MEE 12"),
+          ).rejects.toMatchObject({ response: { status: 503 } })
+        } finally {
+          fetchMock.mockRestore()
         }
       })
     })
