@@ -353,7 +353,11 @@ async function resolveGenericEntries(
   return { cards, unresolved: unresolved.sort() }
 }
 
-function sectionBoard(line: string): DeckBoard | "ignore" | undefined {
+type PastedSection = DeckBoard | "companion" | "about" | "ignore"
+
+const PASTED_ENTRY = /^(\d{1,3})\s*x?\s+(.+)$/i
+
+function sectionBoard(line: string): PastedSection | undefined {
   const heading = line
     .replace(/[:\s]+$/g, "")
     .trim()
@@ -361,8 +365,39 @@ function sectionBoard(line: string): DeckBoard | "ignore" | undefined {
   if (["commander", "commanders"].includes(heading)) return "commander"
   if (["main", "mainboard", "deck"].includes(heading)) return "main"
   if (["side", "sideboard"].includes(heading)) return "sideboard"
+  if (heading === "companion") return "companion"
+  if (heading === "about") return "about"
   if (["maybeboard", "considering", "tokens"].includes(heading)) return "ignore"
   return undefined
+}
+
+function isPastedComment(line: string) {
+  return line.startsWith("#") || line.startsWith("//")
+}
+
+function headinglessSecondBlock(lines: string[]) {
+  const blocks: Array<{ start: number; cards: number }> = []
+  let block: (typeof blocks)[number] | undefined
+  for (const [index, sourceLine] of lines.entries()) {
+    const line = sourceLine.trim()
+    if (!line) {
+      block = undefined
+      continue
+    }
+    if (isPastedComment(line)) continue
+    const match = line.match(PASTED_ENTRY)
+    if (!match) return undefined
+    if (!block) {
+      block = { start: index, cards: 0 }
+      blocks.push(block)
+    }
+    block.cards += Number(match[1])
+  }
+  const [main, trailing] = blocks
+  if (blocks.length !== 2 || !main || !trailing) return undefined
+  const board: DeckBoard =
+    trailing.cards <= 2 && main.cards + trailing.cards === 100 ? "commander" : "sideboard"
+  return { start: trailing.start, board }
 }
 
 function parsePrintingReference(reference: string) {
@@ -381,21 +416,31 @@ function parsePrintingReference(reference: string) {
 export function parsePastedDeckList(list: string) {
   if (list.length > MAX_PASTED_LIST_LENGTH)
     throw new ConvexError({ code: "deck_list_too_large", message: "Deck list is too large" })
-  let board: DeckBoard | "ignore" = "main"
+  const lines = list.split(/\r?\n/)
+  const trailing = headinglessSecondBlock(lines)
+  let board: PastedSection = "main"
   const entries = new Map<string, ParsedEntry>()
+  const companions: ParsedEntry[] = []
   const invalidLines: string[] = []
+  const add = (entry: ParsedEntry) => {
+    const key = printingKey(entry)
+    const current = entries.get(key)
+    entries.set(key, { ...entry, quantity: (current?.quantity ?? 0) + entry.quantity })
+  }
 
-  for (const sourceLine of list.split(/\r?\n/)) {
+  for (const [index, sourceLine] of lines.entries()) {
     const line = sourceLine.trim()
-    if (!line || line.startsWith("#") || line.startsWith("//")) continue
+    if (index === trailing?.start) board = trailing.board
+    if (!line && board === "about") board = "main"
+    if (!line || isPastedComment(line)) continue
     const nextBoard = sectionBoard(line)
     if (nextBoard) {
       board = nextBoard
       continue
     }
-    if (board === "ignore") continue
+    if (board === "ignore" || board === "about") continue
     const sideboardPrefix = /^SB:\s*/i.test(line)
-    const match = line.replace(/^SB:\s*/i, "").match(/^(\d{1,3})\s*x?\s+(.+)$/i)
+    const match = line.replace(/^SB:\s*/i, "").match(PASTED_ENTRY)
     const quantity = match ? Number(match[1]) : 0
     const reference = parsePrintingReference(match?.[2] ?? "")
     if (!match || !reference.name || quantity < 1 || quantity > 999) {
@@ -404,13 +449,20 @@ export function parsePastedDeckList(list: string) {
     }
     const entry: ParsedEntry = {
       ...reference,
-      board: sideboardPrefix ? "sideboard" : board,
+      board: sideboardPrefix || board === "companion" ? "sideboard" : board,
       quantity,
     }
-    const key = printingKey(entry)
-    const current = entries.get(key)
-    entries.set(key, { ...entry, quantity: (current?.quantity ?? 0) + quantity })
+    if (board === "companion") companions.push(entry)
+    else add(entry)
   }
+  const sideboardNames = new Set(
+    [...entries.values()]
+      .filter((entry) => entry.board === "sideboard")
+      .map((entry) => normalizeCardName(entry.name)),
+  )
+  companions
+    .filter((companion) => !sideboardNames.has(normalizeCardName(companion.name)))
+    .forEach(add)
   return { entries: [...entries.values()], invalidLines }
 }
 
