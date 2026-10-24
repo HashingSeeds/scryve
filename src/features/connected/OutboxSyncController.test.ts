@@ -396,6 +396,25 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toBe("A commander cannot damage itself")
   })
 
+  it("queues one resolution when the defender taps Confirm twice", () => {
+    const { clock, controller } = harness()
+    const claim = {
+      claimId: "claim-1",
+      operationId: "commander-claim-000001",
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 4,
+      clientCreatedAt: clock.now(),
+      createdAt: clock.now(),
+    }
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.resolveCommanderDamage(claim, true)
+    controller.resolveCommanderDamage(claim, true)
+
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+  })
+
   it("keeps a declined claim distinct from a confirmed one", () => {
     const { clock, controller } = harness()
     const claim = {
