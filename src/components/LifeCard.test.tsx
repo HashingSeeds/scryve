@@ -740,6 +740,35 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
   })
 
+  it("keeps undo off the attacker's edge and out from under the menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Grace"
+          seatNumber={3}
+          life={30}
+          color="#397B61"
+          menuCorner="topLeft"
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[1],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: { [commanderIds[0]]: 4 },
+            armedPlayerId: commanderIds[0],
+            attackerName: "Ada",
+            facing: { y: "top" },
+            onStage: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    const undo = StyleSheet.flatten(view.getByTestId("commander-undo-seat-3").props.style)
+    expect(undo).toHaveProperty("bottom")
+    expect(undo).toHaveProperty("right")
+  })
+
   it("deals the attacker's power with each tap anywhere on a defending card", () => {
     const onStage = jest.fn()
     const commanderDamage = {

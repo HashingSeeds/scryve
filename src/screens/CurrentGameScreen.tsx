@@ -307,6 +307,7 @@ export function CurrentGameScreen({
   }, [])
 
   const toggleMenu = useCallback(() => {
+    setArmedPlayerId(null)
     setMenuOpen((current) => !current)
   }, [])
 

@@ -61,7 +61,6 @@ export interface CommanderDamageGridBinding {
     stagedFor: (player: GamePlayer) => number
     stagedTargets: number
     onSend: () => void
-    onCancel: () => void
   }
   pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
   onPressSword: (player: GamePlayer) => void
@@ -537,7 +536,6 @@ export function PlayerGrid({
                                   armBar: {
                                     stagedTargets: commanderDamage.staging.stagedTargets,
                                     onSend: stable("armSend", commanderDamage.staging.onSend),
-                                    onCancel: stable("armCancel", commanderDamage.staging.onCancel),
                                   },
                                 }
                               : {}),

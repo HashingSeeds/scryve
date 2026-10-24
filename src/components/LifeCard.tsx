@@ -88,7 +88,7 @@ export type LifeCardCommanderDamage = Omit<
   onPowerStep?: (step: 1 | -1) => void
   facing?: CommanderFacing
   onStage?: (step: number) => void
-  armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
+  armBar?: { stagedTargets: number; onSend: () => void }
   pendingClaims?: readonly CommanderClaim[]
 }
 
@@ -341,7 +341,7 @@ export const LifeCard = memo(function LifeCard({
       ? {
           kind: "source",
           playerName: displayName,
-          submit: commanderDamage.armBar ? "send" : "done",
+          submit: commanderDamage.armBar?.stagedTargets ? "send" : "done",
           mark: { color, shape, seatNumber },
           power: commanderDamage.power ?? 1,
           onPowerStep: commanderDamage.onPowerStep ?? (() => {}),

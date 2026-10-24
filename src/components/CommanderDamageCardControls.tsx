@@ -146,15 +146,14 @@ function DefenderControls({
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
   const attackerForeground = accessibleForeground(attackerColor)
   const rotation = attacker?.rotation ?? 0
-  const corner = facing.x && facing.y ? (`${facing.y}${capitalize(facing.x)}` as const) : undefined
   const thickness = compact ? COMPACT_EDGE : EDGE
-  const menuInCorner = !!corner && corner === menuCorner
+  const menuInCorner = !!facing.x && !!facing.y && cornerName(facing.x, facing.y) === menuCorner
   const badgeSize = menuInCorner ? thickness * 0.58 : thickness * 0.8
   const edgeColors = {
     backgroundColor: attackerColor,
     borderColor: overlayTint(attackerForeground, 0.5),
   }
-  const badgePlacement = menuInCorner
+  const badgePlacement: ViewStyle = menuInCorner
     ? { justifyContent: awayFrom(facing.y), alignItems: awayFrom(facing.x) }
     : $centered
 
@@ -175,7 +174,6 @@ function DefenderControls({
     mode.onChange(step)
   }
 
-  // why: damage recorded before this turn has no hit to take back, so it comes off one power at a time.
   const takeBack = Math.min(hits.at(-1) ?? mode.power, total)
 
   function undo() {
@@ -184,7 +182,7 @@ function DefenderControls({
     mode.onChange(-takeBack)
   }
 
-  const undoCorner = oppositeCorner(menuCorner, facing)
+  const undoCorner = freeCorner(menuCorner, facing)
   const inset = (edge: keyof LifeCardContentInsets) =>
     (contentInsets?.[edge] ?? 0) + theme.spacing.xxs
 
@@ -330,6 +328,7 @@ function AttackerControls({
             text={String(power)}
             weight="bold"
             accessibilityLabel={translate("board:commander.power", { power })}
+            accessibilityLiveRegion="polite"
             maxFontSizeMultiplier={1.2}
             style={[themed(compact ? $compactPowerValue : $powerValue), { color: foreground }]}
           />
@@ -454,8 +453,8 @@ function UndoGlyph({ size, color }: { size: number; color: string }) {
   )
 }
 
-function capitalize<T extends string>(value: T) {
-  return (value.charAt(0).toUpperCase() + value.slice(1)) as Capitalize<T>
+function cornerName(x: "left" | "right", y: "top" | "bottom"): LifeCardMenuCorner {
+  return `${y}${x === "left" ? "Left" : "Right"}`
 }
 
 function edgeStyle(facing: CommanderFacing, thickness: number): ViewStyle {
@@ -470,16 +469,22 @@ function awayFrom(edge: "left" | "right" | "top" | "bottom" | undefined) {
   return edge === "left" || edge === "top" ? "flex-end" : "flex-start"
 }
 
-function oppositeCorner(menuCorner: LifeCardMenuCorner | undefined, facing: CommanderFacing) {
-  if (menuCorner) {
-    const y = menuCorner.startsWith("top") ? "bottom" : "top"
-    const x = menuCorner.endsWith("Left") ? "right" : "left"
-    return { x, y } as const
-  }
-  return {
-    x: facing.x === "right" ? "left" : "right",
-    y: facing.y === "bottom" ? "top" : "bottom",
-  } as const
+const CORNERS = [
+  { x: "right", y: "bottom" },
+  { x: "left", y: "bottom" },
+  { x: "right", y: "top" },
+  { x: "left", y: "top" },
+] as const
+
+/** why: undo must stay off the attacker's colored edges and out from under the menu, whichever layout the seat is in. */
+function freeCorner(menuCorner: LifeCardMenuCorner | undefined, facing: CommanderFacing) {
+  const free = CORNERS.filter(
+    ({ x, y }) => x !== facing.x && y !== facing.y && cornerName(x, y) !== menuCorner,
+  )
+  const awayFromMenu = free.find(
+    ({ x, y }) => menuCorner && !menuCorner.startsWith(y) && !menuCorner.toLowerCase().endsWith(x),
+  )
+  return awayFromMenu ?? free[0] ?? CORNERS[0]
 }
 
 const $centered: ViewStyle = { justifyContent: "center", alignItems: "center" }

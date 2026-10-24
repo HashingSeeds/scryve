@@ -214,6 +214,28 @@ describe("ConnectedBoardScreen", () => {
     )
   })
 
+  it("sends staged commander damage when the menu opens", async () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
+    fireEvent.press(screen.getByTestId("game-menu-button"))
+
+    await waitFor(() =>
+      expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
+        { toPlayerId: "player-2", delta: 1 },
+      ]),
+    )
+    expect(screen.queryByTestId("commander-hit-seat-1")).toBeNull()
+  })
+
   it("leaves assignment without sending when nothing was staged", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
