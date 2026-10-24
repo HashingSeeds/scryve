@@ -4,6 +4,7 @@ import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { useSeatCommander } from "@/features/decks/seatCommander"
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import type { DiceSeatChip } from "@/features/game/dice"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
@@ -308,7 +309,12 @@ export function PlayerGrid({
     : null
   const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
-  const armedPower = armedPlayer ? (commanderPowers[armedPlayer.id] ?? 1) : 1
+  const armedCommander = useSeatCommander(
+    commanderDamage && armedPlayer ? getSeatDeck?.(armedPlayer) : undefined,
+  )
+  const armedPower = armedPlayer
+    ? (commanderPowers[armedPlayer.id] ?? armedCommander.power ?? 1)
+    : 1
   const seatRotations = new Map<number, LifeCardContentRotation>()
   rows.forEach((row, rowIndex) =>
     row.forEach((slot, columnIndex) => {
@@ -479,7 +485,6 @@ export function PlayerGrid({
                     ownership={ownership}
                     staleSince={getStaleSince?.(player)}
                     out={out && lifeCardOut(out, players, system, table)}
-                    deck={commanderDamage ? getSeatDeck?.(player) : undefined}
                     commanderDamage={
                       commanderDamage && boardSeats
                         ? {
@@ -510,12 +515,13 @@ export function PlayerGrid({
                               rotation: seatRotations.get(armedIndex),
                             },
                             power: armedPower,
+                            commanderName: armedCommander.name,
                             onPowerStep: stable(`power:${player.id}`, (step: 1 | -1) =>
                               setCommanderPowers((current) => ({
                                 ...current,
                                 [player.id]: Math.min(
                                   MAX_COMMANDER_DAMAGE,
-                                  Math.max(1, (current[player.id] ?? 1) + step),
+                                  Math.max(1, (current[player.id] ?? armedPower) + step),
                                 ),
                               })),
                             ),

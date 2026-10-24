@@ -92,6 +92,7 @@ export type CardReference = {
   setCode?: string
   collectorNumber?: string
   rarity?: string
+  power?: string
   commanderEligibility?: "eligible" | "ineligible" | "color-choice"
   commanderLegality?: string
   commanderRulesUpdatedAt?: string
@@ -211,6 +212,7 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
   const setCode = stringField(card, "set")
   const collectorNumber = stringField(card, "collector_number")
   const rarity = stringField(card, "rarity")
+  const power = stringField(firstFace ?? card, "power") ?? stringField(card, "power")
   const eligibility = standaloneCommanderEligibility(card, firstFace)
   const commanderLegality = stringField(objectRecord(card.legalities), "commander")
   const colors = card.color_identity
@@ -234,6 +236,7 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
     ...(setCode ? { setCode } : {}),
     ...(collectorNumber ? { collectorNumber } : {}),
     ...(rarity ? { rarity } : {}),
+    ...(power ? { power } : {}),
     ...(eligibility
       ? { commanderEligibility: eligibility, commanderRulesUpdatedAt: new Date().toISOString() }
       : {}),
