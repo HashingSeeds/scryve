@@ -60,6 +60,8 @@ export type PurchaseResult =
   | { status: "cancelled" }
   | { status: "failed"; message: string }
 
+type PaywallOptions = { showsErrorInline?: boolean }
+
 interface RevenueCatAccess {
   configured: boolean
   isReady: boolean
@@ -73,7 +75,7 @@ interface RevenueCatAccess {
   refreshCustomerInfo: (force?: boolean) => Promise<CustomerInfo | null>
   purchase: (productId: CountProductId | typeof FOIL_PRODUCT_ID) => Promise<PurchaseResult>
   restorePurchases: () => Promise<PurchaseResult>
-  presentPaywall: () => Promise<CountPaywallResult>
+  presentPaywall: (options?: PaywallOptions) => Promise<CountPaywallResult>
   presentCustomerCenter: () => Promise<void>
 }
 
@@ -313,25 +315,28 @@ export function RevenueCatProvider({
     }
   }, [acceptCustomerInfo])
 
-  const presentPaywall = useCallback(async () => {
-    const fail = (message: string) => {
-      setError(message)
-      showPaywallFailure(message)
-      return "error" as const
-    }
-    try {
-      setError(undefined)
-      if (!isReady || (await (await loadPurchases()).getAppUserID()) !== appUserID)
-        throw new Error(translate("account:billing.errors.waitForBilling"))
-      const { presentCountProPaywall } = await import("./sdk")
-      const result = await presentCountProPaywall(currentOffering)
-      if (result === "error") return fail(translate("account:billing.errors.paywallFailed"))
-      if (result === "purchased" || result === "restored") await refreshCustomerInfo()
-      return result
-    } catch (cause) {
-      return fail(revenueCatErrorMessage(cause))
-    }
-  }, [appUserID, currentOffering, isReady, refreshCustomerInfo])
+  const presentPaywall = useCallback(
+    async (options?: PaywallOptions) => {
+      const fail = (message: string) => {
+        setError(message)
+        if (!options?.showsErrorInline) showPaywallFailure(message)
+        return "error" as const
+      }
+      try {
+        setError(undefined)
+        if (!isReady || (await (await loadPurchases()).getAppUserID()) !== appUserID)
+          throw new Error(translate("account:billing.errors.waitForBilling"))
+        const { presentCountProPaywall } = await import("./sdk")
+        const result = await presentCountProPaywall(currentOffering)
+        if (result === "error") return fail(translate("account:billing.errors.paywallFailed"))
+        if (result === "purchased" || result === "restored") await refreshCustomerInfo()
+        return result
+      } catch (cause) {
+        return fail(revenueCatErrorMessage(cause))
+      }
+    },
+    [appUserID, currentOffering, isReady, refreshCustomerInfo],
+  )
 
   const presentCustomerCenter = useCallback(async () => {
     try {

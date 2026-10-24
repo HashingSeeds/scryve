@@ -63,7 +63,7 @@ describe("SubscriptionControls", () => {
     expect(view.getByText("Free plan")).toBeTruthy()
     fireEvent.press(view.getByLabelText("View Scryve Pro options"))
 
-    expect(presentPaywall).toHaveBeenCalledTimes(1)
+    expect(presentPaywall).toHaveBeenCalledWith({ showsErrorInline: true })
     expect(presentCustomerCenter).not.toHaveBeenCalled()
     expect(view.queryByTestId("count-pro-customer-center-button")).toBeNull()
   })

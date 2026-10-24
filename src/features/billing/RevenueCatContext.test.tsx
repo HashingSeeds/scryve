@@ -194,6 +194,18 @@ describe("RevenueCatProvider", () => {
     expect(result.current.error).toBe("The Scryve Pro paywall could not complete the request.")
   })
 
+  it("leaves the message to callers that show billing errors inline", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    jest.mocked(presentCountProPaywall).mockResolvedValueOnce("error")
+    await act(async () => {
+      expect(await result.current.presentPaywall({ showsErrorInline: true })).toBe("error")
+    })
+    expect(alert).not.toHaveBeenCalled()
+    expect(result.current.error).toBe("The Scryve Pro paywall could not complete the request.")
+  })
+
   it("uses the browser alert on web, where Alert.alert does nothing", async () => {
     jest.replaceProperty(Platform, "OS", "web")
     const browserAlert = jest.fn()
