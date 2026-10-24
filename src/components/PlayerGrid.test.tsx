@@ -3,12 +3,13 @@ import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import { swapSeats } from "@/features/game/playerLayouts"
-import { playTableRules } from "@/features/game/playSystems"
+import { playSystemRules, playTableRules } from "@/features/game/playSystems"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
 import { LifeCard } from "./LifeCard"
+import { lifeControlTestId } from "./LifeControls"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
@@ -27,6 +28,7 @@ import {
   PlayerGrid,
 } from "./PlayerGrid"
 import { PlayerMark } from "./PlayerMark"
+import type { OutState } from "../../convex/lib/outReason"
 import type { TableState } from "../../convex/lib/table"
 
 function players(count: number) {
@@ -59,7 +61,17 @@ function tableGrid(table: TableState) {
   }
   const view = render(
     <ThemeProvider>
-      <PlayerGrid players={seats} table={runtime} onChange={jest.fn()} />
+      <PlayerGrid
+        players={seats}
+        table={runtime}
+        outState={{
+          counter: playSystemRules("mtg").counter,
+          tableRules: rules,
+          table,
+          lives: seats.map(({ id, life }) => ({ playerId: id, life })),
+        }}
+        onChange={jest.fn()}
+      />
     </ThemeProvider>,
   )
   for (const seat of seats.keys())
@@ -131,6 +143,51 @@ describe("PlayerGrid", () => {
       { kind: "counter.changed", playerId: "player-0", counterId: "poison", delta: 1 },
       expect.any(String),
     )
+  })
+
+  it("shades a seat out on life but keeps its life controls live", () => {
+    const seats = players(2).map((seat, index) => (index === 0 ? { ...seat, life: 0 } : seat))
+    const onChange = jest.fn()
+    const outState: OutState = {
+      counter: playSystemRules("mtg").counter,
+      tableRules: playTableRules("mtg", "standard"),
+      lives: seats.map(({ id, life }) => ({ playerId: id, life })),
+    }
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid players={seats} system="mtg" outState={outState} onChange={onChange} />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("life-card-seat-1")).toHaveProp(
+      "accessibilityLabel",
+      "Seat 1, Player 1, out: life",
+    )
+    expect(view.getByTestId("life-out-label-seat-1")).toBeTruthy()
+    expect(view.queryByTestId("life-eliminated-seat-2")).toBeNull()
+    fireEvent.press(view.getByTestId(lifeControlTestId(1, 1)))
+    expect(onChange).toHaveBeenCalledWith(seats[0].id, 1)
+  })
+
+  it("names the commander that knocked a seat out", () => {
+    const seats = players(2)
+    const outState: OutState = {
+      counter: playSystemRules("mtg").counter,
+      tableRules: playTableRules("mtg", "commander"),
+      lives: seats.map(({ id, life }) => ({ playerId: id, life })),
+      commanderDamage: [{ fromPlayerId: seats[1].id, toPlayerId: seats[0].id, total: 21 }],
+    }
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid players={seats} system="mtg" outState={outState} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("life-card-seat-1")).toHaveProp(
+      "accessibilityLabel",
+      "Seat 1, Player 1, out: 21 commander damage from Player 2",
+    )
+    expect(view.getByTestId("life-out-amount-seat-1").props.children).toBe("21")
   })
 
   it("reads a seat at its losing poison count as out, and keeps its counters editable", () => {

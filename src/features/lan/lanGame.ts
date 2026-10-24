@@ -13,6 +13,7 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
+import { outReason } from "../../../convex/lib/outReason"
 import {
   identitySection,
   startingValueRange,
@@ -33,7 +34,7 @@ import {
   type GameVariant,
   type TreacheryRole,
 } from "../../../convex/lib/treachery"
-import { connectedPlayerIsOut } from "../connected/boardView"
+import { projectionOutState } from "../connected/boardView"
 import {
   CONNECTED_RECENT_OPERATION_LIMIT,
   toConnectedProjection,
@@ -491,6 +492,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
         }
       : {}),
   }
+  const outState = projectionOutState(projection)
   const outcome =
     game.roles && game.status === "active" && viewerKey === game.hostKey
       ? treacheryOutcome(
@@ -501,7 +503,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
                   {
                     playerId: player.playerId,
                     role: dealt.role,
-                    inGame: !connectedPlayerIsOut(projection, player),
+                    inGame: !outReason(outState, player.playerId),
                   },
                 ]
               : []

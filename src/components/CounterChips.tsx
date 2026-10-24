@@ -53,12 +53,6 @@ export function seatTableState(
   }
 }
 
-export function losingCounter({ rules, counters }: Pick<SeatTable, "rules" | "counters">) {
-  return rules.counters.find(
-    ({ id, losesAt }) => losesAt !== undefined && (counters[id] ?? 0) >= losesAt,
-  )
-}
-
 type OutReasonId = keyof typeof board.outReason
 
 const isOutReasonId = (id: string): id is OutReasonId => Object.hasOwn(board.outReason, id)

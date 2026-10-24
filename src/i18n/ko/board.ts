@@ -384,6 +384,16 @@ export default {
   lifeCard: {
     now: "{{identity}}, 현재 {{value}}",
     out: "탈락: {{reason}}",
+    outLabel: "탈락",
+    outFrom: "{{name}}의 커맨더에게 받은 커맨더 피해 {{total}}점",
+    outOn: {
+      none: "생명점",
+      mtg: "생명점",
+      ygo: "라이프 포인트",
+      pokemon: "프라이즈",
+      lorcana: "로어",
+      fab: "생명점",
+    },
     openCalculator: "{{identity}}의 계산기 열기",
   },
   lifeControls: {

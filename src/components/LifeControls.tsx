@@ -1,12 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, useWindowDimensions, View } from "react-native"
+import * as Haptics from "expo-haptics"
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+  type SharedValue,
+} from "react-native-reanimated"
 
+import { localGameRepository } from "@/features/game/localPersistence"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import type { ReducedMotionPreference } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import {
@@ -24,6 +34,8 @@ export interface LifeControlsProps {
   playerName: string
   seatNumber?: number
   disabled?: boolean
+  lockedReason?: string
+  reducedMotion?: ReducedMotionPreference
   contrastCheckedForeground?: string
   compact?: boolean
   contentRotation?: LifeCardContentRotation
@@ -49,6 +61,7 @@ const HALF_CARD_ZONES: readonly {
 ]
 
 const RECENT_DELTA_VISIBLE_MS = 1800
+const BUMP_DISTANCE = 4
 
 export interface RecentDelta {
   get: () => number
@@ -92,6 +105,20 @@ function createRecentDeltaStore() {
   }
 }
 
+function bumpStyle(
+  progress: number,
+  direction: -1 | 1,
+  reducedMotion: ReducedMotionPreference,
+  contentRotation: LifeCardContentRotation,
+) {
+  "worklet"
+  if (reducedMotion !== false) return { opacity: 1 - 0.6 * progress }
+  const distance = BUMP_DISTANCE * progress
+  if (Math.abs(contentRotation) !== 90) return { transform: [{ translateX: direction * distance }] }
+  const towardTop = direction === (contentRotation === 90 ? -1 : 1)
+  return { transform: [{ translateY: towardTop ? -distance : distance }] }
+}
+
 function deltaText(delta: number) {
   return delta > 0 ? `+${delta}` : `-${Math.abs(delta)}`
 }
@@ -108,6 +135,8 @@ export function LifeControls({
   playerName,
   seatNumber = 1,
   disabled,
+  lockedReason,
+  reducedMotion = null,
   contrastCheckedForeground: foreground = "#FFFFFF",
   compact,
   contentRotation = 0,
@@ -143,6 +172,24 @@ export function LifeControls({
   const sideways = Math.abs(contentRotation) === 90
   const rules = playSystemRules(system)
   const tapStep = lifeStep ?? rules.counter.tapStep
+  const locked = lockedReason !== undefined && !disabled
+  const minusBump = useSharedValue(0)
+  const plusBump = useSharedValue(0)
+  const minusBumpStyle = useAnimatedStyle(
+    () => bumpStyle(minusBump.value, -1, reducedMotion, contentRotation),
+    [reducedMotion, contentRotation],
+  )
+  const plusBumpStyle = useAnimatedStyle(
+    () => bumpStyle(plusBump.value, 1, reducedMotion, contentRotation),
+    [reducedMotion, contentRotation],
+  )
+
+  function bump(value: SharedValue<number>) {
+    value.set(withSequence(withTiming(1, { duration: 60 }), withTiming(0, { duration: 140 })))
+    if (reducedMotion === false && localGameRepository.loadSettings().hapticsEnabled) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
+    }
+  }
 
   function labelFor(delta: LifeDelta) {
     return translate(delta > 0 ? "board:lifeControls.add" : "board:lifeControls.subtract", {
@@ -195,20 +242,28 @@ export function LifeControls({
             <BoardPressable
               key={delta}
               testID={lifeControlTestId(seatNumber, delta)}
-              disabled={disabled}
+              // why: Pressable writes its own `disabled` over accessibilityState, so a locked zone leaves it unset to read as disabled and still take the press.
+              disabled={locked ? undefined : disabled}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !!disabled }}
+              accessibilityState={{ disabled: !!disabled || locked }}
               accessibilityLabel={labelFor(delta)}
-              accessibilityHint={translate(`board:lifeControls.hint.${rules.id}`, {
-                identity,
-                delta,
-              })}
-              accessibilityActions={[
-                {
-                  name: "longpress",
-                  label: translate(`board:lifeControls.moreControls.${rules.id}`, { identity }),
-                },
-              ]}
+              accessibilityHint={
+                locked
+                  ? lockedReason
+                  : translate(`board:lifeControls.hint.${rules.id}`, { identity, delta })
+              }
+              accessibilityActions={
+                locked
+                  ? undefined
+                  : [
+                      {
+                        name: "longpress",
+                        label: translate(`board:lifeControls.moreControls.${rules.id}`, {
+                          identity,
+                        }),
+                      },
+                    ]
+              }
               style={({ pressed }) => [
                 themed($zone),
                 sideways
@@ -216,15 +271,19 @@ export function LifeControls({
                   : edge === "left"
                     ? themed($zoneLeft)
                     : themed($zoneRight),
-                pressed && !disabled && { backgroundColor: overlayTint(foreground, 0.14) },
+                pressed &&
+                  !disabled &&
+                  !locked && { backgroundColor: overlayTint(foreground, 0.14) },
               ]}
               delayLongPress={450}
               onPressIn={() => {
+                if (locked) return
                 longPressHandled.current = null
                 onPreview?.(delta)
               }}
               onPressOut={() => onPreview?.(0)}
               onLongPress={() => {
+                if (locked) return
                 longPressHandled.current = direction
                 onPreview?.(0)
                 onLongChange?.(direction)
@@ -233,6 +292,10 @@ export function LifeControls({
                 if (nativeEvent.actionName === "longpress") onLongChange?.(direction)
               }}
               onPress={() => {
+                if (locked) {
+                  bump(direction === -1 ? minusBump : plusBump)
+                  return
+                }
                 if (longPressHandled.current === direction) {
                   longPressHandled.current = null
                   return
@@ -242,24 +305,27 @@ export function LifeControls({
                 onChange(delta)
               }}
             >
-              <Text
-                text={feedback}
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-                style={[
-                  themed(compact ? $compactGlyph : $glyph),
-                  deltaSize !== undefined && { fontSize: deltaSize },
-                  overhang
-                    ? {
-                        transform: [
-                          { translateY: pinsToTopEdge ? overhang : -overhang },
-                          { rotate: `${contentRotation}deg` },
-                        ],
-                      }
-                    : contentRotationStyle,
-                  { color: foreground },
-                ]}
-              />
+              <Animated.View style={direction === -1 ? minusBumpStyle : plusBumpStyle}>
+                <Text
+                  text={feedback}
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                  style={[
+                    themed(compact ? $compactGlyph : $glyph),
+                    deltaSize !== undefined && { fontSize: deltaSize },
+                    overhang
+                      ? {
+                          transform: [
+                            { translateY: pinsToTopEdge ? overhang : -overhang },
+                            { rotate: `${contentRotation}deg` },
+                          ],
+                        }
+                      : contentRotationStyle,
+                    { color: foreground },
+                    locked && $lockedGlyph,
+                  ]}
+                />
+              </Animated.View>
             </BoardPressable>
           )
         })}
@@ -316,3 +382,5 @@ const $compactGlyph: ThemedStyle<TextStyle> = () => ({
   lineHeight: COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   opacity: 0.6,
 })
+
+const $lockedGlyph: TextStyle = { opacity: 0.25 }

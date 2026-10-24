@@ -385,6 +385,16 @@ export default {
   lifeCard: {
     now: "{{identity}}、現在{{value}}",
     out: "敗北: {{reason}}",
+    outLabel: "脱落",
+    outFrom: "{{name}}の統率者から統率者ダメージ{{total}}",
+    outOn: {
+      none: "ライフ",
+      mtg: "ライフ",
+      ygo: "ライフポイント",
+      pokemon: "サイド",
+      lorcana: "ロア",
+      fab: "ライフ",
+    },
     openCalculator: "{{identity}}の電卓を開く",
   },
   lifeControls: {

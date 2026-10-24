@@ -396,6 +396,16 @@ export default {
   lifeCard: {
     now: "{{identity}}, अब {{value}}",
     out: "आउट: {{reason}}",
+    outLabel: "बाहर",
+    outFrom: "{{name}} के कमांडर से {{total}} कमांडर डैमेज",
+    outOn: {
+      none: "लाइफ़",
+      mtg: "लाइफ़",
+      ygo: "लाइफ़ पॉइंट",
+      pokemon: "प्राइज़ कार्ड",
+      lorcana: "लोर",
+      fab: "लाइफ़",
+    },
     openCalculator: "{{identity}} के लिए कैलकुलेटर खोलें",
   },
   lifeControls: {

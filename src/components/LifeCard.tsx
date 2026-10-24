@@ -35,7 +35,7 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
-import { CounterChips, type SeatTable } from "./CounterChips"
+import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
@@ -87,6 +87,12 @@ export type LifeCardCommanderDamage = Omit<
   pendingClaims?: readonly CommanderClaim[]
 }
 
+export type LifeCardOut = { reason: string } & (
+  | { cause: "life" }
+  | { cause: "commanderDamage"; amount: number; attacker?: CommanderAttacker }
+  | { cause: "counter"; amount: number; counterId: string }
+)
+
 export interface LifeCardProps {
   playerId?: string
   playerName: string
@@ -109,7 +115,7 @@ export interface LifeCardProps {
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
   commanderDamage?: LifeCardCommanderDamage
-  eliminated?: string
+  out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
   onPlayStart?: () => void
@@ -141,7 +147,7 @@ export const LifeCard = memo(function LifeCard({
   staleSince,
   commanderDamage,
   dice,
-  eliminated,
+  out,
   seatTable,
   onPlayStart,
   onChange,
@@ -157,7 +163,8 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
-  const frozen = disabled || !!eliminated
+  const locked = !!out && out.cause !== "life"
+  const frozen = disabled || locked
   const inspectDisabled = disabled && ownership !== "unowned"
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -177,17 +184,18 @@ export const LifeCard = memo(function LifeCard({
   }, [preview])
   const shownLife = life + preview
   const shownDigits = String(shownLife).length
-  const resolvedLifeFontSize =
-    lifeFontSizeFor?.(shownDigits) ??
+  const fontSizeFor = (digits: number) =>
+    lifeFontSizeFor?.(digits) ??
     Math.min(
       compact ? COMPACT_LIFE_FONT_SIZE : LIFE_FONT_SIZE,
       getLifeFontSizeThatFits({
         availableWidth: getLifeTargetTextSpace(lifeTargetSize),
         availableHeight: getLifeTargetTextSpace(lifeTargetSize),
-        digits: shownDigits,
+        digits,
         fontScale: 1,
       }),
     )
+  const resolvedLifeFontSize = fontSizeFor(shownDigits)
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const safeContentStyle = lifeCardContentInsetStyle(contentInsets)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
@@ -396,6 +404,30 @@ export const LifeCard = memo(function LifeCard({
     }
   }, [frozen])
 
+  const outLabel = out && translate("board:lifeCard.out", { reason: out.reason })
+  const causeFontSize = out && out.cause !== "life" ? fontSizeFor(String(out.amount).length) : 0
+  const causeGlyphSize = Math.round(causeFontSize * 0.5)
+  const lifeFontStyle: TextStyle = {
+    fontSize: resolvedLifeFontSize,
+    lineHeight: getLifeLineHeight(resolvedLifeFontSize),
+  }
+  const lifeTotal = (...style: StyleProp<TextStyle>[]) => (
+    <Text
+      testID={`life-total-seat-${seatNumber}`}
+      text={String(shownLife)}
+      weight="bold"
+      accessible
+      accessibilityLabel={translate("board:counters.seatItem", {
+        identity,
+        label: counterValueLabel(system, life),
+      })}
+      accessibilityLiveRegion="polite"
+      maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+      numberOfLines={1}
+      style={[themed($life), ...style, { color: foreground }]}
+    />
+  )
+
   function measureCard(event: LayoutChangeEvent) {
     const { width, height } = event.nativeEvent.layout
     setCardSize((current) =>
@@ -420,10 +452,7 @@ export const LifeCard = memo(function LifeCard({
   return (
     <View
       testID={`life-card-seat-${seatNumber}`}
-      accessibilityLabel={[
-        ownershipLabel,
-        eliminated && translate("board:lifeCard.out", { reason: eliminated }),
-      ]
+      accessibilityLabel={[ownershipLabel, outLabel]
         .filter((part): part is string => Boolean(part))
         .reduce(
           (label, part) => translate("board:counters.seatItem", { identity: label, label: part }),
@@ -484,35 +513,62 @@ export const LifeCard = memo(function LifeCard({
           pointerEvents="none"
           style={[themed($readout), localCommander && overviewLifeStyle]}
         >
-          <Text
-            testID={`life-total-seat-${seatNumber}`}
-            text={String(shownLife)}
-            weight="bold"
-            accessible
-            accessibilityLabel={translate("board:counters.seatItem", {
-              identity,
-              label: counterValueLabel(system, life),
-            })}
-            accessibilityLiveRegion="polite"
-            maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
-            numberOfLines={1}
-            style={[
-              themed($life),
-              {
-                fontSize: resolvedLifeFontSize,
-                lineHeight: getLifeLineHeight(resolvedLifeFontSize),
-              },
-              contentRotationStyle,
-              { color: foreground },
-            ]}
-          />
+          {out?.cause === "life" ? (
+            <View style={[$outReadout, contentRotationStyle]}>
+              {lifeTotal(lifeFontStyle)}
+              <Text
+                testID={`life-out-label-seat-${seatNumber}`}
+                text={translate("board:lifeCard.outLabel")}
+                weight="bold"
+                accessible={false}
+                maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+                style={[themed($outLabel), { color: foreground }]}
+              />
+            </View>
+          ) : out ? (
+            <View style={[$outReadout, contentRotationStyle]}>
+              <View style={$outCause}>
+                {out.cause === "counter" ? (
+                  <TableGlyph id={out.counterId} size={causeGlyphSize} color={foreground} />
+                ) : out.attacker ? (
+                  <PlayerMark
+                    seatNumber={out.attacker.seatNumber}
+                    shape={out.attacker.shape}
+                    color={foreground}
+                    insetSwordColor={color}
+                    size={causeGlyphSize}
+                  />
+                ) : null}
+                <Text
+                  testID={`life-out-amount-seat-${seatNumber}`}
+                  text={String(out.amount)}
+                  weight="bold"
+                  accessible={false}
+                  maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+                  numberOfLines={1}
+                  style={[
+                    themed($life),
+                    $outAmount,
+                    {
+                      fontSize: causeFontSize,
+                      lineHeight: getLifeLineHeight(causeFontSize),
+                      color: foreground,
+                    },
+                  ]}
+                />
+              </View>
+              {lifeTotal(themed($struckLife))}
+            </View>
+          ) : (
+            lifeTotal(lifeFontStyle, contentRotationStyle)
+          )}
         </Animated.View>
       </View>
-      {eliminated ? (
+      {out ? (
         <View
           testID={`life-eliminated-seat-${seatNumber}`}
           pointerEvents="none"
-          style={themed($eliminated)}
+          style={[themed($eliminated), locked && $lockedOverlay]}
         />
       ) : null}
       {commanderDamage && (commanderOverviewOpen || localOverviewVisible) && !commanderCardMode ? (
@@ -615,7 +671,9 @@ export const LifeCard = memo(function LifeCard({
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
-          disabled={frozen}
+          disabled={disabled}
+          lockedReason={locked ? outLabel : undefined}
+          reducedMotion={reducedMotion}
           contrastCheckedForeground={foreground}
           compact={compact}
           contentRotation={contentRotation}
@@ -628,6 +686,7 @@ export const LifeCard = memo(function LifeCard({
           onChange={onChange}
           onPreview={showPreview}
           onLongChange={() => setEditorOpen(true)}
+          style={out?.cause === "life" ? $aboveOutOverlay : undefined}
         />
       ) : null}
       {dice && diceCovers ? (
@@ -1049,9 +1108,32 @@ const $mutedContent: ThemedStyle<ViewStyle> = () => ({ opacity: 0 })
 
 const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
-  zIndex: 9,
+  zIndex: 2,
   backgroundColor: colors.board.background,
   opacity: 0.6,
+})
+
+const $lockedOverlay: ViewStyle = { zIndex: 9 }
+
+const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
+
+const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
+
+const $outCause: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
+
+const $outAmount: TextStyle = { width: "auto" }
+
+const $outLabel: ThemedStyle<TextStyle> = ({ spacing }) => ({
+  fontSize: 14,
+  letterSpacing: 2,
+  textTransform: "uppercase",
+  marginTop: -spacing.xs,
+})
+
+const $struckLife: ThemedStyle<TextStyle> = () => ({
+  fontSize: 22,
+  lineHeight: 28,
+  textDecorationLine: "line-through",
 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })

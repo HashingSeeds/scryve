@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native"
+import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 import * as Reanimated from "react-native-reanimated"
 
@@ -928,7 +929,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          eliminated="commander damage"
+          out={{ cause: "commanderDamage", amount: 21, reason: "commander damage" }}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1390,7 +1391,8 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("life-eliminated-seat-1")).toBeNull()
   })
 
-  it("freezes an eliminated card without ending the game", () => {
+  it("locks a card out on commander damage, and a press buzzes and says why", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     const onChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
@@ -1399,17 +1401,24 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={13}
           color="#41476E"
-          eliminated="commander damage"
+          out={{ cause: "commanderDamage", amount: 21, reason: "commander damage" }}
           onChange={onChange}
         />
       </ThemeProvider>,
     )
     expect(view.getByTestId("life-eliminated-seat-1")).toBeTruthy()
+    expect(view.getByTestId("life-out-amount-seat-1").props.children).toBe("21")
+    const minus = view.getByTestId(lifeControlTestId(1, -1))
+    expect(minus).toHaveProp("accessibilityState", { disabled: true })
+    expect(minus).toHaveProp("accessibilityHint", "out: commander damage")
+    jest.mocked(Haptics.notificationAsync).mockClear()
     act(() => {
-      fireEvent.press(view.getByTestId(lifeControlTestId(1, -1)))
+      fireEvent.press(minus)
       fireEvent.press(view.getByTestId(lifeControlTestId(1, 1)))
     })
     expect(onChange).not.toHaveBeenCalled()
+    expect(Haptics.notificationAsync).toHaveBeenCalledTimes(2)
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("13")
+    motion.mockRestore()
   })
 })

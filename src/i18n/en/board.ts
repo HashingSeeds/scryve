@@ -373,6 +373,19 @@ const board = {
   lifeCard: {
     now: "{{identity}}, now {{value}}",
     out: "out: {{reason}}",
+    // Shown under a player's life total once they are out of the game.
+    outLabel: "Out",
+    // Why a player is out, read after "out:". {{total}} is commander damage taken from {{name}}'s commander.
+    outFrom: "{{total}} commander damage from {{name}}",
+    // Why a player is out, read after "out:": the game's main counter ran out (or another player won the race).
+    outOn: {
+      none: "life",
+      mtg: "life",
+      ygo: "Life Points",
+      pokemon: "Prize cards",
+      lorcana: "lore",
+      fab: "life",
+    },
     openCalculator: "Open calculator for {{identity}}",
   },
   lifeControls: {

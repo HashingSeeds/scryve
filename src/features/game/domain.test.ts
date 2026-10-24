@@ -7,7 +7,7 @@ import {
   commandToEvent,
   COMMANDER_LETHAL_DAMAGE,
   incomingCommanderDamage,
-  isEliminatedByCommanderDamage,
+  localOutReason,
   lastPlayerStanding,
   MAX_COMMANDER_DAMAGE,
   asDeviceId,
@@ -471,15 +471,19 @@ describe("commander damage", () => {
     [COMMANDER_LETHAL_DAMAGE + 1, true],
   ])("marks elimination at %i damage: %s", (damage, eliminated) => {
     const game = assign(makeGame(4, 40), 0, 1, damage)
-    expect(isEliminatedByCommanderDamage(game, game.players[1].id)).toBe(eliminated)
-    expect(isEliminatedByCommanderDamage(game, game.players[0].id)).toBe(false)
+    expect(localOutReason(game, game.players[1].id)).toEqual(
+      eliminated
+        ? { cause: "commanderDamage", fromPlayerId: game.players[0].id, total: damage }
+        : undefined,
+    )
+    expect(localOutReason(game, game.players[0].id)).toBeUndefined()
   })
 
   it("does not eliminate on 21 spread across two commanders", () => {
     let game = makeGame(4, 40)
     game = assign(game, 0, 1, 11)
     game = assign(game, 2, 1, 10)
-    expect(isEliminatedByCommanderDamage(game, game.players[1].id)).toBe(false)
+    expect(localOutReason(game, game.players[1].id)).toBeUndefined()
   })
 
   it("names the last player standing once life and commander damage knock out the rest", () => {

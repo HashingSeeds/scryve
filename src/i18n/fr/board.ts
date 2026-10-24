@@ -411,6 +411,16 @@ export default {
   lifeCard: {
     now: "{{identity}}, maintenant {{value}}",
     out: "éliminé : {{reason}}",
+    outLabel: "Éliminé",
+    outFrom: "{{total}} blessures de commandant infligées par {{name}}",
+    outOn: {
+      none: "points de vie",
+      mtg: "points de vie",
+      ygo: "Life Points",
+      pokemon: "cartes Récompense",
+      lorcana: "Lore",
+      fab: "points de vie",
+    },
     openCalculator: "Ouvrir la calculatrice pour {{identity}}",
   },
   lifeControls: {

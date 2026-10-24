@@ -9,7 +9,7 @@ import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
-import { isPlayerOut, matchScoreAfter } from "@/features/game/domain"
+import { localOutReason, matchScoreAfter } from "@/features/game/domain"
 import type { LocalGame, MatchSeatOutcome } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -62,7 +62,7 @@ function gameScoresErrorMessage(cause: unknown) {
 }
 
 function drawForRemaining(game: LocalGame): MatchSeatOutcome[] {
-  return game.players.map((player) => (isPlayerOut(game, player.id) ? "loss" : "draw"))
+  return game.players.map((player) => (localOutReason(game, player.id) ? "loss" : "draw"))
 }
 
 export function defaultMatchOutcomes(game: LocalGame): MatchSeatOutcome[] {

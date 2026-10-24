@@ -18,9 +18,9 @@ import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { counterOutReason, losingCounter, seatTableState } from "./CounterChips"
+import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
-import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
+import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
@@ -44,6 +44,7 @@ import {
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import type { SeatDeck } from "./pokemon/usePokemonDeck"
+import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
@@ -73,6 +74,48 @@ export interface DiceGridBinding {
   onPressSeat: (player: GamePlayer) => void
   onChoose: (player: GamePlayer, order: "first" | "second") => void
   onPressChip: (player: GamePlayer, chip: DiceSeatChip) => void
+}
+
+function lifeCardOut(
+  reason: OutReason,
+  players: readonly GamePlayer[],
+  system: PlaySystemId | undefined,
+  table: TableRuntime | undefined,
+): LifeCardOut {
+  switch (reason.cause) {
+    case "life":
+      return {
+        cause: "life",
+        reason: translate(`board:lifeCard.outOn.${playSystemRules(system).id}`),
+      }
+    case "counter":
+      return {
+        cause: "counter",
+        counterId: reason.counterId,
+        amount: reason.value,
+        reason: counterOutReason({
+          id: reason.counterId,
+          label:
+            table?.tableRules.counters.find(({ id }) => id === reason.counterId)?.label ??
+            reason.counterId,
+        }),
+      }
+    case "commanderDamage": {
+      const attacker = players.find(({ id }) => id === reason.fromPlayerId)
+      return {
+        cause: "commanderDamage",
+        amount: reason.total,
+        attacker: attacker && {
+          color: attacker.color,
+          shape: attacker.shape,
+          seatNumber: players.indexOf(attacker) + 1,
+        },
+        reason: attacker
+          ? translate("board:lifeCard.outFrom", { total: reason.total, name: attacker.name })
+          : translate("board:outReason.commanderDamage"),
+      }
+    }
+  }
 }
 
 function seatOwnership(
@@ -130,7 +173,7 @@ export interface PlayerGridProps {
   getStaleSince?: (player: GamePlayer) => number | undefined
   /** why: only decks the signed-in user owns can be read, so screens return a version only for seats they control. */
   getSeatDeck?: (player: GamePlayer) => SeatDeck | undefined
-  isPlayerEliminated?: (player: GamePlayer) => boolean
+  outState?: OutState
   isPlayerFoil?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
   table?: TableRuntime
@@ -153,7 +196,7 @@ export function PlayerGrid({
   isPlayerOwned,
   getStaleSince,
   getSeatDeck,
-  isPlayerEliminated,
+  outState,
   isPlayerFoil,
   commanderDamage,
   table,
@@ -342,10 +385,7 @@ export function PlayerGrid({
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
               const seatDice = seatDiceFor(dice, player, stable)
               const seatTable = seatTableState(table, player.id)
-              const losing = seatTable && losingCounter(seatTable)
-              const eliminated = isPlayerEliminated?.(player)
-                ? translate("board:outReason.commanderDamage")
-                : losing && counterOutReason(losing)
+              const out = outState && outReason(outState, player.id)
               if (table?.tableRules.pokemon) {
                 return (
                   <View
@@ -416,7 +456,7 @@ export function PlayerGrid({
                     disabled={disabled || playerDisabled}
                     ownership={ownership}
                     staleSince={getStaleSince?.(player)}
-                    eliminated={eliminated}
+                    out={out && lifeCardOut(out, players, system, table)}
                     commanderDamage={
                       commanderDamage && boardSeats
                         ? {
