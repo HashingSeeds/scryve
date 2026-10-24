@@ -384,7 +384,6 @@ function headinglessSecondBlock(lines: string[]) {
       block = undefined
       continue
     }
-    if (isPastedComment(line)) continue
     const match = line.match(PASTED_ENTRY)
     if (!match) return undefined
     if (!block) {

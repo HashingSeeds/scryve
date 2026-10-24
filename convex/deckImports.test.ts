@@ -213,6 +213,7 @@ Sideboard
     const boards = (list: string) => parsePastedDeckList(list).entries.map((entry) => entry.board)
     expect(boards("1 Sol Ring\n\n1 Island\n\n1 Forest")).toEqual(["main", "main", "main"])
     expect(boards("Creatures\n1 Llanowar Elves\n\nLands\n1 Forest")).toEqual(["main", "main"])
+    expect(boards("# Creatures\n4 Llanowar Elves\n\n# Lands\n20 Forest")).toEqual(["main", "main"])
     expect(boards("1 Sol Ring\nSB: 1 Island\n\n1 Forest")).toEqual(["main", "sideboard", "main"])
   })
 
