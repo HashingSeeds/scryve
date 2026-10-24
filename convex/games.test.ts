@@ -1,3 +1,4 @@
+import { ConvexHttpClient } from "convex/browser"
 import { ConvexError } from "convex/values"
 
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
@@ -3360,5 +3361,122 @@ describe("Treachery", () => {
       ["leader", true],
       ["traitor", false],
     ])
+  })
+})
+
+describe("player-facing connected errors", () => {
+  const rejectsWith = (call: Promise<unknown>, code: string, message: string) =>
+    expect(call).rejects.toMatchObject({ data: { code, message } })
+
+  it("codes lobby, join and lifecycle errors so production clients can read them", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t)
+    const { publicId } = created
+    const stranger = await synced(t, "coded-stranger", "Stranger")
+
+    await rejectsWith(
+      stranger.query(api.games.lobbyProjection, { publicId }),
+      "forbidden",
+      "Game unavailable",
+    )
+    await rejectsWith(
+      stranger.query(api.games.lobbyProjection, { publicId: "missing-game-id-123456" }),
+      "forbidden",
+      "Game unavailable",
+    )
+    await rejectsWith(
+      host.mutation(api.games.startGame, { publicId: "missing-game-id-123456" }),
+      "game_not_found",
+      "Game not found",
+    )
+    await rejectsWith(
+      stranger.mutation(api.games.leaveMyGame, { publicId }),
+      "game_membership_required",
+      "Game membership required",
+    )
+    await rejectsWith(
+      host.mutation(api.games.startGame, { publicId }),
+      "seats_unclaimed",
+      "All configured seats (2–6) must be claimed before starting",
+    )
+    await rejectsWith(
+      host.mutation(api.games.leaveMyGame, { publicId }),
+      "host_cannot_leave",
+      "Hosts must finish or abandon an unfinished game instead of leaving it",
+    )
+    await rejectsWith(
+      host.mutation(api.games.createLobby, {
+        publicId: "second-public-game-123456",
+        playerCount: 2,
+        startingLife: 20,
+        ruleset: "standard",
+        inviteToken: "s".repeat(43),
+        manualCodeCandidates: ["NEW234"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+        deviceId: "device-host-0001",
+      }),
+      "already_hosting",
+      "You already host a lobby or active game; resume it before hosting another",
+    )
+
+    const joiner = await synced(t, "coded-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" })
+    await rejectsWith(
+      stranger.mutation(api.games.claimSeat, { token, displayName: "Late", color: "#112233" }),
+      "game_full",
+      "Lobby is full",
+    )
+    const [hostSeat] = (await host.query(api.games.lobbyProjection, { publicId })).players
+    const appearance = { publicId, seat: 2, color: hostSeat.color, shape: "star" }
+    await rejectsWith(
+      joiner.mutation(api.games.setMyAppearance, appearance),
+      "appearance_taken",
+      "Another player already claimed that color or shape",
+    )
+
+    await host.mutation(api.games.startGame, { publicId })
+    await rejectsWith(
+      joiner.mutation(api.games.setMyAppearance, { ...appearance, color: "#117B9C" }),
+      "game_not_lobby",
+      "Appearance can only change in a lobby",
+    )
+    await host.mutation(api.games.finishGame, { publicId })
+    await rejectsWith(
+      host.mutation(api.games.finishGame, { publicId }),
+      "game_not_active",
+      "Only an active game can be finished",
+    )
+    await rejectsWith(
+      host.mutation(api.games.abandonGame, { publicId }),
+      "game_ended",
+      "Only a lobby or active game can be abandoned",
+    )
+  })
+
+  it("reaches v0.2.0 clients as a game-gone error with a translatable code", async () => {
+    const t = makeConvexTest()
+    const stranger = await synced(t, "compat-stranger", "Stranger")
+    const thrown = await stranger
+      .query(api.games.lobbyProjection, { publicId: "missing-game-id-123456" })
+      .catch((cause: unknown) => cause)
+    if (!(thrown instanceof ConvexError)) throw new Error("expected a ConvexError")
+    const previewWireResponse = {
+      status: "error",
+      errorMessage: `[Request ID: 0] Server Error\nUncaught ConvexError: ${thrown.message}`,
+      errorData: thrown.data,
+    }
+    const client = new ConvexHttpClient("https://example.convex.cloud", {
+      fetch: async () => new Response(JSON.stringify(previewWireResponse), { status: 560 }),
+    })
+    const received = await client
+      .query(api.games.lobbyProjection, { publicId: "missing-game-id-123456" })
+      .catch((cause: unknown) => cause)
+
+    const isGameUnavailableErrorAtV020 = (cause: unknown) =>
+      cause instanceof Error && cause.message.includes("Game unavailable")
+    expect(isGameUnavailableErrorAtV020(received)).toBe(true)
+    expect(received).toBeInstanceOf(ConvexError)
+    expect(received).toMatchObject({ data: { code: "forbidden", message: "Game unavailable" } })
   })
 })

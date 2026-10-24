@@ -117,12 +117,6 @@ async function findGameByPublicId(ctx: QueryCtx, publicId: string) {
 
 async function gameByPublicId(ctx: QueryCtx, publicId: string) {
   const game = await findGameByPublicId(ctx, publicId)
-  if (!game) throw new Error("Game not found")
-  return game
-}
-
-async function gameByPublicIdForWrite(ctx: QueryCtx, publicId: string) {
-  const game = await findGameByPublicId(ctx, publicId)
   if (!game) throw gameWriteError("game_not_found", "Game not found")
   return game
 }
@@ -197,6 +191,17 @@ function assertDeviceId(deviceId: string) {
 function assertGameWriteDeviceId(deviceId: string) {
   if (!isValidDeviceId(deviceId))
     throw gameWriteError("invalid_device_id", "Invalid device identifier")
+}
+
+function gameUnavailable() {
+  return new ConvexError({ code: "forbidden", message: "Game unavailable" })
+}
+
+function appearanceTaken() {
+  return new ConvexError({
+    code: "appearance_taken",
+    message: "Another player already claimed that color or shape",
+  })
 }
 
 function syncOperationMismatch() {
@@ -534,7 +539,10 @@ async function clearWayToHost(ctx: MutationCtx, hostUserId: Id<"users">) {
       await terminalizeGame(ctx, existingHostedGame, "abandoned", "host_abandoned", hostUserId)
       continue
     }
-    throw new Error("You already host a lobby or active game; resume it before hosting another")
+    throw new ConvexError({
+      code: "already_hosting",
+      message: "You already host a lobby or active game; resume it before hosting another",
+    })
   }
 }
 
@@ -948,11 +956,16 @@ async function claimPreparedSeat(
   if (held) {
     if (seat === undefined || held.seat === seat)
       return { publicId: game.publicId, seat: held.seat }
-    throw new Error("You already hold a seat in this game")
+    throw new ConvexError({
+      code: "seat_already_held",
+      message: "You already hold a seat in this game",
+    })
   }
-  if (seat !== undefined && !target) throw new Error("Seat not found")
-  if (!target) throw new Error("Game is full")
-  if (target.userId !== undefined) throw new Error("Seat already claimed")
+  if (seat !== undefined && !target)
+    throw new ConvexError({ code: "seat_not_found", message: "Seat not found" })
+  if (!target) throw new ConvexError({ code: "game_full", message: "Game is full" })
+  if (target.userId !== undefined)
+    throw new ConvexError({ code: "seat_taken", message: "Seat already claimed" })
   await ctx.db.patch(target._id, {
     userId: user._id,
     ...(deviceId ? { deviceId } : {}),
@@ -998,16 +1011,20 @@ export const claimSeat = mutation({
         joins.failedInviteAt !== undefined &&
         Date.now() - joins.failedInviteAt < JOIN_ATTEMPT_WINDOW_MS
       )
-        throw new Error(INVALID_INVITE_MESSAGE)
+        throw new ConvexError({ code: "invalid_invite", message: INVALID_INVITE_MESSAGE })
       return null
     }
     assertClientPlaysGame(game, args)
-    if (game.variant !== undefined && !args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
+    if (game.variant !== undefined && !args.deviceId)
+      throw new ConvexError({ code: "device_required", message: TREACHERY_DEVICE_MESSAGE })
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
       if (!seated.userId || seated.userId === user._id) continue
       if (await isBlockedBetween(ctx, user._id, seated.userId))
-        throw new Error("You cannot join a game with a player you blocked or who blocked you")
+        throw new ConvexError({
+          code: "blocked_player",
+          message: "You cannot join a game with a player you blocked or who blocked you",
+        })
     }
     const claimedName =
       args.displayName === undefined ? undefined : assertDisplayName(args.displayName)
@@ -1023,7 +1040,10 @@ export const claimSeat = mutation({
         ...(claimedName === undefined ? {} : { displayName: claimedName }),
       })
     if (claimedName === undefined)
-      throw new Error("A display name is required to claim a lobby seat")
+      throw new ConvexError({
+        code: "display_name_required",
+        message: "A display name is required to claim a lobby seat",
+      })
     const displayName = claimedName
     const duplicate = existingPlayers.find(
       (candidate) =>
@@ -1035,7 +1055,8 @@ export const claimSeat = mutation({
     const occupied = new Set(players.map((player) => player.seat))
     let seat = 1
     while (occupied.has(seat)) seat += 1
-    if (seat > game.playerCount) throw new Error("Lobby is full")
+    if (seat > game.playerCount)
+      throw new ConvexError({ code: "game_full", message: "Lobby is full" })
     const appearance = resolveAppearance({
       preferred: {
         ...(args.color ? { color: args.color } : {}),
@@ -1739,7 +1760,10 @@ export const claimableSeats = mutation({
     for (const seated of players) {
       if (!seated.userId || seated.userId === user._id) continue
       if (await isBlockedBetween(ctx, user._id, seated.userId))
-        throw new Error("You cannot join a game with a player you blocked or who blocked you")
+        throw new ConvexError({
+          code: "blocked_player",
+          message: "You cannot join a game with a player you blocked or who blocked you",
+        })
     }
     return {
       publicId: game.publicId,
@@ -1804,9 +1828,9 @@ export const lobbyProjection = query({
       .query("games")
       .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
       .unique()
-    if (!game) throw new Error("Game unavailable")
+    if (!game) throw gameUnavailable()
     const players = await playersForGame(ctx, game._id)
-    if (!players.some((player) => player.userId === user._id)) throw new Error("Game unavailable")
+    if (!players.some((player) => player.userId === user._id)) throw gameUnavailable()
     const isHost = game.hostUserId === user._id
     const recentEvents =
       args.includeRecentOperationIds !== false && game.status === "active"
@@ -1957,7 +1981,7 @@ export const connectedOperationStatus = query({
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireUser(ctx)
     const players = await playersForGame(ctx, game._id)
-    if (!players.some((player) => player.userId === user._id)) throw new Error("Game unavailable")
+    if (!players.some((player) => player.userId === user._id)) throw gameUnavailable()
     const projectionEventSequence = totalEventCount(game, players)
     return await statusForOperation(ctx, game, user, projectionEventSequence, args.operation)
   },
@@ -2068,13 +2092,16 @@ export const setMyAppearance = mutation({
     assertAllowedColor(args.color)
     assertAllowedShape(args.shape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
-    if (game.status !== "lobby") throw new Error("Appearance can only change in a lobby")
+    if (game.status !== "lobby")
+      throw new ConvexError({
+        code: "game_not_lobby",
+        message: "Appearance can only change in a lobby",
+      })
     const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
     await limitGameRate(ctx, "gameWrite", user._id)
     const players = await playersForGame(ctx, game._id)
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
-    if (appearanceIsTaken(takenAppearances(players, player._id), requested))
-      throw new Error("Another player already claimed that color or shape")
+    if (appearanceIsTaken(takenAppearances(players, player._id), requested)) throw appearanceTaken()
     const proMark =
       typeof args.proShape === "string"
         ? { foil: undefined, ...(await requireProMark(ctx, user, args.proShape)) }
@@ -2085,7 +2112,7 @@ export const setMyAppearance = mutation({
       proMark.proShape &&
       players.some((other) => other._id !== player._id && other.proShape === proMark.proShape)
     )
-      throw new Error("Another player already claimed that color or shape")
+      throw appearanceTaken()
     await ctx.db.patch(player._id, { color: requested.color, shape: requested.shape, ...proMark })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return requested
@@ -2151,17 +2178,24 @@ export const startGame = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     await requireHost(ctx, game)
-    if (game.status !== "lobby") throw new Error("Only a lobby can be started")
+    if (game.status !== "lobby")
+      throw new ConvexError({ code: "game_not_lobby", message: "Only a lobby can be started" })
     const players = await playersForGame(ctx, game._id)
     if (players.length < 2 || players.length > 6 || players.length !== game.playerCount)
-      throw new Error("All configured seats (2–6) must be claimed before starting")
+      throw new ConvexError({
+        code: "seats_unclaimed",
+        message: "All configured seats (2–6) must be claimed before starting",
+      })
     if (game.deckRequired === true) {
       for (const player of players) {
         if (
           player.deckVersionId === undefined ||
           !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         )
-          throw new Error("Every occupied seat must choose a deck before starting")
+          throw new ConvexError({
+            code: "deck_required",
+            message: "Every occupied seat must choose a deck before starting",
+          })
       }
     }
     const roles = rolesFor(game, players.length)
@@ -2199,7 +2233,7 @@ export const revealMyRole = mutation({
   args: { publicId: v.string(), deviceId: v.string() },
   handler: async (ctx, args) => {
     assertDeviceId(args.deviceId)
-    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireUser(ctx)
     const player = (
       await ctx.db
@@ -2207,8 +2241,9 @@ export const revealMyRole = mutation({
         .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
         .take(MAX_PLAYERS_PER_GAME_READ)
     ).find((seat) => holdsSeatOnDevice(seat, user._id, args.deviceId))
-    if (!player) throw new Error("Game membership required")
-    if (player.role === undefined) throw new Error("This game has no hidden roles")
+    if (!player) throw gameWriteError("game_membership_required", "Game membership required")
+    if (player.role === undefined)
+      throw new ConvexError({ code: "no_hidden_roles", message: "This game has no hidden roles" })
     if (player.roleRevealed !== true) {
       await limitGameRate(ctx, "gameWrite", user._id)
       if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
@@ -2227,7 +2262,11 @@ export const updateMySeat = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    if (game.status !== "lobby") throw new Error("Seat metadata can only change in the lobby")
+    if (game.status !== "lobby")
+      throw new ConvexError({
+        code: "game_not_lobby",
+        message: "Seat metadata can only change in the lobby",
+      })
     const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
     await limitGameRate(ctx, "gameWrite", user._id)
     const displayName = assertDisplayName(args.displayName)
@@ -2236,7 +2275,7 @@ export const updateMySeat = mutation({
     if (color !== player.color.toUpperCase()) {
       const players = await playersForGame(ctx, game._id)
       if (players.some((other) => other._id !== player._id && other.color.toUpperCase() === color))
-        throw new Error("Another player already claimed that color or shape")
+        throw appearanceTaken()
     }
     await ctx.db.patch(player._id, { displayName, color })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
@@ -2253,10 +2292,17 @@ export const labelGuestSeatDeck = mutation({
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireHost(ctx, game)
     if (game.status !== "lobby" && game.status !== "active")
-      throw new Error("Only a lobby or an active game can label a seat")
+      throw new ConvexError({
+        code: "game_ended",
+        message: "Only a lobby or an active game can label a seat",
+      })
     await limitGameRate(ctx, "gameWrite", user._id)
     const player = (await playersForGame(ctx, game._id)).find(({ seat }) => seat === args.seat)
-    if (!player || player.userId) throw new Error("Only a guest seat can be labeled")
+    if (!player || player.userId)
+      throw new ConvexError({
+        code: "guest_seat_required",
+        message: "Only a guest seat can be labeled",
+      })
     await ctx.db.patch(player._id, { deckLabel: assertDeckLabel(args.deckLabel ?? undefined) })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return null
@@ -2284,7 +2330,10 @@ export const rotateInvite = mutation({
     const host = await requireHost(ctx, game)
     await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby" && game.status !== "active")
-      throw new Error("Only a lobby or active game invite can be rotated")
+      throw new ConvexError({
+        code: "game_ended",
+        message: "Only a lobby or active game invite can be rotated",
+      })
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
@@ -2324,7 +2373,7 @@ export const changeLife = mutation({
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
       throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
 
-    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireUser(ctx)
     const membership = await ctx.db
       .query("gamePlayers")
@@ -2439,7 +2488,7 @@ export const tableAction = mutation({
       throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
     const action = gatedTableAction(args.action)
 
-    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireUser(ctx)
     const actorId = ctx.db.normalizeId("gamePlayers", action.playerId)
     const actor = actorId ? await ctx.db.get(actorId) : null
@@ -2580,7 +2629,7 @@ export const submitCommanderDamage = mutation({
       throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
     if (args.fromPlayerId === args.toPlayerId) throw new Error("A commander cannot damage itself")
 
-    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const game = await gameByPublicId(ctx, args.publicId)
     assertCommanderGame(game)
     const user = await requireUser(ctx)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
@@ -2738,7 +2787,7 @@ async function resolveCommanderClaim(
   assertGameWriteDeviceId(args.deviceId)
   if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
     throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
-  const game = await gameByPublicIdForWrite(ctx, args.publicId)
+  const game = await gameByPublicId(ctx, args.publicId)
   assertCommanderGame(game)
   const user = await requireUser(ctx)
   const claim = await ctx.db
@@ -3078,7 +3127,8 @@ export const finishGame = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireHost(ctx, game)
-    if (game.status !== "active") throw new Error("Only an active game can be finished")
+    if (game.status !== "active")
+      throw gameWriteError("game_not_active", "Only an active game can be finished")
     const summary = await terminalizeGame(
       ctx,
       game,
@@ -3151,7 +3201,7 @@ async function completeGameWithOperation(
     }
   }
   if (args.kind === "finish" && game.status !== "active")
-    throw new Error("Only an active game can be finished")
+    throw gameWriteError("game_not_active", "Only an active game can be finished")
   const summary = await terminalizeGame(
     ctx,
     game,
@@ -3213,7 +3263,10 @@ export const leaveMyGame = mutation({
     if (args.deviceId) assertDeviceId(args.deviceId)
     const user = await requireUser(ctx)
     if (game.hostUserId === user._id && (game.status === "lobby" || game.status === "active"))
-      throw new Error("Hosts must finish or abandon an unfinished game instead of leaving it")
+      throw new ConvexError({
+        code: "host_cannot_leave",
+        message: "Hosts must finish or abandon an unfinished game instead of leaving it",
+      })
     const userPlayers = await ctx.db
       .query("gamePlayers")
       .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
@@ -3223,7 +3276,7 @@ export const leaveMyGame = mutation({
           (candidate) => candidate.deviceId === args.deviceId || candidate.deviceId === undefined,
         )
       : userPlayers[0]
-    if (!player) throw new Error("Game membership required")
+    if (!player) throw gameWriteError("game_membership_required", "Game membership required")
     if (game.status === "lobby") {
       await ctx.db.delete(player._id)
       await ctx.db.patch(game._id, { updatedAt: Date.now() })
@@ -3238,7 +3291,10 @@ export const abandonGame = mutation({
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireHost(ctx, game)
     if (game.status !== "lobby" && game.status !== "active" && game.status !== "abandoned")
-      throw new Error("Only a lobby or active game can be abandoned")
+      throw new ConvexError({
+        code: "game_ended",
+        message: "Only a lobby or active game can be abandoned",
+      })
     const summary = await terminalizeGame(ctx, game, "abandoned", "host_abandoned", user._id)
     return { publicId: game.publicId, summaryId: summary._id, abandonedAt: summary.finishedAt }
   },
