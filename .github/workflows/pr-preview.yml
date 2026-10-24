@@ -7,6 +7,9 @@ name: pr preview
 # The bundle job runs the PR's dependencies with no secrets. The publish job holds the Expo token,
 # waits for approval in the pr-preview environment, and runs only the PR base's code (main). It
 # reads the PR's export as data and publishes it under the base's app config.
+#
+# The publish job also moves this run's Apollo inbox card through progress to ready or failed (see
+# .github/actions/apollo-card). It skips when the pr-preview environment has no APOLLO_* secrets.
 on:
   pull_request:
     types: [labeled, synchronize, reopened]
@@ -239,6 +242,7 @@ jobs:
 
       # why: the base is a main commit, so the token only meets main's code and dependencies.
       - name: Check out PR base
+        id: checkout
         if: steps.head.outputs.current == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -255,6 +259,14 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
+
+      - name: "Apollo: installing"
+        if: steps.head.outputs.current == 'true'
+        uses: ./.github/actions/apollo-card
+        with:
+          cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
+          token: ${{ secrets.APOLLO_PREVIEW_TOKEN }}
+          card: '{"phase": "publishing", "progress": {"label": "Installing", "step": 1, "of": 4}}'
 
       # why: EAS evaluates app.config.ts, which imports expo/config-plugins, and resolves the
       # fingerprint runtime through expo-updates.
@@ -274,6 +286,14 @@ jobs:
         run: >-
           jq -r '.build.production.env + .build.preview.env | to_entries[] | "\(.key)=\(.value)"'
           eas.json >> "$GITHUB_ENV"
+
+      - name: "Apollo: fetching bundles"
+        if: steps.head.outputs.current == 'true'
+        uses: ./.github/actions/apollo-card
+        with:
+          cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
+          token: ${{ secrets.APOLLO_PREVIEW_TOKEN }}
+          card: '{"phase": "publishing", "progress": {"label": "Fetching bundles", "step": 2, "of": 4}}'
 
       # why: the bundle job ran the PR's dependencies, so its artifact is data. download-artifact
       # would extract it before anything checks the entry names, so the raw zip is checked first
@@ -308,6 +328,14 @@ jobs:
               exit 1
             fi
           done <<< "$paths"
+
+      - name: "Apollo: checking builds"
+        if: steps.head.outputs.current == 'true'
+        uses: ./.github/actions/apollo-card
+        with:
+          cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
+          token: ${{ secrets.APOLLO_PREVIEW_TOKEN }}
+          card: '{"phase": "publishing", "progress": {"label": "Checking builds", "step": 3, "of": 4}}'
 
       - name: Find preview builds that can run this PR
         id: runtime
@@ -356,6 +384,14 @@ jobs:
             *) platform=all ;;
           esac
           echo "platform=$platform" >> "$GITHUB_OUTPUT"
+
+      - name: "Apollo: publishing"
+        if: steps.head.outputs.current == 'true' && steps.runtime.outputs.platform != ''
+        uses: ./.github/actions/apollo-card
+        with:
+          cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
+          token: ${{ secrets.APOLLO_PREVIEW_TOKEN }}
+          card: '{"phase": "publishing", "progress": {"label": "Publishing", "step": 4, "of": 4}}'
 
       # why: `--channel` creates the pr-<number> channel and branch when they are missing. This ships
       # unmerged code, so the preview EAS environment must never point at production Convex.
@@ -441,3 +477,44 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body })
             }
+
+      # why: closes out the Apollo card. A run that skipped because the PR moved on posts nothing;
+      # mini settles its card when it sees the newer commit or the closed PR.
+      - name: "Apollo: result"
+        id: result
+        if: always() && steps.checkout.outcome == 'success'
+        env:
+          JOB_STATUS: ${{ job.status }}
+          PUBLISHED: ${{ steps.publish.outputs.published }}
+          PLATFORM: ${{ steps.runtime.outputs.platform }}
+          IOS: ${{ steps.runtime.outputs.ios }}
+          ANDROID: ${{ steps.runtime.outputs.android }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          [ "$JOB_STATUS" != cancelled ] || exit 0
+          link="scryve-preview://preview/$CHANNEL"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+          pr='{"id": "pr", "label": "Open PR", "url": $pr}'
+          if [ "$PUBLISHED" = true ]; then
+            card=$(jq -nc --arg link "$link" --arg pr "$PR_URL" "{phase: \"ready\", push: \"passive\",
+              url: \$link, actions: [{id: \"open\", label: \"Open preview\", url: \$link}, $pr]}")
+          elif [ "$JOB_STATUS" = failure ] || { [ -n "$IOS$ANDROID" ] && [ -z "$PLATFORM" ]; }; then
+            if [ "$JOB_STATUS" = failure ]; then
+              body="Publishing failed. The run has the details."
+            else
+              body=$(printf 'No preview build can run this commit.\n\niOS: %s\nAndroid: %s' "$IOS" "$ANDROID" | tr -d '`')
+            fi
+            card=$(jq -nc --arg body "$body" --arg run "$run_url" --arg pr "$PR_URL" "{phase: \"failed\",
+              push: \"alert\", body: \$body, actions: [{id: \"run\", label: \"Open run\", url: \$run}, $pr]}")
+          else
+            exit 0
+          fi
+          echo "card=$card" >> "$GITHUB_OUTPUT"
+
+      - name: "Apollo: post result"
+        if: always() && steps.result.outputs.card != ''
+        uses: ./.github/actions/apollo-card
+        with:
+          cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
+          token: ${{ secrets.APOLLO_PREVIEW_TOKEN }}
+          card: ${{ steps.result.outputs.card }}

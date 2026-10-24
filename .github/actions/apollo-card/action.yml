@@ -1,0 +1,52 @@
+name: Apollo preview card
+# why: Matthew follows previews from the Apollo inbox. Mini posts the card that waits for approval;
+# this action carries that same card (keyed by run and attempt) through publishing to
+# ready or failed. The token is scoped to preview cards with Scryve and GitHub links, so the worst a
+# leak does is post fake preview cards. Best effort: a missing secret skips, and a failed post only
+# warns, so Apollo can never fail a preview.
+description: Upsert this run's preview card in the Apollo cloud inbox
+inputs:
+  cloud-url:
+    description: APOLLO_CLOUD_URL. Empty skips.
+    required: true
+  token:
+    description: APOLLO_PREVIEW_TOKEN, a producer token scoped to the preview source. Empty skips.
+    required: true
+  card:
+    description: JSON merged over the base card, e.g. {"phase":"ready","push":"passive"}
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Post the card
+      shell: bash
+      env:
+        APOLLO_URL: ${{ inputs.cloud-url }}
+        APOLLO_TOKEN: ${{ inputs.token }}
+        FIELDS: ${{ inputs.card }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        PR_TITLE: ${{ github.event.pull_request.title }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -uo pipefail
+        if [ -z "$APOLLO_URL" ] || [ -z "$APOLLO_TOKEN" ]; then
+          echo "Apollo secrets are not set; skipping."
+          exit 0
+        fi
+        run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+        # The key must match the waiting card mini posts for this run.
+        card=$(jq -n --argjson fields "$FIELDS" --arg pr "$PR_NUMBER" --arg sha "${HEAD_SHA:0:7}" \
+          --arg key "run:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" --arg title "$PR_TITLE" --arg run "$run_url" '{
+            source: "preview", key: $key, kind: "update", push: "none",
+            title: ("#\($pr) \($title | gsub("[\r\n\t]"; " ")) (\($sha))" | .[0:200]), url: $run
+          } + $fields') || { echo "::warning::Apollo card: bad card JSON"; exit 0; }
+        # The token reaches curl through a config on stdin, keeping it out of `ps`.
+        rm -f "$RUNNER_TEMP/apollo-card.json"
+        code=$(curl -sS --max-time 10 --retry 2 -o "$RUNNER_TEMP/apollo-card.json" -w '%{http_code}' \
+          -K - -X POST -H 'Content-Type: application/json' --data-binary "$card" \
+          "${APOLLO_URL%/}/v1/cards" <<< "header = \"Authorization: Bearer $APOLLO_TOKEN\"") || code=000
+        case $code in
+          2??) ;;
+          *) echo "::warning::Apollo card not updated (HTTP $code): $(jq -r '.error.message? // empty' \
+               "$RUNNER_TEMP/apollo-card.json" 2>/dev/null)" ;;
+        esac
