@@ -3,6 +3,11 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   accountChanged: "सहमति किसी दूसरे खाते से दी गई थी",
+  alreadyHosting:
+    "आप पहले से एक लॉबी या सक्रिय गेम होस्ट कर रहे हैं; दूसरा होस्ट करने से पहले उसे फिर से शुरू करें",
+  appearanceTaken: "यह रंग या आकार किसी और खिलाड़ी ने पहले ही चुन लिया है",
+  blockedPlayer:
+    "आप ऐसे खिलाड़ी के साथ गेम में शामिल नहीं हो सकते जिसे आपने ब्लॉक किया है या जिसने आपको ब्लॉक किया है",
   deckAlreadyArchived: "डेक पहले ही हटाया जा चुका है",
   deckArchived: "यह डेक हटा दिया गया था",
   deckGameImmutable: "गेम सिस्टम बदलने के लिए नया डेक बनाएँ",
@@ -15,6 +20,7 @@ export default {
   detailsBatchTooLarge: "एक साथ बहुत ज़्यादा कार्ड माँगे गए",
   emptyDeckList: "इस डेक सूची में कोई कार्ड नहीं मिला",
   forbidden: "गेम उपलब्ध नहीं है",
+  gameFull: "लॉबी भरी हुई है",
   gameMembershipRequired: "गेम की सदस्यता ज़रूरी है",
   gameNotActive: "गेम चालू नहीं है",
   gameNotFound: "गेम नहीं मिला",
@@ -26,6 +32,7 @@ export default {
   invalidDeckList: "यह YDKE लिंक अमान्य है",
   invalidDeckSection: "डेक सेक्शन अमान्य है",
   invalidDeviceId: "डिवाइस आइडेंटिफ़ायर अमान्य है",
+  invalidInvite: "आमंत्रण अमान्य है, समाप्त हो चुका है या रद्द कर दिया गया है",
   invalidLifeDelta:
     "लाइफ़ में बदलाव -999999 से 999999 के बीच की शून्य के अलावा कोई पूर्ण संख्या होनी चाहिए",
   invalidLocalId: "गेस्ट लोकल ID एक UUID होनी चाहिए",
@@ -42,6 +49,8 @@ export default {
   preconInvalidResponse: "आधिकारिक डेक सेवा ने अमान्य जवाब दिया",
   queryTooLong: "कम फ़िल्टर चुनें या खोज छोटी करें।",
   scryfallRateLimited: "Scryfall अनुरोध रोके गए हैं। थोड़ी देर में फिर कोशिश करें।",
+  seatAlreadyHeld: "इस गेम में आपके पास पहले से सीट है",
+  seatTaken: "सीट पहले ही ली जा चुकी है",
   syncOwnerChanged: "साइन इन किया हुआ खाता बदल गया है",
   tooManyJoinAttempts: "जोड़ने के बहुत ज़्यादा प्रयास हो गए; एक मिनट रुकें और फिर कोशिश करें",
   unauthenticated: "प्रमाणीकरण ज़रूरी है",

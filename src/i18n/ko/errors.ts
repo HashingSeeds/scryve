@@ -3,6 +3,10 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   accountChanged: "다른 계정으로 동의했습니다",
+  alreadyHosting:
+    "이미 만든 로비나 진행 중인 게임이 있습니다. 다른 로비를 만들기 전에 먼저 다시 시작하세요",
+  appearanceTaken: "다른 플레이어가 이미 해당 색 또는 모양을 선택했습니다",
+  blockedPlayer: "차단한 플레이어이거나 나를 차단한 플레이어와 같은 게임에 참가할 수 없습니다",
   deckAlreadyArchived: "이미 삭제된 덱입니다",
   deckArchived: "삭제된 덱입니다",
   deckGameImmutable: "게임 시스템을 바꾸려면 새 덱을 만드세요",
@@ -15,6 +19,7 @@ export default {
   detailsBatchTooLarge: "한 번에 요청한 카드가 너무 많습니다",
   emptyDeckList: "이 덱 목록에서 카드를 찾지 못했습니다",
   forbidden: "사용할 수 없는 게임입니다",
+  gameFull: "로비가 가득 찼습니다",
   gameMembershipRequired: "게임 참가자만 가능합니다",
   gameNotActive: "진행 중인 게임이 아닙니다",
   gameNotFound: "게임을 찾을 수 없습니다",
@@ -26,6 +31,7 @@ export default {
   invalidDeckList: "이 YDKE 링크가 올바르지 않습니다",
   invalidDeckSection: "덱 구역이 올바르지 않습니다",
   invalidDeviceId: "잘못된 기기 식별자입니다",
+  invalidInvite: "초대가 유효하지 않거나 만료되었거나 취소되었습니다",
   invalidLifeDelta: "생명점 변화량은 -999999에서 999999 사이의 0이 아닌 정수여야 합니다",
   invalidLocalId: "게스트 로컬 ID는 UUID여야 합니다",
   invalidLocalUpdatedAt: "게스트 타임스탬프가 올바르지 않습니다",
@@ -41,6 +47,8 @@ export default {
   preconInvalidResponse: "공식 덱 서비스에서 잘못된 응답을 보냈습니다",
   queryTooLong: "필터를 줄이거나 검색어를 짧게 입력하세요.",
   scryfallRateLimited: "Scryfall 요청이 일시 중지되었습니다. 잠시 후 다시 시도하세요.",
+  seatAlreadyHeld: "이미 이 게임에서 자리를 차지하고 있습니다",
+  seatTaken: "이미 다른 플레이어가 차지한 자리입니다",
   syncOwnerChanged: "로그인한 계정이 변경되었습니다",
   tooManyJoinAttempts: "참가 시도가 너무 많습니다. 1분 후 다시 시도하세요",
   unauthenticated: "인증이 필요합니다",

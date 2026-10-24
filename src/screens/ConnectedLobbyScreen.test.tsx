@@ -748,15 +748,26 @@ describe("ConnectedLobbyScreen", () => {
     expect(onLeft).not.toHaveBeenCalled()
   })
 
-  it("leaves a missing lobby without offering a futile retry", () => {
+  it.each([
+    {
+      name: "a legacy message",
+      error: new Error(
+        "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
+      ),
+    },
+    ...["forbidden", "game_not_found"].map((code) => ({
+      name: `a redacted ${code} code`,
+      error: Object.assign(new ConvexError({ code, message: "Game unavailable" }), {
+        message: "[CONVEX Q(games:lobbyProjection)] Server Error",
+      }),
+    })),
+  ])("leaves a missing lobby without offering a futile retry for $name", ({ error }) => {
     const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
     const convexReact = jest.requireMock("convex/react") as {
       useQuery: (...args: unknown[]) => unknown
     }
     const spy = jest.spyOn(convexReact, "useQuery").mockImplementation(() => {
-      throw new Error(
-        "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
-      )
+      throw error
     })
     new ConnectedGameRepository(
       undefined,

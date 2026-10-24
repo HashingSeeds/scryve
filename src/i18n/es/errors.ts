@@ -3,6 +3,10 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   accountChanged: "El consentimiento lo dio otra cuenta",
+  alreadyHosting:
+    "Ya eres anfitrión de una sala o de una partida activa; reanúdala antes de crear otra",
+  appearanceTaken: "Otro jugador ya eligió ese color o esa forma",
+  blockedPlayer: "No puedes unirte a una partida con un jugador al que bloqueaste o que te bloqueó",
   deckAlreadyArchived: "El mazo ya está eliminado",
   deckArchived: "Este mazo fue eliminado",
   deckGameImmutable: "Crea un mazo nuevo para cambiar de sistema de juego",
@@ -15,6 +19,7 @@ export default {
   detailsBatchTooLarge: "Se pidieron demasiadas cartas a la vez",
   emptyDeckList: "No se encontraron cartas en esta lista de mazo",
   forbidden: "Partida no disponible",
+  gameFull: "La sala está llena",
   gameMembershipRequired: "Se requiere ser miembro de la partida",
   gameNotActive: "La partida no está activa",
   gameNotFound: "Partida no encontrada",
@@ -26,6 +31,7 @@ export default {
   invalidDeckList: "Este enlace YDKE no es válido",
   invalidDeckSection: "La sección del mazo no es válida",
   invalidDeviceId: "Identificador de dispositivo no válido",
+  invalidInvite: "La invitación no es válida, caducó o fue revocada",
   invalidLifeDelta:
     "La variación de vidas debe ser un número entero distinto de cero, de -999999 a 999999",
   invalidLocalId: "El ID local de invitado debe ser un UUID",
@@ -42,6 +48,8 @@ export default {
   preconInvalidResponse: "El servicio oficial de mazos devolvió una respuesta no válida",
   queryTooLong: "Elige menos filtros o acorta tu búsqueda.",
   scryfallRateLimited: "Las solicitudes a Scryfall están en pausa. Inténtalo de nuevo en breve.",
+  seatAlreadyHeld: "Ya tienes un asiento en esta partida",
+  seatTaken: "Asiento ya ocupado",
   syncOwnerChanged: "La cuenta con la sesión iniciada cambió",
   tooManyJoinAttempts: "Demasiados intentos de unirte; espera un minuto e inténtalo de nuevo",
   unauthenticated: "Se requiere autenticación",
