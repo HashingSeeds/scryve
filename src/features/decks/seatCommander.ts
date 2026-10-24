@@ -32,6 +32,7 @@ export function seatCommander(
 }
 
 const detailFor = (card: DeckCard) => readCardDetail(cardDetailsKey(card, "mtg"))
+const refreshedThisSession = new Set<string>()
 
 /** why: a game is often played offline, so the commander reads from the device's deck and card caches, and an online read refreshes the card so a printed power stored after the cache was filled still arrives. */
 export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
@@ -43,6 +44,8 @@ export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
 
   useEffect(() => {
     if (!convex || !scryfallId || cached.power !== undefined) return
+    if (refreshedThisSession.has(scryfallId)) return
+    refreshedThisSession.add(scryfallId)
     let active = true
     convex
       .action(api.cards.byId, {
@@ -50,13 +53,10 @@ export function useSeatCommander(deck: SeatDeck | undefined): SeatCommander {
         deviceId: new LocalGameRepository().getDeviceId(),
       })
       .then((reference) => {
-        if (reference.power)
-          saveCardDetails({
-            [scryfallId]: { ...readCardDetail(scryfallId), power: reference.power },
-          })
+        saveCardDetails({ [scryfallId]: { ...readCardDetail(scryfallId), ...reference } })
         if (active) setFetched({ scryfallId, power: printedPower(reference.power) })
       })
-      .catch(() => {})
+      .catch(() => refreshedThisSession.delete(scryfallId))
     return () => {
       active = false
     }
