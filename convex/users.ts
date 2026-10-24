@@ -149,7 +149,8 @@ export const syncCurrent = mutation({
         })
     }
     if (existing) {
-      await ctx.db.patch(existing._id, { displayName, avatarUrl, updatedAt: now })
+      if (existing.displayName !== displayName || existing.avatarUrl !== avatarUrl)
+        await ctx.db.patch(existing._id, { displayName, avatarUrl, updatedAt: now })
       await applyStoredRevenueCatState(ctx, existing)
       return existing._id
     }
