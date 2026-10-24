@@ -1,10 +1,11 @@
 import type { ViewStyle } from "react-native"
-import { Modal, Pressable, View } from "react-native"
+import { Modal, Platform, Pressable, View } from "react-native"
 
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { ClerkAuthView } from "./ClerkAuthView"
 
@@ -16,6 +17,8 @@ export function ClerkAuthModal({
   onDismiss: () => void
 }) {
   const { themed } = useAppTheme()
+  // why: Android shows this modal full screen and edge-to-edge, under the status bar; iOS presents a page sheet below it.
+  const androidTopInset = useSafeAreaInsetsStyle(["top"])
 
   const closeLabel = translate("account:cloud.closeSignIn")
   return (
@@ -26,7 +29,7 @@ export function ClerkAuthModal({
       presentationStyle="pageSheet"
       onRequestClose={onDismiss}
     >
-      <View style={themed($modal)}>
+      <View style={[themed($modal), Platform.OS === "android" && androidTopInset]}>
         <View style={themed($header)}>
           <Pressable
             accessibilityRole="button"
