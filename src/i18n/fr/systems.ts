@@ -54,6 +54,7 @@ export default {
   formatBlurb: {
     mtg: {
       commander: "100 cartes, singleton",
+      pauperCommander: "Communes, commandant peu commun",
       standard: "Éditions récentes",
       pioneer: "Depuis Retour sur Ravnica",
       modern: "Depuis la 8e édition",

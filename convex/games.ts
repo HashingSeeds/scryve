@@ -32,8 +32,8 @@ import {
   confirmCommanderClaim,
   controlsSeat,
   isCommanderDamageDelta,
+  commanderLethalDamage,
   isCommanderFormat,
-  isCommanderLethal,
   isLifeDelta,
   isSameCommanderClaim,
   isSameCommanderResolution,
@@ -53,7 +53,7 @@ import {
   deckLabelValidator,
   type DeckLabel,
 } from "./lib/opponentDecks"
-import { outReason, type OutState } from "./lib/outReason"
+import { commanderOutState, outReason, type CommanderTotal, type OutState } from "./lib/outReason"
 import {
   boundedPaginationOptions,
   CONNECTED_EVENT_PAGE_MAX_ITEMS,
@@ -157,11 +157,15 @@ function assertCommanderDelta(delta: number) {
     throw new Error("Commander damage delta must be a non-zero whole number from -99 to 99")
 }
 
-function isCommanderGame(game: Doc<"games">) {
-  return isCommanderFormat(
+function gameCommanderLethal(game: Doc<"games">) {
+  return commanderLethalDamage(
     game.system ?? game.game ?? DEFAULT_DECK_GAME,
     game.format ?? game.ruleset,
   )
+}
+
+function isCommanderGame(game: Doc<"games">) {
+  return gameCommanderLethal(game) !== undefined
 }
 
 function assertCommanderGame(game: Doc<"games">) {
@@ -444,7 +448,8 @@ async function commanderDamageProjection(
   user: Doc<"users">,
   players: Doc<"gamePlayers">[],
 ) {
-  if (!isCommanderGame(game)) return null
+  const lethal = gameCommanderLethal(game)
+  if (lethal === undefined) return null
   const totals = await ctx.db
     .query("gameCommanderDamage")
     .withIndex("by_game", (q) => q.eq("gameId", game._id))
@@ -460,7 +465,7 @@ async function commanderDamageProjection(
   )
   const eliminatedPlayerIds = new Set<Id<"gamePlayers">>()
   for (const total of totals) {
-    if (isCommanderLethal(total.total)) eliminatedPlayerIds.add(total.toPlayerId)
+    if (total.total >= lethal) eliminatedPlayerIds.add(total.toPlayerId)
   }
   return {
     totals: totals.map((total) => ({
@@ -1817,7 +1822,7 @@ export const lobbyProjection = query({
     const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
     const decidedOutcome =
       isHost && game.status === "active" && game.variant === "treachery"
-        ? decidedTreacheryOutcome(game, players, commanderDamage?.totals)
+        ? decidedTreacheryOutcome(game, players, commanderDamage?.totals ?? [])
         : undefined
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
@@ -1914,14 +1919,15 @@ function roleForViewer(
 function decidedTreacheryOutcome(
   game: Doc<"games">,
   players: Doc<"gamePlayers">[],
-  commanderDamage: OutState<Id<"gamePlayers">>["commanderDamage"],
+  commanderTotals: readonly CommanderTotal<Id<"gamePlayers">>[],
 ) {
+  const lethal = gameCommanderLethal(game)
   const outState: OutState<Id<"gamePlayers">> = {
     counter: systemDefinition(game.system ?? game.game)?.counter,
     tableRules: gameTableRules(game),
     table: tableProjection(game, players),
     lives: players.map((player) => ({ playerId: player._id, life: player.currentLife })),
-    commanderDamage,
+    commanderDamage: commanderOutState(lethal, commanderTotals),
   }
   return treacheryOutcome(
     players.flatMap((player) =>

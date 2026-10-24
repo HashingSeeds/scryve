@@ -182,6 +182,7 @@ describe("LifeCard", () => {
           rows: commanderSeats.rows,
           columns: commanderSeats.columns,
           incoming: {},
+          lethal: 21,
           inspection: { open: false, onToggle: jest.fn() },
         },
       }
@@ -260,6 +261,7 @@ describe("LifeCard", () => {
           players,
           ...commanderSeats,
           incoming: { [commanderIds[1]]: 3 },
+          lethal: 21,
           inspection: { open: false, onToggle: jest.fn() },
         },
       }
@@ -331,6 +333,7 @@ describe("LifeCard", () => {
             players,
             ...seats,
             incoming: { [players[0].id]: 2 },
+            lethal: 21,
             inspection: { open: true, onToggle: jest.fn() },
           }}
         />
@@ -378,6 +381,7 @@ describe("LifeCard", () => {
               color: "#41476E",
             })),
             incoming: { [commanderIds[1]]: 3 },
+            lethal: 21,
             inspection: { open, onToggle: jest.fn() },
           }}
         />
@@ -422,6 +426,7 @@ describe("LifeCard", () => {
               rows: commanderSeats.rows,
               columns: commanderSeats.columns,
               incoming: {},
+              lethal: 21,
               inspection: { open: false, onToggle: jest.fn() },
               armedPlayerId: commanderIds[1],
               attackerName: "Bo",
@@ -616,6 +621,7 @@ describe("LifeCard", () => {
             columns: commanderSeats.columns,
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
+            lethal: 21,
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword,
           }}
@@ -690,6 +696,7 @@ describe("LifeCard", () => {
             columns: commanderSeats.columns,
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
+            lethal: 21,
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword: jest.fn(),
           }}
@@ -723,6 +730,7 @@ describe("LifeCard", () => {
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
             incoming: {},
+            lethal: 21,
           }}
           onChange={jest.fn()}
         />
@@ -747,6 +755,7 @@ describe("LifeCard", () => {
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
             incoming: {},
+            lethal: 21,
           }}
           onChange={jest.fn()}
         />
@@ -780,6 +789,7 @@ describe("LifeCard", () => {
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
             incoming: { [commanderIds[0]]: 7 },
+            lethal: 21,
             armedPlayerId: commanderIds[0],
             attackerName: "Ada",
             stagedAgainstOwner: 4,
@@ -816,6 +826,7 @@ describe("LifeCard", () => {
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
             incoming: {},
+            lethal: 21,
             armedPlayerId: commanderIds[0],
             onPressSword,
           }}
@@ -850,6 +861,7 @@ describe("LifeCard", () => {
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
             incoming: {},
+            lethal: 21,
             pendingClaims: claims,
           }}
           onChange={onChange}

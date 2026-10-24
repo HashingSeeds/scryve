@@ -10,6 +10,7 @@ import {
 } from "./playerLayouts"
 import {
   isPlaySystemId,
+  playCommanderLethal,
   playSystemFormat,
   playSystemRules,
   playTableRules,
@@ -43,14 +44,18 @@ import {
   shapeForSeat,
 } from "../../../convex/lib/appearance"
 import {
-  COMMANDER_LETHAL_DAMAGE,
   isCommanderDamageDelta,
   isLifeDelta,
   MAX_COMMANDER_DAMAGE,
   MAX_LIFE_DELTA,
 } from "../../../convex/lib/gameRules"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
-import { lastStanding, outReason, type OutState } from "../../../convex/lib/outReason"
+import {
+  commanderOutState,
+  lastStanding,
+  outReason,
+  type OutState,
+} from "../../../convex/lib/outReason"
 import { flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
 import {
   applyTableAction,
@@ -59,13 +64,7 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 
-export {
-  COMMANDER_LETHAL_DAMAGE,
-  isCommanderDamageDelta,
-  isLifeDelta,
-  MAX_COMMANDER_DAMAGE,
-  MAX_LIFE_DELTA,
-}
+export { isCommanderDamageDelta, isLifeDelta, MAX_COMMANDER_DAMAGE, MAX_LIFE_DELTA }
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const MIN_PLAYERS = 2
@@ -377,12 +376,15 @@ export function localOutState(game: LocalGame): OutState<PlayerId> {
     tableRules: localTableRules(game),
     table: game.table,
     lives: game.players.map(({ id, life }) => ({ playerId: id, life })),
-    commanderDamage: game.players.flatMap((from) =>
-      game.players.map((to) => ({
-        fromPlayerId: from.id,
-        toPlayerId: to.id,
-        total: commanderDamageBetween(game, from.id, to.id),
-      })),
+    commanderDamage: commanderOutState(
+      playCommanderLethal(game.system, game.format),
+      game.players.flatMap((from) =>
+        game.players.map((to) => ({
+          fromPlayerId: from.id,
+          toPlayerId: to.id,
+          total: commanderDamageBetween(game, from.id, to.id),
+        })),
+      ),
     ),
   }
 }

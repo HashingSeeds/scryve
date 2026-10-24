@@ -175,7 +175,10 @@ describe("PlayerGrid", () => {
       counter: playSystemRules("mtg").counter,
       tableRules: playTableRules("mtg", "commander"),
       lives: seats.map(({ id, life }) => ({ playerId: id, life })),
-      commanderDamage: [{ fromPlayerId: seats[1].id, toPlayerId: seats[0].id, total: 21 }],
+      commanderDamage: {
+        lethal: 21,
+        totals: [{ fromPlayerId: seats[1].id, toPlayerId: seats[0].id, total: 21 }],
+      },
     }
     const view = render(
       <ThemeProvider>
@@ -218,6 +221,7 @@ describe("PlayerGrid", () => {
           players={gamePlayers}
           commanderDamage={{
             incomingFor: () => ({}),
+            lethal: 21,
             armedPlayerId: null,
             onPressSword,
             onStage: jest.fn(),
@@ -246,6 +250,7 @@ describe("PlayerGrid", () => {
       const gamePlayers = players(5)
       const commanderDamage = {
         incomingFor: () => ({}),
+        lethal: 21,
         armedPlayerId: null,
         onPressSword: jest.fn(),
         onStage: jest.fn(),
@@ -585,6 +590,7 @@ describe("PlayerGrid", () => {
           seatOrder={swapSeats(undefined, 4, 0, 3)}
           commanderDamage={{
             incomingFor: () => ({}),
+            lethal: 21,
             armedPlayerId: null,
             onPressSword: jest.fn(),
             onStage: jest.fn(),

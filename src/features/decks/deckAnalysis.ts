@@ -2,6 +2,7 @@ import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 
 import { readCardFaces } from "./cardFaces"
 import { cardSection, type DeckCard } from "./deckCards"
+import { isCommanderFormat } from "../../../convex/lib/gameRules"
 import { formatDefinition } from "../../../convex/lib/systems"
 
 export const MANA_COLORS = ["W", "U", "B", "R", "G"] as const
@@ -160,7 +161,7 @@ export function chanceOfLands(
 
 function formatDeckSize(format: string) {
   if (!formatDefinition("mtg", format)) return undefined
-  if (format === "commander") return 100
+  if (isCommanderFormat("mtg", format)) return 100
   if (format === "limited") return 40
   return 60
 }
@@ -192,7 +193,7 @@ export function analyzeDeck({
   format: string
   details: (card: DeckCard) => AnalysisDetails | undefined
 }): DeckAnalysis {
-  const commander = format === "commander"
+  const commander = isCommanderFormat("mtg", format)
   const played = cards.flatMap((card) => {
     const section = cardSection(card)
     if (section !== "main" && section !== "commander") return []

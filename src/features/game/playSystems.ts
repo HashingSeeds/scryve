@@ -108,8 +108,12 @@ export function defaultStartingLife(system?: unknown, format?: string, playerCou
   )
 }
 
+export function playCommanderLethal(value: unknown, format?: string) {
+  return playFormatDefinition(playSystemId(value), format)?.commanderDamage?.lethal
+}
+
 export function supportsCommanderDamage(value: unknown, format?: string): boolean {
-  return playFormatDefinition(playSystemId(value), format)?.hasCommanderDamage ?? false
+  return playCommanderLethal(value, format) !== undefined
 }
 
 export function playTableRules(value: unknown, format?: string): TableRules {

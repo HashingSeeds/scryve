@@ -30,14 +30,14 @@ describe("outReason", () => {
     const state = commander({
       lives: [{ playerId: "a", life: 0 }],
       table: { players: { a: { counters: { poison: 10 } } }, designations: {} },
-      commanderDamage: [{ fromPlayerId: "b", toPlayerId: "a", total: 21 }],
+      commanderDamage: { lethal: 21, totals: [{ fromPlayerId: "b", toPlayerId: "a", total: 21 }] },
     })
     expect(outReason(state, "a")).toEqual({
       cause: "commanderDamage",
       fromPlayerId: "b",
       total: 21,
     })
-    expect(outReason({ ...state, commanderDamage: [] }, "a")).toEqual({
+    expect(outReason({ ...state, commanderDamage: undefined }, "a")).toEqual({
       cause: "counter",
       counterId: "poison",
       value: 10,
