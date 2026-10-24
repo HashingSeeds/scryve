@@ -26,7 +26,8 @@ export function useNearbyImport() {
       .then(({ manualCodeCandidates }) =>
         importNearby(nearbyImport(finished, manualCodeCandidates)),
       )
-      .then(() => current && nearbyEventHost.markImported(userId))
+      // why: during an account switch Convex can still hold the previous account's token, so the marker records the account the server actually saved for.
+      .then(({ ownerId }) => current && nearbyEventHost.markImported(ownerId, finished))
       .catch((cause: unknown) => {
         const wait = convexRetryAfterMs(cause)
         if (current && wait) retry = setTimeout(() => setAttempt((count) => count + 1), wait)

@@ -286,6 +286,7 @@ describe("events", () => {
       const first = await organizer.mutation(api.events.importNearby, nearby)
       const again = await organizer.mutation(api.events.importNearby, nearby)
       expect(again.eventId).toBe(first.eventId)
+      expect(again.ownerId).toBe("organizer")
 
       const view = await t.query(api.events.view, { eventId: first.eventId })
       expect(view).toMatchObject({ status: "finished", round: 1, name: "Wifi Night" })

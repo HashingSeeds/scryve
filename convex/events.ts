@@ -498,7 +498,7 @@ export const importNearby = mutation({
         q.eq("ownerUserId", user._id).eq("nearbyId", args.nearbyId),
       )
       .first()
-    if (existing) return { eventId: existing._id }
+    if (existing) return { eventId: existing._id, ownerId: user.clerkUserId }
     await limitGameRate(ctx, "eventCreate", user._id)
     const name = assertName(args.name, assertEventName)
     if (!name) throw new Error("Name the event")
@@ -572,7 +572,7 @@ export const importNearby = mutation({
         reportedBy: table.reportedBy === undefined ? undefined : playerIds.get(table.reportedBy),
         updatedAt: now,
       })
-    return { eventId }
+    return { eventId, ownerId: user.clerkUserId }
   },
 })
 

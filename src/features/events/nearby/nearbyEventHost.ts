@@ -81,8 +81,8 @@ class NearbyEventHost {
     this.broadcast()
   }
 
-  markImported(accountId: string) {
-    if (this.state.event) this.commit(this.state.event, this.state.hostPlayerId, accountId)
+  markImported(accountId: string, imported: HubEvent) {
+    if (this.state.event === imported) this.commit(imported, this.state.hostPlayerId, accountId)
   }
 
   async create(event: HubEvent, organizerPlays: { name: string } | null) {
