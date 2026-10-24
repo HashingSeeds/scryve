@@ -6,6 +6,7 @@ import {
   useConnectedProfile,
 } from "@/features/connected/useConnectedProfile"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
+import { isNetworkFailure } from "@/utils/networkFailure"
 
 import { useRevenueCat } from "./RevenueCatContext"
 import { api } from "../../../convex/_generated/api"
@@ -50,7 +51,7 @@ function SyncEntitlements() {
         await syncCurrent({})
       } catch (cause) {
         if (cancelled) return
-        if (attempt === 0) {
+        if (attempt === 0 && !isNetworkFailure(cause)) {
           reportCrash(
             cause instanceof Error ? cause : new Error("Scryve Pro sync failed"),
             ErrorType.HANDLED,

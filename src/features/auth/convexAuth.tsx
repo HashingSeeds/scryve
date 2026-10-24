@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useConvexAuth, useConvexConnectionState } from "convex/react"
 
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
+import { isNetworkFailure } from "@/utils/networkFailure"
 
 type ClerkAuth = {
   isLoaded: boolean
@@ -10,17 +11,6 @@ type ClerkAuth = {
   orgId: string | undefined | null
   orgRole: string | undefined | null
   sessionId: string | undefined | null
-}
-
-/** why: losing signal is routine; reporting it floods Sentry and stops release promotion. */
-function isNetworkFailure(error: unknown) {
-  if (!(error instanceof Error)) return false
-  const code = "code" in error ? error.code : undefined
-  return (
-    code === "clerk_offline" ||
-    code === "network_error" ||
-    /network (error|request failed)|failed to fetch/i.test(error.message)
-  )
 }
 
 export function createConvexAuthHook(
