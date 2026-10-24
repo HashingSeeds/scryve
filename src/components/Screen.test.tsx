@@ -1,10 +1,16 @@
-import { ScrollView, StyleSheet } from "react-native"
+import { ScrollView, StyleSheet, View } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
+import { BottomActionBar } from "./BottomActionBar"
 import { Screen } from "./Screen"
 import { Text } from "./Text"
+
+jest.mock("react-native-safe-area-context", () => ({
+  ...jest.requireActual("react-native-safe-area-context"),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
+}))
 
 describe("Screen", () => {
   it("provides one shared readable content inset for form and list screens", () => {
@@ -80,5 +86,28 @@ describe("Screen", () => {
     )
 
     expect(view.getByText("Game")).toBeTruthy()
+  })
+
+  it("lets a bottom action bar take the home indicator inset instead of stacking on it", () => {
+    const screen = (bar: boolean) => (
+      <ThemeProvider initialContext="dark">
+        <Screen preset="fixed" safeAreaEdges={["bottom"]}>
+          {bar ? (
+            <BottomActionBar>
+              <Text text="Start" />
+            </BottomActionBar>
+          ) : null}
+        </Screen>
+      </ThemeProvider>
+    )
+    const view = render(screen(false))
+    const screenPadding = () => StyleSheet.flatten(view.UNSAFE_getAllByType(View)[0].props.style)
+    expect(screenPadding()).toMatchObject({ paddingBottom: 34 })
+
+    view.rerender(screen(true))
+
+    expect(screenPadding().paddingBottom).toBeUndefined()
+    const bar = view.UNSAFE_getByType(BottomActionBar).findByType(View)
+    expect(StyleSheet.flatten(bar.props.style)).toMatchObject({ paddingBottom: 34 })
   })
 })

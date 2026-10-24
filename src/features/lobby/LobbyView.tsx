@@ -3,7 +3,7 @@ import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Platform, ScrollView, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
-import { BottomActionBar } from "@/components/BottomActionBar"
+import { BOTTOM_LINK_HEIGHT, BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -315,7 +315,7 @@ export function LobbyView({
           {decks ? decks.source(seatList) : seatList()}
         </View>
       </ScrollView>
-      <BottomActionBar style={themed($surface)}>
+      <BottomActionBar endsWithLink style={themed($surface)}>
         {error && !openExitCopy ? <AlertNote testID="connected-action-error" text={error} /> : null}
         {lobby.isHost && !online ? (
           <AlertNote testID="connected-start-offline" text={offlineNotice} />
@@ -604,7 +604,7 @@ const $progressFill: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
 const $secondaryAction: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  minHeight: 44,
+  minHeight: BOTTOM_LINK_HEIGHT,
   borderWidth: 0,
   backgroundColor: colors.transparent,
 })

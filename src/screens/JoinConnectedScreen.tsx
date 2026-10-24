@@ -3,7 +3,6 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -62,9 +61,8 @@ export function JoinConnectedScreen({
 }) {
   const {
     themed,
-    theme: { colors, spacing },
+    theme: { colors },
   } = useAppTheme()
-  const { bottom } = useSafeAreaInsets()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const { user } = useUser()
   const isWebSocketConnected = useConvexOnline()
@@ -212,7 +210,7 @@ export function JoinConnectedScreen({
   return (
     <Screen
       preset="fixed"
-      safeAreaEdges={embedded ? [] : ["bottom"]}
+      safeAreaEdges={["bottom"]}
       backgroundColor={embedded ? colors.surface : undefined}
       contentContainerStyle={themed($screen)}
     >
@@ -299,13 +297,7 @@ export function JoinConnectedScreen({
         {error ? <AlertNote testID="join-error" text={error} /> : null}
         {!isWebSocketConnected ? <AlertNote text={joinOfflineNotice} /> : null}
       </ScrollView>
-      <BottomActionBar
-        style={
-          embedded
-            ? [themed($embeddedFooter), { paddingBottom: Math.max(bottom, spacing.sm) }]
-            : undefined
-        }
-      >
+      <BottomActionBar style={embedded ? themed($embeddedFooter) : undefined}>
         <View style={embedded ? themed($embeddedActions) : undefined}>
           <Button
             testID="claim-seat-button"
@@ -359,7 +351,6 @@ const $embeddedFooter: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.surface,
   paddingHorizontal: spacing.lg,
   paddingTop: spacing.sm,
-  paddingBottom: spacing.sm,
 })
 const $footerSpace: ViewStyle = { height: 44 }
 

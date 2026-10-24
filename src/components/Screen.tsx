@@ -15,6 +15,7 @@ import {
   type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller"
 
+import { BottomInsetClaimContext } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { Header, type HeaderProps } from "@/components/Header"
 import { useAppTheme } from "@/theme/context"
@@ -200,7 +201,14 @@ export function Screen(props: ScreenProps) {
     ? withTitleScrollHandler(props as ScrollScreenProps, onTitleScroll)
     : props
 
-  const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
+  const [bottomInsetClaims, setBottomInsetClaims] = useState(0)
+  const claimBottomInset = useCallback(() => {
+    setBottomInsetClaims((claims) => claims + 1)
+    return () => setBottomInsetClaims((claims) => claims - 1)
+  }, [])
+  const $containerInsets = useSafeAreaInsetsStyle(
+    bottomInsetClaims > 0 ? safeAreaEdges?.filter((edge) => edge !== "bottom") : safeAreaEdges,
+  )
 
   const iosBarsAreViewControllerDriven = isIos
   const barsStyle = iosBarsAreViewControllerDriven
@@ -232,11 +240,13 @@ export function Screen(props: ScreenProps) {
         {...KeyboardAvoidingViewProps}
         style={[$styles.flex1, KeyboardAvoidingViewProps?.style]}
       >
-        {isNonScrolling(screenProps.preset) ? (
-          <ScreenWithoutScrolling {...screenProps} />
-        ) : (
-          <ScreenWithScrolling {...screenProps} />
-        )}
+        <BottomInsetClaimContext.Provider value={claimBottomInset}>
+          {isNonScrolling(screenProps.preset) ? (
+            <ScreenWithoutScrolling {...screenProps} />
+          ) : (
+            <ScreenWithScrolling {...screenProps} />
+          )}
+        </BottomInsetClaimContext.Provider>
       </KeyboardAvoidingView>
     </View>
   )
