@@ -627,6 +627,108 @@ describe("connected MMKV repository", () => {
   })
 })
 
+describe("queued life change coalescing", () => {
+  it("adds a tap to a never-sent life change only in the same direction", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    repository.enqueue(action("operation-life-0001"), [])
+
+    expect(
+      repository.addToUnsentLifeChange("game-public", "operation-life-0001", 3)?.event,
+    ).toEqual(expect.objectContaining({ operationId: "operation-life-0001", delta: 8 }))
+    expect(repository.addToUnsentLifeChange("game-public", "operation-life-0001", -1)).toBeNull()
+    expect(
+      new ConnectedGameRepository(storage, "user-1")
+        .loadOutbox("game-public")
+        .map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
+    ).toEqual([8])
+  })
+
+  it("leaves a life change alone once any drain has attempted it", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    repository.enqueue(action("operation-life-0001"), [])
+    repository.updateAttempt("game-public", "operation-life-0001", 2)
+
+    expect(repository.addToUnsentLifeChange("game-public", "operation-life-0001", 3)).toBeNull()
+    expect(repository.loadOutbox("game-public")[0].event).toEqual(
+      expect.objectContaining({ delta: 5 }),
+    )
+  })
+
+  it("reads and sends pending and failed life changes as v0.1.1 stored them", async () => {
+    const storage = new MemoryStorage()
+    const pendingId = "operation_0f4c2b7e9a1d4c6b8e2f3a5d7c9b1e0f"
+    const failedId = "operation_7d1e3c5a9b2f4e6d8c0a1b3e5f7d9c2a"
+    const event = (operationId: string, delta: number, at: number) => ({
+      type: "life.changed",
+      operationId,
+      gameId: "game-public",
+      playerId: "player-1",
+      delta,
+      actorId: "user-1",
+      deviceId: "device-1",
+      clientCreatedAt: at,
+    })
+    storage.set(
+      CONNECTED_KEYS.outboxRecord("game-public", pendingId, "user-1"),
+      JSON.stringify({
+        schemaVersion: 1,
+        event: event(pendingId, -3, 10),
+        queuedAt: 10,
+        attempts: 0,
+      }),
+    )
+    storage.set(CONNECTED_KEYS.outboxIndex("game-public", "user-1"), JSON.stringify([pendingId]))
+    storage.set(
+      CONNECTED_KEYS.failedRecord("game-public", failedId, "user-1"),
+      JSON.stringify({
+        schemaVersion: 1,
+        action: {
+          schemaVersion: 1,
+          event: event(failedId, 2, 5),
+          queuedAt: 5,
+          attempts: 1,
+          lastAttemptAt: 6,
+        },
+        reason: "Game is not active",
+        failedAt: 7,
+      }),
+    )
+    storage.set(CONNECTED_KEYS.failedIndex("game-public", "user-1"), JSON.stringify([failedId]))
+    const repository = new ConnectedGameRepository(storage, "user-1")
+
+    const pending = repository.loadOutbox("game-public")
+    expect(
+      repository.loadFailed("game-public").map(({ action }) => action.event.operationId),
+    ).toEqual([failedId])
+    expect([...storage.values.keys()].filter((key) => key.startsWith("quarantine:"))).toEqual([])
+    const changeLife = jest.fn(async (args: { operationId: string }) => ({
+      operationId: args.operationId,
+    }))
+    const unused = jest.fn()
+    await sendQueuedAction(
+      {
+        changeLife,
+        tableAction: unused,
+        submitCommanderDamage: unused,
+        confirmCommanderDamage: unused,
+        declineCommanderDamage: unused,
+      },
+      "game-public",
+      pending[0],
+    )
+    expect(changeLife).toHaveBeenCalledWith({
+      publicId: "game-public",
+      playerId: "player-1",
+      operationId: pendingId,
+      delta: -3,
+      deviceId: "device-1",
+      clientCreatedAt: 10,
+    })
+  })
+})
+
 function resumeEntry(publicId: string, updatedAt: number, isHost = true): ResumableGame {
   return {
     publicId,

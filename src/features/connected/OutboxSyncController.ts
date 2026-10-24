@@ -128,6 +128,8 @@ export class OutboxSyncController {
   private reconnectPending = true
   private environmentInitialized = false
   private readonly inFlight = new Set<string>()
+  private drainingIds: ReadonlySet<string> = new Set()
+  private lastQueuedLifeChange: { playerId: string; operationId: string } | undefined
   private readonly dismissedFailureIds = new Set<string>()
   private operationStatus: ConnectedOperationStatus | null = null
   private readonly projectionWaiters = new Map<
@@ -255,6 +257,7 @@ export class OutboxSyncController {
         ? flooredLifeDelta(projection.system, life, requested)
         : requested
     if (!isLifeDelta(delta)) return
+    if (this.addToLastQueuedLifeChange(playerId, delta)) return
     const now = this.now()
     const action: PendingLifeAction = {
       schemaVersion: 1,
@@ -278,8 +281,26 @@ export class OutboxSyncController {
       return
     }
     this.pending = result.pending
+    this.lastQueuedLifeChange = { playerId, operationId: action.event.operationId }
     this.changeError = undefined
     this.publish()
+  }
+
+  private addToLastQueuedLifeChange(playerId: string, delta: LifeDelta): boolean {
+    const last = this.lastQueuedLifeChange
+    if (last?.playerId !== playerId || this.drainingIds.has(last.operationId)) return false
+    const merged = this.options.repository.addToUnsentLifeChange(
+      this.options.publicId,
+      last.operationId,
+      delta,
+    )
+    if (!merged) return false
+    this.pending = this.pending.map((queued) =>
+      queued.event.operationId === last.operationId ? merged : queued,
+    )
+    this.changeError = undefined
+    this.publish()
+    return true
   }
 
   submitCommanderDamage = (
@@ -323,6 +344,7 @@ export class OutboxSyncController {
         continue
       }
       this.pending = result.pending
+      this.lastQueuedLifeChange = undefined
       this.changeError = undefined
       this.publish()
     }
@@ -365,6 +387,7 @@ export class OutboxSyncController {
       return
     }
     this.pending = result.pending
+    this.lastQueuedLifeChange = undefined
     this.changeError = undefined
     this.publish()
   }
@@ -408,6 +431,7 @@ export class OutboxSyncController {
       return false
     }
     this.pending = result.pending
+    this.lastQueuedLifeChange = undefined
     this.changeError = undefined
     this.publish()
     return true
@@ -530,6 +554,7 @@ export class OutboxSyncController {
     const drainingOperationIds = new Set(
       drainStartPending.map((action) => action.event.operationId),
     )
+    this.drainingIds = drainingOperationIds
     const applyDrainSnapshot = (snapshot: DrainOutboxSnapshot) => {
       if (this.stopped) return
       const next = mergeDrainSnapshot(
@@ -571,6 +596,7 @@ export class OutboxSyncController {
       this.publish()
       return result
     } finally {
+      this.drainingIds = new Set()
       this.resolveProjectionWaiter()
     }
   }

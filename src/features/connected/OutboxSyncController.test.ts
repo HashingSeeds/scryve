@@ -396,6 +396,100 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toBe("A commander cannot damage itself")
   })
 
+  it("folds 300 offline taps on one seat into one queued change and sends it once", async () => {
+    const sentDeltas: number[] = []
+    const { controller, repository } = harness({
+      send: async ({ event }) => {
+        if (event.type === "life.changed") sentDeltas.push(event.delta)
+        return { operationId: event.operationId }
+      },
+    })
+    controller.onRemoteProjection(projection(0, 400))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    for (let tap = 0; tap < 300; tap += 1) controller.changeLife("player-1", -1)
+
+    expect(controller.getSnapshot().changeError).toBeUndefined()
+    expect(repository.loadOutbox("game-public")).toHaveLength(1)
+    expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(100)
+    controller.setEnvironment(ONLINE)
+    await settle()
+    expect(sentDeltas).toEqual([-300])
+    expect(controller.getSnapshot().pending).toEqual([])
+  })
+
+  it("starts a new queued change on a direction flip, another seat, or another action between taps", () => {
+    const { clock, controller } = harness()
+    controller.onRemoteProjection(projection(0, 20))
+    const steps = [
+      () => controller.changeLife("player-1", 1),
+      () => controller.changeLife("player-1", 1),
+      () => controller.changeLife("player-1", -1),
+      () => controller.changeLife("player-2", 1),
+      () => controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-2", delta: 2 }]),
+      () => controller.changeLife("player-2", 1),
+    ]
+
+    for (const step of steps) {
+      clock.time += 1
+      step()
+    }
+
+    expect(
+      controller
+        .getSnapshot()
+        .pending.map(({ event }) =>
+          event.type === "life.changed" ? `${event.playerId} ${event.delta}` : event.type,
+        ),
+    ).toEqual([
+      "player-1 2",
+      "player-1 -1",
+      "player-2 1",
+      "commanderDamage.submitted",
+      "player-2 1",
+    ])
+  })
+
+  it("never adds a tap to a change a drain has already picked up", async () => {
+    const sentDeltas: number[] = []
+    const { controller } = harness({
+      send: ({ event }) => {
+        if (event.type === "life.changed") sentDeltas.push(event.delta)
+        return new Promise(() => {})
+      },
+    })
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment(ONLINE)
+
+    controller.changeLife("player-1", 1)
+    await settle()
+    controller.changeLife("player-1", 1)
+    controller.changeLife("player-1", 1)
+
+    expect(sentDeltas).toEqual([1])
+    expect(
+      controller
+        .getSnapshot()
+        .pending.map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
+    ).toEqual([1, 2])
+  })
+
+  it("never adds a tap to a change queued before this session", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    repository.enqueue(action("operation-earlier-0001", 5, 1), [])
+    const { controller } = harness({ storage, repository })
+    controller.onRemoteProjection(projection(0, 20))
+
+    controller.changeLife("player-1", 5)
+
+    expect(
+      repository
+        .loadOutbox("game-public")
+        .map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
+    ).toEqual([5, 5])
+  })
+
   it("queues one resolution when the defender taps Confirm twice", () => {
     const { clock, controller } = harness()
     const claim = {

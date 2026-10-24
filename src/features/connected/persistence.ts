@@ -549,6 +549,20 @@ export class ConnectedGameRepository {
     return this.outbox.enqueue(action, action.event.gameId, currentPending)
   }
 
+  addToUnsentLifeChange(
+    gameId: string,
+    operationId: string,
+    delta: number,
+  ): PendingLifeAction | null {
+    return this.outbox.rewriteUnattempted(gameId, operationId, (action) => {
+      const { event } = action
+      if (event.type !== "life.changed" || event.compensatesOperationId) return null
+      const sum = event.delta + delta
+      if (Math.sign(event.delta) !== Math.sign(delta) || !isLifeDelta(sum)) return null
+      return { ...action, event: { ...event, delta: sum } }
+    })
+  }
+
   loadOutbox(gameId: string): PendingLifeAction[] {
     this.migrateLegacyOutbox(gameId)
     return this.outbox.loadPending(gameId)
