@@ -143,6 +143,80 @@ Sideboard
     ])
   })
 
+  it("reads MTG Arena exports with About and Companion sections", () => {
+    const result = parsePastedDeckList(`About
+Name Mono Red Lurrus
+
+Companion
+1 Lurrus of the Dream-Den (IKO) 226
+
+Deck
+4 Lightning Bolt (STA) 42
+20 Mountain (ZNR) 381
+
+Sideboard
+1 Lurrus of the Dream-Den (IKO) 226
+2 Pyroblast (EMA) 142
+`)
+    expect(result.invalidLines).toEqual([])
+    expect(result.entries).toMatchObject([
+      { name: "Lightning Bolt", quantity: 4, board: "main" },
+      { name: "Mountain", quantity: 20, board: "main" },
+      { name: "Lurrus of the Dream-Den", quantity: 1, board: "sideboard" },
+      { name: "Pyroblast", quantity: 2, board: "sideboard" },
+    ])
+    expect(
+      parsePastedDeckList("Companion\n1 Lurrus of the Dream-Den\n\nDeck\n4 Lightning Bolt"),
+    ).toEqual({
+      entries: [
+        { name: "Lightning Bolt", quantity: 4, board: "main" },
+        { name: "Lurrus of the Dream-Den", quantity: 1, board: "sideboard" },
+      ],
+      invalidLines: [],
+    })
+  })
+
+  it("reads the block after the only blank line as the sideboard", () => {
+    const mtgo = parsePastedDeckList(
+      "4 Lightning Bolt\r\n20 Mountain\r\n\r\n3 Pyroblast\r\n2 Smash to Smithereens\r\n",
+    )
+    expect(mtgo.entries.map(({ name, board }) => [name, board])).toEqual([
+      ["Lightning Bolt", "main"],
+      ["Mountain", "main"],
+      ["Pyroblast", "sideboard"],
+      ["Smash to Smithereens", "sideboard"],
+    ])
+    const goldfish = parsePastedDeckList(
+      "4 Lightning Bolt (STA) 42\n20 Mountain (ZNR) 381\n\n\n4 Lightning Bolt (STA) 42\n\n",
+    )
+    expect(goldfish).toMatchObject({
+      entries: [
+        { name: "Lightning Bolt", quantity: 4, board: "main", setCode: "sta" },
+        { name: "Mountain", quantity: 20, board: "main" },
+        { name: "Lightning Bolt", quantity: 4, board: "sideboard", setCode: "sta" },
+      ],
+      invalidLines: [],
+    })
+  })
+
+  it("reads a trailing block that completes 100 cards as the commander", () => {
+    expect(
+      parsePastedDeckList("1 Sol Ring\n98 Island\n\n1 Atraxa, Praetors' Voice").entries,
+    ).toEqual([
+      { name: "Sol Ring", quantity: 1, board: "main" },
+      { name: "Island", quantity: 98, board: "main" },
+      { name: "Atraxa, Praetors' Voice", quantity: 1, board: "commander" },
+    ])
+  })
+
+  it("keeps blank-line groups in the main deck unless the list is two plain blocks", () => {
+    const boards = (list: string) => parsePastedDeckList(list).entries.map((entry) => entry.board)
+    expect(boards("1 Sol Ring\n\n1 Island\n\n1 Forest")).toEqual(["main", "main", "main"])
+    expect(boards("Creatures\n1 Llanowar Elves\n\nLands\n1 Forest")).toEqual(["main", "main"])
+    expect(boards("# Creatures\n4 Llanowar Elves\n\n# Lands\n20 Forest")).toEqual(["main", "main"])
+    expect(boards("1 Sol Ring\nSB: 1 Island\n\n1 Forest")).toEqual(["main", "sideboard", "main"])
+  })
+
   it("ignores maybeboard and token sections", () => {
     expect(parsePastedDeckList("1 Forest\nMaybeboard\n1 Island\nTokens\n1 Treasure Token")).toEqual(
       {
