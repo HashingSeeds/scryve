@@ -304,6 +304,7 @@ export function createClerkMock() {
 
 export function createConvexReactMock() {
   return {
+    useConvex: () => undefined,
     useConvexAuth: () => ({
       isAuthenticated: connectedHarness.convexAuthenticated,
       isLoading: connectedHarness.convexLoading,
