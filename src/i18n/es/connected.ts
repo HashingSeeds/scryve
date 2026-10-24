@@ -82,6 +82,8 @@ export default {
       "La cola sin conexión de cambios pendientes está llena. Vuelve a conectarte y sincroniza antes de hacer más cambios.",
     commanderDamageRange: "Los cambios de daño de comandante deben estar entre 1 y {{max}}.",
     commanderSelfDamage: "Un comandante no puede dañarse a sí mismo",
+    commanderClaimDeclined:
+      "No se añadieron {{delta}} de daño de comandante a {{name}}. Si aún no ha respondido a tu última solicitud, vuelve a enviarla cuando lo haga.",
     failureCapacity:
       "Los cambios fallidos deben revisarse antes de poder conservar más cambios rechazados. Descarta los fallos revisados y vuelve a intentar sincronizar.",
     finish: {

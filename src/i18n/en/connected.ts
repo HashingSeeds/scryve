@@ -74,6 +74,9 @@ const connected = {
       "The offline queue for pending changes is full. Reconnect and sync before making more changes.",
     commanderDamageRange: "Commander damage changes have to be between 1 and {{max}}.",
     commanderSelfDamage: "A commander cannot damage itself",
+    // Shown to the attacking player after the server turned down their commander damage claim. {{name}} is the defending player; {{delta}} is the damage that was not added. The usual cause is that the defender has not answered an earlier claim from this attacker yet.
+    commanderClaimDeclined:
+      "{{delta}} commander damage to {{name}} wasn't added. If they haven't answered your last claim yet, send it again after they do.",
     failureCapacity:
       "Failed changes need review before more rejected changes can be retained. Dismiss reviewed failures, then retry syncing.",
     finish: {

@@ -67,6 +67,8 @@ export default {
       "대기 중인 변경 사항의 오프라인 대기열이 가득 찼습니다. 다시 연결해 동기화한 후에 더 변경하세요.",
     commanderDamageRange: "커맨더 피해 변경은 1에서 {{max}} 사이여야 합니다.",
     commanderSelfDamage: "커맨더는 자신에게 피해를 줄 수 없습니다",
+    commanderClaimDeclined:
+      "{{name}}에게 준 커맨더 피해 {{delta}}점이 반영되지 않았습니다. 마지막 요청에 아직 응답하지 않았다면, 응답한 후에 다시 보내세요.",
     failureCapacity:
       "거부된 변경 사항을 더 보관하려면 실패한 변경 사항을 먼저 검토해야 합니다. 검토한 실패 항목을 지운 다음 동기화를 다시 시도하세요.",
     finish: {

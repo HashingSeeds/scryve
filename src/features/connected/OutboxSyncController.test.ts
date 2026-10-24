@@ -121,7 +121,7 @@ function harness(
   options: {
     repository?: ConnectedGameRepository
     storage?: MemoryStorage
-    send?: (queued: PendingLifeAction) => Promise<{ operationId: string }>
+    send?: (queued: PendingLifeAction) => Promise<{ operationId: string; status?: string }>
     awaitProjectionBarrier?: boolean
     projectionBarrierTimeoutMs?: number
     finishGame?: () => Promise<unknown>
@@ -488,6 +488,58 @@ describe("outbox sync controller", () => {
         .loadOutbox("game-public")
         .map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
     ).toEqual([5, 5])
+  })
+
+  it("tells the attacker when the server declines a claim the defender has not answered yet", async () => {
+    const { controller, repository } = harness({
+      send: async ({ event }) => ({
+        operationId: event.operationId,
+        status: event.type === "commanderDamage.submitted" ? "declined" : "pending",
+      }),
+    })
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment(ONLINE)
+
+    controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-2", delta: 5 }])
+    await settle()
+
+    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(controller.getSnapshot().changeError).toBe(
+      "5 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+    )
+  })
+
+  it("names the declined claim's own amount when coalesced life taps queue around it", async () => {
+    const sentDeltas: number[] = []
+    const { clock, controller } = harness({
+      send: async ({ event }) => {
+        if (event.type === "life.changed") sentDeltas.push(event.delta)
+        return {
+          operationId: event.operationId,
+          status: event.type === "commanderDamage.submitted" ? "declined" : undefined,
+        }
+      },
+    })
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    const steps = [
+      ...Array.from({ length: 3 }, () => () => controller.changeLife("player-1", -1)),
+      () => controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-2", delta: 7 }]),
+      ...Array.from({ length: 2 }, () => () => controller.changeLife("player-1", -1)),
+    ]
+    for (const step of steps) {
+      clock.time += 1
+      step()
+    }
+
+    controller.setEnvironment(ONLINE)
+    await settle()
+
+    expect(sentDeltas).toEqual([-3, -2])
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(controller.getSnapshot().changeError).toBe(
+      "7 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+    )
   })
 
   it("queues one resolution when the defender taps Confirm twice", () => {
