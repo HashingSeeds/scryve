@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import { counterValueLabel } from "@/features/game/playSystems"
 import type { TableKnockout, TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
@@ -36,7 +37,6 @@ import {
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
-import type { SeatDeck } from "./usePokemonDeck"
 import { shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
 import {
   findPokemon,

@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native"
 
+import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
@@ -27,7 +28,7 @@ import {
 import { catalogRows, hitDetail, pokemonPrintingLabel } from "./pokemonCatalogHits"
 import { PokemonKeypad, tallestKeypadHeight } from "./PokemonKeypad"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
-import { usePokemonDeck, type SeatDeck } from "./usePokemonDeck"
+import { usePokemonDeck } from "./usePokemonDeck"
 import {
   pokemonPrizeValue,
   remainingHp,

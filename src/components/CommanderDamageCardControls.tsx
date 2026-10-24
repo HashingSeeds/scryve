@@ -54,6 +54,7 @@ type AssignmentSource = {
   playerName: string
   submit: "done" | "send"
   mark?: CommanderAttacker
+  commanderName?: string
   power: number
   onPowerStep: (step: 1 | -1) => void
   onSubmit: () => void
@@ -324,6 +325,16 @@ function AttackerControls({
           ) : null}
         </BoardPressable>
         <View style={themed($power)}>
+          {mode.commanderName && !compact ? (
+            <Text
+              testID={`commander-name-seat-${seatNumber}`}
+              text={mode.commanderName}
+              weight="bold"
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[themed($commanderName), { color: foreground }]}
+            />
+          ) : null}
           <PowerStep
             testID={`commander-power-up-seat-${seatNumber}`}
             label={translate("board:commander.raisePower")}
@@ -568,6 +579,12 @@ const $step: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   justifyContent: "center",
   borderRadius: spacing.xs,
+})
+
+const $commanderName: ThemedStyle<TextStyle> = () => ({
+  fontSize: 16,
+  lineHeight: 20,
+  maxWidth: 140,
 })
 
 const $disabledStep: ThemedStyle<ViewStyle> = () => ({ opacity: 0.25 })
