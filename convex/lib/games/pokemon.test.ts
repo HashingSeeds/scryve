@@ -207,9 +207,9 @@ describe("TCGdex Pokemon cards", () => {
           .spyOn(globalThis, "fetch")
           .mockResolvedValue(new Response("{}", { status: 503 }))
         try {
-          await expect(
-            pokemonCardByReference(ctx, "Lightning Energy", "MEE 12"),
-          ).rejects.toMatchObject({ response: { status: 503 } })
+          await expect(pokemonCardByReference(ctx, "Lightning Energy", "MEE 12")).rejects.toThrow(
+            "TCGdex set lookup failed",
+          )
         } finally {
           fetchMock.mockRestore()
         }
