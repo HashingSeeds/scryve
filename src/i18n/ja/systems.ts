@@ -54,7 +54,6 @@ export default {
   formatBlurb: {
     mtg: {
       commander: "100枚、シングルトン",
-      pauperCommander: "コモン、アンコモンの統率者",
       standard: "最新のセット",
       pioneer: "ラヴニカへの回帰以降",
       modern: "第8版以降",

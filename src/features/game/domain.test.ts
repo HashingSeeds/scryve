@@ -474,8 +474,6 @@ describe("commander damage", () => {
     ["commander", 20, false],
     ["commander", 21, true],
     ["commander", 22, true],
-    ["pauperCommander", 15, false],
-    ["pauperCommander", 16, true],
   ])("in %s, marks elimination at %i damage: %s", (format, damage, eliminated) => {
     const game = assign(commanderGame(4, 40, format), 0, 1, damage)
     expect(localOutReason(game, game.players[1].id)).toEqual(

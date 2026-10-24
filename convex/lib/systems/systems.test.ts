@@ -58,10 +58,7 @@ describe("system definitions", () => {
         "commanderDamage" in format ? [[format.id, format.commanderDamage.lethal]] : [],
       ),
     )
-    expect(formats).toEqual([
-      ["commander", 21],
-      ["pauperCommander", 16],
-    ])
+    expect(formats).toEqual([["commander", 21]])
   })
 
   it("knocks a survivor out at 0 and ends a race when anyone reaches the goal", () => {

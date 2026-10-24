@@ -44,6 +44,18 @@ describe("outReason", () => {
     })
   })
 
+  it("knocks a seat out at the format's own lethal commander damage", () => {
+    const at = (total: number) =>
+      outReason(
+        commander({
+          commanderDamage: { lethal: 16, totals: [{ fromPlayerId: "b", toPlayerId: "a", total }] },
+        }),
+        "a",
+      )
+    expect(at(15)).toBeUndefined()
+    expect(at(16)).toEqual({ cause: "commanderDamage", fromPlayerId: "b", total: 16 })
+  })
+
   it("knocks out everyone else once a race game's seat reaches the goal", () => {
     const state: OutState = {
       counter: systemDefinition("lorcana")?.counter,

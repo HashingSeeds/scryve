@@ -196,15 +196,6 @@ export const SYSTEMS = {
         singleton: true,
       },
       {
-        id: "pauperCommander",
-        label: "Pauper Commander",
-        blurb: "Commons, uncommon commander",
-        sections: MTG_COMMAND_ZONE_SECTIONS,
-        startingValue: 30,
-        commanderDamage: { lethal: 16 },
-        singleton: true,
-      },
-      {
         id: "standard",
         label: "Standard",
         blurb: "Recent sets",

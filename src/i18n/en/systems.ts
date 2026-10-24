@@ -54,7 +54,6 @@ const systems = {
   formatBlurb: {
     mtg: {
       commander: "100 cards, singleton",
-      pauperCommander: "Commons, uncommon commander",
       standard: "Recent sets",
       pioneer: "Return to Ravnica forward",
       modern: "8th Edition forward",
