@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process"
 import path from "node:path"
 
-it("generates the scene lifecycle required to launch on iOS 27", () => {
+it("lets each screen choose its iOS status bar appearance", () => {
   const result = spawnSync(
     process.execPath,
     [
@@ -22,15 +22,4 @@ it("generates the scene lifecycle required to launch on iOS 27", () => {
   const viewControllerBasedStatusBarAppearance =
     config._internal.modResults.ios.infoPlist.UIViewControllerBasedStatusBarAppearance
   expect(viewControllerBasedStatusBarAppearance).toEqual(true)
-  expect(config._internal.modResults.ios.infoPlist.UIApplicationSceneManifest).toEqual({
-    UIApplicationSupportsMultipleScenes: false,
-    UISceneConfigurations: {
-      UIWindowSceneSessionRoleApplication: [
-        {
-          UISceneConfigurationName: "Default Configuration",
-          UISceneDelegateClassName: "EXExpoAppSceneDelegate",
-        },
-      ],
-    },
-  })
 })

@@ -38,11 +38,12 @@
   },
   "web": {
     "favicon": "./assets/images/app-icon-web-favicon.png",
-    "bundler": "metro"
+    "bundler": "metro",
+    "output": "single"
   },
   "plugins": [
     "@clerk/expo",
-    "expo-router",
+    ["expo-router", { "asyncRoutes": { "web": false } }],
     "./modules/lazy-view-managers/app.plugin.js",
     "expo-secure-store",
     "expo-localization",
@@ -80,8 +81,8 @@
     [
       "expo-build-properties",
       {
-        "ios": {
-          "enableSceneSupport": true
+        "android": {
+          "enableMinifyInReleaseBuilds": false
         }
       }
     ],

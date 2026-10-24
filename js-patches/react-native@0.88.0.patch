@@ -1,5 +1,5 @@
 diff --git a/Libraries/ReactNative/UIManager.js b/Libraries/ReactNative/UIManager.js
-index 3d27295302865b0602f2393db2c74ea099b673a3..3d4d16e483f87020978efa675a8a62be7a0c1087 100644
+index a97c6a7b3ea7512c4a29c0dd63a2d4d4a2bc11e5..57fec672cda5aa20fb48cc7585fc7e9b8cbb9a77 100644
 --- a/Libraries/ReactNative/UIManager.js
 +++ b/Libraries/ReactNative/UIManager.js
 @@ -23,9 +23,7 @@ const UIManagerImpl: UIManagerJSInterface =
@@ -10,10 +10,10 @@ index 3d27295302865b0602f2393db2c74ea099b673a3..3d4d16e483f87020978efa675a8a62be
 -const UIManager: UIManagerJSInterface = {
 -  ...UIManagerImpl,
 +const UIManagerOverrides = {
-   measure(
-     reactTag: number,
-     callback: (
-@@ -190,4 +188,15 @@ const UIManager: UIManagerJSInterface = {
+   /**
+    * Determines the location on screen, width, and height of the given view and
+    * returns the values via an async callback. If successful, the callback will
+@@ -243,4 +241,15 @@ const UIManager: UIManagerJSInterface = {
    },
  };
  

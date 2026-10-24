@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import { router, useNavigation } from "expo-router"
-import { usePreventRemove } from "expo-router/react-navigation"
+import { router, usePreventRemove } from "expo-router"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
@@ -62,7 +61,6 @@ export function GuestDeckDetailScreen({
   onAddMatch,
 }: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
-  const navigation = useNavigation()
   const stored = useGuestDeck(localId)
   const [draft, setDraft] = useState<GuestDeckPayload | undefined>(() => stored?.deck)
   const revisionRef = useRef(
@@ -84,8 +82,7 @@ export function GuestDeckDetailScreen({
   const syncingElsewhere = useLocalDeckSyncing(localId)
   const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [pendingNavigation, setPendingNavigation] =
-    useState<Parameters<typeof navigation.dispatch>[0]>()
+  const [pendingLeave, setPendingLeave] = useState<() => void>()
   const [focusedIndex, setFocusedIndex] = useState<number>()
   const focusedCard =
     focusedIndex === undefined ? undefined : (draft ?? stored?.deck)?.cards[focusedIndex]
@@ -120,16 +117,16 @@ export function GuestDeckDetailScreen({
     }
   }, [stored])
 
-  usePreventRemove(!leaving && !sameDraft(draft, baseRef.current), ({ data }) => {
-    setPendingNavigation(data.action)
+  usePreventRemove(!leaving && !sameDraft(draft, baseRef.current), ({ repeat }) => {
+    setPendingLeave(() => repeat)
     setDiscarding(true)
   })
 
   useEffect(() => {
     if (!leaving) return
-    if (pendingNavigation) navigation.dispatch(pendingNavigation)
+    if (pendingLeave) pendingLeave()
     else onBack()
-  }, [leaving, navigation, onBack, pendingNavigation])
+  }, [leaving, onBack, pendingLeave])
 
   if (!stored && !draft) {
     return (
@@ -469,7 +466,7 @@ export function GuestDeckDetailScreen({
         destructive
         confirmTestID="guest-deck-discard-confirm"
         onClose={() => {
-          setPendingNavigation(undefined)
+          setPendingLeave(undefined)
           setCancelling(false)
           setDiscarding(false)
         }}

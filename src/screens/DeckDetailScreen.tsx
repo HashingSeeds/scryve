@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
-import { router, useFocusEffect, useNavigation } from "expo-router"
+import { router, useFocusEffect, usePreventRemove } from "expo-router"
 import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
-import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -270,7 +269,6 @@ function DeckDetailContent({
   reviewChanges,
 }: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
-  const navigation = useNavigation()
   const client = useConvex()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const synced = useDeckSync(syncEnabled, access?.ownerId, access?.ready ?? false)
@@ -339,8 +337,7 @@ function DeckDetailContent({
     setDraftState(latestDraft.current)
   }, [])
   const [dialog, setDialog] = useState<DeckDialog>("none")
-  const [pendingNavigation, setPendingNavigation] =
-    useState<Parameters<typeof navigation.dispatch>[0]>()
+  const [pendingLeave, setPendingLeave] = useState<() => void>()
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
@@ -437,17 +434,16 @@ function DeckDetailContent({
     })
   }, [detail, client])
 
-  usePreventRemove(view.changes.any, ({ data }) => {
-    setPendingNavigation(data.action)
+  usePreventRemove(view.changes.any, ({ repeat }) => {
+    setPendingLeave(() => repeat)
     setDialog("discard")
   })
 
   useEffect(() => {
-    if (draft.editing || !pendingNavigation) return
-    const action = pendingNavigation
-    setPendingNavigation(undefined)
-    navigation.dispatch(action)
-  }, [draft.editing, navigation, pendingNavigation])
+    if (draft.editing || !pendingLeave) return
+    setPendingLeave(undefined)
+    pendingLeave()
+  }, [draft.editing, pendingLeave])
 
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
@@ -1425,7 +1421,7 @@ function DeckDetailContent({
         <DialogCard
           visible
           onClose={() => {
-            setPendingNavigation(undefined)
+            setPendingLeave(undefined)
             setDialog("none")
           }}
           closeDisabled={busy}
@@ -1443,7 +1439,7 @@ function DeckDetailContent({
               style={themed($dialogButton)}
               disabled={busy}
               onPress={() => {
-                setPendingNavigation(undefined)
+                setPendingLeave(undefined)
                 setDialog("none")
               }}
             />
