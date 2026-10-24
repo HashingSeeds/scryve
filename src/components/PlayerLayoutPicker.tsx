@@ -9,8 +9,9 @@ import {
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { getPlayerGridLayout, getPlayerGridRowFlex, getPlayerGridRows } from "./PlayerGrid"
+import { getPlayerGridRowFlex, getPlayerGridRows } from "./PlayerGrid"
 import { Text } from "./Text"
+import { usePlayerGridLayout } from "./usePlayerGridLayout"
 
 export function PlayerLayoutPicker({
   playerCount,
@@ -80,7 +81,7 @@ function LayoutPreview({
   previewStyle: ViewStyle
 }) {
   const { themed } = useAppTheme()
-  const layout = getPlayerGridLayout({
+  const layout = usePlayerGridLayout({
     playerCount,
     width,
     height,

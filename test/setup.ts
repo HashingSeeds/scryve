@@ -79,6 +79,12 @@ jest.mock(
   }),
 )
 
+jest.mock("expo-hinge", () => ({
+  isAvailable: () => false,
+  getHinge: () => null,
+  addHingeListener: () => ({ remove: () => undefined }),
+}))
+
 jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"))
 jest.mock("react-native-reanimated", () => ({
   ...require("react-native-reanimated/mock"),
