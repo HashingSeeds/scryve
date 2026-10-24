@@ -69,6 +69,28 @@ describe("normalizeScryfallCard", () => {
     })
   })
 
+  it("keeps the front face's printed power", () => {
+    expect(
+      normalizeScryfallCard({
+        id: "55555555-5555-5555-5555-555555555555",
+        name: "Krenko, Mob Boss",
+        type_line: "Legendary Creature — Goblin Warrior",
+        power: "3",
+        toughness: "3",
+      }),
+    ).toMatchObject({ power: "3" })
+    expect(
+      normalizeScryfallCard({
+        id: "66666666-6666-6666-6666-666666666666",
+        name: "Delver of Secrets // Insectile Aberration",
+        card_faces: [
+          { type_line: "Creature — Human Wizard", power: "1", toughness: "1" },
+          { type_line: "Creature — Human Insect", power: "3", toughness: "2" },
+        ],
+      }),
+    ).toMatchObject({ power: "1" })
+  })
+
   it("omits missing fields and rejects unusable payloads", () => {
     expect(
       normalizeScryfallCard({

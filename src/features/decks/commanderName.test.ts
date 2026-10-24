@@ -1,4 +1,4 @@
-import { commanderShortName, deckCommanderNames } from "./commanderName"
+import { commanderShortName } from "./commanderName"
 
 describe("commanderShortName", () => {
   it.each([
@@ -17,14 +17,4 @@ describe("commanderShortName", () => {
   ])("calls %s %s", (cardName, spoken) => {
     expect(commanderShortName(cardName)).toBe(spoken)
   })
-})
-
-it("names only the commander section of a deck", () => {
-  expect(
-    deckCommanderNames([
-      { name: "Kraum, Ludevic's Opus", board: "commander", quantity: 1 },
-      { name: "Sol Ring", board: "main", quantity: 1 },
-      { name: "Tymna the Weaver", section: "commander", quantity: 1 },
-    ]),
-  ).toEqual(["Kraum", "Tymna"])
 })

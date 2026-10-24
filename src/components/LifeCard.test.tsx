@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 import * as Reanimated from "react-native-reanimated"
 
-import * as seatDeckCards from "@/features/decks/useSeatDeckCards"
 import {
   asActorId,
   asDeviceId,
@@ -857,38 +856,29 @@ describe("LifeCard", () => {
     expect(onStage).toHaveBeenLastCalledWith(2)
   })
 
-  it("names the attacker's commander when their deck has one", () => {
-    const cards = jest
-      .spyOn(seatDeckCards, "useSeatDeckCards")
-      .mockReturnValue([
-        { name: "Krenko, Mob Boss", board: "commander", quantity: 1 },
-      ] as unknown as ReturnType<typeof seatDeckCards.useSeatDeckCards>)
-    try {
-      const view = render(
-        <ThemeProvider initialContext="light">
-          <LifeCard
-            playerName="Ada"
-            seatNumber={1}
-            life={20}
-            color="#41476E"
-            deck={{ ownerId: "owner", versionId: "version" }}
-            commanderDamage={{
-              ownerPlayerId: commanderIds[0],
-              seats: commanderSeats.seats,
-              rows: commanderSeats.rows,
-              columns: commanderSeats.columns,
-              incoming: {},
-              armedPlayerId: commanderIds[0],
-              onPressSword: jest.fn(),
-            }}
-            onChange={jest.fn()}
-          />
-        </ThemeProvider>,
-      )
-      expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
-    } finally {
-      cards.mockRestore()
-    }
+  it("names the attacker's commander above its power", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            armedPlayerId: commanderIds[0],
+            commanderName: "Krenko",
+            onPressSword: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
   })
 
   it("turns the attacking card into its mark and commander power", () => {

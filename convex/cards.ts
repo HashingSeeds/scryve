@@ -435,6 +435,7 @@ const cardDetailsValidator = v.object({
   setName: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
   rarity: v.optional(v.string()),
+  power: v.optional(v.string()),
 })
 
 type CardDetails = Infer<typeof cardDetailsValidator>
@@ -488,6 +489,7 @@ export const detailsBatch = query({
                 ? { collectorNumber: reference.collectorNumber }
                 : {}),
               ...(reference.rarity !== undefined ? { rarity: reference.rarity } : {}),
+              ...(reference.power !== undefined ? { power: reference.power } : {}),
               ...(reference.commanderEligibility !== undefined
                 ? { commanderEligibility: reference.commanderEligibility }
                 : {}),
@@ -561,6 +563,7 @@ const cardReferenceValidator = v.object({
   setCode: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
   rarity: v.optional(v.string()),
+  power: v.optional(v.string()),
 })
 
 async function upsertCardReference(ctx: MutationCtx, card: CardReference) {

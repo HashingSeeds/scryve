@@ -675,6 +675,7 @@ export default defineSchema({
     setCode: v.optional(v.string()),
     collectorNumber: v.optional(v.string()),
     rarity: v.optional(v.string()),
+    power: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_scryfall_id", ["scryfallId"]),
 

@@ -44,6 +44,7 @@ export type FocusedCardDetails = {
   faceDetails?: string
   keywords?: string
   commanderRulesUpdatedAt?: string
+  power?: string
 }
 
 export interface CardFocusDialogProps {

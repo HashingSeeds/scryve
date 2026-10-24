@@ -1,5 +1,3 @@
-import { cardSection, type DeckCard } from "./deckCards"
-
 const TITLES = [
   "Grand Arbiter",
   "Grand Warlord",
@@ -64,10 +62,4 @@ export function commanderShortName(cardName: string): string {
   while (LEADING_TITLE.test(name)) name = name.replace(LEADING_TITLE, "")
   const words = name.split(" ")
   return words.length > 1 && words[0].length <= 3 ? words.slice(0, 2).join(" ") : words[0]
-}
-
-export function deckCommanderNames(cards: readonly DeckCard[]): string[] {
-  return cards
-    .filter((card) => cardSection(card) === "commander")
-    .map((card) => commanderShortName(card.name))
 }
