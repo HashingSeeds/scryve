@@ -22,7 +22,7 @@ export default {
     unnamedPlayer: "プレイヤー",
     rollResult: "{{name}}、{{tool}}、{{value}}",
     rolledGoFirstOrSecond: "{{name}}さんが{{value}}を出しました。先攻か後攻を選んでください",
-    tieRollAgain: "{{names}}が{{value}}で同点。もう一度振ってください",
+    tieRollAgain: "{{value}}で同点です({{names}})。もう一度振ります",
     nameSeparator: "と",
     goesFirst: "{{name}}さんが先攻です",
     wonFlipGoFirstOrSecond: "{{name}}さんがコイントスに勝ちました。先攻か後攻を選んでください",
@@ -45,7 +45,8 @@ export default {
       first: "先攻",
       second: "後攻",
     },
-    tieTapToRollAgain: "同点。タップでもう一度振る",
+    tie: "同点",
+    flippingForFirst: "先攻を決めるコイントスをしています",
     out: "脱落",
     choiceReason: {
       flip: "コイントスに勝利",
@@ -55,7 +56,7 @@ export default {
     rolloffLabel: {
       won: "{{name}}さんが{{value}}を出して先攻です",
       chooses: "{{name}}は{{value}}、ダイスに勝利",
-      tied: "{{name}}は{{value}}、同点、タップでもう一度振る",
+      tied: "{{name}}は{{value}}で同点です。もう一度振ります",
       out: "{{name}}は{{value}}、脱落",
       lost: "{{name}}は{{value}}",
     },
@@ -98,11 +99,7 @@ export default {
     loserChooses: "{{name}}さんが前のゲームに負けました。先攻を選んでください",
     flip: "コイントスで先攻を決める",
     roll: "ダイスで先攻を決める",
-    chip: {
-      roll: "ダイスで先攻決め",
-      flip: "コインで先攻決め",
-      loserChooses: "{{name}}が先攻を選択",
-    },
+    claim: "{{name}}を先攻にする",
   },
   layout: {
     balanced: "バランス",

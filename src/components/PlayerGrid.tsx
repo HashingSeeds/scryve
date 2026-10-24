@@ -72,7 +72,7 @@ export interface DiceGridBinding {
   chipsFor: (player: GamePlayer) => readonly DiceSeatChip[]
   onPressSeat: (player: GamePlayer) => void
   onChoose: (player: GamePlayer, order: "first" | "second") => void
-  onClearChip: (player: GamePlayer, chip: DiceSeatChip) => void
+  onPressChip: (player: GamePlayer, chip: DiceSeatChip) => void
 }
 
 function seatOwnership(
@@ -107,8 +107,8 @@ function seatDiceFor(
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
       dice.onChoose(player, order),
     ),
-    onClearChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
-      dice.onClearChip(player, chip),
+    onPressChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
+      dice.onPressChip(player, chip),
     ),
   }
 }

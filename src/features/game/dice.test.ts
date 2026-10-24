@@ -1,12 +1,12 @@
 import {
   armTool,
+  claimFirst,
   clearFirst,
   clearResult,
   diceSeatChips,
   diceSeatView,
   EMPTY_DICE,
   firstPlayerSeat,
-  flipForFirst,
   offerChoice,
   pickFirst,
   rerollTies,
@@ -14,6 +14,7 @@ import {
   rollOffAnnouncement,
   settleFirst,
   settleResult,
+  startFlip,
   startRollOff,
   systemDice,
 } from "./dice"
@@ -59,7 +60,7 @@ describe("dice roll-off", () => {
     const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], magic, d20s(18, 18, 3))
     expect(diceSeatView(tied, ada)).toMatchObject({ value: 18, attempt: 1, status: "tied" })
     expect(diceSeatView(tied, kat)).toMatchObject({ value: 3, attempt: 1, status: "out" })
-    expect(rollOffAnnouncement(tied.first, players)).toBe("Tie at 18, Ada and Grace. Roll again")
+    expect(rollOffAnnouncement(tied.first, players)).toBe("Tie at 18, Ada and Grace. Rolling again")
     expect(settleFirst(tied)).toBe(tied)
     expect(firstPlayerSeat(tied)).toBeUndefined()
 
@@ -93,9 +94,12 @@ describe("dice roll-off", () => {
 })
 
 describe("first-player choice", () => {
-  it("flips to one seat, asks it on its own card, and crowns the pick", () => {
-    expect(flipForFirst([ada, grace], () => 0.9)).toBe(grace)
-    const asked = offerChoice(EMPTY_DICE, grace, "flip")
+  it("flips a coin over every seat, then asks the winner on its own card and crowns the pick", () => {
+    const flipping = startFlip(EMPTY_DICE, [ada, grace], () => 0.9)
+    expect(diceSeatView(flipping, ada)).toEqual({ kind: "flip" })
+    expect(firstPlayerSeat(flipping)).toBeUndefined()
+    const asked = settleFirst(flipping)
+    expect(asked).toEqual(offerChoice(EMPTY_DICE, grace, "flip"))
     expect(diceSeatView(asked, grace)).toEqual({ kind: "choice", reason: "flip" })
     expect(diceSeatView(asked, ada)).toEqual({ kind: "waiting" })
     expect(settleFirst(asked)).toBe(asked)
@@ -108,6 +112,14 @@ describe("first-player choice", () => {
     })
     expect(diceSeatView(picked, grace)).toEqual({ kind: "first", status: "lost" })
     expect(diceSeatChips(settleFirst(picked), ada)).toEqual([{ kind: "first" }])
+  })
+
+  it("lands a claimed seat straight in its chip, replacing any open choice", () => {
+    const claimed = claimFirst(offerChoice(EMPTY_DICE, grace, "flip"), ada)
+    expect(diceSeatView(claimed, ada)).toBeUndefined()
+    expect(diceSeatView(claimed, grace)).toBeUndefined()
+    expect(diceSeatChips(claimed, ada)).toEqual([{ kind: "first" }])
+    expect(firstPlayerSeat(claimed)).toBe(ada)
   })
 })
 

@@ -58,8 +58,8 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
           chips: grid.chipsFor(player),
           onPress: () => grid.onPressSeat(player),
           onChoose: (order: "first" | "second") => grid.onChoose(player, order),
-          onClearChip: (chip: Parameters<typeof grid.onClearChip>[1]) =>
-            grid.onClearChip(player, chip),
+          onPressChip: (chip: Parameters<typeof grid.onPressChip>[1]) =>
+            grid.onPressChip(player, chip),
         }
         return (
           <View key={player.id}>
@@ -78,7 +78,7 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
               playerName={player.name}
               foreground="#FFFFFF"
               chips={seat.chips}
-              onClear={seat.onClearChip}
+              onPress={seat.onPressChip}
             />
           </View>
         )
@@ -126,12 +126,14 @@ describe("useDice", () => {
     expect(announce).toHaveBeenLastCalledWith("Grace, d20, 11")
   })
 
-  it("offers Yu-Gi-Oh! a d6 instead of a d20", () => {
+  it("leads Yu-Gi-Oh! with its coin and rolls a d6 from the bag, never a d20", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable("ygo")
     expect(view.queryByTestId("dice-d20")).toBeNull()
+    expect(view.getByTestId("dice-coin")).toBeTruthy()
 
-    fireEvent.press(view.getByTestId("dice-d6"))
+    fireEvent.press(view.getByTestId("dice-bag"))
+    fireEvent.press(view.getByTestId("dice-bag-d6"))
     fireEvent.press(view.getByTestId("dice-seat-2"))
     expect(view.getByTestId("dice-chip-2-d6")).toHaveTextContent("4")
   })
@@ -239,7 +241,7 @@ describe("useDice", () => {
     expect(view.queryByTestId("dice-chip-1-d20")).toBeNull()
   })
 
-  it("rolls off for every seat, re-rolls only the tied seats from their cards, and leaves a 1st chip", () => {
+  it("rolls off for every seat, re-rolls only the tied seats on its own, and leaves a 1st chip", () => {
     jest.useFakeTimers()
     jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
@@ -249,15 +251,13 @@ describe("useDice", () => {
 
     fireEvent.press(view.getByTestId("dice-rolloff"))
     expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tie")
-    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Roll again")
+    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Rolling again")
     expect(announce).toHaveBeenCalledTimes(1)
     act(() => jest.advanceTimersByTime(700))
-    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/19Tie/)
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/19Tie$/)
     expect(view.getByTestId("dice-seat-3")).toHaveTextContent(/3Out$/)
-    act(() => jest.advanceTimersByTime(5000))
-    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/19Tie/)
 
-    fireEvent.press(view.getByTestId("dice-seat-2"))
+    act(() => jest.advanceTimersByTime(900))
     act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/20Goes first$/)
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d205")
@@ -272,7 +272,23 @@ describe("useDice", () => {
     expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
   })
 
-  it("flips to one seat, which chooses on its own card while the rest wait", () => {
+  it("flips the coin over every seat, then the winner chooses on its own card while the rest wait", () => {
+    jest.useFakeTimers()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable()
+
+    fireEvent.press(view.getByTestId("dice-flip"))
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe(
+      "Flipping for who goes first",
+    )
+    expect(view.getAllByTestId("dice-coin-flipping")).toHaveLength(3)
+    act(() => jest.advanceTimersByTime(1100))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the flipGoes first\?/)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
+  })
+
+  it("asks the flip's winner at once under reduced motion", () => {
     jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(true)
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
     jest.spyOn(Math, "random").mockReturnValue(0.5)

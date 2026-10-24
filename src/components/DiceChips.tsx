@@ -34,7 +34,7 @@ export interface DiceChipsProps {
   foreground: string
   compact?: boolean
   chips: readonly DiceSeatChip[]
-  onClear: (chip: DiceSeatChip) => void
+  onPress: (chip: DiceSeatChip) => void
   bloomCenterInRow?: Point
 }
 
@@ -44,7 +44,7 @@ export function DiceChips({
   foreground,
   compact,
   chips,
-  onClear,
+  onPress,
   bloomCenterInRow,
 }: DiceChipsProps) {
   const { themed } = useAppTheme()
@@ -75,31 +75,36 @@ export function DiceChips({
     >
       {chips.map((chip) => {
         const key = chipKey(chip)
+        const claim = chip.kind === "claim"
         const label =
-          chip.kind === "first"
-            ? translate("board:dice.goesFirst", { name: playerName })
-            : rollLabel(playerName, chip.roll)
+          chip.kind === "claim"
+            ? translate("board:firstPlayer.claim", { name: playerName })
+            : chip.kind === "first"
+              ? translate("board:dice.goesFirst", { name: playerName })
+              : rollLabel(playerName, chip.roll)
         return (
+          // why: a claim and the 1st it becomes share a slot, so tapping fills the chip in place instead of flying a new one in from the seat's center.
           <ChipFlight
-            key={key}
+            key={chip.kind === "roll" ? key : "first"}
             entering={entering}
-            from={flight}
-            awaiting={!!bloomCenterInRow && reducedMotion === false}
+            from={claim ? undefined : flight}
+            awaiting={!claim && !!bloomCenterInRow && reducedMotion === false}
           >
             <BoardPressable
               testID={`dice-chip-${seatNumber}-${key}`}
               accessibilityRole="button"
               accessibilityLabel={label}
-              accessibilityHint={translate("board:dice.clearsResult")}
+              accessibilityHint={claim ? undefined : translate("board:dice.clearsResult")}
               hitSlop={{ top: 6, bottom: 6 }}
-              onPress={() => onClear(chip)}
+              onPress={() => onPress(chip)}
               style={({ pressed }) => [
                 themed(compact ? $compactChip : $chip),
                 { borderColor: foreground },
-                pressed && $pressed,
+                claim && $claim,
+                pressed && (claim ? $claimPressed : $pressed),
               ]}
             >
-              {chip.kind === "first" ? (
+              {chip.kind !== "roll" ? (
                 <Text
                   tx="board:dice.firstShort"
                   weight="bold"
@@ -178,7 +183,7 @@ function ChipFlight({
 }
 
 function chipKey(chip: DiceSeatChip) {
-  return chip.kind === "first" ? "first" : chip.roll.tool
+  return chip.kind === "roll" ? chip.roll.tool : chip.kind
 }
 
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -211,4 +216,7 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 18 })
 const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 13, lineHeight: 16 })
+// why: an empty, dashed 1st reads as the slot the badge lands in, so tapping it fills it.
+const $claim: ViewStyle = { borderStyle: "dashed", opacity: 0.6 }
+const $claimPressed: ViewStyle = { opacity: 0.4 }
 const $pressed: ViewStyle = { opacity: 0.72 }

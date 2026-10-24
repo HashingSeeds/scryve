@@ -4,7 +4,11 @@ import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
-import { FirstPlayerChips, type FirstPlayerOffer } from "@/components/FirstPlayerChips"
+import {
+  FirstPlayerTabs,
+  type FirstPlayerOffer,
+  type FirstPlayerTab,
+} from "@/components/FirstPlayerTabs"
 import {
   GameMenuBackdrop,
   GameMenuCluster,
@@ -84,9 +88,9 @@ function PinnedGameBoardStage({
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
-  const facings = useMemo(
-    () => getPlayerGridFacings(playerCount, gridLayout),
-    [playerCount, gridLayout],
+  const tabs = useMemo(
+    () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
+    [boardAnchor, playerCount, gridLayout],
   )
   const holderAnchor = useMemo(
     () => boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle),
@@ -132,12 +136,7 @@ function PinnedGameBoardStage({
               onToggle={menu.onToggle}
             />
             {firstPlayer && !menu.open && !menu.exitAction ? (
-              <FirstPlayerChips
-                offer={firstPlayer}
-                anchor={boardAnchor}
-                facings={facings}
-                compact={playerCount > 2}
-              />
+              <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
             ) : null}
           </View>
         </TurnedBoardContext.Provider>
@@ -165,17 +164,18 @@ function LegacyGameBoardStage({
   )
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const topEdgeBand = useTopEdgeBand()
-  const menuAnchor = useMemo(
+  const boardAnchor = useMemo(
     () =>
-      rotateGameBoardAnchor(
-        getPlayerGridMenuAnchor(playerCount, gridLayout, rotation === 0 ? topEdgeBand / height : 0),
-        rotation,
-      ),
+      getPlayerGridMenuAnchor(playerCount, gridLayout, rotation === 0 ? topEdgeBand / height : 0),
     [playerCount, gridLayout, rotation, topEdgeBand, height],
   )
-  const facings = useMemo(
-    () => getPlayerGridFacings(playerCount, gridLayout).map((facing) => facing + rotation),
-    [playerCount, gridLayout, rotation],
+  const menuAnchor = useMemo(
+    () => rotateGameBoardAnchor(boardAnchor, rotation),
+    [boardAnchor, rotation],
+  )
+  const tabs = useMemo(
+    () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
+    [boardAnchor, playerCount, gridLayout, rotation],
   )
 
   return (
@@ -194,16 +194,28 @@ function LegacyGameBoardStage({
         compact={playerCount > 2}
       />
       {firstPlayer && !menu.open && !menu.exitAction ? (
-        <FirstPlayerChips
-          offer={firstPlayer}
-          anchor={menuAnchor}
-          facings={facings}
-          compact={playerCount > 2}
-        />
+        <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
       ) : null}
       {windowOverlay}
     </Animated.View>
   )
+}
+
+/** why: the tabs sit where the menu's row meets the board's left and right edges, clear of the camera cutout and home indicator, each turned toward the players nearest it. `rotation` turns a board drawn sideways onto the screen. */
+export function firstPlayerTabs(
+  boardAnchor: { x: number; y: number },
+  facings: readonly number[],
+  rotation = 0,
+): FirstPlayerTab[] {
+  return [
+    { x: 0, toward: 90 },
+    { x: 1, toward: -90 },
+  ].map(({ x, toward }, index) => {
+    const facing = facings.includes(toward) ? toward : (facings[index] ?? facings[0] ?? 0)
+    const { x: sx, y: sy } = rotateGameBoardAnchor({ x, y: boardAnchor.y }, rotation)
+    const edge = sx === 0 ? "left" : sx === 1 ? "right" : sy === 0 ? "top" : "bottom"
+    return { edge, at: edge === "left" || edge === "right" ? sy : sx, facing: facing + rotation }
+  })
 }
 
 const $pinnedBoard: ViewStyle = { position: "absolute", left: 0, top: 0 }

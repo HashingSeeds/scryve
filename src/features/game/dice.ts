@@ -29,6 +29,7 @@ export type FirstPlayer =
       phase: DicePhase
     }
   | { kind: "choice"; seatId: PlayerId; reason: ChoiceReason }
+  | { kind: "flip"; seatId: PlayerId }
   | { kind: "picked"; seatId: PlayerId; phase: DicePhase; note?: string }
 
 export interface DiceState {
@@ -47,10 +48,13 @@ export type DiceSeatView =
       status: "won" | "chooses" | "tied" | "out" | "lost"
     }
   | { kind: "choice"; reason: ChoiceReason }
+  | { kind: "flip" }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
 
-export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" }
+export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" } | { kind: "claim" }
+
+export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
 
 export const PROMPT_FADE_MS = 260
 export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
@@ -218,6 +222,18 @@ export function flipForFirst(seatIds: readonly PlayerId[], random = Math.random)
   return seatIds[randomIndex(seatIds.length, random)]
 }
 
+export function startFlip(
+  state: DiceState,
+  seatIds: readonly PlayerId[],
+  random = Math.random,
+): DiceState {
+  return { ...state, first: { kind: "flip", seatId: flipForFirst(seatIds, random) } }
+}
+
+export function claimFirst(state: DiceState, seatId: PlayerId): DiceState {
+  return { ...state, first: { kind: "picked", seatId, phase: "chip" } }
+}
+
 export function offerChoice(state: DiceState, seatId: PlayerId, reason: ChoiceReason): DiceState {
   return { ...state, first: { kind: "choice", seatId, reason } }
 }
@@ -228,6 +244,7 @@ export function pickFirst(state: DiceState, seatId: PlayerId, note?: string): Di
 
 export function settleFirst(state: DiceState): DiceState {
   const { first } = state
+  if (first?.kind === "flip") return offerChoice(state, first.seatId, "flip")
   if (!first || first.kind === "choice" || first.phase === "chip") return state
   if (first.kind === "rolloff") {
     if (first.pool.length !== 1) return state
@@ -252,6 +269,7 @@ export function firstPlayerSeat(state: DiceState): PlayerId | undefined {
 
 export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView | undefined {
   const { first } = state
+  if (first?.kind === "flip") return { kind: "flip" }
   if (first?.kind === "choice") {
     return first.seatId === seatId ? { kind: "choice", reason: first.reason } : { kind: "waiting" }
   }

@@ -645,14 +645,14 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             staleSince={staleSince}
             style={[$identity, { marginLeft: identityMetrics.edge - padding }]}
           />
-          {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
+          {diceChips?.length && dice?.onPressChip && !dice.view && !sheetMode ? (
             <DiceChips
               seatNumber={seatNumber}
               playerName={playerName}
               foreground={ink}
               compact={cramped}
               chips={diceChips}
-              onClear={dice.onClearChip}
+              onPress={dice.onPressChip}
             />
           ) : null}
           <BoardPressable

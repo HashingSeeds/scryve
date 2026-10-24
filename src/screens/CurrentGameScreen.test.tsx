@@ -260,15 +260,15 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = renderGame(initial, repository)
     layoutSeats(view)
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
       "Roll for who goes first",
     )
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
     fireEvent.press(view.getByTestId("game-menu-button"))
 
-    fireEvent.press(view.getByTestId("first-player-badge"))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    fireEvent.press(view.getByTestId("first-player-tab"))
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
     expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
@@ -276,13 +276,13 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
 
     const inProgress = renderGame({
       ...game(),
       players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })),
     })
-    expect(inProgress.queryByTestId("first-player-badge")).toBeNull()
+    expect(inProgress.queryByTestId("first-player-tab")).toBeNull()
   })
 
   it("keeps the first-player offer through Pokémon setup and withdraws it at the first point of play", () => {
@@ -302,7 +302,7 @@ describe("CurrentGameScreen", () => {
       context,
     )
     expect(withPoison).not.toBe(mtg)
-    expect(renderGame(withPoison).queryByTestId("first-player-badge")).toBeNull()
+    expect(renderGame(withPoison).queryByTestId("first-player-tab")).toBeNull()
 
     const pokemon = game(2, "pokemon")
     const placed = applyLocalTableAction(
@@ -318,11 +318,11 @@ describe("CurrentGameScreen", () => {
     )
     expect(placed).not.toBe(pokemon)
     const view = renderGame(placed)
-    expect(view.getByTestId("first-player-badge")).toBeTruthy()
+    expect(view.getByTestId("first-player-tab")).toBeTruthy()
     fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
     fireEvent.press(view.getByTestId("pokemon-damage-seat-1--10"))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
   })
 
   it("remembers a used offer and a rematch's loser across a reopen", () => {
@@ -339,7 +339,7 @@ describe("CurrentGameScreen", () => {
         />
       </ThemeProvider>,
     )
-    fireEvent.press(first.getByTestId("first-player-badge"))
+    fireEvent.press(first.getByTestId("first-player-tab"))
     first.unmount()
 
     const reopened = render(
@@ -351,7 +351,7 @@ describe("CurrentGameScreen", () => {
         />
       </ThemeProvider>,
     )
-    expect(reopened.queryByTestId("first-player-badge")).toBeNull()
+    expect(reopened.queryByTestId("first-player-tab")).toBeNull()
     fireEvent.press(reopened.getByTestId("life-seat-1-1"))
     fireEvent.press(reopened.getByTestId("game-menu-button"))
     fireEvent.press(reopened.getByTestId("end-game-button"))
@@ -368,9 +368,25 @@ describe("CurrentGameScreen", () => {
         />
       </ThemeProvider>,
     )
-    expect(rematch.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+    expect(rematch.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
       "Grace lost the last game. Choose who goes first",
     )
+  })
+
+  it("lets a seat claim first from its empty 1st, which closes the offer everywhere", () => {
+    const initial = game()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    expect(view.getByTestId("dice-chip-1-claim").props.accessibilityLabel).toBe(
+      "Mark Ada as going first",
+    )
+
+    fireEvent.press(view.getByTestId("dice-chip-2-claim"))
+    expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
+    expect(view.queryByTestId("dice-chip-1-claim")).toBeNull()
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[1].id)
   })
 
   it("forgets who went first when the result is cleared before play", () => {
@@ -380,7 +396,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = renderGame(initial, repository)
     layoutSeats(view)
-    fireEvent.press(view.getByTestId("first-player-badge"))
+    fireEvent.press(view.getByTestId("first-player-tab"))
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     fireEvent.press(view.getByTestId("dice-chip-1-first"))
     expect(repository.loadActiveGame()?.firstPlayerId).toBeUndefined()
@@ -392,11 +408,11 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = renderGame(initial, repository)
     layoutSeats(view, "pokemon-card-seat")
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
       "Flip for who goes first",
     )
 
-    fireEvent.press(view.getByTestId("first-player-badge"))
+    fireEvent.press(view.getByTestId("first-player-tab"))
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the flip/)
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
 
@@ -410,7 +426,7 @@ describe("CurrentGameScreen", () => {
   it("rolls off for first when Pokémon has more than two players", () => {
     const view = renderGame(game(3, "pokemon"))
     layoutSeats(view, "pokemon-card-seat")
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
       "Roll for who goes first",
     )
   })
@@ -418,16 +434,15 @@ describe("CurrentGameScreen", () => {
   it("hands a rematch's first choice to the player who lost", () => {
     const view = renderGame()
     fireEvent.press(view.getByTestId("life-seat-1-1"))
-    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.queryByTestId("first-player-tab")).toBeNull()
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("end-game-button"))
     fireEvent.press(view.getByTestId("end-game-winner-0"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     layoutSeats(view)
 
-    const badge = view.getByTestId("first-player-badge")
+    const badge = view.getByTestId("first-player-tab")
     expect(badge.props.accessibilityLabel).toBe("Grace lost the last game. Choose who goes first")
-    expect(StyleSheet.flatten(badge.props.style).borderColor).toBe("#39755C")
 
     fireEvent.press(badge)
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)

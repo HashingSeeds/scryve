@@ -316,7 +316,7 @@ export const SYSTEMS = {
     ],
     table: { counters: [], designations: [] },
     variants: [],
-    firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
+    firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: true },
     roundClock: { minutes: 50, endOfRoundTurns: 0 },
     deckAnalysis: false,
     integration: {
