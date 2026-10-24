@@ -407,7 +407,7 @@ export function ConnectedBoardWithRuntime({
   roleRevealOnline = false,
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
-  useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
+  useKeepAwake(undefined, { suppressDeactivateWarnings: true })
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
     connectionStatus: runtime.connectionStatus,
     unsent: runtime.pending.length,

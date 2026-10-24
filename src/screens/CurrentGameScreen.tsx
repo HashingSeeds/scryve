@@ -98,7 +98,7 @@ export function CurrentGameScreen({
   repository,
   ownerId,
 }: CurrentGameScreenProps) {
-  useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
+  useKeepAwake(undefined, { suppressDeactivateWarnings: true })
   const { themed } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)

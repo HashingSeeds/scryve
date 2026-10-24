@@ -1,3 +1,4 @@
+import { useEffect, useId } from "react"
 import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
@@ -77,9 +78,26 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-editor-step-1--5"))
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
-    expect(useKeepAwake).toHaveBeenCalledWith("count-local-game", {
+    expect(useKeepAwake).toHaveBeenCalledWith(undefined, {
       suppressDeactivateWarnings: true,
     })
+  })
+
+  it("stays awake while another board is still mounted", () => {
+    const awake = new Set<string>()
+    jest.mocked(useKeepAwake).mockImplementation(function useExpoKeepAwake(tag) {
+      const id = useId()
+      const held = tag ?? id
+      useEffect(() => {
+        awake.add(held)
+        return () => void awake.delete(held)
+      }, [held])
+    })
+
+    renderGame()
+    renderGame().unmount()
+
+    expect(awake.size).toBe(1)
   })
 
   it.each(["commander", "standard"])("applies one navigation bottom inset in %s", (format) => {
