@@ -1,7 +1,7 @@
+import { useEffect, useId } from "react"
 import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
-import { NativeModulesProxy } from "expo-modules-core"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
@@ -85,14 +85,14 @@ describe("CurrentGameScreen", () => {
 
   it("stays awake while another board is still mounted", () => {
     const awake = new Set<string>()
-    const native = NativeModulesProxy.ExpoKeepAwake
-    jest.mocked(native.activate).mockImplementation(async (tag: string) => void awake.add(tag))
-    jest.mocked(native.deactivate).mockImplementation(async (tag: string) => void awake.delete(tag))
-    jest
-      .mocked(useKeepAwake)
-      .mockImplementation(
-        jest.requireActual<typeof import("expo-keep-awake")>("expo-keep-awake").useKeepAwake,
-      )
+    jest.mocked(useKeepAwake).mockImplementation(function useExpoKeepAwake(tag) {
+      const id = useId()
+      const held = tag ?? id
+      useEffect(() => {
+        awake.add(held)
+        return () => void awake.delete(held)
+      }, [held])
+    })
 
     renderGame()
     renderGame().unmount()
