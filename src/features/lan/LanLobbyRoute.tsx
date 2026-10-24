@@ -59,11 +59,12 @@ function LanLobby() {
   // why: lets an agent drive devices it can deep link into but cannot tap.
   const { access, games } = useNearbyGames(Boolean(params.join) && !role)
 
-  // why: hosting starts once per visit; a remount after leaving must not reopen the lobby.
+  // why: hosting starts once per visit; a remount after leaving must not reopen the lobby. A finished table gives way to the new one, which starts empty.
   const hosted = useRef(false)
   useEffect(() => {
-    if (hosted.current || !setup || !access || access === "denied" || lanSession.getState().role)
-      return
+    const current = lanSession.getState()
+    const playing = current.role && current.lobby?.status !== "finished"
+    if (hosted.current || !setup || !access || access === "denied" || playing) return
     hosted.current = true
     void lanSession.host(setup)
   }, [setup, access])

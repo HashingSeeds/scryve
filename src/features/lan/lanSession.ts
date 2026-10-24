@@ -144,6 +144,7 @@ export class LanSession {
   private game?: LanGame
   private server?: LanHost
   private serverClosed = false
+  private advertisedStatus?: string
   private tokens = new Map<string, string>()
   private passHashes = new Map<string, Promise<string | undefined>>()
   private peers = new Map<string, LanConnection<LanHostMessage>>()
@@ -210,7 +211,9 @@ export class LanSession {
     for (const listener of this.listeners) listener()
   }
 
+  // why: hosting or joining another table quietly closes a finished one, so it stops advertising and its guests learn it ended.
   async host(setup: LanSetup) {
+    if (this.state.role) this.leave()
     this.session += 1
     this.tokens.clear()
     this.passHashes.clear()
@@ -235,15 +238,18 @@ export class LanSession {
     const session = this.session
     this.serverClosed = false
     await this.server?.stop()
+    const status = this.game?.status ?? "lobby"
     try {
       const server = await hostLan<LanGuestMessage, LanHostMessage>(
         serviceName,
         parseGuestMessage,
         (peer) => this.acceptPeer(peer),
         () => session === this.session && this.recoverHost(session),
+        status,
       )
       if (session !== this.session) return void server.stop()
       this.server = server
+      this.advertisedStatus = status
       this.set({ status: "connected", serviceName: server.name, error: undefined })
     } catch (error) {
       if (session !== this.session) return
@@ -407,6 +413,10 @@ export class LanSession {
     this.set({ lobby: lanLobbyOf(game), projection: lanProjection(game, seatKey) })
     for (const settle of this.hostAcks.splice(0)) settleAfterRender(settle)
     const lobby = lanLobbyOf(game)
+    if (this.server && lobby.status !== this.advertisedStatus) {
+      this.advertisedStatus = lobby.status
+      this.server.advertise(lobby.status)
+    }
     for (const [key, peer] of this.peers) {
       peer.send(
         { type: "state", lobby, projection: lanProjection(game, key) },
@@ -445,6 +455,7 @@ export class LanSession {
   }
 
   async join(service: Service) {
+    if (this.state.role) this.leave()
     this.pass = savedPass(service.name)
     const session = ++this.session
     this.replace({
@@ -647,6 +658,7 @@ export class LanSession {
     }
     void this.server?.stop()
     this.server = undefined
+    this.advertisedStatus = undefined
     this.game = undefined
     this.peers.clear()
     this.accepted.clear()

@@ -3,7 +3,12 @@ import { AppState } from "react-native"
 import { useZeroconf } from "react-native-zeroconf"
 
 import { lanSession } from "./lanSession"
-import { checkLocalNetworkAccess, isLanGameService, LAN_SERVICE_TYPE } from "./lanTransport"
+import {
+  checkLocalNetworkAccess,
+  isFinishedTable,
+  isLanGameService,
+  LAN_SERVICE_TYPE,
+} from "./lanTransport"
 
 // why: networks that isolate devices look identical to an empty one, so after a short scan the empty list says how to fix it.
 const NOT_FOUND_AFTER_MS = 10_000
@@ -43,7 +48,10 @@ export function useNearbyGames(enabled: boolean) {
     denied: access === "denied",
     scannedLong,
     games: services.filter(
-      (service) => isLanGameService(service) && lanSession.isReachable(service.name),
+      (service) =>
+        isLanGameService(service) &&
+        !isFinishedTable(service) &&
+        lanSession.isReachable(service.name),
     ),
   }
 }

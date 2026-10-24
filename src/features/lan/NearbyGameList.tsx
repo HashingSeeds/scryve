@@ -15,14 +15,23 @@ import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSessi
 import { OpenSettingsButton } from "./NearbyLobbyScreen"
 import { useNearbyGames } from "./useNearbyGames"
 
-const selectRole = ({ role }: LanSessionState) => role
+const selectTable = ({ role, lobby }: LanSessionState) =>
+  role ? (lobby?.status === "finished" ? "finished" : "playing") : undefined
 
 export function NearbyGameList({ onJoin }: { onJoin: () => void }) {
-  const role = useLanSessionSlice(selectRole)
+  const table = useLanSessionSlice(selectTable)
   if (!lanPlayAvailable()) return null
-  if (role)
-    return <Button testID="back-to-nearby-game" tx="connected:nearby.backToGame" onPress={onJoin} />
-  return <NearbyGames onJoin={onJoin} />
+  const backToGame = (
+    <Button testID="back-to-nearby-game" tx="connected:nearby.backToGame" onPress={onJoin} />
+  )
+  if (table === "playing") return backToGame
+  // why: a finished table only waits for a rematch, so it must not hide other games nearby.
+  return (
+    <>
+      {table === "finished" ? backToGame : null}
+      <NearbyGames onJoin={onJoin} />
+    </>
+  )
 }
 
 function NearbyGames({ onJoin }: { onJoin: () => void }) {
