@@ -10,12 +10,14 @@ import {
 } from "@/features/events/nearby/nearbyEventProtocol"
 import { NearbyEventsScreen } from "@/features/events/nearby/NearbyEventsScreen"
 import { useNearbyEvents } from "@/features/events/nearby/useNearbyEvents"
+import { useNearbyImport } from "@/features/events/nearby/useNearbyImport"
 import { loadLanName, saveLanName } from "@/features/lan/lanAvailability"
 
 const leave = () => (router.canGoBack() ? router.back() : router.replace("/"))
 
 export default function NearbyEventsRoute() {
   const { event } = useNearbyEventHost()
+  useNearbyImport()
   const { events, denied } = useNearbyEvents(
     event ? nearbyEventServiceName(event.code, event.name) : null,
   )

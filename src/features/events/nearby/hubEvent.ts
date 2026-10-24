@@ -348,3 +348,33 @@ export function hubStandings(event: HubEvent, throughRound: number): readonly Pl
     rules: eventRules("mtg"),
   })
 }
+
+export function nearbyImport(event: HubEvent, codeCandidates: string[]) {
+  return {
+    nearbyId: event.id,
+    name: event.name,
+    format: event.format,
+    structure: event.structure,
+    bestOf: event.bestOf,
+    points: event.points,
+    plannedRounds: event.plannedRounds,
+    roundMinutes: event.roundMinutes,
+    round: event.round,
+    createdAt: event.createdAt,
+    finishedAt: event.finishedAt ?? Date.now(),
+    players: event.players.map(({ id, name, droppedAt }) => ({
+      id,
+      name,
+      ...(droppedAt === undefined ? {} : { droppedAt }),
+    })),
+    tables: event.tables.map(({ round, table, playerIds, status, result, reportedBy }) => ({
+      round,
+      table,
+      playerIds: [...playerIds],
+      status,
+      ...(result ? { result } : {}),
+      ...(reportedBy ? { reportedBy } : {}),
+    })),
+    codeCandidates,
+  }
+}

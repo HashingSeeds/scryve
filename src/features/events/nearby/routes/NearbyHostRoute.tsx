@@ -4,6 +4,7 @@ import { router } from "expo-router"
 import { EventScreen } from "@/features/events/EventScreen"
 import { nearbyEventHost, useNearbyEventHost } from "@/features/events/nearby/nearbyEventHost"
 import { useHostEventSource } from "@/features/events/nearby/useNearbyEventSource"
+import { useNearbyImport } from "@/features/events/nearby/useNearbyImport"
 import { startEventMatch } from "@/features/events/startEventMatch"
 
 const RETRY_MS = 3_000
@@ -13,6 +14,7 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace("/event
 export default function NearbyHostRoute() {
   const source = useHostEventSource()
   const { status } = useNearbyEventHost()
+  useNearbyImport()
   // why: the server ends with the app, and the network can drop it, so this screen keeps the event published.
   useEffect(() => {
     if (status !== "idle" && status !== "error") return
