@@ -1,7 +1,10 @@
+import { AccessibilityInfo } from "react-native"
+import * as Haptics from "expo-haptics"
 import { act, renderHook } from "@testing-library/react-native"
 
 import { captureGame } from "@/utils/analytics"
 import { recordReviewCompletion } from "@/utils/storeReview"
+import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { createLocalGame } from "./domain"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
@@ -279,4 +282,22 @@ it("replaces the first player before play and keeps it after play and undo", () 
   expect(repository.loadActiveGame()).toBeNull()
   act(() => result.current.rematch())
   expect(result.current.game.firstPlayerId).toBeUndefined()
+})
+
+it("follows the haptics setting changed while the board is open", async () => {
+  jest.mocked(AccessibilityInfo.isReduceMotionEnabled).mockResolvedValueOnce(false)
+  jest.mocked(Haptics.impactAsync).mockClear()
+  const repository = new LocalGameRepository(new MemoryStorage())
+  const initial = game()
+  const [ada] = initial.players
+  const { result } = renderHook(() => useLocalGame(initial, repository))
+  await act(async () => undefined)
+
+  act(() => result.current.changeLife(ada.id, -1))
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1)
+
+  repository.saveSettings({ ...repository.loadSettings(), hapticsEnabled: false })
+  act(() => result.current.changeLife(ada.id, -1))
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1)
+  resetReducedMotionCacheForTests()
 })
