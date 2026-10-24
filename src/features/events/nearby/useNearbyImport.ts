@@ -18,7 +18,6 @@ export function useNearbyImport() {
   const [attempt, setAttempt] = useState(0)
   const finished = event?.status === "finished" ? event : null
   useEffect(() => {
-    // why: the device keeps one event across sign-ins, so each account that runs it gets its own saved copy; a repeat for the same account returns the first.
     if (!finished || !isAuthenticated || !userId || importedFor === userId) return
     let current = true
     let retry: ReturnType<typeof setTimeout> | undefined
