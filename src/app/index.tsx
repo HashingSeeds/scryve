@@ -17,6 +17,7 @@ import { lanPlayAvailable, savedHostedGame } from "@/features/lan/lanAvailabilit
 import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import { rulesHref } from "@/features/rules/gameRules"
 import { openStorePage, STORE_PAGE } from "@/features/updates/storeUpdate"
+import { translate } from "@/i18n/translate"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
 import { useAppTheme } from "@/theme/context"
@@ -47,7 +48,7 @@ function createFreshGame(prepared: string | undefined, settings: LocalSettings) 
     createPreparedGame(prepared) ??
     createLocalGame({
       players: Array.from({ length: settings.defaultPlayerCount }, (_, index) => ({
-        name: `Player ${index + 1}`,
+        name: translate("board:playerNames.default", { number: index + 1 }),
         color: PLAYER_COLORS[index],
       })),
       startingLife: settings.defaultStartingLife,

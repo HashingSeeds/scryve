@@ -61,6 +61,8 @@ const board = {
     rollDieFor: "Roll a {{die}} for {{name}}",
   },
   playerNames: {
+    // The name a seat gets when nobody types one. It is saved into the game, so keep it short.
+    default: "Player {{number}}",
     required: "Enter a player name.",
     tooLong: "Use {{max}} characters or fewer.",
     unique: "Player names must be unique.",

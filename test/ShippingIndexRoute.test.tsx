@@ -19,6 +19,7 @@ import {
   LOCAL_KEYS,
   localGameRepository,
 } from "@/features/game/localPersistence"
+import { i18n } from "@/i18n"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
 import { storage } from "@/utils/storage"
@@ -101,6 +102,21 @@ describe("shipping index route", () => {
     )
     expect(view.getByTestId("game-board")).toBeTruthy()
     expect(localGameRepository.loadActiveGame()).toBeNull()
+  })
+
+  it("names the default seats in the player's language", async () => {
+    const language = i18n.language
+    await i18n.changeLanguage("es")
+    try {
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <Index />
+        </ThemeProvider>,
+      )
+      expect(view.getAllByText("Jugador 1").length).toBeGreaterThan(0)
+    } finally {
+      await i18n.changeLanguage(language)
+    }
   })
 
   it("asks a fresh install what they play before the first board", () => {

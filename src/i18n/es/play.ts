@@ -69,6 +69,7 @@ export default {
     changeAppearance: "Cambiar el aspecto de {{name}}",
     nameForPlayer: "Nombre del jugador {{seat}}",
     nameGateHelper: 'Los jugadores conectados verán "{{name}}" en su lugar.',
+    deckFallbackName: "Mazo",
     thisIsMe: "Soy yo",
     noSeat: "Sin asiento",
     yourDeck: "Tu mazo",

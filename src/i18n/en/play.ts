@@ -67,6 +67,8 @@ const play = {
     changeAppearance: "Change appearance for {{name}}",
     nameForPlayer: "Name for player {{seat}}",
     nameGateHelper: 'Connected players will see "{{name}}" instead.',
+    // Name for the picked deck when its real name is unknown.
+    deckFallbackName: "Deck",
     thisIsMe: "This is me",
     noSeat: "No seat",
     yourDeck: "Your deck",

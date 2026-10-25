@@ -297,7 +297,7 @@ function NewGameForm({
       deckKey: chosen.deckKey,
       deckFingerprint: chosen.deckFingerprint,
       system: claimedGame.system,
-      name: chosen.deckName ?? "Deck",
+      name: chosen.deckName ?? translate("play:newGame.deckFallbackName"),
       startingValue: seat === undefined ? undefined : claimedGame.players[seat]?.startingLife,
     }
   })
@@ -1432,7 +1432,7 @@ function NewGameForm({
 }
 
 function defaultName(index: number) {
-  return `Player ${index + 1}`
+  return translate("board:playerNames.default", { number: index + 1 })
 }
 
 const CONTENT_MAX_WIDTH = 720
