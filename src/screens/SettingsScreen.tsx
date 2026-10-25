@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { Platform, ScrollView, View } from "react-native"
 import * as Application from "expo-application"
 
 import { ChoiceButton } from "@/components/ChoiceButton"
@@ -168,12 +168,14 @@ export function SettingsScreen({
           />
         ))}
       </View>
-      <Switch
-        testID="haptics-switch"
-        labelTx="account:settings.haptics.label"
-        value={settings.hapticsEnabled}
-        onValueChange={(value) => update({ hapticsEnabled: value })}
-      />
+      {Platform.OS === "web" ? null : (
+        <Switch
+          testID="haptics-switch"
+          labelTx="account:settings.haptics.label"
+          value={settings.hapticsEnabled}
+          onValueChange={(value) => update({ hapticsEnabled: value })}
+        />
+      )}
       <Text tx="account:settings.appearance" preset="subheading" accessibilityRole="header" />
       <Text tx="account:settings.theme.heading" style={themed($label)} />
       <View style={themed($row)}>
