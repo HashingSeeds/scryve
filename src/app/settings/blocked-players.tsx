@@ -6,8 +6,9 @@ import { SettingsPage } from "@/screens/SettingsPage"
 
 export default function BlockedPlayersRoute() {
   const auth = useAuthAccess()
+  const signedOut = auth.isLoaded && !auth.isSignedIn
   // why: local-only builds mount no Convex provider, so the section would crash on a direct URL.
-  if (!auth.configured || !auth.isSignedIn) return <Redirect href="/settings" />
+  if (!auth.configured || signedOut) return <Redirect href="/settings" />
   return (
     <SettingsPage titleTx="connected:blockedPlayers.title" onBack={() => router.back()}>
       <BlockedPlayersSection />

@@ -49,6 +49,7 @@ function renderSettings() {
 describe("settings route", () => {
   beforeEach(() => {
     mockAuthAccess.configured = false
+    mockAuthAccess.isLoaded = true
     mockAuthAccess.isSignedIn = false
   })
 
@@ -79,5 +80,17 @@ describe("settings route", () => {
       </ThemeProvider>,
     )
     expect(screen.getByText("redirect:/settings")).toBeTruthy()
+  })
+
+  it("keeps a direct blocked players visit while the session is still loading", () => {
+    mockAuthAccess.configured = true
+    mockAuthAccess.isLoaded = false
+    render(
+      <ThemeProvider initialContext="light">
+        <BlockedPlayersRoute />
+      </ThemeProvider>,
+    )
+    expect(screen.queryByText("redirect:/settings")).toBeNull()
+    expect(screen.getByText("Blocked players")).toBeTruthy()
   })
 })
