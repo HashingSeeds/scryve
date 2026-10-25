@@ -39,6 +39,11 @@ export default {
     play: "Jouer",
     backToLobby: "Retour au salon",
   },
+  openUrl: {
+    failed: "Impossible d'ouvrir ce lien",
+    noMailApp: "Aucune application de messagerie trouvée",
+    copy: "Copier",
+  },
   retryableError: {
     retryingIn: "Nouvel essai dans {{seconds}} s",
   },

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { FlatList, Linking, Pressable, View } from "react-native"
+import { FlatList, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
 import { Header } from "@/components/Header"
@@ -20,6 +20,7 @@ import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { openUrl } from "@/utils/openUrl"
 
 type Row =
   | { kind: "chapter"; key: string; title: string }
@@ -182,7 +183,7 @@ export function RulesScreen({
   }
 
   const officialLink = (
-    <Pressable accessibilityRole="link" onPress={() => Linking.openURL(source.pageUrl)}>
+    <Pressable accessibilityRole="link" onPress={() => void openUrl(source.pageUrl)}>
       <Text size="sm" style={themed($link)} tx="play:rules.official" />
     </Pressable>
   )

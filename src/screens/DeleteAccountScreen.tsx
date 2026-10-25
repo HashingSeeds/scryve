@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Linking, View } from "react-native"
+import { View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
@@ -11,6 +11,7 @@ import { appLocale } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { openUrl } from "@/utils/openUrl"
 
 export type AccountDeletionStatus = "processing" | "identity_pending" | "failed"
 export type AccountDeletionReceiptStatus = AccountDeletionStatus | "completed"
@@ -96,16 +97,14 @@ export function DeleteAccountScreen({
                 accessibilityRole="link"
                 style={themed($subscriptionLink)}
                 textStyle={themed($subscriptionLinkText)}
-                onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions")}
+                onPress={() => void openUrl("https://apps.apple.com/account/subscriptions")}
               />
               <Button
                 tx="account:deleteAccount.subscription.manageGoogle"
                 accessibilityRole="link"
                 style={themed($subscriptionLink)}
                 textStyle={themed($subscriptionLinkText)}
-                onPress={() =>
-                  void Linking.openURL("https://play.google.com/store/account/subscriptions")
-                }
+                onPress={() => void openUrl("https://play.google.com/store/account/subscriptions")}
               />
             </View>
             {email ? (

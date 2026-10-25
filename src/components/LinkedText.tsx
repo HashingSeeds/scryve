@@ -1,9 +1,10 @@
 import { Fragment } from "react"
-import { Linking, type TextStyle } from "react-native"
+import type { TextStyle } from "react-native"
 
 import { Text, type TextProps } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { openUrl } from "@/utils/openUrl"
 
 const linkPattern = /(https?:\/\/[^\s"<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+)/g
 const trailingPunctuation = /[.,;:!?]+$/
@@ -30,7 +31,7 @@ export function LinkedText({ text, ...rest }: LinkedTextProps) {
             text={segment.content}
             accessibilityRole="link"
             style={themed($link)}
-            onPress={() => void Linking.openURL(segment.href as string)}
+            onPress={() => void openUrl(segment.href as string)}
           />
         ) : (
           <Fragment key={index}>{segment.content}</Fragment>
