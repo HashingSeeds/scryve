@@ -80,7 +80,6 @@ export function AppearancePicker({
             foil={pro && foil}
             foilBackdrop={theme.colors.background}
             size={32}
-            spinning={false}
           />
         </TouchableOpacity>
       </View>

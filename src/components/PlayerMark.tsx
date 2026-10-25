@@ -1,14 +1,7 @@
-import { memo, useEffect, useId } from "react"
+import { memo, useId } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  ZoomIn,
-} from "react-native-reanimated"
+import Animated, { ZoomIn } from "react-native-reanimated"
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
 
 import { relativeLuminance } from "@/utils/colorContrast"
@@ -18,8 +11,6 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
-
-const SPIN_DURATION_MS = 500
 
 /** why: shapes sit inside their 44 unit box with different margins, so lining up boxes leaves drawn edges misaligned (the triangle floated above the prize grid). */
 export const MARK_ART_BOUNDS: Record<
@@ -56,7 +47,6 @@ export interface PlayerMarkProps {
   closeIcon?: boolean
   foil?: boolean
   foilBackdrop?: string
-  spinning?: boolean
   size?: number
   style?: StyleProp<ViewStyle>
 }
@@ -74,30 +64,16 @@ export const PlayerMark = memo(function PlayerMark({
   closeIcon = false,
   foil = false,
   foilBackdrop,
-  spinning = false,
   size = 44,
   style,
 }: PlayerMarkProps) {
   const shape = chosenShape ?? shapeForSeat(seatNumber)
   const foilId = `foil-${useId().replace(/[^A-Za-z0-9]/g, "")}`
   const reducedMotion = useReducedMotion()
-  const spin = useSharedValue(0)
   const rotationStyle: ViewStyle | undefined = rotation
     ? { transform: [{ rotate: `${rotation}deg` }] }
     : undefined
-  const spinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spin.value}deg` }],
-  }))
   const closeEntering = reducedMotion === false ? ZoomIn.duration(CLOSE_POP_MS) : undefined
-
-  useEffect(() => {
-    cancelAnimation(spin)
-    spin.value = 0
-    if (spinning && reducedMotion === false) {
-      spin.value = withTiming(360, { duration: SPIN_DURATION_MS, easing: Easing.out(Easing.quad) })
-    }
-    return () => cancelAnimation(spin)
-  }, [reducedMotion, spin, spinning])
 
   return (
     <View
@@ -108,27 +84,22 @@ export const PlayerMark = memo(function PlayerMark({
       pointerEvents="none"
       style={[{ width: size, height: size }, rotationStyle, style]}
     >
-      <Animated.View
-        testID={`player-mark-spinner-seat-${seatNumber}`}
-        style={[{ width: size, height: size }, spinStyle]}
-      >
-        <Svg width="100%" height="100%" viewBox="0 0 44 44">
-          {foil ? <FoilGradient id={foilId} color={color} backdrop={foilBackdrop} /> : null}
-          <MarkShape
-            shape={shape}
-            color={foil ? `url(#${foilId})` : color}
-            solid={!!insetSwordColor}
-            testID={`player-mark-shape-${shape}`}
-          />
-          {insetSwordColor && !closeIcon ? (
-            insetCheck ? (
-              <CheckInset shape={shape} color={insetSwordColor} />
-            ) : (
-              <SwordInset shape={shape} color={insetSwordColor} />
-            )
-          ) : null}
-        </Svg>
-      </Animated.View>
+      <Svg width="100%" height="100%" viewBox="0 0 44 44">
+        {foil ? <FoilGradient id={foilId} color={color} backdrop={foilBackdrop} /> : null}
+        <MarkShape
+          shape={shape}
+          color={foil ? `url(#${foilId})` : color}
+          solid={!!insetSwordColor}
+          testID={`player-mark-shape-${shape}`}
+        />
+        {insetSwordColor && !closeIcon ? (
+          insetCheck ? (
+            <CheckInset shape={shape} color={insetSwordColor} />
+          ) : (
+            <SwordInset shape={shape} color={insetSwordColor} />
+          )
+        ) : null}
+      </Svg>
       {insetSwordColor && closeIcon ? (
         <CloseIconOverlay shape={shape} color={insetSwordColor} entering={closeEntering} />
       ) : null}

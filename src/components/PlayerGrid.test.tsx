@@ -27,7 +27,6 @@ import {
   getScreenCornerSquaringStyle,
   PlayerGrid,
 } from "./PlayerGrid"
-import { PlayerMark } from "./PlayerMark"
 import type { OutState } from "../../convex/lib/outReason"
 import type { TableState } from "../../convex/lib/table"
 
@@ -860,7 +859,7 @@ describe("PlayerGrid", () => {
     )
   })
 
-  it("marks only the owned player with a spinning icon", () => {
+  it("draws no dashed border on owned or disabled seats", () => {
     const colorfulPlayers = players(2).map((player, index) => ({
       ...player,
       color: index === 0 ? "#F9E547" : "#2D195C",
@@ -874,10 +873,6 @@ describe("PlayerGrid", () => {
         />
       </ThemeProvider>,
     )
-    expect(view.UNSAFE_getAllByType(PlayerMark).map((mark) => mark.props.spinning)).toEqual([
-      true,
-      false,
-    ])
     expect(StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style).borderStyle).toBe(
       undefined,
     )

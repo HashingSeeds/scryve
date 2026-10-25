@@ -428,7 +428,6 @@ export const LifeCard = memo(function LifeCard({
       shape={shape}
       color={foreground}
       compact={compact}
-      spinning={ownership === "owned"}
       insetSwordColor={commanderDamage ? color : undefined}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
