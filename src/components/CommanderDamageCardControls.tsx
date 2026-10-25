@@ -219,7 +219,12 @@ function DefenderControls({
           name: mode.attackerName,
         })}
         accessibilityLiveRegion="polite"
-        style={[themed($edge), edgeStyle(facing, thickness), edgeColors, badgePlacement]}
+        style={[
+          themed($edge),
+          edgeStyle(facing, thickness, compact ? theme.spacing.md : theme.spacing.lg),
+          edgeColors,
+          badgePlacement,
+        ]}
       >
         <Animated.View style={popStyle}>
           <CommanderBadge
@@ -484,13 +489,24 @@ function stripStart(
     : { justifyContent: "center", alignItems: "flex-start", paddingLeft: (insets?.left ?? 0) + gap }
 }
 
+function innerCornerRadius(x: "left" | "right", y: "top" | "bottom") {
+  return `border${y === "top" ? "Bottom" : "Top"}${x === "left" ? "Right" : "Left"}Radius` as const
+}
+
 function cornerName(x: "left" | "right", y: "top" | "bottom"): LifeCardMenuCorner {
   return `${y}${x === "left" ? "Left" : "Right"}`
 }
 
-function edgeStyle(facing: CommanderFacing, thickness: number): ViewStyle {
+/** why: a corner square's inner corner sits inside the card, so it takes the card's corner radius. */
+function edgeStyle(facing: CommanderFacing, thickness: number, radius: number): ViewStyle {
   if (facing.x && facing.y)
-    return { width: thickness, height: thickness, [facing.x]: 0, [facing.y]: 0 }
+    return {
+      width: thickness,
+      height: thickness,
+      [facing.x]: 0,
+      [facing.y]: 0,
+      [innerCornerRadius(facing.x, facing.y)]: radius,
+    }
   if (facing.x) return { top: 0, bottom: 0, width: thickness, [facing.x]: 0 }
   return { left: 0, right: 0, height: thickness, [facing.y ?? "top"]: 0 }
 }
