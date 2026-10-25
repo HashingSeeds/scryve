@@ -53,6 +53,7 @@ export default {
       foilHeading: "Scryve Foil",
       opensPro: "Scryve Proを開きます",
       opensSignIn: "サインインを開きます",
+      proFailed: "Scryve Proを確認できなかったため、Proアイコンはロックされています。",
       names: {
         Default: "デフォルト",
         Two: "ツー",

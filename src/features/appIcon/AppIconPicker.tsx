@@ -103,6 +103,7 @@ export function AppIconPicker() {
   const billing = useRevenueCat()
   const auth = useAuthAccess()
   const planLoading = auth.isSignedIn && billing.customerInfo === null
+  const planFailed = planLoading && !billing.isLoading && Boolean(billing.error)
   const [current, setCurrent] = useState(() => (supportsAlternateIcons ? getAppIconName() : null))
   const [error, setError] = useState("")
   if (!supportsAlternateIcons) return null
@@ -123,6 +124,7 @@ export function AppIconPicker() {
     preview: PREVIEWS[name],
     background,
     locked: tier === "pro" && !billing.isCountPro,
+    lapsed: tier === "foil" && !billing.isFoil,
   })
   const options = [
     {
@@ -132,12 +134,13 @@ export function AppIconPicker() {
       preview: DEFAULT_PREVIEW,
       background: "#000000",
       locked: false,
+      lapsed: false,
     },
     ...APP_ICON_VARIANTS.filter(({ tier }) => tier === "pro").map(variantOption),
   ]
-  const foilOptions = billing.isFoil
-    ? APP_ICON_VARIANTS.filter(({ tier }) => tier === "foil").map(variantOption)
-    : []
+  const foilOptions = APP_ICON_VARIANTS.filter(
+    ({ name, tier }) => tier === "foil" && (billing.isFoil || name === current),
+  ).map(variantOption)
 
   const renderOption = ({
     name,
@@ -146,8 +149,10 @@ export function AppIconPicker() {
     preview,
     background,
     locked,
+    lapsed,
   }: (typeof options)[number]) => {
     const selected = name === current
+    const disabled = lapsed || (locked && planLoading)
     return (
       <TouchableOpacity
         key={id}
@@ -165,10 +170,10 @@ export function AppIconPicker() {
               )
             : undefined
         }
-        accessibilityState={{ selected, disabled: locked && planLoading }}
-        disabled={locked && planLoading}
+        accessibilityState={{ selected, disabled }}
+        disabled={disabled}
         activeOpacity={0.75}
-        style={[$option, locked && $locked]}
+        style={[$option, (locked || lapsed) && $locked]}
         onPress={() => {
           if (!locked) void choose(name)
           else if (auth.isSignedIn) void billing.presentPaywall()
@@ -200,6 +205,7 @@ export function AppIconPicker() {
           </>
         ) : null}
       </View>
+      {planFailed ? <Text size="xs" tx="account:settings.appIcon.proFailed" /> : null}
       {error ? <Text accessibilityRole="alert" size="xs" text={error} /> : null}
     </View>
   )

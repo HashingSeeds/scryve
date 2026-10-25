@@ -53,6 +53,7 @@ export default {
       foilHeading: "Scryve Foil",
       opensPro: "Scryve Pro खोलता है",
       opensSignIn: "साइन इन खुलता है",
+      proFailed: "Scryve Pro की जाँच नहीं हो सकी, इसलिए Pro आइकन लॉक हैं।",
       names: {
         Default: "डिफ़ॉल्ट",
         Two: "दो",
