@@ -402,7 +402,7 @@ describe("LifeCard", () => {
     [{ y: "top" }, { top: 0, left: 0, right: 0, height: 56 }],
     [
       { x: "left", y: "top" },
-      { left: 0, top: 0, width: 56, height: 56 },
+      { left: 0, top: 0, width: 56, height: 56, borderBottomRightRadius: 24 },
     ],
   ] as const)("puts the attacker's color on the edges facing %j", (facing, placement) => {
     const view = render(
