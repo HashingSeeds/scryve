@@ -9,9 +9,15 @@ import { DeckComparePrompt, listDateSpan, listDetail, listLabel } from "./DeckSt
 import { labelLists } from "./listLabels"
 import { deckStatsSummary } from "../../../test/fixtures/deckStats"
 
-const mockPaywall = jest.fn(async () => undefined)
+const mockPaywall = jest.fn(async (_options?: { showsErrorInline?: boolean }) => "cancelled")
+let mockBillingError: string | undefined
 jest.mock("@/features/billing/RevenueCatContext", () => ({
-  useRevenueCat: () => ({ configured: true, isLoading: false, presentPaywall: mockPaywall }),
+  useRevenueCat: () => ({
+    configured: true,
+    isLoading: false,
+    error: mockBillingError,
+    presentPaywall: mockPaywall,
+  }),
 }))
 
 it("names only the deck's current list Current, dates the rest and keeps untracked clear", () => {
@@ -62,4 +68,27 @@ it("presents the Pro paywall after dismissing the iOS prompt", async () => {
   } else await act(async () => undefined)
   expect(mockPaywall).toHaveBeenCalledTimes(1)
   expect(close).toHaveBeenCalledTimes(1)
+})
+
+it("keeps the prompt open with one inline message when the paywall fails", async () => {
+  mockPaywall.mockClear()
+  mockPaywall.mockImplementationOnce(async () => {
+    mockBillingError = "Pro checkout could not open"
+    return "error"
+  })
+  const close = jest.fn()
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <DeckComparePrompt onClose={close} />
+    </ThemeProvider>,
+  )
+  fireEvent.press(view.getByText("See Pro"))
+  if (Platform.OS === "ios")
+    await act(async () => view.UNSAFE_getByType(DialogCard).props.onDismissed())
+  else await act(async () => undefined)
+  expect(mockPaywall).toHaveBeenCalledWith({ showsErrorInline: true })
+  expect(close).not.toHaveBeenCalled()
+  expect(view.UNSAFE_getByType(DialogCard).props.visible).toBe(true)
+  expect(view.getAllByText("Pro checkout could not open")).toHaveLength(1)
+  mockBillingError = undefined
 })

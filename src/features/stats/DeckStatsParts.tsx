@@ -164,16 +164,10 @@ export function DeckComparePrompt({
 }) {
   const billing = useRevenueCat()
   const [state, setState] = useState<"prompt" | "dismiss" | "paywall">("prompt")
-  const [error, setError] = useState<string>()
   async function paywall() {
     setState("paywall")
-    try {
-      await billing.presentPaywall()
-      onClose()
-    } catch {
-      setError(translate("decks:deckLimit.proUnavailable"))
-      setState("prompt")
-    }
+    if ((await billing.presentPaywall({ showsErrorInline: true })) === "error") setState("prompt")
+    else onClose()
   }
   return (
     <DialogCard
@@ -186,7 +180,7 @@ export function DeckComparePrompt({
     >
       <Text tx="decks:stats.comparePro" />
       {preview ? <ComparePreview lists={preview} /> : null}
-      {error ? <AlertNote text={error} /> : null}
+      {billing.error ? <AlertNote text={billing.error} /> : null}
       <Button
         tx="decks:localSync.seePro"
         disabled={!billing.configured || billing.isLoading}
