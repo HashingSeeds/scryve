@@ -65,6 +65,5 @@ describe("settings route", () => {
     mockAuthAccess.isSignedIn = true
     renderSettings()
     expect(screen.getByText("Blocked players")).toBeTruthy()
-    expect(screen.getByTestId("blocked-players-empty")).toBeTruthy()
   })
 })

@@ -191,7 +191,6 @@ export function AppIconPicker() {
 
   return (
     <View style={themed($picker)}>
-      <Text tx="account:settings.appIcon.heading" preset="subheading" accessibilityRole="header" />
       <View accessibilityRole="radiogroup" style={themed($picker)}>
         <View style={themed($row)}>{options.map(renderOption)}</View>
         {foilOptions.length > 0 ? (

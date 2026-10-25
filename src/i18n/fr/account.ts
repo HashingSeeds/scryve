@@ -24,29 +24,27 @@ export default {
   settings: {
     title: "Réglages",
     localDefaults: "Paramètres par défaut des parties locales",
+    general: "Général",
+    appearance: "Apparence",
+    about: "À propos",
+    version: "Version",
     players: "joueurs",
     openScryveTo: "À l'ouverture de Scryve, afficher",
     launchDestination: {
       play: "Jouer",
       decks: "Decks",
     },
-    launchDestinationHint: "Jouer reprend une partie en cours ou ouvre un nouveau plateau.",
     game: "Jeu",
     chooseGame: "Lancer les nouvelles parties en",
     closeGameChoices: "Fermer le choix du jeu",
-    defaultsHint:
-      "Ne les définissez que si vous voulez que les nouvelles parties démarrent avec le même système et le même format.",
     haptics: {
       label: "Retour haptique",
-      helper:
-        "Un léger retour tactile après les changements de points de vie. Les échecs ne bloquent jamais la partie.",
     },
     theme: {
       heading: "Thème",
       system: "Système",
       light: "Clair",
       dark: "Sombre",
-      hint: "Système suit l'apparence de votre appareil. Clair et sombre restent fixes jusqu'à modification ici.",
     },
     appIcon: {
       heading: "Icône de l’app",

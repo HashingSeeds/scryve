@@ -22,6 +22,10 @@ const account = {
   settings: {
     title: "Settings",
     localDefaults: "Local game defaults",
+    general: "General",
+    appearance: "Appearance",
+    about: "About",
+    version: "Version",
     players: "players",
     // Label above a choice of which screen Scryve shows when it opens.
     openScryveTo: "When Scryve opens, show",
@@ -29,23 +33,18 @@ const account = {
       play: "Play",
       decks: "Decks",
     },
-    launchDestinationHint: "Play resumes a current game or opens a fresh board.",
     game: "Game",
     // Heading of the picker for the game and format new games start with.
     chooseGame: "Start new games as",
     closeGameChoices: "Close game choices",
-    defaultsHint:
-      "Set these only when you want new games to start with the same system and format.",
     haptics: {
       label: "Haptic feedback",
-      helper: "A subtle tap response after life changes. Failures never block play.",
     },
     theme: {
       heading: "Theme",
       system: "System",
       light: "Light",
       dark: "Dark",
-      hint: "System follows your device appearance. Light and dark stay fixed until changed here.",
     },
     appIcon: {
       heading: "App icon",

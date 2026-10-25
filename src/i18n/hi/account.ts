@@ -24,29 +24,27 @@ export default {
   settings: {
     title: "सेटिंग",
     localDefaults: "लोकल गेम के डिफ़ॉल्ट",
+    general: "सामान्य",
+    appearance: "दिखावट",
+    about: "जानकारी",
+    version: "वर्शन",
     players: "खिलाड़ी",
     openScryveTo: "Scryve खुलने पर दिखाएँ",
     launchDestination: {
       play: "खेलें",
       decks: "डेक",
     },
-    launchDestinationHint: "खेलें में चल रहा गेम फिर शुरू होता है या नया बोर्ड खुलता है।",
     game: "गेम",
     chooseGame: "नए गेम इस तरह शुरू करें",
     closeGameChoices: "गेम विकल्प बंद करें",
-    defaultsHint:
-      "इन्हें तभी सेट करें जब आप चाहते हों कि नए गेम एक ही सिस्टम और फ़ॉर्मैट से शुरू हों।",
     haptics: {
       label: "हैप्टिक फ़ीडबैक",
-      helper:
-        "लाइफ़ बदलने के बाद हल्का-सा टैप महसूस होता है। इसमें गड़बड़ी होने पर भी गेम नहीं रुकता।",
     },
     theme: {
       heading: "थीम",
       system: "सिस्टम",
       light: "लाइट",
       dark: "डार्क",
-      hint: "सिस्टम आपके डिवाइस की दिखावट के अनुसार चलता है। लाइट और डार्क यहाँ बदलने तक वैसे ही रहते हैं।",
     },
     appIcon: {
       heading: "ऐप आइकन",

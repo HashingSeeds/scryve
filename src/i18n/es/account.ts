@@ -24,29 +24,27 @@ export default {
   settings: {
     title: "Ajustes",
     localDefaults: "Valores predeterminados de partidas locales",
+    general: "General",
+    appearance: "Apariencia",
+    about: "Acerca de",
+    version: "Versión",
     players: "jugadores",
     openScryveTo: "Al abrir Scryve, mostrar",
     launchDestination: {
       play: "Jugar",
       decks: "Mazos",
     },
-    launchDestinationHint: "Jugar retoma la partida actual o abre un tablero nuevo.",
     game: "Juego",
     chooseGame: "Empezar partidas nuevas como",
     closeGameChoices: "Cerrar opciones de juego",
-    defaultsHint:
-      "Configura esto solo si quieres que las partidas nuevas empiecen con el mismo juego y formato.",
     haptics: {
       label: "Respuesta háptica",
-      helper:
-        "Una vibración sutil después de cambiar las vidas. Si falla, nunca bloquea la partida.",
     },
     theme: {
       heading: "Tema",
       system: "Sistema",
       light: "Claro",
       dark: "Oscuro",
-      hint: "Sistema sigue la apariencia de tu dispositivo. Claro y oscuro se mantienen fijos hasta que los cambies aquí.",
     },
     appIcon: {
       heading: "Icono de la app",
