@@ -292,6 +292,19 @@ it.each([true, false, null])("shows honest turn order rates and filters %s", (we
   )
 })
 
+it("leaves out turn order rows with no games", () => {
+  mockSummary = {
+    ...deckStatsSummary,
+    slices: deckStatsSummary.slices.map((slice) => ({
+      ...slice,
+      wentFirst: slice.wentFirst ?? true,
+    })),
+  }
+  const view = render(screen())
+  expect(view.getByTestId("stats-turn-order-true")).toBeTruthy()
+  expect(view.queryByTestId("stats-turn-order-null")).toBeNull()
+})
+
 it("hides turn order when no result tracked it", () => {
   const view = render(screen())
   expect(view.getByText("Turn order")).toBeTruthy()

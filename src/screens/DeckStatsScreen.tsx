@@ -117,10 +117,12 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
     .sort((a, b) => (b ?? 0) - (a ?? 0))
     .map((podSize) => ({ podSize, record: sumSlices(summary.slices, "all", { podSize }) }))
   const turnOrderRows = summary.slices.some((slice) => slice.wentFirst !== null)
-    ? ([true, false, null] as const).map((wentFirst) => ({
-        wentFirst,
-        record: sumSlices(summary.slices, "all", { wentFirst }),
-      }))
+    ? ([true, false, null] as const)
+        .map((wentFirst) => ({
+          wentFirst,
+          record: sumSlices(summary.slices, "all", { wentFirst }),
+        }))
+        .filter((row) => row.record.games > 0)
     : []
   const sourceRows = (["scryve", "manual"] as const).map((value) => ({
     value,
