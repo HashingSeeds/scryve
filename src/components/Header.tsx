@@ -127,6 +127,8 @@ export function Header(props: HeaderProps) {
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
+  // why: the iPhone Duo floats its status bar in a top corner and reports it only as a side inset, so the actions step in while the title stays centered on the screen.
+  const $actionInsets = useSafeAreaInsetsStyle(["left", "right"])
   const { fontScale } = useWindowDimensions()
   const centered = titleMode === "center" && fontScale <= CENTERED_TITLE_MAX_FONT_SCALE
 
@@ -139,7 +141,7 @@ export function Header(props: HeaderProps) {
 
   return (
     <View style={[$container, $containerInsets, { backgroundColor }, $containerStyleOverride]}>
-      <View style={[$styles.row, $wrapper, $styleOverride]}>
+      <View style={[$styles.row, $wrapper, $actionInsets, $styleOverride]}>
         <HeaderAction
           onLayout={measureAction("left")}
           tx={leftTx}
@@ -315,8 +317,9 @@ const $titleWrapperCenter: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
   height: "100%",
-  width: "100%",
   position: "absolute",
+  left: 0,
+  right: 0,
   zIndex: 1,
 }
 

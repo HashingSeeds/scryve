@@ -27,6 +27,7 @@ import { overlayTint } from "./LifeControls"
 import type {
   LifeCardContentInsets,
   LifeCardContentRotation,
+  LifeCardEdge,
   LifeCardMenuCorner,
 } from "./playerCardTypes"
 import { MarkArt } from "./PlayerMark"
@@ -276,8 +277,7 @@ function DefenderControls({
   }
 
   const undoCorner = freeCorner(menuCorner, facing)
-  const inset = (edge: keyof LifeCardContentInsets) =>
-    (contentInsets?.[edge] ?? 0) + theme.spacing.xxs
+  const inset = (edge: LifeCardEdge) => (contentInsets?.[edge] ?? 0) + theme.spacing.xxs
   const sideways = Math.abs(contentRotation) === 90
   const content = takeover?.content ?? { width: 0, height: 0 }
   const contentBox: ViewStyle = {

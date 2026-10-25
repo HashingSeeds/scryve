@@ -604,6 +604,43 @@ describe("LifeCard", () => {
     expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
   })
 
+  it("slides a top seat's name along its edge, clear of a camera hole in its corner", () => {
+    const position = seatIdentityPlacement({
+      rotation: 180,
+      cardSize: { width: 466, height: 330 },
+      gap: 12,
+      insets: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        cutout: { edge: "right", side: "top", size: 84 },
+      },
+      screenEdges: { top: true, left: true, right: true, bottom: false },
+      markHeight: 48,
+    }).position
+    expect(position.left).toBe(12 + 84)
+    expect(position.bottom).toBe(12)
+  })
+
+  it("ends a side seat's identity row before a camera hole at its far end", () => {
+    const { rowMaxWidth } = seatIdentityPlacement({
+      rotation: -90,
+      cardSize: { width: 229, height: 222 },
+      gap: 12,
+      insets: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        cutout: { edge: "top", side: "right", size: 84 },
+      },
+      screenEdges: { top: true, left: false, right: true, bottom: false },
+      markHeight: 48,
+    })
+    expect(rowMaxWidth).toBe(222 - 12 - (84 - 11))
+  })
+
   it.each([
     { inset: 34, bottom: 34 + 8 },
     { inset: 0, bottom: 16 },

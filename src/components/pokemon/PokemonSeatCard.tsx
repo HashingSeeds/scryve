@@ -50,6 +50,7 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatO
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   cornerOffset,
+  CUTOUT_ENDS_INSIDE_INSET,
   getDeltaFontSizeThatFits,
   getLifeLineHeight,
   type LifeCardContentInsets,
@@ -95,7 +96,6 @@ export interface PokemonSeatCardProps {
 const KNOCKOUT_TOAST_MS = 6_000
 const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
-const CUTOUT_ENDS_ABOVE_INSET = 11
 const NAME_LINE_HEIGHT = 26
 const NAME_MAX_FONT_SCALE = 1.3
 const PRIZE_PIP_ASPECT = 4 / 5
@@ -178,7 +178,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const bottomRowLift = besideCutout
     ? Math.max(
         cornerOffset(identityMetrics.edge, edges.bottom, edges.left, contentInsets, screenEdges),
-        insets.bottom - CUTOUT_ENDS_ABOVE_INSET + nameLine / 2 - prizeRowHeight / 2,
+        insets.bottom - CUTOUT_ENDS_INSIDE_INSET + nameLine / 2 - prizeRowHeight / 2,
       ) -
       insets.bottom -
       padding

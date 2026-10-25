@@ -25,6 +25,7 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
+  getCornerCutout,
   getScreenCornerSquaringStyle,
   PlayerGrid,
 } from "./PlayerGrid"
@@ -551,6 +552,14 @@ describe("PlayerGrid", () => {
       StyleSheet.flatten(view.getByTestId(`life-editor-header-seat-${seat}`).props.style)
     expect(header(2).left).toBeGreaterThanOrEqual(44)
     expect(header(3).right).toBeGreaterThanOrEqual(44)
+  })
+
+  it.each([
+    { insets: { top: 0, right: 84, bottom: 34, left: 0 }, cutout: { edge: "right", size: 84 } },
+    { insets: { top: 59, right: 0, bottom: 34, left: 0 }, cutout: undefined },
+  ])("reads a portrait side inset as a corner camera hole", ({ insets, cutout }) => {
+    expect(getCornerCutout(insets, { width: 466, height: 678 })).toEqual(cutout)
+    expect(getCornerCutout(insets, { width: 678, height: 466 })).toBeUndefined()
   })
 
   it("squares only the corners that meet the device's rounded screen corners", () => {

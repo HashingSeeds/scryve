@@ -4,14 +4,12 @@ export type LifeCardContentRotation = -90 | 0 | 90 | 180
 export type LifeCardMenuCorner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight"
 export type LifeCardMenuEdge = "top" | "bottom" | "left" | "right"
 
-export interface LifeCardContentInsets {
-  top: number
-  bottom: number
-  left: number
-  right: number
+export type LifeCardEdge = "top" | "bottom" | "left" | "right"
+
+export interface LifeCardContentInsets extends Record<LifeCardEdge, number> {
+  cutout?: { edge: LifeCardEdge; side: LifeCardEdge; size: number }
 }
 
-export type LifeCardEdge = keyof LifeCardContentInsets
 export type LifeCardScreenEdges = Record<LifeCardEdge, boolean>
 
 export function lifeCardContentInsetStyle(insets?: LifeCardContentInsets): {
@@ -41,6 +39,8 @@ export const LIFE_FONT_SIZE = 120
 export const COMPACT_LIFE_FONT_SIZE = 84
 
 export const SCREEN_CORNER_CLEARANCE = 24
+/** why: iOS reserves a margin around a camera cutout, so the hole itself ends at least this far inside its inset. */
+export const CUTOUT_ENDS_INSIDE_INSET = 11
 export const TUCKS_INTO_SCREEN_CORNERS = Platform.OS !== "web"
 
 export function cornerOffset(
@@ -50,6 +50,7 @@ export function cornerOffset(
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
 ) {
+  if (insets?.cutout?.edge === edge && insets.cutout.side === side) return gap + insets.cutout.size
   const inset = insets?.[edge] ?? 0
   const screenCorner = !!screenEdges?.[edge] && !!screenEdges[side]
   return screenCorner ? Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE)) : gap + inset
