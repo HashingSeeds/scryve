@@ -56,7 +56,6 @@ export interface SeatIdentityProps {
   shape?: PlayerMarkShape
   color: string
   compact?: boolean
-  spinning?: boolean
   insetSwordColor?: string
   foil?: boolean
   staleSince?: number
@@ -70,7 +69,6 @@ export function SeatIdentity({
   shape,
   color,
   compact,
-  spinning,
   insetSwordColor,
   foil,
   staleSince,
@@ -84,7 +82,6 @@ export function SeatIdentity({
         seatNumber={seatNumber}
         shape={shape}
         color={color}
-        spinning={spinning}
         insetSwordColor={insetSwordColor}
         foil={foil}
         size={metrics.mark}

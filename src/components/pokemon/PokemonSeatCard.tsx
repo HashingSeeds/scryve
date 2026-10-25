@@ -641,7 +641,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             shape={shape}
             color={ink}
             compact={cramped}
-            spinning={ownership === "owned"}
             staleSince={staleSince}
             style={[$identity, { marginLeft: identityMetrics.edge - padding }]}
           />
