@@ -366,6 +366,25 @@ describe("SettingsScreen", () => {
     )
   })
 
+  it("hides the haptics switch on web, which has no haptics", () => {
+    const platform = jest.replaceProperty(Platform, "OS", "web")
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <SettingsScreen
+            initialSettings={DEFAULT_LOCAL_SETTINGS}
+            onBack={jest.fn()}
+            onSettingsChange={jest.fn()}
+            onOpenAbout={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+      expect(view.queryByTestId("haptics-switch")).toBeNull()
+    } finally {
+      platform.restore()
+    }
+  })
+
   it("steps player count and starting life within their bounds", () => {
     const onSettingsChange = jest.fn()
     const view = render(
