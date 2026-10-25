@@ -342,6 +342,9 @@ describe("claiming an imported seat through claimSeat", () => {
       }),
     ).rejects.toMatchObject({ data: { code: "seat_taken", message: "Seat already claimed" } })
     await expect(
+      stranger.mutation(api.games.claimSeat, { manualCode: created.manualCode }),
+    ).rejects.toMatchObject({ data: { code: "game_full", message: "Lobby is full" } })
+    await expect(
       stranger.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: "ZZZ999",

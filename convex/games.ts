@@ -963,7 +963,7 @@ async function claimPreparedSeat(
   }
   if (seat !== undefined && !target)
     throw new ConvexError({ code: "seat_not_found", message: "Seat not found" })
-  if (!target) throw new ConvexError({ code: "game_full", message: "Game is full" })
+  if (!target) throw new ConvexError({ code: "game_full", message: "Lobby is full" })
   if (target.userId !== undefined)
     throw new ConvexError({ code: "seat_taken", message: "Seat already claimed" })
   await ctx.db.patch(target._id, {
