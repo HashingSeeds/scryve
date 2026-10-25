@@ -177,7 +177,11 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("start-game-button"))
-    expect(localGameRepository.loadActiveGame()).toBeNull()
+    expect(localGameRepository.loadActiveGame()).toMatchObject({
+      status: "active",
+      events: [],
+      players: [{ name: "Player 1" }, { name: "Player 2" }],
+    })
     expect(router.dismissTo).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: "/",
@@ -212,7 +216,9 @@ describe("new local game route", () => {
     expect(view.getByText(/players · 40 life/)).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(view.queryByText("Reset this game?")).toBeNull()
-    expect(localGameRepository.loadActiveGame()).toBeNull()
+    const started = localGameRepository.loadActiveGame()
+    expect(started).not.toBeNull()
+    expect(started?.id).not.toBe(game.id)
   })
 
   it("does not replace an existing active game", () => {
