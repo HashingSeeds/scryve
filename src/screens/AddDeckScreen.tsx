@@ -44,6 +44,7 @@ import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
@@ -598,6 +599,9 @@ export function AddDeckScreen({
           setCatalogStatus(found.status)
           setCatalogCursor(found.cursor)
           setRetryAfterMs(found.retryAfterMs)
+          const preconsFound = preconResult.status === "fulfilled" && preconResult.value?.length
+          if (!cursor && !query.trim() && !found.decks.length && !preconsFound)
+            captureAnalytics("deck_browse_empty", { system: game, format, status: found.status })
         }
       } catch (cause) {
         if (searchToken.current === token)
@@ -615,6 +619,8 @@ export function AddDeckScreen({
     setCatalogDecks([])
     setCatalogCursor(null)
     setCatalogStatus("ready")
+    // why: the empty state must wait for an answer, not show during the debounce or a request that never lands.
+    setSearching(true)
     const timer = setTimeout(() => void runCatalogSearch(preconQuery), SEARCH_DEBOUNCE_MS)
     return () => {
       clearTimeout(timer)

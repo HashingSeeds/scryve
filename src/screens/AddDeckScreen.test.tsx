@@ -13,6 +13,7 @@ import {
   saveGuestDeck,
 } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 import { clear } from "@/utils/storage"
 
 import { AddDeckScreen, catalogPreviewSections } from "./AddDeckScreen"
@@ -154,6 +155,8 @@ const mockListMine: {
   value: readyShelf,
   error: undefined,
 }
+
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
 jest.mock("@/features/billing/RevenueCatContext", () => ({
   useRevenueCat: () => ({
@@ -1665,6 +1668,25 @@ describe("AddDeckScreen", () => {
     })
     fireEvent.press(view.getByText("Cached deck"))
     expect(view.getByTestId("catalog-deck-preview")).toBeTruthy()
+  })
+
+  it("waits for Browse to answer before saying a format has no decks", async () => {
+    let answer!: (decks: MockCatalogDeck[]) => void
+    mockSearch.mockResolvedValueOnce([])
+    mockSearchTopDecks.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const view = renderAddDeck()
+    chooseFormat(view, "commander")
+    expect(view.queryByText("No decks here yet")).toBeNull()
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(view.getByText("Loading decks…")).toBeTruthy()
+    expect(view.queryByText("No decks here yet")).toBeNull()
+    await act(async () => answer([]))
+    expect(view.getByText("No decks here yet")).toBeTruthy()
+    expect(captureAnalytics).toHaveBeenCalledWith("deck_browse_empty", {
+      system: "mtg",
+      format: "commander",
+      status: "ready",
+    })
   })
 
   it("shows an offline note instead of loading forever and retries on reconnect", async () => {
