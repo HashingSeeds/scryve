@@ -206,6 +206,17 @@ describe("nearby host", () => {
     set.mockRestore()
   })
 
+  it("saves a rematch's first state at once, even right after the last round", async () => {
+    const { session } = await startedGame()
+    await session.writes.finish()
+    expect(savedHostedGame()).toBeUndefined()
+
+    session.start()
+    jest.advanceTimersByTime(50)
+
+    expect(savedHostedGame()).toBeDefined()
+  })
+
   it("keeps the saved game when the host comes back to the foreground", async () => {
     const { session } = await startedGame()
     const onAppState = jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]

@@ -271,8 +271,10 @@ export class LanSession {
     this.saveTimer = undefined
     const { game, roundOwner } = this
     const { role, seatKey, serviceName } = this.state
-    if (role !== "host" || game?.status !== "active" || !seatKey || !serviceName)
+    if (role !== "host" || game?.status !== "active" || !seatKey || !serviceName) {
+      this.savedAt = 0
       return remove(HOSTED_GAME_KEY)
+    }
     this.savedAt = Date.now()
     const { memory, ...rest } = game
     const hosted: HostedGame = {
@@ -644,6 +646,7 @@ export class LanSession {
     this.flushTimer = undefined
     clearTimeout(this.saveTimer)
     this.saveTimer = undefined
+    this.savedAt = 0
     this.reconnectingSince = undefined
     if (role === "host" && game) {
       const ended = game.status === "abandoned" ? game : endLanRound(game, "abandoned", Date.now())
