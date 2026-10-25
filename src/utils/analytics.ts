@@ -29,6 +29,7 @@ const values = {
   write: ["life", "table", "commander.claim", "commander.resolve"],
   tool: DICE_TOOLS,
   source: ["pill", "bag"],
+  status: ["ready", "unsupported", "refreshing", "rate_limited", "unavailable"],
 } as const
 
 export type GameEndSource = (typeof values.end_source)[number]
@@ -63,6 +64,7 @@ type Events = {
   }
   dice_armed: { tool: DiceTool; source: "pill" | "bag"; system?: string; since_roll_ms?: number }
   dice_rolled: { tool: DiceTool; system?: string }
+  deck_browse_empty: { system: string; format: string; status: (typeof values.status)[number] }
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -76,6 +78,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   sync_timing: ["timing", "duration_ms", "attempt_count", "write"],
   dice_armed: ["tool", "source", "system", "since_roll_ms"],
   dice_rolled: ["tool", "system"],
+  deck_browse_empty: ["system", "format", "status"],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"
