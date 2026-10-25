@@ -1,10 +1,7 @@
-import { Platform } from "react-native"
+import { supportsAlternateIcons } from "expo-alternate-app-icons"
 import { router } from "expo-router"
 
-import { openAppleStandardEula } from "@/content/legalLinks"
-import { AppIconPicker } from "@/features/appIcon/AppIconPicker"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { BlockedPlayersSection } from "@/features/connected/BlockedPlayersSection"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { SettingsScreen } from "@/screens/SettingsScreen"
 import { useAppTheme } from "@/theme/context"
@@ -17,15 +14,11 @@ export default function SettingsRoute() {
     <SettingsScreen
       initialSettings={localGameRepository.loadSettings()}
       onBack={() => router.back()}
-      onOpenPrivacy={() => router.push("/privacy")}
-      onOpenTerms={() => router.push("/terms")}
-      onOpenLicenseAgreement={
-        Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
+      onOpenAbout={() => router.push("/settings/about")}
+      onOpenAppIcon={supportsAlternateIcons ? () => router.push("/settings/app-icon") : undefined}
+      onOpenBlockedPlayers={
+        hasCloudSession ? () => router.push("/settings/blocked-players") : undefined
       }
-      onOpenCookiePolicy={() => router.push("/cookie-policy")}
-      onOpenGameContentNotices={() => router.push("/game-content-notices")}
-      BlockedPlayers={hasCloudSession ? <BlockedPlayersSection /> : undefined}
-      AppIcon={<AppIconPicker />}
       onSettingsChange={(settings) => {
         localGameRepository.saveSettings(settings)
         setThemeContextOverride(

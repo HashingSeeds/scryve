@@ -140,7 +140,6 @@ function BlockedPlayersFrame({ children }: { children: ReactNode }) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($section)}>
-      <Text tx="connected:blockedPlayers.title" preset="subheading" accessibilityRole="header" />
       <Text size="xs" style={themed($muted)} tx="connected:blockedPlayers.description" />
       <View testID="blocked-players-state" style={themed($state)}>
         {children}
@@ -149,10 +148,7 @@ function BlockedPlayersFrame({ children }: { children: ReactNode }) {
   )
 }
 
-const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xs,
-  marginTop: spacing.lg,
-})
+const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $state: ThemedStyle<ViewStyle> = () => ({ minHeight: 68, justifyContent: "center" })
 const $stateRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,

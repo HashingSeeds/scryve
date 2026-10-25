@@ -3,10 +3,15 @@ import { render, screen } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import SettingsRoute from "../src/app/settings"
+import BlockedPlayersRoute from "../src/app/settings/blocked-players"
 
-jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
-}))
+jest.mock("expo-router", () => {
+  const { Text } = jest.requireActual("react-native")
+  return {
+    router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
+    Redirect: ({ href }: { href: string }) => <Text>{`redirect:${href}`}</Text>,
+  }
+})
 
 const mockAuthAccess = {
   configured: false,
@@ -44,6 +49,7 @@ function renderSettings() {
 describe("settings route", () => {
   beforeEach(() => {
     mockAuthAccess.configured = false
+    mockAuthAccess.isLoaded = true
     mockAuthAccess.isSignedIn = false
   })
 
@@ -65,6 +71,26 @@ describe("settings route", () => {
     mockAuthAccess.isSignedIn = true
     renderSettings()
     expect(screen.getByText("Blocked players")).toBeTruthy()
-    expect(screen.getByTestId("blocked-players-empty")).toBeTruthy()
+  })
+
+  it("sends a direct blocked players visit without a cloud session back to Settings", () => {
+    render(
+      <ThemeProvider initialContext="light">
+        <BlockedPlayersRoute />
+      </ThemeProvider>,
+    )
+    expect(screen.getByText("redirect:/settings")).toBeTruthy()
+  })
+
+  it("keeps a direct blocked players visit while the session is still loading", () => {
+    mockAuthAccess.configured = true
+    mockAuthAccess.isLoaded = false
+    render(
+      <ThemeProvider initialContext="light">
+        <BlockedPlayersRoute />
+      </ThemeProvider>,
+    )
+    expect(screen.queryByText("redirect:/settings")).toBeNull()
+    expect(screen.getByText("Blocked players")).toBeTruthy()
   })
 })

@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react"
 import { Platform } from "react-native"
 import * as Clipboard from "expo-clipboard"
 import * as Updates from "expo-updates"
@@ -11,6 +12,7 @@ import {
 import { ThemeProvider } from "@/theme/context"
 import { analyticsId } from "@/utils/analytics"
 
+import { AboutScreen } from "./AboutScreen"
 import { SettingsScreen } from "./SettingsScreen"
 
 const mockApp = {
@@ -67,6 +69,18 @@ jest.mock("@/utils/analytics", () => ({
   analyticsId: jest.fn(() => null),
 }))
 
+const renderAbout = (props: Partial<ComponentProps<typeof AboutScreen>> = {}) =>
+  render(
+    <ThemeProvider initialContext="dark">
+      <AboutScreen
+        onBack={jest.fn()}
+        onOpenPrivacy={jest.fn()}
+        onOpenTerms={jest.fn()}
+        {...props}
+      />
+    </ThemeProvider>,
+  )
+
 describe("SettingsScreen", () => {
   beforeEach(() => {
     mockApp.nativeApplicationVersion = "1.2.3"
@@ -88,23 +102,33 @@ describe("SettingsScreen", () => {
     jest.mocked(analyticsId).mockReset().mockReturnValue(null)
   })
 
-  it("shows installed metadata and copies full identifiers", async () => {
+  it("shows installed metadata on About", () => {
     const id = "analytics_" + "a".repeat(32)
     jest.mocked(analyticsId).mockReturnValue(id)
+    const view = renderAbout()
+    expect(view.getByText("Version: 1.2.3")).toBeTruthy()
+    expect(view.getByText("Build: 42")).toBeTruthy()
+    expect(view.getByText("Runtime: abcdef123456…")).toBeTruthy()
+    expect(view.getByText("Update: 12345678-abc…")).toBeTruthy()
+    expect(view.getByText(`Analytics ID: ${id}`)).toBeTruthy()
+  })
+
+  it("summarizes the version and copies full identifiers from Settings", async () => {
+    const id = "analytics_" + "a".repeat(32)
+    jest.mocked(analyticsId).mockReturnValue(id)
+    const onOpenAbout = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
+          onOpenAbout={onOpenAbout}
         />
       </ThemeProvider>,
     )
-    expect(view.getByText("Version: 1.2.3")).toBeTruthy()
-    expect(view.getByText("Build: 42")).toBeTruthy()
-    expect(view.getByText("Runtime: abcdef123456…")).toBeTruthy()
-    expect(view.getByText("Update: 12345678-abc…")).toBeTruthy()
-    expect(view.getByText(`Analytics ID: ${id}`)).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Version, 1.2.3 (42)"))
+    expect(onOpenAbout).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByText("Copy debug info"))
     await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
     expect(view.queryByText("Copy debug info")).toBeNull()
@@ -130,6 +154,7 @@ describe("SettingsScreen", () => {
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>
     )
@@ -158,31 +183,14 @@ describe("SettingsScreen", () => {
     mockApp.nativeApplicationVersion = null
     mockUpdates.runtimeVersion = null
     mockUpdates.channel = null
-    const screen = (
-      <ThemeProvider initialContext="dark">
-        <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
-          onBack={jest.fn()}
-          onSettingsChange={jest.fn()}
-        />
-      </ThemeProvider>
-    )
-    const view = render(screen)
+    const view = renderAbout()
     expect(view.getByText("Update: Bundled")).toBeTruthy()
     expect(view.getByText("Version: Unavailable")).toBeTruthy()
     expect(view.getByText("Build: Unavailable")).toBeTruthy()
     expect(view.getByText("Runtime: Unavailable")).toBeTruthy()
     mockUpdates.isEnabled = false
-    view.rerender(
-      <ThemeProvider initialContext="dark">
-        <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
-          onBack={jest.fn()}
-          onSettingsChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    expect(view.getByText("Update: Development")).toBeTruthy()
+    view.unmount()
+    expect(renderAbout().getByText("Update: Development")).toBeTruthy()
   })
 
   it("reports bundled code when updates are disabled in a native release", async () => {
@@ -192,16 +200,17 @@ describe("SettingsScreen", () => {
     mockUpdates.isEmbeddedLaunch = false
     mockUpdates.updateId = null
     try {
+      renderAbout().getByText("Update: Bundled")
       const view = render(
         <ThemeProvider initialContext="dark">
           <SettingsScreen
             initialSettings={DEFAULT_LOCAL_SETTINGS}
             onBack={jest.fn()}
             onSettingsChange={jest.fn()}
+            onOpenAbout={jest.fn()}
           />
         </ThemeProvider>,
       )
-      expect(view.getByText("Update: Bundled")).toBeTruthy()
       fireEvent.press(view.getByText("Copy debug info"))
       await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
       expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
@@ -224,6 +233,7 @@ describe("SettingsScreen", () => {
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -239,15 +249,7 @@ describe("SettingsScreen", () => {
     mockApp.nativeBuildVersion = null
     Object.assign(mockUpdates, { isEnabled: true, runtimeVersion: "", channel: "" })
     try {
-      const view = render(
-        <ThemeProvider initialContext="dark">
-          <SettingsScreen
-            initialSettings={DEFAULT_LOCAL_SETTINGS}
-            onBack={jest.fn()}
-            onSettingsChange={jest.fn()}
-          />
-        </ThemeProvider>,
-      )
+      const view = renderAbout()
       expect(view.getByText("Build: Not applicable")).toBeTruthy()
       expect(view.getByText("Runtime: Not applicable")).toBeTruthy()
       expect(view.getByText("Channel: Not applicable")).toBeTruthy()
@@ -259,16 +261,7 @@ describe("SettingsScreen", () => {
 
   describe("beta updates", () => {
     const development = __DEV__
-    const renderSettings = () =>
-      render(
-        <ThemeProvider initialContext="dark">
-          <SettingsScreen
-            initialSettings={DEFAULT_LOCAL_SETTINGS}
-            onBack={jest.fn()}
-            onSettingsChange={jest.fn()}
-          />
-        </ThemeProvider>,
-      )
+    const renderSettings = () => renderAbout()
     const tapVersion = (view: ReturnType<typeof renderSettings>, times: number) => {
       for (let tap = 0; tap < times; tap++) fireEvent.press(view.getByText("Version: 1.2.3"))
     }
@@ -352,6 +345,7 @@ describe("SettingsScreen", () => {
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -380,6 +374,7 @@ describe("SettingsScreen", () => {
           initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultPlayerCount: 2 }}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -401,6 +396,7 @@ describe("SettingsScreen", () => {
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -435,6 +431,7 @@ describe("SettingsScreen", () => {
           initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg" }}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -456,6 +453,7 @@ describe("SettingsScreen", () => {
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -483,6 +481,7 @@ describe("SettingsScreen", () => {
           initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg" }}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -526,6 +525,7 @@ describe("SettingsScreen", () => {
           initialSettings={settings}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -551,6 +551,7 @@ describe("SettingsScreen", () => {
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={onBack}
           onSettingsChange={jest.fn()}
+          onOpenAbout={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -566,23 +567,14 @@ describe("SettingsScreen", () => {
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
-  it("exposes every web legal document", () => {
+  it("exposes every web legal document on About", () => {
     const handlers = {
       onOpenPrivacy: jest.fn(),
       onOpenTerms: jest.fn(),
       onOpenCookiePolicy: jest.fn(),
       onOpenGameContentNotices: jest.fn(),
     }
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
-          onBack={jest.fn()}
-          onSettingsChange={jest.fn()}
-          {...handlers}
-        />
-      </ThemeProvider>,
-    )
+    const view = renderAbout(handlers)
 
     fireEvent.press(view.getByText("Privacy Policy"))
     fireEvent.press(view.getByText("Terms of Use"))
@@ -598,18 +590,7 @@ describe("SettingsScreen", () => {
 
   it("exposes the license agreement when a handler is provided", () => {
     const onOpenLicenseAgreement = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
-          onBack={jest.fn()}
-          onSettingsChange={jest.fn()}
-          onOpenPrivacy={jest.fn()}
-          onOpenTerms={jest.fn()}
-          onOpenLicenseAgreement={onOpenLicenseAgreement}
-        />
-      </ThemeProvider>,
-    )
+    const view = renderAbout({ onOpenLicenseAgreement })
 
     fireEvent.press(view.getByText("License Agreement"))
     expect(onOpenLicenseAgreement).toHaveBeenCalledTimes(1)

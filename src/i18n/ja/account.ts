@@ -24,27 +24,27 @@ export default {
   settings: {
     title: "設定",
     localDefaults: "ローカルゲームの初期設定",
+    general: "一般",
+    appearance: "外観",
+    about: "アプリについて",
+    version: "バージョン",
     players: "プレイヤー",
     openScryveTo: "Scryveを開いたときに表示する画面",
     launchDestination: {
       play: "プレイ",
       decks: "デッキ",
     },
-    launchDestinationHint: "プレイは進行中のゲームを再開するか、新しいボードを開きます。",
     game: "ゲーム",
     chooseGame: "新しいゲームの設定",
     closeGameChoices: "ゲームの選択肢を閉じる",
-    defaultsHint: "新しいゲームを同じシステムとフォーマットで始めたい場合のみ設定してください。",
     haptics: {
       label: "触覚フィードバック",
-      helper: "ライフが変わると、軽い振動で知らせます。失敗してもプレイは妨げられません。",
     },
     theme: {
       heading: "テーマ",
       system: "システム",
       light: "ライト",
       dark: "ダーク",
-      hint: "「システム」はデバイスの外観設定に従います。ライトとダークは、ここで変更するまで固定されます。",
     },
     appIcon: {
       heading: "アプリアイコン",
