@@ -421,6 +421,19 @@ describe("nearby messages", () => {
     })
   })
 
+  it("reads an ack's claim status when the host sends one, and an older host's ack without it", () => {
+    const ack = (fields: object) =>
+      parseHostMessage(JSON.stringify({ type: "ack", operationId: "claim-1", ...fields }))
+
+    expect(ack({})).toEqual({ type: "ack", operationId: "claim-1" })
+    expect(ack({ status: "declined" })).toEqual({
+      type: "ack",
+      operationId: "claim-1",
+      status: "declined",
+    })
+    expect(ack({ status: "lost" })).toEqual({ type: "ack", operationId: "claim-1" })
+  })
+
   it("refuses a join with no usable name, and never cuts a name inside a character", () => {
     const join = (name: string) => parseGuestMessage(JSON.stringify({ type: "join", name }))
 

@@ -362,7 +362,11 @@ export class LanSession {
         this.queueReply(
           seatKey,
           result.ok
-            ? { type: "ack", operationId }
+            ? {
+                type: "ack",
+                operationId,
+                ...(result.ack.status ? { status: result.ack.status } : {}),
+              }
             : {
                 type: "nack",
                 operationId,
@@ -424,8 +428,11 @@ export class LanSession {
     const { game: next, result } = applyLanWrite(game, seatKey, event, Date.now())
     if (!result.ok) return Promise.reject(writeFailure(result.error))
     this.publish(next)
+    const { status } = result.ack
     return new Promise((resolve) =>
-      this.hostAcks.push(() => resolve({ operationId: event.operationId })),
+      this.hostAcks.push(() =>
+        resolve({ operationId: event.operationId, ...(status ? { status } : {}) }),
+      ),
     )
   }
 
@@ -513,8 +520,12 @@ export class LanSession {
       const pending = this.pendingWrites.get(message.operationId)
       this.pendingWrites.delete(message.operationId)
       if (!pending) return
-      if (message.type === "ack")
-        return settleAfterRender(() => pending.resolve({ operationId: message.operationId }))
+      if (message.type === "ack") {
+        const { operationId, status } = message
+        return settleAfterRender(() =>
+          pending.resolve({ operationId, ...(status ? { status } : {}) }),
+        )
+      }
       return pending.reject(writeFailure(message))
     }
     this.reconnectingSince = undefined

@@ -1,6 +1,7 @@
 import { translate } from "@/i18n/translate"
 
 import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
+import type { ClaimStatus } from "../../../convex/lib/gameEngine"
 import {
   commanderTotals,
   writeMemoryGame,
@@ -130,7 +131,7 @@ export type LanHostMessage =
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
   | { type: "state"; lobby: LanLobby; projection: ConnectedProjection }
-  | { type: "ack"; operationId: string }
+  | { type: "ack"; operationId: string; status?: ClaimStatus }
   | { type: "nack"; operationId: string; code?: string; message: string }
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
@@ -658,6 +659,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
 }
 
 const LAN_STATUSES: readonly LanStatus[] = ["lobby", "active", "finished", "abandoned"]
+const CLAIM_STATUSES: readonly ClaimStatus[] = ["pending", "confirmed", "declined"]
 
 function parseLobby(value: unknown): LanLobby | null {
   if (!isRecord(value) || !isId(value.id) || !isCount(value.round)) return null
@@ -700,8 +702,10 @@ export function parseHostMessage(line: string): LanHostMessage | null {
     const projection = toConnectedProjection(value.projection)
     return lobby && projection ? { type: "state", lobby, projection } : null
   }
-  if (value.type === "ack" && isId(value.operationId))
-    return { type: "ack", operationId: value.operationId }
+  if (value.type === "ack" && isId(value.operationId)) {
+    const status = CLAIM_STATUSES.find((candidate) => candidate === value.status)
+    return { type: "ack", operationId: value.operationId, ...(status ? { status } : {}) }
+  }
   if (value.type === "nack" && isId(value.operationId) && typeof value.message === "string")
     return {
       type: "nack",
