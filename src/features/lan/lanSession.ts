@@ -59,8 +59,8 @@ const FLUSH_INTERVAL_MS = 33
 // why: a host that was killed never withdraws its Bonjour advert, which can outlive it by over an hour.
 const UNREACHABLE_HIDE_MS = 2 * 60_000
 const WRITES_PER_SECOND = 30
-// why: the saved game carries every event, so a burst of taps is written once rather than on every broadcast.
-const HOST_SAVE_DELAY_MS = 1_000
+// why: the saved game carries every event, so it is written at most once a second; a crash loses at most that second of changes.
+const HOST_SAVE_INTERVAL_MS = 1_000
 const PASS_KEY = "lan.seatPass"
 
 export interface LanSessionState {
@@ -165,6 +165,7 @@ export class LanSession {
   private flushTimer?: ReturnType<typeof setTimeout>
   private flushedAt = 0
   private saveTimer?: ReturnType<typeof setTimeout>
+  private savedAt = 0
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
   private session = 0
   private backgrounded = false
@@ -272,6 +273,7 @@ export class LanSession {
     const { role, seatKey, serviceName } = this.state
     if (role !== "host" || game?.status !== "active" || !seatKey || !serviceName)
       return remove(HOSTED_GAME_KEY)
+    this.savedAt = Date.now()
     const { memory, ...rest } = game
     const hosted: HostedGame = {
       protocol: LAN_PROTOCOL,
@@ -419,7 +421,10 @@ export class LanSession {
     }
     this.replies.clear()
     if (this.backgrounded || game.status !== "active") this.saveHostedGame()
-    else this.saveTimer ??= setTimeout(() => this.saveHostedGame(), HOST_SAVE_DELAY_MS)
+    else {
+      const wait = Math.max(0, this.savedAt + HOST_SAVE_INTERVAL_MS - Date.now())
+      this.saveTimer ??= setTimeout(() => this.saveHostedGame(), wait)
+    }
   }
 
   private hostWrite({ event }: PendingLifeAction): Promise<OutboxAcknowledgement> {

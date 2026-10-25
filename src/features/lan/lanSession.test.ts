@@ -5,7 +5,7 @@ import { ConvexError } from "convex/values"
 import { storage } from "@/utils/storage"
 
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
-import { HOSTED_GAME_KEY, saveLanName } from "./lanAvailability"
+import { HOSTED_GAME_KEY, saveLanName, savedHostedGame } from "./lanAvailability"
 import {
   createLanGame,
   LAN_PROTOCOL,
@@ -183,9 +183,10 @@ describe("nearby host", () => {
     expect(back.sent[0]).toEqual({ type: "welcome", pass })
   })
 
-  it("saves a foreground host's game once for a burst of taps, so a crash resumes the last change", async () => {
+  it("saves a foreground host's game as the round starts, then once for a burst of taps", async () => {
     const { session, bob } = await startedGame()
     const { key } = bob.pass()
+    expect(savedHostedGame()).toBeDefined()
     const set = jest.spyOn(storage, "set")
     const hostedSaves = () => set.mock.calls.filter(([saved]) => saved === HOSTED_GAME_KEY)
 
