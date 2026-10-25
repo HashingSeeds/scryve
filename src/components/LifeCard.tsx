@@ -67,6 +67,7 @@ import {
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   cornerOffset,
+  CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardScreenEdges,
@@ -1209,8 +1210,13 @@ export function seatIdentityPlacement({
       ? Math.max(run / 2 - left - gap - (tucked ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
+  const farCutout =
+    insets?.cutout?.edge === rightEdge && insets.cutout.side === bottomEdge
+      ? insets.cutout.size - CUTOUT_ENDS_INSIDE_INSET
+      : 0
   // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
-  const rowMaxWidth = run && !tucked ? Math.max(run - left * 2, 0) : position.maxWidth
+  const rowMaxWidth =
+    run && !tucked ? Math.max(run - left - Math.max(left, farCutout), 0) : position.maxWidth
   return { layer, position, rowMaxWidth, trailing }
 }
 
