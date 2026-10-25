@@ -10,7 +10,6 @@ import {
 } from "react"
 import { Platform } from "react-native"
 import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
-import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 
 import { APP_ROOT_URL, readPublicCloudConfig } from "@/features/auth/config"
@@ -29,6 +28,7 @@ import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
 import { resourceCache } from "./resourceCache"
 import { type SessionHint, useSessionHint } from "./sessionHint"
+import { tokenCache } from "./tokenCache"
 
 interface AuthAccess {
   configured: boolean

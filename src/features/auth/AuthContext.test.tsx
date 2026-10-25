@@ -27,7 +27,7 @@ jest.mock("@clerk/expo", () => ({
   useAuth: (options: unknown) => mockUseAuth(options),
   useUser: () => mockUseUser(),
 }))
-jest.mock("@clerk/expo/token-cache", () => ({ tokenCache: {} }))
+jest.mock("./tokenCache", () => ({ tokenCache: {} }))
 jest.mock("@clerk/expo/resource-cache", () => ({ resourceCache: "native-resource-cache" }))
 jest.mock("@/utils/crashReporting", () => ({
   ErrorType: { HANDLED: "Handled" },
