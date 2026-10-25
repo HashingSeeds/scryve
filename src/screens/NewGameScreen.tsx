@@ -749,7 +749,12 @@ function NewGameForm({
         />
       </View>
       <>
-        <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
+        <Screen
+          preset="scroll"
+          contentInset="standard"
+          backgroundColor={colors.surface}
+          contentContainerStyle={themed($form)}
+        >
           <GameTabs
             tabs={gameTabs}
             selectedId={selectedTypeId}
@@ -1434,10 +1439,7 @@ const CONTENT_MAX_WIDTH = 720
 const MIN_NAME_ROW_WIDTH = 280
 
 const $root: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
-const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  gap: spacing.md,
-  backgroundColor: colors.surface,
-})
+const $form: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
