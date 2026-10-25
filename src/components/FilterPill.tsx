@@ -58,6 +58,7 @@ export function FilterButton({
   testID?: string
 }) {
   const { themed, theme } = useAppTheme()
+  const active = count > 0
   const label = count
     ? translate("decks:filters.withCount", { count })
     : translate("decks:filters.label")
@@ -68,7 +69,7 @@ export function FilterButton({
         accessibilityRole="button"
         accessibilityLabel={label}
         activeOpacity={1}
-        style={themed($filterButton)}
+        style={[themed($filterButton), active ? themed($filterButtonActive) : undefined]}
         hitSlop={{ top: 6, bottom: 6 }}
         onPress={onPress}
       >
@@ -77,7 +78,7 @@ export function FilterButton({
           height={16}
           viewBox="0 0 24 24"
           fill="none"
-          stroke={accessibleForeground(theme.colors.tint)}
+          stroke={active ? accessibleForeground(theme.colors.tint) : theme.colors.textDim}
           strokeWidth={1.5}
           strokeLinecap="round"
           {...decorativeSvgProps({ accessible: false })}
@@ -89,7 +90,7 @@ export function FilterButton({
         <Text
           size="xxs"
           maxFontSizeMultiplier={PILL_MAX_FONT_SCALE}
-          style={themed($filterText)}
+          style={active ? themed($chipSelectedText) : themed($dimmedText)}
           text={label}
         />
       </TouchableOpacity>
@@ -146,13 +147,13 @@ const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 32,
   minWidth: 44,
   borderRadius: spacing.md,
-  backgroundColor: colors.tint,
+  backgroundColor: colors.tintInactive,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
   paddingHorizontal: spacing.sm,
   gap: spacing.xxs,
 })
-const $filterText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: accessibleForeground(colors.tint),
+const $filterButtonActive: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.tint,
 })
