@@ -266,7 +266,7 @@ describe("PokemonSheet", () => {
       revision: 1,
       cards: [{ name: "Pikachu", cardId: "sv01-063", category: "Pokemon", quantity: 4 }],
     })
-    render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" } }))
+    render(sheet({ deck: { ownerId: "owner-1", versionId: "version-2" } }))
     await flush()
 
     expect(screen.getByTestId("pokemon-result-sv01-063")).toBeTruthy()
