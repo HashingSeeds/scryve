@@ -2,11 +2,12 @@ import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
-import { Button } from "@/components/Button"
+import { Button, type ButtonProps } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import type { ProSubscriptionManagement } from "@/features/billing/RevenueCatContext"
 import { appLocale } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -19,10 +20,13 @@ export type AccountDeletionReceiptStatus = AccountDeletionStatus | "completed"
 const DELETE_CONFIRMATION = "DELETE"
 const STATUS_MARK = { failed: "!", completed: "✓", received: "…" } as const
 const DELETION_STEPS = ["cloud", "history", "local", "feedback", "signOut"] as const
+const APPLE_SUBSCRIPTIONS = "https://apps.apple.com/account/subscriptions"
+const GOOGLE_PLAY_SUBSCRIPTIONS = "https://play.google.com/store/account/subscriptions"
 
 export interface DeleteAccountScreenProps {
   email?: string
   deletionStatus: AccountDeletionStatus | null | undefined
+  subscription: ProSubscriptionManagement
   isSubmitting: boolean
   error?: string
   onBack: () => void
@@ -40,6 +44,7 @@ export interface AccountDeletionReceiptScreenProps {
 export function DeleteAccountScreen({
   email,
   deletionStatus,
+  subscription,
   isSubmitting,
   error,
   onBack,
@@ -89,24 +94,7 @@ export function DeleteAccountScreen({
         ) : null}
         {canRequestDeletion ? (
           <>
-            <View style={themed($subscriptionNotice)}>
-              <Text tx="account:deleteAccount.subscription.heading" style={themed($strong)} />
-              <Text tx="account:deleteAccount.subscription.body" size="xs" style={themed($muted)} />
-              <Button
-                tx="account:deleteAccount.subscription.manageApple"
-                accessibilityRole="link"
-                style={themed($subscriptionLink)}
-                textStyle={themed($subscriptionLinkText)}
-                onPress={() => void openUrl("https://apps.apple.com/account/subscriptions")}
-              />
-              <Button
-                tx="account:deleteAccount.subscription.manageGoogle"
-                accessibilityRole="link"
-                style={themed($subscriptionLink)}
-                textStyle={themed($subscriptionLinkText)}
-                onPress={() => void openUrl("https://play.google.com/store/account/subscriptions")}
-              />
-            </View>
+            <SubscriptionNotice subscription={subscription} />
             {email ? (
               <Text
                 tx="account:deleteAccount.signedInAs"
@@ -216,6 +204,45 @@ export function AccountDeletionReceiptScreen({
         <Button tx="account:deleteAccount.receipt.returnHome" onPress={onReturnHome} />
       </View>
     </Screen>
+  )
+}
+
+function SubscriptionNotice({ subscription }: { subscription: ProSubscriptionManagement }) {
+  const { themed } = useAppTheme()
+  const { store } = subscription
+  return (
+    <View style={themed($subscriptionNotice)}>
+      <Text tx="account:deleteAccount.subscription.heading" style={themed($strong)} />
+      <Text tx="account:deleteAccount.subscription.body" size="xs" style={themed($muted)} />
+      {store === "app_store" || store === "unknown" ? (
+        <ManageLink tx="account:deleteAccount.subscription.manageApple" url={APPLE_SUBSCRIPTIONS} />
+      ) : null}
+      {store === "play_store" || store === "unknown" ? (
+        <ManageLink
+          tx="account:deleteAccount.subscription.manageGoogle"
+          url={GOOGLE_PLAY_SUBSCRIPTIONS}
+        />
+      ) : null}
+      {store === "web" || store === "unknown" ? (
+        <Text tx="account:deleteAccount.subscription.web" size="xs" style={themed($muted)} />
+      ) : null}
+      {subscription.store === "web" && subscription.url ? (
+        <ManageLink tx="account:deleteAccount.subscription.manageWeb" url={subscription.url} />
+      ) : null}
+    </View>
+  )
+}
+
+function ManageLink({ tx, url }: { tx: ButtonProps["tx"]; url: string }) {
+  const { themed } = useAppTheme()
+  return (
+    <Button
+      tx={tx}
+      accessibilityRole="link"
+      style={themed($subscriptionLink)}
+      textStyle={themed($subscriptionLinkText)}
+      onPress={() => void openUrl(url)}
+    />
   )
 }
 

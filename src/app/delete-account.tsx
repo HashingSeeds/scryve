@@ -15,6 +15,7 @@ import {
 } from "@/features/auth/accountDeletionReceiptStore"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { writeSessionHint } from "@/features/auth/sessionHint"
+import { proSubscriptionManagement, useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { AccountDeletionReceiptScreen, DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
@@ -131,6 +132,7 @@ function SignedOutDeletionReceipt({
 function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: string) => void }) {
   const { isLoaded: isUserLoaded, user } = useUser()
   const clerk = useClerk()
+  const { customerInfo } = useRevenueCat()
   const { isAuthenticated, isLoading } = useConvexAuth()
   const requestDeletion = useMutation(api.accountDeletion.requestCurrentAccountDeletion)
   const deletion = useQuery(api.accountDeletion.currentAccountDeletion)
@@ -194,6 +196,7 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
     <DeleteAccountScreen
       email={user?.primaryEmailAddress?.emailAddress}
       deletionStatus={deletion === undefined ? undefined : (deletion?.status ?? null)}
+      subscription={proSubscriptionManagement(customerInfo)}
       isSubmitting={isSubmitting}
       error={error}
       onBack={() => router.back()}
