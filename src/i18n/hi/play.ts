@@ -66,6 +66,7 @@ export default {
     changeAppearance: "{{name}} का रूप बदलें",
     nameForPlayer: "खिलाड़ी {{seat}} का नाम",
     nameGateHelper: 'कनेक्टेड खिलाड़ियों को इसके बजाय "{{name}}" दिखेगा।',
+    deckFallbackName: "डेक",
     thisIsMe: "यह मैं हूँ",
     noSeat: "कोई सीट नहीं",
     yourDeck: "आपका डेक",

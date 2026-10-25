@@ -65,6 +65,7 @@ export default {
     changeAppearance: "{{name}}の外観を変更",
     nameForPlayer: "プレイヤー{{seat}}の名前",
     nameGateHelper: "通信対戦のプレイヤーには代わりに「{{name}}」と表示されます。",
+    deckFallbackName: "デッキ",
     thisIsMe: "自分",
     noSeat: "席なし",
     yourDeck: "あなたのデッキ",

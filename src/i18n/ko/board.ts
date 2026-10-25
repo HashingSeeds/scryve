@@ -74,6 +74,7 @@ export default {
     rollDieFor: "{{name}} {{die}} 굴리기",
   },
   playerNames: {
+    default: "플레이어 {{number}}",
     required: "플레이어 이름을 입력하세요.",
     tooLong: "{{max}}자 이하로 입력하세요.",
     unique: "플레이어 이름은 서로 달라야 합니다.",

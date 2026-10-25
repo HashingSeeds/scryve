@@ -64,6 +64,7 @@ export default {
     changeAppearance: "{{name}} 외형 변경",
     nameForPlayer: "플레이어 {{seat}} 이름",
     nameGateHelper: '연결된 플레이어에게는 "{{name}}" 이름이 대신 표시됩니다.',
+    deckFallbackName: "덱",
     thisIsMe: "나예요",
     noSeat: "자리 없음",
     yourDeck: "내 덱",

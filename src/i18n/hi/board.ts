@@ -74,6 +74,7 @@ export default {
     rollDieFor: "{{name}} के लिए {{die}} फेंकें",
   },
   playerNames: {
+    default: "खिलाड़ी {{number}}",
     required: "खिलाड़ी का नाम दर्ज करें।",
     tooLong: "{{max}} या कम अक्षर इस्तेमाल करें।",
     unique: "खिलाड़ियों के नाम अलग-अलग होने चाहिए।",

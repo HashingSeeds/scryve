@@ -74,6 +74,7 @@ export default {
     rollDieFor: "Tirar un {{die}} por {{name}}",
   },
   playerNames: {
+    default: "Jugador {{number}}",
     required: "Introduce un nombre de jugador.",
     tooLong: "Usa {{max}} caracteres o menos.",
     unique: "Los nombres de jugador deben ser únicos.",

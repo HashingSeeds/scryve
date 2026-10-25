@@ -74,6 +74,7 @@ export default {
     rollDieFor: "Lancer un {{die}} pour {{name}}",
   },
   playerNames: {
+    default: "Joueur {{number}}",
     required: "Saisissez un nom de joueur.",
     tooLong: "Utilisez {{max}} caractères maximum.",
     unique: "Les noms des joueurs doivent être uniques.",

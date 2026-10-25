@@ -74,6 +74,7 @@ export default {
     rollDieFor: "{{name}}の{{die}}を振る",
   },
   playerNames: {
+    default: "プレイヤー{{number}}",
     required: "プレイヤー名を入力してください。",
     tooLong: "{{max}}文字以内で入力してください。",
     unique: "プレイヤー名は重複できません。",
