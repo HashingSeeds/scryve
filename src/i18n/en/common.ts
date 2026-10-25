@@ -36,6 +36,11 @@ const common = {
     play: "Play",
     backToLobby: "Back to lobby",
   },
+  openUrl: {
+    failed: "Couldn't open this link",
+    noMailApp: "No mail app found",
+    copy: "Copy",
+  },
   retryableError: {
     retryingIn: "Retrying in {{seconds}}s",
   },

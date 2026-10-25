@@ -39,6 +39,11 @@ export default {
     play: "プレイ",
     backToLobby: "ロビーに戻る",
   },
+  openUrl: {
+    failed: "このリンクを開けませんでした",
+    noMailApp: "メールアプリが見つかりません",
+    copy: "コピー",
+  },
   retryableError: {
     retryingIn: "{{seconds}}秒後に再試行",
   },

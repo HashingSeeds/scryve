@@ -39,6 +39,11 @@ export default {
     play: "플레이",
     backToLobby: "로비로 돌아가기",
   },
+  openUrl: {
+    failed: "이 링크를 열 수 없습니다",
+    noMailApp: "메일 앱을 찾을 수 없습니다",
+    copy: "복사",
+  },
   retryableError: {
     retryingIn: "{{seconds}}초 후 다시 시도",
   },

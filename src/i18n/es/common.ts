@@ -39,6 +39,11 @@ export default {
     play: "Jugar",
     backToLobby: "Volver a la sala",
   },
+  openUrl: {
+    failed: "No se pudo abrir este enlace",
+    noMailApp: "No se encontró ninguna app de correo",
+    copy: "Copiar",
+  },
   retryableError: {
     retryingIn: "Reintentando en {{seconds}} s",
   },

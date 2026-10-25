@@ -39,6 +39,11 @@ export default {
     play: "खेलें",
     backToLobby: "लॉबी पर वापस जाएँ",
   },
+  openUrl: {
+    failed: "यह लिंक नहीं खुल सका",
+    noMailApp: "कोई मेल ऐप नहीं मिला",
+    copy: "कॉपी करें",
+  },
   retryableError: {
     retryingIn: "{{seconds}} सेकंड में फिर कोशिश होगी",
   },
