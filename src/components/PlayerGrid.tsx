@@ -257,6 +257,9 @@ export function PlayerGrid({
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const stable = useStableCallbacks()
   const [commanderPowers, setCommanderPowers] = useState<Partial<Record<PlayerId, number>>>({})
+  /** why: once the attacker has tapped a target, the next step is finishing, so the pulse moves from the targets to the attacker's mark. */
+  const [actedFor, setActedFor] = useState<PlayerId | null>(null)
+  if (actedFor && actedFor !== commanderDamage?.armedPlayerId) setActedFor(null)
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
   const layout = getPlayerGridLayout({
@@ -536,9 +539,11 @@ export function PlayerGrid({
                             onPressSword: stable(`sword:${player.id}`, () =>
                               commanderDamage.onPressSword(player),
                             ),
-                            onStage: stable(`stage:${player.id}`, (step: number) =>
-                              commanderDamage.onStage(player, step),
-                            ),
+                            acted: !!actedFor,
+                            onStage: stable(`stage:${player.id}`, (step: number) => {
+                              commanderDamage.onStage(player, step)
+                              setActedFor(commanderDamage.armedPlayerId)
+                            }),
                             ...(commanderDamage.staging &&
                             commanderDamage.armedPlayerId === player.id
                               ? {

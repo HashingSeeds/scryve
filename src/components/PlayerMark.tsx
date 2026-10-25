@@ -52,6 +52,7 @@ export interface PlayerMarkProps {
   shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
   insetSwordColor?: string
+  insetCheck?: boolean
   closeIcon?: boolean
   foil?: boolean
   foilBackdrop?: string
@@ -69,6 +70,7 @@ export const PlayerMark = memo(function PlayerMark({
   shape: chosenShape,
   rotation = 0,
   insetSwordColor,
+  insetCheck = false,
   closeIcon = false,
   foil = false,
   foilBackdrop,
@@ -119,7 +121,11 @@ export const PlayerMark = memo(function PlayerMark({
             testID={`player-mark-shape-${shape}`}
           />
           {insetSwordColor && !closeIcon ? (
-            <SwordInset shape={shape} color={insetSwordColor} />
+            insetCheck ? (
+              <CheckInset shape={shape} color={insetSwordColor} />
+            ) : (
+              <SwordInset shape={shape} color={insetSwordColor} />
+            )
           ) : null}
         </Svg>
       </Animated.View>
@@ -247,17 +253,31 @@ function CloseIconOverlay({
 }
 
 function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
-  const { centerX, centerY, size } = SWORD_INSET_THAT_FITS_SHAPE[shape]
   return (
-    <G
-      testID="player-mark-sword"
-      transform={`translate(${centerX - size / 2} ${centerY - size / 2}) scale(${
-        size / SWORD_VIEW_BOX
-      })`}
-    >
+    <G testID="player-mark-sword" transform={insetTransform(shape)}>
       <SwordShapes color={color} />
     </G>
   )
+}
+
+function CheckInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
+  return (
+    <G testID="player-mark-check" transform={insetTransform(shape)}>
+      <Path
+        d="M4.5 12.5 9.5 17.5 19.5 6.5"
+        stroke={color}
+        strokeWidth={3.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </G>
+  )
+}
+
+function insetTransform(shape: PlayerMarkShape) {
+  const { centerX, centerY, size } = SWORD_INSET_THAT_FITS_SHAPE[shape]
+  return `translate(${centerX - size / 2} ${centerY - size / 2}) scale(${size / SWORD_VIEW_BOX})`
 }
 
 const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const

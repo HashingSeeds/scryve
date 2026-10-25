@@ -243,6 +243,44 @@ describe("PlayerGrid", () => {
     expect(latest).toHaveBeenCalledWith(gamePlayers[0])
   })
 
+  it("pulses the targets until the attacker hits one, then pulses the attacker's mark to finish", () => {
+    const gamePlayers = players(3)
+    const grid = (armedPlayerId: ReturnType<typeof asPlayerId> | null) => (
+      <ThemeProvider>
+        <PlayerGrid
+          players={gamePlayers}
+          commanderDamage={{
+            incomingFor: () => ({}),
+            lethal: 21,
+            armedPlayerId,
+            onPressSword: jest.fn(),
+            onStage: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(grid(gamePlayers[0].id))
+    const pulsing = () =>
+      ["commander-target-pulse-seat-2", "commander-target-pulse-seat-3"].filter((id) =>
+        view.queryByTestId(id),
+      )
+
+    expect(pulsing()).toHaveLength(2)
+    expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
+    expect(view.queryByTestId("player-mark-check", { includeHiddenElements: true })).toBeNull()
+
+    fireEvent.press(view.getByTestId("commander-hit-seat-2"))
+    expect(pulsing()).toHaveLength(0)
+    expect(view.getByTestId("commander-finish-pulse-seat-1")).toBeTruthy()
+    expect(view.getByTestId("player-mark-check", { includeHiddenElements: true })).toBeTruthy()
+
+    view.rerender(grid(null))
+    view.rerender(grid(gamePlayers[0].id))
+    expect(pulsing()).toHaveLength(2)
+    expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
+  })
+
   it.each([-90, 90])(
     "preserves five-player seats and commander grids when the board turns %i°",
     (boardRotation) => {

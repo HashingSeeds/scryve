@@ -89,6 +89,7 @@ export type LifeCardCommanderDamage = Omit<
   onPowerStep?: (step: 1 | -1) => void
   facing?: CommanderFacing
   onStage?: (step: number) => void
+  acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
   pendingClaims?: readonly CommanderClaim[]
 }
@@ -346,6 +347,7 @@ export const LifeCard = memo(function LifeCard({
           mark: { color, shape, seatNumber },
           commanderName: commanderDamage.commanderName,
           power: commanderDamage.power ?? 1,
+          acted: !!commanderDamage.acted,
           onPowerStep: commanderDamage.onPowerStep ?? (() => {}),
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
@@ -360,6 +362,7 @@ export const LifeCard = memo(function LifeCard({
               (commanderDamage.stagedAgainstOwner ?? 0),
             power: commanderDamage.power ?? 1,
             facing: commanderDamage.facing ?? {},
+            acted: !!commanderDamage.acted,
             onChange: (step) => commanderDamage.onStage?.(step),
           }
         : undefined

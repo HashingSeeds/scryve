@@ -46,6 +46,7 @@ type AssignmentTarget = {
   total: number
   power: number
   facing: CommanderFacing
+  acted: boolean
   onChange: (step: number) => void
 }
 
@@ -56,6 +57,7 @@ type AssignmentSource = {
   mark?: CommanderAttacker
   commanderName?: string
   power: number
+  acted: boolean
   onPowerStep: (step: 1 | -1) => void
   onSubmit: () => void
 }
@@ -147,6 +149,7 @@ function DefenderControls({
   const reducedMotion = useReducedMotion()
   const [hits, setHits] = useState<number[]>([])
   const pop = useSharedValue(1)
+  const flash = useSharedValue(0)
   const previousTotal = useRef(mode.total)
   const { attacker, facing, total } = mode
   const step = Math.min(mode.power, MAX_COMMANDER_DAMAGE - total)
@@ -172,11 +175,13 @@ function DefenderControls({
     previousTotal.current = total
     if (total <= previous || reducedMotion !== false) return
     pop.value = withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 }))
-  }, [pop, reducedMotion, total])
+    flash.value = withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 }))
+  }, [flash, pop, reducedMotion, total])
 
   const popStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation}deg` }, { scale: pop.value }],
   }))
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
   function hit() {
     if (step <= 0) return
@@ -210,6 +215,11 @@ function DefenderControls({
         onPress={hit}
         style={StyleSheet.absoluteFill}
       />
+      <Animated.View
+        testID={`commander-hit-flash-seat-${seatNumber}`}
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: attackerColor }, flashStyle]}
+      />
       <View
         testID={`commander-edge-seat-${seatNumber}`}
         pointerEvents="none"
@@ -226,16 +236,25 @@ function DefenderControls({
           badgePlacement,
         ]}
       >
-        <Animated.View style={popStyle}>
-          <CommanderBadge
-            testID={`commander-total-seat-${seatNumber}`}
-            shape={attacker?.shape ?? shapeForSeat(attacker?.seatNumber ?? 1)}
-            total={total}
-            fill={attackerForeground}
-            labelColor={attackerColor}
-            size={badgeSize}
-          />
-        </Animated.View>
+        <View style={[$centered, { width: badgeSize, height: badgeSize }]}>
+          {mode.acted ? null : (
+            <PulseRing
+              testID={`commander-target-pulse-seat-${seatNumber}`}
+              size={badgeSize * 1.15}
+              color={attackerForeground}
+            />
+          )}
+          <Animated.View style={popStyle}>
+            <CommanderBadge
+              testID={`commander-total-seat-${seatNumber}`}
+              shape={attacker?.shape ?? shapeForSeat(attacker?.seatNumber ?? 1)}
+              total={total}
+              fill={attackerForeground}
+              labelColor={attackerColor}
+              size={badgeSize}
+            />
+          </Animated.View>
+        </View>
       </View>
       {takeBack > 0 ? (
         <BoardPressable
@@ -273,21 +292,8 @@ function AttackerControls({
   mode: AssignmentSource
 }) {
   const { themed } = useAppTheme()
-  const reducedMotion = useReducedMotion()
-  const ring = useSharedValue(0)
   const markSize = compact ? 64 : 84
   const power = mode.power
-
-  useEffect(() => {
-    if (reducedMotion !== false) return
-    ring.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1)
-    return () => cancelAnimation(ring)
-  }, [reducedMotion, ring])
-
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: reducedMotion === false ? 0.7 * (1 - ring.value) : 0.5,
-    transform: [{ scale: reducedMotion === false ? 0.75 + ring.value * 0.7 : 1.05 }],
-  }))
 
   return (
     <View style={themed($attackerCenter)}>
@@ -306,25 +312,20 @@ function AttackerControls({
           onPress={mode.onSubmit}
           style={[themed($markButton), { width: markSize * 1.3, height: markSize * 1.3 }]}
         >
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              themed($ring),
-              {
-                width: markSize * 1.15,
-                height: markSize * 1.15,
-                borderRadius: markSize,
-                borderColor: foreground,
-              },
-              ringStyle,
-            ]}
-          />
+          {mode.acted ? (
+            <PulseRing
+              testID={`commander-finish-pulse-seat-${seatNumber}`}
+              size={markSize * 1.15}
+              color={foreground}
+            />
+          ) : null}
           {mode.mark ? (
             <PlayerMark
               seatNumber={mode.mark.seatNumber}
               shape={mode.mark.shape}
               color={foreground}
               insetSwordColor={mode.mark.color}
+              insetCheck={mode.acted}
               size={markSize}
             />
           ) : null}
@@ -368,6 +369,36 @@ function AttackerControls({
         </View>
       </View>
     </View>
+  )
+}
+
+/** why: the board's one moving ring marks the next step: the targets until the first hit, then the attacker's mark to finish. */
+function PulseRing({ testID, size, color }: { testID: string; size: number; color: string }) {
+  const { themed } = useAppTheme()
+  const reducedMotion = useReducedMotion()
+  const ring = useSharedValue(0)
+
+  useEffect(() => {
+    if (reducedMotion !== false) return
+    ring.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1)
+    return () => cancelAnimation(ring)
+  }, [reducedMotion, ring])
+
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: reducedMotion === false ? 0.7 * (1 - ring.value) : 0.5,
+    transform: [{ scale: reducedMotion === false ? 0.75 + ring.value * 0.7 : 1.05 }],
+  }))
+
+  return (
+    <Animated.View
+      testID={testID}
+      pointerEvents="none"
+      style={[
+        themed($ring),
+        { width: size, height: size, borderRadius: size, borderColor: color },
+        ringStyle,
+      ]}
+    />
   )
 }
 
