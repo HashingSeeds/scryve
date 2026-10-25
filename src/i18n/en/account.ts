@@ -53,6 +53,7 @@ const account = {
       foilHeading: "Scryve Foil",
       opensPro: "Opens Scryve Pro",
       opensSignIn: "Opens sign in",
+      proFailed: "Couldn't check Scryve Pro, so Pro icons are locked.",
       names: {
         Default: "Default",
         Two: "Two",

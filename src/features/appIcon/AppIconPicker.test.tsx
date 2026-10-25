@@ -5,19 +5,26 @@ import { ThemeProvider } from "@/theme/context"
 
 import { AppIconPicker } from "./AppIconPicker"
 
+let mockCurrentIcon: string | null = null
 jest.mock("expo-alternate-app-icons", () => ({
   supportsAlternateIcons: true,
-  getAppIconName: () => null,
+  getAppIconName: () => mockCurrentIcon,
   setAlternateAppIcon: jest.fn(async (name: string | null) => name),
 }))
 const mockPresentPaywall = jest.fn()
 const mockOpenAuth = jest.fn()
-let mockPlan = { isSignedIn: true, isCountPro: false, isFoil: false }
+let mockPlan: { isSignedIn: boolean; isCountPro: boolean; isFoil: boolean; failed?: boolean } = {
+  isSignedIn: true,
+  isCountPro: false,
+  isFoil: false,
+}
 jest.mock("@/features/billing/RevenueCatContext", () => ({
   useRevenueCat: () => ({
     isCountPro: mockPlan.isCountPro,
     isFoil: mockPlan.isFoil,
-    customerInfo: mockPlan.isSignedIn ? {} : null,
+    isLoading: false,
+    error: mockPlan.failed ? "Network error" : undefined,
+    customerInfo: mockPlan.isSignedIn && !mockPlan.failed ? {} : null,
     presentPaywall: mockPresentPaywall,
   }),
 }))
@@ -35,7 +42,10 @@ function renderFor(plan: typeof mockPlan) {
 }
 
 describe("AppIconPicker", () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockCurrentIcon = null
+  })
 
   it("sends free players to the paywall and signed-out players to sign in", () => {
     const view = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false })
@@ -69,5 +79,23 @@ describe("AppIconPicker", () => {
     const foil = renderFor({ isSignedIn: true, isCountPro: true, isFoil: true })
     fireEvent.press(foil.getByTestId("app-icon-gilded"))
     expect(setAlternateAppIcon).toHaveBeenCalledWith("Gilded")
+  })
+
+  it("keeps a lapsed Foil icon selected", () => {
+    mockCurrentIcon = "Gilded"
+    const view = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false })
+    expect(view.getByTestId("app-icon-gilded").props.accessibilityState).toEqual({
+      selected: true,
+      disabled: true,
+    })
+    expect(view.queryByTestId("app-icon-holo")).toBeNull()
+  })
+
+  it("says why Pro icons are locked when Pro fails to load", () => {
+    const view = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false })
+    expect(view.queryByText("Couldn't check Scryve Pro, so Pro icons are locked.")).toBeNull()
+    view.unmount()
+    const failed = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false, failed: true })
+    expect(failed.getByText("Couldn't check Scryve Pro, so Pro icons are locked.")).toBeTruthy()
   })
 })

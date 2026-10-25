@@ -53,6 +53,7 @@ export default {
       foilHeading: "Scryve Foil",
       opensPro: "Scryve Pro 열기",
       opensSignIn: "로그인 화면을 엽니다",
+      proFailed: "Scryve Pro를 확인할 수 없어 Pro 아이콘이 잠겨 있습니다.",
       names: {
         Default: "기본",
         Two: "투",

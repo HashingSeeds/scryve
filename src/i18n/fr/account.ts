@@ -53,6 +53,7 @@ export default {
       foilHeading: "Scryve Foil",
       opensPro: "Ouvre Scryve Pro",
       opensSignIn: "Ouvre la connexion",
+      proFailed: "Impossible de vérifier Scryve Pro, les icônes Pro sont donc verrouillées.",
       names: {
         Default: "Par défaut",
         Two: "Deux",
