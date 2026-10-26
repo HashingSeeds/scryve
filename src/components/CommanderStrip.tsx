@@ -95,9 +95,12 @@ export const CommanderStrip = memo(function CommanderStrip({
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
     .sort((a, b) => a - b)
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
+  const corner = stripCorner(contentRotation, contentInsets)
+  const [edge, side] = corner
+  const [horizontal, vertical] = edge === "left" || edge === "right" ? [edge, side] : [side, edge]
   const closePosition: ViewStyle = {
-    alignItems: contentRotation === 90 || contentRotation === 180 ? "flex-start" : "flex-end",
-    justifyContent: contentRotation === -90 || contentRotation === 180 ? "flex-start" : "flex-end",
+    alignItems: horizontal === "left" ? "flex-start" : "flex-end",
+    justifyContent: vertical === "top" ? "flex-start" : "flex-end",
     padding: spacing.xxs,
   }
   if (dealt.length === 0) return null
@@ -108,7 +111,7 @@ export const CommanderStrip = memo(function CommanderStrip({
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
       style={[
         themed($strip),
-        stripEdge(contentRotation, spacing.xs, contentInsets, screenEdges),
+        stripEdge(corner, spacing.xs, contentInsets, screenEdges),
         {
           flexDirection: stripDirection(contentRotation),
         },
@@ -233,13 +236,32 @@ const STRIP_CORNER = {
   [-90]: ["right", "top", "bottom"],
 } as const satisfies Record<LifeCardContentRotation, readonly LifeCardEdge[]>
 
-function stripEdge(
+const OPPOSITE_EDGE = { top: "bottom", bottom: "top", left: "right", right: "left" } as const
+
+/** why: a camera hole in the grid's corner would push it into the name, so it moves to the seat's inner corner on the same end and the name keeps its row. */
+export function commanderStripMovesInward(
   rotation: LifeCardContentRotation,
+  insets?: LifeCardContentInsets,
+) {
+  const [edge, side] = STRIP_CORNER[rotation]
+  return insets?.cutout?.edge === side && insets.cutout.side === edge
+}
+
+function stripCorner(rotation: LifeCardContentRotation, insets?: LifeCardContentInsets) {
+  const [edge, side, start] = STRIP_CORNER[rotation]
+  return [
+    commanderStripMovesInward(rotation, insets) ? OPPOSITE_EDGE[edge] : edge,
+    side,
+    start,
+  ] as const
+}
+
+function stripEdge(
+  [edge, side, start]: ReturnType<typeof stripCorner>,
   gap: number,
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
 ): ViewStyle {
-  const [edge, side, start] = STRIP_CORNER[rotation]
   return {
     [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
     [side]: cornerOffset(gap, side, edge, insets, screenEdges),
