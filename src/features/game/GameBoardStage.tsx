@@ -33,8 +33,12 @@ import {
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
-import { PretendClosedDuo } from "@/devtools/PretendClosedDuo"
-import { pretendHinge, pretendHingeAngle, usePretendDuo } from "@/devtools/pretendDuo"
+import {
+  pretendHinge,
+  pretendHingeAngle,
+  pretendOuterDisplay,
+  usePretendDuo,
+} from "@/devtools/pretendDuo"
 import { PretendHingeSlider } from "@/devtools/PretendHingeSlider"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
@@ -125,10 +129,12 @@ function PinnedGameBoardStage({
       insets: safeArea,
     }
   })
+  const outerDisplay = pretending && !pretendOpen ? pretendOuterDisplay(window) : undefined
   const { pinned } = metrics
-  const width = pinned ? metrics.width : window.width
-  const height = pinned ? metrics.height : window.height
-  const holderAngle = pinned ? metrics.holderAngle : 0
+  const width = outerDisplay?.width ?? (pinned ? metrics.width : window.width)
+  const height = outerDisplay?.height ?? (pinned ? metrics.height : window.height)
+  const holderAngle = outerDisplay || !pinned ? 0 : metrics.holderAngle
+  const insets = outerDisplay ? NO_INSETS : metrics.insets
   const fontScale = window.fontScale
   // why: closing the Duo or turning its window ends a turn in progress; cancelling makes its timing callback report unfinished, so it cannot land the next opening's board.
   useEffect(() => {
@@ -200,12 +206,12 @@ function PinnedGameBoardStage({
             screenHeight: height,
             fontScale,
             rotation: 0,
-            insets: metrics.insets,
+            insets,
             touchRotation: -holderAngle,
             tableTurn,
           }
         : undefined,
-    [pinned, width, height, fontScale, metrics.insets, holderAngle, tableTurn],
+    [pinned, width, height, fontScale, insets, holderAngle, tableTurn],
   )
   // why: closed, the menu sat where the outer board's cards met, so as the hinge opens it travels to the center column's junction with the seats rather than jumping there.
   const foldedMenuOffset = useMemo(() => {
@@ -245,53 +251,58 @@ function PinnedGameBoardStage({
   const menuOpen = menu.open && !menu.exitAction
   const bag = openToolBag(menu.actions)
 
-  if (pretending && !pretendOpen)
-    return <PretendClosedDuo renderGrid={renderGrid} testID={testID} />
+  const board = (
+    <TurnedBoardContext.Provider value={holderAngle !== 0}>
+      <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
+        {renderGrid(boardOrientation)}
+        <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
+        <Animated.View
+          pointerEvents="box-none"
+          style={[StyleSheet.absoluteFill, $menuLayer, menuTravel]}
+        >
+          <GameMenuCluster
+            open={menu.open}
+            anchor={boardAnchor}
+            holderAnchor={holderAnchor}
+            holderHeight={holderAngle % 180 === 0 ? height : width}
+            facingAngle={holderAngle}
+            actions={menu.actions}
+            compact={playerCount > 2}
+            exitAction={menu.exitAction}
+            signal={menu.signal}
+            statusLine={menu.statusLine}
+            onToggle={menu.onToggle}
+          />
+        </Animated.View>
+        {firstPlayer && !offering && !refolding && !menu.open && !menu.exitAction ? (
+          <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
+        ) : null}
+        {offering ? (
+          <TableTurnOffer
+            key={holderAngle}
+            angle={turnAngle}
+            unfolded={unfolded}
+            holderAngle={holderAngle}
+            tableSlotColors={tableSlotColors}
+            onLand={setLanded}
+            onKeep={() => {
+              turnAngle.set(withTiming(0, { duration: 250 }))
+              setKept(true)
+            }}
+          />
+        ) : null}
+      </View>
+    </TurnedBoardContext.Provider>
+  )
   return (
     <View testID={testID} style={$stage}>
-      <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
-        <TurnedBoardContext.Provider value={holderAngle !== 0}>
-          <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
-            {renderGrid(boardOrientation)}
-            <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
-            <Animated.View
-              pointerEvents="box-none"
-              style={[StyleSheet.absoluteFill, $menuLayer, menuTravel]}
-            >
-              <GameMenuCluster
-                open={menu.open}
-                anchor={boardAnchor}
-                holderAnchor={holderAnchor}
-                holderHeight={holderAngle % 180 === 0 ? height : width}
-                facingAngle={holderAngle}
-                actions={menu.actions}
-                compact={playerCount > 2}
-                exitAction={menu.exitAction}
-                signal={menu.signal}
-                statusLine={menu.statusLine}
-                onToggle={menu.onToggle}
-              />
-            </Animated.View>
-            {firstPlayer && !offering && !refolding && !menu.open && !menu.exitAction ? (
-              <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
-            ) : null}
-            {offering ? (
-              <TableTurnOffer
-                key={holderAngle}
-                angle={turnAngle}
-                unfolded={unfolded}
-                holderAngle={holderAngle}
-                tableSlotColors={tableSlotColors}
-                onLand={setLanded}
-                onKeep={() => {
-                  turnAngle.set(withTiming(0, { duration: 250 }))
-                  setKept(true)
-                }}
-              />
-            ) : null}
-          </View>
-        </TurnedBoardContext.Provider>
-      </ScreenPinnedView>
+      {outerDisplay ? (
+        <View style={[$outerDisplay, outerDisplay]}>{board}</View>
+      ) : (
+        <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
+          {board}
+        </ScreenPinnedView>
+      )}
       {windowOverlay}
       {pretending ? <PretendHingeSlider /> : null}
     </View>
@@ -369,6 +380,8 @@ export function firstPlayerTabs(
 
 // why: the menu sits above its own backdrop, so the layer carrying it along must stack where the cluster did.
 const $menuLayer: ViewStyle = { zIndex: 30 }
+const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 }
+const $outerDisplay: ViewStyle = { position: "absolute", right: 0, top: 0 }
 const $pinnedBoard: ViewStyle = { position: "absolute", left: 0, top: 0 }
 const $stage: ViewStyle = { flex: 1, width: "100%" }
 const $fill: ViewStyle = StyleSheet.absoluteFill

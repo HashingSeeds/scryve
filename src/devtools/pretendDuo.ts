@@ -39,3 +39,8 @@ export function pretendHinge(angle: number): Hinge {
   "worklet"
   return { angle, status: angle >= 180 ? "fullyOpen" : "partiallyOpen" }
 }
+
+/** why: a closed Duo shows only its outer display, which folds over the right half of the open device, so the pretend one draws the board there and leaves the rest dark. */
+export function pretendOuterDisplay(window: { width: number; height: number }) {
+  return { width: Math.min(window.width / 2, window.height), height: window.height }
+}
