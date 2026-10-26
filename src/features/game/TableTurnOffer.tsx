@@ -8,6 +8,7 @@ import Animated, {
   IOSReferenceFrame,
   runOnJS,
   SensorType,
+  useAnimatedReaction,
   type SharedValue,
   useAnimatedSensor,
   useAnimatedStyle,
@@ -64,11 +65,19 @@ export function TableTurnOffer({
 }) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
+  // why: the seats are still spreading until the Duo lies flat, so the offer's choices wait for it.
+  const [flat, setFlat] = useState(() => unfolded.value >= 1)
+  useAnimatedReaction(
+    () => unfolded.value >= 1,
+    (now, before) => {
+      if (now !== before) runOnJS(setFlat)(now)
+    },
+  )
   const ring = useRef<View>(null)
   // why: the offer blocks the board, so VoiceOver moves to its choice instead of staying on a life control beneath it.
   useEffect(() => {
-    if (ring.current) AccessibilityInfo.sendAccessibilityEvent(ring.current, "focus")
-  }, [])
+    if (flat && ring.current) AccessibilityInfo.sendAccessibilityEvent(ring.current, "focus")
+  }, [flat])
   const rotation = useAnimatedSensor(SensorType.ROTATION, SENSOR_CONFIG)
   const following = useSharedValue(true)
   const startHeading = useSharedValue<number | null>(null)
@@ -153,6 +162,7 @@ export function TableTurnOffer({
       ),
     )
   const turnByTap = () => {
+    if (!flat) return
     following.set(false)
     setTapTurning(true)
     tapTurn(motionDuration(reducedMotion, FALLBACK_TURN_MS))
@@ -164,7 +174,7 @@ export function TableTurnOffer({
   }, [tapTurning, reducedMotion])
 
   const keep = () => {
-    if (Math.abs(angle.value) >= DECLINE_BELOW_DEG || unfolded.value < 1) return
+    if (!flat || Math.abs(angle.value) >= DECLINE_BELOW_DEG) return
     following.set(false)
     onKeep()
   }
@@ -191,6 +201,8 @@ export function TableTurnOffer({
           testID="table-turn-keep"
           accessibilityRole="button"
           accessibilityLabel={translate("board:tableTurn.keep")}
+          accessibilityState={{ disabled: !flat }}
+          disabled={!flat}
           onPress={keep}
           style={[StyleSheet.absoluteFill, themed($scrim)]}
         />
@@ -202,6 +214,7 @@ export function TableTurnOffer({
           direction={direction}
           tableSlotColors={tableSlotColors}
           ringRef={ring}
+          disabled={!flat}
           onPress={turnByTap}
         />
       </Animated.View>
@@ -255,6 +268,7 @@ function TurnRing({
   direction,
   tableSlotColors,
   ringRef,
+  disabled,
   onPress,
 }: {
   angle: SharedValue<number>
@@ -262,6 +276,7 @@ function TurnRing({
   direction: SharedValue<number>
   tableSlotColors?: readonly string[]
   ringRef: Ref<View>
+  disabled: boolean
   onPress: () => void
 }) {
   const {
@@ -303,6 +318,8 @@ function TurnRing({
       testID="table-turn-ring"
       accessibilityRole="button"
       accessibilityLabel={translate("board:tableTurn.turn")}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={$ring}
     >

@@ -1,5 +1,5 @@
-import type { Hinge } from "expo-hinge"
 import type { LayoutRectangle } from "react-native"
+import type { Hinge } from "expo-hinge"
 import type { SharedValue } from "react-native-reanimated"
 
 export interface TableTurn {
