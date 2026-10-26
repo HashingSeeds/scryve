@@ -784,6 +784,11 @@ export const LifeCard = memo(function LifeCard({
               pendingDelta={preview}
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
+              obstacle={
+                commanderStripShown && stripBounds
+                  ? { edge: CONTENT_RIGHT_EDGE[contentRotation], bounds: stripBounds }
+                  : undefined
+              }
               onChange={onChange}
               onPreview={showPreview}
               onLongChange={() => setEditorOpen(true)}

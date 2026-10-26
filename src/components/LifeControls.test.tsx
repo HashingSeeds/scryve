@@ -3,7 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { LifeControls } from "./LifeControls"
+import { glyphClearance, LifeControls } from "./LifeControls"
 
 describe("LifeControls", () => {
   it("maps taps to one life and delegates long presses to custom amount editing", () => {
@@ -187,5 +187,20 @@ describe("LifeControls", () => {
       justifyContent: "flex-start",
       alignItems: "center",
     })
+  })
+})
+
+describe("glyphClearance", () => {
+  const wideSeat = { width: 466, height: 148 }
+
+  it("steps a glyph past a strip that reaches the middle of its end", () => {
+    const strip = { x: 404, y: 40, width: 54, height: 100 }
+    expect(glyphClearance({ edge: "right", bounds: strip }, wideSeat, 34)).toBe(62)
+    expect(glyphClearance({ edge: "left", bounds: { ...strip, x: 8 } }, wideSeat, 34)).toBe(62)
+  })
+
+  it("leaves the glyph alone when the strip stays in its corner", () => {
+    const strip = { x: 404, y: 96, width: 54, height: 44 }
+    expect(glyphClearance({ edge: "right", bounds: strip }, wideSeat, 34)).toBe(0)
   })
 })
