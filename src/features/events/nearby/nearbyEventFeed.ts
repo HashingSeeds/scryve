@@ -41,12 +41,16 @@ function applyList<T extends Item>(
 const sameItems = <T>(a: readonly T[], b: readonly T[]) =>
   a.length === b.length && a.every((item, index) => item === b[index])
 
+const NO_STANDINGS: readonly PlayerStanding[] = []
+
 function standingsFor(
   previous: HostFeed | undefined,
   event: HubEvent,
   through: number,
   scored: readonly HubTable[],
 ) {
+  // why: each check-in grows a list of zero-point rows that screens hide until round 1 is in, and resending it to every guest came to about 94 MB while 124 players joined.
+  if (through === 0) return NO_STANDINGS
   if (previous?.event.players === event.players && sameItems(previous.scored, scored))
     return previous.standings
   const standings = hubStandings(event, through)

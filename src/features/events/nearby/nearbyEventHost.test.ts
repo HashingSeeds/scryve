@@ -70,42 +70,51 @@ const hosted = () => nearbyEventHost.getState().event as HubEvent
 
 function expected(playerId: string) {
   const view = hubView(hosted(), { organizer: false, playerId })
-  return { view, standings: hubStandings(hosted(), standingsThroughRound(view)) }
+  const through = standingsThroughRound(view)
+  return { view, standings: through === 0 ? [] : hubStandings(hosted(), through) }
 }
 
 const currentTables = () => hosted().tables.filter(({ round }) => round === hosted().round)
 
 const match = (gamesWon: number[]) => ({ kind: "match" as const, gamesWon, gamesDrawn: 0 })
 
+const bytes = (lines: readonly NearbyHostMessage[]) =>
+  lines.reduce((sum, line) => sum + JSON.stringify(line).length, 0)
+
+const average = (values: readonly number[]) =>
+  values.reduce((sum, value) => sum + value) / values.length
+
 describe("nearby event host", () => {
   it("sends 128 guests small patches that rebuild the host's view", async () => {
-    await host(127)
-    const guests = Array.from({ length: 128 }, (_, index) => guest(index + 1, true))
-    const bySeat = new Map(guests.map((joined) => [joined.playerId, joined]))
-    const sent: number[] = []
-    const change = (act: () => void) => {
+    await host(0)
+    const guests = [guest(1, true)]
+    const perGuest = (act: () => void) => {
       const before = guests.map(({ received }) => received.length)
       act()
-      sent.push(
-        guests
-          .flatMap(({ received }, index) => received.slice(before[index]))
-          .reduce((sum, line) => sum + JSON.stringify(line).length, 0),
-      )
+      return average(before.map((count, index) => bytes(guests[index]!.received.slice(count))))
     }
 
+    const joins = Array.from({ length: 127 }, (_, index) =>
+      perGuest(() => guests.push(guest(index + 2, true))),
+    )
+    const bySeat = new Map(guests.map((joined) => [joined.playerId, joined]))
+    const changes: number[] = []
     for (let round = 1; round <= 3; round++) {
       nearbyEventHost.run({ kind: "startRound" })
       for (const table of currentTables()) {
         const [first, second] = table.playerIds.map((playerId) => bySeat.get(playerId)!)
-        change(() => first!.run({ kind: "report", tableId: table.id, result: match([2, 1]) }))
-        change(() => second!.run({ kind: "confirm", tableId: table.id }))
+        changes.push(
+          perGuest(() => first!.run({ kind: "report", tableId: table.id, result: match([2, 1]) })),
+          perGuest(() => second!.run({ kind: "confirm", tableId: table.id })),
+        )
       }
     }
     nearbyEventHost.run({ kind: "report", tableId: hosted().tables[0]!.id, result: match([0, 2]) })
     guests[5]!.run({ kind: "drop", playerId: guests[5]!.playerId })
     nearbyEventHost.run({ kind: "finish" })
 
-    expect(sent.reduce((sum, bytes) => sum + bytes) / sent.length).toBeLessThan(128 * 1024)
+    expect(Math.max(...joins)).toBeLessThan(1024)
+    expect(average(changes)).toBeLessThan(1024)
     for (const { playerId, feed } of guests)
       expect(feed()).toEqual({ seq: expect.any(Number), ...expected(playerId) })
   })
