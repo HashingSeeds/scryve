@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native"
-import Animated, { useSharedValue, withTiming } from "react-native-reanimated"
+import Animated, { cancelAnimation, useSharedValue, withTiming } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
@@ -76,9 +76,6 @@ function PinnedGameBoardStage({
     setLanded(undefined)
     setKept(false)
   }
-  useEffect(() => {
-    if (landed) turnAngle.set(0)
-  }, [landed, turnAngle])
   const safeArea = useSafeAreaInsets()
   const [metrics, setMetrics] = useState<ScreenPinnedMetrics>(() => {
     const screen = Dimensions.get("screen")
@@ -95,6 +92,11 @@ function PinnedGameBoardStage({
   const height = pinned ? metrics.height : window.height
   const holderAngle = pinned ? metrics.holderAngle : 0
   const fontScale = window.fontScale
+  // why: closing the Duo or turning its window ends a turn in progress; cancelling makes its timing callback report unfinished, so it cannot land the next opening's board.
+  useEffect(() => {
+    cancelAnimation(turnAngle)
+    turnAngle.set(0)
+  }, [spansHinge, metrics.holderAngle, landed, turnAngle])
 
   const gridLayout = usePlayerGridLayout({
     playerCount,
@@ -169,6 +171,7 @@ function PinnedGameBoardStage({
             ) : null}
             {offering ? (
               <TableTurnOffer
+                key={holderAngle}
                 angle={turnAngle}
                 holderAngle={holderAngle}
                 tableSlotColors={tableSlotColors}

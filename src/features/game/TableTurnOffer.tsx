@@ -1,8 +1,9 @@
-import { useEffect } from "react"
-import { Pressable, StyleSheet, View, type ViewStyle } from "react-native"
+import { type Ref, useEffect, useRef } from "react"
+import { AccessibilityInfo, Pressable, StyleSheet, View, type ViewStyle } from "react-native"
 import Animated, {
   Easing,
   FadeIn,
+  ReduceMotion,
   FadeOut,
   IOSReferenceFrame,
   runOnJS,
@@ -20,7 +21,7 @@ import { getPlayerGridCellRects, getPlayerGridLayout } from "@/components/player
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { useReducedMotion } from "@/utils/useReducedMotion"
+import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { tableTurnLanding } from "./tableTurn"
 
@@ -60,6 +61,12 @@ export function TableTurnOffer({
   onKeep: () => void
 }) {
   const { themed } = useAppTheme()
+  const reducedMotion = useReducedMotion()
+  const ring = useRef<View>(null)
+  // why: the offer blocks the board, so VoiceOver moves to its choice instead of staying on a life control beneath it.
+  useEffect(() => {
+    if (ring.current) AccessibilityInfo.sendAccessibilityEvent(ring.current, "focus")
+  }, [])
   const rotation = useAnimatedSensor(SensorType.ROTATION, SENSOR_CONFIG)
   const following = useSharedValue(true)
   const startHeading = useSharedValue<number | null>(null)
@@ -132,7 +139,11 @@ export function TableTurnOffer({
     angle.set(
       withTiming(
         uprightWay * 90,
-        { duration: FALLBACK_TURN_MS, easing: Easing.inOut(Easing.cubic) },
+        {
+          duration: motionDuration(reducedMotion, FALLBACK_TURN_MS),
+          easing: Easing.inOut(Easing.cubic),
+          reduceMotion: ReduceMotion.Never,
+        },
         (finished) => {
           if (finished) runOnJS(onLand)("upright")
         },
@@ -157,6 +168,7 @@ export function TableTurnOffer({
       entering={FadeIn.duration(400)}
       exiting={FadeOut.duration(250)}
       pointerEvents="box-none"
+      accessibilityViewIsModal
       style={StyleSheet.absoluteFill}
     >
       <Animated.View style={[StyleSheet.absoluteFill, scrimStyle]}>
@@ -174,6 +186,7 @@ export function TableTurnOffer({
           holderAngle={holderAngle}
           direction={direction}
           tableSlotColors={tableSlotColors}
+          ringRef={ring}
           onPress={turnByTap}
         />
       </Animated.View>
@@ -221,12 +234,14 @@ function TurnRing({
   holderAngle,
   direction,
   tableSlotColors,
+  ringRef,
   onPress,
 }: {
   angle: SharedValue<number>
   holderAngle: number
   direction: SharedValue<number>
   tableSlotColors?: readonly string[]
+  ringRef: Ref<View>
   onPress: () => void
 }) {
   const {
@@ -264,6 +279,7 @@ function TurnRing({
 
   return (
     <Pressable
+      ref={ringRef}
       testID="table-turn-ring"
       accessibilityRole="button"
       accessibilityLabel={translate("board:tableTurn.turn")}

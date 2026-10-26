@@ -189,6 +189,19 @@ describe("GameBoardStage on an open iPhone Duo", () => {
     expect(screen.getByTestId("table-turn-ring")).toBeTruthy()
   })
 
+  it("drops a turn in progress when the Duo closes, so the next opening starts square", () => {
+    mockHinge.spans = true
+    const { renderGrid, rerender } = renderSixPlayerTable()
+    act(() => lastTableTurn(renderGrid)?.angle.set(40))
+
+    mockHinge.spans = false
+    rerender()
+    mockHinge.spans = true
+    rerender()
+
+    expect(lastTableTurn(renderGrid)?.angle.value).toBe(0)
+  })
+
   it("makes no offer while the Duo is closed", () => {
     renderSixPlayerTable()
 

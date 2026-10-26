@@ -242,6 +242,7 @@ export const LifeCard = memo(function LifeCard({
   const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
   const [boardBounds, setBoardBounds] = useState<LayoutRectangle | null>(null)
+  const settleBoardBounds = useSettledLayout(setBoardBounds, !!liveSize)
   const overviewProgress = useSharedValue(commanderOverviewOpen ? 1 : 0)
   useEffect(() => {
     if (!localCommander) return
@@ -695,7 +696,7 @@ export const LifeCard = memo(function LifeCard({
           >
             <Animated.View
               testID={`commander-overview-board-seat-${seatNumber}`}
-              onLayout={(event) => setBoardBounds(event.nativeEvent.layout)}
+              onLayout={(event) => settleBoardBounds(event.nativeEvent.layout)}
               style={localCommander ? boardStyle : undefined}
             >
               <CommanderDamageBoard
