@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState, type Ref } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
+import Animated from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
 import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
@@ -23,6 +24,7 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { Text } from "./Text"
+import { type LiveCardSize, useLiveContentFrame } from "./useLiveContentFrame"
 import { playerTableOf } from "../../convex/lib/table"
 
 /** why: what one seat shows and may change. The plain parts compare structurally in the memoized card; PlayerGrid keeps the callbacks stable. */
@@ -153,6 +155,7 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
+  liveSize?: LiveCardSize
   onSheetOpenChange?: (open: boolean) => void
 }
 
@@ -188,6 +191,7 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
+  liveSize,
   onSheetOpenChange,
 }: CounterChipsProps) {
   const {
@@ -235,6 +239,7 @@ export const CounterChips = memo(function CounterChips({
     return () => onSheetOpenChange?.(false)
   }, [onSheetOpenChange, sheetOpen])
 
+  const liveFrame = useLiveContentFrame(contentRotation, liveSize)
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
   const frameWidth = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
@@ -262,10 +267,10 @@ export const CounterChips = memo(function CounterChips({
         />
       ) : null}
       {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0 || editable) ? (
-        <View
+        <Animated.View
           testID={`counter-chips-frame-seat-${seatNumber}`}
           pointerEvents="box-none"
-          style={[frame, $layer]}
+          style={[frame, $layer, liveFrame]}
         >
           <View
             testID={`counter-chips-seat-${seatNumber}`}
@@ -404,7 +409,7 @@ export const CounterChips = memo(function CounterChips({
               </BoardPressable>
             ) : null}
           </View>
-        </View>
+        </Animated.View>
       ) : null}
       {sheet ? (
         <CounterSheet

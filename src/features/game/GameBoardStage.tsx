@@ -1,8 +1,11 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native"
 import { useAnimatedHinge } from "expo-hinge/reanimated"
 import Animated, {
   cancelAnimation,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withTiming,
@@ -24,6 +27,7 @@ import {
 } from "@/components/GameRadialMenu"
 import {
   getPlayerGridFacings,
+  getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
@@ -33,7 +37,7 @@ import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
-import { hingeUnfold, type TableTurn } from "./tableTurn"
+import { hingeUnfold, type TableTurn, windowRectToPanel } from "./tableTurn"
 import { TableTurnOffer } from "./TableTurnOffer"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import {
@@ -149,6 +153,41 @@ function PinnedGameBoardStage({
         : undefined,
     [pinned, width, height, fontScale, metrics.insets, holderAngle, tableTurn],
   )
+  // why: closed, the menu sat where the outer board's cards met, so as the hinge opens it travels to the center column's junction with the seats rather than jumping there.
+  const foldedMenuOffset = useMemo(() => {
+    if (!gridLayout.centerColumn) return { x: 0, y: 0 }
+    const outer = { width: height / 2, height: width }
+    const point = getPlayerGridMenuAnchor(
+      playerCount,
+      getPlayerGridLayout({ playerCount, ...outer, layoutVariant }),
+    )
+    const onPanel = windowRectToPanel(
+      { x: outer.width * (1 + point.x), y: outer.height * point.y, width: 0, height: 0 },
+      { width, height },
+      holderAngle,
+    )
+    return { x: onPanel.x - boardAnchor.x * width, y: onPanel.y - boardAnchor.y * height }
+  }, [gridLayout.centerColumn, playerCount, layoutVariant, width, height, holderAngle, boardAnchor])
+  const menuTravel = useAnimatedStyle(() => {
+    const away = 1 - unfolded.value
+    return {
+      opacity: offering ? 1 - Math.max((unfolded.value - 0.9) / 0.1, 0) : 1,
+      transform: [
+        { translateX: foldedMenuOffset.x * away },
+        { translateY: foldedMenuOffset.y * away },
+      ],
+    }
+  })
+  const closeMenu = useRef(menu.onClose)
+  closeMenu.current = menu.open ? menu.onClose : () => {}
+  const closeMenuWhileMoving = () => closeMenu.current()
+  // why: an open menu would ride the board while it unfolds or turns, so moving the hinge or the device closes it.
+  useAnimatedReaction(
+    () => unfolded.value < 1 || turnAngle.value !== 0,
+    (moving, wasMoving) => {
+      if (moving && !wasMoving) runOnJS(closeMenuWhileMoving)()
+    },
+  )
   const menuOpen = menu.open && !menu.exitAction
   const bag = openToolBag(menu.actions)
 
@@ -159,7 +198,7 @@ function PinnedGameBoardStage({
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             {renderGrid(boardOrientation)}
             <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
-            {offering ? null : (
+            <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, menuTravel]}>
               <GameMenuCluster
                 open={menu.open}
                 anchor={boardAnchor}
@@ -173,7 +212,7 @@ function PinnedGameBoardStage({
                 statusLine={menu.statusLine}
                 onToggle={menu.onToggle}
               />
-            )}
+            </Animated.View>
             {firstPlayer && !offering && !menu.open && !menu.exitAction ? (
               <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
             ) : null}

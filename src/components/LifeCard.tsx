@@ -14,6 +14,7 @@ import Animated, {
   runOnJS,
   type SharedValue,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withDelay,
   withSequence,
@@ -85,6 +86,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
+import { useLiveContentFrame } from "./useLiveContentFrame"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const COMMANDER_OVERVIEW_MS = 220
@@ -474,11 +476,7 @@ export const LifeCard = memo(function LifeCard({
     ).length > 0
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
-  const liveLayer = useAnimatedStyle(() => {
-    if (!liveSize || Math.abs(contentRotation) !== 90) return {}
-    const { width, height } = liveSize.value
-    return { width: height, height: width, left: (width - height) / 2, top: (height - width) / 2 }
-  })
+  const liveLayer = useLiveContentFrame(contentRotation, liveSize)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
     cardSize,
@@ -486,7 +484,24 @@ export const LifeCard = memo(function LifeCard({
     insets: contentInsets,
     screenEdges,
     markHeight: identityMetrics.mark,
-  })
+  }) // why: while a transition resizes the card on the UI thread, the measured run trails it, so the name's limits grow with the live run instead of waiting for it to settle.
+  const sidewaysRun = Math.abs(contentRotation) === 90
+  const measuredRun = sidewaysRun ? cardSize.height : cardSize.width
+  const runGrowth = useDerivedValue(() =>
+    liveSize ? (sidewaysRun ? liveSize.value.height : liveSize.value.width) - measuredRun : 0,
+  )
+  const rowMaxWidth =
+    calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
+      ? Math.max(identityCorner.rowMaxWidth - calculatorButtonSize - identityMetrics.gap, 0)
+      : identityCorner.rowMaxWidth
+  const nameMaxWidth = identityCorner.position.maxWidth
+  const liveRowWidth = useAnimatedStyle(() => ({
+    maxWidth: typeof rowMaxWidth === "number" ? rowMaxWidth + runGrowth.value : rowMaxWidth,
+  }))
+  const liveNameWidth = useAnimatedStyle(() => ({
+    maxWidth: typeof nameMaxWidth === "number" ? nameMaxWidth + runGrowth.value / 2 : nameMaxWidth,
+  }))
+
   const stripAtEdge = !commanderStripMovesInward(contentRotation, contentInsets)
   const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
   // why: beside the commander strip a short seat cuts every name to a few letters, so in commander games such seats keep just their mark from the start; judged by seat length alone so seats of one size match.
@@ -902,7 +917,7 @@ export const LifeCard = memo(function LifeCard({
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          <View
+          <Animated.View
             testID={`life-identity-row-seat-${seatNumber}`}
             pointerEvents="box-none"
             onLayout={({ nativeEvent: { layout } }) => settleIdentityRowAt(layout)}
@@ -914,17 +929,11 @@ export const LifeCard = memo(function LifeCard({
                 gap: identityMetrics.gap,
                 left: identityCorner.position.left,
                 bottom: identityCorner.position.bottom,
-                maxWidth:
-                  calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
-                    ? Math.max(
-                        identityCorner.rowMaxWidth - calculatorButtonSize - identityMetrics.gap,
-                        0,
-                      )
-                    : identityCorner.rowMaxWidth,
               },
+              liveRowWidth,
             ]}
           >
-            <View
+            <Animated.View
               testID={`life-identity-seat-${seatNumber}`}
               pointerEvents="box-none"
               accessibilityElementsHidden={diceCovers}
@@ -932,8 +941,7 @@ export const LifeCard = memo(function LifeCard({
               style={[
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
-                commanderStripShown &&
-                  stripAtEdge && { maxWidth: identityCorner.position.maxWidth },
+                commanderStripShown && stripAtEdge && liveNameWidth,
               ]}
             >
               {commanderDamage?.inspection ? (
@@ -970,7 +978,7 @@ export const LifeCard = memo(function LifeCard({
               ) : (
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
-            </View>
+            </Animated.View>
             {diceChips?.length && dice?.onPressChip && !dice.view && !editorOpen ? (
               <DiceChips
                 seatNumber={seatNumber}
@@ -993,7 +1001,7 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
-          </View>
+          </Animated.View>
           {calculatorButtonShown ? (
             <BoardPressable
               testID={`life-calculator-open-seat-${seatNumber}`}
@@ -1047,6 +1055,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          liveSize={liveSize}
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}
