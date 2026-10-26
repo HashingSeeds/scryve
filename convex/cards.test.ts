@@ -933,6 +933,29 @@ describe("card name catalog", () => {
     }
   })
 
+  it("lets one caller refresh a stale copy while the others serve it", async () => {
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.storeNameCatalog, {
+      game: "mtg",
+      names: "Sol Ring",
+      alternateNames: "",
+    })
+    jest.useFakeTimers({ advanceTimers: true, now: Date.now() + 2 * 86_400_000 })
+    try {
+      await expect(
+        t.mutation(internal.cards.claimNameCatalogRefresh, { game: "mtg" }),
+      ).resolves.toBe(true)
+      const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+      await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toEqual({
+        names: "Sol Ring",
+        alternateNames: "",
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   function alternateNamePages(pages: { flavor: string; next?: string }[]) {
     return jest.spyOn(global, "fetch").mockImplementation((input) => {
       const url = String(input)
@@ -1018,6 +1041,23 @@ describe("card lookup by names", () => {
         method: "POST",
         body: JSON.stringify({ identifiers: [{ name: "Sol Ring" }, { name: "Acidic Slime" }] }),
       }),
+    )
+  })
+
+  it("looks up a two-part name by its front face", async () => {
+    const t = makeConvexTest()
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(() =>
+        response({ data: [{ id: "44444444-4444-4444-4444-444444444444", name: "Fire // Ice" }] }),
+      )
+    await expect(t.action(api.cards.byNames, { names: ["Fire // Ice"] })).resolves.toMatchObject({
+      cards: [{ name: "Fire // Ice" }],
+      lookupFailed: false,
+    })
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.scryfall.com/cards/collection",
+      expect.objectContaining({ body: JSON.stringify({ identifiers: [{ name: "Fire" }] }) }),
     )
   })
 

@@ -660,6 +660,7 @@ export default defineSchema({
     fetchedAt: v.number(),
     names: v.string(),
     alternateNames: v.string(),
+    refreshingUntil: v.optional(v.number()),
   }).index("by_game", ["game"]),
 
   cardReferences: defineTable({

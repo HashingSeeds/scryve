@@ -242,6 +242,7 @@ export const keywordAbilities = action({
 
 const MAX_CARD_NAMES_BYTES = 900_000
 const CARD_NAME_CATALOG_MAX_AGE_MS = 86_400_000
+const CARD_NAME_CATALOG_REFRESH_CLAIM_MS = 120_000
 const MAX_ALTERNATE_NAME_PAGES = 10
 const SCRYFALL_COLLECTION_SIZE = 75
 const MAX_CACHED_PRINTINGS_PER_NAME = 8
@@ -325,6 +326,22 @@ export const storeNameCatalog = internalMutation({
   },
 })
 
+export const claimNameCatalogRefresh = internalMutation({
+  args: { game: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { game }) => {
+    const cached = await ctx.db
+      .query("cardNameCatalogs")
+      .withIndex("by_game", (q) => q.eq("game", game))
+      .unique()
+    const now = Date.now()
+    if (!cached || now - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS) return false
+    if (cached.refreshingUntil !== undefined && cached.refreshingUntil > now) return false
+    await ctx.db.patch(cached._id, { refreshingUntil: now + CARD_NAME_CATALOG_REFRESH_CLAIM_MS })
+    return true
+  },
+})
+
 export const cardNameCatalog = action({
   args: { deviceId: v.optional(v.string()) },
   returns: cardNameCatalogValidator,
@@ -334,8 +351,14 @@ export const cardNameCatalog = action({
       internal.cards.cachedNameCatalog,
       { game: "mtg" },
     )
-    if (cached && Date.now() - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS)
-      return { names: cached.names, alternateNames: cached.alternateNames }
+    if (cached) {
+      const copy = { names: cached.names, alternateNames: cached.alternateNames }
+      if (Date.now() - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS) return copy
+      const claimed: boolean = await ctx.runMutation(internal.cards.claimNameCatalogRefresh, {
+        game: "mtg",
+      })
+      if (!claimed) return copy
+    }
     try {
       await limitCardLookup(ctx, args.deviceId)
       const catalog = {
@@ -784,7 +807,11 @@ export const byNames = action({
       await limitCardLookup(ctx, args.deviceId)
       const response = await fetchScryfall(ctx, "/cards/collection", {
         method: "POST",
-        body: JSON.stringify({ identifiers: missing.map((name) => ({ name })) }),
+        body: JSON.stringify({
+          identifiers: [...new Set(missing.map((name) => name.split(" // ")[0]))].map((name) => ({
+            name,
+          })),
+        }),
       })
       if (!response.ok)
         throw new ConvexError({
