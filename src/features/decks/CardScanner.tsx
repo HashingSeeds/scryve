@@ -28,6 +28,9 @@ type ScannedCard = { name: string; imageUrl?: string; alternates: string[] }
 type ScanStatus = "looking" | "loading" | "steady" | "unsure" | { error: string }
 
 const ALTERNATE_COUNT = 5
+const NOT_READY_RETRY_MS = 150
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function statusText(status: ScanStatus) {
   if (typeof status === "object") return status.error
@@ -56,6 +59,7 @@ export function CardScanner({
   const [added, setAdded] = useState<ScannedCard[]>([])
   const [status, setStatus] = useState<ScanStatus>("looking")
   const [fixing, setFixing] = useState<ScannedCard>()
+  const [cameraReady, setCameraReady] = useState(false)
   const candidateName = useRef<string>(undefined)
   const nameInFrame = useRef<string>(undefined)
   const latest = useRef({ nameIndex, addCard, onRead })
@@ -72,14 +76,14 @@ export function CardScanner({
     return () => void ScreenOrientation.unlockAsync().catch(() => undefined)
   }, [])
 
-  const scanning = Boolean(permission?.granted) && !fixing
+  const scanning = Boolean(permission?.granted) && cameraReady && !fixing
 
   useEffect(() => {
     if (!scanning) return
     let active = true
 
     async function readFrame() {
-      if (!camera.current || !view.current || !frame.current) return
+      if (!camera.current || !view.current || !frame.current) return wait(NOT_READY_RETRY_MS)
       const shot = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false })
       const photo = await readCardText(shot.uri).finally(() => new File(shot.uri).delete())
       const framing = { view: view.current, frame: frame.current }
@@ -133,7 +137,7 @@ export function CardScanner({
           await readFrame()
         } catch {
           if (active) setStatus({ error: translate("decks:cardScan.failed") })
-          await new Promise((resolve) => setTimeout(resolve, 500))
+          await wait(500)
         }
       }
     })()
@@ -187,6 +191,7 @@ export function CardScanner({
               style={StyleSheet.absoluteFill}
               facing="back"
               pictureSize="1920x1080"
+              onCameraReady={() => setCameraReady(true)}
             />
             <View style={$overlay} pointerEvents="none">
               <View
