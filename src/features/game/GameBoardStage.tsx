@@ -247,7 +247,10 @@ function PinnedGameBoardStage({
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             {renderGrid(boardOrientation)}
             <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
-            <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, menuTravel]}>
+            <Animated.View
+              pointerEvents="box-none"
+              style={[StyleSheet.absoluteFill, $menuLayer, menuTravel]}
+            >
               <GameMenuCluster
                 open={menu.open}
                 anchor={boardAnchor}
@@ -356,6 +359,8 @@ export function firstPlayerTabs(
   })
 }
 
+// why: the menu sits above its own backdrop, so the layer carrying it along must stack where the cluster did.
+const $menuLayer: ViewStyle = { zIndex: 30 }
 const $pinnedBoard: ViewStyle = { position: "absolute", left: 0, top: 0 }
 const $stage: ViewStyle = { flex: 1, width: "100%" }
 const $fill: ViewStyle = StyleSheet.absoluteFill
