@@ -3,6 +3,7 @@ package expo.modules.cardtextreader
 import android.content.Context
 import android.os.SystemClock
 import android.util.Size
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
@@ -43,12 +44,31 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
   @Volatile var active = false
 
   init {
+    // why: React Native never lays out native children, and PreviewView adds its drawing
+    // surface only after the camera binds, so without this the preview stays black.
+    previewView.setOnHierarchyChangeListener(object : OnHierarchyChangeListener {
+      override fun onChildViewRemoved(parent: View?, child: View?) = Unit
+      override fun onChildViewAdded(parent: View?, child: View?) = layOutPreview()
+    })
     addView(previewView, 0)
     appContext.mainQueue.launch { bind(ProcessCameraProvider.awaitInstance(context)) }
   }
 
+  override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    measureChild(previewView, widthMeasureSpec, heightMeasureSpec)
+  }
+
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-    previewView.layout(0, 0, right - left, bottom - top)
+    layOutPreview()
+  }
+
+  private fun layOutPreview() {
+    previewView.measure(
+      MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+      MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY),
+    )
+    previewView.layout(0, 0, width, height)
   }
 
   private fun bind(provider: ProcessCameraProvider) {
