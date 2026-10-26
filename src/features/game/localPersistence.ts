@@ -748,6 +748,13 @@ export class LocalGameRepository {
     }
   }
 
+  boardRevision(): string {
+    return JSON.stringify([
+      this.storage.getString(LOCAL_KEYS.settings),
+      this.storage.getString(LOCAL_KEYS.active),
+    ])
+  }
+
   loadActiveGame(): LocalGame | null {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
     const layout = readActiveLayout(raw)
