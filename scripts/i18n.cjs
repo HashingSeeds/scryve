@@ -321,24 +321,22 @@ async function check() {
 
 const ANTHROPIC_API_HOST = "api.anthropic.com"
 
-/** why: ai-pool rejects Console keys and Anthropic rejects the pool's key, so each key goes only to the host that accepts it. */
-function chooseApiKey({ apiKey, baseUrl, poolKey, consoleKey }) {
+/** why: ai-pool rejects Console keys and Anthropic rejects the pool's key, so each key goes only to the host that accepts it. Keys are read lazily so an unreadable file the choice does not need cannot block one that works. */
+function chooseApiKey({ apiKey, baseUrl, readPoolKey, readConsoleKey }) {
   if (apiKey) return apiKey
   const throughPool = Boolean(baseUrl) && new URL(baseUrl).host !== ANTHROPIC_API_HOST
-  return (throughPool && poolKey) || consoleKey
-}
-
-function readIfPresent(file) {
-  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined
+  return (throughPool && readPoolKey()) || readConsoleKey()
 }
 
 function loadApiKey() {
-  const envFile = readIfPresent(path.join(ROOT, ".env.local"))
   const apiKey = chooseApiKey({
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseUrl: process.env.ANTHROPIC_BASE_URL,
-    poolKey: readIfPresent(path.join(os.homedir(), ".config/ai-pool/key"))?.trim(),
-    consoleKey: envFile && util.parseEnv(envFile).ANTHROPIC_API_KEY,
+    readPoolKey: () => readIfPresent(path.join(os.homedir(), ".config/ai-pool/key"))?.trim(),
+    readConsoleKey: () => {
+      const envFile = readIfPresent(path.join(ROOT, ".env.local"))
+      return envFile && util.parseEnv(envFile).ANTHROPIC_API_KEY
+    },
   })
   if (apiKey) process.env.ANTHROPIC_API_KEY = apiKey
 }

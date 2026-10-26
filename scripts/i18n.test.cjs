@@ -144,12 +144,31 @@ test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quo
 })
 
 test("sends the pool key only through ai-pool and the Console key only to Anthropic", () => {
-  const keys = { poolKey: "pool", consoleKey: "console" }
+  const keys = { readPoolKey: () => "pool", readConsoleKey: () => "console" }
   const pool = "https://ai-pool.example.ts.net"
 
   assert.equal(chooseApiKey({ ...keys, baseUrl: pool }), "pool")
   assert.equal(chooseApiKey({ ...keys, baseUrl: "https://api.anthropic.com" }), "console")
   assert.equal(chooseApiKey({ ...keys, baseUrl: undefined }), "console")
-  assert.equal(chooseApiKey({ ...keys, baseUrl: pool, poolKey: undefined }), "console")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: pool, readPoolKey: () => undefined }), "console")
   assert.equal(chooseApiKey({ ...keys, apiKey: "explicit", baseUrl: pool }), "explicit")
+})
+
+test("never reads a key file the choice does not need", () => {
+  const unreadable = () => {
+    throw new Error("EACCES")
+  }
+
+  assert.equal(
+    chooseApiKey({ apiKey: "explicit", readPoolKey: unreadable, readConsoleKey: unreadable }),
+    "explicit",
+  )
+  assert.equal(
+    chooseApiKey({
+      baseUrl: "https://api.anthropic.com",
+      readPoolKey: unreadable,
+      readConsoleKey: () => "console",
+    }),
+    "console",
+  )
 })
