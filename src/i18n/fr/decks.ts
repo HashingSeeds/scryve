@@ -381,7 +381,9 @@ export default {
     wrongCard: "Mauvaise carte",
     whichCard: "De quelle carte s'agit-il ?",
     removeIt: "Retirer",
-    addFailed: "Impossible d'ajouter {{card}}. Vérifiez votre connexion.",
+    addFailed: "Impossible d'ajouter les cartes scannées. Vérifiez votre connexion.",
+    again: "{{card}} encore ?",
+    addAnother: "Ajouter une autre",
     notFound: "Impossible de trouver {{card}}.",
     permission:
       "Scryve utilise l'appareil photo pour lire les noms des cartes. Les photos restent sur cet appareil.",

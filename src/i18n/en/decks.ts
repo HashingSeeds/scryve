@@ -373,7 +373,10 @@ const decks = {
     wrongCard: "Wrong card",
     whichCard: "Which card is it?",
     removeIt: "Remove it",
-    addFailed: "Couldn't add {{card}}. Check your connection.",
+    addFailed: "Couldn't add the scanned cards. Check your connection.",
+    // The scanner saw a card it already added in this session. Asks before adding another copy.
+    again: "{{card}} again?",
+    addAnother: "Add another",
     notFound: "Couldn't find {{card}}.",
     permission: "Scryve uses the camera to read card names. Photos stay on this device.",
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",

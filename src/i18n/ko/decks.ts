@@ -344,7 +344,9 @@ export default {
     wrongCard: "다른 카드예요",
     whichCard: "어떤 카드인가요?",
     removeIt: "제거",
-    addFailed: "{{card}} 카드를 추가하지 못했습니다. 연결 상태를 확인하세요.",
+    addFailed: "스캔한 카드를 추가하지 못했습니다. 연결 상태를 확인하세요.",
+    again: "{{card}}을(를) 또 추가할까요?",
+    addAnother: "하나 더 추가",
     notFound: "{{card}} 카드를 찾지 못했습니다.",
     permission:
       "Scryve는 카드 이름을 읽기 위해 카메라를 사용합니다. 사진은 이 기기에만 저장됩니다.",

@@ -120,7 +120,6 @@ export function CardSearchScreen({
   const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
-  const lastScanAddAt = useRef(0)
   const nameIndex = useCardNameIndex(game, deviceId, scanning)
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
@@ -403,29 +402,27 @@ export function CardSearchScreen({
     return error
   }
 
-  async function addScannedCard(name: string): Promise<ScannedCardAdd> {
+  async function addScannedCards(names: string[]): Promise<ScannedCardAdd[]> {
     try {
       if (!convex) throw new Error("Card search unavailable")
-      const found = await convex.action(api.cards.search, {
-        game,
-        deviceId,
-        query: name.includes('"') ? name : `!"${name}"`,
+      const found = await convex.action(api.cards.byNames, { names, deviceId })
+      const byName = new Map(
+        found.flatMap((card) =>
+          [card.name, ...card.name.split(" // ")].map((name) => [name, card]),
+        ),
+      )
+      return names.map((name) => {
+        const card = byName.get(name)
+        if (!card) return { error: translate("decks:cardScan.notFound", { card: name }) }
+        const error = add(card)
+        if (error) return { error }
+        scannedEntries.current.set(name, searchEntry(card))
+        if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: card.name })}`)
+        return { imageUrl: card.smallImageUrl ?? card.imageUrl }
       })
-      const card = found.find((candidate) => candidate.name === name) ?? found[0]
-      if (!card) return { error: translate("decks:cardScan.notFound", { card: name }) }
-      const error = add(card)
-      if (error) return { error }
-      scannedEntries.current.set(name, searchEntry(card))
-      if (__DEV__) {
-        const ms = Date.now() - lastScanAddAt.current
-        console.log(`SCANADD ${JSON.stringify({ added: card.name, ms })}`)
-        lastScanAddAt.current = Date.now()
-      }
-      return { imageUrl: card.smallImageUrl ?? card.imageUrl }
     } catch (cause) {
-      return {
-        error: convexErrorMessage(cause, translate("decks:cardScan.addFailed", { card: name })),
-      }
+      const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
+      return names.map(() => ({ error }))
     }
   }
 
@@ -515,10 +512,7 @@ export function CardSearchScreen({
                 testID="card-scan-button"
                 tx="decks:cardSearch.scan"
                 accessibilityLabel={translate("decks:cardSearch.scanLabel")}
-                onPress={() => {
-                  lastScanAddAt.current = Date.now()
-                  setScanning(true)
-                }}
+                onPress={() => setScanning(true)}
               />
             ) : null}
           </View>
@@ -838,7 +832,7 @@ export function CardSearchScreen({
         <CardScanner
           game={game}
           nameIndex={nameIndex}
-          addCard={addScannedCard}
+          addCards={addScannedCards}
           removeCard={onRemove ? removeScannedCard : undefined}
           onRead={__DEV__ ? recordScanRead : undefined}
           onClose={() => setScanning(false)}

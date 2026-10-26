@@ -375,7 +375,9 @@ export default {
     wrongCard: "Carta errónea",
     whichCard: "¿Qué carta es?",
     removeIt: "Quitarla",
-    addFailed: "No se pudo añadir {{card}}. Revisa tu conexión.",
+    addFailed: "No se pudieron añadir las cartas escaneadas. Revisa tu conexión.",
+    again: "¿{{card}} otra vez?",
+    addAnother: "Añadir otra",
     notFound: "No se encontró {{card}}.",
     permission:
       "Scryve usa la cámara para leer los nombres de las cartas. Las fotos se quedan en este dispositivo.",
