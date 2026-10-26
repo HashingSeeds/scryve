@@ -1,14 +1,21 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
-import Animated, { runOnJS, useAnimatedReaction, useAnimatedStyle } from "react-native-reanimated"
+import Animated, {
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated"
 
 import { Icon } from "@/components/Icon"
 
 import {
+  PRETEND_CLOSES_AT_DEG,
   PRETEND_OPENS_AT_DEG,
   pretendHingeAngle,
   setPretendDuo,
   setPretendDuoOpen,
+  usePretendDuo,
 } from "./pretendDuo"
 
 const TRACK = 320
@@ -19,10 +26,17 @@ export function PretendHingeSlider() {
     .minDistance(0)
     .onBegin(({ x }) => pretendHingeAngle.set(angleAt(x)))
     .onUpdate(({ x }) => pretendHingeAngle.set(angleAt(x)))
+  const open = useSharedValue(usePretendDuo().open)
   useAnimatedReaction(
-    () => pretendHingeAngle.value >= PRETEND_OPENS_AT_DEG,
-    (open, wasOpen) => {
-      if (open !== wasOpen) runOnJS(setPretendDuoOpen)(open)
+    () => pretendHingeAngle.value,
+    (angle, before) => {
+      const opening = before === null || angle > before
+      const next = open.value
+        ? !(angle < PRETEND_CLOSES_AT_DEG && !opening)
+        : angle >= PRETEND_OPENS_AT_DEG && opening
+      if (next === open.value) return
+      open.set(next)
+      runOnJS(setPretendDuoOpen)(next)
     },
   )
   const fill = useAnimatedStyle(() => ({ width: (pretendHingeAngle.value / 180) * TRACK }))

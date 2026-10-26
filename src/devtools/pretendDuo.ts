@@ -5,8 +5,9 @@ import { makeMutable } from "react-native-reanimated"
 /** why: no one on the team has an iPhone Duo, so dev builds can treat any device as one and drive its hinge from a slider. */
 export const pretendHingeAngle = makeMutable(0)
 
-// why: a real Duo moves its window to the inner display at about 20 degrees, so below that the pretend one counts as closed.
+// why: a real Duo moves its window to the inner display at about 20 degrees opening but back to the outer one at about 84 degrees closing, so the pretend one switches at the same angles.
 export const PRETEND_OPENS_AT_DEG = 20
+export const PRETEND_CLOSES_AT_DEG = 84
 
 const state = { pretending: false, open: false }
 let snapshot = state
