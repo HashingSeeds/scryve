@@ -328,6 +328,10 @@ function chooseApiKey({ apiKey, baseUrl, readPoolKey, readConsoleKey }) {
   return (throughPool && readPoolKey()) || readConsoleKey()
 }
 
+function readIfPresent(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined
+}
+
 function loadApiKey() {
   const apiKey = chooseApiKey({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -504,6 +508,7 @@ if (require.main === module) {
 
 module.exports = {
   chooseApiKey,
+  loadApiKey,
   englishNotes,
   flatten,
   prototypeKeys,
