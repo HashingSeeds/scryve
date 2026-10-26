@@ -33,6 +33,8 @@ import {
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
+import { pretendHinge, pretendHingeAngle, usePretendDuo } from "@/devtools/pretendDuo"
+import { PretendHingeSlider } from "@/devtools/PretendHingeSlider"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
 
@@ -86,10 +88,11 @@ function PinnedGameBoardStage({
   const spansHinge = useWindowSpansHinge()
   const turnAngle = useSharedValue(0)
   const hinge = useAnimatedHinge()
+  const pretending = usePretendDuo()
   const unfoldProgress = useSharedValue(1)
   const hingeSeen = useSharedValue(false)
   useAnimatedReaction(
-    () => hinge.value,
+    () => (pretending ? pretendHinge(pretendHingeAngle.value) : hinge.value),
     (now, before) => {
       unfoldProgress.set(
         hingeSeen.value
@@ -98,6 +101,7 @@ function PinnedGameBoardStage({
       )
       hingeSeen.set(true)
     },
+    [pretending],
   )
   const unfolded = useDerivedValue(() => easeUnfold(unfoldProgress.value))
   const [landed, setLanded] = useState<TableTurn["landed"]>()
@@ -286,6 +290,7 @@ function PinnedGameBoardStage({
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
       {windowOverlay}
+      {pretending ? <PretendHingeSlider /> : null}
     </View>
   )
 }

@@ -28,6 +28,7 @@ import type { LocalGame } from "@/features/game/types"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { setPretendDuo } from "../pretendDuo"
 
 function integer(name: string, value: string): number {
   const parsed = Number(value)
@@ -140,6 +141,7 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
+  if (params.duo !== undefined) setPretendDuo(params.duo === "open")
   repository.clearActiveGame()
   repository.saveActiveGame(game)
   return { pathname: "/", params: { destination: "play" } }
