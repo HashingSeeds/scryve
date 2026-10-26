@@ -1,10 +1,12 @@
 import { getPlayerGridCellRects, getPlayerGridLayout } from "@/components/playerGridGeometry"
 
 import {
+  hingeUnfold,
   rotateRectAround,
   tableTurnGather,
   tableTurnLanding,
   tableTurnPlacement,
+  windowRectToPanel,
 } from "./tableTurn"
 
 const board = { width: 669, height: 951 }
@@ -76,5 +78,24 @@ describe("table turn", () => {
     expect(sizes[0]).toMatchObject({ width: table.width, height: table.height })
     expect(sizes[1]).toMatchObject({ width: table.width, height: table.height })
     expect(sizes[1].scale).toBeGreaterThan(sizes[0].scale)
+  })
+
+  it("spreads the seats as the hinge opens past the switch to the inner display", () => {
+    expect(hingeUnfold({ status: "partiallyOpen", angle: 25 })).toBe(0)
+    expect(hingeUnfold({ status: "partiallyOpen", angle: 95 })).toBeCloseTo(0.5)
+    expect(hingeUnfold({ status: "partiallyOpen", angle: 170 })).toBe(1)
+    expect(hingeUnfold({ status: "fullyOpen", angle: 120 })).toBe(1)
+    expect(hingeUnfold(null)).toBe(1)
+  })
+
+  it("puts the window's right half on the panel's top half when the panel's top is on the holder's right", () => {
+    const rightHalf = { x: 475.5, y: 0, width: 475.5, height: 669 }
+
+    expect(windowRectToPanel(rightHalf, board, -90)).toEqual({
+      x: 0,
+      y: 0,
+      width: 669,
+      height: 475.5,
+    })
   })
 })

@@ -49,12 +49,14 @@ const MINI = { width: 58, height: 84 }
 
 export function TableTurnOffer({
   angle,
+  unfolded,
   holderAngle,
   tableSlotColors,
   onLand,
   onKeep,
 }: {
   angle: SharedValue<number>
+  unfolded: SharedValue<number>
   holderAngle: number
   tableSlotColors?: readonly string[]
   onLand: (landing: "upright" | "reversed") => void
@@ -91,6 +93,11 @@ export function TableTurnOffer({
   // why: the gyroscope is read once per frame and its speed measured over whole frames; reacting to each sample measured speed across the uneven gaps between samples, which overshot and stepped back every third frame.
   useFrameCallback(({ timeSincePreviousFrame }) => {
     if (!following.value) return
+    // why: opening the hinge tilts the sensors, so the turn is measured only from a flat device.
+    if (unfolded.value < 1) {
+      startHeading.set(null)
+      return
+    }
     const { qx, qy, qz, qw } = rotation.sensor.value
     // why: heading from the quaternion is the turn about gravity even with the device tilted, where Euler yaw mixes in pitch and roll. It grows as the device turns counterclockwise, which the board answers by turning clockwise.
     const facing =
@@ -157,16 +164,18 @@ export function TableTurnOffer({
   }, [tapTurning, reducedMotion])
 
   const keep = () => {
-    if (Math.abs(angle.value) >= DECLINE_BELOW_DEG) return
+    if (Math.abs(angle.value) >= DECLINE_BELOW_DEG || unfolded.value < 1) return
     following.set(false)
     onKeep()
   }
 
   const scrimStyle = useAnimatedStyle(() => ({
-    opacity: 1 - Math.min(Math.abs(angle.value) / HINT_FROM_DEG, 1),
+    opacity: openedFully(unfolded.value) * (1 - Math.min(Math.abs(angle.value) / HINT_FROM_DEG, 1)),
   }))
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: Math.max(1 - Math.min(Math.abs(angle.value) / HINT_FROM_DEG, 1), hint.value),
+    opacity:
+      openedFully(unfolded.value) *
+      Math.max(1 - Math.min(Math.abs(angle.value) / HINT_FROM_DEG, 1), hint.value),
   }))
 
   return (
@@ -198,6 +207,11 @@ export function TableTurnOffer({
       </Animated.View>
     </Animated.View>
   )
+}
+
+function openedFully(unfolded: number) {
+  "worklet"
+  return Math.max((unfolded - 0.9) / 0.1, 0)
 }
 
 function arcPoint(degrees: number, radius: number) {

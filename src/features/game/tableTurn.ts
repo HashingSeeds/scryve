@@ -1,10 +1,42 @@
+import type { Hinge } from "expo-hinge"
 import type { LayoutRectangle } from "react-native"
 import type { SharedValue } from "react-native-reanimated"
 
 export interface TableTurn {
   /** why: the board turns opposite the device by the same amount, clockwise positive, so it holds still on the table. */
   angle: SharedValue<number>
+  /** why: the seats spread from where the closed outer board drew them as the hinge opens, 0 at the switch to the inner display and 1 when flat. */
+  unfolded: SharedValue<number>
   landed?: "upright" | "reversed"
+}
+
+const UNFOLD_FROM_DEG = 25
+const UNFOLD_TO_DEG = 165
+
+export function hingeUnfold(hinge: Hinge | null) {
+  "worklet"
+  if (!hinge || hinge.status === "fullyOpen") return 1
+  const progress = Math.min(
+    Math.max((hinge.angle - UNFOLD_FROM_DEG) / (UNFOLD_TO_DEG - UNFOLD_FROM_DEG), 0),
+    1,
+  )
+  return progress * progress * (3 - 2 * progress)
+}
+
+/** why: the board is drawn on the panel, which the window turns by the holder's angle, so a rect the holder sees upright turns the other way onto the panel. */
+export function windowRectToPanel(
+  rect: LayoutRectangle,
+  panel: { width: number; height: number },
+  holderAngle: number,
+): LayoutRectangle {
+  const sideways = holderAngle % 180 !== 0
+  const window = sideways ? { width: panel.height, height: panel.width } : panel
+  const shifted = {
+    ...rect,
+    x: rect.x + (panel.width - window.width) / 2,
+    y: rect.y + (panel.height - window.height) / 2,
+  }
+  return rotateRectAround(shifted, { x: panel.width / 2, y: panel.height / 2 }, holderAngle / 90)
 }
 
 export const TABLE_TURN_GATHER_DEG = 45

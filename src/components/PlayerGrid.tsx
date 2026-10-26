@@ -11,7 +11,7 @@ import { COMMANDER_SLOTS, MAX_COMMANDER_DAMAGE, PARTNER_COMMANDER } from "@/feat
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
-import { rotateRectAround, type TableTurn } from "@/features/game/tableTurn"
+import { rotateRectAround, type TableTurn, windowRectToPanel } from "@/features/game/tableTurn"
 import type {
   CommanderBoardPlayer,
   CommanderSlot,
@@ -347,7 +347,7 @@ export function PlayerGrid({
           gap: spacing.xxs,
           topInset: topEdgeBand,
           holderAngle,
-          angle: tableTurn.angle,
+          tableTurn,
         })
       : undefined
   const menuJunction = getFourCardMenuJunction(rows)
@@ -519,6 +519,7 @@ export function PlayerGrid({
               }
               const turningFrom = turning?.cells.get(slot)
               const turningTo = turning?.tableCells.get(slot)
+              const turningFolded = turning?.foldedCells.get(slot)
               const lifeCard = (liveSize?: SharedValue<{ width: number; height: number }>) => (
                 <LifeCard
                   liveSize={liveSize}
@@ -686,9 +687,11 @@ export function PlayerGrid({
                   testID={`player-cell-seat-${seatNumber}`}
                   style={themed($cell)}
                 >
-                  {turning && turningFrom && turningTo ? (
+                  {turning && turningFrom && turningTo && turningFolded ? (
                     <TurningSeat
                       angle={turning.angle}
+                      unfolded={turning.unfolded}
+                      folded={turningFolded}
                       cell={turningFrom}
                       table={turningTo}
                       board={turning.board}
@@ -732,9 +735,9 @@ function tableTurnCells(input: {
   gap: number
   topInset: number
   holderAngle: number
-  angle: SharedValue<number>
+  tableTurn: TableTurn
 }) {
-  const { playerCount, layout, board, gap, topInset, holderAngle, angle } = input
+  const { playerCount, layout, board, gap, topInset, holderAngle, tableTurn } = input
   const tableLayout = getPlayerGridLayout({
     playerCount,
     width: board.width,
@@ -750,9 +753,24 @@ function tableTurnCells(input: {
     gap,
     topInset,
   })
+  // why: closed, the outer display drew this board upright over the inner display's right half, so the seats spread out from there as the hinge opens.
+  const outer = { width: board.height / 2, height: board.width }
+  const foldedBoard = getPlayerGridCellRects({
+    playerCount,
+    layout: getPlayerGridLayout({ playerCount, ...outer, layoutVariant: layout.variant }),
+    board: outer,
+    gap,
+  })
   return {
-    angle,
+    angle: tableTurn.angle,
+    unfolded: tableTurn.unfolded,
     board,
+    foldedCells: new Map(
+      [...foldedBoard].map(([slot, rect]) => [
+        slot,
+        windowRectToPanel({ ...rect, x: rect.x + outer.width }, board, holderAngle),
+      ]),
+    ),
     cells: getPlayerGridCellRects({ playerCount, layout, board, gap, topInset }),
     tableCells: new Map(
       [...uprightTable].map(([slot, rect]) => [

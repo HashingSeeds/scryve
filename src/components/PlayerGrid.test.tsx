@@ -756,7 +756,11 @@ describe("PlayerGrid", () => {
             fontScale: 1,
             rotation: 0,
             touchRotation: 90,
-            tableTurn: { angle: { value: 0 } as SharedValue<number>, landed: "reversed" },
+            tableTurn: {
+              angle: { value: 0 } as SharedValue<number>,
+              unfolded: { value: 1 } as SharedValue<number>,
+              landed: "reversed",
+            },
           }}
           players={players(6)}
           layoutVariant="tabletop"

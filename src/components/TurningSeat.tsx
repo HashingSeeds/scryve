@@ -11,20 +11,32 @@ import { LayoutSettlingContext } from "@/utils/useSettledLayout"
 
 export function TurningSeat({
   angle,
+  unfolded,
+  folded,
   cell,
   table,
   board,
   children,
 }: {
   angle: SharedValue<number>
+  unfolded: SharedValue<number>
+  folded: LayoutRectangle
   cell: LayoutRectangle
   table: LayoutRectangle
   board: { width: number; height: number }
   children: (liveSize: SharedValue<{ width: number; height: number }>) => ReactNode
 }) {
-  const placed = useDerivedValue(() =>
-    tableTurnPlacement({ cell, table, board, angle: angle.value }),
-  )
+  const placed = useDerivedValue(() => {
+    const open = unfolded.value
+    const mix = (from: number, to: number) => from + (to - from) * open
+    const resting = {
+      x: mix(folded.x, cell.x),
+      y: mix(folded.y, cell.y),
+      width: mix(folded.width, cell.width),
+      height: mix(folded.height, cell.height),
+    }
+    return tableTurnPlacement({ cell: resting, table, board, angle: angle.value })
+  })
   const liveSize = useDerivedValue(() => ({
     width: placed.value.width,
     height: placed.value.height,

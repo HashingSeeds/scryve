@@ -1,6 +1,12 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native"
-import Animated, { cancelAnimation, useSharedValue, withTiming } from "react-native-reanimated"
+import { useAnimatedHinge } from "expo-hinge/reanimated"
+import Animated, {
+  cancelAnimation,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
@@ -27,7 +33,7 @@ import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
-import type { TableTurn } from "./tableTurn"
+import { hingeUnfold, type TableTurn } from "./tableTurn"
 import { TableTurnOffer } from "./TableTurnOffer"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import {
@@ -69,6 +75,8 @@ function PinnedGameBoardStage({
   const window = useWindowDimensions()
   const spansHinge = useWindowSpansHinge()
   const turnAngle = useSharedValue(0)
+  const hinge = useAnimatedHinge()
+  const unfolded = useDerivedValue(() => hingeUnfold(hinge.value))
   const [landed, setLanded] = useState<TableTurn["landed"]>()
   const [kept, setKept] = useState(false)
   // why: closing the Duo ends the turn, so the next opening offers it again from the center column.
@@ -108,8 +116,8 @@ function PinnedGameBoardStage({
   })
   const offering = !!gridLayout.centerColumn && !kept
   const tableTurn = useMemo<TableTurn | undefined>(
-    () => (gridLayout.centerColumn || landed ? { angle: turnAngle, landed } : undefined),
-    [gridLayout.centerColumn, landed, turnAngle],
+    () => (gridLayout.centerColumn || landed ? { angle: turnAngle, unfolded, landed } : undefined),
+    [gridLayout.centerColumn, landed, turnAngle, unfolded],
   )
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
@@ -173,6 +181,7 @@ function PinnedGameBoardStage({
               <TableTurnOffer
                 key={holderAngle}
                 angle={turnAngle}
+                unfolded={unfolded}
                 holderAngle={holderAngle}
                 tableSlotColors={tableSlotColors}
                 onLand={setLanded}
