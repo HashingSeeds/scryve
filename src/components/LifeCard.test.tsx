@@ -742,6 +742,48 @@ describe("LifeCard", () => {
     ).toMatchObject({ width: 300, height: 200, left: -50, top: 50 })
   })
 
+  it("keeps an upright card's counter row on the live size while a transition resizes it", () => {
+    jest.useFakeTimers()
+    const table = playTableRules("mtg", "commander")
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          contentRotation={0}
+          liveSize={
+            { value: { width: 200, height: 300 } } as Reanimated.SharedValue<{
+              width: number
+              height: number
+            }>
+          }
+          seatTable={{
+            counters: {},
+            held: [],
+            rules: table,
+            editable: true,
+            adjustCounter: jest.fn(),
+            takeDesignation: jest.fn(),
+            releaseDesignation: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 158, height: 187, x: 0, y: 0 } },
+    })
+
+    act(() => jest.advanceTimersByTime(200))
+    jest.useRealTimers()
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("counter-chips-frame-seat-1").props.style),
+    ).toMatchObject({ width: 200, height: 300 })
+  })
+
   it("puts the name and assign sword in the corner opposite the commander grid", () => {
     const onPressSword = jest.fn()
     const view = render(
