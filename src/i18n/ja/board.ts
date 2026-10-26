@@ -113,6 +113,11 @@ export default {
     title: "席を入れ替え",
     seat: "{{name}}の席",
   },
+  tableTurn: {
+    cue: "回してテーブル表示",
+    turn: "ボードをテーブルレイアウトに回転します",
+    keep: "このレイアウトを維持",
+  },
   layoutOption: {
     balanced: "バランスレイアウト",
     topFocus: "上重視レイアウト",

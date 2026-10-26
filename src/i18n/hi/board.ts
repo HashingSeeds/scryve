@@ -113,6 +113,11 @@ export default {
     title: "सीट बदलें",
     seat: "{{name}} की सीट",
   },
+  tableTurn: {
+    cue: "टेबल के लिए घुमाएँ",
+    turn: "बोर्ड को टेबल लेआउट में घुमाएँ",
+    keep: "यही लेआउट रखें",
+  },
   layoutOption: {
     balanced: "संतुलित लेआउट",
     topFocus: "ऊपर फ़ोकस लेआउट",

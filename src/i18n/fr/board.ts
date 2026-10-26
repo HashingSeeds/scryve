@@ -114,6 +114,11 @@ export default {
     title: "Échanger les places",
     seat: "Place de {{name}}",
   },
+  tableTurn: {
+    cue: "Tournez pour Table",
+    turn: "Tournez le plateau vers la disposition Table",
+    keep: "Garder cette disposition",
+  },
   layoutOption: {
     balanced: "Disposition équilibrée",
     topFocus: "Disposition priorité haut",

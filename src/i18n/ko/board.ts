@@ -112,6 +112,11 @@ export default {
     title: "자리 바꾸기",
     seat: "{{name}}님의 자리",
   },
+  tableTurn: {
+    cue: "테이블용으로 돌리세요",
+    turn: "보드를 테이블 레이아웃으로 돌리세요",
+    keep: "현재 레이아웃 유지",
+  },
   layoutOption: {
     balanced: "균형 레이아웃",
     topFocus: "상단 중심 레이아웃",

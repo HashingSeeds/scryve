@@ -114,6 +114,11 @@ export default {
     title: "Intercambiar asientos",
     seat: "Asiento de {{name}}",
   },
+  tableTurn: {
+    cue: "Gira para Mesa",
+    turn: "Gira el tablero al diseño Mesa",
+    keep: "Mantener este diseño",
+  },
   layoutOption: {
     balanced: "Diseño equilibrado",
     topFocus: "Diseño con foco arriba",
