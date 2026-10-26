@@ -476,7 +476,7 @@ export function CardSearchScreen({
               />
             ) : null}
           </View>
-          {scanLines.length ? (
+          {scanLines.length > 1 && catalogResults?.length === 0 ? (
             <View style={$pills}>
               {scanLines.map((line) => (
                 <FilterPill

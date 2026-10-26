@@ -1,4 +1,4 @@
-const MAX_CANDIDATES = 6
+const MAX_CANDIDATES = 3
 const NAME_CHARACTERS = /[^\p{L}\p{N}\s'’,:!.&-]/gu
 const MANA_COSTS_AND_NUMBERS = /\{[^}]*\}|(?<![\p{L}\p{N}])\p{N}+(?![\p{L}\p{N}])/gu
 const SET_CODE_LINE = /^(?:\p{Lu}{1,3}\s*)+$/u
