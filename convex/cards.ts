@@ -792,7 +792,12 @@ export const byNames = action({
           message: `Card lookup is temporarily unavailable (${response.status})`,
         })
       const payload = objectRecord((await response.json()) as unknown)
-      const fetched = (Array.isArray(payload?.data) ? payload.data : [])
+      if (!Array.isArray(payload?.data))
+        throw new ConvexError({
+          code: "scryfall_invalid_response",
+          message: "Card service returned an invalid response",
+        })
+      const fetched = payload.data
         .map(normalizeScryfallCard)
         .filter((card): card is CardReference => card !== null)
       if (fetched.length) await ctx.runMutation(internal.cards.cacheMany, { cards: fetched })

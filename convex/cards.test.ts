@@ -1032,6 +1032,15 @@ describe("card lookup by names", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it("treats a Scryfall answer without a card list as a failed lookup", async () => {
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cache, solRing)
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}))
+    await expect(
+      t.action(api.cards.byNames, { names: ["Sol Ring", "Acidic Slime"] }),
+    ).resolves.toMatchObject({ cards: [{ name: "Sol Ring" }], lookupFailed: true })
+  })
+
   it("rejects more names than one Scryfall request can hold", async () => {
     const t = makeConvexTest()
     const names = Array.from({ length: 76 }, (_, index) => `Card ${index}`)
