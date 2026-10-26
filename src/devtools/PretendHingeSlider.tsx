@@ -54,7 +54,7 @@ function angleAt(x: number) {
 const $bar: ViewStyle = {
   position: "absolute",
   left: 16,
-  bottom: 16,
+  top: 32,
   flexDirection: "row",
   alignItems: "center",
   gap: 12,
