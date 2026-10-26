@@ -31,6 +31,7 @@ export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
   const scale = seatIdentityMetrics(compact).mark / MARK_VIEW_BOX
   const art = MARK_ART_BOUNDS[shape]
   return {
+    width: (art.right - art.left) * scale,
     height: (art.bottom - art.top) * scale,
     trim: {
       marginTop: -art.top * scale,
