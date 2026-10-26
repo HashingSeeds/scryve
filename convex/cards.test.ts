@@ -879,6 +879,97 @@ describe("keyword abilities catalog", () => {
   })
 })
 
+describe("card name catalog", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  function scryfall() {
+    return jest.spyOn(global, "fetch").mockImplementation((input) =>
+      response(
+        String(input).endsWith("/catalog/card-names")
+          ? { object: "catalog", data: ["Sol Ring", "Acidic Slime"] }
+          : {
+              object: "list",
+              has_more: false,
+              data: [{ name: "Acidic Slime", flavor_name: "Marauding Mutagen" }],
+            },
+      ),
+    )
+  }
+
+  it("returns real names and printed alternate names", async () => {
+    const t = makeConvexTest()
+    scryfall()
+    await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toEqual({
+      names: "Sol Ring\nAcidic Slime",
+      alternateNames: "Marauding Mutagen\tAcidic Slime",
+    })
+  })
+
+  it("serves every device from one cached copy for a day", async () => {
+    const t = makeConvexTest()
+    const fetchSpy = scryfall()
+    await t.action(api.cards.cardNameCatalog, { deviceId: "a" })
+    const calls = fetchSpy.mock.calls.length
+    await t.action(api.cards.cardNameCatalog, { deviceId: "b" })
+    expect(fetchSpy.mock.calls.length).toBe(calls)
+  })
+
+  it("rejects a malformed name list", async () => {
+    const t = makeConvexTest()
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementation(() => response({ object: "catalog", data: ["Sol\nRing"] }))
+    await expect(t.action(api.cards.cardNameCatalog, {})).rejects.toMatchObject({
+      data: { code: "scryfall_invalid_response" },
+    })
+  })
+})
+
+describe("card lookup by names", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  const solRing = {
+    scryfallId: "22222222-2222-2222-2222-222222222222",
+    oracleId: "33333333-3333-3333-3333-333333333333",
+    name: "Sol Ring",
+    setName: "Commander Masters",
+  }
+
+  it("looks up every uncached name in one Scryfall request", async () => {
+    const t = makeConvexTest()
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response({ data: [] }))
+    await t.action(api.cards.byNames, { names: ["Sol Ring", "Acidic Slime", "Sol Ring"] })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.scryfall.com/cards/collection",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ identifiers: [{ name: "Sol Ring" }, { name: "Acidic Slime" }] }),
+      }),
+    )
+  })
+
+  it("serves cards it has seen before without calling Scryfall", async () => {
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cache, solRing)
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+    await expect(t.action(api.cards.byNames, { names: ["Sol Ring"] })).resolves.toMatchObject({
+      cards: [{ name: "Sol Ring", scryfallId: solRing.scryfallId }],
+      lookupFailed: false,
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("still returns cached cards when Scryfall refuses the rest", async () => {
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cache, solRing)
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 429))
+    await expect(
+      t.action(api.cards.byNames, { names: ["Sol Ring", "Acidic Slime"] }),
+    ).resolves.toMatchObject({ cards: [{ name: "Sol Ring" }], lookupFailed: true })
+  })
+})
+
 describe("card search query limits", () => {
   afterEach(() => jest.restoreAllMocks())
 
