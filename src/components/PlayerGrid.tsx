@@ -290,6 +290,7 @@ export function PlayerGrid({
     height,
     fontScale,
     layoutVariant,
+    holderAngle: boardOrientation?.touchRotation && -boardOrientation.touchRotation,
   })
   const cellSize = getCellSize({
     board: { width: board.width, height: board.height - topEdgeBand },

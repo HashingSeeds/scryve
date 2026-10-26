@@ -79,7 +79,14 @@ function PinnedGameBoardStage({
   const holderAngle = pinned ? metrics.holderAngle : 0
   const fontScale = window.fontScale
 
-  const gridLayout = usePlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant })
+  const gridLayout = usePlayerGridLayout({
+    playerCount,
+    width,
+    height,
+    fontScale,
+    layoutVariant,
+    holderAngle,
+  })
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),

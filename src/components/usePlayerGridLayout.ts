@@ -12,10 +12,20 @@ export function usePlayerGridLayout({
   height,
   fontScale,
   layoutVariant,
+  holderAngle,
 }: LayoutInput) {
   const spansHinge = useWindowSpansHinge()
   return useMemo(
-    () => getPlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant, spansHinge }),
-    [playerCount, width, height, fontScale, layoutVariant, spansHinge],
+    () =>
+      getPlayerGridLayout({
+        playerCount,
+        width,
+        height,
+        fontScale,
+        layoutVariant,
+        spansHinge,
+        holderAngle,
+      }),
+    [playerCount, width, height, fontScale, layoutVariant, spansHinge, holderAngle],
   )
 }

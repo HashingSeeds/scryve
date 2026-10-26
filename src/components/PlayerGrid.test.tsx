@@ -26,6 +26,8 @@ import {
   getPlayerGridRowFlex,
   getPlayerGridRows,
   getCornerCutout,
+  getPlayerContentRotation,
+  getPlayerGridFacings,
   getScreenCornerSquaringStyle,
   PlayerGrid,
 } from "./PlayerGrid"
@@ -626,6 +628,68 @@ describe("PlayerGrid", () => {
       })
     },
   )
+
+  it.each([
+    [
+      -90,
+      [
+        [2, 4],
+        [0, 5],
+        [1, 3],
+      ],
+    ],
+    [
+      90,
+      [
+        [3, 1],
+        [5, 0],
+        [4, 2],
+      ],
+    ],
+  ])(
+    "gives six Table seats a center column on an open Duo held at %i degrees, each facing the edge it faced closed",
+    (holderAngle, expectedRows) => {
+      const layout = getPlayerGridLayout({
+        playerCount: 6,
+        width: 669,
+        height: 951,
+        layoutVariant: "tabletop",
+        spansHinge: true,
+        holderAngle,
+      })
+      const rows = getPlayerGridRows(6, layout)
+      const facings = rows.map((row, rowIndex) =>
+        row.map((slot, columnIndex) =>
+          getPlayerContentRotation({
+            playerCount: 6,
+            layout,
+            row,
+            rowIndex,
+            columnIndex,
+            slot: slot!,
+          }),
+        ),
+      )
+
+      expect(rows).toEqual(expectedRows)
+      expect(facings).toEqual([
+        [180, 180],
+        [90, -90],
+        [0, 0],
+      ])
+      expect(getPlayerGridFacings(6, layout)).toEqual([90, -90])
+    },
+  )
+
+  it.each([
+    ["held upright", { spansHinge: true, holderAngle: 0, layoutVariant: "tabletop" }],
+    ["closed", { spansHinge: false, holderAngle: -90, layoutVariant: "tabletop" }],
+    ["Balanced", { spansHinge: true, holderAngle: -90, layoutVariant: "auto" }],
+  ] as const)("keeps the usual six-player board when %s", (_, input) => {
+    expect(
+      getPlayerGridLayout({ playerCount: 6, width: 669, height: 951, ...input }).centerColumn,
+    ).toBeUndefined()
+  })
 
   it("supports featured and even arrangements without dropping a player", () => {
     const inputs = [

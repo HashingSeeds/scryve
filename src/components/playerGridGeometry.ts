@@ -7,11 +7,20 @@ import type { LifeCardContentRotation } from "./playerCardTypes"
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
 
+const CENTER_COLUMN_SLOTS_WITH_PANEL_TOP_RIGHT = [
+  [2, 4],
+  [0, 5],
+  [1, 3],
+]
+
 export function getPlayerGridRows(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,
 ): (number | null)[][] {
   const seats = Array.from({ length: playerCount }, (_, index) => index)
+  if (layout.centerColumn === "panel-top-right") return CENTER_COLUMN_SLOTS_WITH_PANEL_TOP_RIGHT
+  if (layout.centerColumn === "panel-top-left")
+    return CENTER_COLUMN_SLOTS_WITH_PANEL_TOP_RIGHT.map((row) => [...row].reverse()).reverse()
   if (layout.variant === "tabletop")
     return [[0], ...chunkSeats(seats.slice(1, -1), 2), [playerCount - 1]]
   if (layout.variant === "featured-first") return [[0], ...chunkSeats(seats.slice(1), 2)]
@@ -99,6 +108,11 @@ export function getPlayerContentRotation(input: {
 }): LifeCardContentRotation {
   if (input.playerCount === 2 && input.layout.layout === "two-stacked")
     return input.slot === 0 ? 180 : 0
+  if (input.layout.centerColumn) {
+    if (input.rowIndex === 0) return 180
+    if (input.rowIndex === input.layout.rowCount - 1) return 0
+    return input.columnIndex === 0 ? 90 : -90
+  }
 
   const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
   if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
@@ -123,7 +137,12 @@ export function getPlayerGridFacings(
   )
   const across = facings.filter(acrossBoard).length
   const along = facings.length - across
-  const keepAcross = across === along ? layout.landscape : across > along
+  // why: in the open Duo's center column the menu sits beside the end seats, so the chips face them rather than the side seats that outnumber them.
+  const keepAcross = layout.centerColumn
+    ? false
+    : across === along
+      ? layout.landscape
+      : across > along
   return [...new Set(facings.filter((facing) => acrossBoard(facing) === keepAcross))]
 }
 
@@ -151,6 +170,7 @@ export function getPlayerGridLayout(input: {
   layoutVariant?: PlayerGridLayoutVariant
   // why: a book-style fold crosses the middle of the board's long side, so an even count of cells along that side keeps them off the crease.
   spansHinge?: boolean
+  holderAngle?: number
 }) {
   const landscape = input.width > input.height
   const tablet = Math.min(input.width, input.height) >= 600
@@ -167,6 +187,15 @@ export function getPlayerGridLayout(input: {
           ? denseColumnCount
           : 2
   const variant = playerGridLayoutForCount(input.playerCount, input.layoutVariant)
+  // why: opening the iPhone Duo keeps each player at the edge they faced while it was closed, which leaves the Table's end seats on its long sides; they share a center column until the players turn the device.
+  const centerColumn =
+    input.spansHinge && variant === "tabletop" && input.playerCount === 6
+      ? input.holderAngle === -90
+        ? ("panel-top-right" as const)
+        : input.holderAngle === 90
+          ? ("panel-top-left" as const)
+          : undefined
+      : undefined
   const columnCount =
     variant === "featured-first" ||
     variant === "featured-last" ||
@@ -174,8 +203,9 @@ export function getPlayerGridLayout(input: {
     variant === "tabletop"
       ? 2
       : automaticColumnCount
-  const rowCount =
-    variant === "tabletop"
+  const rowCount = centerColumn
+    ? CENTER_COLUMN_SLOTS_WITH_PANEL_TOP_RIGHT.length
+    : variant === "tabletop"
       ? 2 + Math.ceil((input.playerCount - 2) / 2)
       : variant === "featured-first" || variant === "featured-last"
         ? 1 + Math.ceil((input.playerCount - 1) / 2)
@@ -203,6 +233,7 @@ export function getPlayerGridLayout(input: {
   const minCellHeight = largeText ? Math.ceil(baseCellHeight * 1.25) : baseCellHeight
   return {
     variant,
+    centerColumn,
     columnCount,
     rowCount,
     layout,
