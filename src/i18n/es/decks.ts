@@ -369,6 +369,7 @@ export default {
     read: "Leer carta",
     reading: "Leyendo…",
     noText: "No se encontró el nombre de la carta. Prueba con más luz o acerca la carta.",
+    unsure: "No se pudo identificar la carta. Colócala plana e inténtalo de nuevo.",
     failed: "No se pudo leer la carta. Inténtalo de nuevo.",
     permission:
       "Scryve usa la cámara para leer los nombres de las cartas. Las fotos se quedan en este dispositivo.",

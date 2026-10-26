@@ -286,6 +286,7 @@
   "cardScan.read": "ea5a8fa15888",
   "cardScan.reading": "2941a00ba858",
   "cardScan.noText": "d9814e13d33b",
+  "cardScan.unsure": "16475e579f4c",
   "cardScan.failed": "6a0fe126094e",
   "cardScan.permission": "fd00dfb3a47a",
   "cardScan.permissionDenied": "107f9e2891f6",

@@ -375,6 +375,7 @@ export default {
     read: "Lire la carte",
     reading: "Lecture…",
     noText: "Aucun nom de carte trouvé. Essayez avec plus de lumière ou rapprochez la carte.",
+    unsure: "Impossible d'identifier cette carte. Posez-la à plat et réessayez.",
     failed: "Impossible de lire la carte. Réessayez.",
     permission:
       "Scryve utilise l'appareil photo pour lire les noms des cartes. Les photos restent sur cet appareil.",

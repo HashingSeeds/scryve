@@ -364,6 +364,7 @@ const decks = {
     read: "Read card",
     reading: "Reading…",
     noText: "No card name found. Try more light or hold the card closer.",
+    unsure: "Couldn't tell which card this is. Hold it flat and try again.",
     failed: "Could not read the card. Try again.",
     permission: "Scryve uses the camera to read card names. Photos stay on this device.",
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",

@@ -1,7 +1,8 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Linking, Modal, StyleSheet, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { CameraView, useCameraPermissions } from "expo-camera"
+import * as ScreenOrientation from "expo-screen-orientation"
 import { extractTextFromImage } from "expo-text-extractor"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -13,13 +14,13 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { likelyCardNamesTopFirst } from "./cardScan"
+import { cardTextLinesTopFirst } from "./cardScan"
 
 export function CardScanner({
   onScan,
   onClose,
 }: {
-  onScan: (names: string[]) => void
+  onScan: (textBlocks: string[]) => "accepted" | "unsure"
   onClose: () => void
 }) {
   const camera = useRef<CameraView>(null)
@@ -28,15 +29,22 @@ export function CardScanner({
   const [error, setError] = useState<string>()
   const { themed, theme } = useAppTheme()
 
+  useEffect(() => {
+    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
+      () => undefined,
+    )
+    return () => void ScreenOrientation.unlockAsync().catch(() => undefined)
+  }, [])
+
   async function read() {
     if (!camera.current || reading) return
     setReading(true)
     setError(undefined)
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false })
-      const names = likelyCardNamesTopFirst(await extractTextFromImage(photo.uri))
-      if (names.length) onScan(names)
-      else setError(translate("decks:cardScan.noText"))
+      const textBlocks = await extractTextFromImage(photo.uri)
+      if (!cardTextLinesTopFirst(textBlocks).length) setError(translate("decks:cardScan.noText"))
+      else if (onScan(textBlocks) === "unsure") setError(translate("decks:cardScan.unsure"))
     } catch {
       setError(translate("decks:cardScan.failed"))
     } finally {

@@ -4,6 +4,10 @@ const MANA_COSTS_AND_NUMBERS = /\{[^}]*\}|(?<![\p{L}\p{N}])\p{N}+(?![\p{L}\p{N}]
 const SET_CODE_LINE = /^(?:\p{Lu}{1,3}\s*)+$/u
 
 export function likelyCardNamesTopFirst(blocks: string[]): string[] {
+  return cardTextLinesTopFirst(blocks).slice(0, MAX_CANDIDATES)
+}
+
+export function cardTextLinesTopFirst(blocks: string[]): string[] {
   const seen = new Set<string>()
   return blocks
     .flatMap((block) => block.split("\n"))
@@ -22,5 +26,4 @@ export function likelyCardNamesTopFirst(blocks: string[]): string[] {
       seen.add(key)
       return true
     })
-    .slice(0, MAX_CANDIDATES)
 }

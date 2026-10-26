@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Keyboard, Modal, Platform, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
 import { isSupported as canReadText } from "expo-text-extractor"
@@ -31,11 +31,14 @@ import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { firstUnambiguousCardName } from "./cardNameMatch"
+import { cardTextLinesTopFirst, likelyCardNamesTopFirst } from "./cardScan"
 import { CardScanner } from "./CardScanner"
 import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
+import { useCardNameIndex } from "./useCardNameIndex"
 import { api } from "../../../convex/_generated/api"
 import { picksCommander, systemDefinition } from "../../../convex/lib/systems"
 
@@ -44,6 +47,7 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 const CAN_SCAN = Platform.OS !== "web" && canReadText
+const NAME_MATCH_LINES = 6
 
 function scryfallQuery({
   text,
@@ -117,6 +121,9 @@ export function CardSearchScreen({
   const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
   const [scanLines, setScanLines] = useState<string[]>([])
+  const [matchedName, setMatchedName] = useState<string>()
+  const scanSession = useRef<{ startedAt: number; matchedName?: string }>(undefined)
+  const nameIndex = useCardNameIndex(game, deviceId, scanning)
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
@@ -327,7 +334,7 @@ export function CardSearchScreen({
           game,
           deviceId,
           query: scryfallQuery({
-            text: query.trim(),
+            text: query === matchedName && !query.includes('"') ? `!"${query}"` : query.trim(),
             commander: choosingCommander,
             colors: colorFilters,
             exactColors,
@@ -362,6 +369,7 @@ export function CardSearchScreen({
     searchRequested,
     searchAttempt,
     searchDelayMs,
+    matchedName,
     searchError?.retryAfterMs,
     deviceId,
   ])
@@ -396,7 +404,31 @@ export function CardSearchScreen({
       return
     }
     const error = onAdd(searchEntry(card))
+    if (!error) recordScannedAdd(card.name)
     setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
+  }
+
+  function recordScannedAdd(name: string) {
+    if (!__DEV__ || !scanSession.current) return
+    const { startedAt, matchedName: matched } = scanSession.current
+    console.log(`SCANADD ${JSON.stringify({ added: name, matched, ms: Date.now() - startedAt })}`)
+    scanSession.current = undefined
+  }
+
+  function readScan(textBlocks: string[]) {
+    const lines = cardTextLinesTopFirst(textBlocks)
+    const match = nameIndex
+      ? firstUnambiguousCardName(nameIndex, lines.slice(0, NAME_MATCH_LINES))
+      : undefined
+    if (__DEV__) console.log(`SCANREAD ${JSON.stringify({ textBlocks, match })}`)
+    if (nameIndex && !match) return "unsure"
+    const names = match ? [match.name] : likelyCardNamesTopFirst(textBlocks)
+    if (scanSession.current) scanSession.current.matchedName = match?.name
+    setScanning(false)
+    setScanLines(names)
+    setMatchedName(match?.name)
+    setQuery(names[0])
+    return "accepted"
   }
 
   function addOffline(entry: KnownCardEntry) {
@@ -405,6 +437,7 @@ export function CardSearchScreen({
       return
     }
     const error = onAdd({ ...entry.card, quantity: 1, section })
+    if (!error) recordScannedAdd(entry.card.name)
     setMessage(error ?? translate("decks:cardSearch.added", { card: entry.card.name }))
   }
 
@@ -474,7 +507,10 @@ export function CardSearchScreen({
                 testID="card-scan-button"
                 tx="decks:cardSearch.scan"
                 accessibilityLabel={translate("decks:cardSearch.scanLabel")}
-                onPress={() => setScanning(true)}
+                onPress={() => {
+                  scanSession.current = { startedAt: Date.now() }
+                  setScanning(true)
+                }}
               />
             ) : null}
           </View>
@@ -802,16 +838,7 @@ export function CardSearchScreen({
           </View>
         </DialogCard>
       ) : null}
-      {scanning ? (
-        <CardScanner
-          onClose={() => setScanning(false)}
-          onScan={(lines) => {
-            setScanning(false)
-            setScanLines(lines)
-            setQuery(lines[0])
-          }}
-        />
-      ) : null}
+      {scanning ? <CardScanner onClose={() => setScanning(false)} onScan={readScan} /> : null}
       {candidate ? (
         <CardFocusDialog
           key={printingKey(candidate)}
