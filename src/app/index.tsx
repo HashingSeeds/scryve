@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AppState, View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
@@ -91,12 +91,18 @@ export default function Index() {
   const [newerGame, setNewerGame] = useState(() => localGameRepository.hasNewerActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
   const [resumingNearbyGame] = useState(() => lanPlayAvailable() && Boolean(savedHostedGame()))
+  const readRevision = useRef<string>(undefined)
   const reload = useCallback(() => {
+    const revision = () => `${prepared}:${localGameRepository.boardRevision()}`
+    // why: a reread hands the board new objects, and a fresh game gets new seat ids, so returning to an unchanged board would remount every seat.
+    if (readRevision.current === revision()) return
     const nextSettings = localGameRepository.loadSettings()
     setSettings(nextSettings)
     setLoadedGame(localGameRepository.loadActiveGame())
     setNewerGame(localGameRepository.hasNewerActiveGame())
     setFreshGame(createFreshGame(prepared, nextSettings))
+    // why: loadSettings can rewrite the saved settings, so the revision is taken after it.
+    readRevision.current = revision()
   }, [prepared])
   useFocusEffect(reload)
   // why: the board saves without telling this route, so a reopened app rereads the saved game; otherwise the old-game prompt judges, continues, or ends the game this route loaded at launch.
