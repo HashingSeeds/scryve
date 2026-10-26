@@ -1,4 +1,4 @@
-import { type Ref, useEffect, useRef } from "react"
+import { type Ref, useEffect, useRef, useState } from "react"
 import { AccessibilityInfo, Pressable, StyleSheet, View, type ViewStyle } from "react-native"
 import Animated, {
   Easing,
@@ -134,22 +134,28 @@ export function TableTurnOffer({
       land(shown)
   })
 
-  const turnByTap = () => {
-    following.set(false)
+  const [tapTurning, setTapTurning] = useState(false)
+  const tapTurn = (duration: number) =>
     angle.set(
       withTiming(
         uprightWay * 90,
-        {
-          duration: motionDuration(reducedMotion, FALLBACK_TURN_MS),
-          easing: Easing.inOut(Easing.cubic),
-          reduceMotion: ReduceMotion.Never,
-        },
+        { duration, easing: Easing.inOut(Easing.cubic), reduceMotion: ReduceMotion.Never },
         (finished) => {
           if (finished) runOnJS(onLand)("upright")
         },
       ),
     )
+  const turnByTap = () => {
+    following.set(false)
+    setTapTurning(true)
+    tapTurn(motionDuration(reducedMotion, FALLBACK_TURN_MS))
   }
+  // why: turning Reduce Motion on mid-turn finishes the board at once instead of letting the timed turn play out.
+  useEffect(() => {
+    if (tapTurning && reducedMotion !== false) tapTurn(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tapTurning, reducedMotion])
+
   const keep = () => {
     if (Math.abs(angle.value) >= DECLINE_BELOW_DEG) return
     following.set(false)
