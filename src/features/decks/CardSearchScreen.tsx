@@ -125,6 +125,7 @@ export function CardSearchScreen({
   const [searchAttempt, setSearchAttempt] = useState(0)
 
   const offline = connection?.isWebSocketConnected === false
+  const searchDelayMs = scanLines.includes(query) ? 0 : 350
   const [cachedRules, setCachedRules] = useState(() => loadCardDetails())
   const [colorFilters, setColorFilters] = useState<string[]>([])
   const [exactColors, setExactColors] = useState(true)
@@ -343,7 +344,7 @@ export function CardSearchScreen({
       } finally {
         if (active) setBusy(false)
       }
-    }, 350)
+    }, searchDelayMs)
     return () => {
       active = false
       clearTimeout(timer)
@@ -360,6 +361,7 @@ export function CardSearchScreen({
     keywords,
     searchRequested,
     searchAttempt,
+    searchDelayMs,
     searchError?.retryAfterMs,
     deviceId,
   ])

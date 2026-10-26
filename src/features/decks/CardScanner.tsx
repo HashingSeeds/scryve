@@ -62,7 +62,12 @@ export function CardScanner({
         />
         {permission?.granted ? (
           <View style={$screen}>
-            <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
+            <CameraView
+              ref={camera}
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              pictureSize="1920x1080"
+            />
             <View style={$overlay} pointerEvents="none">
               <View style={$frame} />
               <Text size="sm" style={$hint} text={error ?? translate("decks:cardScan.hint")} />
