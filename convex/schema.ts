@@ -655,6 +655,14 @@ export default defineSchema({
     .index("by_user_and_deck_key_and_fingerprint", ["userId", "deckKey", "fingerprint"])
     .index("by_user_and_fingerprint", ["userId", "fingerprint"]),
 
+  cardNameCatalogs: defineTable({
+    game: v.string(),
+    fetchedAt: v.number(),
+    names: v.string(),
+    alternateNames: v.string(),
+    refreshingUntil: v.optional(v.number()),
+  }).index("by_game", ["game"]),
+
   cardReferences: defineTable({
     commanderEligibility: v.optional(
       v.union(v.literal("eligible"), v.literal("ineligible"), v.literal("color-choice")),
@@ -677,7 +685,9 @@ export default defineSchema({
     rarity: v.optional(v.string()),
     power: v.optional(v.string()),
     updatedAt: v.number(),
-  }).index("by_scryfall_id", ["scryfallId"]),
+  })
+    .index("by_scryfall_id", ["scryfallId"])
+    .index("by_name", ["name"]),
 
   scryfallImageFallbacks: defineTable({
     oracleId: v.string(),

@@ -23,6 +23,7 @@ import {
   fetchScryfall,
   normalizeScryfallCard,
   objectRecord,
+  SCRYFALL_BASE_URL,
 } from "./lib/scryfall"
 
 const MAX_SEARCH_RESULTS = 20
@@ -236,6 +237,140 @@ export const keywordAbilities = action({
         message: "Invalid keyword abilities response",
       })
     return [...new Set(data)]
+  },
+})
+
+const MAX_CARD_NAMES_BYTES = 900_000
+const CARD_NAME_CATALOG_MAX_AGE_MS = 86_400_000
+const CARD_NAME_CATALOG_REFRESH_CLAIM_MS = 120_000
+const MAX_ALTERNATE_NAME_PAGES = 10
+const SCRYFALL_COLLECTION_SIZE = 75
+const MAX_CACHED_PRINTINGS_PER_NAME = 8
+
+const cardNameCatalogValidator = v.object({ names: v.string(), alternateNames: v.string() })
+type CardNameCatalog = Infer<typeof cardNameCatalogValidator>
+
+const isCatalogName = (name: unknown): name is string =>
+  typeof name === "string" && name.trim().length > 0 && name.length <= 200 && !/[\r\n\t]/.test(name)
+
+function invalidCatalog(): never {
+  throw new ConvexError({
+    code: "scryfall_invalid_response",
+    message: "Invalid card names response",
+  })
+}
+
+async function scryfallJson(ctx: ActionCtx, path: string) {
+  const response = await fetchScryfall(ctx, path)
+  if (!response.ok)
+    throw new ConvexError({
+      code: "scryfall_unavailable",
+      message: "Card names are temporarily unavailable",
+    })
+  return objectRecord((await response.json()) as unknown)
+}
+
+async function fetchCardNames(ctx: ActionCtx) {
+  const payload = await scryfallJson(ctx, "/catalog/card-names")
+  const data = payload?.data
+  if (payload?.object !== "catalog" || !Array.isArray(data) || !data.length) invalidCatalog()
+  if (!data.every(isCatalogName)) invalidCatalog()
+  const names = data.join("\n")
+  if (names.length > MAX_CARD_NAMES_BYTES) invalidCatalog()
+  return names
+}
+
+async function fetchPrintedToRulesNameLines(ctx: ActionCtx) {
+  const pairs = new Set<string>()
+  let path = "/cards/search?q=has%3Aflavorname&unique=prints"
+  for (let page = 0; page < MAX_ALTERNATE_NAME_PAGES; page++) {
+    const payload = await scryfallJson(ctx, path)
+    const cards = Array.isArray(payload?.data) ? payload.data : invalidCatalog()
+    for (const value of cards) {
+      const card = objectRecord(value)
+      const faces = Array.isArray(card?.card_faces) ? card.card_faces.map(objectRecord) : []
+      for (const entry of [card, ...faces]) {
+        const printed = entry?.flavor_name
+        if (isCatalogName(printed) && isCatalogName(card?.name))
+          pairs.add(`${printed}\t${card.name}`)
+      }
+    }
+    if (payload?.has_more !== true) return [...pairs].join("\n")
+    const next = payload.next_page
+    if (typeof next !== "string" || !next.startsWith(`${SCRYFALL_BASE_URL}/`)) invalidCatalog()
+    path = next.slice(SCRYFALL_BASE_URL.length)
+  }
+  return invalidCatalog()
+}
+
+export const cachedNameCatalog = internalQuery({
+  args: { game: v.string() },
+  handler: async (ctx, { game }) =>
+    await ctx.db
+      .query("cardNameCatalogs")
+      .withIndex("by_game", (q) => q.eq("game", game))
+      .unique(),
+})
+
+export const storeNameCatalog = internalMutation({
+  args: { game: v.string(), names: v.string(), alternateNames: v.string() },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("cardNameCatalogs")
+      .withIndex("by_game", (q) => q.eq("game", args.game))
+      .unique()
+    const value = { ...args, fetchedAt: Date.now() }
+    if (existing) await ctx.db.replace(existing._id, value)
+    else await ctx.db.insert("cardNameCatalogs", value)
+    return null
+  },
+})
+
+export const claimNameCatalogRefresh = internalMutation({
+  args: { game: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { game }) => {
+    const cached = await ctx.db
+      .query("cardNameCatalogs")
+      .withIndex("by_game", (q) => q.eq("game", game))
+      .unique()
+    const now = Date.now()
+    if (!cached || now - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS) return false
+    if (cached.refreshingUntil !== undefined && cached.refreshingUntil > now) return false
+    await ctx.db.patch(cached._id, { refreshingUntil: now + CARD_NAME_CATALOG_REFRESH_CLAIM_MS })
+    return true
+  },
+})
+
+export const cardNameCatalog = action({
+  args: { deviceId: v.optional(v.string()) },
+  returns: cardNameCatalogValidator,
+  handler: async (ctx, args): Promise<CardNameCatalog> => {
+    await requireActionCapability(ctx, "mtg", "cardCatalog")
+    const cached: Doc<"cardNameCatalogs"> | null = await ctx.runQuery(
+      internal.cards.cachedNameCatalog,
+      { game: "mtg" },
+    )
+    if (cached) {
+      const copy = { names: cached.names, alternateNames: cached.alternateNames }
+      if (Date.now() - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS) return copy
+      const claimed: boolean = await ctx.runMutation(internal.cards.claimNameCatalogRefresh, {
+        game: "mtg",
+      })
+      if (!claimed) return copy
+    }
+    try {
+      await limitCardLookup(ctx, args.deviceId)
+      const catalog = {
+        names: await fetchCardNames(ctx),
+        alternateNames: await fetchPrintedToRulesNameLines(ctx),
+      }
+      await ctx.runMutation(internal.cards.storeNameCatalog, { game: "mtg", ...catalog })
+      return catalog
+    } catch (error) {
+      if (cached) return { names: cached.names, alternateNames: cached.alternateNames }
+      throw error
+    }
   },
 })
 
@@ -633,5 +768,70 @@ export const imageFallbacks = action({
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
     await limitCardLookup(ctx, deviceId)
     return [...new Set(await cardImageCandidates(ctx, game, cardId.trim()))]
+  },
+})
+
+export const cachedByNames = internalQuery({
+  args: { names: v.array(v.string()) },
+  handler: async (ctx, { names }) => {
+    const found: Doc<"cardReferences">[] = []
+    for (const name of names) {
+      const printings = await ctx.db
+        .query("cardReferences")
+        .withIndex("by_name", (q) => q.eq("name", name))
+        .take(MAX_CACHED_PRINTINGS_PER_NAME)
+      const complete = printings.find(isCompleteReference)
+      if (complete) found.push(complete)
+    }
+    return found
+  },
+})
+
+export const byNames = action({
+  args: { names: v.array(v.string()), deviceId: v.optional(v.string()) },
+  returns: v.object({ cards: v.array(cardReferenceValidator), lookupFailed: v.boolean() }),
+  handler: async (ctx, args): Promise<{ cards: CardReference[]; lookupFailed: boolean }> => {
+    const names = [...new Set(args.names.filter(isCatalogName))]
+    if (!names.length) return { cards: [], lookupFailed: false }
+    if (names.length > SCRYFALL_COLLECTION_SIZE)
+      throw new ConvexError({ code: "too_many_names", message: "Look up fewer cards at once." })
+    await requireActionCapability(ctx, "mtg", "cardCatalog")
+    const cachedDocs: Doc<"cardReferences">[] = await ctx.runQuery(internal.cards.cachedByNames, {
+      names,
+    })
+    const cached = cachedDocs.map(toCardReference)
+    const cachedNames = new Set(cached.map((card) => card.name))
+    const missing = names.filter((name) => !cachedNames.has(name))
+    if (!missing.length) return { cards: cached, lookupFailed: false }
+    try {
+      await limitCardLookup(ctx, args.deviceId)
+      const response = await fetchScryfall(ctx, "/cards/collection", {
+        method: "POST",
+        body: JSON.stringify({
+          identifiers: [...new Set(missing.map((name) => name.split(" // ")[0]))].map((name) => ({
+            name,
+          })),
+        }),
+      })
+      if (!response.ok)
+        throw new ConvexError({
+          code: "scryfall_unavailable",
+          message: `Card lookup is temporarily unavailable (${response.status})`,
+        })
+      const payload = objectRecord((await response.json()) as unknown)
+      if (!Array.isArray(payload?.data))
+        throw new ConvexError({
+          code: "scryfall_invalid_response",
+          message: "Card service returned an invalid response",
+        })
+      const fetched = payload.data
+        .map(normalizeScryfallCard)
+        .filter((card): card is CardReference => card !== null)
+      if (fetched.length) await ctx.runMutation(internal.cards.cacheMany, { cards: fetched })
+      return { cards: [...cached, ...fetched], lookupFailed: false }
+    } catch (cause) {
+      if (!cached.length) throw cause
+      return { cards: cached, lookupFailed: true }
+    }
   },
 })

@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values"
 import { internal } from "../_generated/api"
 import type { ActionCtx } from "../_generated/server"
 
-const SCRYFALL_BASE_URL = "https://api.scryfall.com"
+export const SCRYFALL_BASE_URL = "https://api.scryfall.com"
 
 const SCRYFALL_HEADERS = {
   "Accept": "application/json;q=0.9,*/*;q=0.8",
