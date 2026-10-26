@@ -1,5 +1,6 @@
 import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
+import type { SharedValue } from "react-native-reanimated"
 
 import * as seatCommander from "@/features/decks/seatCommander"
 import { asPlayerId, PARTNER_COMMANDER } from "@/features/game/domain"
@@ -741,6 +742,35 @@ describe("PlayerGrid", () => {
     })
     expect(invalidTabletop.variant).toBe("auto")
     expect(getPlayerGridRows(5, invalidTabletop).flat()).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it("seats a Table board that landed upside down on the panel from its far end", () => {
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid
+          boardOrientation={{
+            width: 669,
+            height: 951,
+            screenWidth: 669,
+            screenHeight: 951,
+            fontScale: 1,
+            rotation: 0,
+            touchRotation: 90,
+            tableTurn: { angle: { value: 0 } as SharedValue<number>, landed: "reversed" },
+          }}
+          players={players(6)}
+          layoutVariant="tabletop"
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(
+      within(view.getByTestId("player-grid-row-0")).getByTestId("player-cell-seat-6"),
+    ).toBeTruthy()
+    expect(
+      within(view.getByTestId("player-grid-row-3")).getByTestId("player-cell-seat-1"),
+    ).toBeTruthy()
   })
 
   it("supports the six-player tabletop arrangement", () => {

@@ -12,6 +12,7 @@ import Animated, {
   FadeOut,
   LayoutAnimationConfig,
   runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -28,6 +29,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { startTapTiming } from "@/utils/tapTiming"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
+import { useSettledLayout } from "@/utils/useSettledLayout"
 
 import { BoardPressable } from "./BoardPressable"
 import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
@@ -143,6 +145,8 @@ export interface LifeCardProps {
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
+  /** why: while a board transition animates a card's size on the UI thread, the size measured on the JS thread trails it and the sideways identity flings; this keeps that layer on the live size. */
+  liveSize?: SharedValue<{ width: number; height: number }>
 }
 
 /** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. PlayerGrid rebuilds plain props (insets, styles, commander data) each render, so they compare by content, and it keeps every callback's identity stable. */
@@ -174,6 +178,7 @@ export const LifeCard = memo(function LifeCard({
   onPlayStart,
   onChange,
   style,
+  liveSize,
 }: LifeCardProps) {
   const {
     themed,
@@ -224,6 +229,14 @@ export const LifeCard = memo(function LifeCard({
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
+  const settleCardSize = useSettledLayout(({ width, height }: LayoutRectangle) => {
+    setCardSize((current) =>
+      current.width === width && current.height === height ? current : { width, height },
+    )
+  }, !!liveSize)
+  const settleIdentityRowAt = useSettledLayout(({ x, y }: LayoutRectangle) => {
+    setIdentityRowAt((current) => (current?.x === x && current.y === y ? current : { x, y }))
+  }, !!liveSize)
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
   const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
@@ -460,6 +473,11 @@ export const LifeCard = memo(function LifeCard({
     ).length > 0
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
+  const liveLayer = useAnimatedStyle(() => {
+    if (!liveSize || Math.abs(contentRotation) !== 90) return {}
+    const { width, height } = liveSize.value
+    return { width: height, height: width, left: (width - height) / 2, top: (height - width) / 2 }
+  })
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
     cardSize,
@@ -521,10 +539,7 @@ export const LifeCard = memo(function LifeCard({
   )
 
   function measureCard(event: LayoutChangeEvent) {
-    const { width, height } = event.nativeEvent.layout
-    setCardSize((current) =>
-      current.width === width && current.height === height ? current : { width, height },
-    )
+    settleCardSize(event.nativeEvent.layout)
   }
 
   function openCommanderOverview() {
@@ -784,6 +799,7 @@ export const LifeCard = memo(function LifeCard({
               pendingDelta={preview}
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
+              settleLayout={!!liveSize}
               obstacle={
                 commanderStripShown && stripBounds
                   ? { edge: CONTENT_RIGHT_EDGE[contentRotation], bounds: stripBounds }
@@ -875,26 +891,21 @@ export const LifeCard = memo(function LifeCard({
       !dice?.view &&
       !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
         // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
-        <View
+        <Animated.View
           key={contentRotation}
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
           style={[
             themed($cornerLayer),
             identityCorner.layer,
+            liveLayer,
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
           <View
             testID={`life-identity-row-seat-${seatNumber}`}
             pointerEvents="box-none"
-            onLayout={({ nativeEvent: { layout } }) =>
-              setIdentityRowAt((current) =>
-                current?.x === layout.x && current.y === layout.y
-                  ? current
-                  : { x: layout.x, y: layout.y },
-              )
-            }
+            onLayout={({ nativeEvent: { layout } }) => settleIdentityRowAt(layout)}
             style={[
               $cornerRow,
               {
@@ -1004,7 +1015,7 @@ export const LifeCard = memo(function LifeCard({
               <CalculatorGlyph color={foreground} size={calculatorButtonSize} />
             </BoardPressable>
           ) : null}
-        </View>
+        </Animated.View>
       ) : null}
       {claims?.length ? (
         <CommanderClaimBanner

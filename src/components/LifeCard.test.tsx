@@ -714,6 +714,34 @@ describe("LifeCard", () => {
     ).toMatchObject({ width: 187, height: 158, left: -14.5, top: 14.5 })
   })
 
+  it("keeps a sideways identity layer on the live size while a transition resizes the card", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={90}
+          liveSize={
+            { value: { width: 200, height: 300 } } as Reanimated.SharedValue<{
+              width: number
+              height: number
+            }>
+          }
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 158, height: 187, x: 0, y: 0 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style),
+    ).toMatchObject({ width: 300, height: 200, left: -50, top: 50 })
+  })
+
   it("puts the name and assign sword in the corner opposite the commander grid", () => {
     const onPressSword = jest.fn()
     const view = render(

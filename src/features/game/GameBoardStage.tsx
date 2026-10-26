@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native"
-import Animated from "react-native-reanimated"
+import Animated, { useSharedValue, withTiming } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
@@ -24,8 +24,11 @@ import {
 } from "@/components/PlayerGrid"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
+import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
+import type { TableTurn } from "./tableTurn"
+import { TableTurnOffer } from "./TableTurnOffer"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import {
   SCREEN_PINNING_AVAILABLE,
@@ -39,6 +42,7 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   firstPlayer?: FirstPlayerOffer
+  tableSlotColors?: readonly string[]
   windowOverlay?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
@@ -57,11 +61,24 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
+  tableSlotColors,
   windowOverlay,
   onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
   const window = useWindowDimensions()
+  const spansHinge = useWindowSpansHinge()
+  const turnAngle = useSharedValue(0)
+  const [landed, setLanded] = useState<TableTurn["landed"]>()
+  const [kept, setKept] = useState(false)
+  // why: closing the Duo ends the turn, so the next opening offers it again from the center column.
+  if (!spansHinge && (landed || kept)) {
+    setLanded(undefined)
+    setKept(false)
+  }
+  useEffect(() => {
+    if (landed) turnAngle.set(0)
+  }, [landed, turnAngle])
   const safeArea = useSafeAreaInsets()
   const [metrics, setMetrics] = useState<ScreenPinnedMetrics>(() => {
     const screen = Dimensions.get("screen")
@@ -85,8 +102,13 @@ function PinnedGameBoardStage({
     height,
     fontScale,
     layoutVariant,
-    holderAngle,
+    holderAngle: landed ? undefined : holderAngle,
   })
+  const offering = !!gridLayout.centerColumn && !kept
+  const tableTurn = useMemo<TableTurn | undefined>(
+    () => (gridLayout.centerColumn || landed ? { angle: turnAngle, landed } : undefined),
+    [gridLayout.centerColumn, landed, turnAngle],
+  )
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
@@ -112,9 +134,10 @@ function PinnedGameBoardStage({
             rotation: 0,
             insets: metrics.insets,
             touchRotation: -holderAngle,
+            tableTurn,
           }
         : undefined,
-    [pinned, width, height, fontScale, metrics.insets, holderAngle],
+    [pinned, width, height, fontScale, metrics.insets, holderAngle, tableTurn],
   )
   const menuOpen = menu.open && !menu.exitAction
   const bag = openToolBag(menu.actions)
@@ -126,21 +149,35 @@ function PinnedGameBoardStage({
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             {renderGrid(boardOrientation)}
             <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
-            <GameMenuCluster
-              open={menu.open}
-              anchor={boardAnchor}
-              holderAnchor={holderAnchor}
-              holderHeight={holderAngle % 180 === 0 ? height : width}
-              facingAngle={holderAngle}
-              actions={menu.actions}
-              compact={playerCount > 2}
-              exitAction={menu.exitAction}
-              signal={menu.signal}
-              statusLine={menu.statusLine}
-              onToggle={menu.onToggle}
-            />
-            {firstPlayer && !menu.open && !menu.exitAction ? (
+            {offering ? null : (
+              <GameMenuCluster
+                open={menu.open}
+                anchor={boardAnchor}
+                holderAnchor={holderAnchor}
+                holderHeight={holderAngle % 180 === 0 ? height : width}
+                facingAngle={holderAngle}
+                actions={menu.actions}
+                compact={playerCount > 2}
+                exitAction={menu.exitAction}
+                signal={menu.signal}
+                statusLine={menu.statusLine}
+                onToggle={menu.onToggle}
+              />
+            )}
+            {firstPlayer && !offering && !menu.open && !menu.exitAction ? (
               <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
+            ) : null}
+            {offering ? (
+              <TableTurnOffer
+                angle={turnAngle}
+                holderAngle={holderAngle}
+                tableSlotColors={tableSlotColors}
+                onLand={setLanded}
+                onKeep={() => {
+                  turnAngle.set(withTiming(0, { duration: 250 }))
+                  setKept(true)
+                }}
+              />
             ) : null}
           </View>
         </TurnedBoardContext.Provider>

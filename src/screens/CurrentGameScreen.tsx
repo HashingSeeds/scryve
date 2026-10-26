@@ -426,6 +426,9 @@ export function CurrentGameScreen({
           layoutVariant={layoutVariant}
           onBoardSizeChange={setBoardSize}
           firstPlayer={firstPlayer}
+          tableSlotColors={runtime.game.players.map(
+            (_, slot) => runtime.game.players[runtime.game.seatOrder?.[slot] ?? slot].color,
+          )}
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}

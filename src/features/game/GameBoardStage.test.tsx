@@ -9,6 +9,11 @@ import { GameBoardStage } from "./GameBoardStage"
 import type { ScreenPinnedMetrics } from "../../../modules/screen-pinned-view"
 
 const mockNative: { report?: (metrics: ScreenPinnedMetrics) => void } = {}
+const mockHinge = { spans: false }
+
+jest.mock("@/utils/useWindowSpansHinge", () => ({
+  useWindowSpansHinge: () => mockHinge.spans,
+}))
 
 jest.mock("../../../modules/screen-pinned-view", () => {
   const { View: MockView } = jest.requireActual<typeof import("react-native")>("react-native")
@@ -120,5 +125,73 @@ describe("GameBoardStage on a pinned screen", () => {
     expect(statusLine.props.accessibilityLabel).toBe("Offline for 2m")
     fireEvent.press(statusLine)
     expect(onPress).toHaveBeenCalled()
+  })
+})
+
+describe("GameBoardStage on an open iPhone Duo", () => {
+  afterEach(() => {
+    mockHinge.spans = false
+  })
+
+  function renderSixPlayerTable() {
+    const renderGrid = jest.fn((_orientation: PlayerGridProps["boardOrientation"]) => (
+      <View testID="grid" />
+    ))
+    const stage = () => (
+      <ThemeProvider initialContext="dark">
+        <GameBoardStage
+          playerCount={6}
+          layoutVariant="tabletop"
+          renderGrid={renderGrid}
+          menu={{ open: false, actions: menuActions(), onToggle: jest.fn(), onClose: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(stage())
+    act(() =>
+      mockNative.report?.({
+        pinned: true,
+        holderAngle: -90,
+        width: 669,
+        height: 951,
+        insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      }),
+    )
+    return { renderGrid, rerender: () => view.rerender(stage()) }
+  }
+
+  const lastTableTurn = (renderGrid: ReturnType<typeof renderSixPlayerTable>["renderGrid"]) =>
+    renderGrid.mock.calls.at(-1)?.[0]?.tableTurn
+
+  it("offers six Table seats the Table layout and lands the board when players take it", () => {
+    mockHinge.spans = true
+    const { renderGrid } = renderSixPlayerTable()
+
+    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
+    fireEvent.press(screen.getByLabelText("Turn the board to the Table layout"))
+
+    expect(screen.queryByTestId("table-turn-ring")).toBeNull()
+    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: "upright" })
+  })
+
+  it("keeps the center column when players decline, and offers again after the Duo reopens", () => {
+    mockHinge.spans = true
+    const { renderGrid, rerender } = renderSixPlayerTable()
+
+    fireEvent.press(screen.getByLabelText("Keep this layout"))
+    expect(screen.queryByTestId("table-turn-ring")).toBeNull()
+    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
+
+    mockHinge.spans = false
+    rerender()
+    mockHinge.spans = true
+    rerender()
+    expect(screen.getByTestId("table-turn-ring")).toBeTruthy()
+  })
+
+  it("makes no offer while the Duo is closed", () => {
+    renderSixPlayerTable()
+
+    expect(screen.queryByTestId("table-turn-ring")).toBeNull()
   })
 })

@@ -101,6 +101,12 @@ const board = {
     title: "Swap seats",
     seat: "{{name}}'s seat",
   },
+  tableTurn: {
+    // Circles the open iPhone Duo's board. Players turn the device a quarter turn on the table to get the Table layout.
+    cue: "Turn for Table",
+    turn: "Turn the board to the Table layout",
+    keep: "Keep this layout",
+  },
   layoutOption: {
     balanced: "Balanced layout",
     topFocus: "Top focus layout",

@@ -17,6 +17,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { ReducedMotionPreference } from "@/utils/useReducedMotion"
+import { useSettledLayout } from "@/utils/useSettledLayout"
 
 import { BoardPressable } from "./BoardPressable"
 import {
@@ -47,6 +48,7 @@ export interface LifeControlsProps {
   lifeFontSize?: number
   lifeDigits?: number
   obstacle?: { edge: LifeCardEdge; bounds: LayoutRectangle }
+  settleLayout?: boolean
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   onPreview?: (pendingDelta: number) => void
@@ -179,6 +181,7 @@ export function LifeControls({
   lifeFontSize = 0,
   lifeDigits = 0,
   obstacle,
+  settleLayout = false,
   onChange,
   onLongChange,
   onPreview,
@@ -190,6 +193,11 @@ export function LifeControls({
   } = useAppTheme()
   const { fontScale } = useWindowDimensions()
   const [zonesSize, setZonesSize] = useState({ width: 0, height: 0 })
+  const settleZonesSize = useSettledLayout(({ width, height }: LayoutRectangle) => {
+    setZonesSize((current) =>
+      current.width === width && current.height === height ? current : { width, height },
+    )
+  }, settleLayout)
   const recentDelta =
     useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
   const longPressHandled = useRef<LifeDelta | null>(null)
@@ -236,9 +244,7 @@ export function LifeControls({
       <View
         testID="life-control-zones"
         pointerEvents="box-none"
-        onLayout={({ nativeEvent: { layout } }) =>
-          setZonesSize({ width: layout.width, height: layout.height })
-        }
+        onLayout={({ nativeEvent: { layout } }) => settleZonesSize(layout)}
         style={themed(
           contentRotation === 90
             ? $zonesFacingLeft

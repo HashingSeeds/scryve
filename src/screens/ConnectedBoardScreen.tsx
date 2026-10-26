@@ -1031,6 +1031,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         testID="connected-game-board"
         playerCount={players.length}
         layoutVariant={layoutVariant}
+        tableSlotColors={players.map(({ color }) => color)}
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
             boardOrientation={boardOrientation}

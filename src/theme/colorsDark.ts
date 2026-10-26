@@ -61,6 +61,8 @@ export const colors = {
     surfaceRaised: palette.neutral300,
     border: palette.neutral400,
     text: palette.neutral900,
+
+    cue: palette.accent100,
   },
   gameMenu: {
     signal: {

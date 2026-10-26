@@ -56,6 +56,32 @@ export function getPlayerGridMenuAnchor(
   }
 }
 
+/** why: the table turn moves cards from these rects, so they match the flex rows PlayerGrid draws. */
+export function getPlayerGridCellRects(input: {
+  playerCount: number
+  layout: ReturnType<typeof getPlayerGridLayout>
+  board: { width: number; height: number }
+  gap: number
+  topInset?: number
+}) {
+  const { playerCount, layout, board, gap, topInset = 0 } = input
+  const rows = getPlayerGridRows(playerCount, layout)
+  const flexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const totalFlex = flexes.reduce((total, flex) => total + flex, 0)
+  const rowsHeight = board.height - topInset - gap * (rows.length - 1)
+  const rects = new Map<number, { x: number; y: number; width: number; height: number }>()
+  let y = topInset
+  rows.forEach((row, rowIndex) => {
+    const height = (rowsHeight * flexes[rowIndex]) / totalFlex
+    const width = (board.width - gap * (row.length - 1)) / row.length
+    row.forEach((slot, column) => {
+      if (slot !== null) rects.set(slot, { x: column * (width + gap), y, width, height })
+    })
+    y += height + gap
+  })
+  return rects
+}
+
 export function getCentralMenuBoundary(
   rows: (number | null)[][],
   layout: ReturnType<typeof getPlayerGridLayout>,
