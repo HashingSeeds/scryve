@@ -111,6 +111,11 @@ jest.mock("expo-alternate-app-icons", () => ({
   setAlternateAppIcon: jest.fn(async (name: string | null) => name),
 }))
 
+jest.mock("expo-text-extractor", () => ({
+  isSupported: false,
+  extractTextFromImage: jest.fn(async () => []),
+}))
+
 jest.mock("expo-network", () => ({
   NetworkStateType: jest.requireActual("expo-network/build/Network.types").NetworkStateType,
   addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),

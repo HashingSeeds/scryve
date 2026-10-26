@@ -354,6 +354,21 @@ const decks = {
     clearAll: "Clear all",
     checkFailed: "Could not check all cards in this deck.",
     searchFailed: "Could not search cards. Check your connection and try again.",
+    // Button beside the card search field that opens the camera to read a card's name.
+    scan: "Scan",
+    scanLabel: "Scan a card with the camera",
+  },
+  cardScan: {
+    title: "Scan a card",
+    hint: "Fit the card inside the frame",
+    read: "Read card",
+    reading: "Reading…",
+    noText: "No card name found. Try more light or hold the card closer.",
+    failed: "Could not read the card. Try again.",
+    permission: "Scryve uses the camera to read card names. Photos stay on this device.",
+    permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",
+    allow: "Allow camera",
+    openSettings: "Open settings",
   },
   deckLimit: {
     countLabel: "{{used}} of {{limit}} synced decks",

@@ -329,6 +329,21 @@ export default {
     clearAll: "모두 지우기",
     checkFailed: "이 덱의 카드를 모두 확인하지 못했습니다.",
     searchFailed: "카드를 검색하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.",
+    scan: "스캔",
+    scanLabel: "카메라로 카드 스캔",
+  },
+  cardScan: {
+    title: "카드 스캔",
+    hint: "카드를 프레임 안에 맞추세요",
+    read: "카드 읽기",
+    reading: "읽는 중…",
+    noText: "카드 이름을 찾지 못했습니다. 더 밝은 곳에서 시도하거나 카드를 더 가까이 대세요.",
+    failed: "카드를 읽지 못했습니다. 다시 시도하세요.",
+    permission:
+      "Scryve는 카드 이름을 읽기 위해 카메라를 사용합니다. 사진은 이 기기에만 저장됩니다.",
+    permissionDenied: "카메라 접근이 거부되었습니다. 카드를 스캔하려면 시스템 설정에서 허용하세요.",
+    allow: "카메라 허용",
+    openSettings: "설정 열기",
   },
   deckLimit: {
     countLabel: "동기화된 덱 {{used}}/{{limit}}개",

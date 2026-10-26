@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
-import { Keyboard, Modal, ScrollView, TouchableOpacity, View } from "react-native"
+import { Keyboard, Modal, Platform, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
+import { isSupported as canReadText } from "expo-text-extractor"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -30,6 +31,7 @@ import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { CardScanner } from "./CardScanner"
 import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
@@ -41,6 +43,7 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
+const CAN_SCAN = Platform.OS !== "web" && canReadText
 
 function scryfallQuery({
   text,
@@ -112,6 +115,8 @@ export function CardSearchScreen({
     true,
   )
   const [query, setQuery] = useState("")
+  const [scanning, setScanning] = useState(false)
+  const [scanLines, setScanLines] = useState<string[]>([])
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
@@ -449,17 +454,40 @@ export function CardSearchScreen({
           backgroundColor={theme.colors.surface}
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
-          <TextField
-            testID="card-search-input"
-            accessibilityLabel={translate("decks:cardSearch.searchLabel")}
-            placeholderTx="decks:cardSearch.placeholder"
-            value={query}
-            maxLength={choosingCommander ? 80 : 120}
-            autoCorrect={false}
-            autoFocus={!choosingCommander}
-            returnKeyType="search"
-            onChangeText={setQuery}
-          />
+          <View style={$queryRow}>
+            <TextField
+              testID="card-search-input"
+              accessibilityLabel={translate("decks:cardSearch.searchLabel")}
+              placeholderTx="decks:cardSearch.placeholder"
+              value={query}
+              maxLength={choosingCommander ? 80 : 120}
+              autoCorrect={false}
+              autoFocus={!choosingCommander}
+              returnKeyType="search"
+              onChangeText={setQuery}
+              containerStyle={$queryField}
+            />
+            {CAN_SCAN ? (
+              <Button
+                testID="card-scan-button"
+                tx="decks:cardSearch.scan"
+                accessibilityLabel={translate("decks:cardSearch.scanLabel")}
+                onPress={() => setScanning(true)}
+              />
+            ) : null}
+          </View>
+          {scanLines.length ? (
+            <View style={$pills}>
+              {scanLines.map((line) => (
+                <FilterPill
+                  key={line}
+                  label={line}
+                  selected={query === line}
+                  onPress={() => setQuery(line)}
+                />
+              ))}
+            </View>
+          ) : null}
           {initialSection !== "commander" ? (
             <SelectField
               label={translate("decks:cardSearch.addTo")}
@@ -772,6 +800,16 @@ export function CardSearchScreen({
           </View>
         </DialogCard>
       ) : null}
+      {scanning ? (
+        <CardScanner
+          onClose={() => setScanning(false)}
+          onScan={(lines) => {
+            setScanning(false)
+            setScanLines(lines)
+            setQuery(lines[0])
+          }}
+        />
+      ) : null}
       {candidate ? (
         <CardFocusDialog
           key={printingKey(candidate)}
@@ -828,6 +866,8 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 
+const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
+const $queryField: ViewStyle = { flex: 1 }
 const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", minHeight: 44 }
 const $pills: ViewStyle = { flexDirection: "row", flexWrap: "wrap", gap: 8 }
 const $filterBody: ViewStyle = { gap: 16 }

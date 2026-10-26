@@ -56,7 +56,7 @@
     [
       "expo-camera",
       {
-        "cameraPermission": "Scan Scryve game invitation QR codes. Scryve does not capture, store, or upload images.",
+        "cameraPermission": "Scan Scryve game invitation QR codes and read card names. Photos stay on this device.",
         "microphonePermission": false,
         "recordAudioAndroid": false,
         "barcodeScannerEnabled": true

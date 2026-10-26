@@ -360,6 +360,22 @@ export default {
     clearAll: "Borrar todo",
     checkFailed: "No se pudieron comprobar todas las cartas de este mazo.",
     searchFailed: "No se pudo buscar cartas. Revisa tu conexión e inténtalo de nuevo.",
+    scan: "Escanear",
+    scanLabel: "Escanear una carta con la cámara",
+  },
+  cardScan: {
+    title: "Escanear una carta",
+    hint: "Ajusta la carta dentro del marco",
+    read: "Leer carta",
+    reading: "Leyendo…",
+    noText: "No se encontró el nombre de la carta. Prueba con más luz o acerca la carta.",
+    failed: "No se pudo leer la carta. Inténtalo de nuevo.",
+    permission:
+      "Scryve usa la cámara para leer los nombres de las cartas. Las fotos se quedan en este dispositivo.",
+    permissionDenied:
+      "El acceso a la cámara está denegado. Actívalo en los ajustes del sistema para escanear cartas.",
+    allow: "Permitir cámara",
+    openSettings: "Abrir ajustes",
   },
   deckLimit: {
     countLabel: "{{used}} de {{limit}} mazos sincronizados",

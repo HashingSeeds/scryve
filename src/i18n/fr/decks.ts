@@ -366,6 +366,22 @@ export default {
     clearAll: "Tout effacer",
     checkFailed: "Impossible de vérifier toutes les cartes de ce deck.",
     searchFailed: "Impossible de rechercher des cartes. Vérifiez votre connexion et réessayez.",
+    scan: "Scanner",
+    scanLabel: "Scanner une carte avec l'appareil photo",
+  },
+  cardScan: {
+    title: "Scanner une carte",
+    hint: "Placez la carte dans le cadre",
+    read: "Lire la carte",
+    reading: "Lecture…",
+    noText: "Aucun nom de carte trouvé. Essayez avec plus de lumière ou rapprochez la carte.",
+    failed: "Impossible de lire la carte. Réessayez.",
+    permission:
+      "Scryve utilise l'appareil photo pour lire les noms des cartes. Les photos restent sur cet appareil.",
+    permissionDenied:
+      "L'accès à l'appareil photo est refusé. Activez-le dans les réglages du système pour scanner des cartes.",
+    allow: "Autoriser l'appareil photo",
+    openSettings: "Ouvrir les réglages",
   },
   deckLimit: {
     countLabel: "{{used}} sur {{limit}} decks synchronisés",
