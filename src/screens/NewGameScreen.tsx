@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BOTTOM_LINK_HEIGHT, BottomActionBar } from "@/components/BottomActionBar"
@@ -223,9 +224,13 @@ function NewGameForm({
 }) {
   const {
     themed,
-    theme: { colors },
+    theme: { colors, spacing },
   } = useAppTheme()
-  const { fontScale } = useWindowDimensions()
+  const { fontScale, width } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  // why: the iPhone Duo's outer display floats its status bar beside the camera hole and reports it only as a side inset, so the toggle steps in where it would run under it.
+  const toggleOverhang = (inset: number) =>
+    Math.max(inset - (width - Math.min(width, CONTENT_MAX_WIDTH)) / 2 - spacing.lg, 0)
   // why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over.
   const [formatPicked, setFormatPicked] = useState(false)
   const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
@@ -737,16 +742,23 @@ function NewGameForm({
           backgroundColor={colors.surface}
           onLeftPress={onBack}
         />
-        <SegmentedControl
-          testID="mode"
-          accessibilityLabel={translate("play:newGame.connectionLabel")}
-          segments={[
-            { id: "local", label: translate("play:newGame.onThisDevice") },
-            { id: "connected", label: translate("play:newGame.connected") },
-          ]}
-          selectedId={mode}
-          onSelect={(value) => changeMode(value === "connected" ? "connected" : "local")}
-        />
+        <View
+          style={{
+            marginLeft: toggleOverhang(insets.left),
+            marginRight: toggleOverhang(insets.right),
+          }}
+        >
+          <SegmentedControl
+            testID="mode"
+            accessibilityLabel={translate("play:newGame.connectionLabel")}
+            segments={[
+              { id: "local", label: translate("play:newGame.onThisDevice") },
+              { id: "connected", label: translate("play:newGame.connected") },
+            ]}
+            selectedId={mode}
+            onSelect={(value) => changeMode(value === "connected" ? "connected" : "local")}
+          />
+        </View>
       </View>
       <>
         <Screen
