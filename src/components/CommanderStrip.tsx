@@ -9,6 +9,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
+import { useSettledLayout } from "@/utils/useSettledLayout"
 
 import { BoardPressable } from "./BoardPressable"
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
@@ -80,6 +81,8 @@ export const CommanderStrip = memo(function CommanderStrip({
   } = useAppTheme()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
   const [mapBounds, setMapBounds] = useState<LayoutRectangle | null>(null)
+  const settleStripBounds = useSettledLayout(setStripBounds)
+  const settleMapBounds = useSettledLayout(setMapBounds)
   useEffect(() => {
     if (stripBounds && mapBounds) {
       onBoundsChange?.({
@@ -108,7 +111,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   return (
     <View
       testID={`commander-strip-seat-${seatNumber}`}
-      onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
+      onLayout={(event) => settleStripBounds(event.nativeEvent.layout)}
       style={[
         themed($strip),
         stripEdge(corner, spacing.xs, contentInsets, screenEdges),
@@ -119,7 +122,7 @@ export const CommanderStrip = memo(function CommanderStrip({
     >
       <BoardPressable
         testID={`commander-${open ? "strip-close" : "map"}-seat-${seatNumber}`}
-        onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
+        onLayout={(event) => settleMapBounds(event.nativeEvent.layout)}
         accessibilityRole="button"
         accessibilityLabel={
           open

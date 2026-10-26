@@ -1,6 +1,7 @@
+import { createElement, type ReactNode } from "react"
 import { act, renderHook } from "@testing-library/react-native"
 
-import { useSettledLayout } from "./useSettledLayout"
+import { LayoutSettlingContext, useSettledLayout } from "./useSettledLayout"
 
 describe("useSettledLayout", () => {
   beforeEach(() => jest.useFakeTimers())
@@ -27,5 +28,17 @@ describe("useSettledLayout", () => {
 
     act(() => jest.advanceTimersByTime(120))
     expect(set.mock.calls).toEqual([[2]])
+  })
+
+  it("settles measurements anywhere inside a moving card", () => {
+    const set = jest.fn()
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(LayoutSettlingContext.Provider, { value: true }, children)
+    const { result } = renderHook(() => useSettledLayout(set), { wrapper })
+
+    result.current(1)
+    expect(set).not.toHaveBeenCalled()
+    act(() => jest.advanceTimersByTime(120))
+    expect(set.mock.calls).toEqual([[1]])
   })
 })

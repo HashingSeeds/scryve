@@ -3,6 +3,7 @@ import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
 import Svg, { Circle, Path } from "react-native-svg"
 
+import { useSettledLayout } from "@/utils/useSettledLayout"
 import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
@@ -197,6 +198,7 @@ export const CounterChips = memo(function CounterChips({
   const [addTrigger, setAddTrigger] = useState<{ at: LayoutRectangle; frameKey: string } | null>(
     null,
   )
+  const settleAddTrigger = useSettledLayout(setAddTrigger)
   const longPressed = useRef(false)
   const triggers = useRef(new Map<string, View>()).current
   const returnFocusTo = useRef<string | null>(null)
@@ -388,7 +390,9 @@ export const CounterChips = memo(function CounterChips({
                 accessibilityRole="button"
                 accessibilityLabel={translate("board:counters.addLabel", { identity })}
                 hitSlop={{ top: 6, bottom: 6 }}
-                onLayout={({ nativeEvent }) => setAddTrigger({ at: nativeEvent.layout, frameKey })}
+                onLayout={({ nativeEvent }) =>
+                  settleAddTrigger({ at: nativeEvent.layout, frameKey })
+                }
                 onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
                 style={({ pressed }) => [
                   themed(compact ? $compactChip : $chip),

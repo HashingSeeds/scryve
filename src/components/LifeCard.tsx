@@ -799,7 +799,6 @@ export const LifeCard = memo(function LifeCard({
               pendingDelta={preview}
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
-              settleLayout={!!liveSize}
               obstacle={
                 commanderStripShown && stripBounds
                   ? { edge: CONTENT_RIGHT_EDGE[contentRotation], bounds: stripBounds }

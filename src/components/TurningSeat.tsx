@@ -7,6 +7,7 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { tableTurnPlacement } from "@/features/game/tableTurn"
+import { LayoutSettlingContext } from "@/utils/useSettledLayout"
 
 export function TurningSeat({
   angle,
@@ -45,5 +46,9 @@ export function TurningSeat({
       ],
     }
   })
-  return <Animated.View style={style}>{children(liveSize)}</Animated.View>
+  return (
+    <Animated.View style={style}>
+      <LayoutSettlingContext.Provider value>{children(liveSize)}</LayoutSettlingContext.Provider>
+    </Animated.View>
+  )
 }

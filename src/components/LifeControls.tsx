@@ -48,7 +48,6 @@ export interface LifeControlsProps {
   lifeFontSize?: number
   lifeDigits?: number
   obstacle?: { edge: LifeCardEdge; bounds: LayoutRectangle }
-  settleLayout?: boolean
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   onPreview?: (pendingDelta: number) => void
@@ -181,7 +180,6 @@ export function LifeControls({
   lifeFontSize = 0,
   lifeDigits = 0,
   obstacle,
-  settleLayout = false,
   onChange,
   onLongChange,
   onPreview,
@@ -197,7 +195,7 @@ export function LifeControls({
     setZonesSize((current) =>
       current.width === width && current.height === height ? current : { width, height },
     )
-  }, settleLayout)
+  })
   const recentDelta =
     useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
   const longPressHandled = useRef<LifeDelta | null>(null)
