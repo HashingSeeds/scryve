@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Keyboard, Modal, Platform, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
-import { isSupported as canReadText } from "expo-text-extractor"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -32,8 +31,8 @@ import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { firstUnambiguousCardName } from "./cardNameMatch"
-import { cardTextLinesTopFirst, likelyCardNamesTopFirst } from "./cardScan"
-import { CardScanner } from "./CardScanner"
+import { cardTextLinesTopFirst, NAME_LINES_FROM_CARD_TOP } from "./cardScan"
+import { CardScanner, type CardScan } from "./CardScanner"
 import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
@@ -41,13 +40,14 @@ import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { api } from "../../../convex/_generated/api"
 import { picksCommander, systemDefinition } from "../../../convex/lib/systems"
+import { canReadCardText } from "../../../modules/card-text-reader"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
-const CAN_SCAN = Platform.OS !== "web" && canReadText
-const NAME_MATCH_LINES = 6
+const CAN_SCAN = Platform.OS !== "web" && canReadCardText
+const GUESS_LINES = 3
 
 function scryfallQuery({
   text,
@@ -415,14 +415,15 @@ export function CardSearchScreen({
     scanSession.current = undefined
   }
 
-  function readScan(textBlocks: string[]) {
-    const lines = cardTextLinesTopFirst(textBlocks)
+  function readScan(scan: CardScan) {
+    const lines = cardTextLinesTopFirst(scan.linesFromCardTop)
     const match = nameIndex
-      ? firstUnambiguousCardName(nameIndex, lines.slice(0, NAME_MATCH_LINES))
+      ? firstUnambiguousCardName(nameIndex, lines.slice(0, NAME_LINES_FROM_CARD_TOP))
       : undefined
-    if (__DEV__) console.log(`SCANREAD ${JSON.stringify({ textBlocks, match })}`)
+    if (__DEV__)
+      console.log(`SCANREAD ${JSON.stringify({ photo: scan.photo, framing: scan.framing, match })}`)
     if (nameIndex && !match) return "unsure"
-    const names = match ? [match.name] : likelyCardNamesTopFirst(textBlocks)
+    const names = match ? [match.name] : lines.slice(0, GUESS_LINES)
     if (scanSession.current) scanSession.current.matchedName = match?.name
     setScanning(false)
     setScanLines(names)

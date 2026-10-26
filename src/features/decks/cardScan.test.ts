@@ -1,9 +1,9 @@
-import { likelyCardNamesTopFirst } from "./cardScan"
+import { cardTextLinesTopFirst } from "./cardScan"
 
-describe("likelyCardNamesTopFirst", () => {
+describe("cardTextLinesTopFirst", () => {
   it("ranks a Magic card's name first and drops mana, numbers, and repeats", () => {
     expect(
-      likelyCardNamesTopFirst([
+      cardTextLinesTopFirst([
         "Sol Ring {1}",
         "Artifact\n{T}: Add {C}{C}.",
         "0217 C\nCMM • EN",
@@ -14,7 +14,7 @@ describe("likelyCardNamesTopFirst", () => {
 
   it("keeps punctuation that card names use", () => {
     expect(
-      likelyCardNamesTopFirst([
+      cardTextLinesTopFirst([
         "Urza's Saga",
         "Circle of Protection: Red",
         "Blue-Eyes White Dragon!",
@@ -23,6 +23,6 @@ describe("likelyCardNamesTopFirst", () => {
   })
 
   it("returns nothing when no line reads as words", () => {
-    expect(likelyCardNamesTopFirst(["", "12/24", "HP"])).toEqual([])
+    expect(cardTextLinesTopFirst(["", "12/24", "HP"])).toEqual([])
   })
 })

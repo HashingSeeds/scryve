@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["CardTextReaderModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.cardtextreader.CardTextReaderModule"]
+  }
+}

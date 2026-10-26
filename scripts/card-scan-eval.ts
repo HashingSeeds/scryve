@@ -2,11 +2,24 @@
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
+import type { CardPhotoText } from "../modules/card-text-reader"
 import { cardNameIndex, firstUnambiguousCardName } from "../src/features/decks/cardNameMatch"
-import { cardTextLinesTopFirst } from "../src/features/decks/cardScan"
+import { cardTextLinesTopFirst, NAME_LINES_FROM_CARD_TOP } from "../src/features/decks/cardScan"
+import { framedLinesFromCardTop, type ScanFraming } from "../src/features/decks/cardTextLayout"
 
-const NAME_MATCH_LINES = 6
+const TEXT_ONLY_NAME_LINES = 6
 const scansDir = path.join(__dirname, "card-scans")
+
+type RecordedScan = { card: string } & (
+  { textBlocks: string[] } | { photo: CardPhotoText; framing: ScanFraming }
+)
+
+function nameLines(scan: RecordedScan) {
+  if ("textBlocks" in scan)
+    return cardTextLinesTopFirst(scan.textBlocks).slice(0, TEXT_ONLY_NAME_LINES)
+  const lines = cardTextLinesTopFirst(framedLinesFromCardTop(scan.photo, scan.framing))
+  return lines.slice(0, NAME_LINES_FROM_CARD_TOP)
+}
 
 async function main() {
   const response = await fetch("https://api.scryfall.com/catalog/card-names", {
@@ -18,14 +31,11 @@ async function main() {
   const { data } = (await response.json()) as { data: string[] }
   const index = cardNameIndex(data)
   for (const file of readdirSync(scansDir).filter((name) => name.endsWith(".json"))) {
-    const scans: { card: string; textBlocks: string[] }[] = JSON.parse(
-      readFileSync(path.join(scansDir, file), "utf8"),
-    )
+    const scans: RecordedScan[] = JSON.parse(readFileSync(path.join(scansDir, file), "utf8"))
     const wrong: string[] = []
     let unsure = 0
     for (const scan of scans) {
-      const lines = cardTextLinesTopFirst(scan.textBlocks).slice(0, NAME_MATCH_LINES)
-      const match = firstUnambiguousCardName(index, lines)
+      const match = firstUnambiguousCardName(index, nameLines(scan))
       if (!match) unsure++
       else if (match.name !== scan.card) wrong.push(`${match.name} (was ${scan.card})`)
     }

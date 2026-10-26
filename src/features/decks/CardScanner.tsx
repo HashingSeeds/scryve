@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { Linking, Modal, StyleSheet, View } from "react-native"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as ScreenOrientation from "expo-screen-orientation"
-import { extractTextFromImage } from "expo-text-extractor"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
@@ -15,18 +14,24 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { cardTextLinesTopFirst } from "./cardScan"
+import { framedLinesFromCardTop, type ScanFraming } from "./cardTextLayout"
+import { readCardText, type CardPhotoText } from "../../../modules/card-text-reader"
+
+export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; framing: ScanFraming }
 
 export function CardScanner({
   onScan,
   onClose,
 }: {
-  onScan: (textBlocks: string[]) => "accepted" | "unsure"
+  onScan: (scan: CardScan) => "accepted" | "unsure"
   onClose: () => void
 }) {
   const camera = useRef<CameraView>(null)
   const [permission, requestPermission] = useCameraPermissions()
   const [reading, setReading] = useState(false)
   const [error, setError] = useState<string>()
+  const view = useRef<LayoutRectangle>(undefined)
+  const frame = useRef<LayoutRectangle>(undefined)
   const { themed, theme } = useAppTheme()
 
   useEffect(() => {
@@ -37,14 +42,18 @@ export function CardScanner({
   }, [])
 
   async function read() {
-    if (!camera.current || reading) return
+    if (!camera.current || !view.current || !frame.current || reading) return
     setReading(true)
     setError(undefined)
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false })
-      const textBlocks = await extractTextFromImage(photo.uri)
-      if (!cardTextLinesTopFirst(textBlocks).length) setError(translate("decks:cardScan.noText"))
-      else if (onScan(textBlocks) === "unsure") setError(translate("decks:cardScan.unsure"))
+      const text = await readCardText(photo.uri)
+      const framing = { view: view.current, frame: frame.current }
+      const linesFromCardTop = framedLinesFromCardTop(text, framing)
+      if (!cardTextLinesTopFirst(linesFromCardTop).length)
+        setError(translate("decks:cardScan.noText"))
+      else if (onScan({ linesFromCardTop, photo: text, framing }) === "unsure")
+        setError(translate("decks:cardScan.unsure"))
     } catch {
       setError(translate("decks:cardScan.failed"))
     } finally {
@@ -69,7 +78,7 @@ export function CardScanner({
           backgroundColor={theme.colors.background}
         />
         {permission?.granted ? (
-          <View style={$screen}>
+          <View style={$screen} onLayout={(event) => (view.current = event.nativeEvent.layout)}>
             <CameraView
               ref={camera}
               style={StyleSheet.absoluteFill}
@@ -77,7 +86,10 @@ export function CardScanner({
               pictureSize="1920x1080"
             />
             <View style={$overlay} pointerEvents="none">
-              <View style={$frame} />
+              <View
+                style={$frame}
+                onLayout={(event) => (frame.current = event.nativeEvent.layout)}
+              />
               <Text size="sm" style={$hint} text={error ?? translate("decks:cardScan.hint")} />
             </View>
           </View>
