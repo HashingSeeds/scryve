@@ -281,8 +281,8 @@ async function fetchCardNames(ctx: ActionCtx) {
 
 async function fetchPrintedToRulesNameLines(ctx: ActionCtx) {
   const pairs = new Set<string>()
-  let path: string | undefined = "/cards/search?q=has%3Aflavorname&unique=prints"
-  for (let page = 0; path && page < MAX_ALTERNATE_NAME_PAGES; page++) {
+  let path = "/cards/search?q=has%3Aflavorname&unique=prints"
+  for (let page = 0; page < MAX_ALTERNATE_NAME_PAGES; page++) {
     const payload = await scryfallJson(ctx, path)
     const cards = Array.isArray(payload?.data) ? payload.data : invalidCatalog()
     for (const value of cards) {
@@ -294,13 +294,12 @@ async function fetchPrintedToRulesNameLines(ctx: ActionCtx) {
           pairs.add(`${printed}\t${card.name}`)
       }
     }
-    const next = payload?.next_page
-    path =
-      payload?.has_more === true && typeof next === "string" && next.startsWith(SCRYFALL_BASE_URL)
-        ? next.slice(SCRYFALL_BASE_URL.length)
-        : undefined
+    if (payload?.has_more !== true) return [...pairs].join("\n")
+    const next = payload.next_page
+    if (typeof next !== "string" || !next.startsWith(`${SCRYFALL_BASE_URL}/`)) invalidCatalog()
+    path = next.slice(SCRYFALL_BASE_URL.length)
   }
-  return [...pairs].join("\n")
+  return invalidCatalog()
 }
 
 export const cachedNameCatalog = internalQuery({

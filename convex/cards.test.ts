@@ -933,6 +933,59 @@ describe("card name catalog", () => {
     }
   })
 
+  function alternateNamePages(pages: { flavor: string; next?: string }[]) {
+    return jest.spyOn(global, "fetch").mockImplementation((input) => {
+      const url = String(input)
+      if (url.endsWith("/catalog/card-names"))
+        return response({ object: "catalog", data: ["Sol Ring", "Acidic Slime"] })
+      const index = Number(new URL(url).searchParams.get("page") ?? "1") - 1
+      const page = pages[index]
+      return response({
+        object: "list",
+        has_more: page.next !== undefined,
+        ...(page.next ? { next_page: page.next } : {}),
+        data: [{ name: "Acidic Slime", flavor_name: page.flavor }],
+      })
+    })
+  }
+
+  it("follows Scryfall's next pages for printed names", async () => {
+    const t = makeConvexTest()
+    alternateNamePages([
+      {
+        flavor: "Marauding Mutagen",
+        next: "https://api.scryfall.com/cards/search?q=has%3Aflavorname&unique=prints&page=2",
+      },
+      { flavor: "Slime Time" },
+    ])
+    await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toMatchObject({
+      alternateNames: "Marauding Mutagen\tAcidic Slime\nSlime Time\tAcidic Slime",
+    })
+  })
+
+  it.each([
+    ["a next page on another host", "https://api.scryfall.com.example.net/cards/search?page=2"],
+    ["more pages than it will follow", "https://api.scryfall.com/cards/search?q=x&page=2"],
+  ])(
+    "refuses to cache a partial printed-name list from %s",
+    async (_, next) => {
+      const t = makeConvexTest()
+      alternateNamePages(Array.from({ length: 11 }, () => ({ flavor: "Marauding Mutagen", next })))
+      await expect(t.action(api.cards.cardNameCatalog, {})).rejects.toMatchObject({
+        data: { code: "scryfall_invalid_response" },
+      })
+    },
+    30_000,
+  )
+
+  it("reports an outage when there is no cached copy to fall back on", async () => {
+    const t = makeConvexTest()
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 503))
+    await expect(t.action(api.cards.cardNameCatalog, {})).rejects.toMatchObject({
+      data: { code: "scryfall_unavailable" },
+    })
+  })
+
   it("rejects a malformed name list", async () => {
     const t = makeConvexTest()
     jest
@@ -977,6 +1030,14 @@ describe("card lookup by names", () => {
       lookupFailed: false,
     })
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("rejects more names than one Scryfall request can hold", async () => {
+    const t = makeConvexTest()
+    const names = Array.from({ length: 76 }, (_, index) => `Card ${index}`)
+    await expect(t.action(api.cards.byNames, { names })).rejects.toMatchObject({
+      data: { code: "too_many_names" },
+    })
   })
 
   it("still returns cached cards when Scryfall refuses the rest", async () => {
