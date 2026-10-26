@@ -1,11 +1,13 @@
 import { getPlayerGridCellRects, getPlayerGridLayout } from "@/components/playerGridGeometry"
 
 import {
+  cornersSeenTurned,
   hingeUnfold,
   rotateRectAround,
   tableTurnGather,
   tableTurnLanding,
   tableTurnPlacement,
+  turningCornerRadii,
   windowRectToPanel,
 } from "./tableTurn"
 
@@ -97,5 +99,34 @@ describe("table turn", () => {
       width: 669,
       height: 475.5,
     })
+  })
+
+  it("maps the corner a card lands in back to the card's own corner by its turn", () => {
+    expect(cornersSeenTurned([1, 0, 0, 0], 1)).toEqual([0, 0, 0, 1])
+    expect(cornersSeenTurned([1, 0, 0, 0], -1)).toEqual([0, 1, 0, 0])
+  })
+
+  it("keeps a card rounded in transit and squares only the corners it reaches", () => {
+    const corners = {
+      radius: 16,
+      resting: [1, 0, 0, 0],
+      landingClockwise: [0, 1, 0, 0],
+      landingCounterclockwise: [0, 0, 1, 0],
+    } as const
+
+    expect(turningCornerRadii({ ...corners, unfolded: 1, angle: 0 })).toMatchObject({
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 16,
+    })
+    expect(turningCornerRadii({ ...corners, unfolded: 0.5, angle: 0 }).borderTopLeftRadius).toBe(16)
+    expect(Object.values(turningCornerRadii({ ...corners, unfolded: 1, angle: 45 }))).toEqual([
+      16, 16, 16, 16,
+    ])
+    expect(
+      turningCornerRadii({ ...corners, unfolded: 1, angle: 90 }).borderTopRightRadius,
+    ).toBeCloseTo(0)
+    expect(
+      turningCornerRadii({ ...corners, unfolded: 1, angle: -90 }).borderBottomRightRadius,
+    ).toBeCloseTo(0)
   })
 })

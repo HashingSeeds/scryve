@@ -6,7 +6,11 @@ import Animated, {
   useDerivedValue,
 } from "react-native-reanimated"
 
-import { tableTurnPlacement } from "@/features/game/tableTurn"
+import {
+  type SquaredCorners,
+  tableTurnPlacement,
+  turningCornerRadii,
+} from "@/features/game/tableTurn"
 import { LayoutSettlingContext } from "@/utils/useSettledLayout"
 
 export function TurningSeat({
@@ -16,6 +20,7 @@ export function TurningSeat({
   cell,
   table,
   board,
+  corners,
   children,
 }: {
   angle: SharedValue<number>
@@ -24,6 +29,12 @@ export function TurningSeat({
   cell: LayoutRectangle
   table: LayoutRectangle
   board: { width: number; height: number }
+  corners: {
+    radius: number
+    resting: SquaredCorners
+    landingClockwise: SquaredCorners
+    landingCounterclockwise: SquaredCorners
+  }
   children: (liveSize: SharedValue<{ width: number; height: number }>) => ReactNode
 }) {
   const placed = useDerivedValue(() => {
@@ -56,6 +67,8 @@ export function TurningSeat({
         { rotate: `${placed.value.angle}deg` },
         { scale },
       ],
+      overflow: "hidden",
+      ...turningCornerRadii({ ...corners, unfolded: unfolded.value, angle: angle.value }),
     }
   })
   return (

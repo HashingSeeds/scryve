@@ -42,6 +42,7 @@ const HINT_FROM_DEG = 15
 const HINT_AFTER_MS = 700
 const DECLINE_BELOW_DEG = 5
 const FALLBACK_TURN_MS = 1800
+const UNWIND_BELOW = 0.6
 
 const RING = 300
 const RING_RADIUS = 112
@@ -102,9 +103,13 @@ export function TableTurnOffer({
   // why: the gyroscope is read once per frame and its speed measured over whole frames; reacting to each sample measured speed across the uneven gaps between samples, which overshot and stepped back every third frame.
   useFrameCallback(({ timeSincePreviousFrame }) => {
     if (!following.value) return
-    // why: opening the hinge tilts the sensors, so the turn is measured only from a flat device.
+    // why: the hinge tilts the sensors, so the turn is measured only while the Duo lies flat. Folding it mid-turn turns the board back with the hinge, so it is upright again by the time the Duo shuts, and opening it flat again resumes from the turn the device actually holds.
     if (unfolded.value < 1) {
-      startHeading.set(null)
+      if (startHeading.value !== null)
+        angle.set(
+          reading.value.angle *
+            Math.min(Math.max((unfolded.value - UNWIND_BELOW) / (1 - UNWIND_BELOW), 0), 1),
+        )
       return
     }
     const { qx, qy, qz, qw } = rotation.sensor.value

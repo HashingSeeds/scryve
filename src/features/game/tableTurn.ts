@@ -104,3 +104,41 @@ export function tableTurnPlacement(input: {
     scale,
   }
 }
+
+export type SquaredCorners = readonly [
+  topLeft: number,
+  topRight: number,
+  bottomRight: number,
+  bottomLeft: number,
+]
+
+/** why: a card turned a quarter clockwise shows its own top left corner at the panel's top right, so a corner it lands in maps back by the turn. */
+export function cornersSeenTurned(panel: SquaredCorners, quarterTurns: number): SquaredCorners {
+  const at = (corner: number) => panel[(((corner + quarterTurns) % 4) + 4) % 4]
+  return [at(0), at(1), at(2), at(3)]
+}
+
+/** why: a card squares a corner only once it sits in a device corner, so it stays rounded while it unfolds or turns and squares off as it arrives. */
+export function turningCornerRadii(input: {
+  radius: number
+  unfolded: number
+  angle: number
+  resting: SquaredCorners
+  landingClockwise: SquaredCorners
+  landingCounterclockwise: SquaredCorners
+}) {
+  "worklet"
+  const clamp = (value: number) => Math.min(Math.max(value, 0), 1)
+  const turned = Math.abs(input.angle) / 90
+  const rest = clamp((input.unfolded - 0.85) / 0.15) * (1 - clamp(turned / 0.1))
+  const arrive = clamp((turned - 0.9) / 0.1)
+  const landing = input.angle >= 0 ? input.landingClockwise : input.landingCounterclockwise
+  const radiusAt = (corner: number) =>
+    input.radius * (1 - Math.max(input.resting[corner] * rest, landing[corner] * arrive))
+  return {
+    borderTopLeftRadius: radiusAt(0),
+    borderTopRightRadius: radiusAt(1),
+    borderBottomRightRadius: radiusAt(2),
+    borderBottomLeftRadius: radiusAt(3),
+  }
+}

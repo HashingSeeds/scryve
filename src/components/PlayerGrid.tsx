@@ -11,7 +11,13 @@ import { COMMANDER_SLOTS, MAX_COMMANDER_DAMAGE, PARTNER_COMMANDER } from "@/feat
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
-import { rotateRectAround, type TableTurn, windowRectToPanel } from "@/features/game/tableTurn"
+import {
+  cornersSeenTurned,
+  rotateRectAround,
+  type SquaredCorners,
+  type TableTurn,
+  windowRectToPanel,
+} from "@/features/game/tableTurn"
 import type {
   CommanderBoardPlayer,
   CommanderSlot,
@@ -348,6 +354,7 @@ export function PlayerGrid({
           topInset: topEdgeBand,
           holderAngle,
           tableTurn,
+          radius: layout.compact ? spacing.md : spacing.lg,
         })
       : undefined
   const menuJunction = getFourCardMenuJunction(rows)
@@ -673,12 +680,16 @@ export function PlayerGrid({
                   onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                     onChange(player.id, delta),
                   )}
-                  style={getScreenCornerSquaringStyle({
-                    rows,
-                    rowIndex,
-                    columnIndex,
-                    insets: Platform.OS === "web" ? insets : undefined,
-                  })}
+                  style={
+                    liveSize
+                      ? $squareCard
+                      : getScreenCornerSquaringStyle({
+                          rows,
+                          rowIndex,
+                          columnIndex,
+                          insets: Platform.OS === "web" ? insets : undefined,
+                        })
+                  }
                 />
               )
               return (
@@ -695,6 +706,7 @@ export function PlayerGrid({
                       cell={turningFrom}
                       table={turningTo}
                       board={turning.board}
+                      corners={turning.corners(slot)}
                     >
                       {lifeCard}
                     </TurningSeat>
@@ -736,8 +748,9 @@ function tableTurnCells(input: {
   topInset: number
   holderAngle: number
   tableTurn: TableTurn
+  radius: number
 }) {
-  const { playerCount, layout, board, gap, topInset, holderAngle, tableTurn } = input
+  const { playerCount, layout, board, gap, topInset, holderAngle, tableTurn, radius } = input
   const tableLayout = getPlayerGridLayout({
     playerCount,
     width: board.width,
@@ -761,9 +774,22 @@ function tableTurnCells(input: {
     board: outer,
     gap,
   })
+  const tableRows = getPlayerGridRows(playerCount, tableLayout)
+  const quarter = -Math.sign(holderAngle)
   return {
     angle: tableTurn.angle,
     unfolded: tableTurn.unfolded,
+    // why: the card squares only the corners of the cell it lands in; one way round lands each player in their own Table cell, the other in the cell across the board.
+    corners: (slot: number) => {
+      const upright = squaredCornersOf(tableRows, slot)
+      const reversed = squaredCornersOf(tableRows, playerCount - 1 - slot)
+      return {
+        radius,
+        resting: squaredCornersOf(getPlayerGridRows(playerCount, layout), slot),
+        landingClockwise: cornersSeenTurned(quarter > 0 ? upright : reversed, 1),
+        landingCounterclockwise: cornersSeenTurned(quarter > 0 ? reversed : upright, -1),
+      }
+    },
     board,
     foldedCells: new Map(
       [...foldedBoard].map(([slot, rect]) => [
@@ -779,6 +805,21 @@ function tableTurnCells(input: {
       ]),
     ),
   }
+}
+
+function squaredCornersOf(rows: (number | null)[][], slot: number): SquaredCorners {
+  const rowIndex = rows.findIndex((row) => row.includes(slot))
+  const style = getScreenCornerSquaringStyle({
+    rows,
+    rowIndex,
+    columnIndex: rows[rowIndex].indexOf(slot),
+  })
+  return [
+    style?.borderTopLeftRadius === 0 ? 1 : 0,
+    style?.borderTopRightRadius === 0 ? 1 : 0,
+    style?.borderBottomRightRadius === 0 ? 1 : 0,
+    style?.borderBottomLeftRadius === 0 ? 1 : 0,
+  ]
 }
 
 export function getCellSize(input: {
@@ -929,6 +970,8 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+
+const $squareCard: ViewStyle = { borderRadius: 0 }
 
 const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 
