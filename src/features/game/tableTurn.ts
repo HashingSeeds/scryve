@@ -12,14 +12,41 @@ export interface TableTurn {
 
 const UNFOLD_FROM_DEG = 25
 const UNFOLD_TO_DEG = 165
+// why: closing, the Duo moves its window to the outer display at about 84 degrees (measured in the simulator), long before it shuts, so the fold must be done by then.
+const REFOLD_BY_DEG = 84
 
-export function hingeUnfold(hinge: Hinge | null) {
+export function initialUnfoldProgress(hinge: Hinge | null) {
   "worklet"
   if (!hinge || hinge.status === "fullyOpen") return 1
-  const progress = Math.min(
+  return Math.min(
     Math.max((hinge.angle - UNFOLD_FROM_DEG) / (UNFOLD_TO_DEG - UNFOLD_FROM_DEG), 0),
     1,
   )
+}
+
+/** why: opening spreads the seats over the hinge's whole travel, but closing must fold them before the window switches; covering the remaining distance in whichever direction the hinge moves keeps the board continuous when it changes direction. */
+export function nextUnfoldProgress(progress: number, fromAngle: number, hinge: Hinge | null) {
+  "worklet"
+  if (!hinge || hinge.status === "fullyOpen") return 1
+  const angle = hinge.angle
+  if (angle > fromAngle) {
+    const start = Math.max(fromAngle, UNFOLD_FROM_DEG)
+    if (angle <= start || start >= UNFOLD_TO_DEG) return progress
+    return (
+      progress +
+      ((1 - progress) * (Math.min(angle, UNFOLD_TO_DEG) - start)) / (UNFOLD_TO_DEG - start)
+    )
+  }
+  const start = Math.min(fromAngle, UNFOLD_TO_DEG)
+  if (angle >= start || start <= REFOLD_BY_DEG) return angle < REFOLD_BY_DEG ? 0 : progress
+  return Math.max(
+    progress - (progress * (start - Math.max(angle, REFOLD_BY_DEG))) / (start - REFOLD_BY_DEG),
+    0,
+  )
+}
+
+export function easeUnfold(progress: number) {
+  "worklet"
   return progress * progress * (3 - 2 * progress)
 }
 

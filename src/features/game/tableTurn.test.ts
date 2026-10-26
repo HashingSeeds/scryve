@@ -2,7 +2,8 @@ import { getPlayerGridCellRects, getPlayerGridLayout } from "@/components/player
 
 import {
   cornersSeenTurned,
-  hingeUnfold,
+  initialUnfoldProgress,
+  nextUnfoldProgress,
   rotateRectAround,
   tableTurnGather,
   tableTurnLanding,
@@ -83,11 +84,30 @@ describe("table turn", () => {
   })
 
   it("spreads the seats as the hinge opens past the switch to the inner display", () => {
-    expect(hingeUnfold({ status: "partiallyOpen", angle: 25 })).toBe(0)
-    expect(hingeUnfold({ status: "partiallyOpen", angle: 95 })).toBeCloseTo(0.5)
-    expect(hingeUnfold({ status: "partiallyOpen", angle: 170 })).toBe(1)
-    expect(hingeUnfold({ status: "fullyOpen", angle: 120 })).toBe(1)
-    expect(hingeUnfold(null)).toBe(1)
+    const at = (angle: number) => ({ status: "partiallyOpen", angle }) as const
+    expect(initialUnfoldProgress(at(25))).toBe(0)
+    expect(initialUnfoldProgress(at(95))).toBeCloseTo(0.5)
+    expect(initialUnfoldProgress({ status: "fullyOpen", angle: 120 })).toBe(1)
+    expect(initialUnfoldProgress(null)).toBe(1)
+    expect(nextUnfoldProgress(0, 25, at(95))).toBeCloseTo(0.5)
+    expect(nextUnfoldProgress(0.5, 95, at(165))).toBeCloseTo(1)
+  })
+
+  it("folds the seats by the time a closing Duo moves its window to the outer display", () => {
+    const at = (angle: number) => ({ status: "partiallyOpen", angle }) as const
+    expect(nextUnfoldProgress(1, 180, at(165))).toBe(1)
+    expect(nextUnfoldProgress(1, 165, at(124.5))).toBeCloseTo(0.5)
+    expect(nextUnfoldProgress(0.5, 124.5, at(84))).toBeCloseTo(0)
+    expect(nextUnfoldProgress(0.2, 90, at(60))).toBe(0)
+  })
+
+  it("keeps the board where it is when the hinge changes direction", () => {
+    const at = (angle: number) => ({ status: "partiallyOpen", angle }) as const
+    const closedPart = nextUnfoldProgress(1, 165, at(140))
+    expect(nextUnfoldProgress(closedPart, 140, at(140))).toBe(closedPart)
+    const reopened = nextUnfoldProgress(closedPart, 140, at(150))
+    expect(reopened).toBeGreaterThan(closedPart)
+    expect(nextUnfoldProgress(reopened, 150, at(165))).toBeCloseTo(1)
   })
 
   it("puts the window's right half on the panel's top half when the panel's top is on the holder's right", () => {

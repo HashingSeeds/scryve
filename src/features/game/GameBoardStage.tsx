@@ -37,7 +37,13 @@ import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
-import { hingeUnfold, type TableTurn, windowRectToPanel } from "./tableTurn"
+import {
+  easeUnfold,
+  initialUnfoldProgress,
+  nextUnfoldProgress,
+  type TableTurn,
+  windowRectToPanel,
+} from "./tableTurn"
 import { TableTurnOffer } from "./TableTurnOffer"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import {
@@ -80,12 +86,27 @@ function PinnedGameBoardStage({
   const spansHinge = useWindowSpansHinge()
   const turnAngle = useSharedValue(0)
   const hinge = useAnimatedHinge()
-  const unfolded = useDerivedValue(() => hingeUnfold(hinge.value))
+  const unfoldProgress = useSharedValue(1)
+  const hingeSeen = useSharedValue(false)
+  useAnimatedReaction(
+    () => hinge.value,
+    (now, before) => {
+      unfoldProgress.set(
+        hingeSeen.value
+          ? nextUnfoldProgress(unfoldProgress.value, before?.angle ?? now?.angle ?? 180, now)
+          : initialUnfoldProgress(now),
+      )
+      hingeSeen.set(true)
+    },
+  )
+  const unfolded = useDerivedValue(() => easeUnfold(unfoldProgress.value))
   const [landed, setLanded] = useState<TableTurn["landed"]>()
+  const [refolding, setRefolding] = useState<TableTurn["landed"]>()
   const [kept, setKept] = useState(false)
   // why: closing the Duo ends the turn, so the next opening offers it again from the center column.
-  if (!spansHinge && (landed || kept)) {
+  if (!spansHinge && (landed || kept || refolding)) {
     setLanded(undefined)
+    setRefolding(undefined)
     setKept(false)
   }
   const safeArea = useSafeAreaInsets()
@@ -106,9 +127,37 @@ function PinnedGameBoardStage({
   const fontScale = window.fontScale
   // why: closing the Duo or turning its window ends a turn in progress; cancelling makes its timing callback report unfinished, so it cannot land the next opening's board.
   useEffect(() => {
+    if (refolding) return
     cancelAnimation(turnAngle)
     turnAngle.set(0)
-  }, [spansHinge, metrics.holderAngle, landed, turnAngle])
+  }, [spansHinge, metrics.holderAngle, landed, refolding, turnAngle])
+  // why: closing a Duo that landed on Table turns the board back with the hinge and folds it into the outer display, the turn played backwards; opening flat again lands it back on Table.
+  const refoldAngle =
+    (refolding === "upright" ? -1 : refolding === "reversed" ? 1 : 0) * Math.sign(holderAngle) * 90
+  const beginRefold = () => {
+    setRefolding(landed)
+    setLanded(undefined)
+  }
+  const endRefold = () => {
+    setLanded(refolding)
+    setRefolding(undefined)
+  }
+  useAnimatedReaction(
+    () => unfolded.value < 1,
+    (closing, wasClosing) => {
+      if (closing && !wasClosing && landed) runOnJS(beginRefold)()
+    },
+    [landed],
+  )
+  useAnimatedReaction(
+    () => unfolded.value,
+    (open) => {
+      if (refoldAngle === 0) return
+      turnAngle.set(refoldAngle * open)
+      if (open >= 1) runOnJS(endRefold)()
+    },
+    [refoldAngle],
+  )
 
   const gridLayout = usePlayerGridLayout({
     playerCount,
@@ -118,7 +167,7 @@ function PinnedGameBoardStage({
     layoutVariant,
     holderAngle: landed ? undefined : holderAngle,
   })
-  const offering = !!gridLayout.centerColumn && !kept
+  const offering = !!gridLayout.centerColumn && !kept && !refolding
   const tableTurn = useMemo<TableTurn | undefined>(
     () => (gridLayout.centerColumn || landed ? { angle: turnAngle, unfolded, landed } : undefined),
     [gridLayout.centerColumn, landed, turnAngle, unfolded],
