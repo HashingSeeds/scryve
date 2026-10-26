@@ -146,7 +146,6 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     "expo-image-picker",
     {
       photosPermission: "Allow Scryve to attach a screenshot you choose to a support request.",
-      cameraPermission: false,
       microphonePermission: false,
     },
   ])
