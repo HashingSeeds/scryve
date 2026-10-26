@@ -82,7 +82,7 @@ import {
   seatIdentityMetrics,
   seatMarkArt,
 } from "./SeatIdentity"
-import { $sizeStyles, Text } from "./Text"
+import { Text } from "./Text"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const COMMANDER_OVERVIEW_MS = 220
@@ -468,16 +468,14 @@ export const LifeCard = memo(function LifeCard({
     screenEdges,
     markHeight: identityMetrics.mark,
   })
-  const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
-  const { maxWidth: nameRowMax } = identityCorner.position
-  // why: a name cut to a letter or two beside the commander strip reads as noise, so the strip stacks above the name instead.
-  const stripAtEdge =
-    commanderStripShown && !commanderStripMovesInward(contentRotation, contentInsets)
-  const stripAboveName =
-    stripAtEdge &&
-    typeof nameRowMax === "number" &&
-    nameRowMax - markArt.width - identityMetrics.gap < MIN_NAME_ROOM
-  const stripBesideName = stripAtEdge && !stripAboveName
+  const stripAtEdge = !commanderStripMovesInward(contentRotation, contentInsets)
+  const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
+  // why: beside the commander strip a short seat cuts every name to a few letters, so in commander games such seats keep just their mark from the start; judged by seat length alone so seats of one size match.
+  const markOnly =
+    !!commanderDamage?.inspection &&
+    seatRun > 0 &&
+    seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.mark - identityMetrics.gap <
+      MIN_NAME_ROOM
   const seatIdentity = (
     <SeatIdentity
       seatNumber={seatNumber}
@@ -488,6 +486,7 @@ export const LifeCard = memo(function LifeCard({
       insetSwordColor={commanderDamage ? color : undefined}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
+      markOnly={markOnly}
     />
   )
 
@@ -743,7 +742,7 @@ export const LifeCard = memo(function LifeCard({
                   insetSwordColor={color}
                   closeIcon
                   size={identityMetrics.mark}
-                  style={markArt.trim}
+                  style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
                 />
               </BoardPressable>
             </View>
@@ -859,13 +858,6 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
-          raisedBy={
-            stripAboveName && typeof identityCorner.position.bottom === "number"
-              ? // why: only the name's text runs under the strip, and it sits centered on the taller mark.
-                identityCorner.position.bottom +
-                (markArt.height + $sizeStyles[identityMetrics.name].lineHeight) / 2
-              : undefined
-          }
           open={localOverviewVisible}
           inspectDisabled={inspectDisabled}
           closeIconStyle={overviewCloseStyle}
@@ -924,7 +916,8 @@ export const LifeCard = memo(function LifeCard({
               style={[
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
-                stripBesideName && { maxWidth: nameRowMax },
+                commanderStripShown &&
+                  stripAtEdge && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
               {commanderDamage?.inspection ? (
@@ -1160,7 +1153,7 @@ export function proWatermarkPlacement(
   }
 }
 
-const MIN_NAME_ROOM = 32
+const MIN_NAME_ROOM = 48
 
 // why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
 const CUTOUT_HALF_WIDTH = 64
