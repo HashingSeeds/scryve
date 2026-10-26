@@ -1,3 +1,5 @@
+import { cardTextLinesTopFirst, NAME_LINES_FROM_CARD_TOP } from "./cardScan"
+
 const SHORTLIST_SIZE = 40
 const MIN_SIMILARITY = 0.85
 const MIN_LEAD_OVER_RUNNER_UP = 0.05
@@ -106,4 +108,25 @@ export function firstUnambiguousCardName(
     return { name: index.names[best.nameIndex], similarity: best.similarity }
   }
   return undefined
+}
+
+export function nameFromCardTop(index: CardNameIndex, linesFromCardTop: string[]) {
+  const lines = cardTextLinesTopFirst(linesFromCardTop).slice(0, NAME_LINES_FROM_CARD_TOP)
+  return firstUnambiguousCardName(index, lines)
+}
+
+export function closestNamesFromCardTop(
+  index: CardNameIndex,
+  linesFromCardTop: string[],
+  count: number,
+): string[] {
+  const lines = cardTextLinesTopFirst(linesFromCardTop).slice(0, NAME_LINES_FROM_CARD_TOP)
+  const best = new Map<number, number>()
+  for (const line of lines)
+    for (const { nameIndex, similarity: score } of rankedNames(index, line))
+      if (score > (best.get(nameIndex) ?? -1)) best.set(nameIndex, score)
+  return [...best]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, count)
+    .map(([nameIndex]) => index.names[nameIndex])
 }

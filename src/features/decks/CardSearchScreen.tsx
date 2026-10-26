@@ -30,9 +30,7 @@ import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
-import { firstUnambiguousCardName } from "./cardNameMatch"
-import { cardTextLinesTopFirst, NAME_LINES_FROM_CARD_TOP } from "./cardScan"
-import { CardScanner, type CardScan } from "./CardScanner"
+import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
@@ -46,8 +44,7 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
-const CAN_SCAN = Platform.OS !== "web" && canReadCardText
-const GUESS_LINES = 3
+const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 
 function scryfallQuery({
   text,
@@ -83,6 +80,7 @@ export function CardSearchScreen({
   game,
   format,
   onAdd,
+  onRemove,
   onClose,
   offlineCandidates,
   initialSection,
@@ -91,6 +89,7 @@ export function CardSearchScreen({
   game: string
   format: string
   onAdd: (card: GuestDeckPayload["cards"][number]) => string | undefined
+  onRemove?: (card: GuestDeckPayload["cards"][number]) => void
   onClose: () => void
   /**
    * The account's fully-cached cards to search while offline. Offline adds draw from
@@ -120,9 +119,8 @@ export function CardSearchScreen({
   )
   const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
-  const [scanLines, setScanLines] = useState<string[]>([])
-  const [matchedName, setMatchedName] = useState<string>()
-  const scanSession = useRef<{ startedAt: number; matchedName?: string }>(undefined)
+  const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
+  const lastScanAddAt = useRef(0)
   const nameIndex = useCardNameIndex(game, deviceId, scanning)
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
@@ -132,7 +130,6 @@ export function CardSearchScreen({
   const [searchAttempt, setSearchAttempt] = useState(0)
 
   const offline = connection?.isWebSocketConnected === false
-  const searchDelayMs = scanLines.includes(query) ? 0 : 350
   const [cachedRules, setCachedRules] = useState(() => loadCardDetails())
   const [colorFilters, setColorFilters] = useState<string[]>([])
   const [exactColors, setExactColors] = useState(true)
@@ -334,7 +331,7 @@ export function CardSearchScreen({
           game,
           deviceId,
           query: scryfallQuery({
-            text: query === matchedName && !query.includes('"') ? `!"${query}"` : query.trim(),
+            text: query.trim(),
             commander: choosingCommander,
             colors: colorFilters,
             exactColors,
@@ -351,7 +348,7 @@ export function CardSearchScreen({
       } finally {
         if (active) setBusy(false)
       }
-    }, searchDelayMs)
+    }, 350)
     return () => {
       active = false
       clearTimeout(timer)
@@ -368,8 +365,6 @@ export function CardSearchScreen({
     keywords,
     searchRequested,
     searchAttempt,
-    searchDelayMs,
-    matchedName,
     searchError?.retryAfterMs,
     deviceId,
   ])
@@ -401,35 +396,48 @@ export function CardSearchScreen({
     }
     if (choosingCommander) {
       preview(searchEntry(card))
-      return
+      return undefined
     }
     const error = onAdd(searchEntry(card))
-    if (!error) recordScannedAdd(card.name)
     setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
+    return error
   }
 
-  function recordScannedAdd(name: string) {
-    if (!__DEV__ || !scanSession.current) return
-    const { startedAt, matchedName: matched } = scanSession.current
-    console.log(`SCANADD ${JSON.stringify({ added: name, matched, ms: Date.now() - startedAt })}`)
-    scanSession.current = undefined
+  async function addScannedCard(name: string): Promise<ScannedCardAdd> {
+    try {
+      if (!convex) throw new Error("Card search unavailable")
+      const found = await convex.action(api.cards.search, {
+        game,
+        deviceId,
+        query: name.includes('"') ? name : `!"${name}"`,
+      })
+      const card = found.find((candidate) => candidate.name === name) ?? found[0]
+      if (!card) return { error: translate("decks:cardScan.notFound", { card: name }) }
+      const error = add(card)
+      if (error) return { error }
+      scannedEntries.current.set(name, searchEntry(card))
+      if (__DEV__) {
+        const ms = Date.now() - lastScanAddAt.current
+        console.log(`SCANADD ${JSON.stringify({ added: card.name, ms })}`)
+        lastScanAddAt.current = Date.now()
+      }
+      return { imageUrl: card.smallImageUrl ?? card.imageUrl }
+    } catch (cause) {
+      return {
+        error: convexErrorMessage(cause, translate("decks:cardScan.addFailed", { card: name })),
+      }
+    }
   }
 
-  function readScan(scan: CardScan) {
-    const lines = cardTextLinesTopFirst(scan.linesFromCardTop)
-    const match = nameIndex
-      ? firstUnambiguousCardName(nameIndex, lines.slice(0, NAME_LINES_FROM_CARD_TOP))
-      : undefined
-    if (__DEV__)
-      console.log(`SCANREAD ${JSON.stringify({ photo: scan.photo, framing: scan.framing, match })}`)
-    if (nameIndex && !match) return "unsure"
-    const names = match ? [match.name] : lines.slice(0, GUESS_LINES)
-    if (scanSession.current) scanSession.current.matchedName = match?.name
-    setScanning(false)
-    setScanLines(names)
-    setMatchedName(match?.name)
-    setQuery(names[0])
-    return "accepted"
+  function removeScannedCard(name: string) {
+    const entry = scannedEntries.current.get(name)
+    if (!entry || !onRemove) return
+    onRemove(entry)
+    if (__DEV__) console.log(`SCANREMOVE ${JSON.stringify({ removed: name })}`)
+  }
+
+  function recordScanRead(scan: CardScan, match: string | undefined) {
+    console.log(`SCANREAD ${JSON.stringify({ photo: scan.photo, framing: scan.framing, match })}`)
   }
 
   function addOffline(entry: KnownCardEntry) {
@@ -438,7 +446,6 @@ export function CardSearchScreen({
       return
     }
     const error = onAdd({ ...entry.card, quantity: 1, section })
-    if (!error) recordScannedAdd(entry.card.name)
     setMessage(error ?? translate("decks:cardSearch.added", { card: entry.card.name }))
   }
 
@@ -503,30 +510,18 @@ export function CardSearchScreen({
               onChangeText={setQuery}
               containerStyle={$queryField}
             />
-            {CAN_SCAN ? (
+            {CAN_READ_CARDS && filtersCards && !choosingCommander ? (
               <Button
                 testID="card-scan-button"
                 tx="decks:cardSearch.scan"
                 accessibilityLabel={translate("decks:cardSearch.scanLabel")}
                 onPress={() => {
-                  scanSession.current = { startedAt: Date.now() }
+                  lastScanAddAt.current = Date.now()
                   setScanning(true)
                 }}
               />
             ) : null}
           </View>
-          {scanLines.length > 1 && catalogResults?.length === 0 ? (
-            <View style={$pills}>
-              {scanLines.map((line) => (
-                <FilterPill
-                  key={line}
-                  label={line}
-                  selected={query === line}
-                  onPress={() => setQuery(line)}
-                />
-              ))}
-            </View>
-          ) : null}
           {initialSection !== "commander" ? (
             <SelectField
               label={translate("decks:cardSearch.addTo")}
@@ -839,7 +834,16 @@ export function CardSearchScreen({
           </View>
         </DialogCard>
       ) : null}
-      {scanning ? <CardScanner onClose={() => setScanning(false)} onScan={readScan} /> : null}
+      {scanning ? (
+        <CardScanner
+          game={game}
+          nameIndex={nameIndex}
+          addCard={addScannedCard}
+          removeCard={onRemove ? removeScannedCard : undefined}
+          onRead={__DEV__ ? recordScanRead : undefined}
+          onClose={() => setScanning(false)}
+        />
+      ) : null}
       {candidate ? (
         <CardFocusDialog
           key={printingKey(candidate)}

@@ -1,4 +1,4 @@
-import { cardNameIndex, firstUnambiguousCardName } from "./cardNameMatch"
+import { cardNameIndex, closestNamesFromCardTop, firstUnambiguousCardName } from "./cardNameMatch"
 
 const index = cardNameIndex([
   "Kitt Kanto, Mayhem Diva",
@@ -42,5 +42,14 @@ describe("firstUnambiguousCardName", () => {
 
   it("refuses to choose between two names a misread fits equally", () => {
     expect(firstUnambiguousCardName(index, ["Ajani's Pre ate"])).toBeUndefined()
+  })
+})
+
+describe("closestNamesFromCardTop", () => {
+  it("offers the nearest real names for the card's top lines, best first", () => {
+    expect(closestNamesFromCardTop(index, ["Sol Rlng", "Artifact"], 2)).toEqual([
+      "Sol Ring",
+      "Sol Ring // Sol Ring",
+    ])
   })
 })

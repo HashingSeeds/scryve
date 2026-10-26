@@ -359,18 +359,28 @@ const decks = {
     scanLabel: "Scan a card with the camera",
   },
   cardScan: {
-    title: "Scan a card",
-    hint: "Fit the card inside the frame",
-    read: "Read card",
-    reading: "Reading…",
-    noText: "No card name found. Try more light or hold the card closer.",
+    title: "Scan cards",
+    looking: "Hold a card inside the frame",
+    loading: "Loading card names…",
+    steady: "Hold steady",
     unsure: "Couldn't tell which card this is. Hold it flat and try again.",
     failed: "Could not read the card. Try again.",
+    // Shown at the bottom of the scanner before any card has been added.
+    empty: "Scanned cards are added to the deck and show here.",
+    // How many cards this scanner session has added to the deck.
+    addedCount: "{{count}} added",
+    // Button next to the last scanned card when the scanner picked the wrong one.
+    wrongCard: "Wrong card",
+    whichCard: "Which card is it?",
+    removeIt: "Remove it",
+    addFailed: "Couldn't add {{card}}. Check your connection.",
+    notFound: "Couldn't find {{card}}.",
     permission: "Scryve uses the camera to read card names. Photos stay on this device.",
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",
     allow: "Allow camera",
     openSettings: "Open settings",
   },
+
   deckLimit: {
     countLabel: "{{used}} of {{limit}} synced decks",
     countLabelFree: "{{used}} of {{limit}} free synced decks",

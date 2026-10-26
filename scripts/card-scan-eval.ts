@@ -3,8 +3,13 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 import type { CardPhotoText } from "../modules/card-text-reader"
-import { cardNameIndex, firstUnambiguousCardName } from "../src/features/decks/cardNameMatch"
-import { cardTextLinesTopFirst, NAME_LINES_FROM_CARD_TOP } from "../src/features/decks/cardScan"
+import {
+  cardNameIndex,
+  firstUnambiguousCardName,
+  nameFromCardTop,
+  type CardNameIndex,
+} from "../src/features/decks/cardNameMatch"
+import { cardTextLinesTopFirst } from "../src/features/decks/cardScan"
 import { framedLinesFromCardTop, type ScanFraming } from "../src/features/decks/cardTextLayout"
 
 const TEXT_ONLY_NAME_LINES = 6
@@ -14,11 +19,12 @@ type RecordedScan = { card: string } & (
   { textBlocks: string[] } | { photo: CardPhotoText; framing: ScanFraming }
 )
 
-function nameLines(scan: RecordedScan) {
-  if ("textBlocks" in scan)
-    return cardTextLinesTopFirst(scan.textBlocks).slice(0, TEXT_ONLY_NAME_LINES)
-  const lines = cardTextLinesTopFirst(framedLinesFromCardTop(scan.photo, scan.framing))
-  return lines.slice(0, NAME_LINES_FROM_CARD_TOP)
+function scannedName(index: CardNameIndex, scan: RecordedScan) {
+  if ("textBlocks" in scan) {
+    const lines = cardTextLinesTopFirst(scan.textBlocks).slice(0, TEXT_ONLY_NAME_LINES)
+    return firstUnambiguousCardName(index, lines)
+  }
+  return nameFromCardTop(index, framedLinesFromCardTop(scan.photo, scan.framing))
 }
 
 async function main() {
@@ -35,7 +41,7 @@ async function main() {
     const wrong: string[] = []
     let unsure = 0
     for (const scan of scans) {
-      const match = firstUnambiguousCardName(index, nameLines(scan))
+      const match = scannedName(index, scan)
       if (!match) unsure++
       else if (match.name !== scan.card) wrong.push(`${match.name} (was ${scan.card})`)
     }

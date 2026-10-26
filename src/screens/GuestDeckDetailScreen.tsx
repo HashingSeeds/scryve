@@ -395,6 +395,17 @@ export function GuestDeckDetailScreen({
           initialSection={choosingCommander ? "commander" : undefined}
           commanderCards={current.cards}
           onClose={() => setAdding(false)}
+          onRemove={(card) => {
+            const index = current.cards.findIndex(
+              (entry) => printingKey(entry) === printingKey(card),
+            )
+            const entry = current.cards[index]
+            if (!entry) return
+            updateCard(
+              index,
+              entry.quantity > 1 ? { ...entry, quantity: entry.quantity - 1 } : undefined,
+            )
+          }}
           onAdd={(card) => {
             setUndo(undefined)
             if (isCommanderPick(rules, card)) {
