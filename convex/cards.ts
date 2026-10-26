@@ -337,8 +337,8 @@ export const cardNameCatalog = action({
     )
     if (cached && Date.now() - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS)
       return { names: cached.names, alternateNames: cached.alternateNames }
-    await limitCardLookup(ctx, args.deviceId)
     try {
+      await limitCardLookup(ctx, args.deviceId)
       const catalog = {
         names: await fetchCardNames(ctx),
         alternateNames: await fetchPrintedToRulesNameLines(ctx),

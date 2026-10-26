@@ -914,6 +914,25 @@ describe("card name catalog", () => {
     expect(fetchSpy.mock.calls.length).toBe(calls)
   })
 
+  it("serves a stale copy when a refresh is refused", async () => {
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.storeNameCatalog, {
+      game: "mtg",
+      names: "Sol Ring",
+      alternateNames: "",
+    })
+    jest.useFakeTimers({ advanceTimers: true, now: Date.now() + 2 * 86_400_000 })
+    try {
+      jest.spyOn(global, "fetch").mockImplementation(() => response({}, 429))
+      await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toEqual({
+        names: "Sol Ring",
+        alternateNames: "",
+      })
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("rejects a malformed name list", async () => {
     const t = makeConvexTest()
     jest
