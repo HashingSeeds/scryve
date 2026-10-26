@@ -2,6 +2,8 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 
 const {
+  chooseApiKey,
+  loadApiKey,
   englishNotes,
   flatten,
   prototypeKeys,
@@ -140,4 +142,45 @@ test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quo
   assert.deepEqual(validateUnit(unit, { label: 'Monarca {{name}}"' }, "es"), [
     "label: has an unmatched quote",
   ])
+})
+
+test("sends the pool key only through ai-pool and the Console key only to Anthropic", () => {
+  const keys = { readPoolKey: () => "pool", readConsoleKey: () => "console" }
+  const pool = "https://ai-pool.example.ts.net"
+
+  assert.equal(chooseApiKey({ ...keys, baseUrl: pool }), "pool")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: "https://api.anthropic.com" }), "console")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: undefined }), "console")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: pool, readPoolKey: () => undefined }), "console")
+  assert.equal(chooseApiKey({ ...keys, apiKey: "explicit", baseUrl: pool }), "explicit")
+})
+
+test("never reads a key file the choice does not need", () => {
+  const unreadable = () => {
+    throw new Error("EACCES")
+  }
+
+  assert.equal(
+    chooseApiKey({ apiKey: "explicit", readPoolKey: unreadable, readConsoleKey: unreadable }),
+    "explicit",
+  )
+  assert.equal(
+    chooseApiKey({
+      baseUrl: "https://api.anthropic.com",
+      readPoolKey: unreadable,
+      readConsoleKey: () => "console",
+    }),
+    "console",
+  )
+})
+
+test("loads a key from the machine's own files without throwing", () => {
+  const saved = { ...process.env }
+  try {
+    delete process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+    assert.doesNotThrow(() => loadApiKey())
+  } finally {
+    process.env = saved
+  }
 })
