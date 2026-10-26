@@ -88,29 +88,31 @@ export function CardScanner({
             ) : null}
           </View>
         )}
-        <BottomActionBar>
-          {permission?.granted ? (
-            <Button
-              testID="card-scan-read"
-              preset="reversed"
-              tx={reading ? "decks:cardScan.reading" : "decks:cardScan.read"}
-              disabled={reading}
-              onPress={() => void read()}
-            />
-          ) : permission ? (
+        {permission?.granted ? (
+          <Button
+            testID="card-scan-read"
+            preset="reversed"
+            style={$thumbButton}
+            tx={reading ? "decks:cardScan.reading" : "decks:cardScan.read"}
+            disabled={reading}
+            onPress={() => void read()}
+          />
+        ) : permission ? (
+          <BottomActionBar>
             <Button
               preset="reversed"
               tx={canAsk ? "decks:cardScan.allow" : "decks:cardScan.openSettings"}
               onPress={() => void (canAsk ? requestPermission() : Linking.openSettings())}
             />
-          ) : null}
-        </BottomActionBar>
+          </BottomActionBar>
+        ) : null}
       </Screen>
     </Modal>
   )
 }
 
 const $screen: ViewStyle = { flex: 1 }
+const $thumbButton: ViewStyle = { position: "absolute", top: "48%", left: 16, right: 16 }
 const $overlay: ViewStyle = {
   ...StyleSheet.absoluteFill,
   alignItems: "center",

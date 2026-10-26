@@ -502,17 +502,6 @@ export function CardSearchScreen({
               onChangeText={setQuery}
               containerStyle={$queryField}
             />
-            {CAN_SCAN ? (
-              <Button
-                testID="card-scan-button"
-                tx="decks:cardSearch.scan"
-                accessibilityLabel={translate("decks:cardSearch.scanLabel")}
-                onPress={() => {
-                  scanSession.current = { startedAt: Date.now() }
-                  setScanning(true)
-                }}
-              />
-            ) : null}
           </View>
           {scanLines.length > 1 && catalogResults?.length === 0 ? (
             <View style={$pills}>
@@ -763,6 +752,19 @@ export function CardSearchScreen({
           ) : null}
           {message ? <Text accessibilityLiveRegion="polite" text={message} /> : null}
         </ScrollView>
+        {CAN_SCAN ? (
+          <Button
+            testID="card-scan-button"
+            preset="reversed"
+            style={$thumbButton}
+            tx="decks:cardSearch.scan"
+            accessibilityLabel={translate("decks:cardSearch.scanLabel")}
+            onPress={() => {
+              scanSession.current = { startedAt: Date.now() }
+              setScanning(true)
+            }}
+          />
+        ) : null}
       </Screen>
       {filtersOpen ? (
         <DialogCard
@@ -895,6 +897,7 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 
+const $thumbButton: ViewStyle = { position: "absolute", top: "48%", left: 16, right: 16 }
 const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
 const $queryField: ViewStyle = { flex: 1 }
 const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", minHeight: 44 }
