@@ -5,14 +5,8 @@ import { hostLan, type LanConnection, type LanHost } from "@/features/lan/lanTra
 import { convexErrorCode } from "@/utils/convexError"
 import { load, remove, save } from "@/utils/storage"
 
-import {
-  applyHubCommand,
-  hubStandings,
-  hubView,
-  joinHub,
-  type HubCommand,
-  type HubEvent,
-} from "./hubEvent"
+import { applyHubCommand, joinHub, type HubCommand, type HubEvent } from "./hubEvent"
+import { guestViewMessage, nextHostFeed, type HostFeed } from "./nearbyEventFeed"
 import {
   NEARBY_EVENT_PROTOCOL,
   nearbyEventServiceName,
@@ -21,7 +15,6 @@ import {
   type NearbyHostMessage,
 } from "./nearbyEventProtocol"
 import type { EventActor } from "../../../../convex/lib/events/commands"
-import { standingsThroughRound } from "../eventLogic"
 
 const STORAGE_KEY = "events.nearby.hosted"
 
@@ -36,6 +29,8 @@ export interface NearbyHostState {
 
 interface Guest {
   playerId: string | null
+  patches: boolean
+  synced: boolean
 }
 
 function stored(): Pick<NearbyHostState, "event" | "hostPlayerId"> {
@@ -52,6 +47,7 @@ class NearbyEventHost {
   private listeners = new Set<() => void>()
   private guests = new Map<LanConnection<NearbyHostMessage>, Guest>()
   private server: LanHost | undefined
+  private feed: HostFeed | undefined
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener)
@@ -132,7 +128,7 @@ class NearbyEventHost {
   }
 
   private admit(peer: LanConnection<NearbyHostMessage>) {
-    const guest: Guest = { playerId: null }
+    const guest: Guest = { playerId: null, patches: false, synced: false }
     this.guests.set(peer, guest)
     return {
       onMessage: (message: NearbyGuestMessage) => this.receive(peer, guest, message),
@@ -156,9 +152,10 @@ class NearbyEventHost {
       try {
         const joined = joinHub(event, message, createClientId("player"))
         guest.playerId = joined.playerId
+        guest.patches = message.patches === true
         peer.send({ t: "welcome", playerId: joined.playerId })
         if (joined.event !== event) this.commit(joined.event)
-        else this.sendView(peer, guest)
+        else this.broadcast()
       } catch (cause) {
         peer.sendAndClose({ t: "rejected", reason: "invalid", code: convexErrorCode(cause) })
       }
@@ -180,32 +177,19 @@ class NearbyEventHost {
     }
   }
 
-  private sendView(
-    peer: LanConnection<NearbyHostMessage>,
-    guest: Guest,
-    standings = this.standings(),
-  ) {
-    const { event } = this.state
-    if (!event || !guest.playerId || !standings) return
-    peer.send({
-      t: "view",
-      view: hubView(event, { organizer: false, playerId: guest.playerId }),
-      standings,
-    })
-  }
-
-  private standings() {
-    const { event } = this.state
-    if (!event) return undefined
-    return hubStandings(
-      event,
-      standingsThroughRound(hubView(event, { organizer: true, playerId: null })),
-    )
-  }
-
   private broadcast() {
-    const standings = this.standings()
-    for (const [peer, guest] of this.guests) this.sendView(peer, guest, standings)
+    const { event } = this.state
+    if (!event) return
+    const { feed, patch } = nextHostFeed(this.feed, event)
+    this.feed = feed
+    for (const [peer, guest] of this.guests) {
+      if (!guest.playerId) continue
+      if (patch && guest.synced && guest.patches) peer.send(patch)
+      else if (patch || !guest.synced) {
+        guest.synced = true
+        peer.send(guestViewMessage(feed, guest.playerId))
+      }
+    }
   }
 }
 
