@@ -6,11 +6,17 @@ const MIN_LEAD_OVER_RUNNER_UP = 0.05
 
 export type CardNameIndex = {
   names: string[]
-  faces: { key: string; nameIndex: number; wholeName: boolean; trigramCount: number }[]
+  faces: {
+    key: string
+    nameIndex: number
+    wholeName: boolean
+    trigramCount: number
+    printedName?: string
+  }[]
   facesByTrigram: Map<string, number[]>
 }
 
-export type CardNameMatch = { name: string; similarity: number }
+export type CardNameMatch = { name: string; similarity: number; printedName?: string }
 
 function matchKey(text: string) {
   return text
@@ -44,13 +50,23 @@ function similarity(a: string, b: string) {
   return 1 - previous[b.length] / Math.max(a.length, b.length, 1)
 }
 
-export function cardNameIndex(names: string[]): CardNameIndex {
-  const faces = names.flatMap((name, nameIndex) =>
+export function cardNameIndex(
+  names: string[],
+  printedAlternates: readonly (readonly [printed: string, name: string])[] = [],
+): CardNameIndex {
+  const faces: CardNameIndex["faces"] = names.flatMap((name, nameIndex) =>
     [...new Set([name, ...name.split(" // ")])].map((face) => {
       const key = matchKey(face)
       return { key, nameIndex, wholeName: face === name, trigramCount: trigrams(key).size }
     }),
   )
+  const nameIndexes = new Map(names.map((name, nameIndex) => [name, nameIndex]))
+  for (const [printedName, name] of printedAlternates) {
+    const nameIndex = nameIndexes.get(name)
+    const key = matchKey(printedName)
+    if (nameIndex === undefined || !key) continue
+    faces.push({ key, nameIndex, wholeName: true, trigramCount: trigrams(key).size, printedName })
+  }
   const facesByTrigram = new Map<string, number[]>()
   faces.forEach((face, faceIndex) => {
     for (const gram of trigrams(face.key)) {
@@ -72,7 +88,10 @@ function rankedNames(index: CardNameIndex, line: string) {
       sharedTrigrams.set(faceIndex, (sharedTrigrams.get(faceIndex) ?? 0) + 1)
   const overlap = (faceIndex: number, shared: number) =>
     shared / (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared)
-  const bestByName = new Map<number, { similarity: number; wholeName: boolean; face: string }>()
+  const bestByName = new Map<
+    number,
+    { similarity: number; wholeName: boolean; face: string; printedName?: string }
+  >()
   for (const [faceIndex] of [...sharedTrigrams]
     .sort((a, b) => overlap(b[0], b[1]) - overlap(a[0], a[1]))
     .slice(0, SHORTLIST_SIZE)) {
@@ -81,6 +100,7 @@ function rankedNames(index: CardNameIndex, line: string) {
       similarity: similarity(key, face.key),
       wholeName: face.wholeName,
       face: face.key,
+      printedName: face.printedName,
     }
     const current = bestByName.get(face.nameIndex)
     if (!current || score.similarity > current.similarity) bestByName.set(face.nameIndex, score)
@@ -105,7 +125,11 @@ export function firstUnambiguousCardName(
       best.similarity - runnerUp.similarity < MIN_LEAD_OVER_RUNNER_UP
     )
       continue
-    return { name: index.names[best.nameIndex], similarity: best.similarity }
+    return {
+      name: index.names[best.nameIndex],
+      similarity: best.similarity,
+      ...(best.printedName ? { printedName: best.printedName } : {}),
+    }
   }
   return undefined
 }

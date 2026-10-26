@@ -1,17 +1,21 @@
 import { cardNameIndex, closestNamesFromCardTop, firstUnambiguousCardName } from "./cardNameMatch"
 
-const index = cardNameIndex([
-  "Kitt Kanto, Mayhem Diva",
-  "Sol Ring",
-  "Sol Ring // Sol Ring",
-  "Ensoul Ring",
-  "Counterspell",
-  "Wizards of Thay",
-  "Delver of Secrets // Insectile Aberration",
-  "Ajani's Pridemate",
-  "Ajani's Presence",
-  "Æther Vial",
-])
+const index = cardNameIndex(
+  [
+    "Kitt Kanto, Mayhem Diva",
+    "Sol Ring",
+    "Sol Ring // Sol Ring",
+    "Ensoul Ring",
+    "Counterspell",
+    "Wizards of Thay",
+    "Delver of Secrets // Insectile Aberration",
+    "Ajani's Pridemate",
+    "Ajani's Presence",
+    "Æther Vial",
+    "Acidic Slime",
+  ],
+  [["Marauding Mutagen", "Acidic Slime"]],
+)
 
 describe("firstUnambiguousCardName", () => {
   it.each([
@@ -38,6 +42,13 @@ describe("firstUnambiguousCardName", () => {
 
   it("prefers the card printed with exactly that name over a double-faced card sharing it", () => {
     expect(firstUnambiguousCardName(index, ["Sol Rlng"])?.name).toBe("Sol Ring")
+  })
+
+  it("reads a card printed under another name as its real card", () => {
+    expect(firstUnambiguousCardName(index, ["Maraudlng Mutagen"])).toMatchObject({
+      name: "Acidic Slime",
+      printedName: "Marauding Mutagen",
+    })
   })
 
   it("refuses to choose between two names a misread fits equally", () => {
