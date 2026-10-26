@@ -88,7 +88,7 @@ function PinnedGameBoardStage({
   const spansHinge = useWindowSpansHinge()
   const turnAngle = useSharedValue(0)
   const hinge = useAnimatedHinge()
-  const pretending = usePretendDuo()
+  const { pretending } = usePretendDuo()
   const unfoldProgress = useSharedValue(1)
   const hingeSeen = useSharedValue(false)
   useAnimatedReaction(

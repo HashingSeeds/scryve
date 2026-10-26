@@ -19,5 +19,6 @@ const spansHinge = () => {
 // why: hinge angles stream in while a device folds, and the whole board would re-render for each one; this snapshot only changes when the window starts or stops spanning the fold.
 export function useWindowSpansHinge() {
   const spans = useSyncExternalStore(subscribe, spansHinge, spansHinge)
-  return usePretendDuo() || spans
+  const pretend = usePretendDuo()
+  return (pretend.pretending && pretend.open) || spans
 }

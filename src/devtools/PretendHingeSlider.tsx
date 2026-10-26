@@ -1,10 +1,15 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
-import Animated, { useAnimatedStyle } from "react-native-reanimated"
+import Animated, { runOnJS, useAnimatedReaction, useAnimatedStyle } from "react-native-reanimated"
 
 import { Icon } from "@/components/Icon"
 
-import { pretendHingeAngle, setPretendDuo } from "./pretendDuo"
+import {
+  PRETEND_OPENS_AT_DEG,
+  pretendHingeAngle,
+  setPretendDuo,
+  setPretendDuoOpen,
+} from "./pretendDuo"
 
 const TRACK = 320
 const THUMB = 28
@@ -14,6 +19,12 @@ export function PretendHingeSlider() {
     .minDistance(0)
     .onBegin(({ x }) => pretendHingeAngle.set(angleAt(x)))
     .onUpdate(({ x }) => pretendHingeAngle.set(angleAt(x)))
+  useAnimatedReaction(
+    () => pretendHingeAngle.value >= PRETEND_OPENS_AT_DEG,
+    (open, wasOpen) => {
+      if (open !== wasOpen) runOnJS(setPretendDuoOpen)(open)
+    },
+  )
   const fill = useAnimatedStyle(() => ({ width: (pretendHingeAngle.value / 180) * TRACK }))
 
   return (
