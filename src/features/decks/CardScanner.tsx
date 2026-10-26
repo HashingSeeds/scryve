@@ -191,6 +191,7 @@ export function CardScanner({
               style={StyleSheet.absoluteFill}
               facing="back"
               pictureSize="1920x1080"
+              animateShutter={false}
               onCameraReady={() => setCameraReady(true)}
             />
             <View style={$overlay} pointerEvents="none">
