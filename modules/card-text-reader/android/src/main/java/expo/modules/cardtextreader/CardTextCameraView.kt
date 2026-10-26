@@ -15,7 +15,6 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -23,6 +22,7 @@ import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import java.util.concurrent.Executors
+import kotlinx.coroutines.launch
 
 private const val MIN_FRAME_INTERVAL_MS = 120L
 private val ANALYSIS_SIZE = Size(1280, 960)
@@ -43,8 +43,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
 
   init {
     addView(previewView, 0)
-    val future = ProcessCameraProvider.getInstance(context)
-    future.addListener({ bind(future.get()) }, ContextCompat.getMainExecutor(context))
+    appContext.mainQueue.launch { bind(ProcessCameraProvider.awaitInstance(context)) }
   }
 
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {

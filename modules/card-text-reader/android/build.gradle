@@ -17,6 +17,11 @@ android {
   }
 }
 
+// why: same pin as expo-camera; React Native's full Guava otherwise hides the class CameraX compiles against.
+configurations.configureEach {
+  resolutionStrategy.force "com.google.guava:listenablefuture:1.0"
+}
+
 dependencies {
   implementation 'com.facebook.react:react-android'
   implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1'
