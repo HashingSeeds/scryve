@@ -40,7 +40,6 @@ export interface CommanderStripProps {
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
   compact?: boolean
-  raisedBy?: number
   open: boolean
   inspectDisabled?: boolean
   closeIconStyle?: ComponentProps<typeof Animated.View>["style"]
@@ -69,7 +68,6 @@ export const CommanderStrip = memo(function CommanderStrip({
   contentInsets,
   screenEdges,
   compact,
-  raisedBy,
   open,
   inspectDisabled,
   closeIconStyle,
@@ -113,7 +111,7 @@ export const CommanderStrip = memo(function CommanderStrip({
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
       style={[
         themed($strip),
-        stripEdge(corner, spacing.xs, contentInsets, screenEdges, raisedBy),
+        stripEdge(corner, spacing.xs, contentInsets, screenEdges),
         {
           flexDirection: stripDirection(contentRotation),
         },
@@ -263,10 +261,9 @@ function stripEdge(
   gap: number,
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
-  raisedBy = 0,
 ): ViewStyle {
   return {
-    [edge]: Math.max(cornerOffset(gap, edge, side, insets, screenEdges), raisedBy),
+    [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
     [side]: cornerOffset(gap, side, edge, insets, screenEdges),
     [start]: gap + (insets?.[start] ?? 0),
   }
