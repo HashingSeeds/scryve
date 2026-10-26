@@ -79,6 +79,11 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     // why: a new phase pushes again, so only the player's own messages notify Matthew.
     phase: `player:${playerTurn}`,
     push: "alert",
+    // why: the lock screen and Expo's servers get only this line, never what the player wrote.
+    pushText:
+      playerTurn === "request"
+        ? `New ${request.kind === "bug" ? "bug report" : "idea"}`
+        : "Player replied",
     title: clip(`${label}: ${request.body.split("\n")[0] ?? ""}`, 120),
     body,
     meta: {
