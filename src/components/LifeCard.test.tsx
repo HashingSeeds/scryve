@@ -297,6 +297,45 @@ describe("LifeCard", () => {
     },
   )
 
+  it("stacks the commander strip above a name it would cut to a letter or two", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          contentRotation={90}
+          color="#41476E"
+          compact
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            players: commanderPlayers,
+            ...commanderSeats,
+            incoming: { [commanderIds[1]]: 3 },
+            lethal: 21,
+            inspection: { open: false, onToggle: jest.fn() },
+          }}
+        />
+      </ThemeProvider>,
+    )
+    const layout = (height: number) =>
+      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+        nativeEvent: { layout: { width: 225, height } },
+      })
+    const strip = () => StyleSheet.flatten(view.getByTestId("commander-strip-seat-1").props.style)
+    const nameCap = () =>
+      StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style).maxWidth
+
+    layout(400)
+    expect(strip().left).toBe(darkTheme.spacing.xs)
+    expect(nameCap()).toEqual(expect.any(Number))
+
+    layout(183)
+    expect(strip().left).toBeGreaterThan(darkTheme.spacing.xs * 4)
+    expect(nameCap()).toBeUndefined()
+  })
+
   it("uses the card origin and full bottom space for a vertical inspection grid", () => {
     const players = Array.from({ length: 5 }, (_, seat) => ({
       id: asPlayerId(`player-${seat + 1}`),
