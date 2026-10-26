@@ -392,10 +392,18 @@ describe("feedbackCard", () => {
       kind: "approval",
       phase: "player:m",
       title: "Idea: See https://evil.test/x",
+      pushText: "Player replied",
       meta: { from: "Anonymous" },
     })
     expect(card.body).toBe(`${request.body}\n\nPlayer: http://a.test`)
     expect(card.actions.map(({ id }) => id)).toEqual(["reply"])
+  })
+
+  it("pushes a generic line for a new request, never the player's text", () => {
+    expect(feedbackCard({ request, messages: [] }).pushText).toBe("New idea")
+    expect(feedbackCard({ request: { ...request, kind: "bug" }, messages: [] }).pushText).toBe(
+      "New bug report",
+    )
   })
 
   it("files the card under updates once the team replied, keeping the phase", () => {
