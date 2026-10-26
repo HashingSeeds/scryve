@@ -195,4 +195,18 @@ http.route({
   }),
 })
 
+// why: Apollo calls this when Matthew replies on a card, so the reply reaches the player now instead of on the next 1-minute poll.
+http.route({
+  path: "/apollo/events",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!env.APOLLO_HOOK_SECRET)
+      return new Response("Apollo hook is not configured", { status: 503 })
+    if (request.headers.get("authorization") !== `Bearer ${env.APOLLO_HOOK_SECRET}`)
+      return new Response("Unauthorized", { status: 401 })
+    await ctx.scheduler.runAfter(0, internal.feedback.pullApollo, {})
+    return new Response(null, { status: 204 })
+  }),
+})
+
 export default http

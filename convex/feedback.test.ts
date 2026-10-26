@@ -309,6 +309,36 @@ describe("feedback", () => {
     }
   })
 
+  it("pulls Matthew's replies as soon as Apollo's hook calls", async () => {
+    process.env.APOLLO_CLOUD_URL = "https://apollo.test"
+    process.env.APOLLO_FEEDBACK_TOKEN = "feedback-token"
+    process.env.APOLLO_HOOK_SECRET = "hook-secret"
+    try {
+      const t = makeConvexTest()
+      const urls: string[] = []
+      jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+        urls.push(String(input))
+        return new Response("[]", { status: 200 })
+      })
+      const nudge = (secret: string) =>
+        t.fetch("/apollo/events", {
+          method: "POST",
+          headers: { authorization: `Bearer ${secret}` },
+          body: JSON.stringify({ source: "feedback" }),
+        })
+
+      expect((await nudge("wrong")).status).toBe(401)
+      expect((await nudge("hook-secret")).status).toBe(204)
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      expect(urls).toEqual(["https://apollo.test/v1/events?after=0&source=feedback"])
+    } finally {
+      delete process.env.APOLLO_CLOUD_URL
+      delete process.env.APOLLO_FEEDBACK_TOKEN
+      delete process.env.APOLLO_HOOK_SECRET
+      jest.restoreAllMocks()
+    }
+  })
+
   it("links a bug's Sentry report on its Apollo card", async () => {
     const t = makeConvexTest()
     const requestId = await t.mutation(api.feedback.submit, {

@@ -6,6 +6,7 @@ const app = defineApp({
   env: {
     APOLLO_CLOUD_URL: v.optional(v.string()),
     APOLLO_FEEDBACK_TOKEN: v.optional(v.string()),
+    APOLLO_HOOK_SECRET: v.optional(v.string()),
     CARD_CATALOG_SYNC: v.optional(v.string()),
     CLERK_SECRET_KEY: v.optional(v.string()),
     CLERK_WEBHOOK_SIGNING_SECRET: v.optional(v.string()),
