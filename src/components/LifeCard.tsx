@@ -48,7 +48,7 @@ import {
   type CommanderFacing,
   type CommanderReach,
 } from "./commanderDamageLayout"
-import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
+import { CommanderStrip, commanderDamageDealers, commanderStripMovesInward } from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
@@ -907,7 +907,10 @@ export const LifeCard = memo(function LifeCard({
               style={[
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
-                commanderStripShown && { maxWidth: identityCorner.position.maxWidth },
+                commanderStripShown &&
+                  !commanderStripMovesInward(contentRotation, contentInsets) && {
+                    maxWidth: identityCorner.position.maxWidth,
+                  },
               ]}
             >
               {commanderDamage?.inspection ? (
