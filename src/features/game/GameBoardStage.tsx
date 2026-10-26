@@ -262,7 +262,7 @@ function PinnedGameBoardStage({
                 onToggle={menu.onToggle}
               />
             </Animated.View>
-            {firstPlayer && !offering && !menu.open && !menu.exitAction ? (
+            {firstPlayer && !offering && !refolding && !menu.open && !menu.exitAction ? (
               <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
             ) : null}
             {offering ? (
