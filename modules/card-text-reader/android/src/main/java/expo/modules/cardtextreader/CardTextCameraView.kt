@@ -104,7 +104,8 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
             "y" to box.top,
             "width" to box.width(),
             "height" to box.height(),
-            "angle" to line.angle,
+            // why: ML Kit reports angles against the sensor but boxes against the upright frame.
+            "angle" to uprightAngle(line.angle + rotation),
             "confidence" to line.confidence,
           )
         }
@@ -121,3 +122,5 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     analysisExecutor.shutdown()
   }
 }
+
+private fun uprightAngle(degrees: Float) = ((degrees + 540f) % 360f) - 180f
