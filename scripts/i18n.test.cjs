@@ -2,6 +2,7 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 
 const {
+  chooseApiKey,
   englishNotes,
   flatten,
   prototypeKeys,
@@ -140,4 +141,15 @@ test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quo
   assert.deepEqual(validateUnit(unit, { label: 'Monarca {{name}}"' }, "es"), [
     "label: has an unmatched quote",
   ])
+})
+
+test("sends the pool key only through ai-pool and the Console key only to Anthropic", () => {
+  const keys = { poolKey: "pool", consoleKey: "console" }
+  const pool = "https://ai-pool.example.ts.net"
+
+  assert.equal(chooseApiKey({ ...keys, baseUrl: pool }), "pool")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: "https://api.anthropic.com" }), "console")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: undefined }), "console")
+  assert.equal(chooseApiKey({ ...keys, baseUrl: pool, poolKey: undefined }), "console")
+  assert.equal(chooseApiKey({ ...keys, apiKey: "explicit", baseUrl: pool }), "explicit")
 })

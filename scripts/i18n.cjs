@@ -319,18 +319,28 @@ async function check() {
   process.exitCode = 1
 }
 
+const ANTHROPIC_API_HOST = "api.anthropic.com"
+
+/** why: ai-pool rejects Console keys and Anthropic rejects the pool's key, so each key goes only to the host that accepts it. */
+function chooseApiKey({ apiKey, baseUrl, poolKey, consoleKey }) {
+  if (apiKey) return apiKey
+  const throughPool = Boolean(baseUrl) && new URL(baseUrl).host !== ANTHROPIC_API_HOST
+  return (throughPool && poolKey) || consoleKey
+}
+
+function readIfPresent(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined
+}
+
 function loadApiKey() {
-  if (process.env.ANTHROPIC_API_KEY) return
-  // why: agent shells route through ai-pool, which rejects Console keys with a 401.
-  const poolKey = path.join(os.homedir(), ".config/ai-pool/key")
-  if (process.env.ANTHROPIC_BASE_URL && fs.existsSync(poolKey)) {
-    process.env.ANTHROPIC_API_KEY = fs.readFileSync(poolKey, "utf8").trim()
-    return
-  }
-  const envFile = path.join(ROOT, ".env.local")
-  if (!fs.existsSync(envFile)) return
-  const { ANTHROPIC_API_KEY } = util.parseEnv(fs.readFileSync(envFile, "utf8"))
-  if (ANTHROPIC_API_KEY) process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY
+  const envFile = readIfPresent(path.join(ROOT, ".env.local"))
+  const apiKey = chooseApiKey({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseUrl: process.env.ANTHROPIC_BASE_URL,
+    poolKey: readIfPresent(path.join(os.homedir(), ".config/ai-pool/key"))?.trim(),
+    consoleKey: envFile && util.parseEnv(envFile).ANTHROPIC_API_KEY,
+  })
+  if (apiKey) process.env.ANTHROPIC_API_KEY = apiKey
 }
 
 function requestPayload(units, namespace, locale) {
@@ -495,6 +505,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  chooseApiKey,
   englishNotes,
   flatten,
   prototypeKeys,
