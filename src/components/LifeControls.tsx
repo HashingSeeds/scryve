@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
-import type { StyleProp, TextStyle, ViewStyle } from "react-native"
+import type { LayoutRectangle, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, useWindowDimensions, View } from "react-native"
 import * as Haptics from "expo-haptics"
 import Animated, {
@@ -26,6 +26,7 @@ import {
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_MAX_FONT_SCALE,
   type LifeCardContentRotation,
+  type LifeCardEdge,
 } from "./playerCardTypes"
 import { seatIdentityLabel } from "./SeatIdentity"
 import { Text } from "./Text"
@@ -45,6 +46,7 @@ export interface LifeControlsProps {
   pendingDelta?: number
   lifeFontSize?: number
   lifeDigits?: number
+  obstacle?: { edge: LifeCardEdge; bounds: LayoutRectangle }
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   onPreview?: (pendingDelta: number) => void
@@ -59,6 +61,36 @@ const HALF_CARD_ZONES: readonly {
   { direction: -1, glyph: "−", edge: "left" },
   { direction: 1, glyph: "+", edge: "right" },
 ]
+
+const ZONE_PADDING = {
+  top: "paddingTop",
+  bottom: "paddingBottom",
+  left: "paddingLeft",
+  right: "paddingRight",
+} as const satisfies Record<LifeCardEdge, keyof ViewStyle>
+
+function sidewaysZoneEdge(pinsToTopEdge: boolean): LifeCardEdge {
+  return pinsToTopEdge ? "top" : "bottom"
+}
+
+/** why: on a wide seat the commander strip runs past the middle of its end, so the glyph there steps inward past it. */
+export function glyphClearance(
+  { edge, bounds }: { edge: LifeCardEdge; bounds: LayoutRectangle },
+  zones: { width: number; height: number },
+  glyphSize: number,
+) {
+  const alongY = edge === "left" || edge === "right"
+  const [start, length, across] = alongY
+    ? [bounds.y, bounds.height, zones.height]
+    : [bounds.x, bounds.width, zones.width]
+  if (start >= (across + glyphSize) / 2 || start + length <= (across - glyphSize) / 2) return 0
+  return {
+    left: bounds.x + bounds.width,
+    right: zones.width - bounds.x,
+    top: bounds.y + bounds.height,
+    bottom: zones.height - bounds.y,
+  }[edge]
+}
 
 const RECENT_DELTA_VISIBLE_MS = 1800
 const BUMP_DISTANCE = 4
@@ -146,6 +178,7 @@ export function LifeControls({
   pendingDelta = 0,
   lifeFontSize = 0,
   lifeDigits = 0,
+  obstacle,
   onChange,
   onLongChange,
   onPreview,
@@ -217,6 +250,7 @@ export function LifeControls({
         {HALF_CARD_ZONES.map(({ direction, glyph, edge }) => {
           const delta = direction * tapStep
           const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
+          const zoneEdge = sideways ? sidewaysZoneEdge(pinsToTopEdge) : edge
           const showingDelta = direction * recentDelta > 0
           const feedback = showingDelta ? deltaText(recentDelta) : glyph
           const deltaSize = showingDelta
@@ -234,6 +268,8 @@ export function LifeControls({
           const lineHeight =
             (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) *
             Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+          const clearance =
+            obstacle?.edge === zoneEdge ? glyphClearance(obstacle, zonesSize, lineHeight) : 0
           const overhang =
             sideways && deltaSize
               ? Math.max((getDeltaTextWidth(feedback, deltaSize, fontScale) - lineHeight) / 2, 0)
@@ -271,6 +307,7 @@ export function LifeControls({
                   : edge === "left"
                     ? themed($zoneLeft)
                     : themed($zoneRight),
+                clearance > 0 && { [ZONE_PADDING[zoneEdge]]: clearance + spacing.xxs },
                 pressed &&
                   !disabled &&
                   !locked && { backgroundColor: overlayTint(foreground, 0.14) },
