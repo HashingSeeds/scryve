@@ -33,6 +33,7 @@ import {
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
+import { PretendClosedDuo } from "@/devtools/PretendClosedDuo"
 import { pretendHinge, pretendHingeAngle, usePretendDuo } from "@/devtools/pretendDuo"
 import { PretendHingeSlider } from "@/devtools/PretendHingeSlider"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
@@ -88,7 +89,7 @@ function PinnedGameBoardStage({
   const spansHinge = useWindowSpansHinge()
   const turnAngle = useSharedValue(0)
   const hinge = useAnimatedHinge()
-  const { pretending } = usePretendDuo()
+  const { pretending, open: pretendOpen } = usePretendDuo()
   const unfoldProgress = useSharedValue(1)
   const hingeSeen = useSharedValue(false)
   useAnimatedReaction(
@@ -244,6 +245,8 @@ function PinnedGameBoardStage({
   const menuOpen = menu.open && !menu.exitAction
   const bag = openToolBag(menu.actions)
 
+  if (pretending && !pretendOpen)
+    return <PretendClosedDuo renderGrid={renderGrid} testID={testID} />
   return (
     <View testID={testID} style={$stage}>
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
