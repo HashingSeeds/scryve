@@ -9,7 +9,8 @@ name: pr preview
 # reads the PR's export as data and publishes it under the base's app config.
 #
 # The publish job also moves this run's Apollo inbox card through progress to ready or failed (see
-# .github/actions/apollo-card). It skips when the pr-preview environment has no APOLLO_* secrets.
+# .github/actions/apollo-card). It skips when the pr-preview environment has no APOLLO_* secrets
+# or the PR base predates the action.
 on:
   pull_request:
     types: [labeled, synchronize, reopened]
@@ -261,7 +262,7 @@ jobs:
           node-version-file: .nvmrc
 
       - name: "Apollo: installing"
-        if: steps.head.outputs.current == 'true'
+        if: steps.head.outputs.current == 'true' && hashFiles('.github/actions/apollo-card/action.yml') != ''
         uses: ./.github/actions/apollo-card
         with:
           cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
@@ -288,7 +289,7 @@ jobs:
           eas.json >> "$GITHUB_ENV"
 
       - name: "Apollo: fetching bundles"
-        if: steps.head.outputs.current == 'true'
+        if: steps.head.outputs.current == 'true' && hashFiles('.github/actions/apollo-card/action.yml') != ''
         uses: ./.github/actions/apollo-card
         with:
           cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
@@ -330,7 +331,7 @@ jobs:
           done <<< "$paths"
 
       - name: "Apollo: checking builds"
-        if: steps.head.outputs.current == 'true'
+        if: steps.head.outputs.current == 'true' && hashFiles('.github/actions/apollo-card/action.yml') != ''
         uses: ./.github/actions/apollo-card
         with:
           cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
@@ -386,7 +387,7 @@ jobs:
           echo "platform=$platform" >> "$GITHUB_OUTPUT"
 
       - name: "Apollo: publishing"
-        if: steps.head.outputs.current == 'true' && steps.runtime.outputs.platform != ''
+        if: steps.head.outputs.current == 'true' && steps.runtime.outputs.platform != '' && hashFiles('.github/actions/apollo-card/action.yml') != ''
         uses: ./.github/actions/apollo-card
         with:
           cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
@@ -512,7 +513,7 @@ jobs:
           echo "card=$card" >> "$GITHUB_OUTPUT"
 
       - name: "Apollo: post result"
-        if: always() && steps.result.outputs.card != ''
+        if: always() && steps.result.outputs.card != '' && hashFiles('.github/actions/apollo-card/action.yml') != ''
         uses: ./.github/actions/apollo-card
         with:
           cloud-url: ${{ secrets.APOLLO_CLOUD_URL }}
