@@ -91,8 +91,11 @@ export default function Index() {
   const [newerGame, setNewerGame] = useState(() => localGameRepository.hasNewerActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
   const [resumingNearbyGame] = useState(() => lanPlayAvailable() && Boolean(savedHostedGame()))
+  const [checkedAt, setCheckedAt] = useState(Date.now)
   const readRevision = useRef<string>(undefined)
   const reload = useCallback(() => {
+    // why: a game goes stale with time, not storage, so a day in the background must still raise the old-game prompt.
+    setCheckedAt(Date.now())
     const revision = () => `${prepared}:${localGameRepository.boardRevision()}`
     // why: a reread hands the board new objects, and a fresh game gets new seat ids, so returning to an unchanged board would remount every seat.
     if (readRevision.current === revision()) return
@@ -128,7 +131,7 @@ export default function Index() {
   const restoringAccount = newestResumeGame === undefined && destination !== "play" && !prepared
 
   const started = activeGame !== null && hasLocalGameStarted(activeGame)
-  const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
+  const stale = activeGame && started ? checkedAt - activeGame.updatedAt >= STALE_GAME_MS : false
   const staleChoice = oldGameChoice?.gameId === activeGame?.id ? oldGameChoice?.choice : undefined
 
   if (resumingNearbyGame) return <Redirect href="/lan/game" />

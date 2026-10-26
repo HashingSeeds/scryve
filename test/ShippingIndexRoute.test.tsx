@@ -210,6 +210,31 @@ describe("shipping index route", () => {
     jest.restoreAllMocks()
   })
 
+  it("asks about an untouched game when the app comes back a day later", () => {
+    const game = createLocalGame({
+      players: [
+        { name: "Player 1", color: PLAYER_COLORS[0] },
+        { name: "Player 2", color: PLAYER_COLORS[1] },
+      ],
+      startingLife: 20,
+    })
+    game.players[0].life = 19
+    localGameRepository.saveActiveGame(game)
+    const appState = jest.spyOn(AppState, "addEventListener")
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>,
+    )
+    expect(view.getByTestId("game-board")).toBeTruthy()
+
+    jest.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60 * 60 * 1000)
+    act(() => appState.mock.calls.forEach(([, listener]) => listener("active")))
+
+    expect(view.getByText("Continue game?")).toBeTruthy()
+    jest.restoreAllMocks()
+  })
+
   it("keeps a game saved by a newer version until the player replaces it", () => {
     storage.set(
       LOCAL_KEYS.active,
