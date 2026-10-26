@@ -405,15 +405,19 @@ export function CardSearchScreen({
   async function addScannedCards(names: string[]): Promise<ScannedCardAdd[]> {
     try {
       if (!convex) throw new Error("Card search unavailable")
-      const found = await convex.action(api.cards.byNames, { names, deviceId })
-      const byName = new Map(
-        found.flatMap((card) =>
-          [card.name, ...card.name.split(" // ")].map((name) => [name, card]),
-        ),
-      )
+      const { cards, lookupFailed } = await convex.action(api.cards.byNames, { names, deviceId })
+      const byName = new Map(cards.map((card) => [card.name, card]))
       return names.map((name) => {
         const card = byName.get(name)
-        if (!card) return { error: translate("decks:cardScan.notFound", { card: name }) }
+        if (!card)
+          return {
+            error: translate(
+              lookupFailed ? "decks:cardScan.addFailed" : "decks:cardScan.notFound",
+              {
+                card: name,
+              },
+            ),
+          }
         const error = add(card)
         if (error) return { error }
         scannedEntries.current.set(name, searchEntry(card))
