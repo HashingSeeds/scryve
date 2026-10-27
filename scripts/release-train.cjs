@@ -165,7 +165,8 @@ async function newIssues(candidate) {
   return response.json()
 }
 
-const prNumber = (subject) => /\(#(\d+)\)$/.exec(subject)?.[1]
+const prNumber = (subject) =>
+  /\(#(\d+)\)$/.exec(subject)?.[1] ?? /^Merge pull request #(\d+) from /.exec(subject)?.[1]
 
 /** PRs a range of commit messages ships. A revert commit drops every other PR its message names. */
 function prNumbers(messages) {
@@ -200,15 +201,21 @@ function closedIssues(prs) {
   return [...new Set(issues)]
 }
 
+// why: the next promote starts after this commit, so a failure here is never retried on its own.
 function shipFixes(candidate, messages) {
+  const prs = prNumbers(messages)
+  let args
   try {
-    const issues = closedIssues(prNumbers(messages))
+    const issues = closedIssues(prs)
     if (issues.length === 0) return
-    const args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
+    args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
     run("pnpm", ["exec", "convex", "run", "feedback:shipFixes", JSON.stringify(args)])
     console.log(`Marked feedback fixed for ${issues.map((issue) => `#${issue}`).join(", ")}`)
   } catch (error) {
-    console.warn(`Promoted, but feedback was not marked fixed: ${error.message}`)
+    const retry = args
+      ? `Rerun: pnpm exec convex run feedback:shipFixes '${JSON.stringify(args)}'`
+      : `Shipped PRs: ${prs.map((pr) => `#${pr}`).join(", ")}`
+    console.warn(`Promoted, but feedback was not marked fixed: ${error.message}. ${retry}`)
   }
 }
 
@@ -244,12 +251,7 @@ async function promote({ yes, soakMinutes }) {
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
   // why: read before the production push below, which moves PRODUCTION_REF to the candidate.
-  const messages = git(
-    "log",
-    "--no-merges",
-    "--format=%B%x00",
-    `${PRODUCTION_REF}..${candidate.commit}`,
-  )
+  const messages = git("log", "--format=%B%x00", `${PRODUCTION_REF}..${candidate.commit}`)
     .split("\0")
     .map((message) => message.trim())
     .filter(Boolean)
