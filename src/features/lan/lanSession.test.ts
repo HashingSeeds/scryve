@@ -2,8 +2,10 @@ import { AppState } from "react-native"
 import { act, renderHook } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
+import { storage } from "@/utils/storage"
+
 import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
-import { saveLanName } from "./lanAvailability"
+import { HOSTED_GAME_KEY, saveLanName, savedHostedGame } from "./lanAvailability"
 import {
   createLanGame,
   LAN_PROTOCOL,
@@ -179,6 +181,53 @@ describe("nearby host", () => {
     expect(roundOf(resumed)).toBe(roundOf(session))
     expect(lifeOf(resumed, pass.key)).toBe(35)
     expect(back.sent[0]).toEqual({ type: "welcome", pass })
+  })
+
+  it("saves a foreground host's game as the round starts, then once for a burst of taps", async () => {
+    const { session, bob } = await startedGame()
+    const { key } = bob.pass()
+    expect(savedHostedGame()).toBeDefined()
+    const set = jest.spyOn(storage, "set")
+    const hostedSaves = () => set.mock.calls.filter(([saved]) => saved === HOSTED_GAME_KEY)
+
+    for (let index = 0; index < 10; index++) {
+      bob.send({
+        type: "op",
+        event: lifeEvent(`life-operation-${2000 + index}`, key, -1, roundOf(session)),
+      })
+      jest.advanceTimersByTime(40)
+    }
+    jest.advanceTimersByTime(1000)
+
+    expect(hostedSaves()).toHaveLength(1)
+    const resumed = new LanSession()
+    resumed.resumeHostedGame()
+    expect(lifeOf(resumed, key)).toBe(30)
+    set.mockRestore()
+  })
+
+  it("saves a rematch's first state at once, even right after the last round", async () => {
+    const { session } = await startedGame()
+    await session.writes.finish()
+    expect(savedHostedGame()).toBeUndefined()
+
+    session.start()
+    jest.advanceTimersByTime(50)
+
+    expect(savedHostedGame()).toBeDefined()
+  })
+
+  it("keeps the saved game when the host comes back to the foreground", async () => {
+    const { session } = await startedGame()
+    const onAppState = jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]
+
+    onAppState?.("background")
+    onAppState?.("active")
+    session.resumeHostedGame()
+
+    const resumed = new LanSession()
+    resumed.resumeHostedGame()
+    expect(roundOf(resumed)).toBe(roundOf(session))
   })
 
   it("sends every guest the host's new seat count, and turns away a join past it", async () => {
