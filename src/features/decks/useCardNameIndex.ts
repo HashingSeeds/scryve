@@ -65,7 +65,9 @@ export function useCardNameIndex(game: string, deviceId: string, wanted: boolean
         saveString(CARD_NAMES_KEY, JSON.stringify({ fetchedAt: Date.now(), ...catalog }))
         if (active) setIndex(indexFor(catalog))
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (active && !cached) setIndex(cardNameIndex([]))
+      })
     return () => {
       active = false
     }
