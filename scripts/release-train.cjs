@@ -201,7 +201,6 @@ function closedIssues(prs) {
   return [...new Set(issues)]
 }
 
-// why: the next promote starts after this commit, so a failure here is never retried on its own.
 function shipFixes(candidate, messages) {
   const prs = prNumbers(messages)
   let args
@@ -251,7 +250,12 @@ async function promote({ yes, soakMinutes }) {
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
   // why: read before the production push below, which moves PRODUCTION_REF to the candidate.
-  const messages = git("log", "--format=%B%x00", `${PRODUCTION_REF}..${candidate.commit}`)
+  const messages = git(
+    "log",
+    "--first-parent",
+    "--format=%B%x00",
+    `${PRODUCTION_REF}..${candidate.commit}`,
+  )
     .split("\0")
     .map((message) => message.trim())
     .filter(Boolean)
