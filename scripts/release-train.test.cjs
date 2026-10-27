@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { pickRelease, releaseNotes, summarizeGroup } = require("./release-train.cjs")
+const { pickRelease, prNumbers, releaseNotes, summarizeGroup } = require("./release-train.cjs")
 
 const commits = (...subjects) =>
   subjects.map((subject, index) => ({ commit: `c${index}`, subject }))
@@ -47,6 +47,7 @@ const group = (commit, platform, minutesAgo, attempt = "") =>
       id: `${commit}${attempt}-${platform}`,
       group: `g-${commit}${attempt}-${platform}`,
       platform,
+      runtimeVersion: `rt-${platform}`,
       gitCommitHash: commit,
       message: `merge ${commit}`,
       createdAt: new Date(100 * MINUTE - minutesAgo * MINUTE).toISOString(),
@@ -68,6 +69,7 @@ test("a release carries every platform's group for its commit", () => {
   assert.deepEqual(candidate.updateIds, ["old-ios", "old-android"])
   assert.equal(candidate.firstPublishedAt, 29 * MINUTE)
   assert.equal(candidate.lastPublishedAt, 30 * MINUTE)
+  assert.deepEqual(candidate.runtimes, { ios: "rt-ios", android: "rt-android" })
   assert.deepEqual(
     soaking.map((release) => release.commit),
     ["new"],
@@ -100,4 +102,16 @@ test("a commit published twice promotes only its newest groups", () => {
     "g-same-rerun-ios",
     "g-same-rerun-android",
   ])
+})
+
+test("shipped PRs come from squash subjects", () => {
+  assert.deepEqual(
+    prNumbers([
+      "fix(decks): pasted cards match again (#303)",
+      "chore: no PR",
+      'Revert "fix(decks): pasted cards match again (#303)" (#305)',
+      "fix(decks): pasted cards match again (#303)",
+    ]),
+    [303, 305],
+  )
 })

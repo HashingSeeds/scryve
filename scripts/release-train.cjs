@@ -98,6 +98,7 @@ function summarizeGroup(updates) {
     groups: [first.group],
     platforms: updates.map((update) => update.platform),
     updateIds: updates.map((update) => update.id),
+    runtimes: Object.fromEntries(updates.map((update) => [update.platform, update.runtimeVersion])),
   }
 }
 
@@ -117,6 +118,7 @@ function pickRelease(groups, now, soakMs) {
           groups: [...release.groups, ...group.groups],
           platforms: [...release.platforms, ...group.platforms],
           updateIds: [...release.updateIds, ...group.updateIds],
+          runtimes: { ...release.runtimes, ...group.runtimes },
         }
       : group
     releases.set(group.commit, merged)
@@ -163,6 +165,38 @@ async function newIssues(candidate) {
   return response.json()
 }
 
+function prNumbers(subjects) {
+  return [...new Set(subjects.flatMap((subject) => /\(#(\d+)\)$/.exec(subject)?.[1] ?? []))].map(
+    Number,
+  )
+}
+
+function closedIssues(prs) {
+  if (prs.length === 0) return []
+  const fields = prs.map(
+    (pr) =>
+      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { number } } }`,
+  )
+  const query = `{ repository(owner: "HashingSeeds", name: "scryve") { ${fields.join(" ")} } }`
+  const { data } = JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`]))
+  const issues = Object.values(data.repository).flatMap(
+    (pr) => pr?.closingIssuesReferences.nodes.map((issue) => issue.number) ?? [],
+  )
+  return [...new Set(issues)]
+}
+
+function shipFixes(candidate, subjects) {
+  try {
+    const issues = closedIssues(prNumbers(subjects))
+    if (issues.length === 0) return
+    const args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
+    run("pnpm", ["exec", "convex", "run", "feedback:shipFixes", JSON.stringify(args)])
+    console.log(`Marked feedback fixed for ${issues.map((issue) => `#${issue}`).join(", ")}`)
+  } catch (error) {
+    console.warn(`Promoted, but feedback was not marked fixed: ${error.message}`)
+  }
+}
+
 async function promote({ yes, soakMinutes }) {
   git("fetch", "--quiet", "origin", "main")
   if (!refExists("origin/main")) throw new Error("Could not fetch main")
@@ -194,13 +228,13 @@ async function promote({ yes, soakMinutes }) {
   console.log(
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
-  for (const subject of git(
+  const subjects = git(
     "log",
     "--no-merges",
     "--format=%s",
     `${PRODUCTION_REF}..${candidate.commit}`,
-  ).split("\n"))
-    console.log(`  ${subject}`)
+  ).split("\n")
+  for (const subject of subjects) console.log(`  ${subject}`)
 
   const issues = await newIssues(candidate)
   if (issues.length > 0) {
@@ -229,6 +263,7 @@ async function promote({ yes, soakMinutes }) {
   console.log(
     `Promoted ${commit}: the app update is live and Pages is building the production web app.`,
   )
+  shipFixes(candidate, subjects)
 }
 
 async function main() {
@@ -254,4 +289,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { pickRelease, releaseNotes, summarizeGroup }
+module.exports = { pickRelease, prNumbers, releaseNotes, summarizeGroup }

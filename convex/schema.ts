@@ -3,7 +3,7 @@ import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
 import { eventClock, eventPoints, eventTableResult } from "./lib/events/validators"
-import { feedbackKind } from "./lib/feedback"
+import { feedbackFix, feedbackKind } from "./lib/feedback"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { pokemonBoardValidator } from "./lib/table"
@@ -877,11 +877,15 @@ export default defineSchema({
     appVersion: v.optional(v.string()),
     platform: v.optional(v.string()),
     sentryEventId: v.optional(v.string()),
+    runtimeVersion: v.optional(v.string()),
+    issue: v.optional(v.number()),
+    fixedIn: v.optional(feedbackFix),
     unread: v.boolean(),
     updatedAt: v.number(),
   })
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
-    .index("by_user_and_updated_at", ["userId", "updatedAt"]),
+    .index("by_user_and_updated_at", ["userId", "updatedAt"])
+    .index("by_issue", ["issue"]),
 
   feedbackMessages: defineTable({
     requestId: v.id("feedbackRequests"),

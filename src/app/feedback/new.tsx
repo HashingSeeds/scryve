@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Platform } from "react-native"
 import { router, useLocalSearchParams } from "expo-router"
+import * as Updates from "expo-updates"
 import { useMutation } from "convex/react"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -71,6 +72,7 @@ function Suggest({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => vo
         includeAccount: signedIn && includeAccount,
         appVersion: appVersion(),
         platform: Platform.OS,
+        ...(Updates.runtimeVersion ? { runtimeVersion: Updates.runtimeVersion } : {}),
         ...(sentryEventId ? { sentryEventId } : {}),
       })
       if (mounted.current) router.replace(`/feedback/${requestId}`)

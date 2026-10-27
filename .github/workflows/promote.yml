@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: promote
@@ -49,6 +51,8 @@ jobs:
         env:
           APP_VARIANT: production
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
           SENTRY_READ_TOKEN: ${{ secrets.SENTRY_READ_TOKEN }}
           SOAK_MINUTES: ${{ inputs.soak_minutes }}
           PROMOTE: ${{ inputs.promote && '--yes' || '' }}
