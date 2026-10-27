@@ -132,6 +132,7 @@ const board = {
       pokemon: "Tied on prize cards",
       lorcana: "Tied on lore",
       fab: "Tied on life",
+      riftbound: "Tied on points",
     },
     leads: {
       none: "{{name}} leads on life",
@@ -140,6 +141,7 @@ const board = {
       pokemon: "{{name}} leads on prize cards",
       lorcana: "{{name}} leads on lore",
       fab: "{{name}} leads on life",
+      riftbound: "{{name}} leads on points",
     },
   },
   clock: {
@@ -394,6 +396,7 @@ const board = {
       pokemon: "Prize cards",
       lorcana: "lore",
       fab: "life",
+      riftbound: "points",
     },
     openCalculator: "Open calculator for {{identity}}",
   },
@@ -408,6 +411,7 @@ const board = {
         "Tap to change {{identity}}'s Prize cards by {{delta}}. Long press for more controls.",
       lorcana: "Tap to change {{identity}}'s lore by {{delta}}. Long press for more controls.",
       fab: "Tap to change {{identity}}'s life by {{delta}}. Long press for more controls.",
+      riftbound: "Tap to change {{identity}}'s points by {{delta}}. Long press for more controls.",
     },
     moreControls: {
       none: "{{identity}}, more life controls",
@@ -416,6 +420,7 @@ const board = {
       pokemon: "{{identity}}, more Prize cards controls",
       lorcana: "{{identity}}, more lore controls",
       fab: "{{identity}}, more life controls",
+      riftbound: "{{identity}}, more point controls",
     },
   },
   grid: {
@@ -432,6 +437,8 @@ const board = {
       lorcana_other: "{{count}} player lore grid",
       fab_one: "{{count}} player life grid",
       fab_other: "{{count}} player life grid",
+      riftbound_one: "{{count}} player point grid",
+      riftbound_other: "{{count}} player point grid",
     },
   },
   pokemonSheet: {
@@ -518,6 +525,7 @@ const board = {
       pokemon: "{{name}} Prize cards change",
       lorcana: "{{name}} lore change",
       fab: "{{name}} life change",
+      riftbound: "{{name}} point change",
     },
     add: {
       none: "Add {{amount}} life",
@@ -526,6 +534,7 @@ const board = {
       pokemon: "Add {{amount}} Prize cards",
       lorcana: "Add {{amount}} lore",
       fab: "Add {{amount}} life",
+      riftbound: "Add {{amount}} points",
     },
     subtract: {
       none: "Subtract {{amount}} life",
@@ -534,6 +543,7 @@ const board = {
       pokemon: "Subtract {{amount}} Prize cards",
       lorcana: "Subtract {{amount}} lore",
       fab: "Subtract {{amount}} life",
+      riftbound: "Subtract {{amount}} points",
     },
   },
 }

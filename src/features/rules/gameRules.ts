@@ -52,6 +52,10 @@ export const GAME_RULES = {
     revalidate: true,
     tableItemRules: {},
   },
+  riftbound: {
+    kind: "link",
+    pageUrl: "https://playriftbound.com/en-us/news/rules-and-releases/",
+  },
 } satisfies Record<SystemId, GameRules>
 
 export const RULES_TEXT_IN_APP = Platform.OS !== "web"

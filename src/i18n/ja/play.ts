@@ -157,6 +157,7 @@ export default {
       pokemon: "最終サイド",
       lorcana: "最終ロア",
       fab: "最終ライフ",
+      riftbound: "最終ポイント",
     },
     noWinner: "このゲームの勝者は記録されていません。",
     reportPlayer: "プレイヤーを報告またはブロック",
@@ -179,6 +180,7 @@ export default {
         pokemon: "サイドの変化を読み込み中",
         lorcana: "ロアの変化を読み込み中",
         fab: "ライフの変化を読み込み中",
+        riftbound: "ポイントの増減を読み込み中",
       },
       heading: {
         none: "ライフの変化 · {{changes}}",
@@ -187,6 +189,7 @@ export default {
         pokemon: "サイドの変化 · {{changes}}",
         lorcana: "ロアの変化 · {{changes}}",
         fab: "ライフの変化 · {{changes}}",
+        riftbound: "ポイントの増減 · {{changes}}",
       },
       noChanges: {
         none: "ライフの変化は記録されていません。",
@@ -195,6 +198,7 @@ export default {
         pokemon: "サイドの変化は記録されていません。",
         lorcana: "ロアの変化は記録されていません。",
         fab: "ライフの変化は記録されていません。",
+        riftbound: "ポイントの増減は記録されていません。",
       },
       loadFailed: {
         none: "ライフの変化を読み込めませんでした。",
@@ -203,6 +207,7 @@ export default {
         pokemon: "サイドの変化を読み込めませんでした。",
         lorcana: "ロアの変化を読み込めませんでした。",
         fab: "ライフの変化を読み込めませんでした。",
+        riftbound: "ポイントの増減を読み込めませんでした。",
       },
       detailsUnavailable: {
         none: "ライフ変動の詳細は利用できません。",
@@ -211,6 +216,7 @@ export default {
         pokemon: "サイド変動の詳細は利用できません。",
         lorcana: "ロア変動の詳細は利用できません。",
         fab: "ライフ変動の詳細は利用できません。",
+        riftbound: "ポイント増減の詳細は利用できません。",
       },
       noDetails: {
         none: "ライフ変動の詳細が見つかりませんでした。",
@@ -219,6 +225,7 @@ export default {
         pokemon: "サイド変動の詳細が見つかりませんでした。",
         lorcana: "ロア変動の詳細が見つかりませんでした。",
         fab: "ライフ変動の詳細が見つかりませんでした。",
+        riftbound: "ポイント増減の詳細が見つかりませんでした。",
       },
     },
   },

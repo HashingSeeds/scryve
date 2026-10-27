@@ -317,6 +317,11 @@ export default {
     snow: "mana neigeux",
     either: "{{first}} ou {{second}}",
     orLife: "{{mana}} ou 2 points de vie",
+    energyAmount: "{{amount}} énergie",
+    might: "Puissance",
+    exhaust: "épuiser",
+    domainPower: "puissance {{domain}}",
+    anyPower: "puissance de n'importe quel domaine",
   },
   cardRow: {
     remove: "Retirer {{card}}",
@@ -610,6 +615,8 @@ export default {
       'Utilisez des lignes comme "1 Sol Ring". Les titres Commander, Mainboard et Sideboard sont pris en charge.',
     listHelperLorcana: 'Utilisez des lignes comme "4 Aladdin - Heroic Outlaw".',
     listHelperFab: 'Collez une liste de cartes Fabrary ou des lignes comme "3x Snatch (red)".',
+    listHelperRiftbound:
+      "Utilisez des lignes comme « 3 Pouty Poro » sous des titres comme Legend, Main Deck, Battlefields et Runes.",
     returnToReview: "Retour à la vérification",
     loadingDeck: "Chargement du deck…",
     reloadSource: "Recharger la source",

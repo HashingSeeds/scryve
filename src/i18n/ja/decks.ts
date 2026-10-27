@@ -286,6 +286,11 @@ export default {
     snow: "氷雪マナ",
     either: "{{first}}または{{second}}",
     orLife: "{{mana}}または2ライフ",
+    energyAmount: "エネルギー{{amount}}",
+    might: "パワー",
+    exhaust: "疲労",
+    domainPower: "{{domain}}パワー",
+    anyPower: "任意のドメインのパワー",
   },
   cardRow: {
     remove: "{{card}}を削除",
@@ -561,6 +566,8 @@ export default {
       "「1 Sol Ring」のような行を使います。Commander、Mainboard、Sideboardの見出しに対応しています。",
     listHelperLorcana: "「4 Aladdin - Heroic Outlaw」のような行を使ってください。",
     listHelperFab: "Fabraryのカードリストか「3x Snatch (red)」のような行を貼り付けてください。",
+    listHelperRiftbound:
+      "「3 Pouty Poro」のように、レジェンド、メインデッキ、バトルフィールド、ルーンなどの見出しの下に1行ずつ入力してください。",
     returnToReview: "確認に戻る",
     loadingDeck: "デッキを読み込み中…",
     reloadSource: "ソースを再読み込み",

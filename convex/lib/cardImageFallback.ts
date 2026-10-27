@@ -32,6 +32,7 @@ const catalogImageCandidates = {
   "scryfall": scryfallImageCandidates,
   "lorcanajson": syncedImageCandidates,
   "fab-cube": syncedImageCandidates,
+  "rifthunt": syncedImageCandidates,
 } satisfies Record<
   CatalogProvider,
   (ctx: ActionCtx, cardId: string, game: SystemId) => Promise<string[]>

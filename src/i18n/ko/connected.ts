@@ -280,6 +280,7 @@ export default {
         pokemon: "프라이즈 {{delta}} 변경을 동기화하지 못했습니다",
         lorcana: "로어 {{delta}} 변경을 동기화하지 못했습니다",
         fab: "생명점 {{delta}} 변경을 동기화하지 못했습니다",
+        riftbound: "{{delta}}점 변경 사항을 동기화하지 못했습니다",
       },
       commanderDamage: "커맨더 피해 {{delta}} 지정을 동기화하지 못했습니다",
       table: "테이블 변경을 동기화하지 못했습니다",

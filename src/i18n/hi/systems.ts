@@ -10,6 +10,7 @@ export default {
     pokemon: "प्राइज़ कार्ड",
     lorcana: "लोर",
     fab: "लाइफ़",
+    riftbound: "पॉइंट",
   },
   counterLabel: {
     none: "लाइफ़",
@@ -18,6 +19,7 @@ export default {
     pokemon: "प्राइज़ कार्ड",
     lorcana: "लोर",
     fab: "लाइफ़",
+    riftbound: "पॉइंट",
   },
   startingValueRange: {
     none: "शुरुआती लाइफ़ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
@@ -26,6 +28,7 @@ export default {
     pokemon: "शुरुआती प्राइज़ कार्ड 1 से {{max}} के बीच की पूर्ण संख्या होने चाहिए।",
     lorcana: "शुरुआती लोर 0 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
     fab: "शुरुआती लाइफ़ 1 से {{max}} के बीच की पूर्ण संख्या होनी चाहिए।",
+    riftbound: "शुरुआती पॉइंट 0 से {{max}} तक की पूर्ण संख्या होने चाहिए।",
   },
   tableItem: {
     poison: "पॉइज़न",
@@ -43,12 +46,17 @@ export default {
     side: "साइड डेक",
     hero: "हीरो",
     arena: "एरीना",
+    legend: "लेजेंड",
+    champion: "चुना हुआ चैंपियन",
+    battlefields: "बैटलफ़ील्ड",
+    runes: "रून डेक",
     main: {
       mtg: "मेन डेक",
       ygo: "मेन डेक",
       pokemon: "डेक",
       lorcana: "डेक",
       fab: "डेक",
+      riftbound: "मेन डेक",
     },
   },
   formatBlurb: {
@@ -71,6 +79,9 @@ export default {
       ll: "लेजेंड की अनुमति",
       upf: "मल्टीप्लेयर",
     },
+    riftbound: {
+      constructed: "40 कार्ड, 3 कॉपी",
+    },
   },
   counterValue: {
     none_one: "{{count}} लाइफ़",
@@ -85,6 +96,8 @@ export default {
     lorcana_other: "{{count}} लोर",
     fab_one: "{{count}} लाइफ़",
     fab_other: "{{count}} लाइफ़",
+    riftbound_one: "{{count}} पॉइंट",
+    riftbound_other: "{{count}} पॉइंट",
   },
   counterChange: {
     none_one: "{{count}} लाइफ़ बदलाव",
@@ -99,6 +112,8 @@ export default {
     lorcana_other: "{{count}} लोर बदलाव",
     fab_one: "{{count}} लाइफ़ बदलाव",
     fab_other: "{{count}} लाइफ़ बदलाव",
+    riftbound_one: "{{count}} पॉइंट बदलाव",
+    riftbound_other: "{{count}} पॉइंट बदलाव",
   },
   noneTaken: "अभी तक कोई प्राइज़ कार्ड नहीं लिया",
   taken: "{{amount}} प्राइज़ कार्ड लिए",

@@ -292,6 +292,11 @@ export default {
     snow: "स्नो मैना",
     either: "{{first}} या {{second}}",
     orLife: "{{mana}} या 2 लाइफ़",
+    energyAmount: "{{amount}} एनर्जी",
+    might: "माइट",
+    exhaust: "एग्ज़ॉस्ट",
+    domainPower: "{{domain}} पावर",
+    anyPower: "किसी भी डोमेन की पावर",
   },
   cardRow: {
     remove: "{{card}} हटाएँ",
@@ -568,6 +573,8 @@ export default {
       '"1 Sol Ring" जैसी लाइनें इस्तेमाल करें। Commander, Mainboard और Sideboard हेडिंग समर्थित हैं।',
     listHelperLorcana: '"4 Aladdin - Heroic Outlaw" जैसी पंक्तियाँ इस्तेमाल करें।',
     listHelperFab: 'Fabrary कार्ड लिस्ट या "3x Snatch (red)" जैसी पंक्तियाँ पेस्ट करें।',
+    listHelperRiftbound:
+      'Legend, Main Deck, Battlefields और Runes जैसे शीर्षकों के नीचे "3 Pouty Poro" जैसी पंक्तियाँ लिखें।',
     returnToReview: "समीक्षा पर लौटें",
     loadingDeck: "डेक लोड हो रहा है…",
     reloadSource: "स्रोत फिर लोड करें",

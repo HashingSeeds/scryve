@@ -165,6 +165,7 @@ export default {
       pokemon: "Cartas de Premio finales",
       lorcana: "Leyenda final",
       fab: "Vidas finales",
+      riftbound: "Puntos finales",
     },
     noWinner: "No se registró ningún ganador en esta partida.",
     reportPlayer: "Denunciar o bloquear a un jugador",
@@ -187,6 +188,7 @@ export default {
         pokemon: "Cargando cambios de cartas de Premio",
         lorcana: "Cargando cambios de leyenda",
         fab: "Cargando cambios de vidas",
+        riftbound: "Cargando cambios de puntos",
       },
       heading: {
         none: "Cambios de vidas · {{changes}}",
@@ -195,6 +197,7 @@ export default {
         pokemon: "Cambios de cartas de Premio · {{changes}}",
         lorcana: "Cambios de leyenda · {{changes}}",
         fab: "Cambios de vidas · {{changes}}",
+        riftbound: "Cambios de puntos · {{changes}}",
       },
       noChanges: {
         none: "No se registraron cambios de vidas.",
@@ -203,6 +206,7 @@ export default {
         pokemon: "No se registraron cambios de cartas de Premio.",
         lorcana: "No se registraron cambios de leyenda.",
         fab: "No se registraron cambios de vidas.",
+        riftbound: "No se registraron cambios de puntos.",
       },
       loadFailed: {
         none: "No se pudieron cargar los cambios de vidas.",
@@ -211,6 +215,7 @@ export default {
         pokemon: "No se pudieron cargar los cambios de cartas de Premio.",
         lorcana: "No se pudieron cargar los cambios de leyenda.",
         fab: "No se pudieron cargar los cambios de vidas.",
+        riftbound: "No se pudieron cargar los cambios de puntos.",
       },
       detailsUnavailable: {
         none: "Los detalles de los cambios de vidas no están disponibles.",
@@ -219,6 +224,7 @@ export default {
         pokemon: "Los detalles de los cambios de cartas de Premio no están disponibles.",
         lorcana: "Los detalles de los cambios de leyenda no están disponibles.",
         fab: "Los detalles de los cambios de vidas no están disponibles.",
+        riftbound: "Los detalles de los cambios de puntos no están disponibles.",
       },
       noDetails: {
         none: "No se encontraron detalles de los cambios de vidas.",
@@ -227,6 +233,7 @@ export default {
         pokemon: "No se encontraron detalles de los cambios de cartas de Premio.",
         lorcana: "No se encontraron detalles de los cambios de leyenda.",
         fab: "No se encontraron detalles de los cambios de vidas.",
+        riftbound: "No se encontraron detalles de los cambios de puntos.",
       },
     },
   },

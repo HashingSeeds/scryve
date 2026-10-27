@@ -310,6 +310,11 @@ export default {
     snow: "maná de nieve",
     either: "{{first}} o {{second}}",
     orLife: "{{mana}} o 2 vidas",
+    energyAmount: "Energía: {{amount}}",
+    might: "Poder",
+    exhaust: "agotar",
+    domainPower: "poder de {{domain}}",
+    anyPower: "poder de cualquier dominio",
   },
   cardRow: {
     remove: "Quitar {{card}}",
@@ -602,6 +607,8 @@ export default {
       'Usa líneas como "1 Sol Ring". Se admiten los encabezados Commander, Mainboard y Sideboard.',
     listHelperLorcana: 'Usa líneas como "4 Aladdin - Heroic Outlaw".',
     listHelperFab: 'Pega una lista de cartas de Fabrary o líneas como "3x Snatch (red)".',
+    listHelperRiftbound:
+      'Usa líneas como "3 Pouty Poro" bajo encabezados como Legend, Main Deck, Battlefields y Runes.',
     returnToReview: "Volver a la revisión",
     loadingDeck: "Cargando mazo…",
     reloadSource: "Recargar origen",

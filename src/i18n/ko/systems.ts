@@ -10,6 +10,7 @@ export default {
     pokemon: "프라이즈",
     lorcana: "로어",
     fab: "생명점",
+    riftbound: "점수",
   },
   counterLabel: {
     none: "생명점",
@@ -18,6 +19,7 @@ export default {
     pokemon: "프라이즈",
     lorcana: "로어",
     fab: "생명점",
+    riftbound: "점",
   },
   startingValueRange: {
     none: "시작 생명점은 1에서 {{max}} 사이의 정수여야 합니다.",
@@ -26,6 +28,7 @@ export default {
     pokemon: "시작 프라이즈는 1에서 {{max}} 사이의 정수여야 합니다.",
     lorcana: "시작 로어는 0에서 {{max}} 사이의 정수여야 합니다.",
     fab: "시작 생명점은 1에서 {{max}} 사이의 정수여야 합니다.",
+    riftbound: "시작 점수는 0에서 {{max}} 사이의 정수여야 합니다.",
   },
   tableItem: {
     poison: "독",
@@ -43,12 +46,17 @@ export default {
     side: "사이드 덱",
     hero: "영웅",
     arena: "아레나",
+    legend: "레전드",
+    champion: "선택된 챔피언",
+    battlefields: "배틀필드",
+    runes: "룬 덱",
     main: {
       mtg: "메인 덱",
       ygo: "메인 덱",
       pokemon: "덱",
       lorcana: "덱",
       fab: "덱",
+      riftbound: "메인 덱",
     },
   },
   formatBlurb: {
@@ -71,6 +79,9 @@ export default {
       ll: "레전드 허용",
       upf: "멀티플레이",
     },
+    riftbound: {
+      constructed: "카드 40장, 같은 카드 3장까지",
+    },
   },
   counterValue: {
     none_other: "생명 {{count}}점",
@@ -79,6 +90,7 @@ export default {
     pokemon_other: "프라이즈 {{count}}장",
     lorcana_other: "로어 {{count}}",
     fab_other: "생명 {{count}}점",
+    riftbound_other: "{{count}}점",
   },
   counterChange: {
     none_other: "생명점 변경 {{count}}회",
@@ -87,6 +99,7 @@ export default {
     pokemon_other: "프라이즈 변경 {{count}}회",
     lorcana_other: "로어 변경 {{count}}회",
     fab_other: "생명점 변경 {{count}}회",
+    riftbound_other: "{{count}}점 변경",
   },
   noneTaken: "가져간 프라이즈 없음",
   taken: "프라이즈 {{amount}}장 가져감",

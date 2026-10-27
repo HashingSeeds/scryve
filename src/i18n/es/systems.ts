@@ -10,6 +10,7 @@ export default {
     pokemon: "Cartas de Premio",
     lorcana: "Leyenda",
     fab: "Vidas",
+    riftbound: "Puntos",
   },
   counterLabel: {
     none: "vidas",
@@ -18,6 +19,7 @@ export default {
     pokemon: "cartas de Premio",
     lorcana: "puntos de leyenda",
     fab: "vidas",
+    riftbound: "puntos",
   },
   startingValueRange: {
     none: "Las vidas iniciales deben ser un número entero de 1 a {{max}}.",
@@ -26,6 +28,7 @@ export default {
     pokemon: "Las cartas de Premio iniciales deben ser un número entero de 1 a {{max}}.",
     lorcana: "Los puntos de leyenda iniciales deben ser un número entero de 0 a {{max}}.",
     fab: "Las vidas iniciales deben ser un número entero de 1 a {{max}}.",
+    riftbound: "Los puntos iniciales deben ser un número entero de 0 a {{max}}.",
   },
   tableItem: {
     poison: "Veneno",
@@ -43,12 +46,17 @@ export default {
     side: "Side Deck",
     hero: "Héroe",
     arena: "Arena",
+    legend: "Leyenda",
+    champion: "Campeón elegido",
+    battlefields: "Campos de batalla",
+    runes: "Mazo de runas",
     main: {
       mtg: "Mazo principal",
       ygo: "Deck Principal",
       pokemon: "Mazo",
       lorcana: "Mazo",
       fab: "Mazo",
+      riftbound: "Mazo principal",
     },
   },
   formatBlurb: {
@@ -71,6 +79,9 @@ export default {
       ll: "Leyendas permitidas",
       upf: "Multijugador",
     },
+    riftbound: {
+      constructed: "40 cartas, 3 copias",
+    },
   },
   counterValue: {
     none_one: "{{count}} vida",
@@ -91,6 +102,9 @@ export default {
     fab_one: "{{count}} vida",
     fab_many: "{{count}} de vidas",
     fab_other: "{{count}} vidas",
+    riftbound_one: "{{count}} punto",
+    riftbound_many: "{{count}} de puntos",
+    riftbound_other: "{{count}} puntos",
   },
   counterChange: {
     none_one: "{{count}} cambio de vidas",
@@ -111,6 +125,9 @@ export default {
     fab_one: "{{count}} cambio de vidas",
     fab_many: "{{count}} de cambios de vidas",
     fab_other: "{{count}} cambios de vidas",
+    riftbound_one: "{{count}} cambio de puntos",
+    riftbound_many: "{{count}} de cambios de puntos",
+    riftbound_other: "{{count}} cambios de puntos",
   },
   noneTaken: "ninguna carta de Premio tomada",
   taken: "{{amount}} cartas de Premio tomadas",

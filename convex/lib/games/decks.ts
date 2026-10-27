@@ -2,6 +2,8 @@ import type { ActionCtx } from "../../_generated/server"
 import type { DeckSource } from "../deckSources"
 import type { NormalizedCard, ProviderCards } from "./cards"
 
+export type SectionCard = Pick<NormalizedCard, "category" | "facets">
+
 export const MAX_FEED_DECKS = 20
 export const FEED_REQUEST_TIMEOUT_MS = 10_000
 
@@ -38,7 +40,7 @@ export type DeckListRules = {
   readonly printingLookup?: (
     entry: DeckListEntry,
   ) => ((ctx: ActionCtx, includeImages: boolean) => ProviderCards) | undefined
-  readonly defaultSection?: (card: NormalizedCard) => string
+  readonly defaultSection?: (card: SectionCard) => string
 }
 
 export type LinkedDeck = {

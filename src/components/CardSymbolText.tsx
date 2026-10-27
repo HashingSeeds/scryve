@@ -75,6 +75,47 @@ function fabSymbol(token: string): CardSymbol | undefined {
   return symbol && { art: symbol.art, label: translate(symbol.label) }
 }
 
+const RIFTBOUND_DOMAINS: Partial<Record<string, CoinArt>> = {
+  fury: { kind: "coin", fill: "#E5604A", icon: "flame" },
+  calm: { kind: "coin", fill: "#5FB97A", icon: "leaf" },
+  mind: { kind: "coin", fill: "#6FA8DC", icon: "brain" },
+  body: { kind: "coin", fill: "#E89A3C", icon: "shield" },
+  chaos: { kind: "coin", fill: "#A07AD1", icon: "zap" },
+  order: { kind: "coin", fill: "#F2C94C", icon: "sun" },
+}
+
+function riftboundSymbol(token: string): CardSymbol | undefined {
+  if (/^\d+$/.test(token))
+    return {
+      art: { kind: "coin", fill: GENERIC_FILL, text: token },
+      label: translate("decks:cardSymbols.energyAmount", { amount: token }),
+    }
+  if (token === "might")
+    return {
+      art: { kind: "line", icon: "sword", color: "#E8743B" },
+      label: translate("decks:cardSymbols.might"),
+    }
+  if (token === "exhaust")
+    return {
+      art: { kind: "coin", fill: TAP_FILL, icon: "redo" },
+      label: translate("decks:cardSymbols.exhaust"),
+    }
+  if (token === "rainbow")
+    return {
+      art: { kind: "coin", fill: GENERIC_FILL, icon: "diamond" },
+      label: translate("decks:cardSymbols.anyPower"),
+    }
+  const domain = RIFTBOUND_DOMAINS[token]
+  return (
+    domain && {
+      art: domain,
+      label: translate("decks:cardSymbols.domainPower", {
+        domain: token[0].toUpperCase() + token.slice(1),
+      }),
+    }
+  )
+}
+
 function magicMana(part: string): { art: CoinArt; label: string } | undefined {
   if (/^(\d+|X|Y|Z)$/.test(part)) {
     return {
@@ -110,6 +151,7 @@ function magicSymbol(token: string): CardSymbol | undefined {
 const SYMBOL_READERS: Partial<Record<SystemId, (token: string) => CardSymbol | undefined>> = {
   fab: fabSymbol,
   mtg: magicSymbol,
+  riftbound: riftboundSymbol,
 }
 
 const TOKEN = /(\{[^}]+\})/

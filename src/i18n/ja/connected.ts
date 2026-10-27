@@ -285,6 +285,7 @@ export default {
         pokemon: "{{delta}}のサイドの変更を同期できませんでした",
         lorcana: "{{delta}}のロアの変更を同期できませんでした",
         fab: "{{delta}}のライフの変更を同期できませんでした",
+        riftbound: "{{delta}}ポイントの変更を同期できませんでした",
       },
       commanderDamage: "{{delta}}の統率者ダメージの割り当てを同期できませんでした",
       table: "テーブルの変更を同期できませんでした",

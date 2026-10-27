@@ -21,6 +21,7 @@ import {
   type DeckListEntry,
   type DeckListRules,
   type ParsedDeckList,
+  type SectionCard,
 } from "./lib/games/decks"
 import { GAME_PROVIDERS, type ProviderGame } from "./lib/games/providers"
 import { assertGameSystem, integrationFor, type GameSystemId } from "./lib/integrations"
@@ -185,6 +186,11 @@ export function parseGenericDeckList(list: string, game: ProviderGame): ParsedDe
   return { entries: [...entries.values()], invalidLines }
 }
 
+function entrySection(game: ProviderGame, card: SectionCard, entry: DeckListEntry) {
+  const defaultSection = GAME_PROVIDERS[game].deckList.defaultSection
+  return entry.sectionExplicit || !defaultSection ? entry.section : defaultSection(card)
+}
+
 function genericDeckCard(
   game: ProviderGame,
   card: NormalizedCard,
@@ -194,15 +200,13 @@ function genericDeckCard(
     card.printings.find((candidate) => candidate.printingId === entry.providerCardId) ??
     card.printings[0]
   const face = printing?.faces[0]
-  const defaultSection = GAME_PROVIDERS[game].deckList.defaultSection
-  const section = entry.sectionExplicit || !defaultSection ? entry.section : defaultSection(card)
   return {
     game,
     identityNamespace: card.identityNamespace,
     cardId: card.cardId,
     providerCardId: printing?.providerCardId,
     printingId: printing?.printingId,
-    section,
+    section: entrySection(game, card, entry),
     entryKind: "card",
     originalReference: entry.originalReference,
     ...(card.category ? { category: card.category } : {}),
@@ -224,7 +228,7 @@ function cachedGenericDeckCard(
     cardId: card.cardId,
     providerCardId: card.providerCardId,
     printingId: card.printingId,
-    section: entry.section,
+    section: entrySection(game, card, entry),
     entryKind: "card",
     originalReference: entry.originalReference,
     ...(card.category ? { category: card.category } : {}),

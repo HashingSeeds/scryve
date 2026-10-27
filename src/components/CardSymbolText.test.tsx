@@ -22,6 +22,12 @@ describe("spokenCardText", () => {
     )
   })
 
+  it("reads Riftbound energy, power, Might, and exhaust", () => {
+    expect(spokenCardText("riftbound", "{exhaust}, {2}{fury}{rainbow}: +1 {might}")).toBe(
+      "exhaust, 2 energy Fury power power of any domain: +1 Might",
+    )
+  })
+
   it("leaves unknown tokens and other systems' text as printed", () => {
     expect(spokenCardText("mtg", "{CHAOS}: Add {H}.")).toBe("{CHAOS}: Add {H}.")
     expect(spokenCardText("ygo", "{T}: Add {G}.")).toBe("{T}: Add {G}.")

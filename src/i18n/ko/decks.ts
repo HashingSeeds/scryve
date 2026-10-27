@@ -282,6 +282,11 @@ export default {
     snow: "눈 마나",
     either: "{{first}} 또는 {{second}}",
     orLife: "{{mana}} 또는 생명 2점",
+    energyAmount: "에너지 {{amount}}",
+    might: "마이트",
+    exhaust: "소진",
+    domainPower: "{{domain}} 파워",
+    anyPower: "모든 도메인의 파워",
   },
   cardRow: {
     remove: "{{card}} 제거",
@@ -551,6 +556,8 @@ export default {
       '"1 Sol Ring"과 같은 줄을 사용하세요. Commander, Mainboard, Sideboard 제목을 지원합니다.',
     listHelperLorcana: '"4 Aladdin - Heroic Outlaw" 같은 줄을 사용하세요.',
     listHelperFab: 'Fabrary 카드 목록 또는 "3x Snatch (red)" 같은 줄을 붙여넣으세요.',
+    listHelperRiftbound:
+      '전설, 메인 덱, 전장, 룬 같은 제목 아래에 "3 Pouty Poro"처럼 줄을 입력하세요.',
     returnToReview: "검토로 돌아가기",
     loadingDeck: "덱 불러오는 중…",
     reloadSource: "소스 다시 불러오기",

@@ -66,6 +66,7 @@ import type * as lib_games_lorcana from "../lib/games/lorcana.js";
 import type * as lib_games_magic from "../lib/games/magic.js";
 import type * as lib_games_pokemon from "../lib/games/pokemon.js";
 import type * as lib_games_providers from "../lib/games/providers.js";
+import type * as lib_games_riftbound from "../lib/games/riftbound.js";
 import type * as lib_games_yugioh from "../lib/games/yugioh.js";
 import type * as lib_games_yugiohDecks from "../lib/games/yugiohDecks.js";
 import type * as lib_integrations from "../lib/integrations.js";
@@ -160,6 +161,7 @@ declare const fullApi: ApiFromModules<{
   "lib/games/magic": typeof lib_games_magic;
   "lib/games/pokemon": typeof lib_games_pokemon;
   "lib/games/providers": typeof lib_games_providers;
+  "lib/games/riftbound": typeof lib_games_riftbound;
   "lib/games/yugioh": typeof lib_games_yugioh;
   "lib/games/yugiohDecks": typeof lib_games_yugiohDecks;
   "lib/integrations": typeof lib_integrations;

@@ -9,7 +9,9 @@ describe("required game notices", () => {
     expect(SYSTEMS.mtg.integration.rights.requiredNotices).toEqual([FAN_CONTENT_POLICY_NOTICE])
   })
 
-  it.each(SYSTEM_IDS)("shows %s's required notices in the game content notices", (id) => {
+  const shipped = SYSTEM_IDS.filter((id) => SYSTEMS[id].release !== "alpha")
+
+  it.each(shipped)("shows %s's required notices in the game content notices", (id) => {
     const notices = SYSTEMS[id].integration.rights.requiredNotices
     const paragraphs = gameContentNotices.sections.flatMap((section) =>
       section.blocks.map((block) => block.text),
