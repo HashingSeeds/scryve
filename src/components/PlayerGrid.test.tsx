@@ -1,7 +1,8 @@
 import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
-import { asPlayerId } from "@/features/game/domain"
+import * as seatCommander from "@/features/decks/seatCommander"
+import { asPlayerId, PARTNER_COMMANDER } from "@/features/game/domain"
 import { swapSeats } from "@/features/game/playerLayouts"
 import { playSystemRules, playTableRules } from "@/features/game/playSystems"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
@@ -240,6 +241,54 @@ describe("PlayerGrid", () => {
     act(() => swordAt()())
     expect(first).not.toHaveBeenCalled()
     expect(latest).toHaveBeenCalledWith(gamePlayers[0])
+  })
+
+  it("deals each partner's power to its own total on one tap and leaves a benched partner out", () => {
+    const partners = jest.spyOn(seatCommander, "useSeatCommanders").mockReturnValue([
+      { name: "Tymna", power: 2 },
+      { name: "Kraum", power: 4 },
+    ])
+    try {
+      const gamePlayers = players(2)
+      const onStage = jest.fn()
+      const grid = (singleCommander?: boolean) => (
+        <ThemeProvider>
+          <PlayerGrid
+            players={gamePlayers}
+            commanderDamage={{
+              incomingFor: () => ({}),
+              lethal: 21,
+              armedPlayerId: gamePlayers[0].id,
+              singleCommander,
+              onPressSword: jest.fn(),
+              onStage,
+            }}
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>
+      )
+      const view = render(grid())
+      expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("2")
+      expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("4")
+
+      fireEvent.press(view.getByTestId("commander-hit-seat-2"))
+      expect(onStage.mock.calls).toEqual([
+        [gamePlayers[1], 2, undefined],
+        [gamePlayers[1], 4, PARTNER_COMMANDER],
+      ])
+
+      onStage.mockClear()
+      fireEvent.press(view.getByTestId("commander-toggle-seat-1"))
+      fireEvent.press(view.getByTestId("commander-toggle-seat-1-partner"))
+      fireEvent.press(view.getByTestId("commander-hit-seat-2"))
+      expect(onStage.mock.calls).toEqual([[gamePlayers[1], 4, PARTNER_COMMANDER]])
+
+      view.rerender(grid(true))
+      expect(view.queryByTestId("commander-power-seat-1-partner")).toBeNull()
+      expect(view.queryByTestId("commander-badge-seat-2-partner")).toBeNull()
+    } finally {
+      partners.mockRestore()
+    }
   })
 
   it("pulses the targets until the attacker hits one, then pulses the attacker's mark to finish", () => {

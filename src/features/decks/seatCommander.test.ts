@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react-native"
 
 import { readCardDetail } from "./cardDetailsCache"
-import { printedPower, seatCommander, useSeatCommander } from "./seatCommander"
+import { printedPower, seatCommanders, useSeatCommanders } from "./seatCommander"
 
 const mockAction = jest.fn()
 jest.mock("convex/react", () => ({ useConvex: () => ({ action: mockAction }) }))
@@ -21,21 +21,35 @@ it.each([
   expect(printedPower(power)).toBe(expected)
 })
 
+const krenko = {
+  name: "Krenko, Mob Boss",
+  board: "commander" as const,
+  scryfallId: "krenko",
+  quantity: 1,
+}
+
 it("names and powers a deck's only commander", () => {
-  const krenko = {
-    name: "Krenko, Mob Boss",
-    board: "commander" as const,
-    scryfallId: "krenko",
-    quantity: 1,
-  }
   expect(
-    seatCommander([krenko, { name: "Sol Ring", quantity: 1 }], () => ({ power: "3" })),
-  ).toMatchObject({ name: "Krenko", power: 3 })
+    seatCommanders([krenko, { name: "Sol Ring", quantity: 1 }], () => ({ power: "3" })),
+  ).toMatchObject([{ name: "Krenko", power: 3 }])
+})
+
+it("attacks with both partners but never with a Background", () => {
+  const tymna = { ...krenko, name: "Tymna the Weaver", scryfallId: "tymna" }
   expect(
-    seatCommander([krenko, { ...krenko, name: "Tymna the Weaver", scryfallId: "tymna" }], () => ({
-      power: "2",
-    })),
-  ).toEqual({})
+    seatCommanders([krenko, tymna], (card) => ({ power: card === tymna ? "2" : "3" })),
+  ).toMatchObject([
+    { name: "Krenko", power: 3 },
+    { name: "Tymna", power: 2 },
+  ])
+  const background = { ...krenko, name: "Raised by Giants", scryfallId: "giants" }
+  expect(
+    seatCommanders([krenko, background], (card) =>
+      card === background
+        ? { typeLine: "Legendary Enchantment — Background" }
+        : { power: "3", typeLine: "Legendary Creature — Goblin Warrior" },
+    ),
+  ).toMatchObject([{ name: "Krenko", power: 3 }])
 })
 
 it("defaults to the commander's printed power and keeps its full details cached", async () => {
@@ -46,9 +60,9 @@ it("defaults to the commander's printed power and keeps its full details cached"
     imageUrl: "https://cards.example/krenko.jpg",
     power: "3",
   })
-  const { result } = renderHook(() => useSeatCommander({ ownerId: "owner", versionId: "v1" }))
+  const { result } = renderHook(() => useSeatCommanders({ ownerId: "owner", versionId: "v1" }))
 
-  await waitFor(() => expect(result.current).toEqual({ name: "Krenko", power: 3 }))
+  await waitFor(() => expect(result.current).toEqual([{ name: "Krenko", power: 3 }]))
   expect(mockAction).toHaveBeenCalledTimes(1)
   expect(readCardDetail("krenko-id")).toMatchObject({
     imageUrl: "https://cards.example/krenko.jpg",

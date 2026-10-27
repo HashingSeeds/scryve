@@ -1,6 +1,11 @@
-import { localTableRules, matchScoreAfter } from "@/features/game/domain"
+import {
+  commanderDamageBetween,
+  COMMANDER_SLOTS,
+  localTableRules,
+  matchScoreAfter,
+} from "@/features/game/domain"
 import { NO_PLAY_SYSTEM, supportsCommanderDamage } from "@/features/game/playSystems"
-import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/types"
+import type { CommanderSlot, LocalGame, LocalGameSummary, PlayerId } from "@/features/game/types"
 
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_SNAPSHOT_LIFE } from "../../../convex/lib/gameRules"
@@ -105,7 +110,12 @@ export interface LocalGameSnapshot {
     shape?: string
     currentLife: number
   }[]
-  commanderTotals?: { fromSeat: number; toSeat: number; total: number }[]
+  commanderTotals?: {
+    fromSeat: number
+    toSeat: number
+    commander?: CommanderSlot
+    total: number
+  }[]
   table?: TableState
   layout?: PlayerGridLayoutVariant
 }
@@ -124,15 +134,17 @@ export interface LocalGameSnapshotInput {
 /** Commander totals are only accepted for Commander games, matching the server. */
 function commanderTotalsFor(game: LocalGame, seatsByPlayerId: Map<PlayerId, number>) {
   if (!game.commanderDamage || !supportsCommanderDamage(game.system, game.format)) return undefined
-  const totals: { fromSeat: number; toSeat: number; total: number }[] = []
-  for (const [key, total] of Object.entries(game.commanderDamage)) {
-    if (total <= 0) continue
-    const [fromPlayerId, toPlayerId] = key.split(">") as [PlayerId, PlayerId]
-    const fromSeat = seatsByPlayerId.get(fromPlayerId)
-    const toSeat = seatsByPlayerId.get(toPlayerId)
-    if (fromSeat === undefined || toSeat === undefined || fromSeat === toSeat) continue
-    totals.push({ fromSeat, toSeat, total })
-  }
+  const seats = [...seatsByPlayerId]
+  const totals = seats.flatMap(([fromPlayerId, fromSeat]) =>
+    seats.flatMap(([toPlayerId, toSeat]) =>
+      COMMANDER_SLOTS.flatMap((commander) => {
+        const total = commanderDamageBetween(game, fromPlayerId, toPlayerId, commander)
+        return fromSeat === toSeat || total <= 0
+          ? []
+          : [{ fromSeat, toSeat, ...(commander ? { commander } : {}), total }]
+      }),
+    ),
+  )
   return totals.length > 0 ? totals : undefined
 }
 

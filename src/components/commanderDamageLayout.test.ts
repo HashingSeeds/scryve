@@ -81,8 +81,8 @@ describe("commander damage board layout", () => {
       badgeSize: 46,
       reach: { x: 0, y: -424, radius: 900 },
     })
-    expect(takeover.badge.x).toBeCloseTo(0)
-    expect(takeover.badge.y).toBeCloseTo(-(takeover.disc + 23 + 6))
+    expect(takeover.badges[0].x).toBeCloseTo(0)
+    expect(takeover.badges[0].y).toBeCloseTo(-(takeover.disc + 23 + 6))
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
     expect(takeover.flood).toEqual({ x: 195, y: -214, radius: 900 })
@@ -97,13 +97,16 @@ describe("commander damage board layout", () => {
       badgeSize: 46,
       reach: { x: 0, y: -424, radius: 900 },
     })
-    expect(takeover.badge.x).toBeCloseTo(-takeover.badge.distance)
+    expect(takeover.badges[0].x).toBeCloseTo(-takeover.badges[0].distance)
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
   })
 
   it("slides the badge around the disc when the attacker sits across a narrow card", () => {
-    const { badge, knock } = commanderTakeover({
+    const {
+      badges: [badge],
+      knock,
+    } = commanderTakeover({
       card: { width: 193, height: 420 },
       rotation: -90,
       lifeFontSize: 104,
@@ -117,5 +120,28 @@ describe("commander damage board layout", () => {
     expect(Math.hypot(badge.x, badge.y)).toBeCloseTo(badge.distance)
     expect(outward.y).toBeLessThan(0)
     expect(Math.hypot(knock.x, knock.y)).toBeCloseTo(1)
+  })
+
+  it("sets a partner's badge beside the first, both outside the ring, on the card, toward the attacker", () => {
+    const { badges, disc } = commanderTakeover({
+      card: { width: 390, height: 420 },
+      rotation: 0,
+      lifeFontSize: 148,
+      lifeDigits: 2,
+      badgeSize: 46,
+      badgeCount: 2,
+      reach: { x: 0, y: -424, radius: 900 },
+    })
+    expect(badges).toHaveLength(2)
+    const [first, partner] = badges
+    expect(first.x).toBeCloseTo(-partner.x)
+    expect(first.y).toBeCloseTo(partner.y)
+    expect(first.y).toBeLessThan(0)
+    expect(partner.x - first.x).toBeGreaterThanOrEqual(46)
+    for (const badge of badges) {
+      expect(Math.hypot(badge.x, badge.y) - badge.size / 2).toBeGreaterThan(disc)
+      expect(Math.abs(badge.x) + badge.size / 2).toBeLessThanOrEqual(195)
+      expect(Math.abs(badge.y) + badge.size / 2).toBeLessThanOrEqual(210)
+    }
   })
 })

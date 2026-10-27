@@ -44,6 +44,7 @@ import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { playCommanderLethal } from "@/features/game/playSystems"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import type {
+  CommanderSlot,
   GamePlayer,
   LocalGame,
   LocalGameResult,
@@ -223,9 +224,9 @@ export function CurrentGameScreen({
     setInspectedPlayerId(playerId)
   }
 
-  function assignCommanderDamage(target: GamePlayer, step: number) {
+  function assignCommanderDamage(target: GamePlayer, step: number, commander?: CommanderSlot) {
     if (!armedPlayerId || armedPlayerId === target.id) return
-    runtime.assignCommanderDamage(armedPlayerId, target.id, step)
+    runtime.assignCommanderDamage(armedPlayerId, target.id, step, commander)
   }
 
   const captureMenuDialogOrigin = useCallback((event?: GestureResponderEvent) => {
@@ -435,7 +436,8 @@ export function CurrentGameScreen({
               commanderDamage={
                 commanderDamageEnabled
                   ? {
-                      incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
+                      incomingFor: (player, commander) =>
+                        incomingCommanderDamage(runtime.game, player.id, commander),
                       lethal: commanderLethal,
                       armedPlayerId,
                       inspection: { playerId: inspectedPlayerId, onChange: inspectCommanderDamage },

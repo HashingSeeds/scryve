@@ -26,6 +26,7 @@ import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
 import type { RoundClock } from "./roundClock"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
+  CommanderSlot,
   GameCommand,
   LifeDelta,
   LocalGame,
@@ -102,9 +103,15 @@ export function useLocalGame(
   )
 
   const assignCommanderDamage = useCallback(
-    (fromPlayerId: PlayerId, toPlayerId: PlayerId, delta: number) => {
+    (fromPlayerId: PlayerId, toPlayerId: PlayerId, delta: number, commander?: CommanderSlot) => {
       const previous = gameRef.current
-      const next = dispatch({ type: "commanderDamage.assign", fromPlayerId, toPlayerId, delta })
+      const next = dispatch({
+        type: "commanderDamage.assign",
+        fromPlayerId,
+        toPlayerId,
+        commander,
+        delta,
+      })
       if (next === previous) return
       if (reduceMotion === false && repository.hapticsEnabled()) {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)

@@ -338,6 +338,11 @@ const board = {
     power: "Commander power {{power}}",
     raisePower: "Raise commander power",
     lowerPower: "Lower commander power",
+    // {{name}} is one of two partner commanders that attack together.
+    raisePowerOf: "Raise {{name}}'s power",
+    lowerPowerOf: "Lower {{name}}'s power",
+    // Checkbox: whether this partner commander is in the current attack.
+    partnerAttacks: "{{name}} attacks",
     totalFrom: "{{damage}} commander damage from {{name}}",
     closeFor: "Close commander damage for {{identity}}",
     showFor: "Show commander damage for {{identity}}, {{sources}}",

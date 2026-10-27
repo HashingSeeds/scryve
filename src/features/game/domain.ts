@@ -21,6 +21,7 @@ import { isRoundClockSetup, startRoundClock, type RoundClockSetup } from "./roun
 import type {
   ActorId,
   CommanderDamageAssignedEvent,
+  CommanderSlot,
   CommandContext,
   DeviceId,
   GameCommand,
@@ -45,9 +46,11 @@ import {
 } from "../../../convex/lib/appearance"
 import {
   isCommanderDamageDelta,
+  isCommanderSlot,
   isLifeDelta,
   MAX_COMMANDER_DAMAGE,
   MAX_LIFE_DELTA,
+  PARTNER_COMMANDER,
 } from "../../../convex/lib/gameRules"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 import {
@@ -64,7 +67,14 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 
-export { isCommanderDamageDelta, isLifeDelta, MAX_COMMANDER_DAMAGE, MAX_LIFE_DELTA }
+export {
+  isCommanderDamageDelta,
+  isCommanderSlot,
+  isLifeDelta,
+  MAX_COMMANDER_DAMAGE,
+  MAX_LIFE_DELTA,
+  PARTNER_COMMANDER,
+}
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const MIN_PLAYERS = 2
@@ -347,25 +357,34 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
   })
 }
 
-export const commanderDamageKey = (fromPlayerId: PlayerId, toPlayerId: PlayerId): string =>
-  `${fromPlayerId}>${toPlayerId}`
+export const COMMANDER_SLOTS: readonly CommanderSlot[] = [undefined, PARTNER_COMMANDER]
+
+/** why: the partner's key keeps its marker before the `>`, so builds that split a key on `>` find no seat named `id#1` and skip it instead of misreading it. */
+export const commanderDamageKey = (
+  fromPlayerId: PlayerId,
+  toPlayerId: PlayerId,
+  commander?: CommanderSlot,
+): string =>
+  commander ? `${fromPlayerId}#${commander}>${toPlayerId}` : `${fromPlayerId}>${toPlayerId}`
 
 export function commanderDamageBetween(
   game: LocalGame,
   fromPlayerId: PlayerId,
   toPlayerId: PlayerId,
+  commander?: CommanderSlot,
 ): number {
-  return game.commanderDamage?.[commanderDamageKey(fromPlayerId, toPlayerId)] ?? 0
+  return game.commanderDamage?.[commanderDamageKey(fromPlayerId, toPlayerId, commander)] ?? 0
 }
 
 export function incomingCommanderDamage(
   game: LocalGame,
   toPlayerId: PlayerId,
+  commander?: CommanderSlot,
 ): Record<PlayerId, number> {
   const incoming = {} as Record<PlayerId, number>
   for (const player of game.players) {
     if (player.id === toPlayerId) continue
-    incoming[player.id] = commanderDamageBetween(game, player.id, toPlayerId)
+    incoming[player.id] = commanderDamageBetween(game, player.id, toPlayerId, commander)
   }
   return incoming
 }
@@ -379,11 +398,13 @@ export function localOutState(game: LocalGame): OutState<PlayerId> {
     commanderDamage: commanderOutState(
       playCommanderLethal(game.system, game.format),
       game.players.flatMap((from) =>
-        game.players.map((to) => ({
-          fromPlayerId: from.id,
-          toPlayerId: to.id,
-          total: commanderDamageBetween(game, from.id, to.id),
-        })),
+        game.players.flatMap((to) =>
+          COMMANDER_SLOTS.map((commander) => ({
+            fromPlayerId: from.id,
+            toPlayerId: to.id,
+            total: commanderDamageBetween(game, from.id, to.id, commander),
+          })),
+        ),
       ),
     ),
   }
@@ -495,6 +516,7 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
           candidate.operationId === event.compensatesOperationId &&
           candidate.fromPlayerId === event.fromPlayerId &&
           candidate.toPlayerId === event.toPlayerId &&
+          candidate.commander === event.commander &&
           candidate.delta === -event.delta,
       )
       if (
@@ -505,7 +527,7 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
         return game
     }
 
-    const key = commanderDamageKey(event.fromPlayerId, event.toPlayerId)
+    const key = commanderDamageKey(event.fromPlayerId, event.toPlayerId, event.commander)
     const total = (game.commanderDamage?.[key] ?? 0) + event.delta
     if (total < 0 || total > MAX_COMMANDER_DAMAGE) return game
 
@@ -570,7 +592,7 @@ export function commandToEvent(
     return { ...base, type: "life.changed", playerId: command.playerId, delta }
   }
   if (command.type === "commanderDamage.assign") {
-    const { fromPlayerId, toPlayerId } = command
+    const { fromPlayerId, toPlayerId, commander } = command
     if (fromPlayerId === toPlayerId) return null
     if (!Number.isInteger(command.delta) || command.delta === 0) return null
     if (
@@ -578,11 +600,18 @@ export function commandToEvent(
       !game.players.some(({ id }) => id === toPlayerId)
     )
       return null
-    const current = commanderDamageBetween(game, fromPlayerId, toPlayerId)
+    const current = commanderDamageBetween(game, fromPlayerId, toPlayerId, commander)
     const clamped = Math.max(0, Math.min(MAX_COMMANDER_DAMAGE, current + command.delta))
     const delta = clamped - current
     if (delta === 0) return null
-    return { ...base, type: "commanderDamage.assigned", fromPlayerId, toPlayerId, delta }
+    return {
+      ...base,
+      type: "commanderDamage.assigned",
+      fromPlayerId,
+      toPlayerId,
+      ...(commander ? { commander } : {}),
+      delta,
+    }
   }
   if (command.type === "life.undo") {
     const compensated = compensatedOperationIds(game)
@@ -600,6 +629,7 @@ export function commandToEvent(
         type: "commanderDamage.assigned",
         fromPlayerId: target.fromPlayerId,
         toPlayerId: target.toPlayerId,
+        ...(target.commander ? { commander: target.commander } : {}),
         delta: -target.delta,
         compensatesOperationId: target.operationId,
       }

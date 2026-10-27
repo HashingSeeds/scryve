@@ -4,14 +4,20 @@ import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { useSeatCommander } from "@/features/decks/seatCommander"
+import { useSeatCommanders } from "@/features/decks/seatCommander"
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import type { DiceSeatChip } from "@/features/game/dice"
-import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import { COMMANDER_SLOTS, MAX_COMMANDER_DAMAGE, PARTNER_COMMANDER } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
-import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
+import type {
+  CommanderBoardPlayer,
+  CommanderSlot,
+  GamePlayer,
+  LifeDelta,
+  PlayerId,
+} from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { tableItemRulesOf } from "@/features/rules/gameRules"
 import { translate } from "@/i18n/translate"
@@ -50,9 +56,10 @@ import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
 export interface CommanderDamageGridBinding {
-  incomingFor: (player: GamePlayer) => Record<PlayerId, number>
+  incomingFor: (player: GamePlayer, commander?: CommanderSlot) => Record<PlayerId, number>
   lethal: number
   armedPlayerId: PlayerId | null
+  singleCommander?: boolean
   inspection?: { playerId: PlayerId | null; onChange: (playerId: PlayerId | null) => void }
   /**
    * Only set when assignment and confirmation live on separate devices. Local
@@ -60,13 +67,23 @@ export interface CommanderDamageGridBinding {
    * there is nothing to stage or send.
    */
   staging?: {
-    stagedFor: (player: GamePlayer) => number
+    stagedFor: (player: GamePlayer, commander?: CommanderSlot) => number
     stagedTargets: number
     onSend: () => void
   }
   pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
   onPressSword: (player: GamePlayer) => void
-  onStage: (player: GamePlayer, step: number) => void
+  onStage: (player: GamePlayer, step: number, commander?: CommanderSlot) => void
+}
+
+function strongerCommander(
+  first: Record<PlayerId, number>,
+  partner: Record<PlayerId, number>,
+): Record<PlayerId, number> {
+  const incoming = { ...first }
+  for (const [playerId, total] of Object.entries(partner) as [PlayerId, number][])
+    incoming[playerId] = Math.max(incoming[playerId] ?? 0, total)
+  return incoming
 }
 
 export interface DiceGridBinding {
@@ -256,7 +273,9 @@ export function PlayerGrid({
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const stable = useStableCallbacks()
-  const [commanderPowers, setCommanderPowers] = useState<Partial<Record<PlayerId, number>>>({})
+  const [commanderPowers, setCommanderPowers] = useState<Partial<Record<string, number>>>({})
+  const [benched, setBenched] = useState<{ playerId: PlayerId; index: number } | null>(null)
+  if (benched && benched.playerId !== commanderDamage?.armedPlayerId) setBenched(null)
   /** why: once the attacker has tapped a target, the next step is finishing, so the pulse moves from the targets to the attacker's mark. */
   const [actedFor, setActedFor] = useState<PlayerId | null>(null)
   if (actedFor && actedFor !== commanderDamage?.armedPlayerId) setActedFor(null)
@@ -314,12 +333,17 @@ export function PlayerGrid({
     : null
   const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
-  const armedCommander = useSeatCommander(
+  const seatCommanders = useSeatCommanders(
     commanderDamage && armedPlayer ? getSeatDeck?.(armedPlayer) : undefined,
   )
-  const armedPower = armedPlayer
-    ? (commanderPowers[armedPlayer.id] ?? armedCommander.power ?? 1)
-    : 1
+  const attackers = commanderDamage?.singleCommander ? seatCommanders.slice(0, 1) : seatCommanders
+  const armedCommanders = (
+    attackers.length ? attackers : [{ name: undefined, power: undefined }]
+  ).map((commander, index) => ({
+    name: commander.name,
+    power: commanderPowers[`${armedPlayer?.id}:${index}`] ?? commander.power ?? 1,
+    benched: benched?.index === index,
+  }))
   const seatRotations = new Map<number, LifeCardContentRotation>()
   rows.forEach((row, rowIndex) =>
     row.forEach((slot, columnIndex) => {
@@ -419,6 +443,9 @@ export function PlayerGrid({
               const seatDice = seatDiceFor(dice, player, stable)
               const seatTable = seatTableState(table, player.id)
               const out = outState && outReason(outState, player.id)
+              const firstIncoming = commanderDamage?.incomingFor(player) ?? NO_INCOMING
+              const partnerIncoming =
+                commanderDamage?.incomingFor(player, PARTNER_COMMANDER) ?? NO_INCOMING
               if (table?.tableRules.pokemon) {
                 return (
                   <View
@@ -510,7 +537,7 @@ export function PlayerGrid({
                             seats: boardSeats.seats,
                             rows: boardSeats.rows,
                             columns: boardSeats.columns,
-                            incoming: commanderDamage.incomingFor(player),
+                            incoming: strongerCommander(firstIncoming, partnerIncoming),
                             lethal: commanderDamage.lethal,
                             armedPlayerId: commanderDamage.armedPlayerId,
                             attackerName: armedPlayer?.name,
@@ -520,16 +547,41 @@ export function PlayerGrid({
                               seatNumber: armedIndex + 1,
                               rotation: seatRotations.get(armedIndex),
                             },
-                            power: armedPower,
-                            commanderName: armedCommander.name,
-                            onPowerStep: stable(`power:${player.id}`, (step: 1 | -1) =>
-                              setCommanderPowers((current) => ({
-                                ...current,
-                                [player.id]: Math.min(
-                                  MAX_COMMANDER_DAMAGE,
-                                  Math.max(1, (current[player.id] ?? armedPower) + step),
-                                ),
-                              })),
+                            commanders: armedPlayer
+                              ? armedCommanders.map((commander, index) => ({
+                                  ...commander,
+                                  total:
+                                    ((index ? partnerIncoming : firstIncoming)[armedPlayer.id] ??
+                                      0) +
+                                    (commanderDamage.staging?.stagedFor(
+                                      player,
+                                      COMMANDER_SLOTS[index],
+                                    ) ?? 0),
+                                }))
+                              : undefined,
+                            onPowerStep: stable(
+                              `power:${player.id}`,
+                              (step: 1 | -1, index: number) =>
+                                setCommanderPowers((current) => ({
+                                  ...current,
+                                  [`${player.id}:${index}`]: Math.min(
+                                    MAX_COMMANDER_DAMAGE,
+                                    Math.max(
+                                      1,
+                                      (current[`${player.id}:${index}`] ??
+                                        armedCommanders[index].power) + step,
+                                    ),
+                                  ),
+                                })),
+                            ),
+                            onToggleCommander: stable(`toggle:${player.id}`, (index: number) =>
+                              setBenched((current) =>
+                                current === null
+                                  ? { playerId: player.id, index }
+                                  : current.index === index
+                                    ? null
+                                    : current,
+                              ),
                             ),
                             facing:
                               armedIndex >= 0
@@ -548,14 +600,13 @@ export function PlayerGrid({
                                     defenderIndex: index,
                                   })
                                 : undefined,
-                            stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                             pendingClaims: commanderDamage.pendingFor?.(player),
                             onPressSword: stable(`sword:${player.id}`, () =>
                               commanderDamage.onPressSword(player),
                             ),
                             acted: !!actedFor,
-                            onStage: stable(`stage:${player.id}`, (step: number) => {
-                              commanderDamage.onStage(player, step)
+                            onStage: stable(`stage:${player.id}`, (step: number, index: number) => {
+                              commanderDamage.onStage(player, step, COMMANDER_SLOTS[index])
                               setActedFor(commanderDamage.armedPlayerId)
                             }),
                             ...(commanderDamage.staging &&
@@ -626,6 +677,8 @@ export {
   getPlayerGridRowFlex,
   getPlayerGridRows,
 } from "./playerGridGeometry"
+
+const NO_INCOMING: Record<PlayerId, number> = {}
 
 const LIFE_CONTROL_GUTTER = 32
 const LIFE_HEIGHT_RATIO = 0.5

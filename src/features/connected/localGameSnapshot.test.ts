@@ -2,7 +2,12 @@ import {
   buildFinishedLocalGameSnapshot,
   buildLocalGameSnapshot,
 } from "@/features/connected/localGameSnapshot"
-import { asPlayerId, commanderDamageKey, createLocalGame } from "@/features/game/domain"
+import {
+  asPlayerId,
+  commanderDamageKey,
+  createLocalGame,
+  PARTNER_COMMANDER,
+} from "@/features/game/domain"
 import type { LocalGame } from "@/features/game/types"
 
 const identifiers = {
@@ -89,6 +94,7 @@ describe("buildLocalGameSnapshot", () => {
       commanderDamage: {
         [commanderDamageKey(ada.id, grace.id)]: 7,
         [commanderDamageKey(alan.id, ada.id)]: 21,
+        [commanderDamageKey(alan.id, ada.id, PARTNER_COMMANDER)]: 4,
       },
     }
 
@@ -101,6 +107,7 @@ describe("buildLocalGameSnapshot", () => {
     expect(snapshot.commanderTotals).toEqual([
       { fromSeat: 1, toSeat: 2, total: 7 },
       { fromSeat: 3, toSeat: 1, total: 21 },
+      { fromSeat: 3, toSeat: 1, commander: PARTNER_COMMANDER, total: 4 },
     ])
   })
 

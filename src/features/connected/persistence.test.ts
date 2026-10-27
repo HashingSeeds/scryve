@@ -11,7 +11,14 @@ import {
   subscribeResumeIndex,
 } from "./persistence"
 import { sendQueuedAction } from "./useConnectedGame"
-import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
+import {
+  asActorId,
+  asDeviceId,
+  asGameId,
+  asOperationId,
+  asPlayerId,
+  PARTNER_COMMANDER,
+} from "../game/domain"
 import { storedPlaySystem } from "../game/playSystems"
 import { setOutboxWriter } from "../sync/durableOutbox"
 
@@ -580,6 +587,7 @@ describe("connected MMKV repository", () => {
         gameId,
         fromPlayerId: asPlayerId("player-1"),
         toPlayerId: asPlayerId("player-2"),
+        commander: PARTNER_COMMANDER,
         delta: 3,
         actorId,
         deviceId,
@@ -624,6 +632,9 @@ describe("connected MMKV repository", () => {
     const sent = Object.values(mutations).flatMap((mutation) => mutation.mock.calls)
     expect(sent).toHaveLength(3)
     for (const [args] of sent) expect(args).not.toHaveProperty("writtenBy")
+    expect(mutations.submitCommanderDamage).toHaveBeenCalledWith(
+      expect.objectContaining({ commander: PARTNER_COMMANDER, delta: 3 }),
+    )
   })
 })
 

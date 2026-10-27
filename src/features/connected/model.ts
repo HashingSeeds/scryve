@@ -8,6 +8,7 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 
+import { isCommanderSlot, type PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
@@ -43,6 +44,7 @@ export interface ConnectedPlayerProjection {
 export interface ConnectedCommanderDamageTotal {
   fromPlayerId: string
   toPlayerId: string
+  commander?: typeof PARTNER_COMMANDER
   total: number
 }
 
@@ -51,6 +53,7 @@ export interface ConnectedCommanderDamageClaim {
   operationId: string
   fromPlayerId: string
   toPlayerId: string
+  commander?: typeof PARTNER_COMMANDER
   delta: number
   clientCreatedAt: number
   createdAt: number
@@ -65,6 +68,7 @@ export interface ConnectedCommanderDamageProjection {
 /** A single assignment submitted by the attacker's device. */
 export interface ConnectedCommanderDamageChange {
   toPlayerId: string
+  commander?: typeof PARTNER_COMMANDER
   delta: number
 }
 
@@ -74,6 +78,7 @@ export interface CommanderDamageSubmittedEvent {
   gameId: GameId
   fromPlayerId: PlayerId
   toPlayerId: PlayerId
+  commander?: typeof PARTNER_COMMANDER
   delta: number
   actorId: ActorId
   deviceId: DeviceId
@@ -257,6 +262,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
         !isRecord(total) ||
         typeof total.fromPlayerId !== "string" ||
         typeof total.toPlayerId !== "string" ||
+        !isCommanderSlot(total.commander) ||
         typeof totalValue !== "number" ||
         !Number.isInteger(totalValue) ||
         totalValue < 0
@@ -265,6 +271,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       totals.push({
         fromPlayerId: total.fromPlayerId,
         toPlayerId: total.toPlayerId,
+        ...(total.commander ? { commander: total.commander } : {}),
         total: totalValue,
       })
     }
@@ -279,6 +286,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
         typeof claim.operationId !== "string" ||
         typeof claim.fromPlayerId !== "string" ||
         typeof claim.toPlayerId !== "string" ||
+        !isCommanderSlot(claim.commander) ||
         typeof delta !== "number" ||
         !Number.isInteger(delta) ||
         typeof claim.clientCreatedAt !== "number" ||
@@ -292,6 +300,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
         operationId: claim.operationId,
         fromPlayerId: claim.fromPlayerId,
         toPlayerId: claim.toPlayerId,
+        ...(claim.commander ? { commander: claim.commander } : {}),
         delta,
         clientCreatedAt: claim.clientCreatedAt,
         createdAt: claim.createdAt,
