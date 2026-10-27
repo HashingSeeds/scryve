@@ -108,7 +108,7 @@ export type RoundClockDefinition = {
 export type SystemDefinition = {
   readonly label: string
   readonly shortLabel: string
-  readonly release: "beta" | "general"
+  readonly release: "alpha" | "beta" | "general"
   readonly defaultFormat: { readonly deck: string; readonly play: string }
   readonly counter: CounterDefinition
   readonly formats: readonly FormatDefinition[]

@@ -9,7 +9,11 @@ jest.mock("../../../convex/lib/systems/definitions", () => {
   const actual: typeof Definitions = jest.requireActual("../../../convex/lib/systems/definitions")
   return {
     ...actual,
-    SYSTEMS: { ...actual.SYSTEMS, pokemon: { ...actual.SYSTEMS.pokemon, release: "beta" } },
+    SYSTEMS: {
+      ...actual.SYSTEMS,
+      ygo: { ...actual.SYSTEMS.ygo, release: "alpha" },
+      pokemon: { ...actual.SYSTEMS.pokemon, release: "beta" },
+    },
   }
 })
 
@@ -32,13 +36,13 @@ const gameTypeSystems = ({ FEATURED_GAME_TYPES, MORE_GAME_TYPES }: typeof import
   new Set([...FEATURED_GAME_TYPES, ...MORE_GAME_TYPES].map((type) => type.system))
 
 describe("system visibility", () => {
-  it("hides beta systems from production builds", async () => {
+  it("hides alpha and beta systems from production builds", async () => {
     const { visibility, gameTypes } = await loadIn("production")
 
-    expect(visibility.VISIBLE_SYSTEM_IDS).toEqual(["mtg", "ygo"])
+    expect(visibility.VISIBLE_SYSTEM_IDS).toEqual(["mtg"])
     expect(visibility.isSystemVisible("pokemon")).toBe(false)
     expect(visibility.isSystemVisible("not-a-system")).toBe(false)
-    expect(gameTypeSystems(gameTypes)).toEqual(new Set(["mtg", "ygo", undefined]))
+    expect(gameTypeSystems(gameTypes)).toEqual(new Set(["mtg", undefined]))
     const { suggested, more } = gameTypes.newGameTypes({
       chosen: { system: "pokemon", format: "standard" },
       connected: false,
@@ -50,7 +54,14 @@ describe("system visibility", () => {
     ).toBe(false)
   })
 
-  it.each(["beta", "preview", "development"])("shows beta systems on %s", async (environment) => {
+  it("shows beta systems but not alpha ones on the beta channel", async () => {
+    const { visibility } = await loadIn("beta")
+
+    expect(visibility.isSystemVisible("pokemon")).toBe(true)
+    expect(visibility.isSystemVisible("ygo")).toBe(false)
+  })
+
+  it.each(["preview", "development", "local"])("shows every system on %s", async (environment) => {
     const { visibility, gameTypes } = await loadIn(environment)
 
     expect(visibility.VISIBLE_SYSTEM_IDS).toEqual(SYSTEM_IDS)
