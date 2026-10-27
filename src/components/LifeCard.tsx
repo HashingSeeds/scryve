@@ -135,6 +135,11 @@ export interface LifeCardProps {
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   lifeFontSizeFor?: (digits: number) => number | undefined
+  /** why: while the board unfolds, the total grows from the size the closed board drew it at (`lifeFontSizeFor`) to its own, by `progress`. */
+  unfold?: {
+    progress: SharedValue<number>
+    lifeFontSizeFor: (digits: number) => number | undefined
+  }
   system?: PlaySystemId
   lifeStep?: number
   disabled?: boolean
@@ -168,6 +173,7 @@ export const LifeCard = memo(function LifeCard({
   menuCorner,
   menuEdgeCenter,
   lifeFontSizeFor,
+  unfold,
   system,
   lifeStep,
   disabled,
@@ -291,27 +297,34 @@ export const LifeCard = memo(function LifeCard({
       24,
     0,
   )
-  const overviewLifeStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateX:
-          contentRotation === 90
-            ? lifeOffset * overviewProgress.value
-            : contentRotation === -90
-              ? -lifeOffset * overviewProgress.value
-              : 0,
-      },
-      {
-        translateY:
-          contentRotation === 0
-            ? -lifeOffset * overviewProgress.value
-            : contentRotation === 180
-              ? lifeOffset * overviewProgress.value
-              : 0,
-      },
-      { scale: 1 + (32 / resolvedLifeFontSize - 1) * overviewProgress.value },
-    ],
-  }))
+  // why: the font is sized for the open cell, so while the board unfolds the total scales from the closed board's size instead of jumping to the open size when the window switches displays.
+  const foldedLifeFontSize = unfold?.lifeFontSizeFor(shownDigits)
+  const readoutStyle = useAnimatedStyle(() => {
+    const overview = localCommander ? overviewProgress.value : 0
+    const folded = unfold && foldedLifeFontSize ? foldedLifeFontSize / resolvedLifeFontSize : 1
+    const unfolding = unfold ? folded + (1 - folded) * unfold.progress.value : 1
+    return {
+      transform: [
+        {
+          translateX:
+            contentRotation === 90
+              ? lifeOffset * overview
+              : contentRotation === -90
+                ? -lifeOffset * overview
+                : 0,
+        },
+        {
+          translateY:
+            contentRotation === 0
+              ? -lifeOffset * overview
+              : contentRotation === 180
+                ? lifeOffset * overview
+                : 0,
+        },
+        { scale: (1 + (32 / resolvedLifeFontSize - 1) * overview) * unfolding },
+      ],
+    }
+  })
   const overviewCloseStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
   const boardStyle = useAnimatedStyle(() => ({
     opacity: boardBounds ? 1 : 0,
@@ -633,7 +646,7 @@ export const LifeCard = memo(function LifeCard({
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[themed($readout), localCommander && overviewLifeStyle]}
+          style={[themed($readout), readoutStyle]}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>

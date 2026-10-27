@@ -307,8 +307,10 @@ export function PlayerGrid({
     layoutVariant,
     holderAngle,
   })
+  // why: a board given its size places seats from it in the same render, since the measured size arrives a frame later and drew the seats squished for that frame when the size changed.
+  const seatBoard = boardOrientation ? { width, height } : board
   const cellSize = getCellSize({
-    board: { width: board.width, height: board.height - topEdgeBand },
+    board: { width: seatBoard.width, height: seatBoard.height - topEdgeBand },
     layout,
     gap: spacing.xxs,
   })
@@ -326,6 +328,35 @@ export function PlayerGrid({
         sidewaysGlyphReserve,
       }),
     [cellSize.cellWidth, cellSize.cellHeight, fontScale, lifeTargetSize, sidewaysGlyphReserve],
+  )
+  // why: closed, the outer display drew each seat in a cell of the closed board, so an unfolding seat's total starts at the size it had there.
+  const foldedCellSize = getCellSize({
+    board: { width: seatBoard.height / 2, height: seatBoard.width },
+    layout: getPlayerGridLayout({
+      playerCount: players.length,
+      width: seatBoard.height / 2,
+      height: seatBoard.width,
+      layoutVariant,
+    }),
+    gap: spacing.xxs,
+  })
+  const foldedLifeFontSizeFor = useCallback(
+    (digits: number) =>
+      getLifeFontSize({
+        cellWidth: foldedCellSize.cellWidth,
+        cellHeight: foldedCellSize.cellHeight,
+        digits,
+        fontScale,
+        targetSize: lifeTargetSize,
+        sidewaysGlyphReserve,
+      }),
+    [
+      foldedCellSize.cellWidth,
+      foldedCellSize.cellHeight,
+      fontScale,
+      lifeTargetSize,
+      sidewaysGlyphReserve,
+    ],
   )
 
   function measureBoard(event: LayoutChangeEvent) {
@@ -345,8 +376,6 @@ export function PlayerGrid({
   }
   const seatedRows = rows.map((row) => row.map((slot) => (slot === null ? null : slotSeat(slot))))
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
-  // why: a board given its size places seats from it in the same render, since the measured size arrives a frame later and drew the seats squished for that frame when the size changed.
-  const seatBoard = boardOrientation ? { width, height } : board
   const turning =
     tableTurn && Math.abs(holderAngle ?? 0) === 90 && seatBoard.width > 0
       ? tableTurnCells({
@@ -547,6 +576,11 @@ export function PlayerGrid({
                 menuCorner={menuCorner}
                 menuEdgeCenter={fallbackMenu?.edgeCenter}
                 lifeFontSizeFor={lifeFontSizeFor}
+                unfold={
+                  turning && liveSize
+                    ? { progress: turning.unfolded, lifeFontSizeFor: foldedLifeFontSizeFor }
+                    : undefined
+                }
                 system={system}
                 lifeStep={lifeStep}
                 disabled={disabled || playerDisabled}
