@@ -6,6 +6,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -43,6 +44,7 @@ type AssignmentTarget = {
   attackerName: string
   attacker?: CommanderAttacker
   total: number
+  lethal: number
   power: number
   facing: CommanderFacing
   takeover?: CommanderTakeover
@@ -75,7 +77,7 @@ export interface CommanderDamageCardControlsProps {
   mode: CommanderDamageCardMode
 }
 
-const RAM_MS = 90
+export const RAM_MS = 90
 const RAM_RETURN_MS = 300
 
 export function CommanderDamageCardControls({
@@ -217,8 +219,6 @@ function DefenderControls({
   const reducedMotion = useReducedMotion()
   const [hits, setHits] = useState<number[]>([])
   const [editing, setEditing] = useState(false)
-  const pending = useRef(0)
-  const landings = useRef<ReturnType<typeof setTimeout>[]>([])
   const pop = useSharedValue(1)
   const ram = useSharedValue(0)
   const flash = useSharedValue(0)
@@ -236,11 +236,16 @@ function DefenderControls({
     const previous = previousTotal.current
     previousTotal.current = total
     if (total <= previous || reducedMotion !== false) return
-    pop.value = withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 }))
-    flash.value = withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 }))
-  }, [flash, pop, reducedMotion, total])
-
-  useEffect(() => () => landings.current.forEach(clearTimeout), [])
+    const impact = badge ? RAM_MS : 0
+    pop.value = withDelay(
+      impact,
+      withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 })),
+    )
+    flash.value = withDelay(
+      impact,
+      withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 })),
+    )
+  }, [badge, flash, pop, reducedMotion, total])
 
   const badgeStyle = useAnimatedStyle(() => ({
     transform: [
@@ -251,26 +256,15 @@ function DefenderControls({
   }))
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
-  function land(amount: number) {
-    setHits((current) => [...current, amount])
-    mode.onChange(amount)
-  }
-
   function hit() {
     if (editing) return setEditing(false)
-    const amount = Math.min(step, MAX_COMMANDER_DAMAGE - total - pending.current)
-    if (amount <= 0) return
-    if (reducedMotion !== false || !badge) return land(amount)
-    pending.current += amount
+    if (step <= 0) return
+    setHits((current) => [...current, step])
+    mode.onChange(step)
+    if (reducedMotion !== false || !badge) return
     ram.value = withSequence(
       withTiming(1, { duration: RAM_MS, easing: Easing.in(Easing.quad) }),
       withTiming(0, { duration: RAM_RETURN_MS, easing: Easing.out(Easing.cubic) }),
-    )
-    landings.current.push(
-      setTimeout(() => {
-        pending.current -= amount
-        land(amount)
-      }, RAM_MS),
     )
   }
 
@@ -354,9 +348,7 @@ function DefenderControls({
               strokeWidth={3}
               strokeLinecap="round"
               strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={
-                circumference * (1 - Math.min(total, MAX_COMMANDER_DAMAGE) / MAX_COMMANDER_DAMAGE)
-              }
+              strokeDashoffset={circumference * (1 - Math.min(total, mode.lethal) / mode.lethal)}
               fill="none"
             />
           </Svg>

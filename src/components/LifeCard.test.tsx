@@ -439,6 +439,31 @@ describe("LifeCard", () => {
     expect(view.getByTestId("life-total-seat-2")).toHaveTextContent("30")
   })
 
+  it("lands a hit on the tap even while the badge is still ramming", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    try {
+      const onStage = jest.fn()
+      const view = render(defendingCard(onStage))
+      fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+        nativeEvent: { layout: { width: 193, height: 420 } },
+      })
+      fireEvent.press(view.getByTestId("commander-hit-seat-2"))
+      expect(onStage).toHaveBeenCalledWith(1)
+    } finally {
+      motion.mockRestore()
+    }
+  })
+
+  it("fills the ring at lethal damage, not at the storage cap", () => {
+    const view = render(defendingCard())
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 193, height: 420 } },
+    })
+    const progress = view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" })
+    const circumference = 2 * Math.PI * progress.props.r
+    expect(progress.props.strokeDashoffset).toBeCloseTo(circumference * (1 - 6 / 21))
+  })
+
   it("fixes the total from the badge without counting a hit", () => {
     const onStage = jest.fn()
     const view = render(defendingCard(onStage))

@@ -13,6 +13,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSequence,
   withTiming,
 } from "react-native-reanimated"
@@ -34,6 +35,7 @@ import {
   BADGE,
   COMPACT_BADGE,
   CommanderDamageCardControls,
+  RAM_MS,
   CommanderTakeoverBackdrop,
   PulseRing,
   type CommanderAttacker,
@@ -382,6 +384,7 @@ export const LifeCard = memo(function LifeCard({
             total:
               (commanderDamage.incoming[armedCommanderId] ?? 0) +
               (commanderDamage.stagedAgainstOwner ?? 0),
+            lethal: commanderDamage.lethal,
             power: commanderDamage.power ?? 1,
             facing: commanderDamage.facing ?? {},
             takeover,
@@ -393,18 +396,22 @@ export const LifeCard = memo(function LifeCard({
   const knock = useSharedValue(0)
   const defenderTotal = commanderCardMode?.kind === "target" ? commanderCardMode.total : undefined
   const knockFacing = commanderCardMode?.kind === "target" ? commanderCardMode.facing : undefined
+  const rammed = !!takeover
   const lastDefenderTotal = useRef(defenderTotal)
   useEffect(() => {
     const previous = lastDefenderTotal.current
     lastDefenderTotal.current = defenderTotal
     if (defenderTotal === undefined || previous === undefined || defenderTotal <= previous) return
     if (reducedMotion !== false) return
-    knock.value = withSequence(
-      withTiming(1, { duration: 95 }),
-      withTiming(-0.25, { duration: 130 }),
-      withTiming(0, { duration: 155 }),
+    knock.value = withDelay(
+      rammed ? RAM_MS : 0,
+      withSequence(
+        withTiming(1, { duration: 95 }),
+        withTiming(-0.25, { duration: 130 }),
+        withTiming(0, { duration: 155 }),
+      ),
     )
-  }, [defenderTotal, knock, reducedMotion])
+  }, [defenderTotal, knock, rammed, reducedMotion])
   const facingX = knockFacing?.x === "left" ? 1 : knockFacing?.x === "right" ? -1 : 0
   const facingY = knockFacing?.y === "top" ? 1 : knockFacing?.y === "bottom" ? -1 : 0
   const knockDirection = takeover?.knock ?? {
