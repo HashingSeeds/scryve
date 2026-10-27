@@ -14,6 +14,8 @@ const TARGETS = {
   "ios:development": { profile: "development:device", output: "ios-dev.ipa" },
   "ios:preview": { profile: "preview:device", output: "ios-preview.ipa" },
   "ios:production": { profile: "production", output: "ios-prod.ipa" },
+  // why: Xcode signs this one for development, which EAS cannot, so "profile" only labels it for --nas.
+  "ios:profile": { profile: "profile", output: "ios-profile.ipa" },
   "android:development": { profile: "development", output: "android-dev.apk" },
   "android:preview": { profile: "preview", output: "android-preview.apk" },
   "android:production": { profile: "production", output: "android-prod.aab" },
@@ -44,6 +46,8 @@ function parseArgs(args) {
   const [target, ...extra] = positionals
   if (!(target in TARGETS) || extra.length > 0) throw new Error(USAGE)
   const upload = Boolean(values.upload || values.ship)
+  if (upload && target === "ios:profile")
+    throw new Error("ios:profile is not an EAS build, so it cannot --upload. Use --nas.")
   const nas = Boolean(values.nas)
   return {
     target,
@@ -63,6 +67,10 @@ function easArgs(target) {
 }
 
 function buildCommand({ target, buildPath }) {
+  if (target === "ios:profile") {
+    const env = ["npx", "--yes", easCli, "env:exec", "preview", "--non-interactive"]
+    return ["node", "scripts/quiet-pod-script-phases.cjs", ...env, "sh scripts/ios-profile.sh"]
+  }
   const eas = ["npx", "--yes", easCli, "build", ...easArgs(target), "--local", "--output", buildPath]
   return target.startsWith("ios:") ? ["node", "scripts/quiet-pod-script-phases.cjs", ...eas] : eas
 }
@@ -78,7 +86,18 @@ function nasCommand({ target, buildPath }) {
 const readEnvFile = (file) => util.parseEnv(fs.readFileSync(path.join(root, file), "utf8"))
 
 // why: preview only needs Sentry's token to upload source maps; production loads the same public config as the web release.
-function buildEnv(target) {
+// why: profile builds read only the EAS preview environment, as an EAS build would, and keep their events and source maps out of preview's.
+function buildEnv({ target, buildPath }) {
+  if (target === "ios:profile") {
+    return {
+      APP_VARIANT: "preview",
+      EXPO_NO_DOTENV: "1",
+      EXPO_PUBLIC_SENTRY_ENVIRONMENT: "profile",
+      SENTRY_DISABLE_AUTO_UPLOAD: "true",
+      SCRYVE_PROFILE_BUILD: "1",
+      SCRYVE_PROFILE_IPA: buildPath,
+    }
+  }
   const [environment] = TARGETS[target].profile.split(":")
   if (environment === "development") return { APP_VARIANT: "development" }
   if (environment === "preview") {
@@ -102,7 +121,7 @@ function main() {
   if (options.build) {
     if (TARGETS[options.target].profile === "production") settleVersion()
     fs.mkdirSync(path.dirname(options.buildPath), { recursive: true })
-    run(buildCommand(options), { ...process.env, ...buildEnv(options.target) })
+    run(buildCommand(options), { ...process.env, ...buildEnv(options) })
   }
   if (options.upload) run(uploadCommand(options), process.env)
   if (options.nas) run(nasCommand(options), process.env)

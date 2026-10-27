@@ -61,3 +61,11 @@ test("unknown targets and flags print usage", () => {
   assert.throws(() => parseArgs(["ios:prod"]), /Usage/)
   assert.throws(() => parseArgs(["ios:preview", "--submit"]), /Unknown option/)
 })
+
+test("ios:profile builds with Xcode under the preview environment and never goes to EAS", () => {
+  const options = parseArgs(["ios:profile", "--build", "--nas"])
+  assert.equal(buildCommand(options).at(-1), "sh scripts/ios-profile.sh")
+  assert.equal(buildCommand(options).at(-3), "preview")
+  assert.deepEqual(nasCommand(options).slice(-2), ["--profile", "profile"])
+  assert.throws(() => parseArgs(["ios:profile", "--ship"]), /cannot --upload/)
+})
