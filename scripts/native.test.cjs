@@ -2,7 +2,7 @@ const assert = require("node:assert/strict")
 const path = require("node:path")
 const { test } = require("node:test")
 
-const { buildCommand, parseArgs, uploadCommand } = require("./native.cjs")
+const { buildCommand, nasCommand, parseArgs, uploadCommand } = require("./native.cjs")
 
 const root = path.join(__dirname, "..")
 
@@ -11,6 +11,7 @@ test("a bare target builds into build/", () => {
     target: "ios:preview",
     build: true,
     upload: false,
+    nas: false,
     buildPath: path.join(root, "build", "ios-preview.ipa"),
   })
 })
@@ -19,6 +20,21 @@ test("--upload skips the build and --ship does both", () => {
   assert.equal(parseArgs(["android:production", "--upload"]).build, false)
   const ship = parseArgs(["android:production", "--ship"])
   assert.equal(ship.build && ship.upload, true)
+})
+
+test("--nas puts the artifact on the NAS, after a build only with --build", () => {
+  assert.equal(parseArgs(["ios:development", "--nas"]).build, false)
+  const options = parseArgs(["ios:development", "--build", "--nas"])
+  assert.equal(options.build, true)
+  assert.deepEqual(nasCommand(options), [
+    "builds",
+    "put",
+    path.join(root, "build", "ios-dev.ipa"),
+    "--platform",
+    "ios",
+    "--profile",
+    "development:device",
+  ])
 })
 
 test("--build-path moves the artifact for build and upload alike", () => {
