@@ -170,19 +170,23 @@ const prNumber = (subject) =>
 
 const subjectOf = (message) => message.split("\n")[0]
 
-/** PRs a revert names: a merged `revert-<n>-` branch, `Revert "… (#n)"`, or a `Reverts #n` line. */
+function prTitle(message) {
+  const [subject, ...rest] = message.split("\n")
+  return /^Merge pull request #\d+ from /.test(subject)
+    ? (rest.find((line) => line.trim()) ?? "")
+    : subject
+}
+
 function revertedPrs(message) {
-  const subject = subjectOf(message)
   return [
-    /\/revert-(\d+)-/.exec(subject)?.[1],
-    prNumber(/^Revert "(.*)"/.exec(subject)?.[1] ?? ""),
+    /\/revert-(\d+)-/.exec(subjectOf(message))?.[1],
+    prNumber(/^Revert "(.*)"/.exec(prTitle(message))?.[1] ?? ""),
     ...[...message.matchAll(/^Reverts (?:HashingSeeds\/scryve)?#(\d+)/gim)].map(
       (match) => match[1],
     ),
   ].filter(Boolean)
 }
 
-/** PRs a range of commit messages ships, minus the ones a revert in the range names. */
 function prNumbers(messages) {
   const reverted = new Set(messages.flatMap(revertedPrs))
   const shipped = messages.map((message) => prNumber(subjectOf(message)))

@@ -119,7 +119,9 @@ test("shipped PRs come from squash subjects, minus reverted ones", () => {
       "feat(board): bigger dice (#660)",
       "fix(board): dice roll again (#661)\n\nRevert to the behavior from #660.",
       'Revert "fix: support upstream/tool#630" (#670)',
+      "feat(game): faster dice (#680)",
+      'Merge pull request #681 from HashingSeeds/undo-dice\n\nRevert "feat(game): faster dice (#680)"',
     ]),
-    [305, 267, 310, 630, 641, 660, 661, 670],
+    [305, 267, 310, 630, 641, 660, 661, 670, 681],
   )
 })
