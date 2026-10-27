@@ -97,18 +97,7 @@ function PinnedGameBoardStage({
   const { pretending, open: pretendOpen } = usePretendDuo()
   const unfoldProgress = useSharedValue(1)
   const hingeSeen = useSharedValue(false)
-  useAnimatedReaction(
-    () => (pretending ? pretendHinge(pretendHingeAngle.value) : hinge.value),
-    (now, before) => {
-      unfoldProgress.set(
-        hingeSeen.value
-          ? nextUnfoldProgress(unfoldProgress.value, before?.angle ?? now?.angle ?? 180, now)
-          : initialUnfoldProgress(now),
-      )
-      hingeSeen.set(true)
-    },
-    [pretending],
-  )
+  const holdOpen = useSharedValue(false)
   const unfolded = useDerivedValue(() => easeUnfold(unfoldProgress.value))
   const [landed, setLanded] = useState<TableTurn["landed"]>()
   const [refolding, setRefolding] = useState<TableTurn["landed"]>()
@@ -144,8 +133,10 @@ function PinnedGameBoardStage({
     turnAngle.set(0)
   }, [spansHinge, metrics.holderAngle, landed, refolding, turnAngle])
   // why: closing a Duo that landed on Table turns the board back with the hinge and folds it into the outer display, the turn played backwards; opening flat again lands it back on Table.
-  const refoldAngle =
-    (refolding === "upright" ? -1 : refolding === "reversed" ? 1 : 0) * Math.sign(holderAngle) * 90
+  const refoldAngleOf = (landing: TableTurn["landed"]) =>
+    (landing === "upright" ? -1 : landing === "reversed" ? 1 : 0) * Math.sign(holderAngle) * 90
+  const refoldAngle = refoldAngleOf(refolding)
+  const landedAngle = refoldAngleOf(landed)
   const beginRefold = () => {
     setRefolding(landed)
     setLanded(undefined)
@@ -155,18 +146,30 @@ function PinnedGameBoardStage({
     setRefolding(undefined)
   }
   useAnimatedReaction(
-    () => unfolded.value < 1,
-    (closing, wasClosing) => {
-      if (closing && !wasClosing && landed) runOnJS(beginRefold)()
+    () => (pretending ? pretendHinge(pretendHingeAngle.value) : hinge.value),
+    (now, before) => {
+      const next = hingeSeen.value
+        ? nextUnfoldProgress(unfoldProgress.value, before?.angle ?? now?.angle ?? 180, now)
+        : initialUnfoldProgress(now)
+      hingeSeen.set(true)
+      // why: a landed board has to redraw as the center column turned back to Table before it can fold, so the fold waits for that render; the progress then covers the rest of the hinge's travel, so nothing jumps.
+      if (landed && next < unfoldProgress.value && !holdOpen.value) {
+        holdOpen.set(true)
+        turnAngle.set(landedAngle)
+        runOnJS(beginRefold)()
+      }
+      if (!holdOpen.value) unfoldProgress.set(next)
     },
-    [landed],
+    [pretending, landed, landedAngle],
   )
+  useEffect(() => holdOpen.set(false), [landed, refolding, spansHinge, holdOpen])
   useAnimatedReaction(
     () => unfolded.value,
-    (open) => {
+    (open, before) => {
       if (refoldAngle === 0) return
       turnAngle.set(refoldAngle * open)
-      if (open >= 1) runOnJS(endRefold)()
+      // why: the refold starts with the board still fully open, so only reopening after it began lands the board again.
+      if (open >= 1 && before !== null && before < 1) runOnJS(endRefold)()
     },
     [refoldAngle],
   )
@@ -230,7 +233,8 @@ function PinnedGameBoardStage({
     )
     return { x: onPanel.x - boardAnchor.x * width, y: onPanel.y - boardAnchor.y * height }
   }, [unfolding, landed, playerCount, layoutVariant, width, height, holderAngle, boardAnchor])
-  // why: turning, the menu rides the board from where the center column's seats meet to the middle, where the Table's seats meet, so it is in place when the board lands.
+  // why: turning, the menu rides the board from where the center column's seats meet to the middle, where the Table's seats meet, so it is in place when the board lands. It is anchored in the middle and offset by transform, since a new anchor draws a frame before its offset does.
+  const menuAnchor = gridLayout.centerColumn ? BOARD_MIDDLE : boardAnchor
   const turnMenu = gridLayout.centerColumn
     ? { x: boardAnchor.x * width - width / 2, y: boardAnchor.y * height - height / 2 }
     : undefined
@@ -243,20 +247,8 @@ function PinnedGameBoardStage({
     const y = (turnMenu?.y ?? 0) * kept
     return {
       transform: [
-        {
-          translateX:
-            foldedMenuOffset.x * away +
-            Math.cos(radians) * x -
-            Math.sin(radians) * y -
-            (turnMenu?.x ?? 0),
-        },
-        {
-          translateY:
-            foldedMenuOffset.y * away +
-            Math.sin(radians) * x +
-            Math.cos(radians) * y -
-            (turnMenu?.y ?? 0),
-        },
+        { translateX: foldedMenuOffset.x * away + Math.cos(radians) * x - Math.sin(radians) * y },
+        { translateY: foldedMenuOffset.y * away + Math.sin(radians) * x + Math.cos(radians) * y },
       ],
     }
   })
@@ -284,7 +276,7 @@ function PinnedGameBoardStage({
         >
           <GameMenuCluster
             open={menu.open}
-            anchor={boardAnchor}
+            anchor={menuAnchor}
             holderAnchor={holderAnchor}
             holderHeight={holderAngle % 180 === 0 ? height : width}
             facingAngle={holderAngle}
@@ -402,6 +394,7 @@ export function firstPlayerTabs(
 
 // why: the menu sits above its own backdrop, so the layer carrying it along must stack where the cluster did.
 const $menuLayer: ViewStyle = { zIndex: 30 }
+const BOARD_MIDDLE = { x: 0.5, y: 0.5 }
 const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 }
 const $outerDisplay: ViewStyle = { position: "absolute", right: 0, top: 0 }
 const $pinnedBoard: ViewStyle = { position: "absolute", left: 0, top: 0 }
