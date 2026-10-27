@@ -34,14 +34,33 @@ type ScannedCard = CardNameMatch & {
   imageUrl?: string
   state: "adding" | "added" | { error: string }
 }
-type ScanStatus = "looking" | "loading" | "steady" | "unsure" | { error: string }
+type ScanStatus =
+  "looking" | "loading" | "steady" | "unsure" | { error: string } | { alreadyInDeck: string }
+type LandCount = { card: Omit<ScannedCard, "id" | "state">; inDeck: number; count: number }
 
 const ALTERNATE_COUNT = 5
 const ADD_BATCH_SIZE = 10
 const ADD_BATCH_WAIT_MS = 1500
+const BASIC_LANDS = new Set([
+  "Plains",
+  "Island",
+  "Swamp",
+  "Mountain",
+  "Forest",
+  "Wastes",
+  "Snow-Covered Plains",
+  "Snow-Covered Island",
+  "Snow-Covered Swamp",
+  "Snow-Covered Mountain",
+  "Snow-Covered Forest",
+  "Snow-Covered Wastes",
+])
 
 function statusText(status: ScanStatus) {
-  if (typeof status === "object") return status.error
+  if (typeof status === "object")
+    return "error" in status
+      ? status.error
+      : translate("decks:cardScan.alreadyInDeck", { card: status.alreadyInDeck })
   return translate(`decks:cardScan.${status}`)
 }
 
@@ -52,6 +71,8 @@ function cardLabel(card: CardNameMatch) {
 export function CardScanner({
   game,
   nameIndex,
+  singleton,
+  copiesInDeck,
   addCards,
   removeCard,
   onRead,
@@ -59,6 +80,8 @@ export function CardScanner({
 }: {
   game: string
   nameIndex: CardNameIndex | undefined
+  singleton: boolean
+  copiesInDeck: (name: string) => number
   addCards: (names: string[]) => Promise<ScannedCardAdd[]>
   removeCard?: (name: string) => void
   onRead?: (scan: CardScan, match: string | undefined) => void
@@ -71,7 +94,8 @@ export function CardScanner({
   const addedRef = useRef(added)
   const [status, setStatus] = useState<ScanStatus>("looking")
   const [fixing, setFixing] = useState<ScannedCard>()
-  const [repeat, setRepeat] = useState<Omit<ScannedCard, "state">>()
+  const [landCount, setLandCount] = useState<LandCount>()
+  const countedLands = useRef(new Set<string>())
   const candidateName = useRef<string>(undefined)
   const nameInFrame = useRef<string>(undefined)
   const waiting = useRef<ScannedCard[]>([])
@@ -154,12 +178,30 @@ export function CardScanner({
       .filter((name) => name !== match.name)
       .slice(0, ALTERNATE_COUNT)
     const card = { ...match, alternates }
-    if (addedRef.current.some((scanned) => scanned.name === match.name)) {
-      setRepeat({ ...card, id: -1 })
+    if (BASIC_LANDS.has(match.name)) {
+      if (countedLands.current.has(match.name)) {
+        setStatus({ alreadyInDeck: match.name })
+        return
+      }
+      const inDeck = copiesInDeck(match.name)
+      setLandCount({ card, inDeck, count: Math.max(inDeck, 1) })
       return
     }
-    setRepeat(undefined)
+    if (
+      singleton &&
+      (copiesInDeck(match.name) > 0 ||
+        addedRef.current.some((scanned) => scanned.name === match.name))
+    ) {
+      setStatus({ alreadyInDeck: match.name })
+      return
+    }
     add(card)
+  }
+
+  function addLands({ card, inDeck, count }: LandCount) {
+    setLandCount(undefined)
+    countedLands.current.add(card.name)
+    for (let copy = inDeck; copy < count; copy++) add(card)
   }
 
   async function replace(wrong: ScannedCard, name?: string) {
@@ -181,7 +223,7 @@ export function CardScanner({
 
   const canAsk = permission?.canAskAgain !== false
   const last = added[0]
-  const scanning = Boolean(permission?.granted) && !fixing
+  const scanning = Boolean(permission?.granted) && !fixing && !landCount
 
   return (
     <Modal visible animationType="slide" onRequestClose={() => void close()}>
@@ -223,23 +265,36 @@ export function CardScanner({
         )}
         {permission?.granted ? (
           <View style={themed($added)}>
-            {repeat ? (
+            {landCount ? (
               <>
                 <View style={$addedName}>
+                  <Text weight="medium" numberOfLines={1} text={cardLabel(landCount.card)} />
                   <Text
-                    weight="medium"
-                    numberOfLines={2}
-                    tx="decks:cardScan.again"
-                    txOptions={{ card: cardLabel(repeat) }}
+                    size="xs"
+                    style={{ color: theme.colors.textDim }}
+                    tx="decks:cardScan.howMany"
                   />
                 </View>
                 <Button
-                  testID="card-scan-add-another"
-                  tx="decks:cardScan.addAnother"
-                  onPress={() => {
-                    setRepeat(undefined)
-                    add(repeat)
-                  }}
+                  text="−"
+                  accessibilityLabel={translate("decks:cardRow.decrease", {
+                    card: landCount.card.name,
+                  })}
+                  disabled={landCount.count <= 1}
+                  onPress={() => setLandCount({ ...landCount, count: landCount.count - 1 })}
+                />
+                <Text weight="medium" testID="card-scan-land-count" text={`${landCount.count}`} />
+                <Button
+                  text="+"
+                  accessibilityLabel={translate("decks:cardRow.increase", {
+                    card: landCount.card.name,
+                  })}
+                  onPress={() => setLandCount({ ...landCount, count: landCount.count + 1 })}
+                />
+                <Button
+                  testID="card-scan-add-lands"
+                  tx="decks:cardScan.addLands"
+                  onPress={() => addLands(landCount)}
                 />
               </>
             ) : last ? (

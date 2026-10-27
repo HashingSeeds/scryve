@@ -355,8 +355,9 @@ export default {
     whichCard: "यह कौन सा कार्ड है?",
     removeIt: "हटाएँ",
     addFailed: "स्कैन किए गए कार्ड जोड़े नहीं जा सके। अपना कनेक्शन जाँचें।",
-    again: "{{card}} फिर से?",
-    addAnother: "एक और जोड़ें",
+    alreadyInDeck: "{{card}} पहले से डेक में है",
+    howMany: "डेक में कितने हैं?",
+    addLands: "जोड़ें",
     notFound: "{{card}} नहीं मिला।",
     permission:
       "Scryve कार्ड के नाम पढ़ने के लिए कैमरे का उपयोग करता है। फ़ोटो इसी डिवाइस पर रहती हैं।",

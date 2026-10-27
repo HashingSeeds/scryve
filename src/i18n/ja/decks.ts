@@ -350,8 +350,9 @@ export default {
     whichCard: "どのカードですか?",
     removeIt: "削除",
     addFailed: "スキャンしたカードを追加できませんでした。接続を確認してください。",
-    again: "{{card}}をもう一度追加しますか?",
-    addAnother: "もう1枚追加",
+    alreadyInDeck: "{{card}}はすでにデッキに入っています",
+    howMany: "デッキに何枚入れますか?",
+    addLands: "追加",
     notFound: "{{card}}が見つかりませんでした。",
     permission:
       "Scryveはカメラを使ってカード名を読み取ります。写真はこのデバイスから外に出ません。",

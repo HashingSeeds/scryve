@@ -382,8 +382,9 @@ export default {
     whichCard: "De quelle carte s'agit-il ?",
     removeIt: "Retirer",
     addFailed: "Impossible d'ajouter les cartes scannées. Vérifiez votre connexion.",
-    again: "{{card}} encore ?",
-    addAnother: "Ajouter une autre",
+    alreadyInDeck: "{{card}} est déjà dans le deck",
+    howMany: "Combien dans le deck ?",
+    addLands: "Ajouter",
     notFound: "Impossible de trouver {{card}}.",
     permission:
       "Scryve utilise l'appareil photo pour lire les noms des cartes. Les photos restent sur cet appareil.",

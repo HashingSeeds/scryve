@@ -374,9 +374,12 @@ const decks = {
     whichCard: "Which card is it?",
     removeIt: "Remove it",
     addFailed: "Couldn't add the scanned cards. Check your connection.",
-    // The scanner saw a card it already added in this session. Asks before adding another copy.
-    again: "{{card}} again?",
-    addAnother: "Add another",
+    // The scanner skipped a card this deck already holds, such as a second copy in Commander.
+    alreadyInDeck: "{{card}} is already in the deck",
+    // Asked the first time a basic land is scanned. The answer is that land's total in the deck.
+    howMany: "How many in the deck?",
+    // Adds the chosen number of the scanned basic land.
+    addLands: "Add",
     notFound: "Couldn't find {{card}}.",
     permission: "Scryve uses the camera to read card names. Photos stay on this device.",
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",

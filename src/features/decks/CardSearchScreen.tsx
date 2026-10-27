@@ -836,6 +836,13 @@ export function CardSearchScreen({
         <CardScanner
           game={game}
           nameIndex={nameIndex}
+          singleton={picksCommander(game, format)}
+          copiesInDeck={(name) =>
+            (commanderCards ?? []).reduce(
+              (total, card) => total + (card.name === name ? card.quantity : 0),
+              0,
+            )
+          }
           addCards={addScannedCards}
           removeCard={onRemove ? removeScannedCard : undefined}
           onRead={__DEV__ ? recordScanRead : undefined}
