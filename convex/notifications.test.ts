@@ -88,14 +88,14 @@ describe("push notifications", () => {
     expect(sent[0]).not.toHaveProperty("title")
   })
 
-  it("keeps renewal reminders for signed-in devices and forgets a device with nothing on", async () => {
+  it("keeps renewal reminders for signed-in devices and forgets a device without its token", async () => {
     const t = makeConvexTest()
     await device(t, ME, "phone", { feedbackReplies: true, renewalReminders: true })
     expect(await devices(t)).toMatchObject([
       { feedbackReplies: true, renewalReminders: false, locale: "ja" },
     ])
 
-    await device(t, ME, "phone")
+    await t.mutation(api.notifications.forgetDevice, { key: ME })
     expect(await devices(t)).toEqual([])
     await expect(
       t.mutation(api.notifications.syncDevice, {

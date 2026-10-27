@@ -4,6 +4,7 @@ import { router } from "expo-router"
 import { useConvexAuth, useMutation } from "convex/react"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { appLocale } from "@/i18n"
 import { storage } from "@/utils/storage"
@@ -24,13 +25,22 @@ function Sync() {
   const { isLoading, isAuthenticated } = useConvexAuth()
   const feedbackReplies = usePushPref("feedbackReplies")
   const renewalReminders = usePushPref("renewalReminders")
+  const online = useConvexOnline()
   const syncDevice = useMutation(api.notifications.syncDevice)
+  const forgetDevice = useMutation(api.notifications.forgetDevice)
 
   useEffect(() => onNotificationOpened((url) => router.push(url)), [])
 
   useEffect(() => {
-    const wanted = feedbackReplies || renewalReminders
-    if (!key || isLoading || (!wanted && !storage.getBoolean(REGISTERED))) return
+    if (!key || isLoading || !online) return
+    if (!feedbackReplies && !renewalReminders) {
+      if (storage.getBoolean(REGISTERED))
+        void forgetDevice({ key }).then(
+          () => storage.set(REGISTERED, false),
+          () => undefined,
+        )
+      return
+    }
     void (async () => {
       const token = await pushToken()
       if (!token) return
@@ -42,10 +52,19 @@ function Sync() {
         feedbackReplies,
         renewalReminders,
       })
-      storage.set(REGISTERED, wanted)
+      storage.set(REGISTERED, true)
     })().catch(() => undefined)
-    // why: signing in or out changes which account this device belongs to, so it re-syncs.
-  }, [key, isLoading, isAuthenticated, feedbackReplies, renewalReminders, syncDevice])
+    // why: signing in or out changes which account this device belongs to, and a sync that failed offline must run again once back online.
+  }, [
+    key,
+    isLoading,
+    isAuthenticated,
+    online,
+    feedbackReplies,
+    renewalReminders,
+    syncDevice,
+    forgetDevice,
+  ])
 
   return null
 }

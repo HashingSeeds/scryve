@@ -41,6 +41,19 @@ function sameDevice(a: DeviceFields, b: DeviceFields) {
   )
 }
 
+export const forgetDevice = mutation({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const hash = await senderHash(key)
+    const existing = await ctx.db
+      .query("pushDevices")
+      .withIndex("by_sender", (q) => q.eq("senderHash", hash))
+      .unique()
+    if (existing) await ctx.db.delete(existing._id)
+    return null
+  },
+})
+
 export const syncDevice = mutation({
   args: {
     key: v.string(),
@@ -58,10 +71,6 @@ export const syncDevice = mutation({
       .query("pushDevices")
       .withIndex("by_sender", (q) => q.eq("senderHash", hash))
       .unique()
-    if (!args.feedbackReplies && !args.renewalReminders) {
-      if (existing) await ctx.db.delete(existing._id)
-      return null
-    }
     const user = await signedInUser(ctx)
     const device: DeviceFields = {
       senderHash: hash,
