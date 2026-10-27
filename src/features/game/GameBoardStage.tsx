@@ -49,6 +49,7 @@ import {
   initialUnfoldProgress,
   nextUnfoldProgress,
   type TableTurn,
+  tableTurnGather,
   windowRectToPanel,
 } from "./tableTurn"
 import { TableTurnOffer } from "./TableTurnOffer"
@@ -229,13 +230,33 @@ function PinnedGameBoardStage({
     )
     return { x: onPanel.x - boardAnchor.x * width, y: onPanel.y - boardAnchor.y * height }
   }, [unfolding, landed, playerCount, layoutVariant, width, height, holderAngle, boardAnchor])
+  // why: turning, the menu rides the board from where the center column's seats meet to the middle, where the Table's seats meet, so it is in place when the board lands.
+  const turnMenu = gridLayout.centerColumn
+    ? { x: boardAnchor.x * width - width / 2, y: boardAnchor.y * height - height / 2 }
+    : undefined
   const menuTravel = useAnimatedStyle(() => {
     const away = 1 - unfolded.value
+    const angle = turnAngle.value
+    const kept = turnMenu ? 1 - tableTurnGather(angle) : 1
+    const radians = (angle * Math.PI) / 180
+    const x = (turnMenu?.x ?? 0) * kept
+    const y = (turnMenu?.y ?? 0) * kept
     return {
-      opacity: offering ? 1 - Math.max((unfolded.value - 0.9) / 0.1, 0) : 1,
       transform: [
-        { translateX: foldedMenuOffset.x * away },
-        { translateY: foldedMenuOffset.y * away },
+        {
+          translateX:
+            foldedMenuOffset.x * away +
+            Math.cos(radians) * x -
+            Math.sin(radians) * y -
+            (turnMenu?.x ?? 0),
+        },
+        {
+          translateY:
+            foldedMenuOffset.y * away +
+            Math.sin(radians) * x +
+            Math.cos(radians) * y -
+            (turnMenu?.y ?? 0),
+        },
       ],
     }
   })
