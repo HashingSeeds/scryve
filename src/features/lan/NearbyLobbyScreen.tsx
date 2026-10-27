@@ -2,11 +2,13 @@ import { useEffect, useRef } from "react"
 import { Linking } from "react-native"
 
 import { Button } from "@/components/Button"
+import { buildInviteQrPayload } from "@/features/connected/inviteLinks"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
 import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
+import { nearbyGameCode, nearbyGameHost } from "./nearbyCode"
 import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
 import { NearbyStatusScreen } from "./NearbyStatusScreen"
 
@@ -100,6 +102,7 @@ export function NearbyLobbyScreen({
     )
 
   const isHost = role === "host"
+  const code = serviceName ? nearbyGameCode(serviceName) : undefined
   const away = new Set(lobby.seats.filter((seat) => !seat.connected).map((seat) => seat.key))
   return (
     <LobbyView
@@ -112,9 +115,12 @@ export function NearbyLobbyScreen({
         })),
       }}
       heading={
-        serviceName ? { text: serviceName, label: translate("play:newGame.nearby") } : undefined
+        serviceName
+          ? { text: nearbyGameHost(serviceName), label: translate("play:newGame.nearby") }
+          : undefined
       }
       online={isHost || status === "connected"}
+      invite={code ? { qrPayload: buildInviteQrPayload("", code), manualCode: code } : undefined}
       offlineNotice={translate("connected:nearby.reconnecting")}
       error={error}
       starting={false}
