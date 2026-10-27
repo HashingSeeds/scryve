@@ -42,7 +42,25 @@ const RESTING = {
   borderBottomLeftRadius: 0,
 } as const
 
-/** why: a seat keeps this wrapper whether or not it is turning, so its card stays mounted when the board starts or stops unfolding; remounting six cards froze the switch for over a second on an iPad mini. */
+function placeSeat(turn: SeatTurn) {
+  "worklet"
+  const { folded, cell, table, board } = turn
+  const open = turn.unfolded.value
+  const mix = (from: number, to: number) => from + (to - from) * open
+  const sideways = Math.abs(folded.turn) === 90
+  const width = mix(sideways ? folded.height : folded.width, cell.width)
+  const height = mix(sideways ? folded.width : folded.height, cell.height)
+  const resting = {
+    x: mix(folded.x + folded.width / 2, cell.x + cell.width / 2) - width / 2,
+    y: mix(folded.y + folded.height / 2, cell.y + cell.height / 2) - height / 2,
+    width,
+    height,
+  }
+  const placement = tableTurnPlacement({ cell: resting, table, board, angle: turn.angle.value })
+  return { ...placement, angle: placement.angle + folded.turn * (1 - open) }
+}
+
+/** why: a seat that starts or stops turning is given a fresh wrapper (PlayerGrid keys it by that), since an animated style that changes on a mounted view lands a frame after the seat moves, and that frame drew the board fully open as it switched displays. */
 export function TurningSeat({
   turn,
   children,
@@ -50,31 +68,15 @@ export function TurningSeat({
   turn?: SeatTurn
   children: (liveSize?: SharedValue<{ width: number; height: number }>) => ReactNode
 }) {
-  const placed = useDerivedValue(() => {
-    if (!turn) return null
-    const { folded, cell, table, board } = turn
-    const open = turn.unfolded.value
-    const mix = (from: number, to: number) => from + (to - from) * open
-    const sideways = Math.abs(folded.turn) === 90
-    const width = mix(sideways ? folded.height : folded.width, cell.width)
-    const height = mix(sideways ? folded.width : folded.height, cell.height)
-    const resting = {
-      x: mix(folded.x + folded.width / 2, cell.x + cell.width / 2) - width / 2,
-      y: mix(folded.y + folded.height / 2, cell.y + cell.height / 2) - height / 2,
-      width,
-      height,
-    }
-    const placement = tableTurnPlacement({ cell: resting, table, board, angle: turn.angle.value })
-    return { ...placement, angle: placement.angle + folded.turn * (1 - open) }
+  // why: each reads the placement itself, since a style reading a derived value can run a frame before it updates, and a seat that had just started turning then drew in its open cell for that frame.
+  const liveSize = useDerivedValue(() => {
+    const at = turn && placeSeat(turn)
+    return { width: at?.width ?? 0, height: at?.height ?? 0 }
   })
-  const liveSize = useDerivedValue(() => ({
-    width: placed.value?.width ?? 0,
-    height: placed.value?.height ?? 0,
-  }))
   // why: position, turn and growth move by transform, since layout props would relayout the card every frame. Every key is always set, since a key the style dropped would keep its last turning value.
   const style = useAnimatedStyle(() => {
-    const at = placed.value
-    if (!turn || !at) return RESTING
+    if (!turn) return RESTING
+    const at = placeSeat(turn)
     const { centerX, centerY, width, height, scale } = at
     return {
       ...RESTING,

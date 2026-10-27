@@ -697,6 +697,7 @@ export function PlayerGrid({
             return (
               <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={seatStyle}>
                 <TurningSeat
+                  key={turning ? "turning" : "resting"}
                   turn={
                     turning && turningFrom && turningTo && turningFolded
                       ? {
