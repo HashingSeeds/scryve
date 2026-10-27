@@ -20,7 +20,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
-import { commanderBoardSeats, commanderFacing } from "./commanderDamageLayout"
+import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
@@ -303,6 +303,7 @@ export function PlayerGrid({
   const seatedRows = rows.map((row) =>
     row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
   )
+  const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const boardSeats = commanderDamage
@@ -372,7 +373,7 @@ export function PlayerGrid({
           <View
             key={rowIndex}
             testID={`player-grid-row-${rowIndex}`}
-            style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
+            style={[themed($row), { flex: rowFlexes[rowIndex] }]}
           >
             {row.map((slot, columnIndex) => {
               const index = seatedRows[rowIndex][columnIndex]
@@ -533,6 +534,19 @@ export function PlayerGrid({
                             facing:
                               armedIndex >= 0
                                 ? commanderFacing(seatedRows, armedIndex, index)
+                                : undefined,
+                            reach:
+                              armedIndex >= 0 && armedIndex !== index
+                                ? commanderReach({
+                                    gridRows: seatedRows,
+                                    rowFlexes,
+                                    board: {
+                                      width: board.width,
+                                      height: board.height - topEdgeBand,
+                                    },
+                                    attackerIndex: armedIndex,
+                                    defenderIndex: index,
+                                  })
                                 : undefined,
                             stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                             pendingClaims: commanderDamage.pendingFor?.(player),

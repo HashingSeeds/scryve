@@ -6,11 +6,12 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated"
-import Svg, { Path } from "react-native-svg"
+import Svg, { Circle, Path } from "react-native-svg"
 
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { translate } from "@/i18n/translate"
@@ -20,15 +21,14 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import type { CommanderFacing } from "./commanderDamageLayout"
+import type { CommanderFacing, CommanderTakeover } from "./commanderDamageLayout"
 import { overlayTint } from "./LifeControls"
 import type {
   LifeCardContentInsets,
   LifeCardContentRotation,
   LifeCardMenuCorner,
-  LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { MarkArt, PlayerMark } from "./PlayerMark"
+import { MarkArt } from "./PlayerMark"
 import { Text } from "./Text"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -44,8 +44,10 @@ type AssignmentTarget = {
   attackerName: string
   attacker?: CommanderAttacker
   total: number
+  lethal: number
   power: number
   facing: CommanderFacing
+  takeover?: CommanderTakeover
   acted: boolean
   onChange: (step: number) => void
 }
@@ -71,10 +73,12 @@ export interface CommanderDamageCardControlsProps {
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
-  menuEdgeCenter?: LifeCardMenuEdge
   compact?: boolean
   mode: CommanderDamageCardMode
 }
+
+export const RAM_MS = 90
+const RAM_RETURN_MS = 300
 
 export function CommanderDamageCardControls({
   seatNumber,
@@ -83,7 +87,6 @@ export function CommanderDamageCardControls({
   contentRotation,
   contentInsets,
   menuCorner,
-  menuEdgeCenter,
   compact,
   mode,
 }: CommanderDamageCardControlsProps) {
@@ -106,10 +109,9 @@ export function CommanderDamageCardControls({
         <DefenderControls
           seatNumber={seatNumber}
           playerName={playerName}
-          foreground={foreground}
+          contentRotation={contentRotation}
           contentInsets={contentInsets}
           menuCorner={menuCorner}
-          menuEdgeCenter={menuEdgeCenter}
           compact={compact}
           mode={mode}
         />
@@ -126,67 +128,144 @@ export function CommanderDamageCardControls({
   )
 }
 
+export function CommanderTakeoverBackdrop({
+  seatNumber,
+  takeover,
+  cardSize,
+  attackerColor,
+  defenderColor,
+}: {
+  seatNumber: number
+  takeover: CommanderTakeover
+  cardSize: { width: number; height: number }
+  attackerColor: string
+  defenderColor: string
+}) {
+  const reducedMotion = useReducedMotion()
+  const wave = useSharedValue(reducedMotion === false ? 0 : 1)
+  useEffect(() => {
+    wave.value = withTiming(1, {
+      duration: motionDuration(reducedMotion, 620),
+      easing: Easing.bezier(0.3, 0.6, 0.3, 1),
+    })
+  }, [reducedMotion, wave])
+  const waveStyle = useAnimatedStyle(() => ({ transform: [{ scale: wave.value }] }))
+  const { flood, disc } = takeover
+
+  return (
+    <View
+      testID={`commander-takeover-seat-${seatNumber}`}
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+    >
+      {flood ? (
+        <Animated.View
+          testID={`commander-flood-seat-${seatNumber}`}
+          style={[
+            $absolute,
+            {
+              left: flood.x - flood.radius,
+              top: flood.y - flood.radius,
+              width: flood.radius * 2,
+              height: flood.radius * 2,
+              borderRadius: flood.radius,
+              backgroundColor: attackerColor,
+            },
+            waveStyle,
+          ]}
+        />
+      ) : (
+        <View
+          testID={`commander-flood-seat-${seatNumber}`}
+          style={[StyleSheet.absoluteFill, { backgroundColor: attackerColor }]}
+        />
+      )}
+      <View
+        testID={`commander-disc-seat-${seatNumber}`}
+        style={[
+          $absolute,
+          {
+            left: cardSize.width / 2 - disc,
+            top: cardSize.height / 2 - disc,
+            width: disc * 2,
+            height: disc * 2,
+            borderRadius: disc,
+            backgroundColor: defenderColor,
+          },
+        ]}
+      />
+    </View>
+  )
+}
+
 function DefenderControls({
   seatNumber,
   playerName,
-  foreground,
+  contentRotation,
   contentInsets,
   menuCorner,
-  menuEdgeCenter,
   compact,
   mode,
 }: {
   seatNumber: number
   playerName: string
-  foreground: string
+  contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
-  menuEdgeCenter?: LifeCardMenuEdge
   compact?: boolean
   mode: AssignmentTarget
 }) {
   const { themed, theme } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [hits, setHits] = useState<number[]>([])
+  const [editing, setEditing] = useState(false)
   const pop = useSharedValue(1)
+  const ram = useSharedValue(0)
   const flash = useSharedValue(0)
   const previousTotal = useRef(mode.total)
-  const { attacker, facing, total } = mode
+  const { attacker, facing, takeover, total } = mode
   const step = Math.min(mode.power, MAX_COMMANDER_DAMAGE - total)
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
   const attackerForeground = accessibleForeground(attackerColor)
-  const rotation = attacker?.rotation ?? 0
-  const thickness = compact ? COMPACT_EDGE : EDGE
-  const menuInCorner = !!facing.x && !!facing.y && cornerName(facing.x, facing.y) === menuCorner
-  const badgeSize = menuInCorner ? thickness * 0.58 : thickness * 0.8
-  const edgeColors = {
-    backgroundColor: attackerColor,
-    borderColor: overlayTint(attackerForeground, 0.5),
-  }
-  const menuOnStrip = !facing.y ? menuEdgeCenter === facing.x : menuEdgeCenter === facing.y
-  const badgePlacement: ViewStyle = menuInCorner
-    ? { justifyContent: awayFrom(facing.y), alignItems: awayFrom(facing.x) }
-    : !facing.x !== !facing.y && menuOnStrip
-      ? stripStart(facing, contentInsets, theme.spacing.lg)
-      : $centered
+  const badge = takeover?.badge
+  const badgeShape = attacker?.shape ?? shapeForSeat(attacker?.seatNumber ?? 1)
+  // why: a badge driven all the way to the disc would cover the life total, so the ram stops once it overlaps the ring.
+  const ramReach = takeover && badge ? takeover.disc + badge.size * 0.15 - badge.distance : 0
 
   useEffect(() => {
     const previous = previousTotal.current
     previousTotal.current = total
     if (total <= previous || reducedMotion !== false) return
-    pop.value = withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 }))
-    flash.value = withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 }))
-  }, [flash, pop, reducedMotion, total])
+    const impact = badge ? RAM_MS : 0
+    pop.value = withDelay(
+      impact,
+      withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 })),
+    )
+    flash.value = withDelay(
+      impact,
+      withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 })),
+    )
+  }, [badge, flash, pop, reducedMotion, total])
 
-  const popStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation}deg` }, { scale: pop.value }],
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: Math.cos(badge?.angle ?? 0) * ramReach * ram.value },
+      { translateY: Math.sin(badge?.angle ?? 0) * ramReach * ram.value },
+      { scale: pop.value },
+    ],
   }))
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
   function hit() {
+    if (editing) return setEditing(false)
     if (step <= 0) return
     setHits((current) => [...current, step])
     mode.onChange(step)
+    if (reducedMotion !== false || !badge) return
+    ram.value = withSequence(
+      withTiming(1, { duration: RAM_MS, easing: Easing.in(Easing.quad) }),
+      withTiming(0, { duration: RAM_RETURN_MS, easing: Easing.out(Easing.cubic) }),
+    )
   }
 
   const takeBack = Math.min(hits.at(-1) ?? mode.power, total)
@@ -200,6 +279,27 @@ function DefenderControls({
   const undoCorner = freeCorner(menuCorner, facing)
   const inset = (edge: keyof LifeCardContentInsets) =>
     (contentInsets?.[edge] ?? 0) + theme.spacing.xxs
+  const sideways = Math.abs(contentRotation) === 90
+  const content = takeover?.content ?? { width: 0, height: 0 }
+  const contentBox: ViewStyle = {
+    position: "absolute",
+    left: ((sideways ? content.height : content.width) - content.width) / 2,
+    top: ((sideways ? content.width : content.height) - content.height) / 2,
+    width: content.width,
+    height: content.height,
+    transform: [{ rotate: `${contentRotation}deg` }],
+  }
+  const disc = takeover?.disc ?? 0
+  const ring = disc * 2 + 8
+  const circumference = 2 * Math.PI * disc
+  const badgeSize = badge?.size ?? (compact ? COMPACT_BADGE : BADGE)
+  const editWidth = badgeSize + EDIT_STEP * 2 + 8
+  const editHeight = Math.max(badgeSize, EDIT_STEP) + 8
+  const clamp = (value: number, room: number) => Math.max(-room, Math.min(room, value))
+  const totalLabel = translate("board:commander.totalFrom", {
+    damage: total,
+    name: mode.attackerName,
+  })
 
   return (
     <>
@@ -211,7 +311,7 @@ function DefenderControls({
           name: playerName,
         })}
         accessibilityState={{ disabled: step <= 0 }}
-        disabled={step <= 0}
+        disabled={step <= 0 && !editing}
         onPress={hit}
         style={StyleSheet.absoluteFill}
       />
@@ -220,41 +320,129 @@ function DefenderControls({
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, { backgroundColor: attackerColor }, flashStyle]}
       />
-      <View
-        testID={`commander-edge-seat-${seatNumber}`}
-        pointerEvents="none"
-        accessible
-        accessibilityLabel={translate("board:commander.totalFrom", {
-          damage: total,
-          name: mode.attackerName,
-        })}
-        accessibilityLiveRegion="polite"
-        style={[
-          themed($edge),
-          edgeStyle(facing, thickness, compact ? theme.spacing.md : theme.spacing.lg),
-          edgeColors,
-          badgePlacement,
-        ]}
-      >
-        <View style={[$centered, { width: badgeSize, height: badgeSize }]}>
-          {mode.acted ? null : (
+      <View pointerEvents="box-none" style={contentBox}>
+        {takeover ? (
+          <Svg
+            pointerEvents="none"
+            width={ring}
+            height={ring}
+            style={[
+              $centeredAt(content.width / 2 - ring / 2, content.height / 2 - ring / 2),
+              { transform: [{ rotate: `${(takeover.badge.angle * 180) / Math.PI}deg` }] },
+            ]}
+          >
+            <Circle
+              cx={ring / 2}
+              cy={ring / 2}
+              r={takeover.disc}
+              stroke={overlayTint(attackerForeground, 0.25)}
+              strokeWidth={3}
+              fill="none"
+            />
+            <Circle
+              testID={`commander-progress-seat-${seatNumber}`}
+              cx={ring / 2}
+              cy={ring / 2}
+              r={takeover.disc}
+              stroke={attackerForeground}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={circumference * (1 - Math.min(total, mode.lethal) / mode.lethal)}
+              fill="none"
+            />
+          </Svg>
+        ) : null}
+        {!mode.acted ? (
+          <View
+            pointerEvents="none"
+            style={[
+              $centered,
+              $centeredAt(content.width / 2 - disc, content.height / 2 - disc),
+              { width: disc * 2, height: disc * 2 },
+            ]}
+          >
             <PulseRing
               testID={`commander-target-pulse-seat-${seatNumber}`}
-              size={badgeSize * 1.15}
+              size={disc * 2 + 12}
               color={attackerForeground}
             />
-          )}
-          <Animated.View style={popStyle}>
+          </View>
+        ) : null}
+        {editing ? (
+          <View
+            testID={`commander-edit-seat-${seatNumber}`}
+            style={[
+              themed($edit),
+              $centeredAt(
+                content.width / 2 +
+                  clamp(badge?.x ?? 0, content.width / 2 - editWidth / 2 - 4) -
+                  editWidth / 2,
+                content.height / 2 +
+                  clamp(badge?.y ?? 0, content.height / 2 - editHeight / 2 - 4) -
+                  editHeight / 2,
+              ),
+              {
+                width: editWidth,
+                height: editHeight,
+                borderColor: overlayTint(attackerForeground, 0.6),
+              },
+            ]}
+          >
+            <EditStep
+              testID={`commander-edit-down-seat-${seatNumber}`}
+              label={translate("board:commander.undoHit", { damage: 1 })}
+              glyph="−"
+              color={attackerForeground}
+              disabled={total <= 0}
+              onPress={() => mode.onChange(-1)}
+            />
             <CommanderBadge
               testID={`commander-total-seat-${seatNumber}`}
-              shape={attacker?.shape ?? shapeForSeat(attacker?.seatNumber ?? 1)}
+              shape={badgeShape}
               total={total}
               fill={attackerForeground}
               labelColor={attackerColor}
               size={badgeSize}
             />
-          </Animated.View>
-        </View>
+            <EditStep
+              testID={`commander-edit-up-seat-${seatNumber}`}
+              label={translate("board:commander.dealTo", { damage: 1, name: playerName })}
+              glyph="+"
+              color={attackerForeground}
+              disabled={total >= MAX_COMMANDER_DAMAGE}
+              onPress={() => mode.onChange(1)}
+            />
+          </View>
+        ) : (
+          <BoardPressable
+            testID={`commander-badge-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={totalLabel}
+            accessibilityLiveRegion="polite"
+            hitSlop={8}
+            onPress={() => setEditing(true)}
+            style={[
+              $centered,
+              $centeredAt(
+                content.width / 2 + (badge?.x ?? 0) - badgeSize / 2,
+                content.height / 2 + (badge?.y ?? 0) - badgeSize / 2,
+              ),
+              { width: badgeSize, height: badgeSize },
+            ]}
+          >
+            <Animated.View style={badgeStyle}>
+              <CommanderBadge
+                testID={`commander-total-seat-${seatNumber}`}
+                shape={badgeShape}
+                total={total}
+                fill={attackerForeground}
+                labelColor={attackerColor}
+                size={badgeSize}
+              />
+            </Animated.View>
+          </BoardPressable>
+        )}
       </View>
       {takeBack > 0 ? (
         <BoardPressable
@@ -267,14 +455,49 @@ function DefenderControls({
             {
               [undoCorner.x]: inset(undoCorner.x),
               [undoCorner.y]: inset(undoCorner.y),
-              transform: [{ rotate: `${rotation}deg` }],
+              transform: [{ rotate: `${contentRotation}deg` }],
             },
           ]}
         >
-          <UndoGlyph size={compact ? 22 : 28} color={foreground} />
+          <UndoGlyph size={compact ? 22 : 28} color={attackerForeground} />
         </BoardPressable>
       ) : null}
     </>
+  )
+}
+
+function EditStep({
+  testID,
+  label,
+  glyph,
+  color,
+  disabled,
+  onPress,
+}: {
+  testID: string
+  label: string
+  glyph: string
+  color: string
+  disabled: boolean
+  onPress: () => void
+}) {
+  return (
+    <BoardPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        $centered,
+        { width: EDIT_STEP, height: EDIT_STEP, borderRadius: EDIT_STEP / 2 },
+        pressed && { backgroundColor: overlayTint(color, 0.18) },
+        disabled && { opacity: 0.3 },
+      ]}
+    >
+      <Text text={glyph} weight="bold" maxFontSizeMultiplier={1} style={[$editGlyph, { color }]} />
+    </BoardPressable>
   )
 }
 
@@ -292,88 +515,74 @@ function AttackerControls({
   mode: AssignmentSource
 }) {
   const { themed } = useAppTheme()
-  const markSize = compact ? 64 : 84
+  const markSize = compact ? 72 : 96
   const power = mode.power
 
   return (
     <View style={themed($attackerCenter)}>
       <View
         style={[
-          themed($attackerRow),
+          themed($power),
           contentRotation ? { transform: [{ rotate: `${contentRotation}deg` }] } : null,
         ]}
       >
-        <BoardPressable
-          testID={`commander-exit-seat-${seatNumber}`}
-          accessibilityRole="button"
-          accessibilityLabel={translate(`board:commander.submitAssigningFromSeat.${mode.submit}`, {
-            seat: seatNumber,
-          })}
-          onPress={mode.onSubmit}
-          style={[themed($markButton), { width: markSize * 1.3, height: markSize * 1.3 }]}
-        >
-          {mode.acted ? (
-            <PulseRing
-              testID={`commander-finish-pulse-seat-${seatNumber}`}
-              size={markSize * 1.15}
-              color={foreground}
-            />
-          ) : null}
-          {mode.mark ? (
-            <PlayerMark
-              seatNumber={mode.mark.seatNumber}
-              shape={mode.mark.shape}
-              color={foreground}
-              insetSwordColor={mode.mark.color}
-              insetCheck={mode.acted}
-              size={markSize}
-            />
-          ) : null}
-        </BoardPressable>
-        <View style={themed($power)}>
-          {mode.commanderName && !compact ? (
-            <Text
-              testID={`commander-name-seat-${seatNumber}`}
-              text={mode.commanderName}
-              weight="bold"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.2}
-              style={[themed($commanderName), { color: foreground }]}
-            />
-          ) : null}
-          <PowerStep
-            testID={`commander-power-up-seat-${seatNumber}`}
-            label={translate("board:commander.raisePower")}
-            direction="up"
-            color={foreground}
-            disabled={power >= MAX_COMMANDER_DAMAGE}
-            onPress={() => mode.onPowerStep(1)}
-          />
+        {mode.commanderName && !compact ? (
           <Text
-            testID={`commander-power-seat-${seatNumber}`}
-            text={String(power)}
+            testID={`commander-name-seat-${seatNumber}`}
+            text={mode.commanderName}
             weight="bold"
-            accessibilityLabel={translate("board:commander.power", { power })}
-            accessibilityLiveRegion="polite"
+            numberOfLines={1}
             maxFontSizeMultiplier={1.2}
-            style={[themed(compact ? $compactPowerValue : $powerValue), { color: foreground }]}
+            style={[themed($commanderName), { color: foreground }]}
           />
-          <PowerStep
-            testID={`commander-power-down-seat-${seatNumber}`}
-            label={translate("board:commander.lowerPower")}
-            direction="down"
-            color={foreground}
-            disabled={power <= 1}
-            onPress={() => mode.onPowerStep(-1)}
+        ) : null}
+        <PowerStep
+          testID={`commander-power-up-seat-${seatNumber}`}
+          label={translate("board:commander.raisePower")}
+          direction="up"
+          color={foreground}
+          disabled={power >= MAX_COMMANDER_DAMAGE}
+          onPress={() => mode.onPowerStep(1)}
+        />
+        <View
+          accessible
+          accessibilityLabel={translate("board:commander.power", { power })}
+          accessibilityLiveRegion="polite"
+        >
+          <CommanderBadge
+            testID={`commander-power-seat-${seatNumber}`}
+            shape={mode.mark?.shape ?? shapeForSeat(mode.mark?.seatNumber ?? seatNumber)}
+            total={power}
+            fill={foreground}
+            labelColor={mode.mark?.color ?? foreground}
+            size={markSize}
           />
         </View>
+        <PowerStep
+          testID={`commander-power-down-seat-${seatNumber}`}
+          label={translate("board:commander.lowerPower")}
+          direction="down"
+          color={foreground}
+          disabled={power <= 1}
+          onPress={() => mode.onPowerStep(-1)}
+        />
       </View>
     </View>
   )
 }
 
+const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, left, top })
+
 /** why: the board's one moving ring marks the next step: the targets until the first hit, then the attacker's mark to finish. */
-function PulseRing({ testID, size, color }: { testID: string; size: number; color: string }) {
+export function PulseRing({
+  testID,
+  size,
+  color,
+}: {
+  testID: string
+  size: number
+  color: string
+}) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const ring = useSharedValue(0)
@@ -509,42 +718,8 @@ function UndoGlyph({ size, color }: { size: number; color: string }) {
   )
 }
 
-/** why: a menu centred on the strip's edge would cover a centred badge, so the badge moves to the strip's start. */
-function stripStart(
-  facing: CommanderFacing,
-  insets: LifeCardContentInsets | undefined,
-  gap: number,
-): ViewStyle {
-  return facing.x
-    ? { justifyContent: "flex-start", alignItems: "center", paddingTop: (insets?.top ?? 0) + gap }
-    : { justifyContent: "center", alignItems: "flex-start", paddingLeft: (insets?.left ?? 0) + gap }
-}
-
-function innerCornerRadius(x: "left" | "right", y: "top" | "bottom") {
-  return `border${y === "top" ? "Bottom" : "Top"}${x === "left" ? "Right" : "Left"}Radius` as const
-}
-
 function cornerName(x: "left" | "right", y: "top" | "bottom"): LifeCardMenuCorner {
   return `${y}${x === "left" ? "Left" : "Right"}`
-}
-
-/** why: a corner square's inner corner sits inside the card, so it takes the card's corner radius. */
-function edgeStyle(facing: CommanderFacing, thickness: number, radius: number): ViewStyle {
-  if (facing.x && facing.y)
-    return {
-      width: thickness,
-      height: thickness,
-      [facing.x]: 0,
-      [facing.y]: 0,
-      [innerCornerRadius(facing.x, facing.y)]: radius,
-    }
-  if (facing.x) return { top: 0, bottom: 0, width: thickness, [facing.x]: 0 }
-  return { left: 0, right: 0, height: thickness, [facing.y ?? "top"]: 0 }
-}
-
-/** why: the menu covers the inner corner of a corner square, so its badge leans toward the square's outer corner. */
-function awayFrom(edge: "left" | "right" | "top" | "bottom" | undefined) {
-  return edge === "left" || edge === "top" ? "flex-end" : "flex-start"
 }
 
 const CORNERS = [
@@ -566,10 +741,15 @@ function freeCorner(menuCorner: LifeCardMenuCorner | undefined, facing: Commande
 
 const $centered: ViewStyle = { justifyContent: "center", alignItems: "center" }
 
+const $absolute: ViewStyle = { position: "absolute" }
+
 const $badgeLabel: TextStyle = { position: "absolute", left: 0, right: 0, textAlign: "center" }
 
-const EDGE = 56
-const COMPACT_EDGE = 44
+export const BADGE = 46
+export const COMPACT_BADGE = 36
+const EDIT_STEP = 44
+
+const $editGlyph: TextStyle = { fontSize: 28, lineHeight: 32 }
 
 const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   ...StyleSheet.absoluteFill,
@@ -580,11 +760,6 @@ const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $compactOverlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderRadius: spacing.md,
-})
-
-const $edge: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  borderWidth: 1,
 })
 
 const $undo: ThemedStyle<ViewStyle> = () => ({
@@ -602,23 +777,22 @@ const $attackerCenter: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $attackerRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.md,
-})
-
-const $markButton: ThemedStyle<ViewStyle> = () => ({
-  alignItems: "center",
-  justifyContent: "center",
-})
-
 const $ring: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   borderWidth: 3,
 })
 
 const $power: ThemedStyle<ViewStyle> = () => ({ alignItems: "center" })
+
+const $edit: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: spacing.xxs,
+  borderRadius: 999,
+  borderWidth: 2,
+  backgroundColor: "rgba(0,0,0,0.45)",
+})
 
 const $step: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: 64,
@@ -635,7 +809,3 @@ const $commanderName: ThemedStyle<TextStyle> = () => ({
 })
 
 const $disabledStep: ThemedStyle<ViewStyle> = () => ({ opacity: 0.25 })
-
-const $powerValue: ThemedStyle<TextStyle> = () => ({ fontSize: 72, lineHeight: 80 })
-
-const $compactPowerValue: ThemedStyle<TextStyle> = () => ({ fontSize: 54, lineHeight: 60 })

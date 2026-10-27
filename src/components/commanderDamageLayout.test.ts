@@ -1,7 +1,13 @@
 import { asPlayerId } from "@/features/game/domain"
 import type { PlayerId } from "@/features/game/types"
 
-import { commanderBoardGrid, commanderBoardSeats, commanderFacing } from "./commanderDamageLayout"
+import {
+  commanderBoardGrid,
+  commanderBoardSeats,
+  commanderFacing,
+  commanderReach,
+  commanderTakeover,
+} from "./commanderDamageLayout"
 
 const playerIds = (count: number): PlayerId[] =>
   Array.from({ length: count }, (_, index) => asPlayerId(`player-${index}`))
@@ -53,5 +59,63 @@ describe("commander damage board layout", () => {
     expect(commanderFacing(GRIDS[3], 0, 1)).toEqual({ y: "top" })
     expect(commanderFacing(GRIDS[3], 2, 0)).toEqual({ y: "bottom" })
     expect(commanderFacing(GRIDS[6], 0, 5)).toEqual({ x: "left", y: "top" })
+  })
+
+  it("measures the attacker from each seat so one wave can cross the whole board", () => {
+    const reach = commanderReach({
+      gridRows: GRIDS[5],
+      rowFlexes: [1, 1, 0.8],
+      board: { width: 400, height: 840 },
+      attackerIndex: 0,
+      defenderIndex: 4,
+    })
+    expect(reach).toEqual({ x: -100, y: -570, radius: Math.hypot(300, 690) })
+  })
+
+  it("parks the badge just outside the life disc, toward the attacker, and knocks the card away", () => {
+    const takeover = commanderTakeover({
+      card: { width: 390, height: 420 },
+      rotation: 0,
+      lifeFontSize: 148,
+      lifeDigits: 2,
+      badgeSize: 46,
+      reach: { x: 0, y: -424, radius: 900 },
+    })
+    expect(takeover.badge.x).toBeCloseTo(0)
+    expect(takeover.badge.y).toBeCloseTo(-(takeover.disc + 23 + 6))
+    expect(takeover.knock.x).toBeCloseTo(0)
+    expect(takeover.knock.y).toBeCloseTo(1)
+    expect(takeover.flood).toEqual({ x: 195, y: -214, radius: 900 })
+  })
+
+  it("reads the attacker's direction in a sideways seat's own orientation", () => {
+    const takeover = commanderTakeover({
+      card: { width: 193, height: 420 },
+      rotation: 90,
+      lifeFontSize: 104,
+      lifeDigits: 2,
+      badgeSize: 46,
+      reach: { x: 0, y: -424, radius: 900 },
+    })
+    expect(takeover.badge.x).toBeCloseTo(-takeover.badge.distance)
+    expect(takeover.knock.x).toBeCloseTo(0)
+    expect(takeover.knock.y).toBeCloseTo(1)
+  })
+
+  it("slides the badge around the disc when the attacker sits across a narrow card", () => {
+    const { badge, knock } = commanderTakeover({
+      card: { width: 193, height: 420 },
+      rotation: -90,
+      lifeFontSize: 104,
+      lifeDigits: 2,
+      badgeSize: 46,
+      reach: { x: -197, y: 0, radius: 900 },
+    })
+    expect(Math.abs(badge.x) + badge.size / 2).toBeLessThanOrEqual(210)
+    expect(Math.abs(badge.y) + badge.size / 2).toBeLessThanOrEqual(96.5)
+    const outward = { x: Math.cos(badge.angle), y: Math.sin(badge.angle) }
+    expect(Math.hypot(badge.x, badge.y)).toBeCloseTo(badge.distance)
+    expect(outward.y).toBeLessThan(0)
+    expect(Math.hypot(knock.x, knock.y)).toBeCloseTo(1)
   })
 })
