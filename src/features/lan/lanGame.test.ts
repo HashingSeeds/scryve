@@ -454,3 +454,19 @@ describe("nearby messages", () => {
     expect(lanProjection(lobby(tabletop), "guest").layout).toBe("tabletop")
   })
 })
+
+describe("clock pings", () => {
+  it("reads a ping and its reply, and ignores ones without times", () => {
+    expect(parseGuestMessage(JSON.stringify({ type: "ping", at: 5 }))).toEqual({
+      type: "ping",
+      at: 5,
+    })
+    expect(parseHostMessage(JSON.stringify({ type: "pong", at: 5, hostAt: 9 }))).toEqual({
+      type: "pong",
+      at: 5,
+      hostAt: 9,
+    })
+    expect(parseGuestMessage(JSON.stringify({ type: "ping", at: "soon" }))).toBeNull()
+    expect(parseHostMessage(JSON.stringify({ type: "pong", at: 5 }))).toBeNull()
+  })
+})

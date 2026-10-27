@@ -5,6 +5,7 @@ import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
+import { SyncLatency } from "@/features/connected/syncLatency"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
 import { createClientId, wellFormedPlayerName } from "@/features/game/domain"
 import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
@@ -62,6 +63,7 @@ const WRITES_PER_SECOND = 30
 // why: the saved game carries every event, so it is written at most once a second; a crash loses at most that second of changes.
 const HOST_SAVE_INTERVAL_MS = 1_000
 const PASS_KEY = "lan.seatPass"
+const PING_INTERVAL_MS = 2_000
 
 export interface LanSessionState {
   role?: "host" | "guest"
@@ -160,6 +162,7 @@ export class LanSession {
   private finishedRound?: string
   private pendingWrites = new Map<string, PendingWrite>()
   private reconnectTimer?: ReturnType<typeof setTimeout>
+  private pingTimer?: ReturnType<typeof setInterval>
   private reconnectingSince?: number
   private unreachableAt = new Map<string, number>()
   private flushTimer?: ReturnType<typeof setTimeout>
@@ -169,6 +172,7 @@ export class LanSession {
   // why: hosting and joining finish asynchronously; one that lands after leave() must not revive the session.
   private session = 0
   private backgrounded = false
+  latency = new SyncLatency({ transport: "nearby", role: "guest" })
 
   constructor() {
     // why: iOS reclaims the host's listening socket while the app is in the background, without a close event, so guests are refused until the host listens again.
@@ -200,6 +204,12 @@ export class LanSession {
 
   getState = () => this.state
 
+  private startLatency(role: "host" | "guest") {
+    this.latency.report()
+    this.latency = new SyncLatency({ transport: "nearby", role })
+    if (role === "host") this.latency.setAuthority()
+  }
+
   private set(next: Partial<LanSessionState>) {
     this.replace({ ...this.state, ...next })
   }
@@ -221,6 +231,7 @@ export class LanSession {
     const seatKey = createClientId("seat")
     const game = createLanGame(createClientId("lan"), seatKey, name, setup, Date.now())
     this.game = game
+    this.startLatency("host")
     this.replace({
       role: "host",
       status: "connecting",
@@ -304,6 +315,7 @@ export class LanSession {
     this.session += 1
     this.game = game
     this.roundOwner = roundOwner
+    this.startLatency("host")
     this.tokens = new Map(tokens)
     this.passHashes.clear()
     for (const [key, token] of tokens) this.hashPass({ key, token })
@@ -328,6 +340,8 @@ export class LanSession {
       onMessage: (message: LanGuestMessage) => {
         const game = this.game
         if (!game || session !== this.session) return
+        if (message.type === "ping")
+          return peer.send({ type: "pong", at: message.at, hostAt: Date.now() })
         if (message.type === "join") {
           if (seatKey) return
           const fresh = { key: createClientId("seat"), token: createClientId("token") }
@@ -466,6 +480,7 @@ export class LanSession {
   async join(service: Service) {
     this.pass = savedPass(service.name)
     const session = ++this.session
+    this.startLatency("guest")
     this.replace({
       role: "guest",
       status: "connecting",
@@ -492,6 +507,7 @@ export class LanSession {
         onMessage: (message) => session === this.session && this.receive(message),
         onClose: () => {
           if (session !== this.session) return
+          clearInterval(this.pingTimer)
           this.connection = undefined
           this.rejectPendingWrites("Lost the host")
           this.reconnectingSince ??= Date.now()
@@ -510,6 +526,10 @@ export class LanSession {
       variants: ["treachery"],
       ...(this.pass ? { pass: this.pass } : {}),
     })
+    const ping = () => connection.send({ type: "ping", at: Date.now() })
+    clearInterval(this.pingTimer)
+    this.pingTimer = setInterval(ping, PING_INTERVAL_MS)
+    ping()
   }
 
   private receive(message: LanHostMessage) {
@@ -528,6 +548,8 @@ export class LanSession {
       save(PASS_KEY, { service: this.state.serviceName, ...message.pass })
       return this.set({ seatKey: message.pass.key })
     }
+    if (message.type === "pong")
+      return this.latency.clockSample(message.at, Date.now(), message.hostAt)
     if (message.type === "ack" || message.type === "nack") {
       const pending = this.pendingWrites.get(message.operationId)
       this.pendingWrites.delete(message.operationId)
@@ -653,6 +675,7 @@ export class LanSession {
     const game = this.game
     this.session += 1
     clearTimeout(this.reconnectTimer)
+    clearInterval(this.pingTimer)
     clearTimeout(this.flushTimer)
     this.flushTimer = undefined
     clearTimeout(this.saveTimer)

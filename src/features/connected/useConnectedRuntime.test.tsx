@@ -10,7 +10,7 @@ import {
   type ConnectedWrites,
 } from "./useConnectedRuntime"
 
-jest.mock("@/utils/analytics", () => ({ captureGame: jest.fn() }))
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn(), captureGame: jest.fn() }))
 
 const projection = {
   schemaVersion: 1,

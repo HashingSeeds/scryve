@@ -345,3 +345,20 @@ it("sends local turn order coverage once per completed game without player or ga
     await tick()
   })
 })
+
+it("keeps sync latency to whole milliseconds and the known transports", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  const properties = analyticsProperties("sync_latency", {
+    transport: "nearby",
+    role: "guest",
+    delivery_p50: 104.4,
+    delivery_count: "private",
+    ping_ms: -3,
+    name: "private",
+  })
+  expect(properties).toEqual(
+    expect.objectContaining({ transport: "nearby", role: "guest", delivery_p50: 104 }),
+  )
+  for (const key of ["delivery_count", "ping_ms", "name"])
+    expect(properties).not.toHaveProperty(key)
+})

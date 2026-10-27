@@ -10,7 +10,7 @@ import {
   useState,
 } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, Share, View } from "react-native"
+import { ActivityIndicator, AppState, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
@@ -385,6 +385,24 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
   )
 }
 
+/** why: a frame after the layout effect is when the new totals reach the screen, which is what the other players are waiting for. */
+function usePaintTiming({ latency, projection }: ConnectedGameRuntime) {
+  const eventSequence = projection?.eventSequence
+  useEffect(() => {
+    const away = (state: string) => state === "background" || state === "inactive"
+    latency.setPaused(away(AppState.currentState))
+    const subscription = AppState.addEventListener("change", (state) =>
+      latency.setPaused(away(state)),
+    )
+    return () => subscription.remove()
+  }, [latency])
+  useLayoutEffect(() => {
+    if (eventSequence === undefined) return
+    const frame = requestAnimationFrame(() => latency.painted(eventSequence))
+    return () => cancelAnimationFrame(frame)
+  }, [eventSequence, latency])
+}
+
 export function ConnectedBoardWithRuntime({
   publicId,
   initialInviteOpen,
@@ -408,6 +426,7 @@ export function ConnectedBoardWithRuntime({
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake(undefined, { suppressDeactivateWarnings: true })
+  usePaintTiming(runtime)
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
     connectionStatus: runtime.connectionStatus,
     unsent: runtime.pending.length,

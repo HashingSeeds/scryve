@@ -35,6 +35,7 @@ import type {
 import { toConnectedProjection } from "./model"
 import type { ConnectedGameRepository } from "./persistence"
 import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./reconciliation"
+import { SyncLatency } from "./syncLatency"
 import { flooredLifeDelta } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
 
@@ -66,6 +67,7 @@ export interface OutboxSyncControllerOptions {
   send: (action: PendingLifeAction) => Promise<OutboxAcknowledgement>
   finishGame: (result?: ConnectedGameResult) => Promise<unknown>
   abandonGame: () => Promise<unknown>
+  latency?: SyncLatency
   awaitProjectionBarrier?: boolean
   projectionBarrierTimeoutMs?: number
   now?: () => number
@@ -126,6 +128,7 @@ export class OutboxSyncController {
     remoteReady: false,
   }
   private reconnectPending = true
+  private timingLive = false
   private environmentInitialized = false
   private readonly inFlight = new Set<string>()
   private drainingIds: ReadonlySet<string> = new Set()
@@ -145,6 +148,7 @@ export class OutboxSyncController {
   private stopped = false
   private readonly outbox: OutboxController<OutboxSyncSnapshot>
   readonly table: TableActions
+  readonly latency: SyncLatency
 
   constructor(options: OutboxSyncControllerOptions) {
     this.options = options
@@ -152,6 +156,7 @@ export class OutboxSyncController {
     this.now = options.now ?? Date.now
     this.setTimeoutFn = options.setTimeoutFn ?? ((handler, delay) => setTimeout(handler, delay))
     this.clearTimeoutFn = options.clearTimeoutFn ?? ((handle) => clearTimeout(handle))
+    this.latency = options.latency ?? new SyncLatency({ transport: "cloud" }, this.now)
     this.confirmed = options.repository.loadProjection(options.publicId)
     this.pending = options.repository.loadOutbox(options.publicId)
     this.failed = options.repository.loadFailed(options.publicId)
@@ -200,7 +205,10 @@ export class OutboxSyncController {
       previous.remoteReady !== environment.remoteReady
     this.environment = environment
     if (changed) this.outbox.invalidate()
-    if (!environment.isWebSocketConnected) this.reconnectPending = true
+    if (!environment.isWebSocketConnected) {
+      this.reconnectPending = true
+      this.timingLive = false
+    }
     if (!this.canSync()) this.outbox.cancelRetry()
     this.publish()
   }
@@ -208,15 +216,37 @@ export class OutboxSyncController {
   onRemoteProjection(remote: unknown, status?: ConnectedOperationStatus): void {
     let incoming = toConnectedProjection(remote)
     if (!incoming) return
-    if (status?.operationId === this.pending[0]?.event.operationId) {
+    const head = this.pending[0]?.event
+    if (status?.operationId === head?.operationId) {
       this.operationStatus = status ?? null
       if (status?.status === "acknowledged") {
+        // why: one event past what this device last confirmed can only be its own write, so serverUpdatedAt is that write's server time; any more and it may be someone else's.
+        if (
+          this.options.awaitProjectionBarrier &&
+          head?.type === "life.changed" &&
+          this.confirmed &&
+          incoming.eventSequence === this.confirmed.eventSequence + 1
+        )
+          this.latency.ownWrite(status.operationId, { authorityAt: incoming.serverUpdatedAt })
         incoming = {
           ...incoming,
           recentOperationIds: [...incoming.recentOperationIds, status.operationId],
         }
       }
     }
+    const fresh =
+      !this.confirmed ||
+      incoming.eventSequence > this.confirmed.eventSequence ||
+      incoming.serverUpdatedAt > this.confirmed.serverUpdatedAt
+    // why: the first fresh projection after mounting or reconnecting is a catch-up that measures time away (a replay of the cached one is not fresh), and one carrying this device's own write was painted before it was sent.
+    if (
+      this.timingLive &&
+      this.pending.length === 0 &&
+      this.confirmed &&
+      incoming.eventSequence > this.confirmed.eventSequence
+    )
+      this.latency.remoteChange(incoming.serverUpdatedAt, incoming.eventSequence)
+    if (fresh && this.environment.isWebSocketConnected) this.timingLive = true
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
     this.options.repository.saveProjection(merged)
     this.confirmed = merged
@@ -574,7 +604,7 @@ export class OutboxSyncController {
         publicId: this.options.publicId,
         failed: this.failed,
         currentFailures: () => this.failed,
-        send: (action) => this.sendAndAwaitProjection(action),
+        send: (action) => this.timedSend(action),
         onAttempt: (operationId) => this.inFlight.add(operationId),
         onSettled: (operationId) => {
           this.inFlight.delete(operationId)
@@ -601,8 +631,25 @@ export class OutboxSyncController {
     }
   }
 
-  private async sendAndAwaitProjection(action: PendingLifeAction): Promise<OutboxAcknowledgement> {
+  private async timedSend(action: PendingLifeAction): Promise<OutboxAcknowledgement> {
+    const sentAt = this.now()
+    const acknowledgement = await this.sendAndAwaitProjection(action, sentAt)
+    this.latency.acknowledged(this.now() - sentAt)
+    return acknowledgement
+  }
+
+  private async sendAndAwaitProjection(
+    action: PendingLifeAction,
+    sentAt: number,
+  ): Promise<OutboxAcknowledgement> {
     const acknowledgement = await this.options.send(action)
+    // why: a retry of a write whose reply was lost pairs this send's timing with the first send's server time.
+    if (
+      this.options.awaitProjectionBarrier &&
+      action.event.type === "life.changed" &&
+      action.attempts === 1
+    )
+      this.latency.ownWrite(action.event.operationId, { sentAt, returnedAt: this.now() })
     if (action.event.type === "commanderDamage.submitted" && acknowledgement.status === "declined")
       this.claimDeclined(action.event.toPlayerId, action.event.delta)
     if (!this.options.awaitProjectionBarrier) return acknowledgement

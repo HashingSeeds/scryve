@@ -882,4 +882,87 @@ describe("outbox sync controller", () => {
     expect(resumeWrites()).toBe(2)
     expect(repository.loadResumeIndex()[0]?.updatedAt).toBe(3)
   })
+
+  it("times another player's change from the server applying it, with the clock learned from this device's write", async () => {
+    let reply!: () => void
+    const { clock, controller } = harness({
+      awaitProjectionBarrier: true,
+      send: (queued) =>
+        new Promise((resolve) => {
+          reply = () => resolve({ operationId: queued.event.operationId })
+        }),
+    })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+
+    clock.time = 1_000
+    controller.changeLife("player-1", 5)
+    await settle()
+    const operationId = controller.getSnapshot().pending[0]?.event.operationId ?? ""
+    controller.onRemoteProjection(
+      { ...projection(1, 25), serverUpdatedAt: 5_020 },
+      { status: "acknowledged", operationId, projectionEventSequence: 1 },
+    )
+    clock.time = 1_040
+    reply()
+    await settle()
+    expect(controller.getSnapshot().pending).toEqual([])
+
+    clock.time = 2_000
+    controller.onRemoteProjection({ ...projection(2, 25), serverUpdatedAt: 5_900 })
+    controller.latency.painted(2)
+
+    expect(controller.latency.summary()).toMatchObject({
+      delivery: { count: 1, p50: 100 },
+      ack: { count: 1, p50: 40 },
+      ping: 40,
+    })
+  })
+
+  it("does not set its clock from a write that shares its projection with someone else's", async () => {
+    const { clock, controller } = harness({ awaitProjectionBarrier: true })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    clock.time = 1_000
+    controller.changeLife("player-1", 5)
+    await settle()
+    const operationId = controller.getSnapshot().pending[0]?.event.operationId ?? ""
+    controller.onRemoteProjection(
+      { ...projection(2, 25), serverUpdatedAt: 5_300 },
+      { status: "acknowledged", operationId, projectionEventSequence: 2 },
+    )
+    await settle()
+    expect(controller.getSnapshot().pending).toEqual([])
+    controller.onRemoteProjection(projection(3, 25))
+    controller.latency.painted(3)
+    expect(controller.latency.summary().delivery).toBeUndefined()
+  })
+
+  it("keeps waiting for a fresh projection when a reconnect replays the cached one", () => {
+    const { controller } = harness()
+    controller.latency.setAuthority()
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    controller.onRemoteProjection(projection(4, 20))
+    controller.latency.painted(4)
+    expect(controller.latency.summary().delivery).toBeUndefined()
+    controller.onRemoteProjection(projection(5, 20))
+    controller.latency.painted(5)
+    expect(controller.latency.summary().delivery).toEqual(expect.objectContaining({ count: 1 }))
+  })
+
+  it("does not time a catch-up after reconnecting", () => {
+    const { controller } = harness()
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(4, 20))
+    controller.latency.setAuthority()
+    controller.latency.painted(4)
+    expect(controller.latency.summary().delivery).toBeUndefined()
+  })
 })

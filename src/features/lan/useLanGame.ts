@@ -14,6 +14,7 @@ export function useLanGame(): ConnectedGameRuntime {
     scope: "lan",
     writes: lanSession.writes,
     awaitProjectionBarrier: false,
+    latency: lanSession.latency,
   })
   const reachable = role === "host" || status === "connected"
   return useConnectedRuntime(session, {

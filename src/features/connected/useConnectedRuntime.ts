@@ -26,6 +26,7 @@ import {
   type OutboxSyncEnvironment,
 } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
+import { SyncLatency } from "./syncLatency"
 import { EMPTY_TABLE } from "../../../convex/lib/table"
 
 interface ConnectedGameRuntimeBase extends TableRuntime {
@@ -44,6 +45,7 @@ interface ConnectedGameRuntimeBase extends TableRuntime {
   changeError?: string
   finishError?: string
   finishing: boolean
+  latency: SyncLatency
 }
 
 export type ConnectedGameRuntime = ConnectedGameRuntimeBase &
@@ -79,12 +81,14 @@ export function useConnectedSession({
   scope,
   writes,
   awaitProjectionBarrier,
+  latency,
 }: {
   publicId: string
   ownerId: string
   scope: string
   writes: ConnectedWrites
   awaitProjectionBarrier: boolean
+  latency?: SyncLatency
 }) {
   const repository = useMemo(
     () => new ConnectedGameRepository(undefined, ownerId, {}, scope),
@@ -104,11 +108,18 @@ export function useConnectedSession({
         finishGame: (result) => latestWrites.current.finish(result),
         abandonGame: () => latestWrites.current.abandon(),
         awaitProjectionBarrier,
+        latency,
       }),
-    [awaitProjectionBarrier, deviceId, ownerId, publicId, repository],
+    [awaitProjectionBarrier, deviceId, latency, ownerId, publicId, repository],
   )
   const snapshot = useValue(() => controller.state$.get())
-  useEffect(() => () => controller.dispose(), [controller])
+  useEffect(
+    () => () => {
+      controller.latency.report()
+      controller.dispose()
+    },
+    [controller],
+  )
   return {
     controller,
     snapshot,
@@ -158,9 +169,10 @@ export function useConnectedRuntime(
     ) {
       recordReviewCompletion(`connected:${projection.publicId}`)
       captureGame("game_completed", gameProperties, "connected")
+      controller.latency.report()
     }
     observedGame.current = { id: projection.publicId, status: projection.status }
-  }, [snapshot.projection])
+  }, [controller, snapshot.projection])
 
   const { isAuthenticated } = environment
   useEffect(() => {
@@ -196,6 +208,7 @@ export function useConnectedRuntime(
       finish: controller.finish,
       abandon: controller.abandon,
       dismissFailed: controller.dismissFailed,
+      latency: controller.latency,
     }
     return projection
       ? {
