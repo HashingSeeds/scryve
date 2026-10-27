@@ -25,7 +25,7 @@ export function TurningSeat({
 }: {
   angle: SharedValue<number>
   unfolded: SharedValue<number>
-  folded: LayoutRectangle
+  folded: LayoutRectangle & { turn: number }
   cell: LayoutRectangle
   table: LayoutRectangle
   board: { width: number; height: number }
@@ -40,13 +40,17 @@ export function TurningSeat({
   const placed = useDerivedValue(() => {
     const open = unfolded.value
     const mix = (from: number, to: number) => from + (to - from) * open
+    const sideways = Math.abs(folded.turn) === 90
+    const width = mix(sideways ? folded.height : folded.width, cell.width)
+    const height = mix(sideways ? folded.width : folded.height, cell.height)
     const resting = {
-      x: mix(folded.x, cell.x),
-      y: mix(folded.y, cell.y),
-      width: mix(folded.width, cell.width),
-      height: mix(folded.height, cell.height),
+      x: mix(folded.x + folded.width / 2, cell.x + cell.width / 2) - width / 2,
+      y: mix(folded.y + folded.height / 2, cell.y + cell.height / 2) - height / 2,
+      width,
+      height,
     }
-    return tableTurnPlacement({ cell: resting, table, board, angle: angle.value })
+    const placement = tableTurnPlacement({ cell: resting, table, board, angle: angle.value })
+    return { ...placement, angle: placement.angle + folded.turn * (1 - open) }
   })
   const liveSize = useDerivedValue(() => ({
     width: placed.value.width,

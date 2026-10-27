@@ -66,6 +66,11 @@ export function windowRectToPanel(
   return rotateRectAround(shifted, { x: panel.width / 2, y: panel.height / 2 }, holderAngle / 90)
 }
 
+/** why: a seat that faced another edge on the outer display turns as the board unfolds, starting turned by the difference so it reads as it did closed. */
+export function foldTurn(outerFacing: number, openFacing: number, holderAngle: number) {
+  return ((((outerFacing + holderAngle - openFacing) % 360) + 540) % 360) - 180
+}
+
 export const TABLE_TURN_GATHER_DEG = 45
 
 export function tableTurnGather(angle: number) {

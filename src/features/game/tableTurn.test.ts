@@ -2,6 +2,7 @@ import { getPlayerGridCellRects, getPlayerGridLayout } from "@/components/player
 
 import {
   cornersSeenTurned,
+  foldTurn,
   initialUnfoldProgress,
   nextUnfoldProgress,
   rotateRectAround,
@@ -148,5 +149,13 @@ describe("table turn", () => {
     expect(
       turningCornerRadii({ ...corners, unfolded: 1, angle: -90 }).borderBottomRightRadius,
     ).toBeCloseTo(0)
+  })
+
+  it("turns a seat as it unfolds only when it faces another edge on the open board", () => {
+    // why: a Table end seat faces the panel's side once open, the same edge the holder saw it face closed.
+    expect(foldTurn(180, 90, -90)).toBe(0)
+    // why: a Balanced four seat on the outer display's left faces the panel's top once open.
+    expect(foldTurn(90, 90, -90)).toBe(-90)
+    expect(foldTurn(90, -90, 90)).toBe(-90)
   })
 })

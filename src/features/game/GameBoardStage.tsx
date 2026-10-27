@@ -179,9 +179,10 @@ function PinnedGameBoardStage({
     holderAngle: landed ? undefined : holderAngle,
   })
   const offering = !!gridLayout.centerColumn && !kept && !refolding
+  const unfolding = spansHinge && pinned && Math.abs(holderAngle) === 90
   const tableTurn = useMemo<TableTurn | undefined>(
-    () => (gridLayout.centerColumn || landed ? { angle: turnAngle, unfolded, landed } : undefined),
-    [gridLayout.centerColumn, landed, turnAngle, unfolded],
+    () => (unfolding || landed ? { angle: turnAngle, unfolded, landed } : undefined),
+    [unfolding, landed, turnAngle, unfolded],
   )
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
@@ -213,9 +214,9 @@ function PinnedGameBoardStage({
         : undefined,
     [pinned, width, height, fontScale, insets, holderAngle, tableTurn],
   )
-  // why: closed, the menu sat where the outer board's cards met, so as the hinge opens it travels to the center column's junction with the seats rather than jumping there.
+  // why: closed, the menu sat where the outer board's cards met, so as the hinge opens it travels to where the open board's seats meet rather than jumping there.
   const foldedMenuOffset = useMemo(() => {
-    if (!gridLayout.centerColumn) return { x: 0, y: 0 }
+    if (!unfolding || landed) return { x: 0, y: 0 }
     const outer = { width: height / 2, height: width }
     const point = getPlayerGridMenuAnchor(
       playerCount,
@@ -227,7 +228,7 @@ function PinnedGameBoardStage({
       holderAngle,
     )
     return { x: onPanel.x - boardAnchor.x * width, y: onPanel.y - boardAnchor.y * height }
-  }, [gridLayout.centerColumn, playerCount, layoutVariant, width, height, holderAngle, boardAnchor])
+  }, [unfolding, landed, playerCount, layoutVariant, width, height, holderAngle, boardAnchor])
   const menuTravel = useAnimatedStyle(() => {
     const away = 1 - unfolded.value
     return {

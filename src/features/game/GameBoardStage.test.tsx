@@ -2,7 +2,7 @@ import { StyleSheet, View, type ViewProps } from "react-native"
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
 import type { GameMenuActions, RadialMenuAction } from "@/components/GameRadialMenu"
-import type { PlayerGridProps } from "@/components/PlayerGrid"
+import type { PlayerGridLayoutVariant, PlayerGridProps } from "@/components/PlayerGrid"
 import { ThemeProvider } from "@/theme/context"
 
 import { GameBoardStage } from "./GameBoardStage"
@@ -133,15 +133,18 @@ describe("GameBoardStage on an open iPhone Duo", () => {
     mockHinge.spans = false
   })
 
-  function renderSixPlayerTable() {
+  function renderOpenDuo({
+    playerCount = 6,
+    layoutVariant = "tabletop",
+  }: { playerCount?: number; layoutVariant?: PlayerGridLayoutVariant } = {}) {
     const renderGrid = jest.fn((_orientation: PlayerGridProps["boardOrientation"]) => (
       <View testID="grid" />
     ))
     const stage = () => (
       <ThemeProvider initialContext="dark">
         <GameBoardStage
-          playerCount={6}
-          layoutVariant="tabletop"
+          playerCount={playerCount}
+          layoutVariant={layoutVariant}
           renderGrid={renderGrid}
           menu={{ open: false, actions: menuActions(), onToggle: jest.fn(), onClose: jest.fn() }}
         />
@@ -160,12 +163,12 @@ describe("GameBoardStage on an open iPhone Duo", () => {
     return { renderGrid, rerender: () => view.rerender(stage()) }
   }
 
-  const lastTableTurn = (renderGrid: ReturnType<typeof renderSixPlayerTable>["renderGrid"]) =>
+  const lastTableTurn = (renderGrid: ReturnType<typeof renderOpenDuo>["renderGrid"]) =>
     renderGrid.mock.calls.at(-1)?.[0]?.tableTurn
 
   it("offers six Table seats the Table layout and lands the board when players take it", () => {
     mockHinge.spans = true
-    const { renderGrid } = renderSixPlayerTable()
+    const { renderGrid } = renderOpenDuo()
 
     expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
     fireEvent.press(screen.getByLabelText("Turn the board to the Table layout"))
@@ -174,9 +177,17 @@ describe("GameBoardStage on an open iPhone Duo", () => {
     expect(lastTableTurn(renderGrid)).toMatchObject({ landed: "upright" })
   })
 
+  it("unfolds any open board from the outer display without offering the turn", () => {
+    mockHinge.spans = true
+    const { renderGrid } = renderOpenDuo({ playerCount: 4, layoutVariant: "auto" })
+
+    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
+    expect(screen.queryByTestId("table-turn-ring")).toBeNull()
+  })
+
   it("keeps the center column when players decline, and offers again after the Duo reopens", () => {
     mockHinge.spans = true
-    const { renderGrid, rerender } = renderSixPlayerTable()
+    const { renderGrid, rerender } = renderOpenDuo()
 
     fireEvent.press(screen.getByLabelText("Keep this layout"))
     expect(screen.queryByTestId("table-turn-ring")).toBeNull()
@@ -191,7 +202,7 @@ describe("GameBoardStage on an open iPhone Duo", () => {
 
   it("drops a turn in progress when the Duo closes, so the next opening starts square", () => {
     mockHinge.spans = true
-    const { renderGrid, rerender } = renderSixPlayerTable()
+    const { renderGrid, rerender } = renderOpenDuo()
     act(() => lastTableTurn(renderGrid)?.angle.set(40))
 
     mockHinge.spans = false
@@ -203,7 +214,7 @@ describe("GameBoardStage on an open iPhone Duo", () => {
   })
 
   it("makes no offer while the Duo is closed", () => {
-    renderSixPlayerTable()
+    renderOpenDuo()
 
     expect(screen.queryByTestId("table-turn-ring")).toBeNull()
   })
