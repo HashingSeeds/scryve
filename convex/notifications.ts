@@ -1,7 +1,7 @@
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter"
 import { ConvexError, v } from "convex/values"
 
-import { components } from "./_generated/api"
+import { components, internal } from "./_generated/api"
 import { internalAction, internalMutation, mutation, type MutationCtx } from "./_generated/server"
 import { signedInUser } from "./feedback"
 import { senderHash } from "./lib/feedback"
@@ -22,7 +22,7 @@ async function deviceFor(ctx: MutationCtx, key: string) {
   const hash = await senderHash(key)
   const device = await ctx.db
     .query("pushDevices")
-    .withIndex("by_sender", (q) => q.eq("senderHash", hash))
+    .withIndex("by_sender_hash", (q) => q.eq("senderHash", hash))
     .unique()
   return { hash, device }
 }
@@ -85,25 +85,30 @@ export const send = internalAction({
 })
 
 export const remindRenewals = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { hour: v.optional(v.number()), cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     // why: runs on the hour, and the one-hour windows tile, so each renewal is reminded once without storing that it was.
-    const hour = Math.floor(Date.now() / HOUR) * HOUR
-    const due = await ctx.db
+    const hour = args.hour ?? Math.floor(Date.now() / HOUR) * HOUR
+    const page = await ctx.db
       .query("revenueCatCustomerStates")
       .withIndex("by_renews_at", (q) =>
         q
           .gte("renewsAt", hour + RENEWAL_REMINDER_LEAD_MS)
           .lt("renewsAt", hour + HOUR + RENEWAL_REMINDER_LEAD_MS),
       )
-      .take(500)
-    for (const state of due) {
+      .paginate({ numItems: 100, cursor: args.cursor ?? null })
+    for (const state of page.page) {
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", state.appUserId))
         .unique()
       if (user) await notifyRenewal(ctx, user._id, state.foil === true)
     }
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.notifications.remindRenewals, {
+        hour,
+        cursor: page.continueCursor,
+      })
     return null
   },
 })

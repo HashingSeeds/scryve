@@ -50,13 +50,13 @@ export async function notifyFeedbackReply(
 ) {
   const fromInstall = await ctx.db
     .query("pushDevices")
-    .withIndex("by_sender", (q) => q.eq("senderHash", request.senderHash))
+    .withIndex("by_sender_hash", (q) => q.eq("senderHash", request.senderHash))
     .take(1)
   const userId = request.userId
   const fromAccount = userId
     ? await ctx.db
         .query("pushDevices")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .withIndex("by_user_id", (q) => q.eq("userId", userId))
         .take(USER_DEVICES)
     : []
   const devices = new Map([...fromInstall, ...fromAccount].map((device) => [device._id, device]))
@@ -77,7 +77,7 @@ export async function notifyFeedbackReply(
 export async function notifyRenewal(ctx: MutationCtx, userId: Id<"users">, foil: boolean) {
   const devices = await ctx.db
     .query("pushDevices")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .withIndex("by_user_id", (q) => q.eq("userId", userId))
     .take(USER_DEVICES)
   await sendPush(
     ctx,
@@ -95,7 +95,7 @@ export async function notifyRenewal(ctx: MutationCtx, userId: Id<"users">, foil:
 export async function forgetAccountDevices(ctx: MutationCtx, userId: Id<"users">) {
   const devices = await ctx.db
     .query("pushDevices")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .withIndex("by_user_id", (q) => q.eq("userId", userId))
     .take(USER_DEVICES)
   for (const device of devices) await ctx.db.delete(device._id)
   return devices.length
