@@ -139,6 +139,7 @@ export function CardScanner({
         )
         lookups.current.set(card.id, lookup)
         const result = await lookup
+        if ("error" in result) countedLands.current.delete(card.name)
         updateCard(card.id, "error" in result ? { state: result } : { ...result, state: "added" })
       }),
     )
@@ -205,7 +206,9 @@ export function CardScanner({
     if (
       singleton &&
       (copiesInDeck(card.name) > 0 ||
-        addedRef.current.some((scanned) => scanned.name === card.name))
+        addedRef.current.some(
+          (scanned) => scanned.name === card.name && typeof scanned.state !== "object",
+        ))
     ) {
       setStatus({ alreadyInDeck: card.name })
       return

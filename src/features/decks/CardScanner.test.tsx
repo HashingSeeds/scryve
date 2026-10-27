@@ -212,3 +212,22 @@ test("Done waits for the land count when an alternate turns out to be a basic la
     jest.useRealTimers()
   }
 })
+
+test("a card whose add failed can be scanned again in a Commander deck", async () => {
+  jest.useFakeTimers()
+  try {
+    const addCards = jest
+      .fn<Promise<ScannedCardAdd[]>, [string[]]>()
+      .mockResolvedValueOnce([{ error: "Couldn't add the scanned cards." }])
+      .mockImplementation(async (names) => names.map(() => ({})))
+    const { view } = renderScanner({ singleton: true, addCards })
+    scan("Sol Ring")
+    await act(async () => jest.advanceTimersByTime(1500))
+    scan("Sol Ring")
+    expect(view.queryByText("Sol Ring is already in the deck")).toBeNull()
+    await act(async () => jest.advanceTimersByTime(1500))
+    expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Sol Ring"])
+  } finally {
+    jest.useRealTimers()
+  }
+})

@@ -1,4 +1,4 @@
-/** why: scores the card scanner against recorded real scans; Scryfall's live name lists keep it out of CI. Run: pnpm tsx scripts/card-scan-eval.ts */
+/** why: Scryfall's live name lists keep this out of CI, so scanner accuracy regressions go untested. */
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
