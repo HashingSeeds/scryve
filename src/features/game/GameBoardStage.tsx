@@ -279,7 +279,9 @@ function PinnedGameBoardStage({
       <View collapsable={false} style={boardStyle}>
         {renderGrid(boardOrientation)}
         <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
+        {/* why: a window moving to the other display turns the board with it, and a mounted menu would spin to its new facing and draw a frame where it was; a fresh one starts in place. */}
         <Animated.View
+          key={spansHinge && !outerDisplay ? "inner" : "outer"}
           pointerEvents="box-none"
           style={[StyleSheet.absoluteFill, $menuLayer, menuTravel]}
         >
