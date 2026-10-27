@@ -64,7 +64,7 @@ import { SyncStatsOverlay } from "@/features/connected/SyncStatsOverlay"
 import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
-import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import { asPlayerId, COMMANDER_SLOTS, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -82,7 +82,7 @@ import {
   playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
-import type { GamePlayer, PlayerId } from "@/features/game/types"
+import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { closingMenu, useDice } from "@/features/game/useDice"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { gameRules, openRules } from "@/features/rules/gameRules"
@@ -646,7 +646,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedCommander, setArmedCommander] = useState<{
     playerId: PlayerId
-    staged: Partial<Record<PlayerId, number>>
+    staged: [Partial<Record<PlayerId, number>>, Partial<Record<PlayerId, number>>]
   } | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const finishSubmitInFlight = useRef(false)
@@ -759,14 +759,20 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const displayNameOf = (playerId: string) =>
     game.players.find((candidate) => candidate.playerId === playerId)?.displayName ??
     translate("connected:board.anotherSeat")
-  const incomingCommanderDamage = (player: BoardSeat): Record<PlayerId, number> =>
+  const incomingCommanderDamage = (
+    player: BoardSeat,
+    commander?: CommanderSlot,
+  ): Record<PlayerId, number> =>
     Object.fromEntries(
       players
         .filter(({ id }) => id !== player.id)
         .map((source) => [
           source.id,
           commanderTotals.find(
-            (total) => total.fromPlayerId === source.id && total.toPlayerId === player.id,
+            (total) =>
+              total.fromPlayerId === source.id &&
+              total.toPlayerId === player.id &&
+              total.commander === commander,
           )?.total ?? 0,
         ]),
     ) as Record<PlayerId, number>
@@ -782,26 +788,31 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       sendCommanderDamage()
       return
     }
-    setArmedCommander({ playerId: player.id, staged: {} })
+    setArmedCommander({ playerId: player.id, staged: [{}, {}] })
   }
-  function stageCommanderDamage(target: GamePlayer, step: number) {
+  function stageCommanderDamage(target: GamePlayer, step: number, commander?: CommanderSlot) {
     setArmedCommander((current) => {
       if (!current || current.playerId === target.id) return current
-      const recorded = incomingCommanderDamage(target)[current.playerId] ?? 0
+      const recorded = incomingCommanderDamage(target, commander)[current.playerId] ?? 0
+      const slot = commander ?? 0
       const next = Math.max(
         -recorded,
-        Math.min(MAX_COMMANDER_DAMAGE - recorded, (current.staged[target.id] ?? 0) + step),
+        Math.min(MAX_COMMANDER_DAMAGE - recorded, (current.staged[slot][target.id] ?? 0) + step),
       )
-      const staged = { ...current.staged }
-      if (next === 0) delete staged[target.id]
-      else staged[target.id] = next
+      const staged: typeof current.staged = [{ ...current.staged[0] }, { ...current.staged[1] }]
+      if (next === 0) delete staged[slot][target.id]
+      else staged[slot][target.id] = next
       return { ...current, staged }
     })
   }
   function sendCommanderDamage() {
     if (!armedCommander) return
-    const changes = Object.entries(armedCommander.staged).flatMap(([toPlayerId, delta]) =>
-      delta === undefined || delta === 0 ? [] : [{ toPlayerId, delta }],
+    const changes = armedCommander.staged.flatMap((staged, slot) =>
+      Object.entries(staged).flatMap(([toPlayerId, delta]) =>
+        delta === undefined || delta === 0
+          ? []
+          : [{ toPlayerId, commander: COMMANDER_SLOTS[slot], delta }],
+      ),
     )
     if (changes.length) controls.submitCommanderDamage(armedCommander.playerId, changes)
     setArmedCommander(null)
@@ -1049,11 +1060,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     incomingFor: incomingCommanderDamage,
                     lethal: commanderLethal,
                     armedPlayerId: armedCommander?.playerId ?? null,
+                    // why: nearby games drop the partner slot on the wire, so a partner's damage would land on the first commander there.
+                    singleCommander: !cloud,
                     inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
                     staging: {
-                      stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
+                      stagedFor: (player, commander) =>
+                        armedCommander?.staged[commander ?? 0][player.id] ?? 0,
                       stagedTargets: armedCommander
-                        ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
+                        ? new Set(armedCommander.staged.flatMap(Object.keys)).size
                         : 0,
                       onSend: sendCommanderDamage,
                     },

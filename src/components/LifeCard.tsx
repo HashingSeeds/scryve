@@ -38,6 +38,7 @@ import {
   RAM_MS,
   CommanderTakeoverBackdrop,
   PulseRing,
+  type ArmedCommander,
   type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
@@ -93,13 +94,12 @@ export type LifeCardCommanderDamage = Omit<
   inspection?: { open: boolean; onToggle: () => void }
   attackerName?: string
   attacker?: CommanderAttacker
-  stagedAgainstOwner?: number
-  power?: number
-  commanderName?: string
-  onPowerStep?: (step: 1 | -1) => void
+  commanders?: readonly ArmedCommander[]
+  onPowerStep?: (step: 1 | -1, index: number) => void
+  onToggleCommander?: (index: number) => void
   facing?: CommanderFacing
   reach?: CommanderReach
-  onStage?: (step: number) => void
+  onStage?: (step: number, index: number) => void
   acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
   pendingClaims?: readonly CommanderClaim[]
@@ -351,6 +351,9 @@ export const LifeCard = memo(function LifeCard({
   const armedCommanderId = commanderDamage?.armedPlayerId
   const defending =
     !!commanderDamage && !!armedCommanderId && armedCommanderId !== commanderDamage.ownerPlayerId
+  const armedCommanders = commanderDamage?.commanders ?? [
+    { power: 1, total: (armedCommanderId && commanderDamage?.incoming[armedCommanderId]) || 0 },
+  ]
   const takeover =
     defending && cardSize.width > 0
       ? commanderTakeover({
@@ -359,6 +362,7 @@ export const LifeCard = memo(function LifeCard({
           lifeFontSize: resolvedLifeFontSize,
           lifeDigits: shownDigits,
           badgeSize: compact ? COMPACT_BADGE : BADGE,
+          badgeCount: armedCommanders.length,
           reach: commanderDamage?.reach,
         })
       : undefined
@@ -369,10 +373,10 @@ export const LifeCard = memo(function LifeCard({
           playerName: displayName,
           submit: commanderDamage.armBar?.stagedTargets ? "send" : "done",
           mark: { color, shape, seatNumber },
-          commanderName: commanderDamage.commanderName,
-          power: commanderDamage.power ?? 1,
+          commanders: armedCommanders,
           acted: !!commanderDamage.acted,
           onPowerStep: commanderDamage.onPowerStep ?? (() => {}),
+          onToggle: commanderDamage.onToggleCommander ?? (() => {}),
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
       : commanderDamage && armedCommanderId
@@ -381,20 +385,20 @@ export const LifeCard = memo(function LifeCard({
             attackerName:
               commanderDamage.attackerName ?? translate("board:commander.unknownAttacker"),
             attacker: commanderDamage.attacker,
-            total:
-              (commanderDamage.incoming[armedCommanderId] ?? 0) +
-              (commanderDamage.stagedAgainstOwner ?? 0),
+            commanders: armedCommanders,
             lethal: commanderDamage.lethal,
-            power: commanderDamage.power ?? 1,
             facing: commanderDamage.facing ?? {},
             takeover,
             acted: !!commanderDamage.acted,
-            onChange: (step) => commanderDamage.onStage?.(step),
+            onChange: (step, index) => commanderDamage.onStage?.(step, index),
           }
         : undefined
   const attackerSide = commanderCardMode?.kind === "source"
   const knock = useSharedValue(0)
-  const defenderTotal = commanderCardMode?.kind === "target" ? commanderCardMode.total : undefined
+  const defenderTotal =
+    commanderCardMode?.kind === "target"
+      ? commanderCardMode.commanders.reduce((sum, { total }) => sum + total, 0)
+      : undefined
   const knockFacing = commanderCardMode?.kind === "target" ? commanderCardMode.facing : undefined
   const rammed = !!takeover
   const lastDefenderTotal = useRef(defenderTotal)

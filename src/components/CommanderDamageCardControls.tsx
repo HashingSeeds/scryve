@@ -10,6 +10,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
@@ -39,17 +40,18 @@ export type CommanderAttacker = {
   rotation?: LifeCardContentRotation
 }
 
+export type ArmedCommander = { name?: string; power: number; benched?: boolean; total: number }
+
 type AssignmentTarget = {
   kind: "target"
   attackerName: string
   attacker?: CommanderAttacker
-  total: number
+  commanders: readonly ArmedCommander[]
   lethal: number
-  power: number
   facing: CommanderFacing
   takeover?: CommanderTakeover
   acted: boolean
-  onChange: (step: number) => void
+  onChange: (step: number, index: number) => void
 }
 
 type AssignmentSource = {
@@ -57,10 +59,10 @@ type AssignmentSource = {
   playerName: string
   submit: "done" | "send"
   mark?: CommanderAttacker
-  commanderName?: string
-  power: number
+  commanders: readonly ArmedCommander[]
   acted: boolean
-  onPowerStep: (step: 1 | -1) => void
+  onPowerStep: (step: 1 | -1, index: number) => void
+  onToggle: (index: number) => void
   onSubmit: () => void
 }
 
@@ -217,63 +219,60 @@ function DefenderControls({
 }) {
   const { themed, theme } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const [hits, setHits] = useState<number[]>([])
-  const [editing, setEditing] = useState(false)
-  const pop = useSharedValue(1)
+  const [hits, setHits] = useState<number[][]>([])
+  const [editing, setEditing] = useState<number | null>(null)
   const ram = useSharedValue(0)
   const flash = useSharedValue(0)
-  const previousTotal = useRef(mode.total)
-  const { attacker, facing, takeover, total } = mode
-  const step = Math.min(mode.power, MAX_COMMANDER_DAMAGE - total)
+  const { attacker, facing, takeover, commanders } = mode
+  const totals = commanders.map(({ total }) => total)
+  const struck = totals.reduce((sum, total) => sum + total, 0)
+  const previousStruck = useRef(struck)
+  const steps = commanders.map(({ power, total, benched }) =>
+    benched ? 0 : Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
+  )
+  const dealt = steps.reduce((sum, step) => sum + step, 0)
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
   const attackerForeground = accessibleForeground(attackerColor)
-  const badge = takeover?.badge
+  const badges = takeover?.badges ?? []
   const badgeShape = attacker?.shape ?? shapeForSeat(attacker?.seatNumber ?? 1)
-  // why: a badge driven all the way to the disc would cover the life total, so the ram stops once it overlaps the ring.
-  const ramReach = takeover && badge ? takeover.disc + badge.size * 0.15 - badge.distance : 0
+  const partners = commanders.length > 1
 
   useEffect(() => {
-    const previous = previousTotal.current
-    previousTotal.current = total
-    if (total <= previous || reducedMotion !== false) return
-    const impact = badge ? RAM_MS : 0
-    pop.value = withDelay(
-      impact,
-      withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 })),
-    )
+    const previous = previousStruck.current
+    previousStruck.current = struck
+    if (struck <= previous || reducedMotion !== false) return
     flash.value = withDelay(
-      impact,
+      takeover ? RAM_MS : 0,
       withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 })),
     )
-  }, [badge, flash, pop, reducedMotion, total])
+  }, [flash, reducedMotion, struck, takeover])
 
-  const badgeStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: Math.cos(badge?.angle ?? 0) * ramReach * ram.value },
-      { translateY: Math.sin(badge?.angle ?? 0) * ramReach * ram.value },
-      { scale: pop.value },
-    ],
-  }))
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
   function hit() {
-    if (editing) return setEditing(false)
-    if (step <= 0) return
-    setHits((current) => [...current, step])
-    mode.onChange(step)
-    if (reducedMotion !== false || !badge) return
+    if (editing !== null) return setEditing(null)
+    if (dealt <= 0) return
+    setHits((current) => [...current, steps])
+    steps.forEach((step, index) => {
+      if (step > 0) mode.onChange(step, index)
+    })
+    if (reducedMotion !== false || !takeover) return
     ram.value = withSequence(
       withTiming(1, { duration: RAM_MS, easing: Easing.in(Easing.quad) }),
       withTiming(0, { duration: RAM_RETURN_MS, easing: Easing.out(Easing.cubic) }),
     )
   }
 
-  const takeBack = Math.min(hits.at(-1) ?? mode.power, total)
+  const lastHit = hits.at(-1) ?? commanders.map(({ power, benched }) => (benched ? 0 : power))
+  const takeBacks = totals.map((total, index) => Math.min(lastHit[index] ?? 0, total))
+  const takeBack = takeBacks.reduce((sum, amount) => sum + amount, 0)
 
   function undo() {
     if (takeBack <= 0) return
     setHits((current) => current.slice(0, -1))
-    mode.onChange(-takeBack)
+    takeBacks.forEach((amount, index) => {
+      if (amount > 0) mode.onChange(-amount, index)
+    })
   }
 
   const undoCorner = freeCorner(menuCorner, facing)
@@ -292,14 +291,16 @@ function DefenderControls({
   const disc = takeover?.disc ?? 0
   const ring = disc * 2 + 8
   const circumference = 2 * Math.PI * disc
-  const badgeSize = badge?.size ?? (compact ? COMPACT_BADGE : BADGE)
+  const ringAngle = badges.length ? (badges[0].angle + badges[badges.length - 1].angle) / 2 : 0
+  const lead = Math.max(...totals)
+  const badgeSize = badges[0]?.size ?? (compact ? COMPACT_BADGE : BADGE)
   const editWidth = badgeSize + EDIT_STEP * 2 + 8
   const editHeight = Math.max(badgeSize, EDIT_STEP) + 8
   const clamp = (value: number, room: number) => Math.max(-room, Math.min(room, value))
-  const totalLabel = translate("board:commander.totalFrom", {
-    damage: total,
-    name: mode.attackerName,
-  })
+  // why: a badge driven all the way to the disc would cover the life total, so the ram stops once it overlaps the ring.
+  const ramReachOf = (badge: (typeof badges)[number]) =>
+    takeover ? takeover.disc + badge.size * 0.15 - badge.distance : 0
+  const testSeats = partnerTestSeats(seatNumber)
 
   return (
     <>
@@ -307,11 +308,11 @@ function DefenderControls({
         testID={`commander-hit-seat-${seatNumber}`}
         accessibilityRole="button"
         accessibilityLabel={translate("board:commander.dealTo", {
-          damage: step,
+          damage: dealt,
           name: playerName,
         })}
-        accessibilityState={{ disabled: step <= 0 }}
-        disabled={step <= 0 && !editing}
+        accessibilityState={{ disabled: dealt <= 0 }}
+        disabled={dealt <= 0 && editing === null}
         onPress={hit}
         style={StyleSheet.absoluteFill}
       />
@@ -328,7 +329,7 @@ function DefenderControls({
             height={ring}
             style={[
               $centeredAt(content.width / 2 - ring / 2, content.height / 2 - ring / 2),
-              { transform: [{ rotate: `${(takeover.badge.angle * 180) / Math.PI}deg` }] },
+              { transform: [{ rotate: `${(ringAngle * 180) / Math.PI}deg` }] },
             ]}
           >
             <Circle
@@ -348,7 +349,7 @@ function DefenderControls({
               strokeWidth={3}
               strokeLinecap="round"
               strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={circumference * (1 - Math.min(total, mode.lethal) / mode.lethal)}
+              strokeDashoffset={circumference * (1 - Math.min(lead, mode.lethal) / mode.lethal)}
               fill="none"
             />
           </Svg>
@@ -369,80 +370,82 @@ function DefenderControls({
             />
           </View>
         ) : null}
-        {editing ? (
-          <View
-            testID={`commander-edit-seat-${seatNumber}`}
-            style={[
-              themed($edit),
-              $centeredAt(
-                content.width / 2 +
-                  clamp(badge?.x ?? 0, content.width / 2 - editWidth / 2 - 4) -
-                  editWidth / 2,
-                content.height / 2 +
-                  clamp(badge?.y ?? 0, content.height / 2 - editHeight / 2 - 4) -
-                  editHeight / 2,
-              ),
-              {
-                width: editWidth,
-                height: editHeight,
-                borderColor: overlayTint(attackerForeground, 0.6),
-              },
-            ]}
-          >
-            <EditStep
-              testID={`commander-edit-down-seat-${seatNumber}`}
-              label={translate("board:commander.undoHit", { damage: 1 })}
-              glyph="−"
-              color={attackerForeground}
-              disabled={total <= 0}
-              onPress={() => mode.onChange(-1)}
-            />
-            <CommanderBadge
-              testID={`commander-total-seat-${seatNumber}`}
-              shape={badgeShape}
-              total={total}
-              fill={attackerForeground}
-              labelColor={attackerColor}
-              size={badgeSize}
-            />
-            <EditStep
-              testID={`commander-edit-up-seat-${seatNumber}`}
-              label={translate("board:commander.dealTo", { damage: 1, name: playerName })}
-              glyph="+"
-              color={attackerForeground}
-              disabled={total >= MAX_COMMANDER_DAMAGE}
-              onPress={() => mode.onChange(1)}
-            />
-          </View>
-        ) : (
-          <BoardPressable
-            testID={`commander-badge-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={totalLabel}
-            accessibilityLiveRegion="polite"
-            hitSlop={8}
-            onPress={() => setEditing(true)}
-            style={[
-              $centered,
-              $centeredAt(
-                content.width / 2 + (badge?.x ?? 0) - badgeSize / 2,
-                content.height / 2 + (badge?.y ?? 0) - badgeSize / 2,
-              ),
-              { width: badgeSize, height: badgeSize },
-            ]}
-          >
-            <Animated.View style={badgeStyle}>
+        {commanders.map((commander, index) => {
+          const badge = badges[index]
+          const suffix = testSeats[index]
+          const total = commander.total
+          return editing === index ? (
+            <View
+              key={index}
+              testID={`commander-edit-seat-${suffix}`}
+              style={[
+                themed($edit),
+                $centeredAt(
+                  content.width / 2 +
+                    clamp(badge?.x ?? 0, content.width / 2 - editWidth / 2 - 4) -
+                    editWidth / 2,
+                  content.height / 2 +
+                    clamp(badge?.y ?? 0, content.height / 2 - editHeight / 2 - 4) -
+                    editHeight / 2,
+                ),
+                {
+                  width: editWidth,
+                  height: editHeight,
+                  borderColor: overlayTint(attackerForeground, 0.6),
+                },
+              ]}
+            >
+              <EditStep
+                testID={`commander-edit-down-seat-${suffix}`}
+                label={translate("board:commander.undoHit", { damage: 1 })}
+                glyph="−"
+                color={attackerForeground}
+                disabled={total <= 0}
+                onPress={() => mode.onChange(-1, index)}
+              />
               <CommanderBadge
-                testID={`commander-total-seat-${seatNumber}`}
+                testID={`commander-total-seat-${suffix}`}
                 shape={badgeShape}
                 total={total}
                 fill={attackerForeground}
                 labelColor={attackerColor}
                 size={badgeSize}
               />
-            </Animated.View>
-          </BoardPressable>
-        )}
+              <EditStep
+                testID={`commander-edit-up-seat-${suffix}`}
+                label={translate("board:commander.dealTo", { damage: 1, name: playerName })}
+                glyph="+"
+                color={attackerForeground}
+                disabled={total >= MAX_COMMANDER_DAMAGE}
+                onPress={() => mode.onChange(1, index)}
+              />
+            </View>
+          ) : (
+            <DefenderBadge
+              key={index}
+              testID={`commander-badge-seat-${suffix}`}
+              totalTestID={`commander-total-seat-${suffix}`}
+              label={translate("board:commander.totalFrom", {
+                damage: total,
+                name: (partners && commander.name) || mode.attackerName,
+              })}
+              left={content.width / 2 + (badge?.x ?? 0) - badgeSize / 2}
+              top={content.height / 2 + (badge?.y ?? 0) - badgeSize / 2}
+              angle={badge?.angle ?? 0}
+              ramReach={badge && !commander.benched ? ramReachOf(badge) : 0}
+              ram={ram}
+              total={total}
+              pips={partners ? index + 1 : 0}
+              benched={!!commander.benched}
+              shape={badgeShape}
+              fill={attackerForeground}
+              labelColor={attackerColor}
+              size={badgeSize}
+              impact={takeover ? RAM_MS : 0}
+              onPress={() => setEditing(index)}
+            />
+          )
+        })}
       </View>
       {takeBack > 0 ? (
         <BoardPressable
@@ -463,6 +466,101 @@ function DefenderControls({
         </BoardPressable>
       ) : null}
     </>
+  )
+}
+
+function DefenderBadge({
+  testID,
+  totalTestID,
+  label,
+  left,
+  top,
+  angle,
+  ramReach,
+  ram,
+  total,
+  pips,
+  benched,
+  shape,
+  fill,
+  labelColor,
+  size,
+  impact,
+  onPress,
+}: {
+  testID: string
+  totalTestID: string
+  label: string
+  left: number
+  top: number
+  angle: number
+  ramReach: number
+  ram: SharedValue<number>
+  total: number
+  pips: number
+  benched: boolean
+  shape: PlayerMarkShape
+  fill: string
+  labelColor: string
+  size: number
+  impact: number
+  onPress: () => void
+}) {
+  const reducedMotion = useReducedMotion()
+  const pop = useSharedValue(1)
+  const previousTotal = useRef(total)
+
+  useEffect(() => {
+    const previous = previousTotal.current
+    previousTotal.current = total
+    if (total <= previous || reducedMotion !== false) return
+    pop.value = withDelay(
+      impact,
+      withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 })),
+    )
+  }, [impact, pop, reducedMotion, total])
+
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: Math.cos(angle) * ramReach * ram.value },
+      { translateY: Math.sin(angle) * ramReach * ram.value },
+      { scale: pop.value },
+    ],
+  }))
+
+  return (
+    <BoardPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityLiveRegion="polite"
+      hitSlop={8}
+      onPress={onPress}
+      style={[
+        $centered,
+        $centeredAt(left, top),
+        { width: size, height: size },
+        benched && $benched,
+      ]}
+    >
+      <Animated.View style={badgeStyle}>
+        <CommanderBadge
+          testID={totalTestID}
+          shape={shape}
+          total={total}
+          fill={fill}
+          labelColor={labelColor}
+          size={size}
+        />
+        {pips ? (
+          <View pointerEvents="none" style={[$pips, { top: size + 2 }]}>
+            {Array.from({ length: pips }, (_, pip) => (
+              <View key={pip} style={[$pip, { backgroundColor: fill }]} />
+            ))}
+          </View>
+        ) : null}
+      </Animated.View>
+    </BoardPressable>
   )
 }
 
@@ -515,61 +613,105 @@ function AttackerControls({
   mode: AssignmentSource
 }) {
   const { themed } = useAppTheme()
-  const markSize = compact ? 72 : 96
-  const power = mode.power
+  const partners = mode.commanders.length > 1
+  const markSize = partners ? (compact ? 56 : 72) : compact ? 72 : 96
+  const shape = mode.mark?.shape ?? shapeForSeat(mode.mark?.seatNumber ?? seatNumber)
+  const testSeats = partnerTestSeats(seatNumber)
 
   return (
     <View style={themed($attackerCenter)}>
       <View
         style={[
-          themed($power),
+          themed($partners),
           contentRotation ? { transform: [{ rotate: `${contentRotation}deg` }] } : null,
         ]}
       >
-        {mode.commanderName && !compact ? (
-          <Text
-            testID={`commander-name-seat-${seatNumber}`}
-            text={mode.commanderName}
-            weight="bold"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
-            style={[themed($commanderName), { color: foreground }]}
-          />
-        ) : null}
-        <PowerStep
-          testID={`commander-power-up-seat-${seatNumber}`}
-          label={translate("board:commander.raisePower")}
-          direction="up"
-          color={foreground}
-          disabled={power >= MAX_COMMANDER_DAMAGE}
-          onPress={() => mode.onPowerStep(1)}
-        />
-        <View
-          accessible
-          accessibilityLabel={translate("board:commander.power", { power })}
-          accessibilityLiveRegion="polite"
-        >
-          <CommanderBadge
-            testID={`commander-power-seat-${seatNumber}`}
-            shape={mode.mark?.shape ?? shapeForSeat(mode.mark?.seatNumber ?? seatNumber)}
-            total={power}
-            fill={foreground}
-            labelColor={mode.mark?.color ?? foreground}
-            size={markSize}
-          />
-        </View>
-        <PowerStep
-          testID={`commander-power-down-seat-${seatNumber}`}
-          label={translate("board:commander.lowerPower")}
-          direction="down"
-          color={foreground}
-          disabled={power <= 1}
-          onPress={() => mode.onPowerStep(-1)}
-        />
+        {mode.commanders.map(({ name, power, benched }, index) => {
+          const suffix = testSeats[index]
+          const nameText =
+            name && !compact ? (
+              <Text
+                testID={`commander-name-seat-${suffix}`}
+                text={name}
+                weight="bold"
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+                style={[themed($commanderName), partners && $partnerName, { color: foreground }]}
+              />
+            ) : null
+          const mark = (
+            <CommanderBadge
+              testID={`commander-power-seat-${suffix}`}
+              shape={shape}
+              total={power}
+              fill={foreground}
+              labelColor={mode.mark?.color ?? foreground}
+              size={markSize}
+            />
+          )
+          return (
+            <View key={index} style={[themed($power), benched && $benched]}>
+              {partners && nameText ? (
+                <BoardPressable accessible={false} onPress={() => mode.onToggle(index)}>
+                  {nameText}
+                </BoardPressable>
+              ) : (
+                nameText
+              )}
+              <PowerStep
+                testID={`commander-power-up-seat-${suffix}`}
+                label={
+                  partners
+                    ? translate("board:commander.raisePowerOf", { name })
+                    : translate("board:commander.raisePower")
+                }
+                direction="up"
+                color={foreground}
+                disabled={power >= MAX_COMMANDER_DAMAGE}
+                onPress={() => mode.onPowerStep(1, index)}
+              />
+              {partners ? (
+                <BoardPressable
+                  testID={`commander-toggle-seat-${suffix}`}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={translate("board:commander.partnerAttacks", { name })}
+                  accessibilityValue={{ text: translate("board:commander.power", { power }) }}
+                  accessibilityState={{ checked: !benched }}
+                  accessibilityLiveRegion="polite"
+                  onPress={() => mode.onToggle(index)}
+                >
+                  {mark}
+                </BoardPressable>
+              ) : (
+                <View
+                  accessible
+                  accessibilityLabel={translate("board:commander.power", { power })}
+                  accessibilityLiveRegion="polite"
+                >
+                  {mark}
+                </View>
+              )}
+              <PowerStep
+                testID={`commander-power-down-seat-${suffix}`}
+                label={
+                  partners
+                    ? translate("board:commander.lowerPowerOf", { name })
+                    : translate("board:commander.lowerPower")
+                }
+                direction="down"
+                color={foreground}
+                disabled={power <= 1}
+                onPress={() => mode.onPowerStep(-1, index)}
+              />
+            </View>
+          )
+        })}
       </View>
     </View>
   )
 }
+
+const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber}-partner`]
 
 const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, left, top })
 
@@ -743,6 +885,19 @@ const $centered: ViewStyle = { justifyContent: "center", alignItems: "center" }
 
 const $absolute: ViewStyle = { position: "absolute" }
 
+const $benched: ViewStyle = { opacity: 0.4 }
+
+const $pips: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: 3,
+}
+
+const $pip: ViewStyle = { width: 5, height: 5, borderRadius: 2.5 }
+
 const $badgeLabel: TextStyle = { position: "absolute", left: 0, right: 0, textAlign: "center" }
 
 export const BADGE = 46
@@ -783,6 +938,14 @@ const $ring: ThemedStyle<ViewStyle> = () => ({
 })
 
 const $power: ThemedStyle<ViewStyle> = () => ({ alignItems: "center" })
+
+const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.md,
+})
+
+const $partnerName: TextStyle = { maxWidth: 100 }
 
 const $edit: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

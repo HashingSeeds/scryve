@@ -448,7 +448,7 @@ describe("LifeCard", () => {
         nativeEvent: { layout: { width: 193, height: 420 } },
       })
       fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-      expect(onStage).toHaveBeenCalledWith(1)
+      expect(onStage).toHaveBeenCalledWith(1, 0)
     } finally {
       motion.mockRestore()
     }
@@ -471,7 +471,10 @@ describe("LifeCard", () => {
     fireEvent.press(view.getByTestId("commander-edit-up-seat-2"))
     fireEvent.press(view.getByTestId("commander-edit-down-seat-2"))
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-    expect(onStage.mock.calls).toEqual([[1], [-1]])
+    expect(onStage.mock.calls).toEqual([
+      [1, 0],
+      [-1, 0],
+    ])
     expect(view.queryByTestId("commander-edit-seat-2")).toBeNull()
   })
 
@@ -825,8 +828,7 @@ describe("LifeCard", () => {
       lethal: 21,
       armedPlayerId: commanderIds[0],
       attackerName: "Ada",
-      stagedAgainstOwner: 4,
-      power: 3,
+      commanders: [{ power: 3, total: 11 }],
       facing: { y: "top" as const },
       onStage,
     }
@@ -848,7 +850,10 @@ describe("LifeCard", () => {
 
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
     fireEvent.press(view.getByTestId("commander-undo-seat-2"))
-    expect(onStage.mock.calls).toEqual([[3], [-3]])
+    expect(onStage.mock.calls).toEqual([
+      [3, 0],
+      [-3, 0],
+    ])
 
     view.rerender(
       <ThemeProvider initialContext="light">
@@ -861,15 +866,14 @@ describe("LifeCard", () => {
             ...commanderDamage,
             incoming: { [commanderIds[0]]: 97 },
             lethal: 21,
-            stagedAgainstOwner: 0,
-            power: 5,
+            commanders: [{ power: 5, total: 97 }],
           }}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-    expect(onStage).toHaveBeenLastCalledWith(2)
+    expect(onStage).toHaveBeenLastCalledWith(2, 0)
   })
 
   it("names the attacker's commander above its power", () => {
@@ -888,7 +892,7 @@ describe("LifeCard", () => {
             incoming: {},
             lethal: 21,
             armedPlayerId: commanderIds[0],
-            commanderName: "Krenko",
+            commanders: [{ name: "Krenko", power: 1, total: 0 }],
             onPressSword: jest.fn(),
           }}
           onChange={jest.fn()}
@@ -909,7 +913,7 @@ describe("LifeCard", () => {
       incoming: {},
       lethal: 21,
       armedPlayerId: commanderIds[0],
-      power: 3,
+      commanders: [{ power: 3, total: 0 }],
       onPowerStep,
       onPressSword,
     }
@@ -931,7 +935,10 @@ describe("LifeCard", () => {
     expect(view.getByTestId("player-mark-close", { includeHiddenElements: true })).toBeTruthy()
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
-    expect(onPowerStep.mock.calls).toEqual([[1], [-1]])
+    expect(onPowerStep.mock.calls).toEqual([
+      [1, 0],
+      [-1, 0],
+    ])
     fireEvent.press(view.getByTestId("commander-exit-seat-1"))
     expect(onPressSword).toHaveBeenCalledTimes(1)
 
@@ -942,7 +949,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          commanderDamage={{ ...commanderDamage, power: 1 }}
+          commanderDamage={{ ...commanderDamage, commanders: [{ power: 1, total: 0 }] }}
           onChange={jest.fn()}
         />
       </ThemeProvider>,

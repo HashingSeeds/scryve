@@ -145,7 +145,7 @@ export function commanderReach(input: {
 export interface CommanderTakeover {
   content: { width: number; height: number }
   disc: number
-  badge: { x: number; y: number; angle: number; size: number; distance: number }
+  badges: { x: number; y: number; angle: number; size: number; distance: number }[]
   knock: { x: number; y: number }
   flood?: { x: number; y: number; radius: number }
 }
@@ -169,9 +169,10 @@ export function commanderTakeover(input: {
   lifeFontSize: number
   lifeDigits: number
   badgeSize: number
+  badgeCount?: number
   reach?: CommanderReach
 }): CommanderTakeover {
-  const { card, rotation, lifeFontSize, badgeSize, reach } = input
+  const { card, rotation, lifeFontSize, badgeSize, badgeCount = 1, reach } = input
   const sideways = Math.abs(rotation) === 90
   const content = sideways
     ? { width: card.height, height: card.width }
@@ -189,7 +190,13 @@ export function commanderTakeover(input: {
   const toward = reach ? rotate(reach.x, reach.y, -rotation) : { x: 0, y: -1 }
   const wanted = Math.atan2(toward.y, toward.x)
   const half = badgeSize / 2 + 4
-  const fits = (angle: number) => {
+  const spread = 2 * Math.asin(Math.min(1, (badgeSize + BADGE_GAP) / (2 * distance)))
+  const anglesAround = (center: number) =>
+    Array.from(
+      { length: badgeCount },
+      (_, index) => center + (index - (badgeCount - 1) / 2) * spread,
+    )
+  const fitsOne = (angle: number) => {
     const x = Math.cos(angle) * distance
     const y = Math.sin(angle) * distance
     const inside =
@@ -199,6 +206,7 @@ export function commanderTakeover(input: {
       Math.abs(y) + half > content.height / 2 - CORNER_CLEARANCE
     return inside && !inCorner
   }
+  const fits = (center: number) => anglesAround(center).every(fitsOne)
   let angle = wanted
   search: for (let offset = 0; offset <= Math.PI; offset += ANGLE_STEP)
     for (const candidate of [wanted + offset, wanted - offset])
@@ -210,13 +218,13 @@ export function commanderTakeover(input: {
   return {
     content,
     disc,
-    badge: {
-      x: Math.cos(angle) * distance,
-      y: Math.sin(angle) * distance,
-      angle,
+    badges: anglesAround(angle).map((badgeAngle) => ({
+      x: Math.cos(badgeAngle) * distance,
+      y: Math.sin(badgeAngle) * distance,
+      angle: badgeAngle,
       size: badgeSize,
       distance,
-    },
+    })),
     knock: { x: -outward.x, y: -outward.y },
     flood: reach && {
       x: card.width / 2 + reach.x,
