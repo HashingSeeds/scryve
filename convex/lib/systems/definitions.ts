@@ -117,6 +117,7 @@ export type SystemDefinition = {
   readonly firstPlayer: FirstPlayerDefinition
   readonly roundClock: RoundClockDefinition
   readonly deckAnalysis: boolean
+  readonly resultTracking: boolean
   readonly integration: IntegrationDefinition
 }
 
@@ -264,6 +265,7 @@ export const SYSTEMS = {
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,
+    resultTracking: true,
     integration: {
       identityNamespace: "scryfall-oracle",
       capabilities: {
@@ -318,6 +320,7 @@ export const SYSTEMS = {
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: true },
     roundClock: { minutes: 50, endOfRoundTurns: 0 },
     deckAnalysis: false,
+    resultTracking: true,
     integration: {
       identityNamespace: "ygoprodeck-card",
       capabilities: {
@@ -368,6 +371,7 @@ export const SYSTEMS = {
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: true },
     roundClock: { minutes: 50, bestOfOneMinutes: 30, endOfRoundTurns: 3, overtimeMinutes: 15 },
     deckAnalysis: false,
+    resultTracking: true,
     integration: {
       identityNamespace: "tcgdex-card",
       capabilities: {
@@ -418,6 +422,7 @@ export const SYSTEMS = {
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 5 },
     deckAnalysis: false,
+    resultTracking: true,
     integration: {
       identityNamespace: "lorcanajson-card",
       capabilities: {
@@ -494,6 +499,7 @@ export const SYSTEMS = {
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
     roundClock: { minutes: 55, endOfRoundTurns: 1 },
     deckAnalysis: false,
+    resultTracking: true,
     integration: {
       identityNamespace: "fab-cube-card",
       capabilities: {

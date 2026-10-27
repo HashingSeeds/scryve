@@ -19,7 +19,7 @@ import { cardCountLabel } from "./deckCopy"
 import type { DeckStatsRecord } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
-import { systemDefinition } from "../../../convex/lib/systems"
+import { systemDefinition, tracksResults } from "../../../convex/lib/systems"
 
 export type DeckTab = "cards" | "notes" | "analysis"
 
@@ -109,6 +109,7 @@ export function DeckView({
   stats?: DeckStatsRecord
 }) {
   const { themed, theme } = useAppTheme()
+  const tracked = tracksResults(game)
   const sections = groupedCards(cards, localizedDeckSections(game, format))
   if (onChooseCommander && !sections.some((section) => section.board === "commander")) {
     sections.unshift({
@@ -184,8 +185,8 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
-              {stats ? <DeckStats record={stats} /> : statsContent}
-              {onStats && (stats || statsContent) ? (
+              {tracked && (stats ? <DeckStats record={stats} /> : statsContent)}
+              {tracked && onStats && (stats || statsContent) ? (
                 <TouchableOpacity
                   testID="open-deck-stats"
                   accessibilityRole="button"
@@ -195,7 +196,7 @@ export function DeckView({
                   <Text size="sm" tx="decks:stats.viewStats" style={themed($action)} />
                 </TouchableOpacity>
               ) : null}
-              {onAddMatch ? (
+              {tracked && onAddMatch ? (
                 <TouchableOpacity
                   testID="add-match-result"
                   accessibilityRole="button"

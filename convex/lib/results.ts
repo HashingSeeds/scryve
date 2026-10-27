@@ -8,6 +8,7 @@ import {
 import type { MatchOutcome } from "./matchResults"
 import { resultOpponents, summarySeats } from "./opponentDecks"
 import { MAX_PLAYERS } from "./policy"
+import { tracksResults } from "./systems"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
@@ -116,6 +117,7 @@ export async function recordPlayerResult(
   source?: "local" | "nearby" | "connected",
 ) {
   if (isAbandonedSummary(summary) || !player.userId) return
+  if (!tracksResults(summary.system ?? summary.game)) return
   const outcome = player.outcome ?? "unknown"
   source ??= await gameResultSource(ctx, summary)
   await addDeckResult(ctx, {
@@ -231,6 +233,7 @@ function deckedOwnerSeat(match: Doc<"matches">) {
 export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
   if (match.finishedAt === undefined) return
   if (match.source === "connected" && match.status !== "finished") return
+  if (!tracksResults(match.system)) return
   const owner = deckedOwnerSeat(match)
   for (const seat of match.seats) {
     if (!seat.userId) continue
@@ -267,6 +270,7 @@ export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">,
 
 /** why: deleting a manual match must reverse exactly what recordMatchResult added. */
 export async function removeMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
+  if (!tracksResults(match.system)) return
   for (const seat of match.seats)
     if (seat.userId)
       await removeDeckResult(
