@@ -43,12 +43,13 @@ type LobbyProjection = {
   invitation?: { token: string; manualCode: string } | null
   players: LobbyPlayer[]
   commanderDamage?: {
-    totals: Array<{ fromPlayerId: string; toPlayerId: string; total: number }>
+    totals: Array<{ fromPlayerId: string; toPlayerId: string; commander?: 1; total: number }>
     pendingClaims: Array<{
       claimId: string
       operationId: string
       fromPlayerId: string
       toPlayerId: string
+      commander?: 1
       delta: number
       clientCreatedAt: number
       createdAt: number
