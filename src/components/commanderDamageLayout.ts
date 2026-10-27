@@ -1,5 +1,7 @@
 import type { PlayerId } from "@/features/game/types"
 
+import { LIFE_DIGIT_ASPECT } from "./playerCardTypes"
+
 export interface CommanderBoardSeat {
   playerId: PlayerId
   row: number
@@ -89,4 +91,137 @@ export function commanderFacing(
   if (attacker.row === defender.row) return { x }
   const sharesColumn = attacker.left < defender.right && defender.left < attacker.right
   return sharesColumn ? { y } : { x, y }
+}
+
+export interface CommanderReach {
+  x: number
+  y: number
+  radius: number
+}
+
+function seatCenter(
+  gridRows: readonly (number | null)[][],
+  rowFlexes: readonly number[],
+  playerIndex: number,
+) {
+  const total = rowFlexes.reduce((sum, flex) => sum + flex, 0)
+  let top = 0
+  for (const [row, slots] of gridRows.entries()) {
+    const height = rowFlexes[row] / total
+    const column = slots.indexOf(playerIndex)
+    if (column >= 0) return { x: (column + 0.5) / slots.length, y: top + height / 2 }
+    top += height
+  }
+  return undefined
+}
+
+export function commanderReach(input: {
+  gridRows: readonly (number | null)[][]
+  rowFlexes: readonly number[]
+  board: { width: number; height: number }
+  attackerIndex: number
+  defenderIndex: number
+}): CommanderReach | undefined {
+  const { gridRows, rowFlexes, board } = input
+  const attacker = seatCenter(gridRows, rowFlexes, input.attackerIndex)
+  const defender = seatCenter(gridRows, rowFlexes, input.defenderIndex)
+  if (!attacker || !defender || !(board.width > 0) || !(board.height > 0)) return undefined
+  const ax = attacker.x * board.width
+  const ay = attacker.y * board.height
+  return {
+    x: ax - defender.x * board.width,
+    y: ay - defender.y * board.height,
+    radius: Math.max(
+      ...[
+        [0, 0],
+        [board.width, 0],
+        [0, board.height],
+        [board.width, board.height],
+      ].map(([x, y]) => Math.hypot(x - ax, y - ay)),
+    ),
+  }
+}
+
+export interface CommanderTakeover {
+  content: { width: number; height: number }
+  disc: number
+  badge: { x: number; y: number; angle: number; size: number; distance: number }
+  knock: { x: number; y: number }
+  flood?: { x: number; y: number; radius: number }
+}
+
+// why: undo and the menu button sit in a card's corners and would cover a badge parked there.
+const CORNER_CLEARANCE = 52
+const BADGE_GAP = 6
+const ANGLE_STEP = Math.PI / 90
+
+function rotate(x: number, y: number, degrees: number) {
+  const radians = (degrees * Math.PI) / 180
+  return {
+    x: x * Math.cos(radians) - y * Math.sin(radians),
+    y: x * Math.sin(radians) + y * Math.cos(radians),
+  }
+}
+
+export function commanderTakeover(input: {
+  card: { width: number; height: number }
+  rotation: number
+  lifeFontSize: number
+  lifeDigits: number
+  badgeSize: number
+  reach?: CommanderReach
+}): CommanderTakeover {
+  const { card, rotation, lifeFontSize, badgeSize, reach } = input
+  const sideways = Math.abs(rotation) === 90
+  const content = sideways
+    ? { width: card.height, height: card.width }
+    : { width: card.width, height: card.height }
+  const textWidth = Math.max(input.lifeDigits, 2) * LIFE_DIGIT_ASPECT * lifeFontSize * 0.9
+  const textHeight = lifeFontSize * 0.74
+  const disc = Math.max(
+    0,
+    Math.min(
+      Math.hypot(textWidth, textHeight) / 2 + lifeFontSize * 0.06,
+      Math.min(content.width, content.height) / 2 - BADGE_GAP,
+    ),
+  )
+  const distance = disc + badgeSize / 2 + BADGE_GAP
+  const toward = reach ? rotate(reach.x, reach.y, -rotation) : { x: 0, y: -1 }
+  const wanted = Math.atan2(toward.y, toward.x)
+  const half = badgeSize / 2 + 4
+  const fits = (angle: number) => {
+    const x = Math.cos(angle) * distance
+    const y = Math.sin(angle) * distance
+    const inside =
+      Math.abs(x) + half <= content.width / 2 && Math.abs(y) + half <= content.height / 2
+    const inCorner =
+      Math.abs(x) + half > content.width / 2 - CORNER_CLEARANCE &&
+      Math.abs(y) + half > content.height / 2 - CORNER_CLEARANCE
+    return inside && !inCorner
+  }
+  let angle = wanted
+  search: for (let offset = 0; offset <= Math.PI; offset += ANGLE_STEP)
+    for (const candidate of [wanted + offset, wanted - offset])
+      if (fits(candidate)) {
+        angle = candidate
+        break search
+      }
+  const outward = rotate(Math.cos(angle), Math.sin(angle), rotation)
+  return {
+    content,
+    disc,
+    badge: {
+      x: Math.cos(angle) * distance,
+      y: Math.sin(angle) * distance,
+      angle,
+      size: badgeSize,
+      distance,
+    },
+    knock: { x: -outward.x, y: -outward.y },
+    flood: reach && {
+      x: card.width / 2 + reach.x,
+      y: card.height / 2 + reach.y,
+      radius: reach.radius,
+    },
+  }
 }

@@ -31,11 +31,19 @@ import { BoardPressable } from "./BoardPressable"
 import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
+  BADGE,
+  COMPACT_BADGE,
   CommanderDamageCardControls,
+  CommanderTakeoverBackdrop,
+  PulseRing,
   type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
-import type { CommanderFacing } from "./commanderDamageLayout"
+import {
+  commanderTakeover,
+  type CommanderFacing,
+  type CommanderReach,
+} from "./commanderDamageLayout"
 import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
@@ -88,6 +96,7 @@ export type LifeCardCommanderDamage = Omit<
   commanderName?: string
   onPowerStep?: (step: 1 | -1) => void
   facing?: CommanderFacing
+  reach?: CommanderReach
   onStage?: (step: number) => void
   acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
@@ -338,6 +347,19 @@ export const LifeCard = memo(function LifeCard({
 
   const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
   const armedCommanderId = commanderDamage?.armedPlayerId
+  const defending =
+    !!commanderDamage && !!armedCommanderId && armedCommanderId !== commanderDamage.ownerPlayerId
+  const takeover =
+    defending && cardSize.width > 0
+      ? commanderTakeover({
+          card: cardSize,
+          rotation: contentRotation,
+          lifeFontSize: resolvedLifeFontSize,
+          lifeDigits: shownDigits,
+          badgeSize: compact ? COMPACT_BADGE : BADGE,
+          reach: commanderDamage?.reach,
+        })
+      : undefined
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -362,6 +384,7 @@ export const LifeCard = memo(function LifeCard({
               (commanderDamage.stagedAgainstOwner ?? 0),
             power: commanderDamage.power ?? 1,
             facing: commanderDamage.facing ?? {},
+            takeover,
             acted: !!commanderDamage.acted,
             onChange: (step) => commanderDamage.onStage?.(step),
           }
@@ -382,13 +405,16 @@ export const LifeCard = memo(function LifeCard({
       withTiming(0, { duration: 155 }),
     )
   }, [defenderTotal, knock, reducedMotion])
-  const knockX = knockFacing?.x === "left" ? 1 : knockFacing?.x === "right" ? -1 : 0
-  const knockY = knockFacing?.y === "top" ? 1 : knockFacing?.y === "bottom" ? -1 : 0
-  const knockDistance = knockX && knockY ? KNOCKBACK / Math.SQRT2 : KNOCKBACK
+  const facingX = knockFacing?.x === "left" ? 1 : knockFacing?.x === "right" ? -1 : 0
+  const facingY = knockFacing?.y === "top" ? 1 : knockFacing?.y === "bottom" ? -1 : 0
+  const knockDirection = takeover?.knock ?? {
+    x: facingX && facingY ? facingX / Math.SQRT2 : facingX,
+    y: facingX && facingY ? facingY / Math.SQRT2 : facingY,
+  }
   const knockStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: knock.value * knockX * knockDistance },
-      { translateY: knock.value * knockY * knockDistance },
+      { translateX: knock.value * knockDirection.x * KNOCKBACK },
+      { translateY: knock.value * knockDirection.y * KNOCKBACK },
     ],
   }))
   const lifeControlsShown =
@@ -519,6 +545,15 @@ export const LifeCard = memo(function LifeCard({
             size={(Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height) * 0.8}
           />
         </View>
+      ) : null}
+      {takeover ? (
+        <CommanderTakeoverBackdrop
+          seatNumber={seatNumber}
+          takeover={takeover}
+          cardSize={cardSize}
+          attackerColor={commanderDamage?.attacker?.color ?? foreground}
+          defenderColor={color}
+        />
       ) : null}
       <View
         pointerEvents={
@@ -696,7 +731,6 @@ export const LifeCard = memo(function LifeCard({
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           menuCorner={menuCorner}
-          menuEdgeCenter={menuEdgeCenter}
           compact={compact}
           mode={commanderCardMode}
         />
@@ -721,6 +755,48 @@ export const LifeCard = memo(function LifeCard({
           onLongChange={() => setEditorOpen(true)}
           style={out?.cause === "life" ? $aboveOutOverlay : undefined}
         />
+      ) : null}
+      {commanderCardMode?.kind === "source" ? (
+        // why: the mark and name opened this mode, so the same spot finishes it: an X until a hit lands, then a check.
+        <View
+          key={`finish-${contentRotation}`}
+          pointerEvents="box-none"
+          style={[
+            themed($cornerLayer),
+            identityCorner.layer,
+            { transform: [{ rotate: `${contentRotation}deg` }] },
+          ]}
+        >
+          <BoardPressable
+            testID={`commander-exit-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={translate(
+              `board:commander.submitAssigningFromSeat.${commanderCardMode.submit}`,
+              { seat: seatNumber },
+            )}
+            hitSlop={12}
+            onPress={commanderCardMode.onSubmit}
+            style={[themed($overviewClose), identityCorner.position]}
+          >
+            {commanderCardMode.acted ? (
+              <PulseRing
+                testID={`commander-finish-pulse-seat-${seatNumber}`}
+                size={identityMetrics.mark * 1.15}
+                color={foreground}
+              />
+            ) : null}
+            <PlayerMark
+              seatNumber={seatNumber}
+              shape={shape}
+              color={foreground}
+              insetSwordColor={color}
+              closeIcon={!commanderCardMode.acted}
+              insetCheck={commanderCardMode.acted}
+              size={identityMetrics.mark}
+              style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
+            />
+          </BoardPressable>
+        </View>
       ) : null}
       {dice && diceCovers ? (
         <DiceSeatOverlay
