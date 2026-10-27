@@ -249,7 +249,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Notifications are off unless you turn them on. If you do, we keep a token for your device so we can tell you when we reply to your feedback, or remind you before your subscription renews. Expo, and Apple or Google, deliver them. When you turn them off, we delete the token.",
+          text: "Notifications are off unless you turn them on. If you do, we keep a token for your device so we can tell you when we reply to your feedback, or remind you before your subscription renews. Expo, and Apple or Google, deliver them. When you turn them off, we delete the token the next time Scryve is online.",
         },
       ],
     },

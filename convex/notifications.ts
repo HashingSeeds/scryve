@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values"
 
 import { components, internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
-import { internalAction, internalMutation, mutation } from "./_generated/server"
+import { internalAction, internalMutation, mutation, type MutationCtx } from "./_generated/server"
 import { signedInUser } from "./feedback"
 import { senderHash } from "./lib/feedback"
 import {
@@ -19,11 +19,14 @@ import {
 
 const limiter = new RateLimiter(components.rateLimiter, {
   pushDeviceSync: { kind: "token bucket", rate: 20, period: HOUR, capacity: 10 },
+  // why: each new feedback key gets a fresh bucket, so only this caps how many devices can be added.
+  pushDeviceNew: { kind: "fixed window", rate: 300, period: HOUR },
 })
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push"
 const EXPO_TIMEOUT_MS = 15_000
-const SEND_RETRY_MS = [MINUTE, 10 * MINUTE] as const
+// why: a renewal reminder goes out once, and it leaves 3 days of room, so it outlasts a long Expo outage.
+const SEND_RETRY_MS = [MINUTE, 10 * MINUTE, HOUR, 6 * HOUR] as const
 // why: Expo reports most dead tokens only in receipts, which are ready some minutes after the send.
 const RECEIPT_DELAY_MS = 15 * MINUTE
 const REMINDER_BATCH = 50
@@ -39,6 +42,16 @@ function sameDevice(a: DeviceFields, b: DeviceFields) {
     a.feedbackReplies === b.feedbackReplies &&
     a.renewalReminders === b.renewalReminders
   )
+}
+
+async function limit(ctx: MutationCtx, name: "pushDeviceSync" | "pushDeviceNew", key?: string) {
+  const result = await limiter.limit(ctx, name, key ? { key } : {})
+  if (!result.ok)
+    throw new ConvexError({
+      code: "rate_limited",
+      message: `Try again in ${Math.ceil(result.retryAfter / 1000)} seconds.`,
+      retryAfterMs: result.retryAfter,
+    })
 }
 
 export const forgetDevice = mutation({
@@ -82,13 +95,8 @@ export const syncDevice = mutation({
       renewalReminders: args.renewalReminders && !!user,
     }
     if (existing && sameDevice(existing, device)) return null
-    const limit = await limiter.limit(ctx, "pushDeviceSync", { key: hash })
-    if (!limit.ok)
-      throw new ConvexError({
-        code: "rate_limited",
-        message: `Try again in ${Math.ceil(limit.retryAfter / 1000)} seconds.`,
-        retryAfterMs: limit.retryAfter,
-      })
+    await limit(ctx, "pushDeviceSync", hash)
+    if (!existing) await limit(ctx, "pushDeviceNew")
     const value = { ...device, updatedAt: Date.now() }
     if (existing) await ctx.db.replace(existing._id, value)
     else await ctx.db.insert("pushDevices", value)

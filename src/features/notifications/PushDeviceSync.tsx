@@ -41,9 +41,10 @@ function Sync() {
         )
       return
     }
+    let stale = false
     void (async () => {
       const token = await pushToken()
-      if (!token) return
+      if (!token || stale) return
       await syncDevice({
         key,
         token,
@@ -54,6 +55,9 @@ function Sync() {
       })
       storage.set(REGISTERED, true)
     })().catch(() => undefined)
+    return () => {
+      stale = true
+    }
     // why: signing in or out changes which account this device belongs to, and a sync that failed offline must run again once back online.
   }, [
     key,
