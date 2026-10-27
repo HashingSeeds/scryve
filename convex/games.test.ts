@@ -2042,6 +2042,111 @@ describe("connected commander damage claims", () => {
       }),
     ).rejects.toThrow("reused with different data")
   })
+
+  it("tracks partner commander damage separately, so only 21 from one commander is lethal", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const first = (operationId: string, delta: number) =>
+      commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta)
+    const partner = (operationId: string, delta: number) => ({
+      ...first(operationId, delta),
+      commander: 1,
+    })
+    const confirm = (operationId: string) =>
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId,
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_001,
+      })
+
+    await expect(
+      game.host.mutation(api.games.submitCommanderDamage, first("first-commander-0001", 11)),
+    ).resolves.toMatchObject({ status: "pending" })
+    await expect(
+      game.host.mutation(api.games.submitCommanderDamage, partner("partner-commander-0001", 11)),
+    ).resolves.toMatchObject({ status: "pending" })
+    const defender = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(defender.commanderDamage?.pendingClaims).toEqual([
+      expect.not.objectContaining({ commander: expect.anything() }),
+      expect.objectContaining({ operationId: "partner-commander-0001", commander: 1 }),
+    ])
+    await confirm("first-commander-0001")
+    await expect(confirm("partner-commander-0001")).resolves.toMatchObject({ total: 11 })
+
+    let projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players[1]).toMatchObject({
+      currentLife: 18,
+      eliminatedByCommanderDamage: false,
+    })
+    const pair = { fromPlayerId: game.hostPlayerId, toPlayerId: game.joinerPlayerId }
+    expect(projection.commanderDamage?.totals).toEqual(
+      expect.arrayContaining([
+        { ...pair, total: 11 },
+        { ...pair, commander: 1, total: 11 },
+      ]),
+    )
+
+    await game.host.mutation(api.games.submitCommanderDamage, partner("partner-commander-0002", 10))
+    await confirm("partner-commander-0002")
+    projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.players[1]).toMatchObject({ eliminatedByCommanderDamage: true })
+    expect(projection.commanderDamage?.totals).toEqual(
+      expect.arrayContaining([
+        { ...pair, total: 11 },
+        { ...pair, commander: 1, total: 21 },
+      ]),
+    )
+
+    const events = await game.joiner.query(api.games.connectedEvents, {
+      publicId: game.publicId,
+      paginationOpts: { cursor: null, numItems: 20 },
+    })
+    expect(
+      events.page
+        .filter((event) => event.claimOperationId === "partner-commander-0002")
+        .map((event) => [event.kind, event.commander]),
+    ).toEqual([
+      ["commanderDamage.confirmed", 1],
+      ["commanderDamage.claimed", 1],
+    ])
+
+    const { publicId, ...submitted } = partner("partner-commander-0002", 10)
+    const status = (operation: Omit<typeof submitted, "commander"> & { commander?: number }) =>
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId,
+        operation: { kind: "commanderDamage.submitted", ...operation },
+      })
+    await expect(status(submitted)).resolves.toMatchObject({ status: "acknowledged" })
+    await expect(status({ ...submitted, commander: undefined })).resolves.toMatchObject({
+      status: "conflict",
+    })
+    await expect(
+      game.host.mutation(api.games.submitCommanderDamage, first("partner-commander-0002", 10)),
+    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+  })
+
+  it("rejects a commander slot other than the first or the partner", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    for (const commander of [0, 2])
+      await expect(
+        game.host.mutation(api.games.submitCommanderDamage, {
+          ...commanderArgs(
+            game.publicId,
+            game.hostPlayerId,
+            game.joinerPlayerId,
+            `commander-slot-000${commander}`,
+            3,
+          ),
+          commander,
+        }),
+      ).rejects.toThrow("Commander must be omitted for the first commander or 1 for the partner")
+  })
 })
 
 describe("Convex replay-safe game completion", () => {

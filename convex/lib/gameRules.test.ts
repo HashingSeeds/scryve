@@ -3,6 +3,7 @@ import {
   commanderClaimOutcome,
   confirmCommanderClaim,
   controlsSeat,
+  isSameCommanderClaim,
   isSameLifeChange,
   MAX_PENDING_COMMANDER_CLAIMS,
 } from "./gameRules"
@@ -40,6 +41,25 @@ describe("game rules", () => {
       { clientCreatedAt: undefined },
     ])
       expect(isSameLifeChange({ ...request, ...nearMiss }, request)).toBe(false)
+  })
+
+  it("treats a commander claim from the partner as a different claim", () => {
+    const request = {
+      operationId: "claim",
+      fromPlayerId: "attacker",
+      toPlayerId: "defender",
+      delta: 3,
+      actorUserId: "player",
+      deviceId: "phone",
+      clientCreatedAt: 10,
+    }
+
+    expect(isSameCommanderClaim({ ...request }, request)).toBe(true)
+    expect(isSameCommanderClaim({ ...request, commander: 1 }, { ...request, commander: 1 })).toBe(
+      true,
+    )
+    expect(isSameCommanderClaim({ ...request, commander: 1 }, request)).toBe(false)
+    expect(isSameCommanderClaim(request, { ...request, commander: 1 })).toBe(false)
   })
 
   it("floors life at zero only for systems that stop there", () => {
