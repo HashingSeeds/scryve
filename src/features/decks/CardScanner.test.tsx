@@ -4,7 +4,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import { cardNameIndex } from "./cardNameMatch"
-import { CardScanner } from "./CardScanner"
+import { CardScanner, type ScannedCardAdd } from "./CardScanner"
 import type { CardPhotoText } from "../../../modules/card-text-reader"
 
 let mockOnText: ((event: { nativeEvent: CardPhotoText }) => void) | undefined
@@ -23,8 +23,16 @@ jest.mock("expo-camera", () => ({
 
 const nameIndex = cardNameIndex(["Sol Ring", "Arcane Signet", "Forest"])
 
-function renderScanner(props: { singleton: boolean; inDeck?: Record<string, number> }) {
-  const addCards = jest.fn(async (names: string[]) => names.map(() => ({})))
+function renderScanner(props: {
+  singleton: boolean
+  inDeck?: Record<string, number>
+  addCards?: (names: string[]) => Promise<ScannedCardAdd[]>
+}) {
+  const addCards = jest.fn(
+    props.addCards ?? (async (names: string[]): Promise<ScannedCardAdd[]> => names.map(() => ({}))),
+  )
+  const removeCard = jest.fn()
+  const onClose = jest.fn()
   const view = render(
     <ThemeProvider initialContext="dark">
       <CardScanner
@@ -33,25 +41,43 @@ function renderScanner(props: { singleton: boolean; inDeck?: Record<string, numb
         singleton={props.singleton}
         copiesInDeck={(name) => props.inDeck?.[name] ?? 0}
         addCards={addCards}
-        onClose={jest.fn()}
+        removeCard={removeCard}
+        onClose={onClose}
       />
     </ThemeProvider>,
   )
   const layout = { x: 0, y: 0, width: 400, height: 700 }
   for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
     fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
-  return { view, addCards }
+  return { view, addCards, removeCard, onClose }
 }
 
-function show(text?: string) {
-  const lines = text ? [{ text, x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }] : []
+function show(...texts: string[]) {
+  const lines = texts.map((text) => ({
+    text,
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 20,
+    angle: 0,
+    confidence: 1,
+  }))
   act(() => mockOnText?.({ nativeEvent: { width: 960, height: 1280, lines } }))
 }
 
-function scan(name: string) {
-  show(name)
-  show(name)
+function scan(...lines: string[]) {
+  show(...lines)
+  show(...lines)
   show()
+}
+
+function slowAdds() {
+  let land: () => void = () => undefined
+  const addCards = (names: string[]) =>
+    new Promise<ScannedCardAdd[]>((resolve) => {
+      land = () => resolve(names.map(() => ({})))
+    })
+  return { addCards, land: () => act(async () => land()) }
 }
 
 async function finish(view: ReturnType<typeof render>) {
@@ -90,4 +116,50 @@ test("asks once how many of a basic land the deck holds and tops it up", async (
   expect(view.queryByText("How many in the deck?")).toBeNull()
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Forest", "Forest"])
+})
+
+test("waits for adds still in flight before closing and ignores reads after Done", async () => {
+  jest.useFakeTimers()
+  try {
+    const slow = slowAdds()
+    const { view, onClose } = renderScanner({ singleton: false, addCards: slow.addCards })
+    scan("Sol Ring")
+    act(() => jest.advanceTimersByTime(1500))
+    fireEvent.press(view.getByText("Done"))
+    scan("Arcane Signet")
+    expect(view.queryByText("Arcane Signet")).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+    await slow.land()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("Wrong card removes a card whose add was still in flight once it lands", async () => {
+  jest.useFakeTimers()
+  try {
+    const slow = slowAdds()
+    const { view, removeCard } = renderScanner({ singleton: false, addCards: slow.addCards })
+    scan("Sol Ring")
+    act(() => jest.advanceTimersByTime(1500))
+    fireEvent.press(view.getByText("Wrong card"))
+    fireEvent.press(view.getByText("Remove it"))
+    expect(removeCard).not.toHaveBeenCalled()
+    await slow.land()
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("an alternate picked after a misread follows the basic land count prompt", async () => {
+  const { view, addCards } = renderScanner({ singleton: true })
+  scan("Sol Ring", "Forest")
+  fireEvent.press(view.getByText("Wrong card"))
+  await act(async () => fireEvent.press(view.getByText("Forest")))
+  expect(view.getByText("How many in the deck?")).toBeTruthy()
+  fireEvent.press(view.getByTestId("card-scan-add-lands"))
+  await finish(view)
+  expect(addCards.mock.calls.flat(2)).toEqual(["Forest"])
 })

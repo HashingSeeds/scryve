@@ -100,6 +100,9 @@ export function CardScanner({
   const nameInFrame = useRef<string>(undefined)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const lookups = useRef(new Map<number, Promise<ScannedCardAdd>>())
+  const [closing, setClosing] = useState(false)
+  const closingRef = useRef(false)
   const nextId = useRef(0)
   const lastAcceptedAt = useRef(Date.now())
   const { themed, theme } = useAppTheme()
@@ -126,11 +129,17 @@ export function CardScanner({
     clearTimeout(batchTimer.current)
     const batch = waiting.current.splice(0)
     if (!batch.length) return
-    const results = await addCards(batch.map((card) => card.name))
-    batch.forEach((card, index) => {
-      const result = results[index] ?? { error: translate("decks:cardScan.failed") }
-      updateCard(card.id, "error" in result ? { state: result } : { ...result, state: "added" })
-    })
+    const results = addCards(batch.map((card) => card.name))
+    await Promise.all(
+      batch.map(async (card, index) => {
+        const lookup = results.then(
+          (all) => all[index] ?? { error: translate("decks:cardScan.failed") },
+        )
+        lookups.current.set(card.id, lookup)
+        const result = await lookup
+        updateCard(card.id, "error" in result ? { state: result } : { ...result, state: "added" })
+      }),
+    )
   }
 
   function add(card: Omit<ScannedCard, "id" | "state">) {
@@ -149,7 +158,7 @@ export function CardScanner({
   }
 
   function readText(photo: CardPhotoText) {
-    if (!view.current || !frame.current) return
+    if (closingRef.current || !view.current || !frame.current) return
     const framing = { view: view.current, frame: frame.current }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
@@ -177,22 +186,25 @@ export function CardScanner({
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)
       .filter((name) => name !== match.name)
       .slice(0, ALTERNATE_COUNT)
-    const card = { ...match, alternates }
-    if (BASIC_LANDS.has(match.name)) {
-      if (countedLands.current.has(match.name)) {
-        setStatus({ alreadyInDeck: match.name })
+    accept({ ...match, alternates })
+  }
+
+  function accept(card: Omit<ScannedCard, "id" | "state">) {
+    if (BASIC_LANDS.has(card.name)) {
+      if (countedLands.current.has(card.name)) {
+        setStatus({ alreadyInDeck: card.name })
         return
       }
-      const inDeck = copiesInDeck(match.name)
+      const inDeck = copiesInDeck(card.name)
       setLandCount({ card, inDeck, count: Math.max(inDeck, 1) })
       return
     }
     if (
       singleton &&
-      (copiesInDeck(match.name) > 0 ||
-        addedRef.current.some((scanned) => scanned.name === match.name))
+      (copiesInDeck(card.name) > 0 ||
+        addedRef.current.some((scanned) => scanned.name === card.name))
     ) {
-      setStatus({ alreadyInDeck: match.name })
+      setStatus({ alreadyInDeck: card.name })
       return
     }
     add(card)
@@ -206,24 +218,28 @@ export function CardScanner({
 
   async function replace(wrong: ScannedCard, name?: string) {
     setFixing(undefined)
-    const stillWaiting = waiting.current.indexOf(wrong)
+    setAdded((current) => current.filter((card) => card.id !== wrong.id))
+    const stillWaiting = waiting.current.findIndex((card) => card.id === wrong.id)
     if (stillWaiting >= 0) waiting.current.splice(stillWaiting, 1)
-    else if (wrong.state === "added") removeCard?.(wrong.name)
-    setAdded((current) => current.filter((card) => card !== wrong))
-    if (name) {
-      add({ name, similarity: 1, alternates: [] })
-      await addWaitingCards()
+    else {
+      const result = await lookups.current.get(wrong.id)
+      if (result && !("error" in result)) removeCard?.(wrong.name)
     }
+    if (name) accept({ name, similarity: 1, alternates: [] })
   }
 
   async function close() {
+    if (closingRef.current) return
+    closingRef.current = true
+    setClosing(true)
     await addWaitingCards()
+    await Promise.all(lookups.current.values())
     onClose()
   }
 
   const canAsk = permission?.canAskAgain !== false
   const last = added[0]
-  const scanning = Boolean(permission?.granted) && !fixing && !landCount
+  const scanning = Boolean(permission?.granted) && !fixing && !landCount && !closing
 
   return (
     <Modal visible animationType="slide" onRequestClose={() => void close()}>
