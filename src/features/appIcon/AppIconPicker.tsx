@@ -18,83 +18,85 @@ import { APP_ICON_VARIANTS, type AppIconName } from "./appIconVariants"
 
 type Preview = { ios: ImageSourcePropType; android: ImageSourcePropType }
 
+// why: 288px previews from scripts/app-icons.ts, because iOS release builds decode the 1024px icons on the main thread and hitch the first open.
 const PREVIEWS: Record<AppIconName, Preview> = {
   Two: {
-    ios: require("@assets/images/app-icons/two-ios.png"),
-    android: require("@assets/images/app-icons/two-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/two-ios.png"),
+    android: require("@assets/images/app-icons/previews/two-android.png"),
   },
   Three: {
-    ios: require("@assets/images/app-icons/three-ios.png"),
-    android: require("@assets/images/app-icons/three-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/three-ios.png"),
+    android: require("@assets/images/app-icons/previews/three-android.png"),
   },
   Midnight: {
-    ios: require("@assets/images/app-icons/midnight-ios.png"),
-    android: require("@assets/images/app-icons/midnight-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/midnight-ios.png"),
+    android: require("@assets/images/app-icons/previews/midnight-android.png"),
   },
   Graphite: {
-    ios: require("@assets/images/app-icons/graphite-ios.png"),
-    android: require("@assets/images/app-icons/graphite-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/graphite-ios.png"),
+    android: require("@assets/images/app-icons/previews/graphite-android.png"),
   },
   Ink: {
-    ios: require("@assets/images/app-icons/ink-ios.png"),
-    android: require("@assets/images/app-icons/ink-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/ink-ios.png"),
+    android: require("@assets/images/app-icons/previews/ink-android.png"),
   },
   Outline: {
-    ios: require("@assets/images/app-icons/outline-ios.png"),
-    android: require("@assets/images/app-icons/outline-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/outline-ios.png"),
+    android: require("@assets/images/app-icons/previews/outline-android.png"),
   },
   Bone: {
-    ios: require("@assets/images/app-icons/bone-ios.png"),
-    android: require("@assets/images/app-icons/bone-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/bone-ios.png"),
+    android: require("@assets/images/app-icons/previews/bone-android.png"),
   },
   Paper: {
-    ios: require("@assets/images/app-icons/paper-ios.png"),
-    android: require("@assets/images/app-icons/paper-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/paper-ios.png"),
+    android: require("@assets/images/app-icons/previews/paper-android.png"),
   },
   Ash: {
-    ios: require("@assets/images/app-icons/ash-ios.png"),
-    android: require("@assets/images/app-icons/ash-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/ash-ios.png"),
+    android: require("@assets/images/app-icons/previews/ash-android.png"),
   },
   Pencil: {
-    ios: require("@assets/images/app-icons/pencil-ios.png"),
-    android: require("@assets/images/app-icons/pencil-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/pencil-ios.png"),
+    android: require("@assets/images/app-icons/previews/pencil-android.png"),
   },
   Foil: {
-    ios: require("@assets/images/app-icons/foil-ios.png"),
-    android: require("@assets/images/app-icons/foil-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/foil-ios.png"),
+    android: require("@assets/images/app-icons/previews/foil-android.png"),
   },
   Contour: {
-    ios: require("@assets/images/app-icons/contour-ios.png"),
-    android: require("@assets/images/app-icons/contour-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/contour-ios.png"),
+    android: require("@assets/images/app-icons/previews/contour-android.png"),
   },
   Stripes: {
-    ios: require("@assets/images/app-icons/stripes-ios.png"),
-    android: require("@assets/images/app-icons/stripes-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/stripes-ios.png"),
+    android: require("@assets/images/app-icons/previews/stripes-android.png"),
   },
   Neon: {
-    ios: require("@assets/images/app-icons/neon-ios.png"),
-    android: require("@assets/images/app-icons/neon-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/neon-ios.png"),
+    android: require("@assets/images/app-icons/previews/neon-android.png"),
   },
   Blueprint: {
-    ios: require("@assets/images/app-icons/blueprint-ios.png"),
-    android: require("@assets/images/app-icons/blueprint-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/blueprint-ios.png"),
+    android: require("@assets/images/app-icons/previews/blueprint-android.png"),
   },
   Gilded: {
-    ios: require("@assets/images/app-icons/gilded-ios.png"),
-    android: require("@assets/images/app-icons/gilded-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/gilded-ios.png"),
+    android: require("@assets/images/app-icons/previews/gilded-android.png"),
   },
   Prism: {
-    ios: require("@assets/images/app-icons/prism-ios.png"),
-    android: require("@assets/images/app-icons/prism-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/prism-ios.png"),
+    android: require("@assets/images/app-icons/previews/prism-android.png"),
   },
   Holo: {
-    ios: require("@assets/images/app-icons/holo-ios.png"),
-    android: require("@assets/images/app-icons/holo-android-foreground.png"),
+    ios: require("@assets/images/app-icons/previews/holo-ios.png"),
+    android: require("@assets/images/app-icons/previews/holo-android.png"),
   },
 }
+// why: scripts/app-icons.ts does not draw the main icon, so these are 288px copies of app-icon-ios.png and app-icon-android-adaptive-foreground.png.
 const DEFAULT_PREVIEW: Preview = {
-  ios: require("@assets/images/app-icon-ios.png"),
-  android: require("@assets/images/app-icon-android-adaptive-foreground.png"),
+  ios: require("@assets/images/app-icons/previews/default-ios.png"),
+  android: require("@assets/images/app-icons/previews/default-android.png"),
 }
 const ANDROID = Platform.OS === "android"
 
