@@ -109,6 +109,11 @@ export default {
     copyDebugInfo: "デバッグ情報をコピー",
     copied: "コピーしました",
     copyFailed: "コピーできませんでした。もう一度お試しください。",
+    syncStats: {
+      label: "開発者向け統計",
+      helper:
+        "オンライン対戦や近くのデバイスとの対戦で、変更が各デバイスに届くまでの時間を表示します。",
+    },
   },
   support: {
     pageTitle: "Scryve サポート",

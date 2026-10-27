@@ -287,6 +287,14 @@ export default {
     report: "Reportar",
     block: "Bloquear",
   },
+  syncStats: {
+    you: "Tú",
+    ping: "ping",
+    p50: "p50",
+    p90: "p90",
+    p99: "p99",
+    count: "n",
+  },
   board: {
     checkingSession: "Comprobando sesión conectada…",
     sessionUnavailable: "Sesión conectada no disponible",

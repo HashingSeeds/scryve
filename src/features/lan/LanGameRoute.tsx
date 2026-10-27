@@ -37,6 +37,7 @@ export default function LanGameRoute() {
       awayPlayerIds={awayPlayerIds}
       onRevealRole={lanSession.revealRole}
       roleRevealOnline={role === "host" || status === "connected"}
+      peerLatency={role === "host" ? lanSession.peerLatency : undefined}
       onGameEnded={backToLobby}
       onGameAbandoned={leaveGame}
       onLeave={leaveGame}

@@ -109,6 +109,10 @@ export default {
     copyDebugInfo: "디버그 정보 복사",
     copied: "복사됨",
     copyFailed: "복사할 수 없습니다. 다시 시도해 주세요.",
+    syncStats: {
+      label: "괴짜용 통계",
+      helper: "온라인 및 근처 게임에서 변경 사항이 각 기기에 전달되는 데 걸리는 시간을 표시합니다.",
+    },
   },
   support: {
     pageTitle: "Scryve 지원",

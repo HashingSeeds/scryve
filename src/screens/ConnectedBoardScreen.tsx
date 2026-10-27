@@ -59,6 +59,8 @@ import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
+import type { PeerLatency } from "@/features/connected/syncLatency"
+import { SyncStatsOverlay } from "@/features/connected/SyncStatsOverlay"
 import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
@@ -424,7 +426,11 @@ export function ConnectedBoardWithRuntime({
   onRevealRole,
   roleRevealOnline = false,
   runtime,
-}: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
+  peerLatency,
+}: ConnectedBoardRuntimeProps & {
+  runtime: ConnectedGameRuntime
+  peerLatency?: () => PeerLatency[]
+}) {
   useKeepAwake(undefined, { suppressDeactivateWarnings: true })
   usePaintTiming(runtime)
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
@@ -585,6 +591,7 @@ export function ConnectedBoardWithRuntime({
               onRevealRole={onRevealRole}
               roleRevealOnline={roleRevealOnline}
             />
+            <SyncStatsOverlay latency={runtime.latency} peers={peerLatency} />
           </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
       </ConnectedTableContext.Provider>

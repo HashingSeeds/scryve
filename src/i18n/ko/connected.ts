@@ -264,6 +264,14 @@ export default {
     report: "신고",
     block: "차단",
   },
+  syncStats: {
+    you: "나",
+    ping: "핑",
+    p50: "p50",
+    p90: "p90",
+    p99: "p99",
+    count: "횟수",
+  },
   board: {
     checkingSession: "연결 세션 확인 중…",
     sessionUnavailable: "연결 세션을 이용할 수 없습니다",

@@ -42,6 +42,7 @@ import {
   type ConnectedActionEvent,
   type ConnectedProjection,
 } from "../connected/model"
+import { parseLatencySummary, type SyncLatencySummary } from "../connected/syncLatency"
 import {
   asActorId,
   asDeviceId,
@@ -126,6 +127,7 @@ export type LanGuestMessage =
   | { type: "reveal" }
   | { type: "deck"; deck: LanSeatDeck | null }
   | { type: "ping"; at: number }
+  | { type: "stats"; stats: SyncLatencySummary }
 
 export type LanHostMessage =
   | { type: "welcome"; pass: LanSeatPass }
@@ -650,6 +652,10 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
     }
   if (value.type === "reveal") return { type: "reveal" }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
+  if (value.type === "stats") {
+    const stats = parseLatencySummary(value.stats)
+    return stats ? { type: "stats", stats } : null
+  }
   if (value.type === "deck") {
     const deck = value.deck === null ? null : parseSeatDeck(value.deck)
     return value.deck === null || deck ? { type: "deck", deck } : null

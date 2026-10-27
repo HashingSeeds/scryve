@@ -108,6 +108,11 @@ const account = {
     copyDebugInfo: "Copy debug info",
     copied: "Copied",
     copyFailed: "Could not copy. Try again.",
+    syncStats: {
+      // Playful name for a hidden switch that shows technical timing numbers on the game board.
+      label: "Stats for nerds",
+      helper: "Shows how long changes take to reach each device in online and nearby games.",
+    },
   },
   support: {
     pageTitle: "Scryve Support",

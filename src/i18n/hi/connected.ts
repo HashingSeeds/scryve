@@ -278,6 +278,14 @@ export default {
     report: "रिपोर्ट करें",
     block: "ब्लॉक करें",
   },
+  syncStats: {
+    you: "आप",
+    ping: "पिंग",
+    p50: "p50",
+    p90: "p90",
+    p99: "p99",
+    count: "संख्या",
+  },
   board: {
     checkingSession: "कनेक्टेड सेशन की जाँच हो रही है…",
     sessionUnavailable: "कनेक्टेड सेशन उपलब्ध नहीं है",

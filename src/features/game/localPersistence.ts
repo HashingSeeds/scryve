@@ -89,6 +89,7 @@ export interface LocalSettings {
   defaultSystem?: PlaySystemId
   defaultFormat?: string
   askWhatYouPlay?: true
+  syncStats?: boolean
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -132,6 +133,9 @@ interface HistoryDetail {
   game: LocalGame
   eventsTruncated: boolean
 }
+
+export const syncStatsEnabled = (settings: string | undefined) =>
+  parseSettings(parseJson(settings))?.syncStats === true
 
 function parseJson(value: string | undefined): unknown {
   if (!value) return null
@@ -504,6 +508,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
     ...systemPreference,
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
+    ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
   }
 }
 

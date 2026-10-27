@@ -468,5 +468,8 @@ describe("clock pings", () => {
     })
     expect(parseGuestMessage(JSON.stringify({ type: "ping", at: "soon" }))).toBeNull()
     expect(parseHostMessage(JSON.stringify({ type: "pong", at: 5 }))).toBeNull()
+    expect(
+      parseGuestMessage(JSON.stringify({ type: "stats", stats: { ping: 3, ack: { count: "x" } } })),
+    ).toEqual({ type: "stats", stats: { ping: 3 } })
   })
 })
