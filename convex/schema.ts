@@ -231,6 +231,7 @@ export default defineSchema({
     delta: v.optional(v.number()),
     fromPlayerId: v.optional(v.id("gamePlayers")),
     toPlayerId: v.optional(v.id("gamePlayers")),
+    commander: v.optional(v.literal(1)),
     claimOperationId: v.optional(v.string()),
     actorUserId: v.optional(v.id("users")),
     deviceId: v.optional(v.string()),
@@ -251,11 +252,13 @@ export default defineSchema({
     gameId: v.id("games"),
     fromPlayerId: v.id("gamePlayers"),
     toPlayerId: v.id("gamePlayers"),
+    commander: v.optional(v.literal(1)),
     total: v.number(),
     updatedAt: v.number(),
   })
     .index("by_game", ["gameId"])
-    .index("by_game_and_pair", ["gameId", "fromPlayerId", "toPlayerId"]),
+    .index("by_game_and_pair", ["gameId", "fromPlayerId", "toPlayerId"])
+    .index("by_game_pair_and_commander", ["gameId", "fromPlayerId", "toPlayerId", "commander"]),
 
   // Pending rows are short-lived operational state; resolved rows remain as a bounded audit trail
   // only for the lifetime of the game and are never used to calculate totals.
@@ -265,6 +268,7 @@ export default defineSchema({
     resolutionOperationId: v.optional(v.string()),
     fromPlayerId: v.id("gamePlayers"),
     toPlayerId: v.id("gamePlayers"),
+    commander: v.optional(v.literal(1)),
     delta: v.number(),
     status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("declined")),
     actorUserId: v.optional(v.id("users")),

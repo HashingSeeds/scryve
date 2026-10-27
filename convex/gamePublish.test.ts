@@ -171,6 +171,37 @@ describe("publishLocalGame", () => {
     ).rejects.toThrow("Game identifier collision; retry")
   })
 
+  it("publishes partner commander damage as its own total", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host-subject", "Host")
+    const created = await host.mutation(api.games.publishLocalGame, {
+      ...snapshotArgs(),
+      commanderTotals: [
+        { fromSeat: 1, toSeat: 2, total: 11 },
+        { fromSeat: 1, toSeat: 2, commander: 1, total: 21 },
+      ],
+    })
+
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    const pair = {
+      fromPlayerId: created.players[0].playerId,
+      toPlayerId: created.players[1].playerId,
+    }
+    expect(projection.commanderDamage?.totals).toEqual(
+      expect.arrayContaining([
+        { ...pair, total: 11 },
+        { ...pair, commander: 1, total: 21 },
+      ]),
+    )
+    expect(projection.players[1]).toMatchObject({ eliminatedByCommanderDamage: true })
+    await expect(
+      host.mutation(api.games.publishLocalGame, {
+        ...snapshotArgs({ operationId: "publish-operation-00000002" }),
+        commanderTotals: [{ fromSeat: 1, toSeat: 2, commander: 2, total: 3 }],
+      }),
+    ).rejects.toThrow("Commander must be omitted for the first commander or 1 for the partner")
+  })
+
   it("validates snapshot trust boundaries before any write", async () => {
     const t = makeConvexTest()
     const host = await signedIn(t, "host-subject", "Host")

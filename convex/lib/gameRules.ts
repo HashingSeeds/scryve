@@ -16,6 +16,11 @@ export const isCommanderDamageDelta = (value: unknown): value is number =>
   value !== 0 &&
   Math.abs(value) <= MAX_COMMANDER_DAMAGE
 
+export const PARTNER_COMMANDER = 1
+
+export const isCommanderSlot = (value: unknown): value is typeof PARTNER_COMMANDER | undefined =>
+  value === undefined || value === PARTNER_COMMANDER
+
 export interface SeatOwner {
   userId?: string
   deviceId?: string
@@ -88,6 +93,7 @@ export interface CommanderClaimRequest {
   operationId: string
   fromPlayerId: string
   toPlayerId: string
+  commander?: number
   delta: number
   actorUserId: string
   deviceId: string
@@ -101,6 +107,7 @@ export const isSameCommanderClaim = (
   recorded.operationId === request.operationId &&
   recorded.fromPlayerId === request.fromPlayerId &&
   recorded.toPlayerId === request.toPlayerId &&
+  recorded.commander === request.commander &&
   recorded.delta === request.delta &&
   recorded.actorUserId === request.actorUserId &&
   recorded.deviceId === request.deviceId &&
