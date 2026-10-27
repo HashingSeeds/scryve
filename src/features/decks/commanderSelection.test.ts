@@ -250,3 +250,84 @@ it("uses checked search metadata when moving an uncached Oracle-matching printin
   expect(result.cards.some((entry) => entry.scryfallId === "search-printing")).toBe(false)
   expect(result.cards.find((entry) => entry.name === "Old")?.commanderColor).toBeUndefined()
 })
+
+describe("commander pairs", () => {
+  const rules: Record<string, CommanderSelectionDetails> = {
+    "Thrasios": {
+      ...eligible,
+      colorIdentity: "GU",
+      oracleText: "Partner (You can have two commanders if both have partner.)",
+    },
+    "Tymna": { ...eligible, colorIdentity: "WB", keywords: "Partner" },
+    "Plain": { ...eligible, colorIdentity: "R" },
+    "Pir, Imaginative Rascal": {
+      ...eligible,
+      oracleText: "Partner with Toothy, Imaginary Friend (When this creature enters…)",
+    },
+    "Toothy, Imaginary Friend": { ...eligible, oracleText: "Partner with Pir, Imaginative Rascal" },
+    "Pir, Imposter": { ...eligible, oracleText: "Partner with Toothy, Imaginary Friend" },
+    "Liesa": { ...eligible, colorIdentity: "WB", oracleText: "Choose a Background" },
+    "Acolyte": {
+      commanderEligibility: "ineligible",
+      commanderLegality: "legal",
+      colorIdentity: "G",
+      typeLine: "Legendary Enchantment — Background",
+    },
+  }
+  const detailsFor = (entry: DeckCard) => rules[entry.name]
+  const commanderAfterPicking = (commanders: string[], name: string) => {
+    const cards = [...commanders.map((entry) => card(entry, { board: "commander" })), card(name)]
+    const chosen = cards.find((entry) => entry.name === name)
+    const result = selectCommander(cards, printingKey(chosen ?? cards[0]), detailsFor)
+    if ("error" in result) return result
+    return result.cards.filter((entry) => cardSection(entry) === "commander").map((e) => e.name)
+  }
+
+  it("keeps a Partner as the second commander", () => {
+    expect(commanderAfterPicking(["Thrasios"], "Tymna")).toEqual(["Thrasios", "Tymna"])
+  })
+
+  it("still swaps in a commander that cannot pair", () => {
+    expect(commanderAfterPicking(["Thrasios"], "Plain")).toEqual(["Plain"])
+  })
+
+  it("pairs Partner with only when each names the other", () => {
+    expect(commanderAfterPicking(["Pir, Imaginative Rascal"], "Toothy, Imaginary Friend")).toEqual([
+      "Pir, Imaginative Rascal",
+      "Toothy, Imaginary Friend",
+    ])
+    expect(commanderAfterPicking(["Pir, Imposter"], "Toothy, Imaginary Friend")).toEqual([
+      "Toothy, Imaginary Friend",
+    ])
+  })
+
+  it("accepts a Background only beside a Choose a Background commander", () => {
+    expect(commanderAfterPicking(["Liesa"], "Acolyte")).toEqual(["Liesa", "Acolyte"])
+    expect(commanderAfterPicking(["Thrasios"], "Acolyte")).toEqual({
+      error: "This card cannot be a commander.",
+    })
+  })
+
+  it("refuses a third commander and keeps both when re-choosing one", () => {
+    expect(commanderAfterPicking(["Thrasios", "Tymna"], "Plain")).toHaveProperty("error")
+    const pair = [card("Thrasios", { board: "commander" }), card("Tymna", { board: "commander" })]
+    const result = selectCommander(pair, printingKey(pair[1]), detailsFor)
+    if ("error" in result) throw new Error(result.error)
+    expect(result.cards.map(cardSection)).toEqual(["commander", "commander"])
+  })
+
+  it("checks the main deck against both commanders' colors", () => {
+    const deck = [
+      card("Thrasios", { section: "commander" }),
+      card("Tymna", { section: "commander" }),
+      card("Plain"),
+      card("Acolyte"),
+    ]
+    expect(getCommanderWarnings(deck, detailsFor)).toEqual([
+      "Outside this commander's color identity: Plain.",
+    ])
+    expect(getCommanderWarnings(deck.slice(1), detailsFor)).toEqual([
+      "Outside this commander's color identity: Plain, Acolyte.",
+    ])
+  })
+})

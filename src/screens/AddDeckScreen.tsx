@@ -1084,16 +1084,15 @@ export function AddDeckScreen({
 
   if (reviewingPasted && pastedDraft) {
     const singleCommander = canChooseCommander({ game, format }, pastedCards)
-    const cachedRules = singleCommander && pastedCommanderSelected ? loadCardDetails() : {}
-    const commanderWarnings =
-      singleCommander && pastedCommanderSelected
-        ? getCommanderWarnings(
-            pastedCards,
-            (card) =>
-              cachedRules[cardDetailsKey(card, game)] ??
-              previewDetailsByKey[cardDetailsKey(card, game)],
-          )
-        : []
+    const cachedRules = pastedCommanderSelected ? loadCardDetails() : {}
+    const commanderWarnings = pastedCommanderSelected
+      ? getCommanderWarnings(
+          pastedCards,
+          (card) =>
+            cachedRules[cardDetailsKey(card, game)] ??
+            previewDetailsByKey[cardDetailsKey(card, game)],
+        )
+      : []
     const sections = catalogPreviewSections(
       pastedCards.map((card) => ({ ...card, section: cardSection(card) })),
       localizedDeckSections(pastedDraft.game, pastedDraft.format),

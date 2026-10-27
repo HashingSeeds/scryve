@@ -6,6 +6,46 @@ export type CommanderSelectionDetails = {
   commanderEligibility?: string
   commanderLegality?: string
   colorIdentity?: string
+  typeLine?: string
+  oracleText?: string
+  keywords?: string
+}
+
+type CommanderCandidate = { name: string; details?: CommanderSelectionDetails }
+
+function pairingAbilities(details?: CommanderSelectionDetails) {
+  return new Set(
+    (details?.oracleText ?? details?.keywords ?? "").split("\n").map((line) =>
+      line
+        .replace(/\s*\(.*$/, "")
+        .replace(/\u2019/g, "'")
+        .trim()
+        .toLowerCase(),
+    ),
+  )
+}
+
+export function isBackground(details?: CommanderSelectionDetails) {
+  return /\bBackground\b/.test(details?.typeLine ?? "")
+}
+
+export function formsCommanderPair(first: CommanderCandidate, second: CommanderCandidate) {
+  if (first.name === second.name) return false
+  const own = pairingAbilities(first.details)
+  const other = pairingAbilities(second.details)
+  const doctor = (card: CommanderCandidate) =>
+    /\bTime Lord Doctor\b/.test(card.details?.typeLine ?? "")
+  const both = (ability: string) => own.has(ability) && other.has(ability)
+  return (
+    both("partner") ||
+    both("friends forever") ||
+    (own.has(`partner with ${second.name.toLowerCase()}`) &&
+      other.has(`partner with ${first.name.toLowerCase()}`)) ||
+    (own.has("choose a background") && isBackground(second.details)) ||
+    (other.has("choose a background") && isBackground(first.details)) ||
+    (own.has("doctor's companion") && doctor(second)) ||
+    (other.has("doctor's companion") && doctor(first))
+  )
 }
 
 export function selectCommander<T extends DeckCard>(
@@ -14,24 +54,37 @@ export function selectCommander<T extends DeckCard>(
   detailsFor: (card: T) => CommanderSelectionDetails | undefined,
   commanderColor?: string,
 ): { cards: T[]; warnings: string[] } | { error: string } {
+  const commanders = cards.filter((card) => cardSection(card) === "commander")
+  const pairs = (first: T, second: T, secondDetails = detailsFor(second)) =>
+    formsCommanderPair(
+      { name: first.name, details: detailsFor(first) },
+      { name: second.name, details: secondDetails },
+    )
+  const selected = cards.find((card) => printingKey(card) === selectedKey)
+  const commanderCount = commanders.reduce((count, card) => count + card.quantity, 0)
   if (
-    cards.reduce(
-      (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
-      0,
-    ) > 1
+    commanderCount > 2 ||
+    (commanderCount === 2 &&
+      (commanders.length !== 2 ||
+        !pairs(commanders[0], commanders[1]) ||
+        !selected ||
+        !commanders.includes(selected)))
   ) {
     return { error: translate("decks:commander.multipleUnsupported") }
   }
-  const selected = cards.find((card) => printingKey(card) === selectedKey)
   if (!selected || selected.quantity < 1)
     return { error: translate("decks:commander.chooseCardInDeck") }
   const details = detailsFor(selected)
-  if (details?.commanderEligibility === "ineligible") {
+  const partner = commanders.find((card) => card !== selected && pairs(card, selected, details))
+  const joinsAsBackground = partner !== undefined && isBackground(details)
+  if (details?.commanderEligibility === "ineligible" && !joinsAsBackground) {
     return { error: translate("decks:commander.ineligible") }
   }
   if (
-    details?.commanderEligibility !== "eligible" &&
-    details?.commanderEligibility !== "color-choice"
+    !details ||
+    (!joinsAsBackground &&
+      details.commanderEligibility !== "eligible" &&
+      details.commanderEligibility !== "color-choice")
   ) {
     return { error: translate("decks:commander.eligibilityUnchecked") }
   }
@@ -72,7 +125,7 @@ export function selectCommander<T extends DeckCard>(
         commanderColor:
           details.commanderEligibility === "color-choice" ? commanderColor : undefined,
       })
-    } else if (cardSection(card) === "commander") {
+    } else if (cardSection(card) === "commander" && card !== partner) {
       const demoted = { ...card, section: "main", board: "main" as const }
       delete demoted.commanderColor
       result.push(demoted)
@@ -90,10 +143,11 @@ export function selectCommander<T extends DeckCard>(
   if (nextCards.some((card) => card.quantity > 999)) {
     return { error: translate("decks:commander.copyLimit") }
   }
+  const commanderKey = printingKey({ ...selected, section: "commander" })
   return {
     cards: nextCards,
     warnings: getCommanderWarnings(nextCards, (card) =>
-      cardSection(card) === "commander" ? details : detailsFor(card),
+      printingKey(card) === commanderKey ? details : detailsFor(card),
     ),
   }
 }
@@ -103,30 +157,41 @@ export function getCommanderWarnings<T extends DeckCard>(
   detailsFor: (card: T) => CommanderSelectionDetails | undefined,
 ): string[] {
   const commanders = cards.filter((card) => cardSection(card) === "commander")
-  if (commanders.length !== 1 || commanders[0].quantity !== 1) return []
-  const commander = commanders[0]
-  const details = detailsFor(commander)
-  if (!details) return [translate("decks:commander.detailsMissing")]
-  const warnings: string[] = []
-  const sameCard = cards.filter((card) =>
-    commander.oracleId && card.oracleId
-      ? card.oracleId === commander.oracleId
-      : card.name === commander.name,
+  if (
+    commanders.length === 0 ||
+    commanders.length > 2 ||
+    commanders.some((card) => card.quantity !== 1)
   )
-  if (sameCard.reduce((count, card) => count + card.quantity, 0) > 1) {
+    return []
+  const commanderDetails = commanders.map(detailsFor)
+  if (!commanderDetails.every((details) => details !== undefined))
+    return [translate("decks:commander.detailsMissing")]
+  const warnings: string[] = []
+  const copies = (commander: T) =>
+    cards
+      .filter((card) =>
+        commander.oracleId && card.oracleId
+          ? card.oracleId === commander.oracleId
+          : card.name === commander.name,
+      )
+      .reduce((count, card) => count + card.quantity, 0)
+  if (commanders.some((commander) => copies(commander) > 1)) {
     warnings.push(translate("decks:commander.duplicateCommander"))
   }
-  const identity = `${details.colorIdentity ?? ""}${details.commanderEligibility === "color-choice" ? (commander.commanderColor ?? "") : ""}`
-  let incomplete = details.colorIdentity === undefined
+  const identity = commanderDetails
+    .map(
+      (details, index) =>
+        `${details.colorIdentity ?? ""}${details.commanderEligibility === "color-choice" ? (commanders[index].commanderColor ?? "") : ""}`,
+    )
+    .join("")
+  const identityKnown = commanderDetails.every((details) => details.colorIdentity !== undefined)
+  let incomplete = !identityKnown
   const conflicts: string[] = []
   for (const card of cards) {
     if (cardSection(card) !== "main") continue
     const colorIdentity = detailsFor(card)?.colorIdentity
     if (colorIdentity === undefined) incomplete = true
-    else if (
-      details.colorIdentity !== undefined &&
-      [...colorIdentity].some((color) => !identity.includes(color))
-    )
+    else if (identityKnown && [...colorIdentity].some((color) => !identity.includes(color)))
       conflicts.push(card.name)
   }
   if (conflicts.length > 0) {
