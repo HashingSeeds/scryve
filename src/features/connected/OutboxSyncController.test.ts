@@ -938,6 +938,22 @@ describe("outbox sync controller", () => {
     expect(controller.latency.summary().delivery).toBeUndefined()
   })
 
+  it("keeps waiting for a fresh projection when a reconnect replays the cached one", () => {
+    const { controller } = harness()
+    controller.latency.setAuthority()
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    controller.onRemoteProjection(projection(4, 20))
+    controller.latency.painted(4)
+    expect(controller.latency.summary().delivery).toBeUndefined()
+    controller.onRemoteProjection(projection(5, 20))
+    controller.latency.painted(5)
+    expect(controller.latency.summary().delivery).toEqual(expect.objectContaining({ count: 1 }))
+  })
+
   it("does not time a catch-up after reconnecting", () => {
     const { controller } = harness()
     controller.setEnvironment(ONLINE)

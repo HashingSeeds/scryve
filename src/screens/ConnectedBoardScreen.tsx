@@ -10,7 +10,7 @@ import {
   useState,
 } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, Share, View } from "react-native"
+import { ActivityIndicator, AppState, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
@@ -388,6 +388,12 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
 /** why: a frame after the layout effect is when the new totals reach the screen, which is what the other players are waiting for. */
 function usePaintTiming({ latency, projection }: ConnectedGameRuntime) {
   const eventSequence = projection?.eventSequence
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) =>
+      latency.setPaused(state !== "active"),
+    )
+    return () => subscription.remove()
+  }, [latency])
   useLayoutEffect(() => {
     if (eventSequence === undefined) return
     const frame = requestAnimationFrame(() => latency.painted(eventSequence))

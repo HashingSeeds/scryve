@@ -51,6 +51,18 @@ describe("SyncLatency", () => {
     expect(latency.summary()).toEqual({ delivery: expect.objectContaining({ count: 1, p50: 60 }) })
   })
 
+  it("ignores changes while the app is in the background", () => {
+    const { latency, at } = meter()
+    latency.setAuthority()
+    latency.remoteChange(0, 1)
+    latency.setPaused(true)
+    latency.remoteChange(10, 2)
+    at(60_000)
+    latency.setPaused(false)
+    latency.painted(2)
+    expect(latency.summary().delivery).toBeUndefined()
+  })
+
   it("drops changes that piled up while frames were paused instead of timing the pause", () => {
     const { latency, at } = meter()
     latency.setAuthority()

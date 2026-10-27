@@ -128,7 +128,7 @@ export class OutboxSyncController {
     remoteReady: false,
   }
   private reconnectPending = true
-  private remoteSeen = false
+  private timingLive = false
   private environmentInitialized = false
   private readonly inFlight = new Set<string>()
   private drainingIds: ReadonlySet<string> = new Set()
@@ -205,7 +205,10 @@ export class OutboxSyncController {
       previous.remoteReady !== environment.remoteReady
     this.environment = environment
     if (changed) this.outbox.invalidate()
-    if (!environment.isWebSocketConnected) this.reconnectPending = true
+    if (!environment.isWebSocketConnected) {
+      this.reconnectPending = true
+      this.timingLive = false
+    }
     if (!this.canSync()) this.outbox.cancelRetry()
     this.publish()
   }
@@ -231,16 +234,19 @@ export class OutboxSyncController {
         }
       }
     }
-    // why: a catch-up after mounting or reconnecting measures time away, and a projection carrying this device's own write was painted before it was sent.
+    const fresh =
+      !this.confirmed ||
+      incoming.eventSequence > this.confirmed.eventSequence ||
+      incoming.serverUpdatedAt > this.confirmed.serverUpdatedAt
+    // why: the first fresh projection after mounting or reconnecting is a catch-up that measures time away (a replay of the cached one is not fresh), and one carrying this device's own write was painted before it was sent.
     if (
-      this.remoteSeen &&
-      !this.reconnectPending &&
+      this.timingLive &&
       this.pending.length === 0 &&
       this.confirmed &&
       incoming.eventSequence > this.confirmed.eventSequence
     )
       this.latency.remoteChange(incoming.serverUpdatedAt, incoming.eventSequence)
-    this.remoteSeen = true
+    if (fresh && this.environment.isWebSocketConnected) this.timingLive = true
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
     this.options.repository.saveProjection(merged)
     this.confirmed = merged

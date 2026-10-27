@@ -5,7 +5,7 @@ const MAX_SAMPLES = 2_000
 // why: phone clocks drift a few ms a minute, so a best ping this old no longer pins the offset.
 const CLOCK_STALE_MS = 60_000
 const MAX_TRACKED_WRITES = 32
-// why: changes pile up only while frames are paused, as in a hidden web tab, and timing them would measure the pause.
+// why: frames can stall without the app leaving the foreground, and a stalled backlog measures the stall.
 const MAX_UNPAINTED = 16
 
 export type SyncTransport = { transport: "cloud" } | { transport: "nearby"; role: "host" | "guest" }
@@ -52,6 +52,7 @@ export class SyncLatency {
   private uncorrected: number[] = []
   private acks: number[] = []
   private unpainted: { authorityAt: number; eventSequence: number }[] = []
+  private paused = false
   private writes = new Map<string, { sentAt?: number; returnedAt?: number; authorityAt?: number }>()
 
   constructor(
@@ -98,7 +99,14 @@ export class SyncLatency {
     this.clockSample(write.sentAt, write.returnedAt, write.authorityAt)
   }
 
+  /** why: a background app or hidden web tab keeps receiving changes but paints none, so timing them would measure the time away. */
+  setPaused(paused: boolean): void {
+    this.paused = paused
+    if (paused) this.unpainted = []
+  }
+
   remoteChange(authorityAt: number, eventSequence: number): void {
+    if (this.paused) return
     if (this.unpainted.length >= MAX_UNPAINTED) this.unpainted = []
     this.unpainted.push({ authorityAt, eventSequence })
   }
