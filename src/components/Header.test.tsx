@@ -51,6 +51,6 @@ describe("Header", () => {
     })
 
     expect(titleInset()).toBe(73)
-    Dimensions.set({ window })
+    act(() => Dimensions.set({ window }))
   })
 })

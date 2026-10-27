@@ -168,7 +168,7 @@ export function Header(props: HeaderProps) {
               size="md"
               text={titleContent}
               numberOfLines={1}
-              adjustsFontSizeToFit
+              adjustsFontSizeToFit={centered}
               minimumFontScale={TITLE_MIN_FONT_SCALE}
               maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
               style={[$title, $titleStyleOverride]}
