@@ -149,7 +149,7 @@ module.exports = {
     },
     {
       files: ["src/**/*.tsx"],
-      excludedFiles: ["**/*.test.tsx", "src/app/dev/**"],
+      excludedFiles: ["**/*.test.tsx", "src/app/dev/**", "src/devtools/**"],
       plugins: ["i18next"],
       rules: {
         "i18next/no-literal-string": [
