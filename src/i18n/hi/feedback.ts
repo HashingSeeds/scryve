@@ -69,6 +69,7 @@ export default {
     linked: "आपके खाते के साथ भेजा गया",
     linkedElsewhere: "किसी दूसरे खाते के साथ भेजा गया",
     signInToKeep: "ऐप दोबारा इंस्टॉल करने पर भी यह थ्रेड रखने के लिए साइन इन करें",
+    notifyReplies: "हमारे जवाब देने पर मुझे सूचित करें",
   },
   unavailable: "फ़ीडबैक के लिए Scryve का क्लाउड चाहिए, जो इस बिल्ड में सेट अप नहीं है।",
 } satisfies LocaleNamespace

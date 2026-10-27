@@ -76,6 +76,17 @@ export default {
         Holo: "होलो",
       },
     },
+    notifications: {
+      heading: "नोटिफ़िकेशन",
+      feedbackReplies: "फ़ीडबैक के जवाब",
+      renewalReminders: "नवीनीकरण रिमाइंडर",
+      renewalRemindersHelper: "आपकी सदस्यता के नवीनीकरण से 3 दिन पहले",
+      channel: "जवाब और रिमाइंडर",
+      feedbackReplyPreview: "आपके फ़ीडबैक पर नया जवाब",
+      blockedTitle: "नोटिफ़िकेशन बंद हैं",
+      blockedBody: "सेटिंग में जाकर Scryve के लिए नोटिफ़िकेशन चालू करें।",
+      openSettings: "सेटिंग खोलें",
+    },
     privacy: {
       heading: "गोपनीयता",
       shareUsageHelper:
@@ -286,6 +297,12 @@ export default {
     closeSignIn: "साइन इन बंद करें",
   },
   billing: {
+    renewalPrompt: {
+      title: "नवीनीकरण से पहले याद दिलाएँ?",
+      body: "आपके अगले वार्षिक शुल्क से 3 दिन पहले नोटिफ़िकेशन पाएँ।",
+      notNow: "अभी नहीं",
+      remind: "मुझे याद दिलाएँ",
+    },
     access: {
       checking: "एक्सेस जाँचा जा रहा है…",
       renews: "{{date}} को रिन्यू होगा",

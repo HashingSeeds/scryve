@@ -1,6 +1,7 @@
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api } from "./_generated/api"
 import { deletedIdentityHash } from "./lib/auth"
+import { readRevenueCatSnapshot } from "./lib/revenueCat"
 
 const webhookAuth = "Bearer webhook-test"
 const apiKey = "sk_test_revenuecat"
@@ -432,5 +433,27 @@ describe("RevenueCat entitlement sync", () => {
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       "https://api.revenuecat.com/v1/subscribers/clerk_action",
     )
+  })
+
+  it("reads the next charge only while the subscription will renew", () => {
+    const expires = "2027-01-01T00:00:00Z"
+    const snapshot = (subscription: Record<string, unknown>) =>
+      readRevenueCatSnapshot(
+        {
+          request_date_ms: 0,
+          subscriber: {
+            entitlements: {
+              "Count Pro": { expires_date: expires, product_identifier: "yearly" },
+            },
+            subscriptions: { yearly: { is_sandbox: false, ...subscription } },
+          },
+        },
+        "PRODUCTION",
+      )?.renewsAt
+
+    expect(snapshot({ unsubscribe_detected_at: null })).toBe(Date.parse(expires))
+    expect(snapshot({ unsubscribe_detected_at: "2026-12-01T00:00:00Z" })).toBeUndefined()
+    expect(snapshot({ billing_issues_detected_at: "2026-12-01T00:00:00Z" })).toBeUndefined()
+    expect(snapshot({ store: "promotional" })).toBeUndefined()
   })
 })

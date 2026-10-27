@@ -76,6 +76,19 @@ const account = {
         Holo: "Holo",
       },
     },
+    notifications: {
+      heading: "Notifications",
+      feedbackReplies: "Feedback replies",
+      renewalReminders: "Renewal reminders",
+      renewalRemindersHelper: "3 days before your subscription renews",
+      // Android's name for Scryve's notification channel, shown in system settings.
+      channel: "Replies and reminders",
+      // Shown on the lock screen instead of a feedback reply when the player hides notification previews.
+      feedbackReplyPreview: "New reply to your feedback",
+      blockedTitle: "Notifications are off",
+      blockedBody: "Turn on notifications for Scryve in Settings.",
+      openSettings: "Open Settings",
+    },
     privacy: {
       heading: "Privacy",
       shareUsageHelper:
@@ -286,6 +299,13 @@ const account = {
     closeSignIn: "Close sign in",
   },
   billing: {
+    // Asked right after someone buys a yearly plan.
+    renewalPrompt: {
+      title: "Remind you before it renews?",
+      body: "Get a notification 3 days before your next yearly charge.",
+      notNow: "Not now",
+      remind: "Remind me",
+    },
     access: {
       checking: "Checking access…",
       renews: "Renews {{date}}",

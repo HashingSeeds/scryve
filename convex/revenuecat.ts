@@ -3,6 +3,7 @@ import { v } from "convex/values"
 import { internal } from "./_generated/api"
 import { action, env, internalMutation, internalQuery } from "./_generated/server"
 import { hasAccountDeletion } from "./lib/auth"
+import { renewalReminderTime } from "./lib/notifications"
 import {
   applyRevenueCatState,
   fetchRevenueCatSnapshot,
@@ -15,6 +16,7 @@ const snapshotValidator = v.object({
   enabled: v.boolean(),
   foil: v.optional(v.boolean()),
   observedAt: v.number(),
+  renewsAt: v.optional(v.number()),
   transferRevocation: v.optional(v.boolean()),
 })
 
@@ -65,11 +67,14 @@ export const commitSync = internalMutation({
             (current.observedAt === snapshot.observedAt && !snapshot.transferRevocation))
         )
           continue
+        const renewsAt = snapshot.enabled ? snapshot.renewsAt : undefined
         const value = {
           enabled: snapshot.enabled,
           foil: snapshot.foil,
           environment: args.environment,
           observedAt: snapshot.observedAt,
+          renewsAt,
+          ...(renewsAt !== current?.renewsAt ? { remindAt: renewalReminderTime(renewsAt) } : {}),
           updatedAt: Date.now(),
         }
         if (current) await ctx.db.patch(current._id, value)

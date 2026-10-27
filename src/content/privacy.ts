@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-10-23",
-  effectiveDate: "October 23, 2026",
+  version: "2026-10-27",
+  effectiveDate: "October 27, 2026",
   sections: [
     {
       blocks: [
@@ -245,6 +245,15 @@ export const privacyContent = {
       ],
     },
     {
+      heading: "Notifications",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "Notifications are off unless you turn them on. If you do, we keep a token for your device so we can tell you when we reply to your feedback, or remind you before your subscription renews. Expo, and Apple or Google, deliver them. When you turn them off, we delete the token.",
+        },
+      ],
+    },
+    {
       heading: "Information we receive from other sources",
       blocks: [
         {
@@ -398,6 +407,7 @@ export const privacyContent = {
             "Convex, for application hosting, database storage, synchronization, and backend services.",
             "Cloudflare, for website hosting, security, abuse prevention, wait-list form verification, and the inbox where we read and answer feedback.",
             "RevenueCat, for verifying purchases and managing subscription entitlements.",
+            "Expo, to deliver notifications you turn on.",
             "Apple and Google, when you purchase a subscription or use their platform services.",
             "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
             "PostHog, for optional product analytics only when you enable usage sharing.",

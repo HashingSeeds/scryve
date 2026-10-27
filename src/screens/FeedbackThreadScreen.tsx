@@ -19,6 +19,7 @@ export interface FeedbackThreadScreenProps {
   restore?: { id: number; text: string }
   onReply: (body: string) => void
   onIncludeAccount: (included: boolean) => void
+  notifyReplies?: { on: boolean; onChange: (on: boolean) => void }
   onSignIn: () => void
   onBack: () => void
 }
@@ -30,6 +31,7 @@ export function FeedbackThreadScreen({
   restore,
   onReply,
   onIncludeAccount,
+  notifyReplies,
   onSignIn,
   onBack,
 }: FeedbackThreadScreenProps) {
@@ -91,6 +93,14 @@ export function FeedbackThreadScreen({
             onChangeText={setReply}
           />
           {error ? <Text text={error} accessibilityRole="alert" size="xs" /> : null}
+          {notifyReplies ? (
+            <Switch
+              testID="feedback-thread-notify"
+              labelTx="feedback:thread.notifyReplies"
+              value={notifyReplies.on}
+              onValueChange={notifyReplies.onChange}
+            />
+          ) : null}
           {request.linkedElsewhere ? (
             <Text tx="feedback:thread.linkedElsewhere" size="xs" style={themed($muted)} />
           ) : request.canLink ? (

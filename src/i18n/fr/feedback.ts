@@ -72,6 +72,7 @@ export default {
     linked: "Envoyé avec votre compte",
     linkedElsewhere: "Envoyé avec un autre compte",
     signInToKeep: "Connectez-vous pour conserver cette conversation si vous réinstallez",
+    notifyReplies: "Me prévenir quand vous répondez",
   },
   unavailable:
     "Les retours nécessitent le cloud de Scryve, qui n'est pas configuré dans cette version.",

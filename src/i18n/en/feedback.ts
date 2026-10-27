@@ -70,6 +70,7 @@ const feedback = {
     linked: "Sent with your account",
     linkedElsewhere: "Sent with a different account",
     signInToKeep: "Sign in to keep this thread if you reinstall",
+    notifyReplies: "Notify me when we reply",
   },
   unavailable: "Feedback needs Scryve's cloud, which isn't set up in this build.",
 }

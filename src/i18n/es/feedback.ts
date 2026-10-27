@@ -73,6 +73,7 @@ export default {
     linked: "Enviado con tu cuenta",
     linkedElsewhere: "Enviado con otra cuenta",
     signInToKeep: "Inicia sesión para conservar este hilo si reinstalas",
+    notifyReplies: "Avisarme cuando respondamos",
   },
   unavailable:
     "Los comentarios necesitan la nube de Scryve, que no está configurada en esta versión.",

@@ -20,6 +20,7 @@ import {
   playSystemRules,
   playSystemShortLabel,
 } from "@/features/game/playSystems"
+import type { PushKind } from "@/features/notifications/prefs"
 import { copyDebugInfo, readAppInfo } from "@/features/updates/appInfo"
 import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
 import { translate } from "@/i18n/translate"
@@ -53,6 +54,11 @@ export interface SettingsScreenProps {
   onOpenAbout: () => void
   onOpenAppIcon?: () => void
   onOpenBlockedPlayers?: () => void
+  notifications?: {
+    feedbackReplies: boolean
+    renewalReminders?: boolean
+    onChange: (kind: PushKind, on: boolean) => void
+  }
 }
 
 export function SettingsScreen({
@@ -62,6 +68,7 @@ export function SettingsScreen({
   onOpenAbout,
   onOpenAppIcon,
   onOpenBlockedPlayers,
+  notifications,
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
@@ -197,6 +204,30 @@ export function SettingsScreen({
           topSeparator
           onPress={onOpenAppIcon}
         />
+      ) : null}
+      {notifications ? (
+        <>
+          <Text
+            tx="account:settings.notifications.heading"
+            preset="subheading"
+            accessibilityRole="header"
+          />
+          <Switch
+            testID="notify-feedback-switch"
+            labelTx="account:settings.notifications.feedbackReplies"
+            value={notifications.feedbackReplies}
+            onValueChange={(on) => notifications.onChange("feedbackReplies", on)}
+          />
+          {notifications.renewalReminders !== undefined ? (
+            <Switch
+              testID="notify-renewal-switch"
+              labelTx="account:settings.notifications.renewalReminders"
+              helperTx="account:settings.notifications.renewalRemindersHelper"
+              value={notifications.renewalReminders}
+              onValueChange={(on) => notifications.onChange("renewalReminders", on)}
+            />
+          ) : null}
+        </>
       ) : null}
       <Text tx="account:settings.privacy.heading" preset="subheading" accessibilityRole="header" />
       <Switch

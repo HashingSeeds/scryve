@@ -14,6 +14,7 @@ type RevenueCatSnapshot = {
   enabled: boolean
   foil: boolean
   observedAt: number
+  renewsAt?: number
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -32,14 +33,19 @@ function isActiveDate(value: unknown, observedAt: number) {
   return typeof value === "string" && Date.parse(value) > observedAt
 }
 
-function matchesEnvironment(
-  subscriber: Record<string, unknown>,
-  productIdentifier: string,
-  environment: RevenueCatEnvironment,
-) {
+function subscriptionFor(subscriber: Record<string, unknown>, productIdentifier: unknown) {
   const subscriptions = asRecord(subscriber.subscriptions)
-  const subscription = subscriptions ? asRecord(subscriptions[productIdentifier]) : null
-  return subscription?.is_sandbox === (environment === "SANDBOX")
+  return subscriptions && typeof productIdentifier === "string"
+    ? asRecord(subscriptions[productIdentifier])
+    : null
+}
+
+function renewalTime(subscription: Record<string, unknown>, expiresDate: unknown) {
+  if (typeof expiresDate !== "string" || subscription.store === "promotional") return undefined
+  if (subscription.unsubscribe_detected_at || subscription.billing_issues_detected_at)
+    return undefined
+  const renewsAt = Date.parse(expiresDate)
+  return Number.isFinite(renewsAt) ? renewsAt : undefined
 }
 
 export function readRevenueCatSnapshot(
@@ -64,11 +70,15 @@ export function readRevenueCatSnapshot(
     isActiveDate(countPro.expires_date, observedAt) ||
     (countPro.grace_period_expires_date !== null &&
       isActiveDate(countPro.grace_period_expires_date, observedAt))
-  const enabled =
-    active &&
-    typeof productIdentifier === "string" &&
-    matchesEnvironment(subscriber, productIdentifier, environment)
-  return { enabled, foil: enabled && productIdentifier === FOIL_PRODUCT_ID, observedAt }
+  const subscription = subscriptionFor(subscriber, productIdentifier)
+  const enabled = active && subscription?.is_sandbox === (environment === "SANDBOX")
+  return {
+    enabled,
+    foil: enabled && productIdentifier === FOIL_PRODUCT_ID,
+    observedAt,
+    renewsAt:
+      enabled && subscription ? renewalTime(subscription, countPro.expires_date) : undefined,
+  }
 }
 
 export async function fetchRevenueCatSnapshot(

@@ -778,8 +778,12 @@ export default defineSchema({
     foil: v.optional(v.boolean()),
     environment: v.union(v.literal("PRODUCTION"), v.literal("SANDBOX")),
     observedAt: v.number(),
+    renewsAt: v.optional(v.number()),
+    remindAt: v.optional(v.number()),
     updatedAt: v.number(),
-  }).index("by_app_user_id", ["appUserId"]),
+  })
+    .index("by_app_user_id", ["appUserId"])
+    .index("by_remind_at", ["remindAt"]),
 
   revenueCatWebhookEvents: defineTable({
     eventId: v.string(),
@@ -887,6 +891,19 @@ export default defineSchema({
   }).index("by_request", ["requestId"]),
 
   feedbackApolloCursor: defineTable({ after: v.number() }),
+  pushDevices: defineTable({
+    senderHash: v.string(),
+    userId: v.optional(v.id("users")),
+    token: v.string(),
+    platform: v.union(v.literal("ios"), v.literal("android")),
+    locale: v.optional(v.string()),
+    feedbackReplies: v.boolean(),
+    renewalReminders: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_sender", ["senderHash"])
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"]),
   events: defineTable({
     // why: optional so account deletion can detach an organizer without deleting other players' standings.
     ownerUserId: v.optional(v.id("users")),
