@@ -13,7 +13,6 @@ export const isPreviewBuild = () => Constants.expoConfig?.extra?.appVariant === 
 
 export const lanPlayAvailable = () => Platform.OS !== "web"
 
-// why: nearby events and the Nearby only switch reach beta testers first through the Beta updates switch they already have; internal preview builds get them too so release mode can be tested.
 export const nearbyBetaAvailable = () =>
   lanPlayAvailable() && (__DEV__ || isPreviewBuild() || betaUpdatesChosen())
 
