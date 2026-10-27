@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import { router, useNavigation } from "expo-router"
-import { usePreventRemove } from "expo-router/react-navigation"
+import { router } from "expo-router"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
@@ -29,6 +28,7 @@ import {
 } from "@/features/decks/guestDeck"
 import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncAction } from "@/features/decks/LocalDeckSyncAction"
+import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
@@ -62,19 +62,21 @@ export function GuestDeckDetailScreen({
   onAddMatch,
 }: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
-  const navigation = useNavigation()
   const stored = useGuestDeck(localId)
-  const [draft, setDraft] = useState<GuestDeckPayload | undefined>(() => stored?.deck)
-  const revisionRef = useRef(
-    stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined,
+  const [restored] = useState(() => (stored ? loadLocalDraft(localId) : undefined))
+  const [draft, setDraft] = useState<GuestDeckPayload | undefined>(
+    () => restored?.deck ?? stored?.deck,
   )
-  const baseRef = useRef(stored?.deck)
+  const revisionRef = useRef(
+    restored?.revision ??
+      (stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined),
+  )
+  const baseRef = useRef(restored?.base ?? stored?.deck)
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
   const [tab, setTab] = useState<DeckTab>("cards")
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing] = useState(restored !== undefined)
   const [settings, setSettings] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
   const [undo, setUndo] = useState<{ name: string; cards: GuestCard[] }>()
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
@@ -84,8 +86,6 @@ export function GuestDeckDetailScreen({
   const syncingElsewhere = useLocalDeckSyncing(localId)
   const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [pendingNavigation, setPendingNavigation] =
-    useState<Parameters<typeof navigation.dispatch>[0]>()
   const [focusedIndex, setFocusedIndex] = useState<number>()
   const focusedCard =
     focusedIndex === undefined ? undefined : (draft ?? stored?.deck)?.cards[focusedIndex]
@@ -120,16 +120,17 @@ export function GuestDeckDetailScreen({
     }
   }, [stored])
 
-  usePreventRemove(!leaving && !sameDraft(draft, baseRef.current), ({ data }) => {
-    setPendingNavigation(data.action)
-    setDiscarding(true)
-  })
+  useEffect(() => {
+    const base = baseRef.current
+    const revision = revisionRef.current
+    if (draft && base && revision && !sameDraft(draft, base))
+      keepLocalDraft(localId, { deck: draft, base, revision })
+    else forgetLocalDraft(localId)
+  }, [draft, localId])
 
   useEffect(() => {
-    if (!leaving) return
-    if (pendingNavigation) navigation.dispatch(pendingNavigation)
-    else onBack()
-  }, [leaving, navigation, onBack, pendingNavigation])
+    if (leaving) onBack()
+  }, [leaving, onBack])
 
   if (!stored && !draft) {
     return (
@@ -138,11 +139,7 @@ export function GuestDeckDetailScreen({
         backgroundColor={theme.colors.surface}
         contentContainerStyle={themed($screen)}
       >
-        <Header
-          titleTx="decks:deckView.guestTitle"
-          leftTx="common:back"
-          onLeftPress={() => (sameDraft(draft, baseRef.current) ? onBack() : setDiscarding(true))}
-        />
+        <Header titleTx="decks:deckView.guestTitle" leftTx="common:back" onLeftPress={onBack} />
         <View style={themed($empty)}>
           <Text preset="subheading" tx="decks:guestDetail.unavailable" />
           <Text tx="decks:guestDetail.unavailableDetail" />
@@ -273,14 +270,12 @@ export function GuestDeckDetailScreen({
             : undefined
         }
         dirty={!sameDraft(current, baseRef.current)}
-        onBack={() => (sameDraft(current, baseRef.current) ? onBack() : setDiscarding(true))}
+        onBack={onBack}
         onEdit={() => setEditing(true)}
         onSave={save}
         onCancel={() => {
-          if (!sameDraft(current, baseRef.current)) {
-            setCancelling(true)
-            setDiscarding(true)
-          } else setEditing(false)
+          if (!sameDraft(current, baseRef.current)) setDiscarding(true)
+          else setEditing(false)
         }}
         onDetails={() => setSettings(true)}
         onAdd={() => {
@@ -468,20 +463,17 @@ export function GuestDeckDetailScreen({
         cancelText={translate("decks:detail.keepEditing")}
         destructive
         confirmTestID="guest-deck-discard-confirm"
-        onClose={() => {
-          setPendingNavigation(undefined)
-          setCancelling(false)
-          setDiscarding(false)
-        }}
+        onClose={() => setDiscarding(false)}
         onConfirm={() => {
-          if (cancelling) {
-            setDraft(baseRef.current)
-            setCommanderSelected(false)
-            setEditing(false)
-            setUndo(undefined)
-            setDiscarding(false)
-            setCancelling(false)
-          } else setLeaving(true)
+          baseRef.current = stored?.deck
+          revisionRef.current = stored
+            ? { localId: stored.localId, updatedAt: stored.updatedAt }
+            : undefined
+          setDraft(stored?.deck)
+          setCommanderSelected(false)
+          setEditing(false)
+          setUndo(undefined)
+          setDiscarding(false)
         }}
       />
       <ConfirmDialog
@@ -509,6 +501,7 @@ export function GuestDeckDetailScreen({
               return
             }
             deleteGuestDeck(localId)
+            forgetLocalDraft(localId)
             setLeaving(true)
           } catch (cause) {
             setError(

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
-import { router, useFocusEffect, useNavigation } from "expo-router"
+import { router, useFocusEffect } from "expo-router"
 import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
-import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -57,6 +56,11 @@ import {
   isDeckKnownDeleted,
   resolveDeckView,
 } from "@/features/decks/resolveDeckView"
+import {
+  forgetAccountDraft,
+  keepAccountDraft,
+  loadAccountDraft,
+} from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
@@ -270,17 +274,17 @@ function DeckDetailContent({
   reviewChanges,
 }: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
-  const navigation = useNavigation()
   const client = useConvex()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const synced = useDeckSync(syncEnabled, access?.ownerId, access?.ready ?? false)
   const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
   const versionWrites = useDeckVersionWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
   const knownDeleted = isDeckKnownDeleted(deckId, synced.metadata, metadataWrites.metadata)
-  const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
+  const [restored] = useState(() => loadAccountDraft(access?.ownerId, deckId))
+  const [selectedVersionId, setSelectedVersionId] = useState(restored?.versionId)
   const pinnedVersionTarget = useRef<
     { versionId: Id<"deckVersions">; expectedRevision: number } | undefined
-  >(undefined)
+  >(restored?.pinned)
   const mappedSelection =
     selectedVersionId !== undefined ? versionWrites.mappedVersion(selectedVersionId) : undefined
   const versionCache = useDeckVersionCache(
@@ -331,7 +335,7 @@ function DeckDetailContent({
   const archiveDeck = useMutation(api.decks.archive)
   const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const [tab, setTab] = useState<DeckTab>("cards")
-  const [draft, setDraftState] = useState(closedDeckDraft)
+  const [draft, setDraftState] = useState(restored?.draft ?? closedDeckDraft)
   // why: search taps can land before a re-render, so limit checks read this ref, which every draft write updates first.
   const latestDraft = useRef(draft)
   const setDraft = useCallback((update: DeckDraft | ((current: DeckDraft) => DeckDraft)) => {
@@ -339,8 +343,6 @@ function DeckDetailContent({
     setDraftState(latestDraft.current)
   }, [])
   const [dialog, setDialog] = useState<DeckDialog>("none")
-  const [pendingNavigation, setPendingNavigation] =
-    useState<Parameters<typeof navigation.dispatch>[0]>()
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
@@ -437,17 +439,18 @@ function DeckDetailContent({
     })
   }, [detail, client])
 
-  usePreventRemove(view.changes.any, ({ data }) => {
-    setPendingNavigation(data.action)
-    setDialog("discard")
-  })
-
+  const ownerId = access?.ownerId
+  const draftVersionId =
+    pinnedVersionTarget.current?.versionId ?? selectedVersionId ?? view.version?._id
   useEffect(() => {
-    if (draft.editing || !pendingNavigation) return
-    const action = pendingNavigation
-    setPendingNavigation(undefined)
-    navigation.dispatch(action)
-  }, [draft.editing, navigation, pendingNavigation])
+    if (view.changes.any)
+      keepAccountDraft(ownerId, deckId, {
+        draft,
+        versionId: draftVersionId,
+        pinned: pinnedVersionTarget.current,
+      })
+    else forgetAccountDraft(ownerId, deckId)
+  }, [deckId, draft, draftVersionId, ownerId, view.changes.any])
 
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
@@ -1424,10 +1427,7 @@ function DeckDetailContent({
       {dialog === "discard" ? (
         <DialogCard
           visible
-          onClose={() => {
-            setPendingNavigation(undefined)
-            setDialog("none")
-          }}
+          onClose={() => setDialog("none")}
           closeDisabled={busy}
           backdropTestID="discard-edits-backdrop"
           backdropAccessibilityLabel={translate("decks:detail.keepEditing")}
@@ -1442,10 +1442,7 @@ function DeckDetailContent({
               tx="decks:detail.keepEditing"
               style={themed($dialogButton)}
               disabled={busy}
-              onPress={() => {
-                setPendingNavigation(undefined)
-                setDialog("none")
-              }}
+              onPress={() => setDialog("none")}
             />
             <Button
               tx="decks:detail.discard"
