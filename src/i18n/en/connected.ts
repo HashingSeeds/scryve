@@ -277,6 +277,21 @@ const connected = {
     report: "Report",
     block: "Block",
   },
+  // A small technical table on the game board, behind the "Stats for nerds" setting. Keep every label very short.
+  syncStats: {
+    // Row for this device.
+    you: "You",
+    // Round-trip time to whoever runs the game.
+    ping: "ping",
+    // Median time for another player's change to show up here, in milliseconds.
+    p50: "p50",
+    // 90th percentile of the same time.
+    p90: "p90",
+    // 99th percentile of the same time.
+    p99: "p99",
+    // How many changes were timed.
+    count: "n",
+  },
   board: {
     checkingSession: "Checking connected session…",
     sessionUnavailable: "Connected session unavailable",

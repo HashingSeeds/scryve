@@ -243,6 +243,13 @@ export function SettingsScreen({
           <Text tx="account:settings.copyFailed" size="sm" accessibilityLiveRegion="polite" />
         ) : null}
       </View>
+      <Switch
+        testID="sync-stats-switch"
+        labelTx="account:settings.syncStats.label"
+        helperTx="account:settings.syncStats.helper"
+        value={settings.syncStats ?? false}
+        onValueChange={(value) => update({ syncStats: value })}
+      />
       <DialogCard
         visible={choosingGame}
         onClose={() => setChoosingGame(false)}

@@ -268,6 +268,14 @@ export default {
     report: "報告",
     block: "ブロック",
   },
+  syncStats: {
+    you: "自分",
+    ping: "応答時間",
+    p50: "中央値",
+    p90: "90%",
+    p99: "99%",
+    count: "件数",
+  },
   board: {
     checkingSession: "通信対戦のセッションを確認中…",
     sessionUnavailable: "通信対戦のセッションを利用できません",

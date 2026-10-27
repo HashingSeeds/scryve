@@ -109,6 +109,11 @@ export default {
     copyDebugInfo: "Copiar info de depuración",
     copied: "Copiado",
     copyFailed: "No se pudo copiar. Inténtalo de nuevo.",
+    syncStats: {
+      label: "Estadísticas para nerds",
+      helper:
+        "Muestra cuánto tardan los cambios en llegar a cada dispositivo en partidas en línea y cercanas.",
+    },
   },
   support: {
     pageTitle: "Soporte de Scryve",

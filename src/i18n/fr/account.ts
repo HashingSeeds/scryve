@@ -110,6 +110,11 @@ export default {
     copyDebugInfo: "Copier les infos de débogage",
     copied: "Copié",
     copyFailed: "Copie impossible. Réessayez.",
+    syncStats: {
+      label: "Stats pour les geeks",
+      helper:
+        "Affiche le temps que mettent les changements à atteindre chaque appareil dans les parties en ligne et à proximité.",
+    },
   },
   support: {
     pageTitle: "Assistance Scryve",

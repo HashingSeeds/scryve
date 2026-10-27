@@ -5,7 +5,11 @@ import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
-import { SyncLatency } from "@/features/connected/syncLatency"
+import {
+  SyncLatency,
+  type PeerLatency,
+  type SyncLatencySummary,
+} from "@/features/connected/syncLatency"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
 import { createClientId, wellFormedPlayerName } from "@/features/game/domain"
 import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
@@ -174,6 +178,7 @@ export class LanSession {
   private session = 0
   private backgrounded = false
   latency = new SyncLatency({ transport: "nearby", role: "guest" })
+  private guestLatency = new Map<string, SyncLatencySummary>()
 
   constructor() {
     // why: iOS reclaims the host's listening socket while the app is in the background, without a close event, so guests are refused until the host listens again.
@@ -195,6 +200,12 @@ export class LanSession {
     abandon: async () => this.leave(),
   }
 
+  peerLatency = (): PeerLatency[] =>
+    [...this.guestLatency].map(([key, summary]) => ({
+      name: this.state.lobby?.seats.find((seat) => seat.key === key)?.name ?? "",
+      summary,
+    }))
+
   isReachable = (serviceName: string) =>
     Date.now() - (this.unreachableAt.get(serviceName) ?? 0) > UNREACHABLE_HIDE_MS
 
@@ -207,6 +218,7 @@ export class LanSession {
 
   private startLatency(role: "host" | "guest") {
     this.latency.report()
+    this.guestLatency.clear()
     this.latency = new SyncLatency({ transport: "nearby", role })
     if (role === "host") this.latency.setAuthority()
   }
@@ -359,6 +371,7 @@ export class LanSession {
           return this.publish(admitted.game)
         }
         if (!seatKey) return
+        if (message.type === "stats") return void this.guestLatency.set(seatKey, message.stats)
         const now = Date.now()
         if (now - windowStart >= 1_000) {
           windowStart = now
@@ -405,6 +418,7 @@ export class LanSession {
         if (!seatKey || this.peers.get(seatKey) !== peer || !game) return
         this.peers.delete(seatKey)
         this.replies.delete(seatKey)
+        this.guestLatency.delete(seatKey)
         if (game.status === "lobby") {
           this.tokens.delete(seatKey)
           this.passHashes.delete(seatKey)
@@ -527,7 +541,12 @@ export class LanSession {
       variants: ["treachery"],
       ...(this.pass ? { pass: this.pass } : {}),
     })
-    const ping = () => connection.send({ type: "ping", at: Date.now() })
+    const ping = () => {
+      connection.send({ type: "ping", at: Date.now() })
+      const stats = this.latency.summary()
+      if (stats.delivery || stats.ack || stats.ping !== undefined)
+        connection.send({ type: "stats", stats })
+    }
     clearInterval(this.pingTimer)
     this.pingTimer = setInterval(ping, PING_INTERVAL_MS)
     ping()

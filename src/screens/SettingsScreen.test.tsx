@@ -354,7 +354,8 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByTestId("haptics-switch"))
     fireEvent.press(view.getByText("Dark"))
     fireEvent.press(view.getByTestId("launch-destination-decks"))
-    expect(onSettingsChange).toHaveBeenCalledTimes(5)
+    fireEvent.press(view.getByTestId("sync-stats-switch"))
+    expect(onSettingsChange).toHaveBeenCalledTimes(6)
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         defaultPlayerCount: 3,
@@ -362,6 +363,7 @@ describe("SettingsScreen", () => {
         hapticsEnabled: false,
         themePreference: "dark",
         launchDestination: "decks",
+        syncStats: true,
       }),
     )
   })

@@ -25,6 +25,11 @@ export interface SyncLatencySummary {
   ping?: number
 }
 
+export interface PeerLatency {
+  name: string
+  summary: SyncLatencySummary
+}
+
 export function latencyStats(samples: readonly number[]): LatencyStats | undefined {
   if (samples.length === 0) return undefined
   const sorted = [...samples].sort((a, b) => a - b)
@@ -158,5 +163,28 @@ export class SyncLatency {
       ...(ack && { ack_count: ack.count, ack_p50: ack.p50, ack_p90: ack.p90, ack_p99: ack.p99 }),
       ...(ping !== undefined && { ping_ms: ping }),
     })
+  }
+}
+
+const isMs = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0
+
+function parseStats(value: unknown): LatencyStats | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const { count, p50, p90, p99, over500, over1000 } = value as Record<string, unknown>
+  return isMs(count) && isMs(p50) && isMs(p90) && isMs(p99) && isMs(over500) && isMs(over1000)
+    ? { count, p50, p90, p99, over500, over1000 }
+    : undefined
+}
+
+export function parseLatencySummary(value: unknown): SyncLatencySummary | null {
+  if (typeof value !== "object" || value === null) return null
+  const { delivery, ack, ping } = value as Record<string, unknown>
+  const parsedDelivery = parseStats(delivery)
+  const parsedAck = parseStats(ack)
+  return {
+    ...(parsedDelivery ? { delivery: parsedDelivery } : {}),
+    ...(parsedAck ? { ack: parsedAck } : {}),
+    ...(isMs(ping) ? { ping } : {}),
   }
 }

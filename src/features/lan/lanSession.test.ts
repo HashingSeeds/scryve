@@ -106,6 +106,16 @@ const lifeOf = (session: LanSession, key: string) =>
   session.getState().projection?.players.find((player) => player.playerId === key)?.currentLife
 
 describe("nearby host", () => {
+  it("keeps each guest's reported sync times under its seat name", async () => {
+    const { session, alice } = await startedGame()
+    const stats = {
+      ping: 30,
+      ack: { count: 2, p50: 40, p90: 60, p99: 60, over500: 0, over1000: 0 },
+    }
+    alice.send({ type: "stats", stats })
+    expect(session.peerLatency()).toEqual([{ name: "Alice", summary: stats }])
+  })
+
   it("answers a guest's ping at once with the host's clock", async () => {
     const { alice } = await startedGame()
     jest.setSystemTime(50_000)
@@ -537,6 +547,15 @@ describe("nearby guest", () => {
     act(() => lanSession.leave())
   })
 
+  it("reports its own sync times with each ping once it has any", async () => {
+    const { session, sent } = await guest()
+    expect(sent).not.toContainEqual(expect.objectContaining({ type: "stats" }))
+    session.latency.acknowledged(45)
+    jest.advanceTimersByTime(2_000)
+    expect(sent.at(-1)).toMatchObject({ type: "stats", stats: { ack: { count: 1, p50: 45 } } })
+    session.leave()
+  })
+
   it("sets its clock from the host's reply to a ping", async () => {
     const { session, sent, host } = await guest()
     const ping = sent.find((message) => (message as LanGuestMessage).type === "ping")
@@ -544,6 +563,8 @@ describe("nearby guest", () => {
     jest.advanceTimersByTime(30)
     host()?.onMessage({ type: "pong", at: Date.now() - 30, hostAt: 90_000 })
     expect(session.latency.summary()).toEqual({ ping: 30 })
+    jest.advanceTimersByTime(2_000)
+    expect(sent.at(-1)).toEqual({ type: "stats", stats: { ping: 30 } })
     session.leave()
   })
 
