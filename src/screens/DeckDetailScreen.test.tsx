@@ -6,6 +6,7 @@ import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
+import { clear as clearStorage } from "@/utils/storage"
 
 import { DeckDetailScreen } from "./DeckDetailScreen"
 
@@ -113,8 +114,6 @@ const mockPokemonCardByReference = jest.fn(async () => ({
   rarity: "common",
 }))
 const queryArgs: Array<Record<string, unknown>> = []
-let mockPreventRemoveCallback: ((options: { data: { action: object } }) => void) | undefined
-const mockNavigationDispatch = jest.fn()
 
 const solRing = {
   _id: "card-1",
@@ -250,18 +249,6 @@ jest.mock("expo-router", () => ({
     require("react").useEffect(() => {
       if (mockFocused) return callback()
     }, [callback, mockFocused]),
-  useNavigation: () => ({
-    dispatch: mockNavigationDispatch,
-  }),
-}))
-
-jest.mock("expo-router/react-navigation", () => ({
-  usePreventRemove: (
-    _preventRemove: boolean,
-    callback: (options: { data: { action: object } }) => void,
-  ) => {
-    mockPreventRemoveCallback = callback
-  },
 }))
 
 jest.mock("../../convex/_generated/api", () => ({
@@ -303,12 +290,11 @@ describe("DeckDetailScreen", () => {
   } as Parameters<typeof DeckDetailScreen>[0]["access"]
 
   beforeEach(() => {
+    clearStorage()
     clearCardDetails()
     mockFocused = true
     jest.clearAllMocks()
     queryArgs.length = 0
-    mockPreventRemoveCallback = undefined
-    mockNavigationDispatch.mockClear()
     mockDetail.value = {
       ...loadedDetail,
       version: mainVersion,
@@ -1822,29 +1808,34 @@ describe("DeckDetailScreen", () => {
     expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
-  it("replays native navigation only after changed edits are discarded", () => {
-    const view = renderDetail()
-    fireEvent.press(view.getByTestId("edit-deck-button"))
-    fireEvent.press(view.getAllByText("+")[0])
-    const action = { type: "GO_BACK" }
+  it("keeps an unsaved edit after leaving and saves it from the reopened deck", async () => {
+    const first = renderDetail()
+    fireEvent.press(first.getByTestId("edit-deck-button"))
+    fireEvent.press(first.getAllByText("+")[0])
+    first.unmount()
 
-    act(() => mockPreventRemoveCallback?.({ data: { action } }))
-    expect(view.getByTestId("discard-edits-dialog")).toBeTruthy()
-    expect(mockNavigationDispatch).not.toHaveBeenCalled()
-
-    fireEvent.press(view.getByTestId("discard-edits-confirm"))
-    expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
+    const reopened = renderDetail()
+    expect(reopened.getByText("Edit deck")).toBeTruthy()
+    fireEvent.press(reopened.getByTestId("save-version-button"))
+    await waitFor(() =>
+      expect(mockSaveVersion).toHaveBeenCalledWith({
+        deckId: "deck-1",
+        versionId: "version-main",
+        cards: [expect.objectContaining({ name: "Sol Ring", quantity: 2 })],
+      }),
+    )
+    reopened.unmount()
+    expect(renderDetail().queryByText("Edit deck")).toBeNull()
   })
 
-  it("does not replay cancelled navigation after saving", async () => {
-    const view = renderDetail()
-    fireEvent.press(view.getByTestId("edit-deck-button"))
-    fireEvent.press(view.getAllByText("+")[0])
-    act(() => mockPreventRemoveCallback?.({ data: { action: { type: "GO_BACK" } } }))
-    fireEvent.press(view.getByText("Keep editing"))
-    fireEvent.press(view.getByText("Save"))
-    await waitFor(() => expect(mockSaveVersion).toHaveBeenCalled())
-    expect(mockNavigationDispatch).not.toHaveBeenCalled()
+  it("forgets a kept edit once it is discarded", () => {
+    const first = renderDetail()
+    fireEvent.press(first.getByTestId("edit-deck-button"))
+    fireEvent.press(first.getAllByText("+")[0])
+    fireEvent.press(first.getByText("Cancel"))
+    fireEvent.press(first.getByTestId("discard-edits-confirm"))
+    first.unmount()
+    expect(renderDetail().queryByText("Edit deck")).toBeNull()
   })
 
   it("opens the shared card dialog with provider details for a Yu-Gi-Oh card", async () => {

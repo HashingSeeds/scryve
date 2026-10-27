@@ -73,7 +73,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function isPayload(value: unknown): value is GuestDeckPayload {
+export function isGuestDeckPayload(value: unknown): value is GuestDeckPayload {
   if (
     !isRecord(value) ||
     typeof value.name !== "string" ||
@@ -128,7 +128,7 @@ function isGuestDeck(value: unknown): value is GuestDeck {
     typeof value.updatedAt === "number" &&
     Number.isSafeInteger(value.updatedAt) &&
     value.updatedAt >= value.createdAt &&
-    isPayload(value.deck) &&
+    isGuestDeckPayload(value.deck) &&
     (value.movedFromAccount === undefined || typeof value.movedFromAccount === "boolean") &&
     (value.deckKey === undefined ||
       (typeof value.deckKey === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.deckKey))) &&
@@ -257,7 +257,8 @@ export function saveGuestDeck(
     movedFromAccount?: boolean
   } = {},
 ): GuestDeck {
-  if (!isPayload(deck)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
+  if (!isGuestDeckPayload(deck))
+    throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   const decks = writableDecks()
   const previous = options.localId
     ? decks.find((candidate) => candidate.localId === options.localId)

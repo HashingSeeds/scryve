@@ -1,9 +1,10 @@
-import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { Header } from "@/components/Header"
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
+import { clear as clearStorage } from "@/utils/storage"
 
 import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
@@ -27,21 +28,9 @@ jest.mock("convex/react", () => ({
   useAction: () => mockSearchCards,
 }))
 
-let mockPreventRemove = false
-let mockPreventRemoveCallback:
-  ((options: { data: { action: { type: string } } }) => void) | undefined
-const mockNavigationDispatch = jest.fn()
-const mockNavigation = { dispatch: mockNavigationDispatch }
 const mockStatsPush = jest.fn()
 jest.mock("expo-router", () => ({
-  useNavigation: () => mockNavigation,
   router: { push: (...args: unknown[]) => mockStatsPush(...args) },
-}))
-jest.mock("expo-router/react-navigation", () => ({
-  usePreventRemove: (preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
-    mockPreventRemove = preventRemove
-    mockPreventRemoveCallback = callback
-  },
 }))
 
 const mockStored = {
@@ -60,6 +49,7 @@ const mockStored = {
 let mockCurrent: GuestDeck | undefined = mockStored
 let mockSaveFailure = false
 jest.mock("@/features/decks/guestDeck", () => ({
+  isGuestDeckPayload: jest.requireActual("@/features/decks/guestDeck").isGuestDeckPayload,
   useGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
   loadGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
   saveGuestDeck: jest.fn((deck: typeof mockStored.deck) => {
@@ -88,13 +78,11 @@ function renderScreen(onBack = jest.fn(), localId = mockStored.localId) {
 }
 
 beforeEach(() => {
+  clearStorage()
   clearCardDetails()
   mockStatsQuery.mockClear()
   mockSearchCards.mockReset()
   mockConnectionState.isWebSocketConnected = true
-  mockPreventRemove = false
-  mockPreventRemoveCallback = undefined
-  mockNavigationDispatch.mockClear()
   mockCurrent = mockStored
   mockSaveFailure = false
   mockSaveGuestDeck.mockClear()
@@ -257,16 +245,30 @@ test("supports removing the last copy, Undo, and cancelling an edit", () => {
   expect(view.onBack).not.toHaveBeenCalled()
 })
 
-test("blocks system back and replays navigation after discard", () => {
-  const view = renderScreen()
-  editNote(view, "Unsaved")
-  const action = { type: "GO_BACK" }
-  act(() => mockPreventRemoveCallback?.({ data: { action } }))
-  fireEvent.press(view.getByText("Keep editing"))
-  expect(mockPreventRemove).toBe(true)
-  act(() => mockPreventRemoveCallback?.({ data: { action } }))
-  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
-  expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
+test("keeps an unsaved edit after leaving and saves it from the reopened deck", () => {
+  const first = renderScreen()
+  editNote(first, "Unsaved")
+  first.unmount()
+  const reopened = renderScreen()
+  fireEvent.press(reopened.getByTestId("deck-tab-notes"))
+  expect(reopened.getByDisplayValue("Unsaved")).toBeTruthy()
+  fireEvent.press(reopened.getByTestId("save-version-button"))
+  expect(mockSaveGuestDeck).toHaveBeenCalledWith(
+    expect.objectContaining({ note: "Unsaved" }),
+    expect.anything(),
+  )
+  reopened.unmount()
+  expect(renderScreen().queryByText("Cancel")).toBeNull()
+})
+
+test("forgets a kept edit once it is discarded", () => {
+  const first = renderScreen()
+  fireEvent.press(first.getByTestId("edit-deck-button"))
+  fireEvent.press(first.getByLabelText("Decrease Sol Ring"))
+  fireEvent(first.UNSAFE_getByType(Header), "leftPress")
+  fireEvent.press(first.getByTestId("guest-deck-discard-confirm"))
+  first.unmount()
+  expect(renderScreen().getByText("2×")).toBeTruthy()
 })
 
 test("searches new cards into Main deck by default and saves merged copies", async () => {
