@@ -45,6 +45,8 @@ function Sync() {
     void (async () => {
       const token = await pushToken()
       if (!token || stale) return
+      // why: set before sending, so turning both off while this is in flight still forgets the device.
+      storage.set(REGISTERED, true)
       await syncDevice({
         key,
         token,
@@ -53,7 +55,6 @@ function Sync() {
         feedbackReplies,
         renewalReminders,
       })
-      storage.set(REGISTERED, true)
     })().catch(() => undefined)
     return () => {
       stale = true
