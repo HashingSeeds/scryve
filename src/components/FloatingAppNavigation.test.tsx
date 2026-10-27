@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/theme/context"
 import { FloatingAppNavigation } from "./FloatingAppNavigation"
 
 let mockNearbyPlay = false
-jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
+jest.mock("@/features/lan/lanAvailability", () => ({ nearbyBetaAvailable: () => mockNearbyPlay }))
 
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: jest.fn(() => ({ top: 0, right: 0, bottom: 34, left: 0 })),

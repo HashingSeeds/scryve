@@ -9,7 +9,7 @@ import { GameMenuBackdrop } from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 let mockNearbyPlay = false
-jest.mock("@/features/lan/lanAvailability", () => ({ lanPlayAvailable: () => mockNearbyPlay }))
+jest.mock("@/features/lan/lanAvailability", () => ({ nearbyBetaAvailable: () => mockNearbyPlay }))
 let mockStoreUpdate: { labelTx: "play:launch.openAppStore"; url: string } | null = null
 jest.mock("@/features/updates/storeUpdate", () => ({
   ...jest.requireActual("@/features/updates/storeUpdate"),

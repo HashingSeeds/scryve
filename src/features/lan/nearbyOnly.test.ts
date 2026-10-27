@@ -1,6 +1,6 @@
 import type { NearbyOnlyWebSocket as Socket } from "./nearbyOnly"
 
-jest.mock("./lanAvailability", () => ({ lanPlayAvailable: () => true }))
+jest.mock("./lanAvailability", () => ({ nearbyBetaAvailable: () => true }))
 
 class FakeSocket extends EventTarget {
   constructor(readonly url: string) {

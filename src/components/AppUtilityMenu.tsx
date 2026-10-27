@@ -10,7 +10,7 @@ import Animated, {
 
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { openEvents } from "@/features/events/openEvents"
-import { lanPlayAvailable } from "@/features/lan/lanAvailability"
+import { nearbyBetaAvailable } from "@/features/lan/lanAvailability"
 import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
 import { updateFromStore, useStoreUpdate } from "@/features/updates/storeUpdate"
@@ -53,7 +53,7 @@ export function AppUtilityMenu({
   const updateReady = useAppUpdate().status === "ready"
   const storeUpdate = useStoreUpdate()
   const nearbyOnly = useNearbyOnly()
-  const testsNearby = lanPlayAvailable()
+  const testsNearby = nearbyBetaAvailable()
   const showsEvents = nearbyOnly || readPublicCloudConfig().configured
   const itemCount =
     4 +
