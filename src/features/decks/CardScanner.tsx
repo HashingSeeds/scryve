@@ -198,7 +198,10 @@ export function CardScanner({
         setStatus({ alreadyInDeck: card.name })
         return
       }
-      const inDeck = copiesInDeck(card.name)
+      const stillAdding = addedRef.current.filter(
+        (scanned) => scanned.name === card.name && scanned.state === "adding",
+      ).length
+      const inDeck = copiesInDeck(card.name) + stillAdding
       landCountOpen.current = true
       setLandCount({ card, inDeck, count: Math.max(inDeck, 1) })
       return

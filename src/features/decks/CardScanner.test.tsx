@@ -231,3 +231,24 @@ test("a card whose add failed can be scanned again in a Commander deck", async (
     jest.useRealTimers()
   }
 })
+
+test("a land retry counts copies still being added", async () => {
+  let landSecondBatch: () => void = () => undefined
+  const addCards = jest
+    .fn<Promise<ScannedCardAdd[]>, [string[]]>()
+    .mockImplementationOnce(async (names) => names.map(() => ({ error: "Offline" })))
+    .mockImplementationOnce(
+      (names) =>
+        new Promise((resolve) => {
+          landSecondBatch = () => resolve(names.map(() => ({})))
+        }),
+    )
+    .mockImplementation(async (names) => names.map(() => ({})))
+  const { view } = renderScanner({ singleton: true, addCards })
+  scan("Forest")
+  for (let tap = 1; tap < 20; tap++) fireEvent.press(view.getByLabelText("Increase Forest"))
+  await act(async () => fireEvent.press(view.getByTestId("card-scan-add-lands")))
+  scan("Forest")
+  expect(view.getByTestId("card-scan-land-count")).toHaveTextContent("10")
+  await act(async () => landSecondBatch())
+})
