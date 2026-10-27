@@ -4,6 +4,7 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
+import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
@@ -765,6 +766,58 @@ describe("DeckDetailScreen", () => {
       </ThemeProvider>,
     )
     expect(view.getByText("Sol Ring")).toBeTruthy()
+  })
+
+  it("keeps an offline edit of an older cached version tied to that version", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const main = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 1,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    const newer = { ...main, versionId: "version-sideboard", versionNumber: 2, name: "vs Control" }
+    mockVersionCacheState.versions = [main, newer]
+    mockVersionCacheState.version = newer
+    mockVersionCacheState.cards = [{ ...solRing, deckVersionId: "version-sideboard" }]
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("version-picker-version-main"))
+    mockVersionCacheState.version = main
+    mockVersionCacheState.cards = [solRing]
+    view.rerender(screen())
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getAllByText("+")[0])
+    view.unmount()
+
+    expect(loadAccountDraft("owner-a", "deck-1")).toMatchObject({
+      versionId: "version-main",
+      pinned: { versionId: "version-main" },
+    })
   })
 
   it("keeps a valid cached-origin edit when live detail arrives without auto-saving", () => {

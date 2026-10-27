@@ -440,7 +440,8 @@ function DeckDetailContent({
   }, [detail, client])
 
   const ownerId = access?.ownerId
-  const draftVersionId = view.version?._id
+  const draftVersionId =
+    pinnedVersionTarget.current?.versionId ?? selectedVersionId ?? view.version?._id
   useEffect(() => {
     if (view.changes.any)
       keepAccountDraft(ownerId, deckId, {
