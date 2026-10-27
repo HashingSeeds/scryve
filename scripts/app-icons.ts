@@ -210,15 +210,23 @@ function svg(icon: IconArt, look: Look) {
 
 const root = path.resolve(import.meta.dirname, "..")
 const scratch = mkdtempSync(path.join(tmpdir(), "scryve-app-icons-"))
-function render(variant: IconArt, outputs: Partial<Record<Look, string>>) {
+function render(variant: IconArt, outputs: Partial<Record<Look, string>>, size = 1024) {
   for (const [look, output] of Object.entries(outputs) as [Look, string][]) {
     const source = path.join(scratch, `${variant.name}-${look}.svg`)
     writeFileSync(source, svg(variant, look))
-    execFileSync("inkscape", [source, "-o", path.join(root, output), "-w", "1024", "-h", "1024"], {
-      stdio: "ignore",
-    })
+    execFileSync(
+      "inkscape",
+      [source, "-o", path.join(root, output), "-w", String(size), "-h", String(size)],
+      { stdio: "ignore" },
+    )
   }
 }
 
-mkdirSync(path.join(root, "assets/images/app-icons"), { recursive: true })
-for (const variant of APP_ICON_VARIANTS) render(variant, appIconAssets(variant.name))
+// why: the Settings picker shows these, because iOS release builds decode its 1024px icons on the main thread and hitch the first open.
+const PREVIEWS = "assets/images/app-icons/previews"
+mkdirSync(path.join(root, PREVIEWS), { recursive: true })
+for (const variant of APP_ICON_VARIANTS) {
+  render(variant, appIconAssets(variant.name))
+  const preview = `${PREVIEWS}/${variant.name.toLowerCase()}`
+  render(variant, { ios: `${preview}-ios.png`, androidForeground: `${preview}-android.png` }, 288)
+}
