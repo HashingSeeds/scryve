@@ -1327,6 +1327,7 @@ export function AddDeckScreen({
             commanderCards={pastedCards}
             initialSection={choosingPastedCommander ? "commander" : undefined}
             onAdd={addImportCard}
+            onRemove={(card) => changeImportQuantity(card, -1)}
             onClose={() => {
               Keyboard.dismiss()
               setAddingPastedCard(false)
