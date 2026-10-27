@@ -5,8 +5,10 @@ import { ThemeProvider } from "@/theme/context"
 import { NearbyGameList } from "./NearbyGameList"
 
 const mockAccess = jest.fn()
+const mockJoin = jest.fn()
+let mockServices: { name: string }[] = []
 jest.mock("./lanSession", () => ({
-  lanSession: {},
+  lanSession: { join: (service: unknown) => mockJoin(service), isReachable: () => true },
   useLanSessionSlice: (select: (state: object) => unknown) => select({}),
 }))
 jest.mock("./lanTransport", () => ({
@@ -14,18 +16,34 @@ jest.mock("./lanTransport", () => ({
   isLanGameService: () => true,
   LAN_SERVICE_TYPE: "scryve",
 }))
-jest.mock("react-native-zeroconf", () => ({ useZeroconf: () => ({ services: [] }) }))
+jest.mock("react-native-zeroconf", () => ({ useZeroconf: () => ({ services: mockServices }) }))
 
-const renderList = () =>
+const renderList = (props: { code?: string; onJoin?: () => void } = {}) =>
   render(
     <ThemeProvider initialContext="dark">
-      <NearbyGameList onJoin={jest.fn()} />
+      <NearbyGameList onJoin={jest.fn()} {...props} />
     </ThemeProvider>,
   )
 
 describe("NearbyGameList", () => {
   beforeEach(() => jest.useFakeTimers())
-  afterEach(() => jest.useRealTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    mockServices = []
+    mockJoin.mockReset()
+  })
+
+  it("joins the nearby game advertising the entered code", async () => {
+    mockAccess.mockResolvedValue("granted")
+    const host = { name: "Sam AB23CD" }
+    mockServices = [{ name: "Ana XY45ZW" }, host]
+    const onJoin = jest.fn()
+    renderList({ code: "ab2-3cd", onJoin })
+
+    await act(async () => {})
+    expect(mockJoin).toHaveBeenCalledWith(host)
+    expect(onJoin).toHaveBeenCalledTimes(1)
+  })
 
   it("points at the Wi-Fi once a scan keeps finding nothing", async () => {
     mockAccess.mockResolvedValue("granted")

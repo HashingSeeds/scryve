@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { ViewStyle } from "react-native"
 import { ScrollView } from "react-native"
 import { router, useLocalSearchParams } from "expo-router"
@@ -17,15 +18,23 @@ const openNearbyLobby = () => router.push("/lan")
 
 export default function JoinRoute() {
   const { code } = useLocalSearchParams<{ code?: string }>()
+  // why: a warm invite link changes the code without remounting this route, and both code fields start from it.
+  return <Join key={code} code={code} />
+}
+
+function Join({ code }: { code?: string }) {
   const { configured } = useAuthAccess()
-  if (!configured && lanPlayAvailable()) return <NearbyOnlyJoin />
+  // why: cloud and nearby games share the code field, so a typed or scanned code joins whichever game is on this Wi-Fi.
+  const [typed, setTyped] = useState(code)
+  if (!configured && lanPlayAvailable()) return <NearbyOnlyJoin code={code} />
   return (
     <CloudScreen multiplayer onBack={() => router.dismissTo("/")}>
       {(access) => (
         <JoinConnectedScreen
           access={access}
           initialCode={code}
-          nearby={<NearbyGameList onJoin={openNearbyLobby} />}
+          onCodeChange={setTyped}
+          nearby={<NearbyGameList code={typed} onJoin={openNearbyLobby} />}
           onBack={() => router.back()}
           onScan={() => router.push("/connected/scan")}
           onJoined={(id) =>
@@ -37,13 +46,13 @@ export default function JoinRoute() {
   )
 }
 
-function NearbyOnlyJoin() {
+function NearbyOnlyJoin({ code }: { code?: string }) {
   const { themed } = useAppTheme()
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$styles.flex1}>
       <Header leftTx="common:back" onLeftPress={() => router.back()} />
       <ScrollView style={$styles.flex1} contentContainerStyle={themed($content)}>
-        <NearbyGameList onJoin={openNearbyLobby} />
+        <NearbyGameList code={code} onJoin={openNearbyLobby} />
       </ScrollView>
     </Screen>
   )

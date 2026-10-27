@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto"
 
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 function bytesToBase64Url(bytes: Uint8Array) {
   const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("")

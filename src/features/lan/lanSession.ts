@@ -50,6 +50,7 @@ import {
   type LanHost,
 } from "./lanTransport"
 import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
+import { nearbyCodeFor, nearbyServiceName } from "./nearbyCode"
 import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
 
 const RECONNECT_DELAY_MS = 1_500
@@ -236,7 +237,7 @@ export class LanSession {
       role: "host",
       status: "connecting",
       seatKey,
-      serviceName: `${name} ${game.id.slice(-4)}`,
+      serviceName: nearbyServiceName(name, nearbyCodeFor(game.id)),
       lobby: lanLobbyOf(game),
       projection: lanProjection(game, seatKey),
     })
