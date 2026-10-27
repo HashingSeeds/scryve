@@ -300,11 +300,15 @@ it("keeps the board playable and tells the player once when storage refuses the 
   const initial = game()
   const [ada] = initial.players
   const { result } = renderHook(() => useLocalGame(initial, repository))
+  const set = storage.set.bind(storage)
   const quota = new Error("QuotaExceededError")
-  storage.set = () => {
-    throw quota
+  const refuse = () => {
+    storage.set = () => {
+      throw quota
+    }
   }
 
+  refuse()
   act(() => result.current.changeLife(ada.id, -1))
   act(() => result.current.changeLife(ada.id, -1))
   act(() => result.current.changeLayout("even-grid"))
@@ -314,6 +318,12 @@ it("keeps the board playable and tells the player once when storage refuses the 
   expect(alert).toHaveBeenCalledTimes(1)
   expect(reportCrash).toHaveBeenCalledTimes(1)
   expect(reportCrash).toHaveBeenCalledWith(quota, "Handled", expect.anything())
+
+  storage.set = set
+  act(() => result.current.changeLife(ada.id, -1))
+  refuse()
+  act(() => result.current.changeLife(ada.id, -1))
+  expect(alert).toHaveBeenCalledTimes(2)
   alert.mockRestore()
 })
 

@@ -69,6 +69,7 @@ export function useLocalGame(
     (next: LocalGame) => {
       try {
         repository.saveActiveGame(next)
+        saveFailureShown.current = false
         setUnsavedGameId(undefined)
       } catch (cause) {
         setUnsavedGameId(next.id)
