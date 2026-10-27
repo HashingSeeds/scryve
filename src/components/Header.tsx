@@ -1,5 +1,6 @@
-import { ReactElement, ReactNode } from "react"
+import { ReactElement, ReactNode, useState } from "react"
 import {
+  LayoutChangeEvent,
   StyleProp,
   TextStyle,
   TouchableOpacity,
@@ -80,6 +81,7 @@ export interface HeaderProps {
 }
 
 interface HeaderActionProps {
+  onLayout: (event: LayoutChangeEvent) => void
   backgroundColor?: string
   icon?: IconTypes
   iconColor?: string
@@ -92,9 +94,10 @@ interface HeaderActionProps {
 
 export function Header(props: HeaderProps) {
   const {
-    theme: { colors },
+    theme: { colors, spacing },
     themed,
   } = useAppTheme()
+  const [actionWidths, setActionWidths] = useState({ left: 0, right: 0 })
   const {
     backgroundColor = colors.background,
     LeftActionComponent,
@@ -128,11 +131,17 @@ export function Header(props: HeaderProps) {
   const centered = titleMode === "center" && fontScale <= CENTERED_TITLE_MAX_FONT_SCALE
 
   const titleContent = titleTx ? translate(titleTx, titleTxOptions) : title
+  const centeredInset = Math.max(spacing.xxl, actionWidths.left, actionWidths.right)
+  const measureAction = (side: "left" | "right") => (event: LayoutChangeEvent) => {
+    const width = Math.ceil(event.nativeEvent.layout.width)
+    setActionWidths((widths) => (widths[side] === width ? widths : { ...widths, [side]: width }))
+  }
 
   return (
     <View style={[$container, $containerInsets, { backgroundColor }, $containerStyleOverride]}>
       <View style={[$styles.row, $wrapper, $styleOverride]}>
         <HeaderAction
+          onLayout={measureAction("left")}
           tx={leftTx}
           text={leftText}
           icon={leftIcon}
@@ -148,7 +157,9 @@ export function Header(props: HeaderProps) {
             style={[
               titleAccessory ? $titleWrapperAccessoryPointerEvents : $titleWrapperPointerEvents,
               !!titleAccessory && themed($titleWrapperRow),
-              centered ? themed($titleWrapperCenter) : $titleWrapperFlex,
+              centered
+                ? [$titleWrapperCenter, { paddingHorizontal: centeredInset }]
+                : $titleWrapperFlex,
               $titleContainerStyleOverride,
             ]}
           >
@@ -157,6 +168,8 @@ export function Header(props: HeaderProps) {
               size="md"
               text={titleContent}
               numberOfLines={1}
+              adjustsFontSizeToFit={centered}
+              minimumFontScale={TITLE_MIN_FONT_SCALE}
               maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
               style={[$title, $titleStyleOverride]}
             />
@@ -165,6 +178,7 @@ export function Header(props: HeaderProps) {
         )}
 
         <HeaderAction
+          onLayout={measureAction("right")}
           tx={rightTx}
           text={rightText}
           icon={rightIcon}
@@ -179,7 +193,15 @@ export function Header(props: HeaderProps) {
   )
 }
 
-function HeaderAction(props: HeaderActionProps) {
+function HeaderAction({ onLayout, ...props }: HeaderActionProps) {
+  return (
+    <View onLayout={onLayout} style={$actionSlot}>
+      <HeaderActionContent {...props} />
+    </View>
+  )
+}
+
+function HeaderActionContent(props: Omit<HeaderActionProps, "onLayout">) {
   const { backgroundColor, icon, text, tx, txOptions, onPress, ActionComponent, iconColor } = props
   const { themed } = useAppTheme()
 
@@ -228,11 +250,18 @@ function HeaderAction(props: HeaderActionProps) {
 
 const HEADER_MAX_FONT_SCALE = 1.5
 const CENTERED_TITLE_MAX_FONT_SCALE = 1.3
+const TITLE_MIN_FONT_SCALE = 0.75
 
 const $wrapper: ViewStyle = {
   height: 56,
   alignItems: "center",
   justifyContent: "space-between",
+}
+
+const $actionSlot: ViewStyle = {
+  height: "100%",
+  justifyContent: "center",
+  zIndex: 2,
 }
 
 const $container: ViewStyle = {
@@ -282,15 +311,14 @@ const $titleWrapperRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 
-const $titleWrapperCenter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $titleWrapperCenter: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
   height: "100%",
   width: "100%",
   position: "absolute",
-  paddingHorizontal: spacing.xxl,
   zIndex: 1,
-})
+}
 
 const $titleWrapperFlex: ViewStyle = {
   justifyContent: "center",
