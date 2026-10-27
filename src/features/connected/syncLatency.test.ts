@@ -26,7 +26,7 @@ describe("latencyStats", () => {
 })
 
 describe("SyncLatency", () => {
-  it("times a paint on the authority's clock, even one painted before the first ping landed", () => {
+  it("corrects a paint made before the first ping with that ping, and keeps it through later ones", () => {
     const { latency, at } = meter()
     latency.remoteChange(10_050, 1)
     at(1_100)
@@ -37,7 +37,7 @@ describe("SyncLatency", () => {
     latency.clockSample(3_000, 3_020, 12_000)
     latency.clockSample(4_000, 4_200, 13_500)
 
-    expect(latency.summary()).toMatchObject({ delivery: { count: 1, p50: 40 }, ping: 20 })
+    expect(latency.summary()).toMatchObject({ delivery: { count: 1, p50: 10 }, ping: 20 })
   })
 
   it("waits for the frame that shows the change", () => {

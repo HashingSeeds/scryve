@@ -43,10 +43,11 @@ const keepNewest = (samples: number[], sample: number) => {
   if (samples.length > MAX_SAMPLES) samples.shift()
 }
 
-/** why: paints wait on this device's clock until the authority offset is known, so a player who never writes still gets numbers once a clock sample lands. */
 export class SyncLatency {
   private clock?: { offset: number; rtt: number; at: number }
   private paints: number[] = []
+  // why: paints before the first clock sample are kept on this device's clock and corrected once it lands; later ones keep the offset they were painted under.
+  private uncorrected: number[] = []
   private acks: number[] = []
   private unpainted: { authorityAt: number; eventSequence: number }[] = []
   private writes = new Map<string, { sentAt?: number; returnedAt?: number; authorityAt?: number }>()
@@ -65,7 +66,14 @@ export class SyncLatency {
     if (rtt < 0) return
     const best = this.clock
     if (best && best.rtt <= rtt && receivedAt - best.at < CLOCK_STALE_MS) return
-    this.clock = { offset: authorityAt - (sentAt + receivedAt) / 2, rtt, at: receivedAt }
+    const offset = authorityAt - (sentAt + receivedAt) / 2
+    this.clock = { offset, rtt, at: receivedAt }
+    for (const paint of this.uncorrected.splice(0)) this.keepPaint(paint, offset)
+  }
+
+  // why: a slightly-off offset can put a fast paint a few ms before the authority applied it.
+  private keepPaint(paint: number, offset: number) {
+    keepNewest(this.paints, Math.max(0, paint + offset))
   }
 
   /** why: a cloud write's reply and the projection carrying its server time arrive in either order. */
@@ -96,7 +104,9 @@ export class SyncLatency {
     const at = this.now()
     this.unpainted = this.unpainted.filter((change) => {
       if (change.eventSequence > eventSequence) return true
-      keepNewest(this.paints, at - change.authorityAt)
+      const paint = at - change.authorityAt
+      if (this.clock) this.keepPaint(paint, this.clock.offset)
+      else keepNewest(this.uncorrected, paint)
       return false
     })
   }
@@ -107,9 +117,7 @@ export class SyncLatency {
 
   summary(): SyncLatencySummary {
     const { clock } = this
-    // why: a slightly-off offset can put a fast paint a few ms before the authority applied it.
-    const delivery =
-      clock && latencyStats(this.paints.map((paint) => Math.max(0, paint + clock.offset)))
+    const delivery = latencyStats(this.paints)
     const ack = latencyStats(this.acks)
     return {
       ...(delivery ? { delivery } : {}),
@@ -122,6 +130,7 @@ export class SyncLatency {
   report(): void {
     const { delivery, ack, ping } = this.summary()
     this.paints = []
+    this.uncorrected = []
     this.acks = []
     if (!delivery && !ack) return
     captureAnalytics("sync_latency", {
