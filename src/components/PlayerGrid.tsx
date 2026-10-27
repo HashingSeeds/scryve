@@ -358,6 +358,17 @@ export function PlayerGrid({
           radius: layout.compact ? spacing.md : spacing.lg,
         })
       : undefined
+  // why: seats sit by position in one list keyed by player rather than inside flex rows, so a seat that changes rows moves instead of remounting.
+  const cellRects =
+    board.width > 0
+      ? getPlayerGridCellRects({
+          playerCount: players.length,
+          layout,
+          board,
+          gap: spacing.xxs,
+          topInset: topEdgeBand,
+        })
+      : undefined
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const boardSeats = commanderDamage
@@ -428,297 +439,282 @@ export function PlayerGrid({
           (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
         ]}
       >
-        {rows.map((row, rowIndex) => (
-          <View
-            key={rowIndex}
-            testID={`player-grid-row-${rowIndex}`}
-            style={[themed($row), { flex: rowFlexes[rowIndex] }]}
-          >
-            {row.map((slot, columnIndex) => {
-              const index = seatedRows[rowIndex][columnIndex]
-              if (slot === null || index === null) {
-                return (
-                  <View
-                    key={`empty-${rowIndex}-${columnIndex}`}
-                    testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
-                    style={themed($cell)}
+        {rows.flatMap((row, rowIndex) =>
+          row.map((slot, columnIndex) => {
+            const index = seatedRows[rowIndex][columnIndex]
+            if (slot === null || index === null) return null
+            const rect = cellRects?.get(slot)
+            const seatStyle = [
+              $seat,
+              rect && { left: rect.x, top: rect.y, width: rect.width, height: rect.height },
+            ]
+            const player = players[index]
+            const seatNumber = index + 1
+            const playerDisabled = Boolean(isPlayerDisabled?.(player))
+            const contentRotation = getPlayerContentRotation({
+              playerCount: players.length,
+              layout,
+              row,
+              rowIndex,
+              columnIndex,
+              slot,
+            })
+            const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
+            const screenEdges = {
+              top: rowIndex === 0,
+              bottom: rowIndex === rows.length - 1,
+              left: columnIndex === 0,
+              right: columnIndex === row.length - 1,
+            }
+            const contentInsets = {
+              top: screenEdges.top ? insets.top : 0,
+              bottom: screenEdges.bottom ? insets.bottom : 0,
+              left: screenEdges.left ? insets.left : 0,
+              right: screenEdges.right ? insets.right : 0,
+              cutout: seatCutout(cutout, contentRotation, screenEdges),
+            }
+            const fallbackMenu =
+              fallbackMenuBoundary === null
+                ? undefined
+                : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+            const menuCorner =
+              menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
+            const seatDice = seatDiceFor(dice, player, stable)
+            const seatTable = seatTableState(table, player.id)
+            const out = outState && outReason(outState, player.id)
+            const firstIncoming = commanderDamage?.incomingFor(player) ?? NO_INCOMING
+            const partnerIncoming =
+              commanderDamage?.incomingFor(player, PARTNER_COMMANDER) ?? NO_INCOMING
+            if (table?.tableRules.pokemon) {
+              return (
+                <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={seatStyle}>
+                  <PokemonSeatCard
+                    playerId={player.id}
+                    playerName={player.name}
+                    seatNumber={seatNumber}
+                    shape={player.shape}
+                    prizes={player.life}
+                    color={player.color}
+                    compact={layout.compact}
+                    contentRotation={contentRotation}
+                    contentInsets={contentInsets}
+                    screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
+                    menuCorner={menuCorner}
+                    menuEdgeCenter={fallbackMenu?.edgeCenter}
+                    disabled={disabled || playerDisabled}
+                    ownership={ownership}
+                    staleSince={getStaleSince?.(player)}
+                    deck={getSeatDeck?.(player)}
+                    opponents={players
+                      .filter(({ id }) => id !== player.id)
+                      .map(({ id, name }) => ({ id, name }))}
+                    table={table}
+                    dice={seatDice}
+                    onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
+                      onChange(player.id, delta),
+                    )}
+                    onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
+                    style={getScreenCornerSquaringStyle({
+                      rows,
+                      rowIndex,
+                      columnIndex,
+                      insets: Platform.OS === "web" ? insets : undefined,
+                    })}
                   />
-                )
-              }
-              const player = players[index]
-              const seatNumber = index + 1
-              const playerDisabled = Boolean(isPlayerDisabled?.(player))
-              const contentRotation = getPlayerContentRotation({
-                playerCount: players.length,
-                layout,
-                row,
-                rowIndex,
-                columnIndex,
-                slot,
-              })
-              const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
-              const screenEdges = {
-                top: rowIndex === 0,
-                bottom: rowIndex === rows.length - 1,
-                left: columnIndex === 0,
-                right: columnIndex === row.length - 1,
-              }
-              const contentInsets = {
-                top: screenEdges.top ? insets.top : 0,
-                bottom: screenEdges.bottom ? insets.bottom : 0,
-                left: screenEdges.left ? insets.left : 0,
-                right: screenEdges.right ? insets.right : 0,
-                cutout: seatCutout(cutout, contentRotation, screenEdges),
-              }
-              const fallbackMenu =
-                fallbackMenuBoundary === null
-                  ? undefined
-                  : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
-              const menuCorner =
-                menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
-              const seatDice = seatDiceFor(dice, player, stable)
-              const seatTable = seatTableState(table, player.id)
-              const out = outState && outReason(outState, player.id)
-              const firstIncoming = commanderDamage?.incomingFor(player) ?? NO_INCOMING
-              const partnerIncoming =
-                commanderDamage?.incomingFor(player, PARTNER_COMMANDER) ?? NO_INCOMING
-              if (table?.tableRules.pokemon) {
-                return (
-                  <View
-                    key={player.id}
-                    testID={`player-cell-seat-${seatNumber}`}
-                    style={themed($cell)}
-                  >
-                    <PokemonSeatCard
-                      playerId={player.id}
-                      playerName={player.name}
-                      seatNumber={seatNumber}
-                      shape={player.shape}
-                      prizes={player.life}
-                      color={player.color}
-                      compact={layout.compact}
-                      contentRotation={contentRotation}
-                      contentInsets={contentInsets}
-                      screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
-                      menuCorner={menuCorner}
-                      menuEdgeCenter={fallbackMenu?.edgeCenter}
-                      disabled={disabled || playerDisabled}
-                      ownership={ownership}
-                      staleSince={getStaleSince?.(player)}
-                      deck={getSeatDeck?.(player)}
-                      opponents={players
-                        .filter(({ id }) => id !== player.id)
-                        .map(({ id, name }) => ({ id, name }))}
-                      table={table}
-                      dice={seatDice}
-                      onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
-                        onChange(player.id, delta),
-                      )}
-                      onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-                      style={getScreenCornerSquaringStyle({
+                </View>
+              )
+            }
+            const turningFrom = turning?.cells.get(slot)
+            const turningTo = turning?.tableCells.get(slot)
+            const turningFolded = turning?.foldedCells.get(slot)
+            const lifeCard = (liveSize?: SharedValue<{ width: number; height: number }>) => (
+              <LifeCard
+                liveSize={liveSize}
+                playerId={player.id}
+                playerName={player.name}
+                seatNumber={seatNumber}
+                shape={player.shape}
+                foil={isPlayerFoil?.(player)}
+                life={player.life}
+                color={player.color}
+                compact={layout.compact}
+                contentRotation={contentRotation}
+                boardRotation={boardOrientation?.touchRotation ?? boardRotation}
+                contentInsets={contentInsets}
+                screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
+                menuCorner={menuCorner}
+                menuEdgeCenter={fallbackMenu?.edgeCenter}
+                lifeFontSizeFor={lifeFontSizeFor}
+                system={system}
+                lifeStep={lifeStep}
+                disabled={disabled || playerDisabled}
+                ownership={ownership}
+                staleSince={getStaleSince?.(player)}
+                out={out && lifeCardOut(out, players, system, table)}
+                commanderDamage={
+                  commanderDamage && boardSeats
+                    ? {
+                        ownerPlayerId: player.id,
+                        players: commanderDamage.inspection ? commanderPlayers : undefined,
+                        inspection: commanderDamage.inspection
+                          ? {
+                              open: commanderDamage.inspection.playerId === player.id,
+                              onToggle: stable(`inspect:${player.id}`, () =>
+                                commanderDamage.inspection?.onChange(
+                                  commanderDamage.inspection.playerId === player.id
+                                    ? null
+                                    : player.id,
+                                ),
+                              ),
+                            }
+                          : undefined,
+                        seats: boardSeats.seats,
+                        rows: boardSeats.rows,
+                        columns: boardSeats.columns,
+                        incoming: strongerCommander(firstIncoming, partnerIncoming),
+                        lethal: commanderDamage.lethal,
+                        armedPlayerId: commanderDamage.armedPlayerId,
+                        attackerName: armedPlayer?.name,
+                        attacker: armedPlayer && {
+                          color: armedPlayer.color,
+                          shape: armedPlayer.shape,
+                          seatNumber: armedIndex + 1,
+                          rotation: seatRotations.get(armedIndex),
+                        },
+                        commanders: armedPlayer
+                          ? armedCommanders.map((commander, index) => ({
+                              ...commander,
+                              total:
+                                ((index ? partnerIncoming : firstIncoming)[armedPlayer.id] ?? 0) +
+                                (commanderDamage.staging?.stagedFor(
+                                  player,
+                                  COMMANDER_SLOTS[index],
+                                ) ?? 0),
+                            }))
+                          : undefined,
+                        onPowerStep: stable(`power:${player.id}`, (step: 1 | -1, index: number) =>
+                          setCommanderPowers((current) => ({
+                            ...current,
+                            [`${player.id}:${index}`]: Math.min(
+                              MAX_COMMANDER_DAMAGE,
+                              Math.max(
+                                1,
+                                (current[`${player.id}:${index}`] ?? armedCommanders[index].power) +
+                                  step,
+                              ),
+                            ),
+                          })),
+                        ),
+                        onToggleCommander: stable(`toggle:${player.id}`, (index: number) =>
+                          setBenched((current) =>
+                            current === null
+                              ? { playerId: player.id, index }
+                              : current.index === index
+                                ? null
+                                : current,
+                          ),
+                        ),
+                        facing:
+                          armedIndex >= 0
+                            ? commanderFacing(seatedRows, armedIndex, index)
+                            : undefined,
+                        reach:
+                          armedIndex >= 0 && armedIndex !== index
+                            ? commanderReach({
+                                gridRows: seatedRows,
+                                rowFlexes,
+                                board: {
+                                  width: board.width,
+                                  height: board.height - topEdgeBand,
+                                },
+                                attackerIndex: armedIndex,
+                                defenderIndex: index,
+                              })
+                            : undefined,
+                        pendingClaims: commanderDamage.pendingFor?.(player),
+                        onPressSword: stable(`sword:${player.id}`, () =>
+                          commanderDamage.onPressSword(player),
+                        ),
+                        acted: !!actedFor,
+                        onStage: stable(`stage:${player.id}`, (step: number, index: number) => {
+                          commanderDamage.onStage(player, step, COMMANDER_SLOTS[index])
+                          setActedFor(commanderDamage.armedPlayerId)
+                        }),
+                        ...(commanderDamage.staging && commanderDamage.armedPlayerId === player.id
+                          ? {
+                              armBar: {
+                                stagedTargets: commanderDamage.staging.stagedTargets,
+                                onSend: stable("armSend", commanderDamage.staging.onSend),
+                              },
+                            }
+                          : {}),
+                      }
+                    : undefined
+                }
+                seatTable={
+                  table && seatTable
+                    ? {
+                        ...seatTable,
+                        editable: !(disabled || playerDisabled),
+                        adjustCounter: stable(
+                          `counter:${player.id}`,
+                          (counterId: string, delta: number) =>
+                            table.adjustCounter(player.id, counterId, delta),
+                        ),
+                        takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
+                          table.takeDesignation(player.id, designationId),
+                        ),
+                        releaseDesignation: stable(
+                          `release:${player.id}`,
+                          (designationId: string) =>
+                            table.releaseDesignation(player.id, designationId),
+                        ),
+                        ...(tableItemRules && onOpenRule
+                          ? { tableItemRules, openRule: stable("openRule", onOpenRule) }
+                          : {}),
+                      }
+                    : undefined
+                }
+                dice={seatDice}
+                onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
+                onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
+                  onChange(player.id, delta),
+                )}
+                style={
+                  liveSize
+                    ? $squareCard
+                    : getScreenCornerSquaringStyle({
                         rows,
                         rowIndex,
                         columnIndex,
                         insets: Platform.OS === "web" ? insets : undefined,
-                      })}
-                    />
-                  </View>
-                )
-              }
-              const turningFrom = turning?.cells.get(slot)
-              const turningTo = turning?.tableCells.get(slot)
-              const turningFolded = turning?.foldedCells.get(slot)
-              const lifeCard = (liveSize?: SharedValue<{ width: number; height: number }>) => (
-                <LifeCard
-                  liveSize={liveSize}
-                  playerId={player.id}
-                  playerName={player.name}
-                  seatNumber={seatNumber}
-                  shape={player.shape}
-                  foil={isPlayerFoil?.(player)}
-                  life={player.life}
-                  color={player.color}
-                  compact={layout.compact}
-                  contentRotation={contentRotation}
-                  boardRotation={boardOrientation?.touchRotation ?? boardRotation}
-                  contentInsets={contentInsets}
-                  screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
-                  menuCorner={menuCorner}
-                  menuEdgeCenter={fallbackMenu?.edgeCenter}
-                  lifeFontSizeFor={lifeFontSizeFor}
-                  system={system}
-                  lifeStep={lifeStep}
-                  disabled={disabled || playerDisabled}
-                  ownership={ownership}
-                  staleSince={getStaleSince?.(player)}
-                  out={out && lifeCardOut(out, players, system, table)}
-                  commanderDamage={
-                    commanderDamage && boardSeats
+                      })
+                }
+              />
+            )
+            return (
+              <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={seatStyle}>
+                <TurningSeat
+                  turn={
+                    turning && turningFrom && turningTo && turningFolded
                       ? {
-                          ownerPlayerId: player.id,
-                          players: commanderDamage.inspection ? commanderPlayers : undefined,
-                          inspection: commanderDamage.inspection
-                            ? {
-                                open: commanderDamage.inspection.playerId === player.id,
-                                onToggle: stable(`inspect:${player.id}`, () =>
-                                  commanderDamage.inspection?.onChange(
-                                    commanderDamage.inspection.playerId === player.id
-                                      ? null
-                                      : player.id,
-                                  ),
-                                ),
-                              }
-                            : undefined,
-                          seats: boardSeats.seats,
-                          rows: boardSeats.rows,
-                          columns: boardSeats.columns,
-                          incoming: strongerCommander(firstIncoming, partnerIncoming),
-                          lethal: commanderDamage.lethal,
-                          armedPlayerId: commanderDamage.armedPlayerId,
-                          attackerName: armedPlayer?.name,
-                          attacker: armedPlayer && {
-                            color: armedPlayer.color,
-                            shape: armedPlayer.shape,
-                            seatNumber: armedIndex + 1,
-                            rotation: seatRotations.get(armedIndex),
-                          },
-                          commanders: armedPlayer
-                            ? armedCommanders.map((commander, index) => ({
-                                ...commander,
-                                total:
-                                  ((index ? partnerIncoming : firstIncoming)[armedPlayer.id] ?? 0) +
-                                  (commanderDamage.staging?.stagedFor(
-                                    player,
-                                    COMMANDER_SLOTS[index],
-                                  ) ?? 0),
-                              }))
-                            : undefined,
-                          onPowerStep: stable(`power:${player.id}`, (step: 1 | -1, index: number) =>
-                            setCommanderPowers((current) => ({
-                              ...current,
-                              [`${player.id}:${index}`]: Math.min(
-                                MAX_COMMANDER_DAMAGE,
-                                Math.max(
-                                  1,
-                                  (current[`${player.id}:${index}`] ??
-                                    armedCommanders[index].power) + step,
-                                ),
-                              ),
-                            })),
-                          ),
-                          onToggleCommander: stable(`toggle:${player.id}`, (index: number) =>
-                            setBenched((current) =>
-                              current === null
-                                ? { playerId: player.id, index }
-                                : current.index === index
-                                  ? null
-                                  : current,
-                            ),
-                          ),
-                          facing:
-                            armedIndex >= 0
-                              ? commanderFacing(seatedRows, armedIndex, index)
-                              : undefined,
-                          reach:
-                            armedIndex >= 0 && armedIndex !== index
-                              ? commanderReach({
-                                  gridRows: seatedRows,
-                                  rowFlexes,
-                                  board: {
-                                    width: board.width,
-                                    height: board.height - topEdgeBand,
-                                  },
-                                  attackerIndex: armedIndex,
-                                  defenderIndex: index,
-                                })
-                              : undefined,
-                          pendingClaims: commanderDamage.pendingFor?.(player),
-                          onPressSword: stable(`sword:${player.id}`, () =>
-                            commanderDamage.onPressSword(player),
-                          ),
-                          acted: !!actedFor,
-                          onStage: stable(`stage:${player.id}`, (step: number, index: number) => {
-                            commanderDamage.onStage(player, step, COMMANDER_SLOTS[index])
-                            setActedFor(commanderDamage.armedPlayerId)
-                          }),
-                          ...(commanderDamage.staging && commanderDamage.armedPlayerId === player.id
-                            ? {
-                                armBar: {
-                                  stagedTargets: commanderDamage.staging.stagedTargets,
-                                  onSend: stable("armSend", commanderDamage.staging.onSend),
-                                },
-                              }
-                            : {}),
+                          angle: turning.angle,
+                          unfolded: turning.unfolded,
+                          folded: turningFolded,
+                          cell: turningFrom,
+                          table: turningTo,
+                          board: turning.board,
+                          corners: turning.corners(slot),
                         }
                       : undefined
                   }
-                  seatTable={
-                    table && seatTable
-                      ? {
-                          ...seatTable,
-                          editable: !(disabled || playerDisabled),
-                          adjustCounter: stable(
-                            `counter:${player.id}`,
-                            (counterId: string, delta: number) =>
-                              table.adjustCounter(player.id, counterId, delta),
-                          ),
-                          takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
-                            table.takeDesignation(player.id, designationId),
-                          ),
-                          releaseDesignation: stable(
-                            `release:${player.id}`,
-                            (designationId: string) =>
-                              table.releaseDesignation(player.id, designationId),
-                          ),
-                          ...(tableItemRules && onOpenRule
-                            ? { tableItemRules, openRule: stable("openRule", onOpenRule) }
-                            : {}),
-                        }
-                      : undefined
-                  }
-                  dice={seatDice}
-                  onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-                  onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
-                    onChange(player.id, delta),
-                  )}
-                  style={
-                    liveSize
-                      ? $squareCard
-                      : getScreenCornerSquaringStyle({
-                          rows,
-                          rowIndex,
-                          columnIndex,
-                          insets: Platform.OS === "web" ? insets : undefined,
-                        })
-                  }
-                />
-              )
-              return (
-                <View
-                  key={player.id}
-                  testID={`player-cell-seat-${seatNumber}`}
-                  style={themed($cell)}
                 >
-                  {turning && turningFrom && turningTo && turningFolded ? (
-                    <TurningSeat
-                      angle={turning.angle}
-                      unfolded={turning.unfolded}
-                      folded={turningFolded}
-                      cell={turningFrom}
-                      table={turningTo}
-                      board={turning.board}
-                      corners={turning.corners(slot)}
-                    >
-                      {lifeCard}
-                    </TurningSeat>
-                  ) : (
-                    lifeCard()
-                  )}
-                </View>
-              )
-            })}
-          </View>
-        ))}
+                  {lifeCard}
+                </TurningSeat>
+              </View>
+            )
+          }),
+        )}
       </Animated.View>
     </View>
   )
@@ -995,13 +991,7 @@ const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: 0,
 })
 
-const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
-  flexDirection: "row",
-  gap: spacing.xxs,
-})
-
-const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $seat: ViewStyle = { position: "absolute" }
 
 const $squareCard: ViewStyle = { borderRadius: 0 }
 

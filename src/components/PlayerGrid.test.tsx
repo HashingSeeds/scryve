@@ -1,5 +1,5 @@
 import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
-import { act, fireEvent, render, within } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 import type { SharedValue } from "react-native-reanimated"
 
 import * as seatCommander from "@/features/decks/seatCommander"
@@ -34,6 +34,7 @@ import {
 } from "./PlayerGrid"
 import type { OutState } from "../../convex/lib/outReason"
 import type { TableState } from "../../convex/lib/table"
+import { seatRows } from "../../test/support/seatRows"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -745,7 +746,7 @@ describe("PlayerGrid", () => {
   })
 
   it("seats a Table board that landed upside down on the panel from its far end", () => {
-    const view = render(
+    render(
       <ThemeProvider>
         <PlayerGrid
           boardOrientation={{
@@ -769,12 +770,9 @@ describe("PlayerGrid", () => {
       </ThemeProvider>,
     )
 
-    expect(
-      within(view.getByTestId("player-grid-row-0")).getByTestId("player-cell-seat-6"),
-    ).toBeTruthy()
-    expect(
-      within(view.getByTestId("player-grid-row-3")).getByTestId("player-cell-seat-1"),
-    ).toBeTruthy()
+    const rows = seatRows({ width: 669, height: 951 })
+    expect(rows[0].seats).toEqual([6])
+    expect(rows[3].seats).toEqual([1])
   })
 
   it("supports the six-player tabletop arrangement", () => {
@@ -788,6 +786,22 @@ describe("PlayerGrid", () => {
     expect(getPlayerGridRows(6, layout)).toEqual([[0], [1, 2], [3, 4], [5]])
     expect(layout).toMatchObject({ columnCount: 2, rowCount: 4, variant: "tabletop" })
     expect(getPlayerGridLayoutOptions(6)).toContainEqual({ variant: "tabletop", label: "Table" })
+  })
+
+  it("keeps a seat mounted when a new layout moves it to another row", () => {
+    const grid = (layoutVariant: "auto" | "tabletop") => (
+      <ThemeProvider>
+        <PlayerGrid players={players(4)} layoutVariant={layoutVariant} onChange={jest.fn()} />
+      </ThemeProvider>
+    )
+    const view = render(grid("auto"))
+    const card = view.getByTestId("life-card-seat-2")
+    expect(seatRows()[0].seats).toContain(2)
+
+    view.rerender(grid("tabletop"))
+
+    expect(seatRows()[1].seats).toContain(2)
+    expect(view.getByTestId("life-card-seat-2")).toBe(card)
   })
 
   it("moves swapped players and their commander board cells together", () => {
@@ -808,12 +822,9 @@ describe("PlayerGrid", () => {
       </ThemeProvider>,
     )
 
-    expect(
-      within(view.getByTestId("player-grid-row-0")).getByTestId("player-cell-seat-4"),
-    ).toBeTruthy()
-    expect(
-      within(view.getByTestId("player-grid-row-1")).getByTestId("player-cell-seat-1"),
-    ).toBeTruthy()
+    const rows = seatRows()
+    expect(rows[0].seats).toContain(4)
+    expect(rows[1].seats).toContain(1)
     const firstCard = view.UNSAFE_getAllByType(LifeCard)[0].props
     expect(firstCard.playerId).toBe("player-3")
     expect(firstCard.seatNumber).toBe(4)
@@ -826,15 +837,15 @@ describe("PlayerGrid", () => {
   })
 
   it("gives a full-width odd player less height than paired player rows", () => {
-    const view = render(
+    render(
       <ThemeProvider initialContext="light">
         <PlayerGrid players={players(5)} onChange={jest.fn()} />
       </ThemeProvider>,
     )
 
-    expect(StyleSheet.flatten(view.getByTestId("player-grid-row-0").props.style).flex).toBe(1)
-    expect(StyleSheet.flatten(view.getByTestId("player-grid-row-1").props.style).flex).toBe(1)
-    expect(StyleSheet.flatten(view.getByTestId("player-grid-row-2").props.style).flex).toBe(0.8)
+    const rows = seatRows()
+    expect(rows[2].height).toBeCloseTo(rows[0].height * 0.8)
+    expect(rows[1].height).toBeCloseTo(rows[0].height)
   })
 
   it("anchors the game menu to weighted row intersections", () => {

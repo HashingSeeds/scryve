@@ -27,6 +27,7 @@ import {
   resetConnectedHarness,
   themed,
 } from "../../test/support/connectedHarness"
+import { seatRows } from "../../test/support/seatRows"
 import { CLAIM_ARM_MS } from "../components/CommanderClaimBanner"
 import type { PlayerGridLayoutVariant } from "../features/game/playerLayouts"
 
@@ -1206,7 +1207,7 @@ describe("ConnectedBoardScreen", () => {
         expect(screen.getByTestId("player-grid").props.accessibilityLabel).toBe(
           `${playerCount} player life grid`,
         )
-        expect(screen.getAllByTestId(/^player-grid-row-/)).toHaveLength(expectedRows)
+        expect(seatRows()).toHaveLength(expectedRows)
         expect(
           screen.getByTestId(`life-card-seat-${playerCount}`).props.accessibilityLabel,
         ).toContain("Your seat")

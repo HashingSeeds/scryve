@@ -476,7 +476,7 @@ export const LifeCard = memo(function LifeCard({
     ).length > 0
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
-  const liveLayer = useLiveContentFrame(contentRotation, liveSize)
+  const liveLayer = useLiveContentFrame(contentRotation, cardSize, liveSize)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
     cardSize,

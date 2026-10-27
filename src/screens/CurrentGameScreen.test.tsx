@@ -10,6 +10,7 @@ import { prefetchRules } from "@/features/rules/rulesSource"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
+import { seatRows } from "../../test/support/seatRows"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
 
@@ -512,7 +513,7 @@ describe("CurrentGameScreen", () => {
     const menuStyle = StyleSheet.flatten(view.getByTestId("game-menu-anchor").props.style)
     expect(menuStyle).toMatchObject({ left: "50%", top: `${(2 / 3) * 100}%` })
     expect(menuStyle.right).toBeUndefined()
-    expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
+    expect(seatRows()).toHaveLength(3)
 
     fireEvent.press(view.getByTestId("game-menu-button"))
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
@@ -583,7 +584,7 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("layout-button"))
     fireEvent.press(view.getByTestId("layout-tabletop"))
 
-    expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
+    expect(seatRows()).toHaveLength(3)
     await waitFor(() => expect(repository.loadActiveGame()?.layout).toBe("tabletop"))
   })
 

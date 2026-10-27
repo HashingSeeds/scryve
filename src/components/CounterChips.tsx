@@ -239,7 +239,7 @@ export const CounterChips = memo(function CounterChips({
     return () => onSheetOpenChange?.(false)
   }, [onSheetOpenChange, sheetOpen])
 
-  const liveFrame = useLiveContentFrame(contentRotation, liveSize)
+  const liveFrame = useLiveContentFrame(contentRotation, cardSize, liveSize)
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
   const frameWidth = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
