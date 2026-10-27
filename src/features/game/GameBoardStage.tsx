@@ -265,9 +265,18 @@ function PinnedGameBoardStage({
   const menuOpen = menu.open && !menu.exitAction
   const bag = openToolBag(menu.actions)
 
+  const boardStyle = !pinned
+    ? outerDisplay
+      ? [$outerDisplay, outerDisplay]
+      : $fill
+    : [
+        $pinnedBoard,
+        { width, height },
+        outerDisplay && pretendOuterPlacement(outerDisplay, metrics),
+      ]
   const board = (
-    <TurnedBoardContext.Provider value={holderAngle !== 0}>
-      <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
+    <TurnedBoardContext.Provider value={metrics.pinned && metrics.holderAngle !== 0}>
+      <View collapsable={false} style={boardStyle}>
         {renderGrid(boardOrientation)}
         <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
         <Animated.View
@@ -310,13 +319,9 @@ function PinnedGameBoardStage({
   )
   return (
     <View testID={testID} style={$stage}>
-      {outerDisplay ? (
-        <View style={[$outerDisplay, outerDisplay]}>{board}</View>
-      ) : (
-        <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
-          {board}
-        </ScreenPinnedView>
-      )}
+      <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
+        {board}
+      </ScreenPinnedView>
       {windowOverlay}
       {pretending ? <PretendHingeSlider /> : null}
     </View>
@@ -390,6 +395,23 @@ export function firstPlayerTabs(
     const edge = sx === 0 ? "left" : sx === 1 ? "right" : sy === 0 ? "top" : "bottom"
     return { edge, at: edge === "left" || edge === "right" ? sy : sx, facing: facing + rotation }
   })
+}
+
+/** why: the pretend outer display stays inside the pinned view, so the board keeps its place in the tree and its seats are not rebuilt when the pretend Duo opens; it is turned onto the panel to sit upright on the window's right half. */
+function pretendOuterPlacement(display: BoardSize, metrics: ScreenPinnedMetrics): ViewStyle {
+  const panel = { width: metrics.width, height: metrics.height }
+  const sideways = metrics.holderAngle % 180 !== 0
+  const windowWidth = sideways ? panel.height : panel.width
+  const rect = windowRectToPanel(
+    { x: windowWidth - display.width, y: 0, ...display },
+    panel,
+    metrics.holderAngle,
+  )
+  return {
+    left: rect.x + rect.width / 2 - display.width / 2,
+    top: rect.y + rect.height / 2 - display.height / 2,
+    transform: [{ rotate: `${metrics.holderAngle}deg` }],
+  }
 }
 
 // why: the menu sits above its own backdrop, so the layer carrying it along must stack where the cluster did.
