@@ -11,6 +11,7 @@ import {
   asPlayerId,
   createClientId,
   hasLocalGameStarted,
+  isCommanderSlot,
   isLifeDelta,
   localGameAccount,
   MAX_COMMANDER_DAMAGE,
@@ -284,6 +285,7 @@ function parseEvent(value: unknown): GameEvent | null {
       !Number.isInteger(value.delta) ||
       value.delta === 0 ||
       Math.abs(value.delta) > MAX_COMMANDER_DAMAGE ||
+      !isCommanderSlot(value.commander) ||
       (value.compensatesOperationId !== undefined &&
         typeof value.compensatesOperationId !== "string")
     ) {
@@ -294,6 +296,7 @@ function parseEvent(value: unknown): GameEvent | null {
       type: "commanderDamage.assigned",
       fromPlayerId: asPlayerId(value.fromPlayerId),
       toPlayerId: asPlayerId(value.toPlayerId),
+      ...(value.commander ? { commander: value.commander } : {}),
       delta: value.delta,
       ...(typeof value.compensatesOperationId === "string"
         ? { compensatesOperationId: asOperationId(value.compensatesOperationId) }

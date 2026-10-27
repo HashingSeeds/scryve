@@ -31,6 +31,7 @@ import {
   asOperationId,
   asPlayerId,
   isCommanderDamageDelta,
+  isCommanderSlot,
   isLifeDelta,
 } from "../game/domain"
 import type { LifeChangedEvent } from "../game/types"
@@ -141,6 +142,7 @@ function parseCommanderDamageEvent(
     typeof value.fromPlayerId !== "string" ||
     typeof value.toPlayerId !== "string" ||
     value.fromPlayerId === value.toPlayerId ||
+    !isCommanderSlot(value.commander) ||
     !isCommanderDamageDelta(value.delta) ||
     typeof value.actorId !== "string" ||
     typeof value.deviceId !== "string" ||
@@ -157,6 +159,7 @@ function parseCommanderDamageEvent(
     gameId: asGameId(value.gameId),
     fromPlayerId: asPlayerId(value.fromPlayerId),
     toPlayerId: asPlayerId(value.toPlayerId),
+    ...(value.commander ? { commander: value.commander } : {}),
     delta: value.delta,
     actorId: asActorId(value.actorId),
     deviceId: asDeviceId(value.deviceId),
@@ -415,6 +418,7 @@ const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, tr
   compensatesOperationId: true,
   fromPlayerId: true,
   toPlayerId: true,
+  commander: true,
   claimOperationId: true,
   accepted: true,
   action: true,

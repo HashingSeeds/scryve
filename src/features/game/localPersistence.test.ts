@@ -6,6 +6,7 @@ import {
   createLocalGame,
   createRematch,
   defaultCommandContext,
+  PARTNER_COMMANDER,
 } from "./domain"
 import {
   DEFAULT_LOCAL_SETTINGS,
@@ -171,16 +172,29 @@ describe("LocalGameRepository", () => {
       { type: "commanderDamage.assign", fromPlayerId: grace.id, toPlayerId: ada.id, delta: 3 },
       context,
     )
+    game = applyGameCommand(
+      game,
+      {
+        type: "commanderDamage.assign",
+        fromPlayerId: grace.id,
+        toPlayerId: ada.id,
+        commander: PARTNER_COMMANDER,
+        delta: 2,
+      },
+      context,
+    )
 
     repository.saveActiveGame(game)
     const loaded = repository.loadActiveGame()
 
     expect(loaded).toEqual(game)
+    expect(loaded?.events.at(-1)).toMatchObject({ commander: PARTNER_COMMANDER })
     expect(loaded?.commanderDamage).toEqual({
       [commanderDamageKey(ada.id, grace.id)]: 7,
       [commanderDamageKey(grace.id, ada.id)]: 3,
+      [commanderDamageKey(grace.id, ada.id, PARTNER_COMMANDER)]: 2,
     })
-    expect(loaded?.players.map((player) => player.life)).toEqual([37, 33])
+    expect(loaded?.players.map((player) => player.life)).toEqual([35, 33])
   })
 
   it("loads an active game stored in the schema 1 layout and keeps appending to it", () => {

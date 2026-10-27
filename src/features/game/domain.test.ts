@@ -9,6 +9,7 @@ import {
   localOutReason,
   lastPlayerStanding,
   MAX_COMMANDER_DAMAGE,
+  PARTNER_COMMANDER,
   asDeviceId,
   asGameId,
   asOperationId,
@@ -489,6 +490,43 @@ describe("commander damage", () => {
     game = assign(game, 0, 1, 11)
     game = assign(game, 2, 1, 10)
     expect(localOutReason(game, game.players[1].id)).toBeUndefined()
+  })
+
+  it("keeps a partner's damage apart, lethal on its own, and undoes it on its own", () => {
+    const partner = (game: LocalGame, delta: number) =>
+      applyGameCommand(
+        game,
+        {
+          type: "commanderDamage.assign",
+          fromPlayerId: game.players[0].id,
+          toPlayerId: game.players[1].id,
+          commander: PARTNER_COMMANDER,
+          delta,
+        },
+        sharedContext,
+      )
+    let game = partner(assign(commanderGame(2, 40), 0, 1, 11), 10)
+    const [attacker, defender] = game.players.map(({ id }) => id)
+    expect(commanderDamageBetween(game, attacker, defender)).toBe(11)
+    expect(commanderDamageBetween(game, attacker, defender, PARTNER_COMMANDER)).toBe(10)
+    expect(game.players[1].life).toBe(19)
+    expect(localOutReason(game, defender)).toBeUndefined()
+    expect(Object.keys(game.commanderDamage ?? {})).toEqual([
+      `${attacker}>${defender}`,
+      `${attacker}#1>${defender}`,
+    ])
+
+    game = partner(game, 11)
+    expect(localOutReason(game, defender)).toEqual({
+      cause: "commanderDamage",
+      fromPlayerId: attacker,
+      total: 21,
+    })
+
+    game = applyGameCommand(game, { type: "life.undo" }, sharedContext)
+    expect(commanderDamageBetween(game, attacker, defender)).toBe(11)
+    expect(commanderDamageBetween(game, attacker, defender, PARTNER_COMMANDER)).toBe(10)
+    expect(game.events.at(-1)).toMatchObject({ commander: PARTNER_COMMANDER, delta: -11 })
   })
 
   it("names the last player standing once life and commander damage knock out the rest", () => {

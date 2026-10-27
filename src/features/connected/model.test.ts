@@ -81,13 +81,17 @@ describe("connected projection parsing", () => {
         eliminatedByCommanderDamage: false,
       })),
       commanderDamage: {
-        totals: [{ fromPlayerId: "player-1", toPlayerId: "player-2", total: 7 }],
+        totals: [
+          { fromPlayerId: "player-1", toPlayerId: "player-2", total: 7 },
+          { fromPlayerId: "player-1", toPlayerId: "player-2", commander: 1, total: 4 },
+        ],
         pendingClaims: [
           {
             claimId: "claim-1",
             operationId: "operation-1",
             fromPlayerId: "player-1",
             toPlayerId: "player-2",
+            commander: 1,
             delta: 3,
             clientCreatedAt: 1,
             createdAt: 2,
@@ -97,9 +101,13 @@ describe("connected projection parsing", () => {
       },
     })
     expect(projection?.players[0].eliminatedByCommanderDamage).toBe(false)
-    expect(projection?.commanderDamage?.totals[0]).toMatchObject({ total: 7 })
+    expect(projection?.commanderDamage?.totals).toEqual([
+      { fromPlayerId: "player-1", toPlayerId: "player-2", total: 7 },
+      { fromPlayerId: "player-1", toPlayerId: "player-2", commander: 1, total: 4 },
+    ])
     expect(projection?.commanderDamage?.pendingClaims[0]).toMatchObject({
       claimId: "claim-1",
+      commander: 1,
     })
   })
 

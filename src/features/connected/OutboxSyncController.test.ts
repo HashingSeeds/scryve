@@ -388,6 +388,19 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
   })
 
+  it("queues each partner's damage with its own commander slot", () => {
+    const { controller, repository } = harness()
+    controller.submitCommanderDamage("player-1", [
+      { toPlayerId: "player-2", delta: 4 },
+      { toPlayerId: "player-2", commander: 1, delta: 2 },
+    ])
+    const queued = repository
+      .loadOutbox("game-public")
+      .flatMap(({ event }) => (event.type === "commanderDamage.submitted" ? [event] : []))
+    expect(queued.find((event) => event.delta === 4)).not.toHaveProperty("commander")
+    expect(queued.find((event) => event.delta === 2)).toMatchObject({ commander: 1 })
+  })
+
   it("rejects commander damage against the attacking player before enqueueing", () => {
     const { controller, repository } = harness()
     controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-1", delta: 4 }])

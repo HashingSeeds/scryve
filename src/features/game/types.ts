@@ -2,8 +2,11 @@ import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
 import type { PlaySystemId } from "./playSystems"
 import type { RoundClock } from "./roundClock"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
+import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
+
+export type CommanderSlot = typeof PARTNER_COMMANDER | undefined
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name }
 
@@ -47,6 +50,7 @@ export interface CommanderDamageAssignedEvent extends BaseGameEvent {
   type: "commanderDamage.assigned"
   fromPlayerId: PlayerId
   toPlayerId: PlayerId
+  commander?: typeof PARTNER_COMMANDER
   delta: number
   compensatesOperationId?: OperationId
 }
@@ -135,6 +139,7 @@ export type GameCommand =
       type: "commanderDamage.assign"
       fromPlayerId: PlayerId
       toPlayerId: PlayerId
+      commander?: typeof PARTNER_COMMANDER
       delta: number
     }
   | { type: "life.undo" }

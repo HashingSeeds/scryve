@@ -349,7 +349,7 @@ export class OutboxSyncController {
       this.publish()
       return
     }
-    for (const { toPlayerId, delta } of changes) {
+    for (const { toPlayerId, commander, delta } of changes) {
       const now = this.now()
       const action: PendingLifeAction = {
         schemaVersion: 1,
@@ -359,6 +359,7 @@ export class OutboxSyncController {
           gameId: asGameId(this.options.publicId),
           fromPlayerId: asPlayerId(fromPlayerId),
           toPlayerId: asPlayerId(toPlayerId),
+          ...(commander ? { commander } : {}),
           delta,
           actorId: asActorId(this.options.ownerId),
           deviceId: this.options.deviceId,
