@@ -51,6 +51,15 @@ describe("SyncLatency", () => {
     expect(latency.summary()).toEqual({ delivery: expect.objectContaining({ count: 1, p50: 60 }) })
   })
 
+  it("drops changes that piled up while frames were paused instead of timing the pause", () => {
+    const { latency, at } = meter()
+    latency.setAuthority()
+    for (let sequence = 1; sequence <= 17; sequence += 1) latency.remoteChange(0, sequence)
+    at(60_000)
+    latency.painted(17)
+    expect(latency.summary().delivery).toEqual(expect.objectContaining({ count: 1 }))
+  })
+
   it.each(["reply first", "projection first"] as const)(
     "pairs a cloud write with its server time: %s",
     (order) => {

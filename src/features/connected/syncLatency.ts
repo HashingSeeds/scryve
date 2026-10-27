@@ -5,6 +5,8 @@ const MAX_SAMPLES = 2_000
 // why: phone clocks drift a few ms a minute, so a best ping this old no longer pins the offset.
 const CLOCK_STALE_MS = 60_000
 const MAX_TRACKED_WRITES = 32
+// why: changes pile up only while frames are paused, as in a hidden web tab, and timing them would measure the pause.
+const MAX_UNPAINTED = 16
 
 export type SyncTransport = { transport: "cloud" } | { transport: "nearby"; role: "host" | "guest" }
 
@@ -97,6 +99,7 @@ export class SyncLatency {
   }
 
   remoteChange(authorityAt: number, eventSequence: number): void {
+    if (this.unpainted.length >= MAX_UNPAINTED) this.unpainted = []
     this.unpainted.push({ authorityAt, eventSequence })
   }
 
