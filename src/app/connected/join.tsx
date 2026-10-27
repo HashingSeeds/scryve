@@ -18,6 +18,11 @@ const openNearbyLobby = () => router.push("/lan")
 
 export default function JoinRoute() {
   const { code } = useLocalSearchParams<{ code?: string }>()
+  // why: a warm invite link changes the code without remounting this route, and both code fields start from it.
+  return <Join key={code} code={code} />
+}
+
+function Join({ code }: { code?: string }) {
   const { configured } = useAuthAccess()
   // why: cloud and nearby games share the code field, so a typed or scanned code joins whichever game is on this Wi-Fi.
   const [typed, setTyped] = useState(code)
