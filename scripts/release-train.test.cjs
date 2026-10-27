@@ -104,7 +104,7 @@ test("a commit published twice promotes only its newest groups", () => {
   ])
 })
 
-test("shipped PRs come from squash subjects", () => {
+test("shipped PRs come from squash subjects, minus reverted ones", () => {
   assert.deepEqual(
     prNumbers([
       "fix(decks): pasted cards match again (#303)",
@@ -112,6 +112,6 @@ test("shipped PRs come from squash subjects", () => {
       'Revert "fix(decks): pasted cards match again (#303)" (#305)',
       "fix(decks): pasted cards match again (#303)",
     ]),
-    [303, 305],
+    [305],
   )
 })

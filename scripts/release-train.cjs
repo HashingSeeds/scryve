@@ -165,22 +165,29 @@ async function newIssues(candidate) {
   return response.json()
 }
 
+const prNumber = (subject) => /\(#(\d+)\)$/.exec(subject)?.[1]
+
 function prNumbers(subjects) {
-  return [...new Set(subjects.flatMap((subject) => /\(#(\d+)\)$/.exec(subject)?.[1] ?? []))].map(
-    Number,
+  const reverted = new Set(
+    subjects.map((subject) => prNumber(/^Revert "(.*)"/.exec(subject)?.[1] ?? "")),
   )
+  const shipped = subjects.map(prNumber).filter((pr) => pr && !reverted.has(pr))
+  return [...new Set(shipped)].map(Number)
 }
 
 function closedIssues(prs) {
   if (prs.length === 0) return []
   const fields = prs.map(
     (pr) =>
-      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { number } } }`,
+      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { number repository { nameWithOwner } } } }`,
   )
   const query = `{ repository(owner: "HashingSeeds", name: "scryve") { ${fields.join(" ")} } }`
   const { data } = JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`]))
   const issues = Object.values(data.repository).flatMap(
-    (pr) => pr?.closingIssuesReferences.nodes.map((issue) => issue.number) ?? [],
+    (pr) =>
+      pr?.closingIssuesReferences.nodes
+        .filter((issue) => issue.repository.nameWithOwner === "HashingSeeds/scryve")
+        .map((issue) => issue.number) ?? [],
   )
   return [...new Set(issues)]
 }
