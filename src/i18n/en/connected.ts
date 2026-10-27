@@ -293,6 +293,7 @@ const connected = {
         pokemon: "A {{delta}} Prize cards change could not sync",
         lorcana: "A {{delta}} lore change could not sync",
         fab: "A {{delta}} life change could not sync",
+        riftbound: "A {{delta}} point change could not sync",
       },
       commanderDamage: "A {{delta}} commander damage assignment could not sync",
       table: "A table change could not sync",

@@ -92,6 +92,7 @@ function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"
     pokemon: actions.setup,
     lorcana: actions.status,
     fab: actions.rules,
+    riftbound: actions.connect,
   } satisfies Record<SystemId, string>
   return markers[isSystemId(game) ? game : DEFAULT_DECK_GAME]
 }

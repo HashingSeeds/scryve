@@ -143,6 +143,7 @@ export default {
       pokemon: "サイドが同じ",
       lorcana: "ロアが同じ",
       fab: "ライフが同じ",
+      riftbound: "ポイント同点",
     },
     leads: {
       none: "{{name}}さんがライフでリード",
@@ -151,6 +152,7 @@ export default {
       pokemon: "{{name}}さんがサイドでリード",
       lorcana: "{{name}}さんがロアでリード",
       fab: "{{name}}さんがライフでリード",
+      riftbound: "{{name}}がポイントでリード",
     },
   },
   clock: {
@@ -399,6 +401,7 @@ export default {
       pokemon: "サイド",
       lorcana: "ロア",
       fab: "ライフ",
+      riftbound: "ポイント",
     },
     openCalculator: "{{identity}}の電卓を開く",
   },
@@ -412,6 +415,7 @@ export default {
       pokemon: "タップで{{identity}}のサイドを{{delta}}変更します。長押しでその他の操作。",
       lorcana: "タップで{{identity}}のロアを{{delta}}変更します。長押しでその他の操作。",
       fab: "タップで{{identity}}のライフを{{delta}}変更します。長押しでその他の操作。",
+      riftbound: "タップで{{identity}}のポイントを{{delta}}変更します。長押しでその他の操作。",
     },
     moreControls: {
       none: "{{identity}}、ライフのその他の操作",
@@ -420,6 +424,7 @@ export default {
       pokemon: "{{identity}}、サイドのその他の操作",
       lorcana: "{{identity}}、ロアのその他の操作",
       fab: "{{identity}}、ライフのその他の操作",
+      riftbound: "{{identity}}、その他のポイント操作",
     },
   },
   grid: {
@@ -430,6 +435,7 @@ export default {
       pokemon_other: "{{count}}人用サイド一覧",
       lorcana_other: "{{count}}人用ロア一覧",
       fab_other: "{{count}}人用ライフ一覧",
+      riftbound_other: "{{count}}人のプレイヤーのポイント一覧",
     },
   },
   pokemonSheet: {
@@ -519,6 +525,7 @@ export default {
       pokemon: "{{name}}のサイド変更",
       lorcana: "{{name}}のロア変更",
       fab: "{{name}}のライフ変更",
+      riftbound: "{{name}}のポイント変更",
     },
     add: {
       none: "ライフを{{amount}}増やす",
@@ -527,6 +534,7 @@ export default {
       pokemon: "サイドを{{amount}}枚増やす",
       lorcana: "ロアを{{amount}}増やす",
       fab: "ライフを{{amount}}増やす",
+      riftbound: "{{amount}}ポイントを加算",
     },
     subtract: {
       none: "ライフを{{amount}}減らす",
@@ -535,6 +543,7 @@ export default {
       pokemon: "サイドを{{amount}}枚減らす",
       lorcana: "ロアを{{amount}}減らす",
       fab: "ライフを{{amount}}減らす",
+      riftbound: "{{amount}}ポイントを減算",
     },
   },
 } satisfies LocaleNamespace

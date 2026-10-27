@@ -6,6 +6,7 @@ export const MAX_CARD_FACETS = 32
 export const MAX_CATALOG_BATCH = 25
 export const MAX_DATASET_BATCH = 100
 const DATASET_REQUEST_TIMEOUT_MS = 120_000
+export const SCRYVE_USER_AGENT = "Scryve/1.0 (+https://scryve.sow.care)"
 
 export type CardFace = {
   index: number
@@ -136,7 +137,7 @@ export function httpsUrl(value: unknown) {
 
 export async function fetchDatasetJson(url: string): Promise<unknown> {
   const response = await fetch(url, {
-    headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
+    headers: { "Accept": "application/json", "User-Agent": SCRYVE_USER_AGENT },
     signal: AbortSignal.timeout(DATASET_REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw Object.assign(new Error(`Dataset fetch failed: ${url}`), { response })

@@ -19,7 +19,7 @@ describe("system definitions", () => {
     expect(hasCommandZone("mtg", "brawl")).toBe(true)
   })
 
-  it("picks an identity card in Commander and every Flesh and Blood format, and only Commander runs the Commander picker", () => {
+  it("picks an identity card in Commander, Flesh and Blood, and Riftbound, and only Commander runs the Commander picker", () => {
     const identities = SYSTEM_IDS.flatMap((system) =>
       SYSTEMS[system].formats.flatMap((format) => {
         const section = identitySection(system, format.id)
@@ -29,6 +29,7 @@ describe("system definitions", () => {
     expect(identities).toEqual([
       "mtg:commander:commander",
       ...SYSTEMS.fab.formats.map(({ id }) => `fab:${id}:hero`),
+      "riftbound:constructed:legend",
     ])
     expect(
       SYSTEM_IDS.flatMap((system) =>

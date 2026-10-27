@@ -10,6 +10,7 @@ export default {
     pokemon: "Cartes Récompense",
     lorcana: "Lore",
     fab: "Points de vie",
+    riftbound: "Points",
   },
   counterLabel: {
     none: "points de vie",
@@ -18,6 +19,7 @@ export default {
     pokemon: "cartes Récompense",
     lorcana: "éclats de Lore",
     fab: "points de vie",
+    riftbound: "points",
   },
   startingValueRange: {
     none: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
@@ -26,6 +28,7 @@ export default {
     pokemon: "Les cartes Récompense de départ doivent être un nombre entier de 1 à {{max}}.",
     lorcana: "Le Lore de départ doit être un nombre entier de 0 à {{max}}.",
     fab: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
+    riftbound: "Les points de départ doivent être un nombre entier de 0 à {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -43,12 +46,17 @@ export default {
     side: "Side Deck",
     hero: "Héros",
     arena: "Arène",
+    legend: "Légende",
+    champion: "Champion choisi",
+    battlefields: "Champs de bataille",
+    runes: "Deck de Runes",
     main: {
       mtg: "Main Deck",
       ygo: "Main Deck",
       pokemon: "Deck",
       lorcana: "Deck",
       fab: "Deck",
+      riftbound: "Deck principal",
     },
   },
   formatBlurb: {
@@ -71,6 +79,9 @@ export default {
       ll: "Légendes autorisées",
       upf: "Multijoueur",
     },
+    riftbound: {
+      constructed: "40 cartes, 3 exemplaires",
+    },
   },
   counterValue: {
     none_one: "{{count}} point de vie",
@@ -91,6 +102,9 @@ export default {
     fab_one: "{{count}} point de vie",
     fab_many: "{{count}} de points de vie",
     fab_other: "{{count}} points de vie",
+    riftbound_one: "{{count}} point",
+    riftbound_many: "{{count}} de points",
+    riftbound_other: "{{count}} points",
   },
   counterChange: {
     none_one: "{{count}} changement de points de vie",
@@ -111,6 +125,9 @@ export default {
     fab_one: "{{count}} changement de points de vie",
     fab_many: "{{count}} de changements de points de vie",
     fab_other: "{{count}} changements de points de vie",
+    riftbound_one: "{{count}} changement de points",
+    riftbound_many: "{{count}} de changements de points",
+    riftbound_other: "{{count}} changements de points",
   },
   noneTaken: "aucune carte Récompense récupérée",
   taken: "{{amount}} Récompenses récupérées",

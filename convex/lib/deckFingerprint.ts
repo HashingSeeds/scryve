@@ -17,6 +17,7 @@ const DEFAULT_NAMESPACES: Record<string, string> = {
   pokemon: "tcgdex-card",
   lorcana: "lorcanajson-card",
   fab: "fab-cube-card",
+  riftbound: "riftbound-card",
 }
 
 export function canonicalDecklist(cards: readonly FingerprintCard[]) {

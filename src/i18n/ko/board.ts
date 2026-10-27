@@ -142,6 +142,7 @@ export default {
       pokemon: "프라이즈 동점",
       lorcana: "로어 동점",
       fab: "생명점 동점",
+      riftbound: "점수 동점",
     },
     leads: {
       none: "{{name}}님이 생명점에서 앞섭니다",
@@ -150,6 +151,7 @@ export default {
       pokemon: "{{name}}님이 프라이즈에서 앞섭니다",
       lorcana: "{{name}}님이 로어에서 앞섭니다",
       fab: "{{name}}님이 생명점에서 앞섭니다",
+      riftbound: "{{name}}님이 점수에서 앞서고 있습니다",
     },
   },
   clock: {
@@ -398,6 +400,7 @@ export default {
       pokemon: "프라이즈",
       lorcana: "로어",
       fab: "생명점",
+      riftbound: "점수",
     },
     openCalculator: "{{identity}}의 계산기 열기",
   },
@@ -413,6 +416,8 @@ export default {
       lorcana:
         "탭하면 {{identity}}의 로어가 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
       fab: "탭하면 {{identity}}의 생명점이 {{delta}} 변경됩니다. 길게 누르면 더 많은 조작이 나옵니다.",
+      riftbound:
+        "탭하면 {{identity}}의 점수가 {{delta}}만큼 변경됩니다. 길게 누르면 더 많은 조작이 나타납니다.",
     },
     moreControls: {
       none: "{{identity}}, 생명점 추가 조작",
@@ -421,6 +426,7 @@ export default {
       pokemon: "{{identity}}, 프라이즈 추가 조작",
       lorcana: "{{identity}}, 로어 추가 조작",
       fab: "{{identity}}, 생명점 추가 조작",
+      riftbound: "{{identity}}, 점수 조작 더 보기",
     },
   },
   grid: {
@@ -431,6 +437,7 @@ export default {
       pokemon_other: "{{count}}인 프라이즈 표",
       lorcana_other: "{{count}}인 로어 표",
       fab_other: "{{count}}인 생명점 표",
+      riftbound_other: "플레이어 {{count}}명 점수 그리드",
     },
   },
   pokemonSheet: {
@@ -520,6 +527,7 @@ export default {
       pokemon: "{{name}} 프라이즈 변경",
       lorcana: "{{name}} 로어 변경",
       fab: "{{name}} 생명점 변경",
+      riftbound: "{{name}} 점수 변경",
     },
     add: {
       none: "생명점 {{amount}} 추가",
@@ -528,6 +536,7 @@ export default {
       pokemon: "프라이즈 {{amount}}장 추가",
       lorcana: "로어 {{amount}} 추가",
       fab: "생명점 {{amount}} 추가",
+      riftbound: "{{amount}}점 추가",
     },
     subtract: {
       none: "생명점 {{amount}} 차감",
@@ -536,6 +545,7 @@ export default {
       pokemon: "프라이즈 {{amount}}장 차감",
       lorcana: "로어 {{amount}} 차감",
       fab: "생명점 {{amount}} 차감",
+      riftbound: "{{amount}}점 차감",
     },
   },
 } satisfies LocaleNamespace

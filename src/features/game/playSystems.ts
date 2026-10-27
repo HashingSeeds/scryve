@@ -43,6 +43,7 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
   pokemon: playRulesFor("pokemon"),
   lorcana: playRulesFor("lorcana"),
   fab: playRulesFor("fab"),
+  riftbound: playRulesFor("riftbound"),
 }
 
 const GENERIC_COUNTER: CounterRules = {

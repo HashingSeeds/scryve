@@ -7,6 +7,7 @@ const systems = {
     pokemon: "Prize cards",
     lorcana: "Lore",
     fab: "Life",
+    riftbound: "Points",
   },
   // Lowercase noun that follows a number in other strings, as in "add 5 life".
   counterLabel: {
@@ -16,6 +17,7 @@ const systems = {
     pokemon: "Prize cards",
     lorcana: "lore",
     fab: "life",
+    riftbound: "points",
   },
   startingValueRange: {
     none: "Starting life must be a whole number from 1 to {{max}}.",
@@ -24,6 +26,7 @@ const systems = {
     pokemon: "Starting Prize cards must be a whole number from 1 to {{max}}.",
     lorcana: "Starting lore must be a whole number from 0 to {{max}}.",
     fab: "Starting life must be a whole number from 1 to {{max}}.",
+    riftbound: "Starting points must be a whole number from 0 to {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -43,12 +46,19 @@ const systems = {
     side: "Side Deck",
     hero: "Hero",
     arena: "Arena",
+    // Riftbound: the deck's Legend card, which sets its two domains.
+    legend: "Legend",
+    // Riftbound: the champion unit that starts the game on the table.
+    champion: "Chosen Champion",
+    battlefields: "Battlefields",
+    runes: "Rune deck",
     main: {
       mtg: "Main deck",
       ygo: "Main Deck",
       pokemon: "Deck",
       lorcana: "Deck",
       fab: "Deck",
+      riftbound: "Main deck",
     },
   },
   formatBlurb: {
@@ -71,6 +81,9 @@ const systems = {
       ll: "Legends allowed",
       upf: "Multiplayer",
     },
+    riftbound: {
+      constructed: "40 cards, 3 copies",
+    },
   },
   counterValue: {
     none_one: "{{count}} life",
@@ -85,6 +98,8 @@ const systems = {
     lorcana_other: "{{count}} lore",
     fab_one: "{{count}} life",
     fab_other: "{{count}} life",
+    riftbound_one: "{{count}} point",
+    riftbound_other: "{{count}} points",
   },
   counterChange: {
     none_one: "{{count}} life change",
@@ -99,6 +114,8 @@ const systems = {
     lorcana_other: "{{count}} lore changes",
     fab_one: "{{count}} life change",
     fab_other: "{{count}} life changes",
+    riftbound_one: "{{count}} point change",
+    riftbound_other: "{{count}} point changes",
   },
   // Pokémon only: no Prize cards taken yet.
   noneTaken: "no prizes taken",

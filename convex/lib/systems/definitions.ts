@@ -163,7 +163,16 @@ const FAB_SECTIONS = [
   { id: "main", label: "Deck" },
 ] as const
 
-export const SYSTEM_IDS = ["mtg", "ygo", "pokemon", "lorcana", "fab"] as const
+const RIFTBOUND_SECTIONS = [
+  { id: "legend", label: "Legend", identity: true },
+  { id: "champion", label: "Chosen Champion" },
+  { id: "main", label: "Main deck" },
+  { id: "battlefields", label: "Battlefields" },
+  { id: "runes", label: "Rune deck" },
+  { id: "sideboard", label: "Sideboard" },
+] as const
+
+export const SYSTEM_IDS = ["mtg", "ygo", "pokemon", "lorcana", "fab", "riftbound"] as const
 export type SystemId = (typeof SYSTEM_IDS)[number]
 
 export const SYSTEMS = {
@@ -519,6 +528,70 @@ export const SYSTEMS = {
           "Scryve is in no way affiliated with Legend Story Studios. Legend Story Studios®, Flesh and Blood™, and set names are trademarks of Legend Story Studios. Flesh and Blood characters, cards, logos, and art are property of Legend Story Studios.",
         ],
         imageCredit: "© Legend Story Studios",
+      },
+    },
+  },
+  riftbound: {
+    label: "Riftbound",
+    shortLabel: "Riftbound",
+    release: "alpha",
+    defaultFormat: { deck: "constructed", play: "constructed" },
+    counter: {
+      label: "points",
+      heading: "Points",
+      singular: "point",
+      plural: "points",
+      defaultValue: 0,
+      presets: [0],
+      tapStep: 1,
+      quickAdjustments: [2, 1],
+      scrubStep: 1,
+      scrubSteps: 8,
+      goal: { kind: "race", to: 8 },
+      maxStartingValue: 7,
+      flooredAtZero: true,
+    },
+    formats: [
+      {
+        id: "constructed",
+        label: "Constructed",
+        blurb: "40 cards, 3 copies",
+        sections: RIFTBOUND_SECTIONS,
+      },
+    ],
+    table: { counters: [], designations: [] },
+    variants: [],
+    firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
+    roundClock: { minutes: 50, endOfRoundTurns: 3 },
+    deckAnalysis: false,
+    resultTracking: false,
+    integration: {
+      identityNamespace: "riftbound-card",
+      capabilities: {
+        integration: available("scryve"),
+        cardCatalog: available("rifthunt", "Synced from the RiftHunt bulk export."),
+        deckImport: available("rifthunt"),
+        exampleDecks: {
+          technical: "unavailable",
+          release: "disabled",
+          provider: "riot",
+          note: "No deck source until Riot approves the API key.",
+        },
+        images: available("riot", "Functional card context only."),
+        playTracking: available("scryve"),
+        aggregateMetagameStats: {
+          technical: "available",
+          release: "disabled",
+          note: "Riot prohibits publishing or retaining metagame-defining statistics.",
+        },
+      },
+      rights: {
+        review: "permission_pending",
+        basis: "fair_use",
+        imageUse: "functional_card_context",
+        requiredNotices: [
+          "Riftbound, card names, card text, card artwork, characters, and related marks are property of Riot Games. Scryve is not affiliated with, endorsed, or sponsored by Riot Games.",
+        ],
       },
     },
   },

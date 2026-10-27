@@ -144,6 +144,7 @@ export default {
       pokemon: "प्राइज़ कार्ड बराबर",
       lorcana: "लोर बराबर",
       fab: "लाइफ़ बराबर",
+      riftbound: "पॉइंट पर बराबरी",
     },
     leads: {
       none: "{{name}} लाइफ़ में आगे हैं",
@@ -152,6 +153,7 @@ export default {
       pokemon: "{{name}} प्राइज़ कार्ड में आगे हैं",
       lorcana: "{{name}} लोर में आगे हैं",
       fab: "{{name}} लाइफ़ में आगे हैं",
+      riftbound: "{{name}} पॉइंट में आगे हैं",
     },
   },
   clock: {
@@ -410,6 +412,7 @@ export default {
       pokemon: "प्राइज़ कार्ड",
       lorcana: "लोर",
       fab: "लाइफ़",
+      riftbound: "पॉइंट",
     },
     openCalculator: "{{identity}} के लिए कैलकुलेटर खोलें",
   },
@@ -425,6 +428,8 @@ export default {
       lorcana:
         "{{identity}} का लोर {{delta}} बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
       fab: "{{identity}} की लाइफ़ {{delta}} बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
+      riftbound:
+        "{{identity}} के पॉइंट {{delta}} से बदलने के लिए टैप करें। और विकल्पों के लिए देर तक दबाएँ।",
     },
     moreControls: {
       none: "{{identity}}, लाइफ़ के और विकल्प",
@@ -433,6 +438,7 @@ export default {
       pokemon: "{{identity}}, प्राइज़ कार्ड के और विकल्प",
       lorcana: "{{identity}}, लोर के और विकल्प",
       fab: "{{identity}}, लाइफ़ के और विकल्प",
+      riftbound: "{{identity}}, और पॉइंट कंट्रोल",
     },
   },
   grid: {
@@ -449,6 +455,8 @@ export default {
       lorcana_other: "{{count}} खिलाड़ियों की लोर ग्रिड",
       fab_one: "{{count}} खिलाड़ी की लाइफ़ ग्रिड",
       fab_other: "{{count}} खिलाड़ियों की लाइफ़ ग्रिड",
+      riftbound_one: "{{count}} खिलाड़ी का पॉइंट ग्रिड",
+      riftbound_other: "{{count}} खिलाड़ियों का पॉइंट ग्रिड",
     },
   },
   pokemonSheet: {
@@ -539,6 +547,7 @@ export default {
       pokemon: "{{name}} के प्राइज़ कार्ड में बदलाव",
       lorcana: "{{name}} के लोर में बदलाव",
       fab: "{{name}} की लाइफ़ में बदलाव",
+      riftbound: "{{name}} का पॉइंट बदलाव",
     },
     add: {
       none: "{{amount}} लाइफ़ जोड़ें",
@@ -547,6 +556,7 @@ export default {
       pokemon: "{{amount}} प्राइज़ कार्ड जोड़ें",
       lorcana: "{{amount}} लोर जोड़ें",
       fab: "{{amount}} लाइफ़ जोड़ें",
+      riftbound: "{{amount}} पॉइंट जोड़ें",
     },
     subtract: {
       none: "{{amount}} लाइफ़ घटाएँ",
@@ -555,6 +565,7 @@ export default {
       pokemon: "{{amount}} प्राइज़ कार्ड घटाएँ",
       lorcana: "{{amount}} लोर घटाएँ",
       fab: "{{amount}} लाइफ़ घटाएँ",
+      riftbound: "{{amount}} पॉइंट घटाएँ",
     },
   },
 } satisfies LocaleNamespace

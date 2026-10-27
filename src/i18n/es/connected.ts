@@ -304,6 +304,7 @@ export default {
         pokemon: "No se pudo sincronizar un cambio de {{delta}} cartas de Premio",
         lorcana: "No se pudo sincronizar un cambio de {{delta}} puntos de leyenda",
         fab: "No se pudo sincronizar un cambio de {{delta}} vidas",
+        riftbound: "No se pudo sincronizar un cambio de {{delta}} puntos",
       },
       commanderDamage: "No se pudo sincronizar una asignación de {{delta}} de daño de comandante",
       table: "No se pudo sincronizar un cambio en la mesa",

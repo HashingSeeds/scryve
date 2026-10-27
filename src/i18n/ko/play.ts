@@ -156,6 +156,7 @@ export default {
       pokemon: "최종 프라이즈",
       lorcana: "최종 로어",
       fab: "최종 생명점",
+      riftbound: "최종 점수",
     },
     noWinner: "이 게임에는 기록된 승자가 없습니다.",
     reportPlayer: "플레이어 신고 또는 차단",
@@ -178,6 +179,7 @@ export default {
         pokemon: "프라이즈 변동 불러오는 중",
         lorcana: "로어 변동 불러오는 중",
         fab: "생명점 변동 불러오는 중",
+        riftbound: "점수 변동 불러오는 중",
       },
       heading: {
         none: "생명점 변동 · {{changes}}",
@@ -186,6 +188,7 @@ export default {
         pokemon: "프라이즈 변동 · {{changes}}",
         lorcana: "로어 변동 · {{changes}}",
         fab: "생명점 변동 · {{changes}}",
+        riftbound: "점수 변동 · {{changes}}",
       },
       noChanges: {
         none: "기록된 생명점 변동이 없습니다.",
@@ -194,6 +197,7 @@ export default {
         pokemon: "기록된 프라이즈 변동이 없습니다.",
         lorcana: "기록된 로어 변동이 없습니다.",
         fab: "기록된 생명점 변동이 없습니다.",
+        riftbound: "기록된 점수 변동이 없습니다.",
       },
       loadFailed: {
         none: "생명점 변동을 불러올 수 없습니다.",
@@ -202,6 +206,7 @@ export default {
         pokemon: "프라이즈 변동을 불러올 수 없습니다.",
         lorcana: "로어 변동을 불러올 수 없습니다.",
         fab: "생명점 변동을 불러올 수 없습니다.",
+        riftbound: "점수 변동을 불러오지 못했습니다.",
       },
       detailsUnavailable: {
         none: "생명점 변화 상세 정보를 사용할 수 없습니다.",
@@ -210,6 +215,7 @@ export default {
         pokemon: "프라이즈 변화 상세 정보를 사용할 수 없습니다.",
         lorcana: "로어 변화 상세 정보를 사용할 수 없습니다.",
         fab: "생명점 변화 상세 정보를 사용할 수 없습니다.",
+        riftbound: "점수 변동 상세 정보를 사용할 수 없습니다.",
       },
       noDetails: {
         none: "생명점 변화 상세 정보가 없습니다.",
@@ -218,6 +224,7 @@ export default {
         pokemon: "프라이즈 변화 상세 정보가 없습니다.",
         lorcana: "로어 변화 상세 정보가 없습니다.",
         fab: "생명점 변화 상세 정보가 없습니다.",
+        riftbound: "점수 변동 상세 정보를 찾지 못했습니다.",
       },
     },
   },

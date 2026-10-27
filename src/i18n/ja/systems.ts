@@ -10,6 +10,7 @@ export default {
     pokemon: "サイド",
     lorcana: "ロア",
     fab: "ライフ",
+    riftbound: "ポイント",
   },
   counterLabel: {
     none: "ライフ",
@@ -18,6 +19,7 @@ export default {
     pokemon: "サイド",
     lorcana: "ロア",
     fab: "ライフ",
+    riftbound: "ポイント",
   },
   startingValueRange: {
     none: "開始時のライフは1から{{max}}までの整数にしてください。",
@@ -26,6 +28,7 @@ export default {
     pokemon: "開始時のサイドは1から{{max}}までの整数にしてください。",
     lorcana: "開始時のロアは0から{{max}}までの整数にしてください。",
     fab: "開始時のライフは1から{{max}}までの整数にしてください。",
+    riftbound: "初期ポイントは0から{{max}}までの整数にしてください。",
   },
   tableItem: {
     poison: "毒",
@@ -43,12 +46,17 @@ export default {
     side: "サイドデッキ",
     hero: "ヒーロー",
     arena: "闘技場",
+    legend: "レジェンド",
+    champion: "チョーズン・チャンピオン",
+    battlefields: "バトルフィールド",
+    runes: "ルーンデッキ",
     main: {
       mtg: "メインデッキ",
       ygo: "メインデッキ",
       pokemon: "デッキ",
       lorcana: "デッキ",
       fab: "デッキ",
+      riftbound: "メインデッキ",
     },
   },
   formatBlurb: {
@@ -71,6 +79,9 @@ export default {
       ll: "リビングレジェンド可",
       upf: "多人数戦",
     },
+    riftbound: {
+      constructed: "40枚、同名カード3枚まで",
+    },
   },
   counterValue: {
     none_other: "ライフ{{count}}",
@@ -79,6 +90,7 @@ export default {
     pokemon_other: "サイド{{count}}枚",
     lorcana_other: "{{count}}ロア",
     fab_other: "ライフ{{count}}",
+    riftbound_other: "{{count}}ポイント",
   },
   counterChange: {
     none_other: "ライフ変動{{count}}回",
@@ -87,6 +99,7 @@ export default {
     pokemon_other: "サイド変動{{count}}回",
     lorcana_other: "ロア変動{{count}}回",
     fab_other: "ライフ変動{{count}}回",
+    riftbound_other: "{{count}}ポイントの増減",
   },
   noneTaken: "サイドをとっていません",
   taken: "サイドを{{amount}}枚とりました",

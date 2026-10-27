@@ -36,7 +36,7 @@ const LOWERCASE_LATIN_ALLOWED = new Set(["v", "vs", "to"])
 const GENERATED_HEADER =
   "// why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.\n"
 
-const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Flesh and Blood).
+const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Flesh and Blood, Riftbound).
 
 Rules:
 - Keep each string short and natural for a phone screen. Match the English tone: plain, direct, no added enthusiasm.

@@ -50,6 +50,7 @@ export const normalizedCardValidator = v.object({
     v.literal("pokemon"),
     v.literal("lorcana"),
     v.literal("fab"),
+    v.literal("riftbound"),
   ),
   identityNamespace: v.string(),
   cardId: v.string(),

@@ -4,6 +4,7 @@ import { FAB_CUBE_DATASET, FAB_DECK_LIST, FAB_PRECON_FEED } from "./fleshAndBloo
 import { LIMITLESS_FEED, LIMITLESS_LINK } from "./limitless"
 import { LORCANA_DECK_LIST, LORCANA_JSON_DATASET, LORCANA_STARTER_DECKS } from "./lorcana"
 import { POKEMON_DECK_LIST, TCGDEX_CATALOG } from "./pokemon"
+import { RIFTBOUND_DECK_LIST, RIFTHUNT_DATASET } from "./riftbound"
 import { YGOPRODECK_CATALOG } from "./yugioh"
 import { YDK_DECK_LIST, YGOPRODECK_FEED, YGOPRODECK_LINK } from "./yugiohDecks"
 import type { GameSystemId } from "../integrations"
@@ -41,6 +42,12 @@ export const GAME_PROVIDERS: Readonly<Record<ProviderGame, GameProvider>> = {
     deckList: FAB_DECK_LIST,
     deckLink: null,
     deckFeed: FAB_PRECON_FEED,
+  },
+  riftbound: {
+    catalog: { bulk: RIFTHUNT_DATASET },
+    deckList: RIFTBOUND_DECK_LIST,
+    deckLink: null,
+    deckFeed: null,
   },
 }
 

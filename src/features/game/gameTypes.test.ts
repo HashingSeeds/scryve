@@ -40,7 +40,14 @@ describe("newGameTypes", () => {
   it("groups the rest by game, each game's headline format first", () => {
     const { more } = newGameTypes({ connected: false })
 
-    expect(more.map(({ system }) => system)).toEqual(["mtg", "ygo", "pokemon", "lorcana", "fab"])
+    expect(more.map(({ system }) => system)).toEqual([
+      "mtg",
+      "ygo",
+      "pokemon",
+      "lorcana",
+      "fab",
+      "riftbound",
+    ])
     expect(ids(more.find(({ system }) => system === "ygo")?.types ?? [])).toEqual([
       "ygo-advanced",
       "ygo-traditional",

@@ -146,6 +146,7 @@ export default {
       pokemon: "Empate en cartas de Premio",
       lorcana: "Empate en leyenda",
       fab: "Empate en vidas",
+      riftbound: "Empate a puntos",
     },
     leads: {
       none: "{{name}} lidera en vidas",
@@ -154,6 +155,7 @@ export default {
       pokemon: "{{name}} lidera en cartas de Premio",
       lorcana: "{{name}} lidera en leyenda",
       fab: "{{name}} lidera en vidas",
+      riftbound: "{{name}} lidera en puntos",
     },
   },
   clock: {
@@ -426,6 +428,7 @@ export default {
       pokemon: "cartas de Premio",
       lorcana: "leyenda",
       fab: "vidas",
+      riftbound: "puntos",
     },
     openCalculator: "Abrir la calculadora de {{identity}}",
   },
@@ -441,6 +444,8 @@ export default {
       lorcana:
         "Toca para cambiar la leyenda de {{identity}} en {{delta}}. Mantén presionado para ver más controles.",
       fab: "Toca para cambiar las vidas de {{identity}} en {{delta}}. Mantén presionado para ver más controles.",
+      riftbound:
+        "Toca para cambiar los puntos de {{identity}} en {{delta}}. Mantén presionado para ver más controles.",
     },
     moreControls: {
       none: "{{identity}}, más controles de vidas",
@@ -449,6 +454,7 @@ export default {
       pokemon: "{{identity}}, más controles de cartas de Premio",
       lorcana: "{{identity}}, más controles de leyenda",
       fab: "{{identity}}, más controles de vidas",
+      riftbound: "{{identity}}, más controles de puntos",
     },
   },
   grid: {
@@ -471,6 +477,9 @@ export default {
       fab_one: "Cuadrícula de vidas de {{count}} jugador",
       fab_many: "Cuadrícula de vidas de {{count}} jugadores",
       fab_other: "Cuadrícula de vidas de {{count}} jugadores",
+      riftbound_one: "Cuadrícula de puntos de {{count}} jugador",
+      riftbound_many: "Cuadrícula de puntos de {{count}} jugadores",
+      riftbound_other: "Cuadrícula de puntos de {{count}} jugadores",
     },
   },
   pokemonSheet: {
@@ -562,6 +571,7 @@ export default {
       pokemon: "Cambio de cartas de Premio de {{name}}",
       lorcana: "Cambio de leyenda de {{name}}",
       fab: "Cambio de vidas de {{name}}",
+      riftbound: "Cambio de puntos de {{name}}",
     },
     add: {
       none: "Sumar {{amount}} a las vidas",
@@ -570,6 +580,7 @@ export default {
       pokemon: "Sumar {{amount}} a las cartas de Premio",
       lorcana: "Sumar {{amount}} a la leyenda",
       fab: "Sumar {{amount}} a las vidas",
+      riftbound: "Sumar {{amount}} a los puntos",
     },
     subtract: {
       none: "Restar {{amount}} de las vidas",
@@ -578,6 +589,7 @@ export default {
       pokemon: "Restar {{amount}} de las cartas de Premio",
       lorcana: "Restar {{amount}} de la leyenda",
       fab: "Restar {{amount}} de las vidas",
+      riftbound: "Restar {{amount}} a los puntos",
     },
   },
 } satisfies LocaleNamespace

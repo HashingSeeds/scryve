@@ -165,6 +165,7 @@ const play = {
       pokemon: "Final Prize cards",
       lorcana: "Final lore",
       fab: "Final Life",
+      riftbound: "Final points",
     },
     noWinner: "No winner was recorded for this game.",
     reportPlayer: "Report or block a player",
@@ -187,6 +188,7 @@ const play = {
         pokemon: "Loading Prize cards changes",
         lorcana: "Loading lore changes",
         fab: "Loading life changes",
+        riftbound: "Loading point changes",
       },
       heading: {
         none: "Life changes · {{changes}}",
@@ -195,6 +197,7 @@ const play = {
         pokemon: "Prize cards changes · {{changes}}",
         lorcana: "Lore changes · {{changes}}",
         fab: "Life changes · {{changes}}",
+        riftbound: "Point changes · {{changes}}",
       },
       noChanges: {
         none: "No life changes were recorded.",
@@ -203,6 +206,7 @@ const play = {
         pokemon: "No Prize cards changes were recorded.",
         lorcana: "No lore changes were recorded.",
         fab: "No life changes were recorded.",
+        riftbound: "No point changes were recorded.",
       },
       loadFailed: {
         none: "Could not load life changes.",
@@ -211,6 +215,7 @@ const play = {
         pokemon: "Could not load Prize cards changes.",
         lorcana: "Could not load lore changes.",
         fab: "Could not load life changes.",
+        riftbound: "Could not load point changes.",
       },
       detailsUnavailable: {
         none: "Life change details are unavailable.",
@@ -219,6 +224,7 @@ const play = {
         pokemon: "Prize cards change details are unavailable.",
         lorcana: "Lore change details are unavailable.",
         fab: "Life change details are unavailable.",
+        riftbound: "Point change details are unavailable.",
       },
       noDetails: {
         none: "No life change details were found.",
@@ -227,6 +233,7 @@ const play = {
         pokemon: "No Prize cards change details were found.",
         lorcana: "No lore change details were found.",
         fab: "No life change details were found.",
+        riftbound: "No point change details were found.",
       },
     },
   },

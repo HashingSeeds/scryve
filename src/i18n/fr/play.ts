@@ -166,6 +166,7 @@ export default {
       pokemon: "Cartes Récompense finales",
       lorcana: "Lore final",
       fab: "Points de vie finaux",
+      riftbound: "Points finaux",
     },
     noWinner: "Aucun vainqueur n'a été enregistré pour cette partie.",
     reportPlayer: "Signaler ou bloquer un joueur",
@@ -188,6 +189,7 @@ export default {
         pokemon: "Chargement des changements de cartes Récompense",
         lorcana: "Chargement des changements de Lore",
         fab: "Chargement des changements de points de vie",
+        riftbound: "Chargement des changements de points",
       },
       heading: {
         none: "Changements de points de vie · {{changes}}",
@@ -196,6 +198,7 @@ export default {
         pokemon: "Changements de cartes Récompense · {{changes}}",
         lorcana: "Changements de Lore · {{changes}}",
         fab: "Changements de points de vie · {{changes}}",
+        riftbound: "Changements de points · {{changes}}",
       },
       noChanges: {
         none: "Aucun changement de points de vie n'a été enregistré.",
@@ -204,6 +207,7 @@ export default {
         pokemon: "Aucun changement de cartes Récompense n'a été enregistré.",
         lorcana: "Aucun changement de Lore n'a été enregistré.",
         fab: "Aucun changement de points de vie n'a été enregistré.",
+        riftbound: "Aucun changement de points n'a été enregistré.",
       },
       loadFailed: {
         none: "Impossible de charger les changements de points de vie.",
@@ -212,6 +216,7 @@ export default {
         pokemon: "Impossible de charger les changements de cartes Récompense.",
         lorcana: "Impossible de charger les changements de Lore.",
         fab: "Impossible de charger les changements de points de vie.",
+        riftbound: "Impossible de charger les changements de points.",
       },
       detailsUnavailable: {
         none: "Les détails des changements de points de vie ne sont pas disponibles.",
@@ -220,6 +225,7 @@ export default {
         pokemon: "Les détails des changements de cartes Récompense ne sont pas disponibles.",
         lorcana: "Les détails des changements de Lore ne sont pas disponibles.",
         fab: "Les détails des changements de points de vie ne sont pas disponibles.",
+        riftbound: "Les détails des changements de points ne sont pas disponibles.",
       },
       noDetails: {
         none: "Aucun détail des changements de points de vie trouvé.",
@@ -228,6 +234,7 @@ export default {
         pokemon: "Aucun détail des changements de cartes Récompense trouvé.",
         lorcana: "Aucun détail des changements de Lore trouvé.",
         fab: "Aucun détail des changements de points de vie trouvé.",
+        riftbound: "Aucun détail de changement de points n'a été trouvé.",
       },
     },
   },

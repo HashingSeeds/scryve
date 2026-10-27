@@ -31,6 +31,7 @@ const RULES: Record<SystemId, EventRules> = {
   mtg: MAGIC,
   lorcana: MAGIC,
   fab: MAGIC,
+  riftbound: MAGIC,
   pokemon: {
     tiebreakers: ["opponentMatchWin", "opponentOpponentMatchWin"],
     winPercent: "winsWithoutByes",

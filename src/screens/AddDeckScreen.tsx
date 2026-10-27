@@ -59,7 +59,7 @@ import {
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
 import type { ProviderGame } from "../../convex/lib/games/providers"
-import { isSystemId, type SystemId } from "../../convex/lib/systems"
+import { isSystemId, systemDefinition, type SystemId } from "../../convex/lib/systems"
 
 const DECK_LIST_HELPERS = {
   mtg: "decks:addDeck.listHelperMtg",
@@ -67,6 +67,7 @@ const DECK_LIST_HELPERS = {
   pokemon: "decks:addDeck.listHelperPokemon",
   lorcana: "decks:addDeck.listHelperLorcana",
   fab: "decks:addDeck.listHelperFab",
+  riftbound: "decks:addDeck.listHelperRiftbound",
 } as const satisfies Record<SystemId, TxKeyPath>
 
 type CreationMode = "precon" | "paste" | "blank"
@@ -80,6 +81,10 @@ const MODES = [
   { id: "paste", labelTx: "decks:addDeck.modeImport" },
   { id: "blank", labelTx: "decks:addDeck.modeBuild" },
 ] as const satisfies ReadonlyArray<{ id: CreationMode; labelTx: TxKeyPath }>
+
+const browsable = (game: string) =>
+  systemDefinition(game)?.integration.capabilities.exampleDecks.release === "enabled"
+const startingMode = (game: string): CreationMode => (browsable(game) ? "precon" : "paste")
 
 const SEARCH_DEBOUNCE_MS = 350
 
@@ -313,6 +318,7 @@ const PUBLISHERS = new Map([
   ["pokemon", "Pokémon"],
   ["lorcana", "Ravensburger"],
   ["fab", "Legend Story Studios"],
+  ["riftbound", "Riot Games"],
 ])
 
 function catalogSourceLabel(deck: CatalogDeck) {
@@ -421,7 +427,7 @@ export function AddDeckScreen({
   const importCatalog = useMutation(api.decks.importCatalog)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
-  const [mode, setMode] = useState<CreationMode>("precon")
+  const [mode, setMode] = useState(() => startingMode(game))
   const [catalogStatus, setCatalogStatus] =
     useState<FunctionReturnType<typeof api.deckCatalogs.browse>["status"]>("ready")
   const [catalogCursor, setCatalogCursor] = useState<string | null>(null)
@@ -537,7 +543,7 @@ export function AddDeckScreen({
     setSelectedCatalogDeck(undefined)
     setSelectedPrecon(undefined)
     setFocusedPreviewCard(undefined)
-    setMode("precon")
+    setMode(startingMode(next))
     setCatalogStatus("ready")
     setCatalogCursor(null)
   }
@@ -1680,7 +1686,7 @@ export function AddDeckScreen({
           accessibilityLabel={translate("decks:addDeck.startingPoint")}
           style={themed($tabs)}
         >
-          {MODES.map((candidate) => (
+          {MODES.filter(({ id }) => id !== "precon" || browsable(game)).map((candidate) => (
             <TouchableOpacity
               key={candidate.id}
               testID={`mode-picker-options-${candidate.id}`}

@@ -146,6 +146,7 @@ export default {
       pokemon: "Égalité de cartes Récompense",
       lorcana: "Égalité de Lore",
       fab: "Égalité de points de vie",
+      riftbound: "Égalité aux points",
     },
     leads: {
       none: "{{name}} mène aux points de vie",
@@ -154,6 +155,7 @@ export default {
       pokemon: "{{name}} mène aux cartes Récompense",
       lorcana: "{{name}} mène au Lore",
       fab: "{{name}} mène aux points de vie",
+      riftbound: "{{name}} mène aux points",
     },
   },
   clock: {
@@ -424,6 +426,7 @@ export default {
       pokemon: "cartes Récompense",
       lorcana: "Lore",
       fab: "points de vie",
+      riftbound: "points",
     },
     openCalculator: "Ouvrir la calculatrice pour {{identity}}",
   },
@@ -439,6 +442,8 @@ export default {
       lorcana:
         "Touchez pour modifier le Lore de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
       fab: "Touchez pour modifier les points de vie de {{identity}} de {{delta}}. Appui long pour plus de commandes.",
+      riftbound:
+        "Touchez pour modifier les points de {{identity}} de {{delta}}. Appuyez longuement pour plus d'options.",
     },
     moreControls: {
       none: "{{identity}}, plus de commandes de points de vie",
@@ -447,6 +452,7 @@ export default {
       pokemon: "{{identity}}, plus de commandes de cartes Récompense",
       lorcana: "{{identity}}, plus de commandes de Lore",
       fab: "{{identity}}, plus de commandes de points de vie",
+      riftbound: "{{identity}}, plus d'options de points",
     },
   },
   grid: {
@@ -469,6 +475,9 @@ export default {
       fab_one: "Grille des points de vie de {{count}} joueur",
       fab_many: "Grille des points de vie de {{count}} joueurs",
       fab_other: "Grille des points de vie de {{count}} joueurs",
+      riftbound_one: "Grille de points de {{count}} joueur",
+      riftbound_many: "Grille de points de {{count}} de joueurs",
+      riftbound_other: "Grille de points de {{count}} joueurs",
     },
   },
   pokemonSheet: {
@@ -560,6 +569,7 @@ export default {
       pokemon: "Modification des cartes Récompense de {{name}}",
       lorcana: "Modification du Lore de {{name}}",
       fab: "Modification des points de vie de {{name}}",
+      riftbound: "Modification des points de {{name}}",
     },
     add: {
       none: "Ajouter {{amount}} points de vie",
@@ -568,6 +578,7 @@ export default {
       pokemon: "Ajouter {{amount}} cartes Récompense",
       lorcana: "Ajouter {{amount}} éclats de Lore",
       fab: "Ajouter {{amount}} points de vie",
+      riftbound: "Ajouter {{amount}} points",
     },
     subtract: {
       none: "Retirer {{amount}} points de vie",
@@ -576,6 +587,7 @@ export default {
       pokemon: "Retirer {{amount}} cartes Récompense",
       lorcana: "Retirer {{amount}} éclats de Lore",
       fab: "Retirer {{amount}} points de vie",
+      riftbound: "Retirer {{amount}} points",
     },
   },
 } satisfies LocaleNamespace

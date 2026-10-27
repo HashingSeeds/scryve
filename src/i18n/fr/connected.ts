@@ -310,6 +310,7 @@ export default {
         pokemon: "Un changement de {{delta}} cartes Récompense n'a pas pu être synchronisé",
         lorcana: "Un changement de {{delta}} Lore n'a pas pu être synchronisé",
         fab: "Un changement de {{delta}} point de vie n'a pas pu être synchronisé",
+        riftbound: "Une modification de {{delta}} points n'a pas pu être synchronisée",
       },
       commanderDamage:
         "Une attribution de {{delta}} blessures de commandant n'a pas pu être synchronisée",

@@ -26,6 +26,7 @@ const FEATURED: readonly GameType[] = [
   { id: "pokemon-standard", system: "pokemon", format: "standard" },
   { id: "lorcana-core", system: "lorcana", format: "core" },
   { id: "fab-cc", system: "fab", format: "cc" },
+  { id: "riftbound-constructed", system: "riftbound", format: "constructed" },
   { id: "none" },
 ]
 

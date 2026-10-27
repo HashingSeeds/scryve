@@ -302,6 +302,16 @@ const decks = {
     either: "{{first}} or {{second}}",
     // A Phyrexian cost paid with mana or with 2 life.
     orLife: "{{mana}} or 2 life",
+    // Riftbound: an energy cost. {{amount}} is a number.
+    energyAmount: "{{amount}} energy",
+    // Riftbound: a unit's combat stat.
+    might: "Might",
+    // Riftbound: turn the card sideways to use it, like tapping.
+    exhaust: "exhaust",
+    // Riftbound: a power cost of one domain. {{domain}} is a proper noun such as Fury or Calm and stays in English.
+    domainPower: "{{domain}} power",
+    // Riftbound: a power cost payable with any domain.
+    anyPower: "power of any domain",
   },
   cardRow: {
     remove: "Remove {{card}}",
@@ -583,6 +593,8 @@ const decks = {
     listHelperLorcana: 'Use lines like "4 Aladdin - Heroic Outlaw".',
     // Card names and quoted examples are parser input; keep them in English exactly.
     listHelperFab: 'Paste a Fabrary card list or lines like "3x Snatch (red)".',
+    listHelperRiftbound:
+      'Use lines like "3 Pouty Poro" under headings like Legend, Main Deck, Battlefields, and Runes.',
     returnToReview: "Return to review",
     loadingDeck: "Loading deck…",
     reloadSource: "Reload source",
