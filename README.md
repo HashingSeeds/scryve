@@ -103,11 +103,12 @@ pnpm ios:production        # iOS, production profile
 
 Android has `android:development`, `android:preview`, and `android:production`.
 
-A bare target builds into `build/` (for example `build/ios-preview.ipa`). `--upload` sends that file to EAS with project metadata through `eas-local`, a fork of eas-cli that must be on your PATH. `--ship` builds, then uploads. `--build-path <path>` points either step at another file:
+A bare target builds into `build/` (for example `build/ios-preview.ipa`). `--upload` sends that file to EAS with project metadata through `eas-local`, a fork of eas-cli that must be on your PATH. `--nas` puts it on the home NAS with `builds` (from Matthew's dotfiles), where other machines and agents can find it by fingerprint. `--ship` builds, then uploads; pass `--build` with `--nas` to build first. `--build-path <path>` points any step at another file:
 
 ```bash
 pnpm ios:preview --ship
 pnpm android:production --upload --build-path ~/Downloads/app.aab
+pnpm ios:development --build --nas
 ```
 
 ## Running Maestro end-to-end tests

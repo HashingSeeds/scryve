@@ -19,10 +19,11 @@ const TARGETS = {
   "android:production": { profile: "production", output: "android-prod.aab" },
 }
 
-const USAGE = `Usage: pnpm <target> [--build] [--upload] [--ship] [--build-path <path>]
+const USAGE = `Usage: pnpm <target> [--build] [--upload] [--nas] [--ship] [--build-path <path>]
 Targets: ${Object.keys(TARGETS).join(", ")}`
 
-// Reads `<target> [flags]`. No flag builds, --ship builds then uploads, and --build-path moves the artifact for both.
+// Reads `<target> [flags]`. No flag builds. --upload (EAS) and --nas (the NAS, through `builds`) send an existing artifact
+// unless --build is passed, --ship builds then uploads, and --build-path moves the artifact for every step.
 function parseArgs(args) {
   let parsed
   try {
@@ -33,6 +34,7 @@ function parseArgs(args) {
         build: { type: "boolean" },
         upload: { type: "boolean" },
         ship: { type: "boolean" },
+        nas: { type: "boolean" },
         "build-path": { type: "string" },
       },
     })
@@ -43,10 +45,12 @@ function parseArgs(args) {
   const [target, ...extra] = positionals
   if (!(target in TARGETS) || extra.length > 0) throw new Error(USAGE)
   const upload = Boolean(values.upload || values.ship)
+  const nas = Boolean(values.nas)
   return {
     target,
-    build: Boolean(values.build || values.ship || !upload),
+    build: Boolean(values.build || values.ship || !(upload || nas)),
     upload,
+    nas,
     // why: pnpm runs scripts from the repo root, so a path typed in a subdirectory resolves against INIT_CWD.
     buildPath: values["build-path"]
       ? path.resolve(process.env.INIT_CWD ?? process.cwd(), values["build-path"])
@@ -66,6 +70,10 @@ function buildCommand({ target, buildPath }) {
 
 function uploadCommand({ target, buildPath }) {
   return ["eas-local", "upload", ...easArgs(target), "--build-path", buildPath, "--current", "--non-interactive"]
+}
+
+function nasCommand({ target, buildPath }) {
+  return ["builds", "put", buildPath, ...easArgs(target)]
 }
 
 const readEnvFile = (file) => util.parseEnv(fs.readFileSync(path.join(root, file), "utf8"))
@@ -98,6 +106,7 @@ function main() {
     run(buildCommand(options), { ...process.env, ...buildEnv(options.target) })
   }
   if (options.upload) run(uploadCommand(options), process.env)
+  if (options.nas) run(nasCommand(options), process.env)
 }
 
 if (require.main === module) {
@@ -109,4 +118,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { TARGETS, buildCommand, parseArgs, uploadCommand }
+module.exports = { TARGETS, buildCommand, nasCommand, parseArgs, uploadCommand }
