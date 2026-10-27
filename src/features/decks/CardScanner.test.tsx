@@ -163,3 +163,29 @@ test("an alternate picked after a misread follows the basic land count prompt", 
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Forest"])
 })
+
+test("Done keeps an alternate chosen while the wrong card was still being added", async () => {
+  jest.useFakeTimers()
+  try {
+    let land: () => void = () => undefined
+    const addCards = jest.fn(
+      (names: string[]) =>
+        new Promise<ScannedCardAdd[]>((resolve) => {
+          land = () => resolve(names.map(() => ({})))
+        }),
+    )
+    const { view, removeCard, onClose } = renderScanner({ singleton: false, addCards })
+    scan("Sol Ring", "Arcane Signet")
+    act(() => jest.advanceTimersByTime(1500))
+    fireEvent.press(view.getByText("Wrong card"))
+    fireEvent.press(view.getByText("Arcane Signet"))
+    fireEvent.press(view.getByText("Done"))
+    await act(async () => land())
+    await act(async () => land())
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Arcane Signet"])
+    expect(onClose).toHaveBeenCalledTimes(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})

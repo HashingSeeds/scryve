@@ -101,6 +101,7 @@ export function CardScanner({
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const lookups = useRef(new Map<number, Promise<ScannedCardAdd>>())
+  const corrections = useRef(new Set<Promise<void>>())
   const [closing, setClosing] = useState(false)
   const closingRef = useRef(false)
   const nextId = useRef(0)
@@ -216,6 +217,11 @@ export function CardScanner({
     for (let copy = inDeck; copy < count; copy++) add(card)
   }
 
+  function correct(wrong: ScannedCard, name?: string) {
+    const correction = replace(wrong, name).finally(() => corrections.current.delete(correction))
+    corrections.current.add(correction)
+  }
+
   async function replace(wrong: ScannedCard, name?: string) {
     setFixing(undefined)
     setAdded((current) => current.filter((card) => card.id !== wrong.id))
@@ -232,6 +238,7 @@ export function CardScanner({
     if (closingRef.current) return
     closingRef.current = true
     setClosing(true)
+    await Promise.all(corrections.current)
     await addWaitingCards()
     await Promise.all(lookups.current.values())
     onClose()
@@ -366,9 +373,9 @@ export function CardScanner({
           <Text preset="subheading" tx="decks:cardScan.whichCard" />
           <View style={$alternates}>
             {fixing.alternates.map((name) => (
-              <Button key={name} text={name} onPress={() => void replace(fixing, name)} />
+              <Button key={name} text={name} onPress={() => correct(fixing, name)} />
             ))}
-            <Button tx="decks:cardScan.removeIt" onPress={() => void replace(fixing)} />
+            <Button tx="decks:cardScan.removeIt" onPress={() => correct(fixing)} />
           </View>
         </DialogCard>
       ) : null}
