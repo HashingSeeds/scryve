@@ -67,6 +67,7 @@ export default {
     banned: "이 카드는 커맨더에서 금지되어 있습니다.",
     legalityUnconfirmed: "이 카드의 커맨더 사용 가능 여부를 확인하지 않았습니다.",
     chooseColor: "이 커맨더의 색을 선택하세요.",
+    pairUnchecked: "현재 커맨더의 상세 정보를 불러오기 전까지는 이 조합을 확인할 수 없습니다.",
     copyLimit: "이 변경은 카드 항목당 999장 제한을 초과합니다.",
     detailsMissing: "일부 카드 정보가 없습니다. 덱의 색 정체성을 완전히 확인하지 못했습니다.",
     duplicateCommander: "이 커맨더의 다른 사본이 덱에 남아 있습니다.",

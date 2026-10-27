@@ -73,6 +73,8 @@ export default {
     banned: "Esta carta está prohibida en Commander.",
     legalityUnconfirmed: "No se ha confirmado la legalidad de esta carta en Commander.",
     chooseColor: "Elige un color para este comandante.",
+    pairUnchecked:
+      "No podemos revisar este par hasta que se carguen los detalles de tu comandante actual.",
     copyLimit: "Este cambio superaría el límite de 999 copias por entrada de carta.",
     detailsMissing:
       "Faltan algunos detalles de cartas. La identidad de color del mazo no se ha comprobado por completo.",

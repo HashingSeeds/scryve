@@ -291,6 +291,13 @@ describe("commander pairs", () => {
     expect(commanderAfterPicking(["Thrasios"], "Plain")).toEqual(["Plain"])
   })
 
+  it("refuses to swap out a commander whose rules text has not loaded for a possible partner", () => {
+    expect(commanderAfterPicking(["Uncached"], "Tymna")).toEqual({
+      error: "Can't check this pair until your current commander's details load.",
+    })
+    expect(commanderAfterPicking(["Uncached"], "Plain")).toEqual(["Plain"])
+  })
+
   it("pairs Partner with only when each names the other", () => {
     expect(commanderAfterPicking(["Pir, Imaginative Rascal"], "Toothy, Imaginary Friend")).toEqual([
       "Pir, Imaginative Rascal",

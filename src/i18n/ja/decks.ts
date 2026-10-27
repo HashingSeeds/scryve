@@ -67,6 +67,7 @@ export default {
     banned: "このカードはCommanderで禁止されています。",
     legalityUnconfirmed: "このカードのCommanderでのリーガル状況は確認されていません。",
     chooseColor: "この統率者の色を選んでください。",
+    pairUnchecked: "現在の統率者の詳細が読み込まれるまで、このペアは確認できません。",
     copyLimit: "この変更だと、1エントリーあたり999枚の上限を超えます。",
     detailsMissing: "一部のカード詳細がありません。デッキの固有色は完全には確認されていません。",
     duplicateCommander: "この統率者のコピーがもう1枚デッキに残っています。",

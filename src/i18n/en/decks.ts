@@ -67,6 +67,7 @@ const decks = {
     banned: "This card is banned in Commander.",
     legalityUnconfirmed: "Commander legality has not been confirmed for this card.",
     chooseColor: "Choose a color for this commander.",
+    pairUnchecked: "Can't check this pair until your current commander's details load.",
     copyLimit: "This change would exceed the 999-copy limit for a card entry.",
     detailsMissing:
       "Some card details are missing. Deck color identity has not been fully checked.",

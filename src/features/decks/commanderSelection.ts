@@ -29,12 +29,25 @@ export function isBackground(details?: CommanderSelectionDetails) {
   return /\bBackground\b/.test(details?.typeLine ?? "")
 }
 
+function isDoctor(details?: CommanderSelectionDetails) {
+  return /\bTime Lord Doctor\b/.test(details?.typeLine ?? "")
+}
+
+function mayPair(details?: CommanderSelectionDetails) {
+  return (
+    isBackground(details) ||
+    isDoctor(details) ||
+    [...pairingAbilities(details)].some((line) =>
+      /^(partner|friends forever|choose a background|doctor's companion)\b/.test(line),
+    )
+  )
+}
+
 export function formsCommanderPair(first: CommanderCandidate, second: CommanderCandidate) {
   if (first.name === second.name) return false
   const own = pairingAbilities(first.details)
   const other = pairingAbilities(second.details)
-  const doctor = (card: CommanderCandidate) =>
-    /\bTime Lord Doctor\b/.test(card.details?.typeLine ?? "")
+  const doctor = (card: CommanderCandidate) => isDoctor(card.details)
   const both = (ability: string) => own.has(ability) && other.has(ability)
   return (
     both("partner") ||
@@ -76,6 +89,13 @@ export function selectCommander<T extends DeckCard>(
     return { error: translate("decks:commander.chooseCardInDeck") }
   const details = detailsFor(selected)
   const partner = commanders.find((card) => card !== selected && pairs(card, selected, details))
+  const unreadCommander = commanders.some((card) => {
+    const current = detailsFor(card)
+    return card !== selected && current?.oracleText === undefined && current?.keywords === undefined
+  })
+  if (!partner && unreadCommander && mayPair(details)) {
+    return { error: translate("decks:commander.pairUnchecked") }
+  }
   const joinsAsBackground = partner !== undefined && isBackground(details)
   if (details?.commanderEligibility === "ineligible" && !joinsAsBackground) {
     return { error: translate("decks:commander.ineligible") }
