@@ -109,9 +109,11 @@ test("shipped PRs come from squash subjects, minus reverted ones", () => {
     prNumbers([
       "fix(decks): pasted cards match again (#303)",
       "chore: no PR",
-      'Revert "fix(decks): pasted cards match again (#303)" (#305)',
-      "fix(decks): pasted cards match again (#303)",
+      'Revert "fix(decks): pasted cards match again (#303)" (#305)\n\nReverts HashingSeeds/scryve#303',
+      "feat(game): lock the board to portrait (#264)",
+      "revert(game): let the board rotate to landscape again (#267)\n\nReverts #264. Players need landscape.",
+      "fix(sync): faster merges (#310)\n\nFixes #12",
     ]),
-    [305],
+    [305, 267, 310],
   )
 })

@@ -167,12 +167,20 @@ async function newIssues(candidate) {
 
 const prNumber = (subject) => /\(#(\d+)\)$/.exec(subject)?.[1]
 
-function prNumbers(subjects) {
+/** PRs a range of commit messages ships. A revert commit drops every other PR its message names. */
+function prNumbers(messages) {
+  const subjectOf = (message) => message.split("\n")[0]
   const reverted = new Set(
-    subjects.map((subject) => prNumber(/^Revert "(.*)"/.exec(subject)?.[1] ?? "")),
+    messages
+      .filter((message) => /^revert/i.test(message))
+      .flatMap((message) =>
+        [...message.matchAll(/#(\d+)/g)]
+          .map((match) => match[1])
+          .filter((pr) => pr !== prNumber(subjectOf(message))),
+      ),
   )
-  const shipped = subjects.map(prNumber).filter((pr) => pr && !reverted.has(pr))
-  return [...new Set(shipped)].map(Number)
+  const shipped = messages.map((message) => prNumber(subjectOf(message)))
+  return [...new Set(shipped.filter((pr) => pr && !reverted.has(pr)))].map(Number)
 }
 
 function closedIssues(prs) {
@@ -192,9 +200,9 @@ function closedIssues(prs) {
   return [...new Set(issues)]
 }
 
-function shipFixes(candidate, subjects) {
+function shipFixes(candidate, messages) {
   try {
-    const issues = closedIssues(prNumbers(subjects))
+    const issues = closedIssues(prNumbers(messages))
     if (issues.length === 0) return
     const args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
     run("pnpm", ["exec", "convex", "run", "feedback:shipFixes", JSON.stringify(args)])
@@ -235,12 +243,17 @@ async function promote({ yes, soakMinutes }) {
   console.log(
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
-  const subjects = git(
+  // why: read before the production push below, which moves PRODUCTION_REF to the candidate.
+  const messages = git(
     "log",
     "--no-merges",
-    "--format=%s",
+    "--format=%B%x00",
     `${PRODUCTION_REF}..${candidate.commit}`,
-  ).split("\n")
+  )
+    .split("\0")
+    .map((message) => message.trim())
+    .filter(Boolean)
+  const subjects = messages.map((message) => message.split("\n")[0])
   for (const subject of subjects) console.log(`  ${subject}`)
 
   const issues = await newIssues(candidate)
@@ -270,7 +283,7 @@ async function promote({ yes, soakMinutes }) {
   console.log(
     `Promoted ${commit}: the app update is live and Pages is building the production web app.`,
   )
-  shipFixes(candidate, subjects)
+  shipFixes(candidate, messages)
 }
 
 async function main() {
