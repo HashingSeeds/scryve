@@ -375,17 +375,16 @@ describe("hasFoil", () => {
 })
 
 describe("renewsYearly", () => {
-  const offering = { annual: { product: { identifier: "yearly:annual" } } } as never
   const renewing = (productIdentifier: string, willRenew = true) =>
     ({ entitlements: { active: { "Count Pro": { productIdentifier, willRenew } } } }) as never
 
-  it("matches the offering's annual plan across store id formats, only while it renews", () => {
-    expect(renewsYearly(renewing("yearly"), offering)).toBe(true)
-    expect(renewsYearly(renewing("yearly:annual"), offering)).toBe(true)
-    expect(renewsYearly(renewing("foil_yearly"), offering)).toBe(true)
-    expect(renewsYearly(renewing("monthly"), offering)).toBe(false)
-    expect(renewsYearly(renewing("yearly", false), offering)).toBe(false)
-    expect(renewsYearly(null, offering)).toBe(false)
+  it("matches yearly plans across store id formats, only while they renew", () => {
+    expect(renewsYearly(renewing("yearly"))).toBe(true)
+    expect(renewsYearly(renewing("yearly:annual"))).toBe(true)
+    expect(renewsYearly(renewing("foil_yearly"))).toBe(true)
+    expect(renewsYearly(renewing("monthly"))).toBe(false)
+    expect(renewsYearly(renewing("yearly", false))).toBe(false)
+    expect(renewsYearly(null)).toBe(false)
   })
 })
 

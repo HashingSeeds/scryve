@@ -22,6 +22,7 @@ import { translate } from "@/i18n/translate"
 
 import {
   COUNT_PACKAGE_IDS,
+  COUNT_PRODUCT_IDS,
   COUNT_PRO_ENTITLEMENT_ID,
   FOIL_PRODUCT_ID,
   FOIL_SUPPORTER_OFFERING_ID,
@@ -147,19 +148,13 @@ export function hasFoil(customerInfo: CustomerInfo | null) {
   )
 }
 
-// why: Play product ids carry a `:base-plan` suffix that App Store ids and offerings may not.
-const baseProduct = (identifier: string | undefined) => identifier?.split(":")[0]
+const YEARLY_PRODUCTS = new Set<string>([COUNT_PRODUCT_IDS.yearly, FOIL_PRODUCT_ID])
 
-export function renewsYearly(
-  customerInfo: CustomerInfo | null,
-  offering: PurchasesOffering | null,
-) {
+export function renewsYearly(customerInfo: CustomerInfo | null) {
   const entitlement = customerInfo?.entitlements.active[COUNT_PRO_ENTITLEMENT_ID]
-  if (!entitlement?.willRenew) return false
-  const product = baseProduct(entitlement.productIdentifier)
-  return (
-    product === FOIL_PRODUCT_ID || product === baseProduct(offering?.annual?.product.identifier)
-  )
+  // why: Play product ids carry a `:base-plan` suffix that App Store ids don't.
+  const product = entitlement?.productIdentifier.split(":")[0]
+  return Boolean(entitlement?.willRenew && product && YEARLY_PRODUCTS.has(product))
 }
 
 function showPaywallFailure(message: string) {
@@ -370,7 +365,7 @@ export function RevenueCatProvider({
         if (result === "error") return fail(translate("account:billing.errors.paywallFailed"))
         if (result === "purchased" || result === "restored") {
           const next = await refreshCustomerInfo()
-          if (result === "purchased" && renewsYearly(next, currentOffering)) offerRenewalReminder()
+          if (result === "purchased" && renewsYearly(next)) offerRenewalReminder()
         }
         return result
       } catch (cause) {
@@ -386,12 +381,11 @@ export function RevenueCatProvider({
       const { presentCountCustomerCenter } = await import("./sdk")
       await presentCountCustomerCenter(customerInfo)
       const next = await refreshCustomerInfo()
-      if (!renewsYearly(customerInfo, currentOffering) && renewsYearly(next, currentOffering))
-        offerRenewalReminder()
+      if (!renewsYearly(customerInfo) && renewsYearly(next)) offerRenewalReminder()
     } catch (cause) {
       setError(revenueCatErrorMessage(cause))
     }
-  }, [currentOffering, customerInfo, refreshCustomerInfo])
+  }, [customerInfo, refreshCustomerInfo])
 
   const value = useMemo<RevenueCatAccess>(
     () => ({

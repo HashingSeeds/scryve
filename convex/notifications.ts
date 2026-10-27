@@ -24,7 +24,6 @@ const limiter = new RateLimiter(components.rateLimiter, {
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push"
 const EXPO_TIMEOUT_MS = 15_000
-// why: a renewal reminder goes out once, and it leaves 3 days of room, so it outlasts a long Expo outage.
 const SEND_RETRY_MS = [MINUTE, 10 * MINUTE, HOUR, 6 * HOUR] as const
 // why: Expo reports most dead tokens only in receipts, which are ready some minutes after the send.
 const RECEIPT_DELAY_MS = 15 * MINUTE
