@@ -74,6 +74,8 @@ export default {
     banned: "Cette carte est bannie en Commander.",
     legalityUnconfirmed: "La légalité en Commander n'a pas été confirmée pour cette carte.",
     chooseColor: "Choisissez une couleur pour ce commandant.",
+    pairUnchecked:
+      "Impossible de vérifier cette paire tant que les détails de votre commandant actuel ne sont pas chargés.",
     copyLimit: "Ce changement dépasserait la limite de 999 exemplaires par entrée de carte.",
     detailsMissing:
       "Certains détails de cartes sont manquants. L’identité couleur du deck n’a pas été entièrement vérifiée.",

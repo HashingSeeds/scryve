@@ -15,7 +15,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { getCommanderWarnings, selectCommander } from "@/features/decks/commanderSelection"
-import { cardDetailsKey, printingKey } from "@/features/decks/deckCards"
+import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
 import { addCommanderCard, canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import { DeckStats } from "@/features/decks/DeckStats"
 import { DeckView, type DeckTab } from "@/features/decks/DeckView"
@@ -101,6 +101,23 @@ export function GuestDeckDetailScreen({
         }
       : undefined,
     picksCommander(focusedGame, (draft ?? stored?.deck)?.format),
+  )
+  const currentCommander = editing
+    ? (draft ?? stored?.deck)?.cards.find((card) => cardSection(card) === "commander")
+    : undefined
+  useCardDetails(
+    currentCommander
+      ? {
+          ...currentCommander,
+          detailKey: cardDetailsKey(currentCommander, focusedGame),
+          game: focusedGame,
+          catalogCardId:
+            currentCommander.cardId ??
+            currentCommander.printingId ??
+            currentCommander.providerCardId,
+        }
+      : undefined,
+    true,
   )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)

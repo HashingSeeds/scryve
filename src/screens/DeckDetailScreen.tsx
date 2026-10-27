@@ -413,6 +413,23 @@ function DeckDetailContent({
       : undefined,
     picksCommander(game, deck?.format),
   )
+  const currentCommander = draft.editing
+    ? cards.find((card) => cardSection(card) === "commander")
+    : undefined
+  useCardDetails(
+    currentCommander
+      ? {
+          ...currentCommander,
+          detailKey: cardDetailsKey(currentCommander, game),
+          game,
+          catalogCardId:
+            currentCommander.cardId ??
+            currentCommander.printingId ??
+            currentCommander.providerCardId,
+        }
+      : undefined,
+    true,
+  )
 
   const { displayCards } = view
   useEffect(() => {

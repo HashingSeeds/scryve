@@ -13,6 +13,7 @@ import { RetryableError } from "@/components/RetryableError"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { readCardFaces } from "@/features/decks/cardFaces"
+import { isBackground } from "@/features/decks/commanderSelection"
 import type { CommanderColor } from "@/features/decks/deckCards"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -130,7 +131,7 @@ export function CardFocusDialog({
   const commanderProblem =
     !details?.commanderEligibility || !details?.commanderLegality
       ? translate("decks:cardFocus.eligibilityUnverified")
-      : details.commanderEligibility === "ineligible"
+      : details.commanderEligibility === "ineligible" && !isBackground(details)
         ? translate("decks:cardFocus.ineligible")
         : details.commanderLegality !== "legal"
           ? translate("decks:cardFocus.notLegal")
