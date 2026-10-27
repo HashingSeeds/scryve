@@ -22,8 +22,7 @@ const TARGETS = {
 const USAGE = `Usage: pnpm <target> [--build] [--upload] [--nas] [--ship] [--build-path <path>]
 Targets: ${Object.keys(TARGETS).join(", ")}`
 
-// Reads `<target> [flags]`. No flag builds. --upload (EAS) and --nas (the NAS, through `builds`) send an existing artifact
-// unless --build is passed, --ship builds then uploads, and --build-path moves the artifact for every step.
+// Reads `<target> [flags]`. No flag builds, --upload (EAS) and --nas (`builds put`) send the artifact after a build only with --build, --ship builds then uploads, and --build-path moves the artifact for every step.
 function parseArgs(args) {
   let parsed
   try {
