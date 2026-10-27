@@ -242,7 +242,8 @@ export default {
   },
   saveFailed: {
     title: "Impossible d'enregistrer cette partie",
-    message: "Vous pouvez continuer à jouer, mais la partie sera perdue si vous fermez Scryve.",
+    message:
+      "Vous pouvez continuer à jouer, mais la partie risque d'être perdue si vous quittez le plateau ou fermez Scryve.",
   },
   endGame: {
     failed: "Impossible de terminer cette partie.",

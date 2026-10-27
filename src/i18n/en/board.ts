@@ -223,7 +223,7 @@ const board = {
   saveFailed: {
     // Shown once when the device refuses to store the game, usually because storage is full.
     title: "Can't save this game",
-    message: "You can keep playing, but the game will be lost if you close Scryve.",
+    message: "You can keep playing, but the game may be lost if you leave the board or close Scryve.",
   },
   endGame: {
     failed: "Could not end this game.",

@@ -235,7 +235,8 @@ export default {
   },
   saveFailed: {
     title: "このゲームを保存できません",
-    message: "プレイは続けられますが、Scryveを閉じるとゲームは失われます。",
+    message:
+      "プレイは続けられますが、ボードを離れるかScryveを閉じると、ゲームが失われる可能性があります。",
   },
   endGame: {
     failed: "このゲームを終了できませんでした。",

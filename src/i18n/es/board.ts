@@ -242,7 +242,8 @@ export default {
   },
   saveFailed: {
     title: "No se puede guardar esta partida",
-    message: "Puedes seguir jugando, pero la partida se perderá si cierras Scryve.",
+    message:
+      "Puedes seguir jugando, pero la partida podría perderse si sales del tablero o cierras Scryve.",
   },
   endGame: {
     failed: "No se pudo terminar esta partida.",
