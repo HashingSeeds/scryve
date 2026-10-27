@@ -63,6 +63,7 @@
     "ios:development": "node scripts/native.cjs ios:development",
     "ios:preview": "node scripts/native.cjs ios:preview",
     "ios:production": "node scripts/native.cjs ios:production",
+    "ios:profile": "node scripts/native.cjs ios:profile",
     "android:development": "node scripts/native.cjs android:development",
     "android:preview": "node scripts/native.cjs android:preview",
     "android:production": "node scripts/native.cjs android:production",

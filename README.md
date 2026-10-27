@@ -111,6 +111,14 @@ pnpm android:production --upload --build-path ~/Downloads/app.aab
 pnpm ios:development --build --nas
 ```
 
+EAS signs device builds ad hoc, and Instruments and xctrace cannot attach to those. `pnpm ios:profile` instead builds the preview app in Release with Xcode's Apple Development signing, OTA updates off, and Sentry events under `profile`. It replaces a preview install on the device. Run it on a Mac whose Xcode is signed into the team, in Terminal or after `security unlock-keychain` over SSH. To trace on a test device:
+
+```bash
+pnpm ios:profile --build --nas
+ssh mini builds get --app scryve --platform ios --profile profile   # prints the path on the mini
+agent-device-mini install com.sowinghope.count.preview <path>
+```
+
 ## Running Maestro end-to-end tests
 
 Maestro drives the installed iOS or Android development build through native accessibility, so no

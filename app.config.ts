@@ -181,6 +181,8 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     name: getAppName(),
     slug: config.slug ?? "count",
     scheme: [getAppScheme(), getLegacyAppScheme()],
+    // why: profile builds have no EAS channel, so they run only the JS they were built from.
+    ...(process.env.SCRYVE_PROFILE_BUILD ? { updates: { ...config.updates, enabled: false } } : {}),
     ios: {
       ...config.ios,
       bundleIdentifier: getUniqueIdentifier(),
