@@ -1,6 +1,7 @@
 import { type Ref, useEffect, useRef, useState } from "react"
 import { AccessibilityInfo, Pressable, StyleSheet, View, type ViewStyle } from "react-native"
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   ReduceMotion,
@@ -89,10 +90,13 @@ export function TableTurnOffer({
   const uprightWay = -Math.sign(holderAngle)
   const direction = useSharedValue(uprightWay)
   const chosenWay = useSharedValue(0)
+  const timedTurn = useSharedValue(false)
+  const [tapTurning, setTapTurning] = useState(false)
 
   const land = (shown: number) => {
     "worklet"
     following.set(false)
+    timedTurn.set(true)
     angle.set(
       withTiming(Math.sign(shown) * 90, { duration: 220 }, (finished) => {
         if (finished) runOnJS(onLand)(tableTurnLanding(shown, holderAngle))
@@ -102,14 +106,21 @@ export function TableTurnOffer({
 
   // why: the gyroscope is read once per frame and its speed measured over whole frames; reacting to each sample measured speed across the uneven gaps between samples, which overshot and stepped back every third frame.
   useFrameCallback(({ timeSincePreviousFrame }) => {
-    if (!following.value) return
+    if (!following.value) {
+      // why: a timed turn, from a tap or the last stretch after the gyro settles, must not land on a Duo that is closing, so the hinge stops it and hands the board back to be turned back with the fold.
+      if (unfolded.value >= 1 || !timedTurn.value) return
+      cancelAnimation(angle)
+      reading.set({ angle: angle.value, speed: 0 })
+      timedTurn.set(false)
+      following.set(true)
+      runOnJS(setTapTurning)(false)
+    }
     // why: the hinge tilts the sensors, so the turn is measured only while the Duo lies flat. Folding it mid-turn turns the board back with the hinge, so it is upright again by the time the Duo shuts, and opening it flat again resumes from the turn the device actually holds.
     if (unfolded.value < 1) {
-      if (startHeading.value !== null)
-        angle.set(
-          reading.value.angle *
-            Math.min(Math.max((unfolded.value - UNWIND_BELOW) / (1 - UNWIND_BELOW), 0), 1),
-        )
+      angle.set(
+        reading.value.angle *
+          Math.min(Math.max((unfolded.value - UNWIND_BELOW) / (1 - UNWIND_BELOW), 0), 1),
+      )
       return
     }
     const { qx, qy, qz, qw } = rotation.sensor.value
@@ -155,7 +166,6 @@ export function TableTurnOffer({
       land(shown)
   })
 
-  const [tapTurning, setTapTurning] = useState(false)
   const tapTurn = (duration: number) =>
     angle.set(
       withTiming(
@@ -169,6 +179,7 @@ export function TableTurnOffer({
   const turnByTap = () => {
     if (!flat) return
     following.set(false)
+    timedTurn.set(true)
     setTapTurning(true)
     tapTurn(motionDuration(reducedMotion, FALLBACK_TURN_MS))
   }
