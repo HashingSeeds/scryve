@@ -510,7 +510,22 @@ describe("feedbackCard", () => {
       })
       expect(card.phase).toMatch(/^fixed:abcdef1:/)
       expect(card.phase.length).toBeLessThanOrEqual(40)
-      expect(prefill(card)).toBe("Thanks for the report! The fix is out. Restart Scryve to get it.")
+      expect(prefill(card)).toBe("Thanks for the idea! It is out. Restart Scryve to get it.")
+      expect(
+        prefill(
+          feedbackCard({
+            request: {
+              ...request,
+              kind: "bug",
+              platform: "ios",
+              issue: 7,
+              fixedIn,
+              runtimeVersion: "rt-1",
+            },
+            messages: [],
+          }),
+        ),
+      ).toBe("Thanks for the report! The fix is out. Restart Scryve to get it.")
     })
 
     it("points at the store when the player's runtime can't load the update", () => {
@@ -521,7 +536,7 @@ describe("feedbackCard", () => {
     })
 
     it("covers both when the runtime is unknown", () => {
-      expect(prefill(fixed())).toContain("Restart Scryve, and if you still see it, update")
+      expect(prefill(fixed())).toContain("Restart Scryve, and if you don't see it, update")
     })
 
     it("goes back to an update with the fixed meta once Matthew replied", () => {

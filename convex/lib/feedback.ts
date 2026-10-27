@@ -85,11 +85,13 @@ function fixReach(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
 
 function fixedReply(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
   const reach = fixReach(request, fix)
-  if (reach === "update") return "Thanks for the report! The fix is out. Restart Scryve to get it."
+  const [thanks, change] =
+    request.kind === "bug" ? ["Thanks for the report!", "The fix"] : ["Thanks for the idea!", "It"]
+  if (reach === "update") return `${thanks} ${change} is out. Restart Scryve to get it.`
   if (reach === "unknown")
-    return "Thanks for the report! The fix is out. Restart Scryve, and if you still see it, update Scryve from the store."
+    return `${thanks} ${change} is out. Restart Scryve, and if you don't see it, update Scryve from the store.`
   const store = request.platform === "android" ? "Google Play" : "the App Store"
-  return `Thanks for the report! The fix is in the next Scryve version. Update from ${store} once it's out.`
+  return `${thanks} ${change} is in the next Scryve version. Update from ${store} once it's out.`
 }
 
 function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
