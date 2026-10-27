@@ -137,7 +137,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     source: "feedback",
     key: `${APOLLO_KEY_PREFIX}${request._id}`,
     kind: awaitingTeam ? "approval" : "update",
-    // why: a new phase pushes again, so only the player's own messages and a shipped fix notify Matthew. Apollo caps a phase at 40 characters, which a message id fills.
+    // why: Apollo caps a phase at 40 characters.
     phase: fix
       ? `fixed:${fix.commit.slice(0, 7)}:${Math.round(lastPlayer?._creationTime ?? request._creationTime)}`
       : `player:${playerTurn}`,

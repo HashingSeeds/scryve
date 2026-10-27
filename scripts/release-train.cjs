@@ -168,15 +168,18 @@ async function newIssues(candidate) {
 const prNumber = (subject) =>
   /\(#(\d+)\)$/.exec(subject)?.[1] ?? /^Merge pull request #(\d+) from /.exec(subject)?.[1]
 
-/** PRs a range of commit messages ships. A revert commit drops every other PR its message names. */
+/**
+ * PRs a range of commit messages ships. A revert (any line starting "Revert", or a merged
+ * `revert-<n>-` branch) drops every other PR its message names.
+ */
 function prNumbers(messages) {
   const subjectOf = (message) => message.split("\n")[0]
   const reverted = new Set(
     messages
-      .filter((message) => /^revert/i.test(message))
+      .filter((message) => /^revert/im.test(message) || /\/revert-\d+-/.test(subjectOf(message)))
       .flatMap((message) =>
-        [...message.matchAll(/#(\d+)/g)]
-          .map((match) => match[1])
+        [...message.matchAll(/#(\d+)|\/revert-(\d+)-/g)]
+          .map((match) => match[1] ?? match[2])
           .filter((pr) => pr !== prNumber(subjectOf(message))),
       ),
   )

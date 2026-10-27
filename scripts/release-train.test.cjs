@@ -114,7 +114,9 @@ test("shipped PRs come from squash subjects, minus reverted ones", () => {
       "revert(game): let the board rotate to landscape again (#267)\n\nReverts #264. Players need landscape.",
       "fix(sync): faster merges (#310)\n\nFixes #12",
       "Merge pull request #630 from HashingSeeds/docs/adr-0002-phases\n\ndocs: phases ADR",
+      "Merge pull request #640 from HashingSeeds/feat/sync\n\nfeat: sync",
+      'Merge pull request #641 from HashingSeeds/revert-640-feat/sync\n\nRevert "feat: sync"',
     ]),
-    [305, 267, 310, 630],
+    [305, 267, 310, 630, 641],
   )
 })
