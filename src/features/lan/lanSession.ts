@@ -543,7 +543,8 @@ export class LanSession {
     const ping = () => {
       connection.send({ type: "ping", at: Date.now() })
       const stats = this.latency.summary()
-      if (stats.delivery || stats.ack) connection.send({ type: "stats", stats })
+      if (stats.delivery || stats.ack || stats.ping !== undefined)
+        connection.send({ type: "stats", stats })
     }
     clearInterval(this.pingTimer)
     this.pingTimer = setInterval(ping, PING_INTERVAL_MS)

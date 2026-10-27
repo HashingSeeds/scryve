@@ -563,6 +563,8 @@ describe("nearby guest", () => {
     jest.advanceTimersByTime(30)
     host()?.onMessage({ type: "pong", at: Date.now() - 30, hostAt: 90_000 })
     expect(session.latency.summary()).toEqual({ ping: 30 })
+    jest.advanceTimersByTime(2_000)
+    expect(sent.at(-1)).toEqual({ type: "stats", stats: { ping: 30 } })
     session.leave()
   })
 
