@@ -345,12 +345,14 @@ export function PlayerGrid({
   }
   const seatedRows = rows.map((row) => row.map((slot) => (slot === null ? null : slotSeat(slot))))
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  // why: a board given its size places seats from it in the same render, since the measured size arrives a frame later and drew the seats squished for that frame when the size changed.
+  const seatBoard = boardOrientation ? { width, height } : board
   const turning =
-    tableTurn && Math.abs(holderAngle ?? 0) === 90 && board.width > 0
+    tableTurn && Math.abs(holderAngle ?? 0) === 90 && seatBoard.width > 0
       ? tableTurnCells({
           playerCount: players.length,
           layout,
-          board,
+          board: seatBoard,
           gap: spacing.xxs,
           topInset: topEdgeBand,
           holderAngle: holderAngle ?? 0,
@@ -360,11 +362,11 @@ export function PlayerGrid({
       : undefined
   // why: seats sit by position in one list keyed by player rather than inside flex rows, so a seat that changes rows moves instead of remounting.
   const cellRects =
-    board.width > 0
+    seatBoard.width > 0
       ? getPlayerGridCellRects({
           playerCount: players.length,
           layout,
-          board,
+          board: seatBoard,
           gap: spacing.xxs,
           topInset: topEdgeBand,
         })
