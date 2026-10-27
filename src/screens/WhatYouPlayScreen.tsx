@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { Trans } from "react-i18next"
 
+import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
@@ -19,6 +20,7 @@ import {
 import { COMMANDER_SEATS } from "@/features/game/whatYouPlay"
 import { useFirstUseSharing } from "@/features/legal/useFirstUseSharing"
 import { useAppTheme } from "@/theme/context"
+import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
 import { isCommanderFormat } from "../../convex/lib/gameRules"
@@ -56,99 +58,103 @@ export function WhatYouPlayScreen({
   const { configured, sharing, setSharing, saveFailed, saveSharing } = useFirstUseSharing()
 
   return (
-    <Screen
-      preset="fixed"
-      safeAreaEdges={["top", "bottom"]}
-      contentContainerStyle={themed($screen)}
-    >
-      <View style={themed($body)}>
-        <Text text={BRAND_EYEBROW} preset="formLabel" style={themed($eyebrow)} />
-        <Text tx="play:whatYouPlay.heading" preset="heading" accessibilityRole="header" />
-      </View>
-      <ScrollView style={$list} contentContainerStyle={themed($choices)}>
-        <GameTypeList
-          types={FIRST_GAME_TYPES}
-          selectedId={chosen?.id}
-          detail={(type) =>
-            gameTypeDetail(
-              type,
-              isCommanderFormat(type.system, type.format) ? COMMANDER_SEATS : defaultPlayerCount,
-            )
-          }
-          onChoose={setChosen}
-        />
-        <Text tx="play:whatYouPlay.changeLater" size="xs" style={themed($muted)} />
-      </ScrollView>
-      <View style={themed($footer)}>
-        {acceptsLegal && configured ? (
-          <Switch
-            testID="first-use-analytics-switch"
-            labelTx="account:shareUsage"
-            value={sharing}
-            labelPosition="left"
-            helperTx="account:legalConsent.shareUsageHelper"
-            HelperTextProps={{ size: "xs", style: themed($muted) }}
-            onValueChange={setSharing}
+    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$styles.flex1}>
+      <View style={themed($content)}>
+        <View style={themed($body)}>
+          <Text text={BRAND_EYEBROW} preset="formLabel" style={themed($eyebrow)} />
+          <Text tx="play:whatYouPlay.heading" preset="heading" accessibilityRole="header" />
+        </View>
+        <ScrollView style={$list} contentContainerStyle={themed($choices)}>
+          <GameTypeList
+            types={FIRST_GAME_TYPES}
+            selectedId={chosen?.id}
+            detail={(type) =>
+              gameTypeDetail(
+                type,
+                isCommanderFormat(type.system, type.format) ? COMMANDER_SEATS : defaultPlayerCount,
+              )
+            }
+            onChoose={setChosen}
           />
-        ) : null}
-        {saveFailed ? (
-          <Text accessibilityRole="alert" size="xs" tx="account:legalConsent.sharingSaveFailed" />
-        ) : null}
-        {acceptsLegal ? (
-          <Text size="xs" style={themed($muted)}>
-            <Trans
-              i18nKey="play:whatYouPlay.acceptance"
-              components={{
-                terms: (
-                  <Text
-                    size="xs"
-                    accessibilityRole="link"
-                    style={themed($link)}
-                    onPress={acceptsLegal.onOpenTerms}
-                  />
-                ),
-                privacy: (
-                  <Text
-                    size="xs"
-                    accessibilityRole="link"
-                    style={themed($link)}
-                    onPress={acceptsLegal.onOpenPrivacy}
-                  />
-                ),
-              }}
-            />
-          </Text>
-        ) : null}
-        <Button
-          testID="what-you-play-start"
-          tx="play:whatYouPlay.play"
-          preset="reversed"
-          style={themed($primaryAction)}
-          disabled={!chosen || acceptsLegal?.isSubmitting}
-          onPress={() => {
-            if (!chosen || (acceptsLegal && !saveSharing())) return
-            onChoose(chosen)
-          }}
-        />
+          <Text tx="play:whatYouPlay.changeLater" size="xs" style={themed($muted)} />
+        </ScrollView>
       </View>
+      <BottomActionBar style={$bar}>
+        <View style={themed($footer)}>
+          {acceptsLegal && configured ? (
+            <Switch
+              testID="first-use-analytics-switch"
+              labelTx="account:shareUsage"
+              value={sharing}
+              labelPosition="left"
+              helperTx="account:legalConsent.shareUsageHelper"
+              HelperTextProps={{ size: "xs", style: themed($muted) }}
+              onValueChange={setSharing}
+            />
+          ) : null}
+          {saveFailed ? (
+            <Text accessibilityRole="alert" size="xs" tx="account:legalConsent.sharingSaveFailed" />
+          ) : null}
+          {acceptsLegal ? (
+            <Text size="xs" style={themed($muted)}>
+              <Trans
+                i18nKey="play:whatYouPlay.acceptance"
+                components={{
+                  terms: (
+                    <Text
+                      size="xs"
+                      accessibilityRole="link"
+                      style={themed($link)}
+                      onPress={acceptsLegal.onOpenTerms}
+                    />
+                  ),
+                  privacy: (
+                    <Text
+                      size="xs"
+                      accessibilityRole="link"
+                      style={themed($link)}
+                      onPress={acceptsLegal.onOpenPrivacy}
+                    />
+                  ),
+                }}
+              />
+            </Text>
+          ) : null}
+          <Button
+            testID="what-you-play-start"
+            tx="play:whatYouPlay.play"
+            preset="reversed"
+            style={themed($primaryAction)}
+            disabled={!chosen || acceptsLegal?.isSubmitting}
+            onPress={() => {
+              if (!chosen || (acceptsLegal && !saveSharing())) return
+              onChoose(chosen)
+            }}
+          />
+        </View>
+      </BottomActionBar>
     </Screen>
   )
 }
 
-const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $column: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 560,
   alignSelf: "center",
-  flex: 1,
-  gap: spacing.lg,
   paddingHorizontal: spacing.lg,
-  paddingTop: spacing.xl,
-  paddingBottom: spacing.md,
 })
+const $content: ThemedStyle<ViewStyle> = (theme) => ({
+  ...$column(theme),
+  flex: 1,
+  gap: theme.spacing.lg,
+  paddingTop: theme.spacing.xl,
+  paddingBottom: theme.spacing.md,
+})
+const $bar: ViewStyle = { paddingHorizontal: 0 }
 const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $list: ViewStyle = { flex: 1 }
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+const $footer: ThemedStyle<ViewStyle> = (theme) => ({ ...$column(theme), gap: theme.spacing.sm })
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ borderRadius: CHOICE_RADIUS })
 const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
