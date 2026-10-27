@@ -349,8 +349,11 @@ describe("feedback", () => {
       sentryEventId: "0123456789abcdef0123456789abcdef",
     })
     const input = await t.query(internal.feedback.apolloCardInput, { requestId })
-    expect(feedbackCard(input!).meta).toMatchObject({
-      sentry: "https://matthew-chisolm.sentry.io/issues/?query=0123456789abcdef0123456789abcdef",
+    expect(feedbackCard(input!).actions).toContainEqual({
+      id: "sentry",
+      label: "Sentry",
+      url: "https://matthew-chisolm.sentry.io/issues/?query=0123456789abcdef0123456789abcdef",
+      repeat: true,
     })
   })
 
