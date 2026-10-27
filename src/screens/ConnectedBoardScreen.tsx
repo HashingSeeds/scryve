@@ -389,8 +389,10 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
 function usePaintTiming({ latency, projection }: ConnectedGameRuntime) {
   const eventSequence = projection?.eventSequence
   useEffect(() => {
+    const away = (state: string) => state === "background" || state === "inactive"
+    latency.setPaused(away(AppState.currentState))
     const subscription = AppState.addEventListener("change", (state) =>
-      latency.setPaused(state !== "active"),
+      latency.setPaused(away(state)),
     )
     return () => subscription.remove()
   }, [latency])
