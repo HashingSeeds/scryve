@@ -7,25 +7,16 @@ import type { MutationCtx } from "../_generated/server"
 const DAY = 24 * 60 * 60 * 1000
 // why: stores start charging up to a day before renewal, so the reminder needs room to cancel first.
 export const RENEWAL_REMINDER_LEAD_MS = 3 * DAY
-
-export function renewalReminderTime(renewsAt: number | undefined) {
-  return renewsAt === undefined ? undefined : renewsAt - RENEWAL_REMINDER_LEAD_MS
-}
-
 export const USER_DEVICES = 20
-const EXPO_BATCH = 100
 
-export const EXPO_PUSH_TOKEN = /^Expo(?:nent)?PushToken\[[\w-]{1,200}\]$/
+const LOCALES = ["en", "es", "fr", "hi", "ja", "ko"] as const
+type Locale = (typeof LOCALES)[number]
 
-export const NOTIFICATION_LOCALES = ["en", "es", "fr", "hi", "ja", "ko"] as const
-export type NotificationLocale = (typeof NOTIFICATION_LOCALES)[number]
-
-export function notificationLocale(tag: string | undefined): NotificationLocale {
-  const language = tag?.split("-")[0]
-  return NOTIFICATION_LOCALES.find((locale) => locale === language) ?? "en"
+export function notificationLocale(tag: string | undefined): Locale {
+  return LOCALES.find((locale) => locale === tag?.split("-")[0]) ?? "en"
 }
 
-const RENEWS_SOON: Record<NotificationLocale, string> = {
+const RENEWS_SOON: Record<Locale, string> = {
   en: "Renews in 3 days.",
   es: "Se renueva en 3 días.",
   fr: "Renouvellement dans 3 jours.",
@@ -39,51 +30,24 @@ export const pushMessage = v.object({
   title: v.optional(v.string()),
   body: v.string(),
   categoryId: v.optional(v.string()),
-  url: v.string(),
+  data: v.object({ url: v.string() }),
 })
-export type PushMessage = Infer<typeof pushMessage>
+type PushMessage = Infer<typeof pushMessage>
 
 // why: must match the category the app registers, or iOS hides previews behind its generic placeholder.
 export const FEEDBACK_REPLY_CATEGORY = "feedback_reply"
-const FEEDBACK_PREVIEW_LENGTH = 180
+// why: APNs drops payloads over 4 KB, and a full 2,000-character reply can pass that.
+const PREVIEW_LENGTH = 180
 
-export function feedbackReplyMessage(
-  device: Doc<"pushDevices">,
-  requestId: string,
+async function sendPush(ctx: MutationCtx, messages: PushMessage[]) {
+  if (messages.length) await ctx.scheduler.runAfter(0, internal.notifications.send, { messages })
+}
+
+export async function notifyFeedbackReply(
+  ctx: MutationCtx,
+  request: Doc<"feedbackRequests">,
   reply: string,
-): PushMessage {
-  return {
-    to: device.token,
-    body:
-      reply.length > FEEDBACK_PREVIEW_LENGTH
-        ? `${reply.slice(0, FEEDBACK_PREVIEW_LENGTH - 1)}…`
-        : reply,
-    categoryId: FEEDBACK_REPLY_CATEGORY,
-    url: `/feedback/${requestId}`,
-  }
-}
-
-export function renewalReminderMessage(device: Doc<"pushDevices">, foil: boolean): PushMessage {
-  return {
-    to: device.token,
-    title: foil ? "Scryve Foil" : "Scryve Pro",
-    body: RENEWS_SOON[notificationLocale(device.locale)],
-    url: "/account",
-  }
-}
-
-export function uniqueByToken(devices: Doc<"pushDevices">[]) {
-  return [...new Map(devices.map((device) => [device.token, device])).values()]
-}
-
-export async function sendPush(ctx: MutationCtx, messages: PushMessage[]) {
-  for (let start = 0; start < messages.length; start += EXPO_BATCH)
-    await ctx.scheduler.runAfter(0, internal.notifications.send, {
-      messages: messages.slice(start, start + EXPO_BATCH),
-    })
-}
-
-export async function feedbackReplyDevices(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
+) {
   const fromInstall = await ctx.db
     .query("pushDevices")
     .withIndex("by_sender", (q) => q.eq("senderHash", request.senderHash))
@@ -95,7 +59,37 @@ export async function feedbackReplyDevices(ctx: MutationCtx, request: Doc<"feedb
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .take(USER_DEVICES)
     : []
-  return uniqueByToken([...fromInstall, ...fromAccount].filter((device) => device.feedbackReplies))
+  const devices = new Map([...fromInstall, ...fromAccount].map((device) => [device._id, device]))
+  const body = reply.length > PREVIEW_LENGTH ? `${reply.slice(0, PREVIEW_LENGTH - 1)}…` : reply
+  await sendPush(
+    ctx,
+    [...devices.values()]
+      .filter((device) => device.feedbackReplies)
+      .map((device) => ({
+        to: device.token,
+        body,
+        categoryId: FEEDBACK_REPLY_CATEGORY,
+        data: { url: `/feedback/${request._id}` },
+      })),
+  )
+}
+
+export async function notifyRenewal(ctx: MutationCtx, userId: Id<"users">, foil: boolean) {
+  const devices = await ctx.db
+    .query("pushDevices")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(USER_DEVICES)
+  await sendPush(
+    ctx,
+    devices
+      .filter((device) => device.renewalReminders)
+      .map((device) => ({
+        to: device.token,
+        title: foil ? "Scryve Foil" : "Scryve Pro",
+        body: RENEWS_SOON[notificationLocale(device.locale)],
+        data: { url: "/account" },
+      })),
+  )
 }
 
 export async function forgetAccountDevices(ctx: MutationCtx, userId: Id<"users">) {
@@ -103,10 +97,6 @@ export async function forgetAccountDevices(ctx: MutationCtx, userId: Id<"users">
     .query("pushDevices")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(USER_DEVICES)
-  for (const device of devices) {
-    if (device.feedbackReplies)
-      await ctx.db.patch(device._id, { userId: undefined, renewalReminders: false })
-    else await ctx.db.delete(device._id)
-  }
+  for (const device of devices) await ctx.db.delete(device._id)
   return devices.length
 }

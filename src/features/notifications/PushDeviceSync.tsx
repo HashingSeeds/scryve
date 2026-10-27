@@ -1,5 +1,4 @@
 import { useEffect } from "react"
-import { Platform } from "react-native"
 import { router } from "expo-router"
 import { useConvexAuth, useMutation } from "convex/react"
 
@@ -47,14 +46,7 @@ function Sync() {
       if (!token || stale) return
       // why: set before sending, so turning both off while this is in flight still forgets the device.
       storage.set(REGISTERED, true)
-      await syncDevice({
-        key,
-        token,
-        platform: Platform.OS === "ios" ? "ios" : "android",
-        locale: appLocale,
-        feedbackReplies,
-        renewalReminders,
-      })
+      await syncDevice({ key, token, locale: appLocale, feedbackReplies, renewalReminders })
     })().catch(() => undefined)
     return () => {
       stale = true

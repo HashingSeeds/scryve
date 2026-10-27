@@ -24,7 +24,7 @@ import {
   feedbackKind,
   senderHash,
 } from "./lib/feedback"
-import { feedbackReplyDevices, feedbackReplyMessage, sendPush } from "./lib/notifications"
+import { notifyFeedbackReply } from "./lib/notifications"
 
 const limiter = new RateLimiter(components.rateLimiter, {
   feedbackSubmit: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
@@ -416,11 +416,7 @@ export const applyApolloEvent = internalMutation({
     await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
     await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
     await postCard(ctx, request._id)
-    const devices = await feedbackReplyDevices(ctx, request)
-    await sendPush(
-      ctx,
-      devices.map((device) => feedbackReplyMessage(device, request._id, body)),
-    )
+    await notifyFeedbackReply(ctx, request, body)
     return null
   },
 })

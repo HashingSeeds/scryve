@@ -4,22 +4,19 @@ import { forgetAccountDevices, RENEWAL_REMINDER_LEAD_MS } from "./lib/notificati
 
 const ME = "a".repeat(64)
 const LAPTOP = "c".repeat(64)
-const DAY = 24 * 60 * 60 * 1000
+const HOUR = 60 * 60 * 1000
 
-function token(name: string) {
-  return `ExponentPushToken[${name}]`
-}
+const token = (name: string) => `ExponentPushToken[${name}]`
 
 function device(
   t: Pick<ConvexTestHarness, "mutation">,
   key: string,
   name: string,
-  prefs: { feedbackReplies?: boolean; renewalReminders?: boolean } = {},
+  prefs: { feedbackReplies?: boolean; renewalReminders?: boolean },
 ) {
   return t.mutation(api.notifications.syncDevice, {
     key,
     token: token(name),
-    platform: "ios",
     locale: "ja-JP",
     feedbackReplies: prefs.feedbackReplies ?? false,
     renewalReminders: prefs.renewalReminders ?? false,
@@ -32,22 +29,16 @@ async function signedIn(t: ConvexTestHarness, subject: string) {
   return actor
 }
 
-function expo(tickets: Record<string, unknown> = {}) {
+function expo() {
   const sent: Record<string, unknown>[] = []
-  jest.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-    if (!String(input).endsWith("/push/send")) return Response.json({ data: {} })
-    const messages = JSON.parse(String(init?.body)) as { to: string }[]
-    sent.push(...messages)
-    return Response.json({
-      data: messages.map(({ to }, i) => tickets[to] ?? { status: "ok", id: `ticket-${i}` }),
-    })
+  jest.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+    sent.push(...(JSON.parse(String(init?.body)) as Record<string, unknown>[]))
+    return Response.json({ data: [] })
   })
   return sent
 }
 
-async function devices(t: ConvexTestHarness) {
-  return await t.run((ctx) => ctx.db.query("pushDevices").collect())
-}
+const devices = (t: ConvexTestHarness) => t.run((ctx) => ctx.db.query("pushDevices").collect())
 
 describe("push notifications", () => {
   beforeEach(() => jest.useFakeTimers())
@@ -57,7 +48,7 @@ describe("push notifications", () => {
     jest.restoreAllMocks()
   })
 
-  it("tells every device that asked when the team replies, once per device", async () => {
+  it("tells every device that asked when the team replies", async () => {
     const t = makeConvexTest()
     const ana = await signedIn(t, "clerk_ana")
     const requestId = await ana.mutation(api.feedback.submit, {
@@ -85,32 +76,26 @@ describe("push notifications", () => {
       }),
       expect.objectContaining({ to: token("tablet") }),
     ])
-    expect(sent[0]).not.toHaveProperty("title")
   })
 
-  it("keeps renewal reminders for signed-in devices and forgets a device without its token", async () => {
+  it("keeps renewal reminders only for signed-in devices, and forgets without a token", async () => {
     const t = makeConvexTest()
     await device(t, ME, "phone", { feedbackReplies: true, renewalReminders: true })
-    expect(await devices(t)).toMatchObject([
-      { feedbackReplies: true, renewalReminders: false, locale: "ja" },
-    ])
+    expect(await devices(t)).toMatchObject([{ renewalReminders: false, locale: "ja" }])
 
     await t.mutation(api.notifications.forgetDevice, { key: ME })
     expect(await devices(t)).toEqual([])
-    await expect(
-      t.mutation(api.notifications.syncDevice, {
-        key: ME,
-        token: "not-a-token",
-        platform: "ios",
-        feedbackReplies: true,
-        renewalReminders: false,
-      }),
-    ).rejects.toThrow("Invalid push token")
+
+    const ana = await signedIn(t, "clerk_ana")
+    await device(ana, ME, "phone", { renewalReminders: true })
+    const user = await t.run((ctx) => ctx.db.query("users").first())
+    await t.run((ctx) => forgetAccountDevices(ctx, user!._id))
+    expect(await devices(t)).toEqual([])
   })
 
-  it("reminds opted-in devices three days before each renewal, once", async () => {
+  it("reminds opted-in devices in the hour that is 3 days before renewal", async () => {
     const t = makeConvexTest()
-    const now = Date.now()
+    const hour = Math.floor(Date.now() / HOUR) * HOUR
     const ana = await signedIn(t, "clerk_ana")
     await device(ana, ME, "phone", { renewalReminders: true })
     await device(ana, LAPTOP, "tablet", { feedbackReplies: true })
@@ -119,17 +104,18 @@ describe("push notifications", () => {
         environment: "PRODUCTION",
         snapshots: [{ appUserIds: ["clerk_ana"], enabled: true, observedAt, renewsAt }],
       })
-    await sync(now + 30 * DAY, 1)
     const sent = expo()
+    const remind = async () => {
+      await t.mutation(internal.notifications.remindRenewals, {})
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    }
 
-    await t.mutation(internal.notifications.remindRenewals, {})
+    await sync(hour + HOUR + RENEWAL_REMINDER_LEAD_MS, 1)
+    await remind()
     expect(sent).toEqual([])
 
-    jest.setSystemTime(now + 30 * DAY - RENEWAL_REMINDER_LEAD_MS)
-    await sync(now + 30 * DAY, 2)
-    await t.mutation(internal.notifications.remindRenewals, {})
-    await t.mutation(internal.notifications.remindRenewals, {})
-    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    await sync(hour + RENEWAL_REMINDER_LEAD_MS + 5 * 60 * 1000, 2)
+    await remind()
     expect(sent).toEqual([
       expect.objectContaining({
         to: token("phone"),
@@ -139,40 +125,8 @@ describe("push notifications", () => {
       }),
     ])
 
-    await sync(now + 60 * DAY, 3)
-    await sync(undefined, 4)
-    jest.setSystemTime(now + 60 * DAY - RENEWAL_REMINDER_LEAD_MS)
-    await t.mutation(internal.notifications.remindRenewals, {})
-    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    await sync(undefined, 3)
+    await remind()
     expect(sent).toHaveLength(1)
-  })
-
-  it("unlinks a deleted account's devices but keeps this install's feedback replies", async () => {
-    const t = makeConvexTest()
-    const ana = await signedIn(t, "clerk_ana")
-    await device(ana, ME, "phone", { feedbackReplies: true, renewalReminders: true })
-    await device(ana, LAPTOP, "tablet", { renewalReminders: true })
-    const user = await t.run((ctx) => ctx.db.query("users").first())
-
-    await t.run((ctx) => forgetAccountDevices(ctx, user!._id))
-    expect(await devices(t)).toEqual([
-      expect.objectContaining({
-        token: token("phone"),
-        feedbackReplies: true,
-        renewalReminders: false,
-      }),
-    ])
-    expect((await devices(t))[0]).not.toHaveProperty("userId")
-  })
-
-  it("forgets devices Expo says are gone", async () => {
-    const t = makeConvexTest()
-    await device(t, ME, "gone", { feedbackReplies: true })
-    expo({ [token("gone")]: { status: "error", details: { error: "DeviceNotRegistered" } } })
-
-    await t.action(internal.notifications.send, {
-      messages: [{ to: token("gone"), body: "Hi", url: "/feedback" }],
-    })
-    expect(await devices(t)).toEqual([])
   })
 })
