@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import type { ConnectedGameStatus } from "@/features/connected/model"
+import { SyncLatency } from "@/features/connected/syncLatency"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 
@@ -112,6 +113,7 @@ export type MockConnectedRuntime = TableRuntime & {
   changeError?: string
   finishError?: string
   finishing: boolean
+  latency: SyncLatency
 }
 
 export const mockClaimSeat = jest.fn(async () => ({ publicId: "game-public", seat: 2 }))
@@ -201,6 +203,7 @@ function defaultRuntime(): MockConnectedRuntime {
     abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
     finishing: false,
+    latency: new SyncLatency({ transport: "cloud" }),
     table: { designations: {}, players: {} },
     tableRules: { counters: [], designations: [] },
     ...createTableActions(

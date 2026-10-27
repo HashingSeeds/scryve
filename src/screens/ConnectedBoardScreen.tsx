@@ -385,6 +385,16 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
   )
 }
 
+/** why: a frame after the layout effect is when the new totals reach the screen, which is what the other players are waiting for. */
+function usePaintTiming({ latency, projection }: ConnectedGameRuntime) {
+  const eventSequence = projection?.eventSequence
+  useLayoutEffect(() => {
+    if (eventSequence === undefined) return
+    const frame = requestAnimationFrame(() => latency.painted(eventSequence))
+    return () => cancelAnimationFrame(frame)
+  }, [eventSequence, latency])
+}
+
 export function ConnectedBoardWithRuntime({
   publicId,
   initialInviteOpen,
@@ -408,6 +418,7 @@ export function ConnectedBoardWithRuntime({
   runtime,
 }: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake(undefined, { suppressDeactivateWarnings: true })
+  usePaintTiming(runtime)
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
     connectionStatus: runtime.connectionStatus,
     unsent: runtime.pending.length,

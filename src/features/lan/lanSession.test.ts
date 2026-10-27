@@ -106,6 +106,13 @@ const lifeOf = (session: LanSession, key: string) =>
   session.getState().projection?.players.find((player) => player.playerId === key)?.currentLife
 
 describe("nearby host", () => {
+  it("answers a guest's ping at once with the host's clock", async () => {
+    const { alice } = await startedGame()
+    jest.setSystemTime(50_000)
+    alice.send({ type: "ping", at: 7 })
+    expect(alice.sent.at(-1)).toEqual({ type: "pong", at: 7, hostAt: 50_000 })
+  })
+
   it("sends a guest the projection with its change, then the acknowledgement, in one write", async () => {
     const { session, bob } = await startedGame()
     const { key } = bob.pass()
@@ -528,6 +535,16 @@ describe("nearby guest", () => {
 
     expect(lobbyReader).toHaveBeenCalledTimes(2)
     act(() => lanSession.leave())
+  })
+
+  it("sets its clock from the host's reply to a ping", async () => {
+    const { session, sent, host } = await guest()
+    const ping = sent.find((message) => (message as LanGuestMessage).type === "ping")
+    expect(ping).toEqual({ type: "ping", at: Date.now() })
+    jest.advanceTimersByTime(30)
+    host()?.onMessage({ type: "pong", at: Date.now() - 30, hostAt: 90_000 })
+    expect(session.latency.summary()).toEqual({ ping: 30 })
+    session.leave()
   })
 
   it("settles a write on the host's reply, refused or not", async () => {

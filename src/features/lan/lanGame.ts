@@ -125,6 +125,7 @@ export type LanGuestMessage =
   | { type: "op"; event: ConnectedActionEvent }
   | { type: "reveal" }
   | { type: "deck"; deck: LanSeatDeck | null }
+  | { type: "ping"; at: number }
 
 export type LanHostMessage =
   | { type: "welcome"; pass: LanSeatPass }
@@ -133,6 +134,7 @@ export type LanHostMessage =
   | { type: "state"; lobby: LanLobby; projection: ConnectedProjection }
   | { type: "ack"; operationId: string; status?: ClaimStatus }
   | { type: "nack"; operationId: string; code?: string; message: string }
+  | { type: "pong"; at: number; hostAt: number }
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
 
@@ -647,6 +649,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
         : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
+  if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
   if (value.type === "deck") {
     const deck = value.deck === null ? null : parseSeatDeck(value.deck)
     return value.deck === null || deck ? { type: "deck", deck } : null
@@ -713,5 +716,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       ...(typeof value.code === "string" ? { code: value.code } : {}),
       message: value.message,
     }
+  if (value.type === "pong" && isCount(value.at) && isCount(value.hostAt))
+    return { type: "pong", at: value.at, hostAt: value.hostAt }
   return null
 }

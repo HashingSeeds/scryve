@@ -30,7 +30,29 @@ const values = {
   tool: DICE_TOOLS,
   source: ["pill", "bag"],
   status: ["ready", "unsupported", "refreshing", "rate_limited", "unavailable"],
+  transport: ["cloud", "nearby"],
+  role: ["host", "guest"],
 } as const
+
+const LATENCY_KEYS = [
+  "delivery_count",
+  "delivery_p50",
+  "delivery_p90",
+  "delivery_p99",
+  "delivery_over_500",
+  "delivery_over_1000",
+  "ack_count",
+  "ack_p50",
+  "ack_p90",
+  "ack_p99",
+  "ping_ms",
+] as const
+const NUMBER_KEYS = new Set<string>([
+  "duration_ms",
+  "attempt_count",
+  "since_roll_ms",
+  ...LATENCY_KEYS,
+])
 
 export type GameEndSource = (typeof values.end_source)[number]
 type SyncTiming = (typeof values.timing)[number]
@@ -65,6 +87,10 @@ type Events = {
   dice_armed: { tool: DiceTool; source: "pill" | "bag"; system?: string; since_roll_ms?: number }
   dice_rolled: { tool: DiceTool; system?: string }
   deck_browse_empty: { system: string; format: string; status: (typeof values.status)[number] }
+  sync_latency: {
+    transport: (typeof values.transport)[number]
+    role?: (typeof values.role)[number]
+  } & Partial<Record<(typeof LATENCY_KEYS)[number], number>>
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -79,6 +105,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   dice_armed: ["tool", "source", "system", "since_roll_ms"],
   dice_rolled: ["tool", "system"],
   deck_browse_empty: ["system", "format", "status"],
+  sync_latency: ["transport", "role", ...LATENCY_KEYS],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"
@@ -120,7 +147,7 @@ export function analyticsProperties(event: string, properties: Record<string, un
     } else if (key === "player_count") {
       if (typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= 6)
         result[key] = value
-    } else if (key === "duration_ms" || key === "attempt_count" || key === "since_roll_ms") {
+    } else if (NUMBER_KEYS.has(key)) {
       if (typeof value === "number" && Number.isFinite(value) && value >= 0)
         result[key] = Math.round(value)
     } else if (key === "first_player_known") {
