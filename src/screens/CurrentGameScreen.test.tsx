@@ -1,5 +1,5 @@
 import { useEffect, useId } from "react"
-import { StyleSheet } from "react-native"
+import { Alert, StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
@@ -634,8 +634,9 @@ describe("CurrentGameScreen", () => {
     jest.useRealTimers()
   })
 
-  it("keeps the end dialog open to show a failed rematch save", () => {
+  it("starts the rematch in memory and says once that it can't be saved", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
     const initial = game()
     repository.saveActiveGame(initial)
     const save = repository.saveActiveGame.bind(repository)
@@ -658,8 +659,10 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("end-game-winner-0"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
 
-    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
-    expect(view.getByText("Storage is full")).toBeTruthy()
+    expect(view.queryByTestId("end-game-dialog")).toBeNull()
+    expect(repository.loadHistory()).toHaveLength(1)
+    expect(alert).toHaveBeenCalledTimes(1)
+    alert.mockRestore()
   })
 
   it("discards an abandoned game without adding it to history", async () => {

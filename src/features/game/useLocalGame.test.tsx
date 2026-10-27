@@ -1,8 +1,9 @@
-import { AccessibilityInfo } from "react-native"
+import { AccessibilityInfo, Alert } from "react-native"
 import * as Haptics from "expo-haptics"
 import { act, renderHook } from "@testing-library/react-native"
 
 import { captureGame } from "@/utils/analytics"
+import { reportCrash } from "@/utils/crashReporting"
 import { recordReviewCompletion } from "@/utils/storeReview"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
@@ -13,6 +14,10 @@ import { useLocalGame } from "./useLocalGame"
 
 jest.mock("@/utils/analytics", () => ({ captureGame: jest.fn() }))
 jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: jest.fn() }))
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
+}))
 
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
@@ -202,21 +207,6 @@ describe("useLocalGame persistence", () => {
       ["Grace", 21],
     ])
   })
-
-  it("does not publish a change when persistence fails", () => {
-    const repository = new LocalGameRepository(new MemoryStorage())
-    const initial = game()
-    jest.spyOn(repository, "saveActiveGame").mockImplementation(() => {
-      throw new Error("storage unavailable")
-    })
-    const { result } = renderHook(() => useLocalGame(initial, repository))
-
-    expect(() => act(() => result.current.changeLife(initial.players[0].id, 1))).toThrow(
-      "storage unavailable",
-    )
-    expect(result.current.game).toBe(initial)
-    expect(result.current.game.players[0].life).toBe(20)
-  })
 })
 
 it("counts the first gameplay action once, then explicit completion", () => {
@@ -300,4 +290,29 @@ it("follows the haptics setting changed while the board is open", async () => {
   act(() => result.current.changeLife(ada.id, -1))
   expect(Haptics.impactAsync).toHaveBeenCalledTimes(1)
   resetReducedMotionCacheForTests()
+})
+
+it("keeps the board playable and tells the player once when storage refuses the game", () => {
+  jest.mocked(reportCrash).mockClear()
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+  const storage = new MemoryStorage()
+  const repository = new LocalGameRepository(storage)
+  const initial = game()
+  const [ada] = initial.players
+  const { result } = renderHook(() => useLocalGame(initial, repository))
+  const quota = new Error("QuotaExceededError")
+  storage.set = () => {
+    throw quota
+  }
+
+  act(() => result.current.changeLife(ada.id, -1))
+  act(() => result.current.changeLife(ada.id, -1))
+  act(() => result.current.changeLayout("even-grid"))
+
+  expect(result.current.game.players[0].life).toBe(18)
+  expect(result.current.game.layout).toBe("even-grid")
+  expect(alert).toHaveBeenCalledTimes(1)
+  expect(reportCrash).toHaveBeenCalledTimes(1)
+  expect(reportCrash).toHaveBeenCalledWith(quota, "Handled", expect.anything())
+  alert.mockRestore()
 })

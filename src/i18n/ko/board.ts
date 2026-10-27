@@ -232,6 +232,10 @@ export default {
     matchSaved: "매치를 저장했습니다",
     summary: "요약",
   },
+  saveFailed: {
+    title: "이 게임을 저장할 수 없습니다",
+    message: "계속 플레이할 수 있지만 Scryve를 닫으면 게임이 사라집니다.",
+  },
   endGame: {
     failed: "게임을 종료할 수 없습니다.",
     cancel: "게임 종료 취소",

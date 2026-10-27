@@ -240,6 +240,10 @@ export default {
     matchSaved: "Encuentro guardado",
     summary: "Resumen",
   },
+  saveFailed: {
+    title: "No se puede guardar esta partida",
+    message: "Puedes seguir jugando, pero la partida se perderá si cierras Scryve.",
+  },
   endGame: {
     failed: "No se pudo terminar esta partida.",
     cancel: "Cancelar el fin de la partida",

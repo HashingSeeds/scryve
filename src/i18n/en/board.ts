@@ -220,6 +220,11 @@ const board = {
     matchSaved: "Match saved",
     summary: "Summary",
   },
+  saveFailed: {
+    // Shown once when the device refuses to store the game, usually because storage is full.
+    title: "Can't save this game",
+    message: "You can keep playing, but the game will be lost if you close Scryve.",
+  },
   endGame: {
     failed: "Could not end this game.",
     cancel: "Cancel ending the game",
