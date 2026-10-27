@@ -19,7 +19,6 @@ import {
 
 const limiter = new RateLimiter(components.rateLimiter, {
   pushDeviceSync: { kind: "token bucket", rate: 20, period: HOUR, capacity: 10 },
-  // why: each new feedback key gets a fresh bucket, so only this caps how many devices can be added.
   pushDeviceNew: { kind: "fixed window", rate: 300, period: HOUR },
 })
 
