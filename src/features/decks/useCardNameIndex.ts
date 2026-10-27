@@ -62,7 +62,7 @@ export function useCardNameIndex(game: string, deviceId: string, wanted: boolean
     void convex
       ?.action(api.cards.cardNameCatalog, { deviceId })
       .then((catalog) => {
-        saveString(CARD_NAMES_KEY, JSON.stringify({ fetchedAt: Date.now(), ...catalog }))
+        saveString(CARD_NAMES_KEY, JSON.stringify(catalog))
         if (active) setIndex(indexFor(catalog))
       })
       .catch(() => {
