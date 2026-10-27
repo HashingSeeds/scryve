@@ -233,6 +233,11 @@ export default {
     matchSaved: "マッチを保存しました",
     summary: "サマリー",
   },
+  saveFailed: {
+    title: "このゲームを保存できません",
+    message:
+      "プレイは続けられますが、ボードを離れるかScryveを閉じると、ゲームが失われる可能性があります。",
+  },
   endGame: {
     failed: "このゲームを終了できませんでした。",
     cancel: "ゲームの終了をキャンセル",

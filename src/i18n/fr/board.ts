@@ -240,6 +240,11 @@ export default {
     matchSaved: "Match enregistré",
     summary: "Résumé",
   },
+  saveFailed: {
+    title: "Impossible d'enregistrer cette partie",
+    message:
+      "Vous pouvez continuer à jouer, mais la partie risque d'être perdue si vous quittez le plateau ou fermez Scryve.",
+  },
   endGame: {
     failed: "Impossible de terminer cette partie.",
     cancel: "Annuler la fin de la partie",

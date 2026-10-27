@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Alert, Platform } from "react-native"
 import * as Haptics from "expo-haptics"
 
 import { translate } from "@/i18n/translate"
 import { captureGame, type GameEndSource } from "@/utils/analytics"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
@@ -36,9 +38,10 @@ import { EMPTY_TABLE } from "../../../convex/lib/table"
 /**
  * why: `storedGame` is the game as the route last read it from storage. The route rereads on
  * focus, so a board left open under setup adopts renames and ended games instead of saving
- * its older copy over them. A new read always wins: the board saves before it updates, so
- * storage is never behind it. Each read is a new object, so callers must keep it stable
- * between reads. `ownerId` is the signed-in account, so a finished game is filed under it
+ * its older copy over them. A new read wins because the board saves before it updates. The
+ * exception is a board storage refused: a read of the same game no newer than the board is
+ * its own last good save, so the board keeps its unsaved state. Each read is a new object, so
+ * callers must keep it stable between reads. `ownerId` is the signed-in account, so a finished game is filed under it
  * for upload.
  */
 export function useLocalGame(
@@ -48,15 +51,38 @@ export function useLocalGame(
 ) {
   const [game, setGame] = useState(storedGame)
   const [readGame, setReadGame] = useState(storedGame)
+  const [unsavedGameId, setUnsavedGameId] = useState<string>()
   if (storedGame !== readGame) {
     setReadGame(storedGame)
-    setGame(storedGame)
+    const staleRead = storedGame.id === unsavedGameId && storedGame.updatedAt <= game.updatedAt
+    if (!staleRead) setGame(storedGame)
   }
   const reduceMotion = useReducedMotion()
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
   const context = useMemo(() => defaultCommandContext(deviceId), [deviceId])
   const gameRef = useRef(game)
   gameRef.current = game
+  const saveFailureShown = useRef(false)
+
+  // why: a full web storage quota (SCRYVE-23) throws on every save, which dropped each tap. Ending a game still throws so the end dialog reports the history write.
+  const save = useCallback(
+    (next: LocalGame) => {
+      try {
+        repository.saveActiveGame(next)
+        saveFailureShown.current = false
+        setUnsavedGameId(undefined)
+      } catch (cause) {
+        setUnsavedGameId(next.id)
+        if (saveFailureShown.current) return
+        saveFailureShown.current = true
+        reportCrash(cause instanceof Error ? cause : new Error(String(cause)), ErrorType.HANDLED, {
+          fingerprint: ["local-game-save-failed"],
+        })
+        showSaveFailure()
+      }
+    },
+    [repository],
+  )
 
   const dispatch = useCallback(
     (command: GameCommand, endSource?: GameEndSource): LocalGame => {
@@ -64,7 +90,7 @@ export function useLocalGame(
       if (applied === gameRef.current) return applied
       const next = withFirstPlayerSettled(applied)
       if (next.status === "active") {
-        repository.saveActiveGame(next)
+        save(next)
         if (!hasLocalGameStarted(gameRef.current) && hasLocalGameStarted(next))
           captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
       } else repository.archiveGame(next, endSource, ownerId)
@@ -72,7 +98,7 @@ export function useLocalGame(
       setGame(next)
       return next
     },
-    [context, ownerId, repository],
+    [context, ownerId, repository, save],
   )
 
   const assignCommanderDamage = useCallback(
@@ -91,11 +117,11 @@ export function useLocalGame(
     (board: { layout?: PlayerGridLayoutVariant; seatOrder?: SeatOrder }) => {
       const current = gameRef.current
       const next = { ...current, ...board, updatedAt: Date.now() }
-      repository.saveActiveGame(next)
+      save(next)
       gameRef.current = next
       setGame(next)
     },
-    [repository],
+    [save],
   )
   const changeLayout = useCallback(
     (layout: PlayerGridLayoutVariant) => {
@@ -111,8 +137,8 @@ export function useLocalGame(
   // why: a round clock runs before the first tap, so an unsaved timed board would restart its clock when the route rebuilds it.
   const timedBoardId = game.clock && game.status === "active" ? game.id : undefined
   useEffect(() => {
-    if (timedBoardId) repository.saveActiveGame(gameRef.current)
-  }, [repository, timedBoardId])
+    if (timedBoardId) save(gameRef.current)
+  }, [save, timedBoardId])
 
   // why: clock changes are rare taps (pause, adjust, next turn), so saving each one stays off the per-tick path.
   const changeClock = useCallback(
@@ -122,11 +148,11 @@ export function useLocalGame(
       const { clock: _previous, ...rest } = current
       const clock = update(current.clock)
       const next: LocalGame = { ...rest, ...(clock ? { clock } : {}), updatedAt: Date.now() }
-      repository.saveActiveGame(next)
+      save(next)
       gameRef.current = next
       setGame(next)
     },
-    [repository],
+    [save],
   )
 
   const changeLife = useCallback(
@@ -158,7 +184,7 @@ export function useLocalGame(
           const applied = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
           if (applied === previous) return false
           const next = withFirstPlayerSettled(applied)
-          repository.saveActiveGame(next)
+          save(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
           gameRef.current = next
@@ -166,17 +192,17 @@ export function useLocalGame(
           return true
         },
       ),
-    [repository],
+    [save],
   )
 
   const replaceBoard = useCallback(
     (next: LocalGame) => {
-      repository.saveActiveGame(next)
+      save(next)
       gameRef.current = next
       setGame(next)
       return next
     },
-    [repository],
+    [save],
   )
 
   const markFirstPlayerUsed = useCallback(() => {
@@ -274,6 +300,14 @@ export function useLocalGame(
       return gameRef.current
     },
   }
+}
+
+function showSaveFailure() {
+  const title = translate("board:saveFailed.title")
+  const message = translate("board:saveFailed.message")
+  // why: react-native-web's Alert.alert is a no-op.
+  if (Platform.OS === "web") globalThis.alert(`${title}\n\n${message}`)
+  else Alert.alert(title, message)
 }
 
 /** why: any board action means cards are drawn, so it closes the first-player offer for good, in the same write as the change itself. Undoing the change never brings the offer back. */
