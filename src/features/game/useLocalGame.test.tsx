@@ -316,3 +316,32 @@ it("keeps the board playable and tells the player once when storage refuses the 
   expect(reportCrash).toHaveBeenCalledWith(quota, "Handled", expect.anything())
   alert.mockRestore()
 })
+
+it("keeps unsaved taps when the route rereads the last good save", () => {
+  jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+  const storage = new MemoryStorage()
+  const repository = new LocalGameRepository(storage)
+  repository.saveActiveGame(game())
+  const stored = repository.loadActiveGame()!
+  const [ada] = stored.players
+  const { result, rerender } = renderHook(
+    ({ storedGame }: { storedGame: LocalGame }) => useLocalGame(storedGame, repository),
+    { initialProps: { storedGame: stored } },
+  )
+  const set = storage.set.bind(storage)
+  storage.set = () => {
+    throw new Error("QuotaExceededError")
+  }
+
+  act(() => result.current.changeLife(ada.id, -3))
+  rerender({ storedGame: repository.loadActiveGame()! })
+  expect(result.current.game.players[0].life).toBe(17)
+
+  storage.set = set
+  act(() => result.current.changeLife(ada.id, -1))
+  const renamed = { ...repository.loadActiveGame()!, updatedAt: Date.now() + 1_000 }
+  renamed.players = renamed.players.map((player) => ({ ...player, name: "Lovelace" }))
+  rerender({ storedGame: renamed })
+  expect(result.current.game.players[0].name).toBe("Lovelace")
+  jest.mocked(Alert.alert).mockRestore()
+})

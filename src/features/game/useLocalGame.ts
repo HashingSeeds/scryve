@@ -38,10 +38,10 @@ import { EMPTY_TABLE } from "../../../convex/lib/table"
 /**
  * why: `storedGame` is the game as the route last read it from storage. The route rereads on
  * focus, so a board left open under setup adopts renames and ended games instead of saving
- * its older copy over them. A new read always wins: the board saves before it updates, so
- * storage is only behind it when storage refuses the save, and then the player is told once.
- * Each read is a new object, so callers must keep it stable
- * between reads. `ownerId` is the signed-in account, so a finished game is filed under it
+ * its older copy over them. A new read wins because the board saves before it updates. The
+ * exception is a board storage refused: a read of the same game no newer than the board is
+ * its own last good save, so the board keeps its unsaved state. Each read is a new object, so
+ * callers must keep it stable between reads. `ownerId` is the signed-in account, so a finished game is filed under it
  * for upload.
  */
 export function useLocalGame(
@@ -51,9 +51,11 @@ export function useLocalGame(
 ) {
   const [game, setGame] = useState(storedGame)
   const [readGame, setReadGame] = useState(storedGame)
+  const [unsavedGameId, setUnsavedGameId] = useState<string>()
   if (storedGame !== readGame) {
     setReadGame(storedGame)
-    setGame(storedGame)
+    const staleRead = storedGame.id === unsavedGameId && storedGame.updatedAt <= game.updatedAt
+    if (!staleRead) setGame(storedGame)
   }
   const reduceMotion = useReducedMotion()
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
@@ -67,7 +69,9 @@ export function useLocalGame(
     (next: LocalGame) => {
       try {
         repository.saveActiveGame(next)
+        setUnsavedGameId(undefined)
       } catch (cause) {
+        setUnsavedGameId(next.id)
         if (saveFailureShown.current) return
         saveFailureShown.current = true
         reportCrash(cause instanceof Error ? cause : new Error(String(cause)), ErrorType.HANDLED, {
