@@ -179,15 +179,15 @@ const $zone: ThemedStyle<ViewStyle> = () => ({
 const $dimmed: ViewStyle = { opacity: 0.5 }
 const $zoneLeft: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-start",
-  paddingStart: spacing.md,
+  paddingStart: spacing.sm,
 })
 const $zoneRight: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-end",
-  paddingEnd: spacing.md,
+  paddingEnd: spacing.sm,
 })
 const $glyph: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.text,
-  fontSize: 40,
-  lineHeight: 46,
+  fontSize: 32,
+  lineHeight: 38,
   opacity: 0.6,
 })
