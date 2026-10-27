@@ -168,21 +168,23 @@ async function newIssues(candidate) {
 const prNumber = (subject) =>
   /\(#(\d+)\)$/.exec(subject)?.[1] ?? /^Merge pull request #(\d+) from /.exec(subject)?.[1]
 
-/**
- * PRs a range of commit messages ships. A revert (any line starting "Revert", or a merged
- * `revert-<n>-` branch) drops every other PR its message names.
- */
+const subjectOf = (message) => message.split("\n")[0]
+
+/** PRs a revert names: a merged `revert-<n>-` branch, `Revert "… (#n)"`, or a `Reverts #n` line. */
+function revertedPrs(message) {
+  const subject = subjectOf(message)
+  return [
+    /\/revert-(\d+)-/.exec(subject)?.[1],
+    prNumber(/^Revert "(.*)"/.exec(subject)?.[1] ?? ""),
+    ...[...message.matchAll(/^Reverts (?:HashingSeeds\/scryve)?#(\d+)/gim)].map(
+      (match) => match[1],
+    ),
+  ].filter(Boolean)
+}
+
+/** PRs a range of commit messages ships, minus the ones a revert in the range names. */
 function prNumbers(messages) {
-  const subjectOf = (message) => message.split("\n")[0]
-  const reverted = new Set(
-    messages
-      .filter((message) => /^revert/im.test(message) || /\/revert-\d+-/.test(subjectOf(message)))
-      .flatMap((message) =>
-        [...message.matchAll(/#(\d+)|\/revert-(\d+)-/g)]
-          .map((match) => match[1] ?? match[2])
-          .filter((pr) => pr !== prNumber(subjectOf(message))),
-      ),
-  )
+  const reverted = new Set(messages.flatMap(revertedPrs))
   const shipped = messages.map((message) => prNumber(subjectOf(message)))
   return [...new Set(shipped.filter((pr) => pr && !reverted.has(pr)))].map(Number)
 }
