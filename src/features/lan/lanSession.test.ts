@@ -270,6 +270,40 @@ describe("nearby host", () => {
     expect(lifeOf(session, alice.pass().key)).toBe(40)
   })
 
+  it("tells the attacker, guest or host, when a claim waits on an unanswered one", async () => {
+    const { session, alice, bob } = await startedGame()
+    const defender = alice.pass().key
+    const claim = (operationId: string, fromPlayerId: string) =>
+      ({
+        ...lifeEvent(operationId, fromPlayerId, 0, roundOf(session)),
+        type: "commanderDamage.submitted",
+        fromPlayerId,
+        toPlayerId: defender,
+        delta: 5,
+      }) as PendingLifeAction["event"]
+    const hostClaim = (operationId: string) =>
+      session.writes.send({
+        event: claim(operationId, session.getState().seatKey ?? ""),
+      } as PendingLifeAction)
+    const acks = () => bob.sent.filter((message) => message.type === "ack")
+
+    bob.send({ type: "op", event: claim("claim-operation-0001", bob.pass().key) })
+    bob.send({ type: "op", event: claim("claim-operation-0002", bob.pass().key) })
+    const first = hostClaim("claim-operation-0003")
+    const second = hostClaim("claim-operation-0004")
+    jest.advanceTimersByTime(100)
+
+    expect(acks()).toEqual([
+      { type: "ack", operationId: "claim-operation-0001", status: "pending" },
+      { type: "ack", operationId: "claim-operation-0002", status: "declined" },
+    ])
+    await expect(first).resolves.toEqual({ operationId: "claim-operation-0003", status: "pending" })
+    await expect(second).resolves.toEqual({
+      operationId: "claim-operation-0004",
+      status: "declined",
+    })
+  })
+
   it("caps how fast one socket can write", async () => {
     const { session, bob } = await startedGame()
 
@@ -467,6 +501,24 @@ describe("nearby guest", () => {
 
     await expect(acked).resolves.toEqual({ operationId: "life-operation-0003" })
     await expect(refused).rejects.toBeInstanceOf(ConvexError)
+  })
+
+  it("hands a declined claim's status to the outbox, and settles an older host's bare ack", async () => {
+    const { session, host } = await guest()
+    const write = (operationId: string) =>
+      session.writes.send({ event: lifeEvent(operationId, "guest", -1) } as PendingLifeAction)
+    const declined = write("claim-operation-0001")
+    const bare = write("claim-operation-0002")
+
+    host()?.onMessage({ type: "ack", operationId: "claim-operation-0001", status: "declined" })
+    host()?.onMessage({ type: "ack", operationId: "claim-operation-0002" })
+    jest.advanceTimersByTime(50)
+
+    await expect(declined).resolves.toEqual({
+      operationId: "claim-operation-0001",
+      status: "declined",
+    })
+    await expect(bare).resolves.toEqual({ operationId: "claim-operation-0002" })
   })
 
   it("fails a write it never heard back about when the host drops, so the outbox retries it", async () => {
