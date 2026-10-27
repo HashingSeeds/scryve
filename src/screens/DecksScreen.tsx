@@ -41,7 +41,7 @@ import {
   deckFormats,
   DEFAULT_DECK_GAME,
 } from "../../convex/lib/deckGames"
-import { isSystemId, type SystemId } from "../../convex/lib/systems"
+import { isSystemId, tracksResults, type SystemId } from "../../convex/lib/systems"
 
 type ShelfDeck = {
   _id: string
@@ -124,7 +124,7 @@ function DeckRow({
   const local = guestDeckLocalId(String(deck._id)) !== undefined
   const favorite = deck.favoritedAt !== undefined
   const allResults = deck.keyRecord ?? deck.record
-  const record = allResults && recordSummary(allRecord(allResults))
+  const record = tracksResults(game) && allResults && recordSummary(allRecord(allResults))
   const versions =
     deck.versionCount && deck.versionCount > 1
       ? translate("decks:shelf.versionCount", { count: deck.versionCount })
