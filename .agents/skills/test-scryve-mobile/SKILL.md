@@ -34,6 +34,9 @@ Development identity:
 - Clerk test identities: `jane+clerk_test@sow.care`, `john+clerk_test@sow.care`
 - Clerk development OTP: `424242` (same for both)
 - Any `*+clerk_test@sow.care` address is a test account on the Clerk development instance.
+  On dev and preview you may create more (for example `alice+clerk_test@sow.care`)
+  when a test needs extra players; they use the same OTP. Never create accounts
+  on production.
 
 Bundle presence proves the variant, not native compatibility. An Expo
 fingerprint can prove that an EAS build matches this worktree's native runtime,
@@ -114,9 +117,9 @@ the affected flow needs:
    action and use Clerk's real development sign-in flow with
    `jane+clerk_test@sow.care` and OTP `424242`. Discover and act on the current
    Clerk fields from a fresh accessibility snapshot rather than assuming their
-   labels or order. If Clerk asks to create a username or password, stop and
-   report that the dedicated test user is missing instead of creating another
-   account.
+   labels or order. If Clerk asks to create a username or password, the
+   address has no account yet: finish creating it on dev or preview for a
+   `*+clerk_test@sow.care` address, and stop and report for anything else.
 4. Wait for the auth modal to close and confirm the account action reflects the
    signed-in state. If signed-in consent appears, accept it through the same
    `accept-legal-button` flow and wait for its backend sync.
