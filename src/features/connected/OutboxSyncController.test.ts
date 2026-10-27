@@ -919,6 +919,25 @@ describe("outbox sync controller", () => {
     })
   })
 
+  it("does not set its clock from a write that shares its projection with someone else's", async () => {
+    const { clock, controller } = harness({ awaitProjectionBarrier: true })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    clock.time = 1_000
+    controller.changeLife("player-1", 5)
+    await settle()
+    const operationId = controller.getSnapshot().pending[0]?.event.operationId ?? ""
+    controller.onRemoteProjection(
+      { ...projection(2, 25), serverUpdatedAt: 5_300 },
+      { status: "acknowledged", operationId, projectionEventSequence: 2 },
+    )
+    await settle()
+    expect(controller.getSnapshot().pending).toEqual([])
+    controller.onRemoteProjection(projection(3, 25))
+    controller.latency.painted(3)
+    expect(controller.latency.summary().delivery).toBeUndefined()
+  })
+
   it("does not time a catch-up after reconnecting", () => {
     const { controller } = harness()
     controller.setEnvironment(ONLINE)

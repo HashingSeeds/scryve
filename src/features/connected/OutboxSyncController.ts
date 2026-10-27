@@ -217,10 +217,12 @@ export class OutboxSyncController {
     if (status?.operationId === head?.operationId) {
       this.operationStatus = status ?? null
       if (status?.status === "acknowledged") {
+        // why: one event past what this device last confirmed can only be its own write, so serverUpdatedAt is that write's server time; any more and it may be someone else's.
         if (
           this.options.awaitProjectionBarrier &&
           head?.type === "life.changed" &&
-          incoming.eventSequence === status.projectionEventSequence
+          this.confirmed &&
+          incoming.eventSequence === this.confirmed.eventSequence + 1
         )
           this.latency.ownWrite(status.operationId, { authorityAt: incoming.serverUpdatedAt })
         incoming = {
@@ -635,7 +637,12 @@ export class OutboxSyncController {
     sentAt: number,
   ): Promise<OutboxAcknowledgement> {
     const acknowledgement = await this.options.send(action)
-    if (this.options.awaitProjectionBarrier && action.event.type === "life.changed")
+    // why: a retry of a write whose reply was lost pairs this send's timing with the first send's server time.
+    if (
+      this.options.awaitProjectionBarrier &&
+      action.event.type === "life.changed" &&
+      action.attempts === 1
+    )
       this.latency.ownWrite(action.event.operationId, { sentAt, returnedAt: this.now() })
     if (action.event.type === "commanderDamage.submitted" && acknowledgement.status === "declined")
       this.claimDeclined(action.event.toPlayerId, action.event.delta)
