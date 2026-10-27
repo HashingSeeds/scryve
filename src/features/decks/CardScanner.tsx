@@ -95,6 +95,7 @@ export function CardScanner({
   const [status, setStatus] = useState<ScanStatus>("looking")
   const [fixing, setFixing] = useState<ScannedCard>()
   const [landCount, setLandCount] = useState<LandCount>()
+  const landCountOpen = useRef(false)
   const countedLands = useRef(new Set<string>())
   const candidateName = useRef<string>(undefined)
   const nameInFrame = useRef<string>(undefined)
@@ -197,6 +198,7 @@ export function CardScanner({
         return
       }
       const inDeck = copiesInDeck(card.name)
+      landCountOpen.current = true
       setLandCount({ card, inDeck, count: Math.max(inDeck, 1) })
       return
     }
@@ -212,6 +214,7 @@ export function CardScanner({
   }
 
   function addLands({ card, inDeck, count }: LandCount) {
+    landCountOpen.current = false
     setLandCount(undefined)
     countedLands.current.add(card.name)
     for (let copy = inDeck; copy < count; copy++) add(card)
@@ -239,6 +242,11 @@ export function CardScanner({
     closingRef.current = true
     setClosing(true)
     await Promise.all(corrections.current)
+    if (landCountOpen.current) {
+      closingRef.current = false
+      setClosing(false)
+      return
+    }
     await addWaitingCards()
     await Promise.all(lookups.current.values())
     onClose()

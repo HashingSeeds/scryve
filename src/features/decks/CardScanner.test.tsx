@@ -189,3 +189,26 @@ test("Done keeps an alternate chosen while the wrong card was still being added"
     jest.useRealTimers()
   }
 })
+
+test("Done waits for the land count when an alternate turns out to be a basic land", async () => {
+  jest.useFakeTimers()
+  try {
+    const slow = slowAdds()
+    const { view, addCards, onClose } = renderScanner({ singleton: false, addCards: slow.addCards })
+    scan("Sol Ring", "Forest")
+    act(() => jest.advanceTimersByTime(1500))
+    fireEvent.press(view.getByText("Wrong card"))
+    fireEvent.press(view.getByText("Forest"))
+    fireEvent.press(view.getByText("Done"))
+    await slow.land()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(view.getByText("How many in the deck?")).toBeTruthy()
+    fireEvent.press(view.getByTestId("card-scan-add-lands"))
+    await act(async () => fireEvent.press(view.getByText("Done")))
+    await slow.land()
+    expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Forest"])
+    expect(onClose).toHaveBeenCalledTimes(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})
