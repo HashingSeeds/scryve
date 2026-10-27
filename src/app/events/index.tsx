@@ -3,7 +3,7 @@ import { useQuery } from "convex/react"
 
 import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
 import { EventListScreen } from "@/features/events/EventListScreen"
-import { lanPlayAvailable } from "@/features/lan/lanAvailability"
+import { nearbyBetaAvailable } from "@/features/lan/lanAvailability"
 
 import { api } from "../../../convex/_generated/api"
 
@@ -19,7 +19,7 @@ function EventList({ access }: { access: CloudAccess }) {
       onNew={() => router.push("/events/new")}
       onJoin={() => router.push("/events/join")}
       onOpen={(eventId) => router.push({ pathname: "/events/[eventId]", params: { eventId } })}
-      onNearby={lanPlayAvailable() ? () => router.push("/events/nearby") : undefined}
+      onNearby={nearbyBetaAvailable() ? () => router.push("/events/nearby") : undefined}
     />
   )
 }

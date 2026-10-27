@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react"
 
 import { load, save } from "@/utils/storage"
 
-import { lanPlayAvailable } from "./lanAvailability"
+import { nearbyBetaAvailable } from "./lanAvailability"
 
 const NEARBY_ONLY_KEY = "lan.nearbyOnly"
 const UNREACHABLE_SYNC_URL = "wss://convex.offline.invalid/api/sync"
@@ -11,7 +11,7 @@ const listeners = new Set<() => void>()
 const liveSockets = new Set<WebSocket>()
 let nearbyOnly = load(NEARBY_ONLY_KEY) === true
 
-const cutOff = () => lanPlayAvailable() && nearbyOnly
+const cutOff = () => nearbyBetaAvailable() && nearbyOnly
 
 /** why: deck caches and pending writes are scoped by the Convex URL, so a different URL would strand them; only the socket changes. */
 export class NearbyOnlyWebSocket extends WebSocket {
