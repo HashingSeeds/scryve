@@ -63,6 +63,17 @@ describe("SyncLatency", () => {
     expect(latency.summary().delivery).toBeUndefined()
   })
 
+  it("keeps the first server time it saw for a write", () => {
+    const { latency, at } = meter()
+    latency.ownWrite("op", { authorityAt: 5_020 })
+    latency.ownWrite("op", { authorityAt: 5_400 })
+    latency.ownWrite("op", { sentAt: 1_000, returnedAt: 1_040 })
+    latency.remoteChange(5_500, 2)
+    at(1_600)
+    latency.painted(2)
+    expect(latency.summary()).toMatchObject({ delivery: { p50: 100 } })
+  })
+
   it("drops changes that piled up while frames were paused instead of timing the pause", () => {
     const { latency, at } = meter()
     latency.setAuthority()

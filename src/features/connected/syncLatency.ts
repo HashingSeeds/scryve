@@ -79,12 +79,12 @@ export class SyncLatency {
     keepNewest(this.paints, Math.max(0, paint + offset))
   }
 
-  /** why: a cloud write's reply and the projection carrying its server time arrive in either order. */
+  /** why: a cloud write's reply and the projection carrying its server time arrive in either order, and only the first projection after the write carries its time. */
   ownWrite(
     operationId: string,
     part: { sentAt: number; returnedAt: number } | { authorityAt: number },
   ): void {
-    const write = { ...this.writes.get(operationId), ...part }
+    const write = { ...part, ...this.writes.get(operationId) }
     if (
       write.sentAt === undefined ||
       write.returnedAt === undefined ||
