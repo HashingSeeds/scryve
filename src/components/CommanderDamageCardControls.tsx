@@ -87,6 +87,8 @@ const RAM_RETURN_MS = 300
 // why: the defenders' flood, the attacker's bloom, and both leaving share one timing, so an attack opens and closes as one motion across the board.
 export const TAKEOVER_MS = 620
 const TAKEOVER_EASING = Easing.bezier(0.3, 0.6, 0.3, 1)
+// why: the drain plays the flood backwards, so it mirrors the opening curve rather than rushing off the card at the start.
+const DRAIN_EASING = Easing.bezier(0.7, 0, 0.7, 0.4)
 const SOURCE_BLOOM_FROM = 0.6
 
 export function CommanderDamageCardControls({
@@ -194,7 +196,11 @@ export function useCommanderTakeover(
       else runOnJS(setDraining)(false)
     }
     wave.value = duration
-      ? withTiming(active ? 1 : 0, { duration, easing: TAKEOVER_EASING }, done)
+      ? withTiming(
+          active ? 1 : 0,
+          { duration, easing: active ? TAKEOVER_EASING : DRAIN_EASING },
+          done,
+        )
       : active
         ? 1
         : 0
