@@ -885,7 +885,7 @@ export default defineSchema({
   })
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
     .index("by_user_and_updated_at", ["userId", "updatedAt"])
-    .index("by_issue", ["issue"]),
+    .index("by_issue_and_fixed_in", ["issue", "fixedIn"]),
 
   feedbackMessages: defineTable({
     requestId: v.id("feedbackRequests"),

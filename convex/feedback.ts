@@ -442,10 +442,9 @@ export const shipFixes = internalMutation({
     for (const issue of new Set(issues)) {
       const requests = await ctx.db
         .query("feedbackRequests")
-        .withIndex("by_issue", (q) => q.eq("issue", issue))
+        .withIndex("by_issue_and_fixed_in", (q) => q.eq("issue", issue).eq("fixedIn", undefined))
         .take(FIXES_PER_ISSUE)
       for (const request of requests) {
-        if (request.fixedIn) continue
         await ctx.db.patch(request._id, { fixedIn: { ...fix, at } })
         await postCard(ctx, request._id)
       }
