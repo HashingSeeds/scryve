@@ -158,7 +158,7 @@ describe("nearby event host", () => {
     })
   })
 
-  it("sends a burst of results as one update, and a lone change at once", async () => {
+  it("sends a burst of players' results as one update, and the organizer's change at once", async () => {
     await host(0)
     const guests = Array.from({ length: 8 }, (_, index) => guest(index + 1, true))
     const bySeat = new Map(guests.map((joined) => [joined.playerId, joined]))
@@ -181,7 +181,6 @@ describe("nearby event host", () => {
     for (const { playerId, feed } of guests)
       expect(feed()).toEqual({ seq: expect.any(Number), ...expected(playerId) })
 
-    jest.advanceTimersByTime(1000)
     const quiet = guests[0]!.updates().length
     nearbyEventHost.run({ kind: "clock", action: { kind: "pause" } })
     expect(guests[0]!.updates()).toHaveLength(quiet + 1)
