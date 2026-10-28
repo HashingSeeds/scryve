@@ -160,7 +160,7 @@ function takeoverExit(duration: number, source: boolean): EntryExitAnimationFunc
     "worklet"
     const timing = { duration, easing: Easing.in(Easing.quad) }
     return {
-      initialValues: { opacity: 1, transform: [{ scale: 1 }] },
+      initialValues: {},
       animations: {
         opacity: withTiming(0, timing),
         transform: [{ scale: withTiming(source ? SOURCE_BLOOM_FROM : 1, timing) }],
