@@ -52,7 +52,8 @@
       "node": "24.18.1",
       "env": {
         "APP_VARIANT": "production",
-        "EXPO_PUBLIC_INVITE_ORIGIN": "https://scryve.sow.care"
+        "EXPO_PUBLIC_INVITE_ORIGIN": "https://scryve.sow.care",
+        "SENTRY_ALLOW_FAILURE": "true"
       },
       "distribution": "store",
       "channel": "production",
