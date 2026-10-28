@@ -124,7 +124,6 @@ export const forgetTokens = internalMutation({
 export const remindRenewals = internalMutation({
   args: { hour: v.optional(v.number()), cursor: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    // why: runs on the hour, and the one-hour windows tile, so each renewal is reminded once without storing that it was.
     const hour = args.hour ?? Math.floor(Date.now() / HOUR) * HOUR
     const page = await ctx.db
       .query("revenueCatCustomerStates")

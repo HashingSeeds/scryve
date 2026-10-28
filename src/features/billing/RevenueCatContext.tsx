@@ -380,7 +380,7 @@ export function RevenueCatProvider({
       setError(undefined)
       const { presentCountCustomerCenter } = await import("./sdk")
       await presentCountCustomerCenter(customerInfo)
-      const next = await refreshCustomerInfo()
+      const next = await refreshCustomerInfo(true)
       if (!renewsYearly(customerInfo) && renewsYearly(next)) offerRenewalReminder()
     } catch (cause) {
       setError(revenueCatErrorMessage(cause))

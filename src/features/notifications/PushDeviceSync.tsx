@@ -44,7 +44,6 @@ function Sync() {
     if (!key || isLoading || !online) return
     let stale = false
     void (async () => {
-      // why: the token is null once notifications are off in system settings, so that forgets the device too.
       const token = feedbackReplies || renewalReminders ? await pushToken() : null
       if (stale) return
       if (!token) {
