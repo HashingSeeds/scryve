@@ -36,7 +36,7 @@ export function useConvexEventSource(eventId: string): EventSource {
       async (...args: Args) => {
         const sentAt = Date.now()
         await run(...args)
-        latency.acknowledged(Date.now() - sentAt)
+        latency.commandShown(sentAt)
       }
     return {
       update: timed(async (patch: Parameters<EventSource["update"]>[0]) => {

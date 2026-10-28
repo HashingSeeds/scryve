@@ -160,8 +160,7 @@ class NearbyEventClient {
         if (!feed) return this.connection?.close()
         this.seq = feed.seq
         this.set({ view: feed.view, standings: feed.standings, status: "connected" })
-        const shownAt = Date.now()
-        for (const sentAt of this.confirmedAt.splice(0)) this.latency.acknowledged(shownAt - sentAt)
+        for (const sentAt of this.confirmedAt.splice(0)) this.latency.commandShown(sentAt)
         return
       }
       case "done": {

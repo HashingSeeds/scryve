@@ -60,11 +60,12 @@ export class SyncLatency {
   private acks: number[] = []
   private unpainted: { authorityAt: number; eventSequence: number }[] = []
   private paused = false
+  private backAt = 0
   private writes = new Map<string, { sentAt?: number; returnedAt?: number; authorityAt?: number }>()
 
   constructor(
     readonly context: SyncContext,
-    private readonly now: () => number = Date.now,
+    private readonly now: () => number = () => Date.now(),
   ) {}
 
   setAuthority(): void {
@@ -110,6 +111,7 @@ export class SyncLatency {
   setPaused(paused: boolean): void {
     this.paused = paused
     if (paused) this.unpainted = []
+    else this.backAt = this.now()
   }
 
   remoteChange(authorityAt: number, eventSequence: number): void {
@@ -131,6 +133,12 @@ export class SyncLatency {
 
   acknowledged(durationMs: number): void {
     keepNewest(this.acks, durationMs)
+  }
+
+  /** why: a command sent before the app went away and settled after it came back would time the time away. */
+  commandShown(sentAt: number): void {
+    if (this.paused || sentAt < this.backAt) return
+    keepNewest(this.acks, this.now() - sentAt)
   }
 
   summary(): SyncLatencySummary {
