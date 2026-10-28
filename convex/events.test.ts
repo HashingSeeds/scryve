@@ -1,8 +1,16 @@
 import { convexTest, type TestConvex } from "convex-test"
 
+import {
+  applyHubCommand,
+  createHubEvent,
+  hubStandings,
+  joinHub,
+  nearbyImport,
+} from "../src/features/events/nearby/hubEvent"
 import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
+import { MAX_EVENT_PLAYERS, MAX_EVENT_ROUNDS } from "./lib/events/model"
 import schema from "./schema"
 
 const modules = {
@@ -343,6 +351,79 @@ describe("events", () => {
       await expect(
         organizer.mutation(api.events.importNearby, { ...nearby, nearbyId: "event_x", ...change }),
       ).rejects.toThrow(message)
+    })
+
+    it("saves the largest event a host can run, with the host's standings", async () => {
+      let event = createHubEvent(
+        {
+          id: "event_max",
+          code: "MAX123",
+          name: "Store Championship",
+          format: "modern",
+          structure: "swiss",
+          bestOf: 3,
+          plannedRounds: MAX_EVENT_ROUNDS,
+          roundMinutes: 50,
+        },
+        1,
+      )
+      for (let seat = 1; seat <= MAX_EVENT_PLAYERS; seat++)
+        event = joinHub(
+          event,
+          { name: `Player ${seat}`, token: `token-${seat}-0000000` },
+          `p${seat}`,
+        ).event
+      const organizer = { kind: "organizer" } as const
+      for (let round = 1; round <= MAX_EVENT_ROUNDS; round++) {
+        event = applyHubCommand(event, organizer, { kind: "startRound" }, round)
+        for (const table of event.tables)
+          if (table.round === round && table.status === "open")
+            event = applyHubCommand(
+              event,
+              organizer,
+              {
+                kind: "report",
+                tableId: table.id,
+                result: {
+                  kind: "match",
+                  gamesWon: table.table % 3 ? [2, 1] : [1, 1],
+                  gamesDrawn: 1,
+                },
+              },
+              round,
+            )
+      }
+      event = applyHubCommand(event, organizer, { kind: "finish" }, MAX_EVENT_ROUNDS + 1)
+
+      const { t, organizer: account } = await setup([])
+      const { eventId } = await account.mutation(
+        api.events.importNearby,
+        nearbyImport(event, ["MAX123", "MAX124"]),
+      )
+      const saved = await t.query(api.events.standings, {
+        eventId,
+        throughRound: MAX_EVENT_ROUNDS,
+      })
+      const names = new Map(event.players.map((player) => [player.id, player.name]))
+      const view = await t.query(api.events.view, { eventId })
+      const savedNames = new Map<string, string>(
+        view!.players.map((player) => [player.id, player.name]),
+      )
+      const tables = await t.run((ctx) =>
+        ctx.db
+          .query("eventTables")
+          .withIndex("by_event_and_round", (q) => q.eq("eventId", eventId))
+          .collect(),
+      )
+      expect(tables).toHaveLength((MAX_EVENT_PLAYERS / 2) * MAX_EVENT_ROUNDS)
+      expect(
+        saved!.map(({ playerId, ...row }) => ({ ...row, name: savedNames.get(playerId) })),
+      ).toEqual(
+        hubStandings(event, MAX_EVENT_ROUNDS).map(({ playerId, ...row }) => ({
+          ...row,
+          name: names.get(playerId),
+        })),
+      )
     })
 
     it("gives each organizer their own copy of the same nearby event", async () => {
