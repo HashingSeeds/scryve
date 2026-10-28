@@ -4,12 +4,14 @@ import { StyleSheet, View } from "react-native"
 import Animated, {
   cancelAnimation,
   Easing,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
   withSequence,
   withTiming,
+  type EntryExitAnimationFunction,
   type SharedValue,
 } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
@@ -82,6 +84,10 @@ export interface CommanderDamageCardControlsProps {
 
 export const RAM_MS = 90
 const RAM_RETURN_MS = 300
+// why: the defenders' flood, the attacker's bloom, and both leaving share one timing, so an attack opens and closes as one motion across the board.
+export const TAKEOVER_MS = 620
+const TAKEOVER_EASING = Easing.bezier(0.3, 0.6, 0.3, 1)
+const SOURCE_BLOOM_FROM = 0.6
 
 export function CommanderDamageCardControls({
   seatNumber,
@@ -95,18 +101,34 @@ export function CommanderDamageCardControls({
 }: CommanderDamageCardControlsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const progress = useSharedValue(reducedMotion === false ? 0 : 1)
+  const duration = motionDuration(reducedMotion, TAKEOVER_MS)
+  const source = mode.kind === "source"
+  const progress = useSharedValue(duration ? 0 : 1)
 
   useEffect(() => {
-    progress.value = withTiming(1, { duration: motionDuration(reducedMotion, 160) })
-  }, [progress, reducedMotion])
+    // why: a defender's ring and badges wait for the flood to reach them; the attacker's controls bloom out over the same span.
+    progress.value = source
+      ? withTiming(1, { duration, easing: TAKEOVER_EASING })
+      : withDelay(duration * 0.4, withTiming(1, { duration: duration * 0.6 }))
+  }, [duration, progress, source])
 
-  const entranceStyle = useAnimatedStyle(() => ({ opacity: progress.value }))
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: source
+      ? [{ scale: SOURCE_BLOOM_FROM + (1 - SOURCE_BLOOM_FROM) * progress.value }]
+      : [],
+  }))
 
   return (
     <Animated.View
       testID={`commander-card-mode-seat-${seatNumber}`}
-      style={[themed($overlay), compact && themed($compactOverlay), entranceStyle]}
+      exiting={duration ? takeoverExit(duration / 2, source) : undefined}
+      style={[
+        themed($overlay),
+        !source && $aboveFlood,
+        compact && themed($compactOverlay),
+        entranceStyle,
+      ]}
     >
       {mode.kind === "target" ? (
         <DefenderControls
@@ -131,27 +153,81 @@ export function CommanderDamageCardControls({
   )
 }
 
+function takeoverExit(duration: number, source: boolean): EntryExitAnimationFunction {
+  return () => {
+    "worklet"
+    const timing = { duration, easing: Easing.in(Easing.quad) }
+    return {
+      initialValues: { opacity: 1, transform: [{ scale: 1 }] },
+      animations: {
+        opacity: withTiming(0, timing),
+        transform: [{ scale: withTiming(source ? SOURCE_BLOOM_FROM : 1, timing) }],
+      },
+    }
+  }
+}
+
+/** why: a defender's flood grows over the card's own controls before they go, and drains back off them when the attack ends, so the card keeps the last takeover until the flood has drained. `covered` turns true once the flood fills the card. */
+export function useCommanderTakeover(
+  takeover: CommanderTakeover | undefined,
+  attackerColor: string | undefined,
+) {
+  const reducedMotion = useReducedMotion()
+  const duration = motionDuration(reducedMotion, TAKEOVER_MS)
+  const active = !!takeover
+  const last = useRef({ takeover, attackerColor })
+  if (takeover) last.current = { takeover, attackerColor }
+  const [draining, setDraining] = useState(false)
+  const [covered, setCovered] = useState(active && !duration)
+  const wave = useSharedValue(active && !duration ? 1 : 0)
+  const wasActive = useRef(false)
+
+  useEffect(() => {
+    if (wasActive.current === active) return
+    wasActive.current = active
+    setDraining(!active)
+    setCovered(false)
+    const done = (finished?: boolean) => {
+      "worklet"
+      if (!finished) return
+      if (active) runOnJS(setCovered)(true)
+      else runOnJS(setDraining)(false)
+    }
+    wave.value = duration
+      ? withTiming(active ? 1 : 0, { duration, easing: TAKEOVER_EASING }, done)
+      : active
+        ? 1
+        : 0
+    if (!duration) {
+      setCovered(active)
+      setDraining(false)
+    }
+  }, [active, duration, wave])
+
+  const shown = takeover || draining ? last.current : undefined
+  return {
+    takeover: shown?.takeover,
+    attackerColor: shown?.attackerColor,
+    wave,
+    covered: active && covered,
+  }
+}
+
 export function CommanderTakeoverBackdrop({
   seatNumber,
   takeover,
+  wave,
   cardSize,
   attackerColor,
   defenderColor,
 }: {
   seatNumber: number
   takeover: CommanderTakeover
+  wave: SharedValue<number>
   cardSize: { width: number; height: number }
   attackerColor: string
   defenderColor: string
 }) {
-  const reducedMotion = useReducedMotion()
-  const wave = useSharedValue(reducedMotion === false ? 0 : 1)
-  useEffect(() => {
-    wave.value = withTiming(1, {
-      duration: motionDuration(reducedMotion, 620),
-      easing: Easing.bezier(0.3, 0.6, 0.3, 1),
-    })
-  }, [reducedMotion, wave])
   const waveStyle = useAnimatedStyle(() => ({ transform: [{ scale: wave.value }] }))
   const { flood, disc } = takeover
 
@@ -159,7 +235,7 @@ export function CommanderTakeoverBackdrop({
     <View
       testID={`commander-takeover-seat-${seatNumber}`}
       pointerEvents="none"
-      style={StyleSheet.absoluteFill}
+      style={[StyleSheet.absoluteFill, $flood]}
     >
       {flood ? (
         <Animated.View
@@ -188,8 +264,8 @@ export function CommanderTakeoverBackdrop({
         style={[
           $absolute,
           {
-            left: cardSize.width / 2 - disc,
-            top: cardSize.height / 2 - disc,
+            left: cardSize.width / 2 + takeover.cardDiscOffset.x - disc,
+            top: cardSize.height / 2 + takeover.cardDiscOffset.y - disc,
             width: disc * 2,
             height: disc * 2,
             borderRadius: disc,
@@ -289,6 +365,8 @@ function DefenderControls({
     transform: [{ rotate: `${contentRotation}deg` }],
   }
   const disc = takeover?.disc ?? 0
+  const discX = content.width / 2 + (takeover?.discOffset.x ?? 0)
+  const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
   const ring = disc * 2 + 8
   const circumference = 2 * Math.PI * disc
   const ringAngle = badges.length ? (badges[0].angle + badges[badges.length - 1].angle) / 2 : 0
@@ -328,7 +406,7 @@ function DefenderControls({
             width={ring}
             height={ring}
             style={[
-              $centeredAt(content.width / 2 - ring / 2, content.height / 2 - ring / 2),
+              $centeredAt(discX - ring / 2, discY - ring / 2),
               { transform: [{ rotate: `${(ringAngle * 180) / Math.PI}deg` }] },
             ]}
           >
@@ -359,7 +437,7 @@ function DefenderControls({
             pointerEvents="none"
             style={[
               $centered,
-              $centeredAt(content.width / 2 - disc, content.height / 2 - disc),
+              $centeredAt(discX - disc, discY - disc),
               { width: disc * 2, height: disc * 2 },
             ]}
           >
@@ -628,15 +706,21 @@ function AttackerControls({
       >
         {mode.commanders.map(({ name, power, benched }, index) => {
           const suffix = testSeats[index]
+          // why: partners need their names to tell the two marks apart, so a compact card keeps them, smaller; a lone commander's name is left off there for room.
           const nameText =
-            name && !compact ? (
+            name && (partners || !compact) ? (
               <Text
                 testID={`commander-name-seat-${suffix}`}
                 text={name}
                 weight="bold"
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[themed($commanderName), partners && $partnerName, { color: foreground }]}
+                style={[
+                  themed($commanderName),
+                  partners && $partnerName,
+                  compact && $compactName,
+                  { color: foreground },
+                ]}
               />
             ) : null
           const mark = (
@@ -889,6 +973,11 @@ const $centered: ViewStyle = { justifyContent: "center", alignItems: "center" }
 
 const $absolute: ViewStyle = { position: "absolute" }
 
+/** why: while an attack holds a defending card, the flood covers its own controls (z 10), the life total rides above the flood, and the ring, badges, and hit target above that. */
+export const TAKEOVER_LAYERS = { flood: 11, life: 12, controls: 13 } as const
+const $flood: ViewStyle = { zIndex: TAKEOVER_LAYERS.flood }
+const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }
+
 const $benched: ViewStyle = { opacity: 0.4 }
 
 const $pips: ViewStyle = {
@@ -950,6 +1039,8 @@ const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $partnerName: TextStyle = { maxWidth: 100 }
+
+const $compactName: TextStyle = { fontSize: 13, lineHeight: 16, maxWidth: 88 }
 
 const $edit: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

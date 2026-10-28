@@ -39,6 +39,8 @@ import {
   RAM_MS,
   CommanderTakeoverBackdrop,
   PulseRing,
+  TAKEOVER_LAYERS,
+  useCommanderTakeover,
   type ArmedCommander,
   type CommanderAttacker,
   type CommanderDamageCardMode,
@@ -371,6 +373,7 @@ export const LifeCard = memo(function LifeCard({
           reach: commanderDamage?.reach,
         })
       : undefined
+  const floodedBy = useCommanderTakeover(takeover, commanderDamage?.attacker?.color)
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -399,6 +402,8 @@ export const LifeCard = memo(function LifeCard({
           }
         : undefined
   const attackerSide = commanderCardMode?.kind === "source"
+  // why: a defender's own controls stay until the attacker's flood has covered them.
+  const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
   const lifeMuted = attackerSide || (!localCommander && commanderOverviewOpen)
   const lifeFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
@@ -438,7 +443,7 @@ export const LifeCard = memo(function LifeCard({
     ],
   }))
   const lifeControlsShown =
-    !commanderCardMode &&
+    !commanderCovers &&
     !commanderOverviewOpen &&
     !localOverviewVisible &&
     !tableSheetOpen &&
@@ -450,7 +455,7 @@ export const LifeCard = memo(function LifeCard({
   const claimShown = !!claims?.length
   const commanderStripShown =
     !!commanderDamage?.inspection &&
-    !commanderCardMode &&
+    !commanderCovers &&
     !tableSheetOpen &&
     !diceCovers &&
     commanderDamageDealers(
@@ -576,12 +581,13 @@ export const LifeCard = memo(function LifeCard({
           />
         </View>
       ) : null}
-      {takeover ? (
+      {floodedBy.takeover ? (
         <CommanderTakeoverBackdrop
           seatNumber={seatNumber}
-          takeover={takeover}
+          takeover={floodedBy.takeover}
+          wave={floodedBy.wave}
           cardSize={cardSize}
-          attackerColor={commanderDamage?.attacker?.color ?? foreground}
+          attackerColor={floodedBy.attackerColor ?? foreground}
           defenderColor={color}
         />
       ) : null}
@@ -597,7 +603,12 @@ export const LifeCard = memo(function LifeCard({
             ? "no-hide-descendants"
             : "auto"
         }
-        style={[themed($content), lifeFadeStyle, localOverviewVisible && $overviewReadout]}
+        style={[
+          themed($content),
+          lifeFadeStyle,
+          localOverviewVisible && $overviewReadout,
+          floodedBy.takeover && $aboveFlood,
+        ]}
       >
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
@@ -762,7 +773,8 @@ export const LifeCard = memo(function LifeCard({
             compact={compact}
             mode={commanderCardMode}
           />
-        ) : lifeControlsShown ? (
+        ) : null}
+        {lifeControlsShown ? (
           <Animated.View
             entering={lifeFadeDuration ? FadeIn.duration(lifeFadeDuration) : undefined}
             exiting={lifeFadeDuration ? FadeOut.duration(lifeFadeDuration) : undefined}
@@ -849,7 +861,7 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
+      {commanderDamage?.inspection && !commanderCovers && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -870,7 +882,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {!commanderCardMode &&
+      {!commanderCovers &&
       !tableSheetOpen &&
       !dice?.view &&
       !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
@@ -1021,7 +1033,7 @@ export const LifeCard = memo(function LifeCard({
       {seatTable &&
       !claimShown &&
       !diceCovers &&
-      !commanderCardMode &&
+      !commanderCovers &&
       !commanderOverviewOpen &&
       !localOverviewVisible &&
       !editorOpen ? (
@@ -1300,3 +1312,5 @@ const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 
 const $overviewReadout: ViewStyle = { zIndex: 8 }
+
+const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.life }
