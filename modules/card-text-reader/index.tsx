@@ -1,0 +1,30 @@
+import type { ViewProps } from "react-native"
+import { requireNativeView, requireOptionalNativeModule } from "expo"
+
+export type CardTextLine = {
+  text: string
+  x: number
+  y: number
+  width: number
+  height: number
+  angle: number
+  confidence: number
+}
+
+export type CardPhotoText = { width: number; height: number; lines: CardTextLine[] }
+
+type CardTextCameraProps = ViewProps & {
+  active: boolean
+  onText: (event: { nativeEvent: CardPhotoText }) => void
+}
+
+/** why: null on web, Jest, and binaries built before the module existed. */
+export const canReadCardText = requireOptionalNativeModule("CardTextReader") !== null
+
+const NativeCardTextCamera = canReadCardText
+  ? requireNativeView<CardTextCameraProps>("CardTextReader")
+  : undefined
+
+export function CardTextCamera(props: CardTextCameraProps) {
+  return NativeCardTextCamera ? <NativeCardTextCamera {...props} /> : null
+}

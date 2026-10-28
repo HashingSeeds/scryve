@@ -902,6 +902,7 @@ describe("card name catalog", () => {
     await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toEqual({
       names: "Sol Ring\nAcidic Slime",
       alternateNames: "Marauding Mutagen\tAcidic Slime",
+      fetchedAt: expect.any(Number),
     })
   })
 
@@ -914,20 +915,20 @@ describe("card name catalog", () => {
     expect(fetchSpy.mock.calls.length).toBe(calls)
   })
 
-  it("serves a stale copy when a refresh is refused", async () => {
+  it("serves a stale copy with its own fetch time when a refresh is refused", async () => {
     const t = makeConvexTest()
+    const storedAt = Date.now()
     await t.mutation(internal.cards.storeNameCatalog, {
       game: "mtg",
       names: "Sol Ring",
       alternateNames: "",
     })
-    jest.useFakeTimers({ advanceTimers: true, now: Date.now() + 2 * 86_400_000 })
+    jest.useFakeTimers({ advanceTimers: true, now: storedAt + 2 * 86_400_000 })
     try {
       jest.spyOn(global, "fetch").mockImplementation(() => response({}, 429))
-      await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toEqual({
-        names: "Sol Ring",
-        alternateNames: "",
-      })
+      const served = await t.action(api.cards.cardNameCatalog, {})
+      expect(served).toMatchObject({ names: "Sol Ring", alternateNames: "" })
+      expect(served.fetchedAt).toBeLessThan(storedAt + 86_400_000)
     } finally {
       jest.useRealTimers()
     }
@@ -946,7 +947,7 @@ describe("card name catalog", () => {
         t.mutation(internal.cards.claimNameCatalogRefresh, { game: "mtg" }),
       ).resolves.toBe(true)
       const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
-      await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toEqual({
+      await expect(t.action(api.cards.cardNameCatalog, {})).resolves.toMatchObject({
         names: "Sol Ring",
         alternateNames: "",
       })

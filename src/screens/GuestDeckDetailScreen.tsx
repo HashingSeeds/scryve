@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { router } from "expo-router"
@@ -64,9 +64,14 @@ export function GuestDeckDetailScreen({
   const { themed, theme } = useAppTheme()
   const stored = useGuestDeck(localId)
   const [restored] = useState(() => (stored ? loadLocalDraft(localId) : undefined))
-  const [draft, setDraft] = useState<GuestDeckPayload | undefined>(
+  const [draft, setDraftState] = useState<GuestDeckPayload | undefined>(
     () => restored?.deck ?? stored?.deck,
   )
+  const draftRef = useRef(draft)
+  const setDraft = useCallback((next: GuestDeckPayload | undefined) => {
+    draftRef.current = next
+    setDraftState(next)
+  }, [])
   const revisionRef = useRef(
     restored?.revision ??
       (stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined),
@@ -120,11 +125,6 @@ export function GuestDeckDetailScreen({
     true,
   )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
-  const draftRef = useRef(draft)
-  useEffect(() => {
-    draftRef.current = draft
-  }, [draft])
-
   useEffect(() => {
     if (stored && sameDraft(draftRef.current, baseRef.current)) {
       setDraft(stored.deck)
@@ -135,7 +135,7 @@ export function GuestDeckDetailScreen({
       baseRef.current = undefined
       revisionRef.current = undefined
     }
-  }, [stored])
+  }, [setDraft, stored])
 
   useEffect(() => {
     const base = baseRef.current
@@ -181,14 +181,15 @@ export function GuestDeckDetailScreen({
     return sections.find((section) => section.id === id)?.label ?? id
   }
 
+  const latest = () => draftRef.current ?? current
   const updateCard = (index: number, card: GuestCard | undefined) =>
     setDraft({
-      ...current,
-      cards: current.cards.flatMap((entry, cardIndex) =>
+      ...latest(),
+      cards: latest().cards.flatMap((entry, cardIndex) =>
         cardIndex === index && card ? [card] : cardIndex === index ? [] : [entry],
       ),
     })
-  const update = (changes: Partial<GuestDeckPayload>) => setDraft({ ...current, ...changes })
+  const update = (changes: Partial<GuestDeckPayload>) => setDraft({ ...latest(), ...changes })
   const chooseCommander = (color?: GuestCard["commanderColor"]) => {
     if (!focusedCard) return
     const cached = loadCardDetails()
@@ -395,12 +396,23 @@ export function GuestDeckDetailScreen({
           initialSection={choosingCommander ? "commander" : undefined}
           commanderCards={current.cards}
           onClose={() => setAdding(false)}
+          onRemove={(card) => {
+            const { cards } = latest()
+            const index = cards.findIndex((entry) => printingKey(entry) === printingKey(card))
+            const entry = cards[index]
+            if (!entry) return
+            updateCard(
+              index,
+              entry.quantity > 1 ? { ...entry, quantity: entry.quantity - 1 } : undefined,
+            )
+          }}
           onAdd={(card) => {
             setUndo(undefined)
+            const { cards } = latest()
             if (isCommanderPick(rules, card)) {
               const cached = loadCardDetails()
               const result = addCommanderCard(
-                current.cards,
+                cards,
                 card,
                 (entry) => cached[cardDetailsKey(entry, game)],
               )
@@ -410,17 +422,15 @@ export function GuestDeckDetailScreen({
               if (choosingCommander) setAdding(false)
               return undefined
             }
-            const index = current.cards.findIndex(
-              (entry) => printingKey(entry) === printingKey(card),
-            )
+            const index = cards.findIndex((entry) => printingKey(entry) === printingKey(card))
             if (index >= 0) {
-              const entry = current.cards[index]
+              const entry = cards[index]
               if (entry.quantity >= 999) return translate("decks:draft.copyLimit", { limit: 999 })
               updateCard(index, { ...entry, quantity: entry.quantity + 1 })
             } else {
-              if (current.cards.length >= MAX_DECK_CARDS)
+              if (cards.length >= MAX_DECK_CARDS)
                 return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
-              update({ cards: [...current.cards, card] })
+              update({ cards: [...cards, card] })
             }
             return undefined
           }}

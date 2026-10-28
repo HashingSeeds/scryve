@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-10-27",
-  effectiveDate: "October 27, 2026",
+  version: "2026-10-28",
+  effectiveDate: "October 28, 2026",
   sections: [
     {
       blocks: [
@@ -192,7 +192,7 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "Camera Access. We request camera access only when you choose to scan a QR code for a connected game. Scryve does not capture, store, or upload camera images. You can change camera permission in your device settings.",
+            "Camera Access. We request camera access only when you choose to scan a QR code for a connected game or scan cards into a deck. Card text is read on your device, and only recognized card names are used to look up cards. Scryve does not capture, store, or upload camera images. You can change camera permission in your device settings.",
             "Mobile Device Data. We automatically collect device information (such as your mobile device ID, model, and manufacturer), operating system, version information and system configuration information, device and application identification numbers, browser type and version, hardware model Internet service provider and/or mobile carrier, and Internet Protocol (IP) address (or proxy server). If you are using our application(s), we may also collect information about the phone network associated with your mobile device, your mobile device’s operating system or platform, the type of mobile device you use, your mobile device’s unique device ID, and information about the features of our application(s) you accessed.",
           ],
         },

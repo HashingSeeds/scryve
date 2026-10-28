@@ -1141,6 +1141,7 @@ function DeckDetailContent({
           initialSection={choosingCommander ? "commander" : undefined}
           commanderCards={draft.cards}
           onClose={() => setAdding(false)}
+          onRemove={removeCard}
           onAdd={(card) => {
             if (isCommanderPick(deck, card)) {
               const cached = loadCardDetails()

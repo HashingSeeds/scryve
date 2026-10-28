@@ -247,7 +247,11 @@ const MAX_ALTERNATE_NAME_PAGES = 10
 const SCRYFALL_COLLECTION_SIZE = 75
 const MAX_CACHED_PRINTINGS_PER_NAME = 8
 
-const cardNameCatalogValidator = v.object({ names: v.string(), alternateNames: v.string() })
+const cardNameCatalogValidator = v.object({
+  names: v.string(),
+  alternateNames: v.string(),
+  fetchedAt: v.number(),
+})
 type CardNameCatalog = Infer<typeof cardNameCatalogValidator>
 
 const isCatalogName = (name: unknown): name is string =>
@@ -352,7 +356,11 @@ export const cardNameCatalog = action({
       { game: "mtg" },
     )
     if (cached) {
-      const copy = { names: cached.names, alternateNames: cached.alternateNames }
+      const copy = {
+        names: cached.names,
+        alternateNames: cached.alternateNames,
+        fetchedAt: cached.fetchedAt,
+      }
       if (Date.now() - cached.fetchedAt < CARD_NAME_CATALOG_MAX_AGE_MS) return copy
       const claimed: boolean = await ctx.runMutation(internal.cards.claimNameCatalogRefresh, {
         game: "mtg",
@@ -366,9 +374,14 @@ export const cardNameCatalog = action({
         alternateNames: await fetchPrintedToRulesNameLines(ctx),
       }
       await ctx.runMutation(internal.cards.storeNameCatalog, { game: "mtg", ...catalog })
-      return catalog
+      return { ...catalog, fetchedAt: Date.now() }
     } catch (error) {
-      if (cached) return { names: cached.names, alternateNames: cached.alternateNames }
+      if (cached)
+        return {
+          names: cached.names,
+          alternateNames: cached.alternateNames,
+          fetchedAt: cached.fetchedAt,
+        }
       throw error
     }
   },

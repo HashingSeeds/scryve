@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { Keyboard, Modal, ScrollView, TouchableOpacity, View } from "react-native"
+import { useEffect, useRef, useState } from "react"
+import { Keyboard, Modal, Platform, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -30,17 +30,21 @@ import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
+import { useCardNameIndex } from "./useCardNameIndex"
 import { api } from "../../../convex/_generated/api"
 import { picksCommander, systemDefinition } from "../../../convex/lib/systems"
+import { canReadCardText } from "../../../modules/card-text-reader"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
+const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 
 function scryfallQuery({
   text,
@@ -76,6 +80,7 @@ export function CardSearchScreen({
   game,
   format,
   onAdd,
+  onRemove,
   onClose,
   offlineCandidates,
   initialSection,
@@ -84,6 +89,7 @@ export function CardSearchScreen({
   game: string
   format: string
   onAdd: (card: GuestDeckPayload["cards"][number]) => string | undefined
+  onRemove?: (card: GuestDeckPayload["cards"][number]) => void
   onClose: () => void
   /**
    * The account's fully-cached cards to search while offline. Offline adds draw from
@@ -112,6 +118,9 @@ export function CardSearchScreen({
     true,
   )
   const [query, setQuery] = useState("")
+  const [scanning, setScanning] = useState(false)
+  const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
+  const nameIndex = useCardNameIndex(game, deviceId, scanning)
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
@@ -386,10 +395,50 @@ export function CardSearchScreen({
     }
     if (choosingCommander) {
       preview(searchEntry(card))
-      return
+      return undefined
     }
     const error = onAdd(searchEntry(card))
     setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
+    return error
+  }
+
+  async function addScannedCards(names: string[]): Promise<ScannedCardAdd[]> {
+    try {
+      if (!convex) throw new Error("Card search unavailable")
+      const { cards, lookupFailed } = await convex.action(api.cards.byNames, { names, deviceId })
+      const byName = new Map(cards.map((card) => [card.name, card]))
+      return names.map((name) => {
+        const card = byName.get(name)
+        if (!card)
+          return {
+            error: translate(
+              lookupFailed ? "decks:cardScan.addFailed" : "decks:cardScan.notFound",
+              {
+                card: name,
+              },
+            ),
+          }
+        const error = add(card)
+        if (error) return { error }
+        scannedEntries.current.set(name, searchEntry(card))
+        if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: card.name })}`)
+        return { imageUrl: card.smallImageUrl ?? card.imageUrl }
+      })
+    } catch (cause) {
+      const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
+      return names.map(() => ({ error }))
+    }
+  }
+
+  function removeScannedCard(name: string) {
+    const entry = scannedEntries.current.get(name)
+    if (!entry || !onRemove) return
+    onRemove(entry)
+    if (__DEV__) console.log(`SCANREMOVE ${JSON.stringify({ removed: name })}`)
+  }
+
+  function recordScanRead(scan: CardScan, match: string | undefined) {
+    console.log(`SCANREAD ${JSON.stringify({ photo: scan.photo, framing: scan.framing, match })}`)
   }
 
   function addOffline(entry: KnownCardEntry) {
@@ -449,17 +498,28 @@ export function CardSearchScreen({
           backgroundColor={theme.colors.surface}
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
-          <TextField
-            testID="card-search-input"
-            accessibilityLabel={translate("decks:cardSearch.searchLabel")}
-            placeholderTx="decks:cardSearch.placeholder"
-            value={query}
-            maxLength={choosingCommander ? 80 : 120}
-            autoCorrect={false}
-            autoFocus={!choosingCommander}
-            returnKeyType="search"
-            onChangeText={setQuery}
-          />
+          <View style={$queryRow}>
+            <TextField
+              testID="card-search-input"
+              accessibilityLabel={translate("decks:cardSearch.searchLabel")}
+              placeholderTx="decks:cardSearch.placeholder"
+              value={query}
+              maxLength={choosingCommander ? 80 : 120}
+              autoCorrect={false}
+              autoFocus={!choosingCommander}
+              returnKeyType="search"
+              onChangeText={setQuery}
+              containerStyle={$queryField}
+            />
+            {CAN_READ_CARDS && filtersCards && !choosingCommander ? (
+              <Button
+                testID="card-scan-button"
+                tx="decks:cardSearch.scan"
+                accessibilityLabel={translate("decks:cardSearch.scanLabel")}
+                onPress={() => setScanning(true)}
+              />
+            ) : null}
+          </View>
           {initialSection !== "commander" ? (
             <SelectField
               label={translate("decks:cardSearch.addTo")}
@@ -772,6 +832,23 @@ export function CardSearchScreen({
           </View>
         </DialogCard>
       ) : null}
+      {scanning ? (
+        <CardScanner
+          game={game}
+          nameIndex={nameIndex}
+          singleton={picksCommander(game, format)}
+          copiesInDeck={(name) =>
+            (commanderCards ?? []).reduce(
+              (total, card) => total + (card.name === name ? card.quantity : 0),
+              0,
+            )
+          }
+          addCards={addScannedCards}
+          removeCard={onRemove ? removeScannedCard : undefined}
+          onRead={__DEV__ ? recordScanRead : undefined}
+          onClose={() => setScanning(false)}
+        />
+      ) : null}
       {candidate ? (
         <CardFocusDialog
           key={printingKey(candidate)}
@@ -828,6 +905,8 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 
+const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
+const $queryField: ViewStyle = { flex: 1 }
 const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", minHeight: 44 }
 const $pills: ViewStyle = { flexDirection: "row", flexWrap: "wrap", gap: 8 }
 const $filterBody: ViewStyle = { gap: 16 }
