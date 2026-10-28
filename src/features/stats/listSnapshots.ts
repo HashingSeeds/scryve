@@ -45,6 +45,14 @@ export function saveListSnapshot(deckKey: string, fingerprint: string, cards: De
   )
 }
 
+/** why: a device deck has no synced version, so a game reads the list pinned when it started, or the device's current list when that pin is gone. */
+export function pinnedListCards(deckKey: string, fingerprint: string): DeckCard[] | undefined {
+  return (
+    snapshots(deckKey).find((row) => row.fingerprint === fingerprint)?.cards ??
+    loadGuestDecks().find((deck) => (deck.deckKey ?? deck.localId) === deckKey)?.deck.cards
+  )
+}
+
 export async function lookupListSnapshot(
   deckKey: string,
   fingerprint: string,
