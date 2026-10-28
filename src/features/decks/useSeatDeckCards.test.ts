@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react-native"
 
+import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import { storage } from "@/utils/storage"
 
 import { DeckVersionCacheRepository } from "./deckVersionsCache"
@@ -50,4 +51,14 @@ it("tries the network again after a failed read", async () => {
 
   await waitFor(() => expect(result.current).toEqual([sol]))
   expect(mockQuery).toHaveBeenCalledTimes(2)
+})
+
+it("reads a device deck from the list pinned when the game started", () => {
+  saveListSnapshot("local-deck", "fp-1", [krenko, sol])
+  const { result } = renderHook(() =>
+    useSeatDeckCards({ deckKey: "local-deck", fingerprint: "fp-1" }),
+  )
+
+  expect(result.current).toEqual([krenko, sol])
+  expect(mockQuery).not.toHaveBeenCalled()
 })

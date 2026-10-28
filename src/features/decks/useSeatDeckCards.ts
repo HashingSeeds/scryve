@@ -1,28 +1,35 @@
 import { useEffect, useMemo, useReducer } from "react"
 import { useConvex } from "convex/react"
 
-import { DeckVersionCacheRepository, type StorableVersionCard } from "./deckVersionsCache"
+import { pinnedListCards } from "@/features/stats/listSnapshots"
+
+import type { DeckCard } from "./deckCards"
+import { DeckVersionCacheRepository } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
-export type SeatDeck = { ownerId: string; versionId: string }
+/** why: a synced deck is read by version, and a device deck by the list pinned when the game started. */
+export type SeatDeck =
+  { ownerId: string; versionId: string } | { deckKey: string; fingerprint: string }
 
-const NO_CARDS: readonly StorableVersionCard[] = []
+const NO_CARDS: readonly DeckCard[] = []
 const readCards = () => (deploymentUrl: string, ownerId: string, versionId: string) =>
   new DeckVersionCacheRepository(ownerId, undefined, deploymentUrl).loadCards(versionId)?.cards ??
   NO_CARDS
 const refreshedThisSession = new Set<string>()
 
 /** why: a game is often played offline, so the deck shows from the device cache, and the first fetch per version each session refills that cache. */
-export function useSeatDeckCards(deck: SeatDeck | undefined): readonly StorableVersionCard[] {
+export function useSeatDeckCards(deck: SeatDeck | undefined): readonly DeckCard[] {
   const convex = useConvex()
-  const ownerId = deck?.ownerId
-  const versionId = deck?.versionId
+  const ownerId = deck && "versionId" in deck ? deck.ownerId : undefined
+  const versionId = deck && "versionId" in deck ? deck.versionId : undefined
+  const deckKey = deck && "deckKey" in deck ? deck.deckKey : undefined
+  const fingerprint = deck && "deckKey" in deck ? deck.fingerprint : undefined
   const [cardsFor, rereadCards] = useReducer(readCards, undefined, readCards)
-  const cards = useMemo(
-    () => (convex && ownerId && versionId ? cardsFor(convex.url, ownerId, versionId) : NO_CARDS),
-    [cardsFor, convex, ownerId, versionId],
-  )
+  const cards = useMemo(() => {
+    if (deckKey && fingerprint) return pinnedListCards(deckKey, fingerprint) ?? NO_CARDS
+    return convex && ownerId && versionId ? cardsFor(convex.url, ownerId, versionId) : NO_CARDS
+  }, [cardsFor, convex, ownerId, versionId, deckKey, fingerprint])
 
   useEffect(() => {
     if (!convex || !ownerId || !versionId) return

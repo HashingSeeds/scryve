@@ -454,8 +454,11 @@ export function CurrentGameScreen({
               }
               getSeatDeck={(player) => {
                 const account = runtime.game.account
-                return player.id === account?.mePlayerId && account.deckVersionId
-                  ? { ownerId: account.ownerId, versionId: account.deckVersionId }
+                if (!account || player.id !== account.mePlayerId) return undefined
+                if (account.deckVersionId)
+                  return { ownerId: account.ownerId, versionId: account.deckVersionId }
+                return account.deckKey && account.deckFingerprint
+                  ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
                   : undefined
               }}
               table={runtime.tableRuntime}
