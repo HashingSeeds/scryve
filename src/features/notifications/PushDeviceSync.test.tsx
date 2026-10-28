@@ -47,9 +47,9 @@ describe("PushDeviceSync", () => {
   })
 
   it("still forgets after turning off, on, and off again while the first forget is in flight", async () => {
-    let finishForget = () => undefined
+    let finishForget: () => void = () => undefined
     mockForget.mockImplementationOnce(
-      () => new Promise<undefined>((resolve) => (finishForget = () => resolve(undefined))),
+      () => new Promise<void>((resolve) => (finishForget = resolve)),
     )
     storage.set("notifications.registered", true)
     mockPushOn = false
