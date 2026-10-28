@@ -1,7 +1,8 @@
 import type { HubCommand } from "./hubEvent"
 import type { PlayerStanding } from "../../../../convex/lib/events/model"
-import type { EventView } from "../eventSource"
+import type { EventPlayer, EventTableView, EventView } from "../eventSource"
 
+// why: hosts that predate patches reject any other version, so new abilities ride on hello flags instead of a bump.
 export const NEARBY_EVENT_PROTOCOL = 1
 /** why: events share the `_scryve._tcp` Bonjour type with nearby games (a new type needs a native build), so the name tells them apart. */
 export const NEARBY_EVENT_PREFIX = "event-"
@@ -21,19 +22,38 @@ export type NearbyGuestMessage =
       readonly code: string
       readonly name: string
       readonly token: string
+      readonly patches?: boolean
     }
   | { readonly t: "do"; readonly id: number; readonly command: HubCommand }
 
 export type NearbyRejection = "code" | "protocol" | "closed" | "invalid"
 
+interface ListPatch<T> {
+  readonly set: readonly T[]
+  readonly gone: readonly string[]
+}
+
+export interface NearbyViewMessage {
+  readonly t: "view"
+  readonly seq?: number
+  readonly view: EventView
+  readonly standings: readonly PlayerStanding[]
+}
+
+export interface NearbyPatchMessage {
+  readonly t: "patch"
+  readonly seq: number
+  readonly view: Omit<EventView, "players" | "tables" | "isOrganizer" | "myPlayerId">
+  readonly players?: ListPatch<EventPlayer>
+  readonly tables?: ListPatch<EventTableView>
+  readonly standings?: readonly PlayerStanding[]
+}
+
 export type NearbyHostMessage =
   | { readonly t: "welcome"; readonly playerId: string }
   | { readonly t: "rejected"; readonly reason: NearbyRejection; readonly code?: string }
-  | {
-      readonly t: "view"
-      readonly view: EventView
-      readonly standings: readonly PlayerStanding[]
-    }
+  | NearbyViewMessage
+  | NearbyPatchMessage
   | { readonly t: "done"; readonly id: number; readonly error?: string; readonly code?: string }
 
 const COMMAND_KINDS = new Set<HubCommand["kind"]>([
@@ -55,14 +75,14 @@ export function parseGuestMessage(line: string): NearbyGuestMessage | null {
   const message: unknown = JSON.parse(line)
   if (!isRecord(message)) return null
   if (message.t === "hello") {
-    const { v, code, name, token } = message
+    const { v, code, name, token, patches } = message
     return typeof v === "number" &&
       typeof code === "string" &&
       typeof name === "string" &&
       typeof token === "string" &&
       token.length >= 16 &&
       token.length <= 128
-      ? { t: "hello", v, code, name, token }
+      ? { t: "hello", v, code, name, token, patches: patches === true }
       : null
   }
   if (message.t === "do") {

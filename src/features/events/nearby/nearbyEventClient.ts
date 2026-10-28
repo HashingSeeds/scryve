@@ -7,6 +7,7 @@ import { connectLan, resolveLanService, type LanConnection } from "@/features/la
 import { loadString, saveString } from "@/utils/storage"
 
 import type { HubCommand } from "./hubEvent"
+import { applyHostMessage } from "./nearbyEventFeed"
 import {
   NEARBY_EVENT_PROTOCOL,
   parseHostMessage,
@@ -45,6 +46,7 @@ function deviceToken(code: string) {
 class NearbyEventClient {
   private state: NearbyClientState = IDLE
   private listeners = new Set<() => void>()
+  private seq = 0
   private connection: LanConnection<NearbyGuestMessage> | undefined
   private target: { service: Service; code: string; name: string } | undefined
   private pending = new Map<number, { resolve: () => void; reject: (error: Error) => void }>()
@@ -110,6 +112,7 @@ class NearbyEventClient {
         code: target.code,
         name: target.name,
         token: deviceToken(target.code),
+        patches: true,
       })
     } catch {
       this.lost(undefined)
@@ -138,8 +141,18 @@ class NearbyEventClient {
         this.joined(message.reason)
         return
       case "view":
-        this.set({ view: message.view, standings: message.standings, status: "connected" })
+      case "patch": {
+        const { view, standings } = this.state
+        const feed = applyHostMessage(
+          view && standings ? { seq: this.seq, view, standings } : undefined,
+          message,
+        )
+        // why: a patch applied over a missed one leaves this guest's view wrong for good; reconnecting brings a whole view.
+        if (!feed) return this.connection?.close()
+        this.seq = feed.seq
+        this.set({ view: feed.view, standings: feed.standings, status: "connected" })
         return
+      }
       case "done": {
         const waiting = this.pending.get(message.id)
         this.pending.delete(message.id)
