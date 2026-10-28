@@ -14,6 +14,9 @@ class CardTextReaderModule : Module() {
         view.active = active
       }
 
+      // why: only iOS tracks the card so far; Android keeps reading inside the fixed frame.
+      Prop("guide") { _: CardTextCameraView, _: Map<String, Double>? -> }
+
       OnViewDestroys { view -> view.release() }
     }
   }
