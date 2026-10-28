@@ -17,10 +17,12 @@ import type {
   PurchasesPackage,
 } from "react-native-purchases"
 
+import { offerRenewalReminder } from "@/features/notifications/prefs"
 import { translate } from "@/i18n/translate"
 
 import {
   COUNT_PACKAGE_IDS,
+  COUNT_PRODUCT_IDS,
   COUNT_PRO_ENTITLEMENT_ID,
   FOIL_PRODUCT_ID,
   FOIL_SUPPORTER_OFFERING_ID,
@@ -144,6 +146,15 @@ export function hasFoil(customerInfo: CustomerInfo | null) {
     customerInfo?.entitlements.active[COUNT_PRO_ENTITLEMENT_ID]?.productIdentifier ===
       FOIL_PRODUCT_ID
   )
+}
+
+const YEARLY_PRODUCTS = new Set<string>([COUNT_PRODUCT_IDS.yearly, FOIL_PRODUCT_ID])
+
+export function renewsYearly(customerInfo: CustomerInfo | null) {
+  const entitlement = customerInfo?.entitlements.active[COUNT_PRO_ENTITLEMENT_ID]
+  // why: Play product ids carry a `:base-plan` suffix that App Store ids don't.
+  const product = entitlement?.productIdentifier.split(":")[0]
+  return Boolean(entitlement?.willRenew && product && YEARLY_PRODUCTS.has(product))
 }
 
 function showPaywallFailure(message: string) {
@@ -352,7 +363,10 @@ export function RevenueCatProvider({
         const { presentCountProPaywall } = await import("./sdk")
         const result = await presentCountProPaywall(currentOffering)
         if (result === "error") return fail(translate("account:billing.errors.paywallFailed"))
-        if (result === "purchased" || result === "restored") await refreshCustomerInfo()
+        if (result === "purchased" || result === "restored") {
+          const next = await refreshCustomerInfo()
+          if (result === "purchased" && renewsYearly(next)) offerRenewalReminder()
+        }
         return result
       } catch (cause) {
         return fail(revenueCatErrorMessage(cause))
@@ -366,7 +380,8 @@ export function RevenueCatProvider({
       setError(undefined)
       const { presentCountCustomerCenter } = await import("./sdk")
       await presentCountCustomerCenter(customerInfo)
-      await refreshCustomerInfo()
+      const next = await refreshCustomerInfo(true)
+      if (!renewsYearly(customerInfo) && renewsYearly(next)) offerRenewalReminder()
     } catch (cause) {
       setError(revenueCatErrorMessage(cause))
     }

@@ -6,6 +6,7 @@ import Purchases from "react-native-purchases"
 import {
   hasFoil,
   proSubscriptionManagement,
+  renewsYearly,
   RevenueCatProvider,
   useRevenueCat,
 } from "./RevenueCatContext"
@@ -370,6 +371,20 @@ describe("hasFoil", () => {
     expect(hasFoil(entitledTo("yearly"))).toBe(false)
     expect(hasFoil(entitledTo("foil_yearly", "FAILED"))).toBe(false)
     expect(hasFoil(expiredCustomerInfo)).toBe(false)
+  })
+})
+
+describe("renewsYearly", () => {
+  const renewing = (productIdentifier: string, willRenew = true) =>
+    ({ entitlements: { active: { "Count Pro": { productIdentifier, willRenew } } } }) as never
+
+  it("matches yearly plans across store id formats, only while they renew", () => {
+    expect(renewsYearly(renewing("yearly"))).toBe(true)
+    expect(renewsYearly(renewing("yearly:annual"))).toBe(true)
+    expect(renewsYearly(renewing("foil_yearly"))).toBe(true)
+    expect(renewsYearly(renewing("monthly"))).toBe(false)
+    expect(renewsYearly(renewing("yearly", false))).toBe(false)
+    expect(renewsYearly(null)).toBe(false)
   })
 })
 

@@ -66,6 +66,7 @@ export default {
     linked: "내 계정으로 전송됨",
     linkedElsewhere: "다른 계정으로 전송됨",
     signInToKeep: "로그인하면 앱을 다시 설치해도 이 대화가 유지됩니다",
+    notifyReplies: "내 모든 피드백의 답글 알림 받기",
   },
   unavailable: "피드백은 Scryve 클라우드가 필요하지만 이 빌드에는 설정되어 있지 않습니다.",
 } satisfies LocaleNamespace

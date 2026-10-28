@@ -15,6 +15,7 @@ const snapshotValidator = v.object({
   enabled: v.boolean(),
   foil: v.optional(v.boolean()),
   observedAt: v.number(),
+  renewsAt: v.optional(v.number()),
   transferRevocation: v.optional(v.boolean()),
 })
 
@@ -70,6 +71,7 @@ export const commitSync = internalMutation({
           foil: snapshot.foil,
           environment: args.environment,
           observedAt: snapshot.observedAt,
+          renewsAt: snapshot.enabled ? snapshot.renewsAt : undefined,
           updatedAt: Date.now(),
         }
         if (current) await ctx.db.patch(current._id, value)

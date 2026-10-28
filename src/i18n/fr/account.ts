@@ -76,6 +76,17 @@ export default {
         Holo: "Holo",
       },
     },
+    notifications: {
+      heading: "Notifications",
+      feedbackReplies: "Réponses aux commentaires",
+      renewalReminders: "Rappels de renouvellement",
+      renewalRemindersHelper: "3 jours avant le renouvellement de votre abonnement",
+      channel: "Réponses et rappels",
+      feedbackReplyPreview: "Nouvelle réponse à votre commentaire",
+      blockedTitle: "Les notifications sont désactivées",
+      blockedBody: "Activez les notifications pour Scryve dans les réglages.",
+      openSettings: "Ouvrir les réglages",
+    },
     privacy: {
       heading: "Confidentialité",
       shareUsageHelper:
@@ -290,6 +301,12 @@ export default {
     closeSignIn: "Fermer la connexion",
   },
   billing: {
+    renewalPrompt: {
+      title: "Vous prévenir avant le renouvellement ?",
+      body: "Recevez une notification 3 jours avant votre prochain paiement annuel.",
+      notNow: "Plus tard",
+      remind: "Me prévenir",
+    },
     access: {
       checking: "Vérification de l’accès…",
       renews: "Renouvellement le {{date}}",

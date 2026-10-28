@@ -213,6 +213,10 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     android: {
       ...config.android,
       package: getUniqueIdentifier(),
+      // why: Android push needs Firebase; EAS provides this file as a secret file variable.
+      ...(process.env.GOOGLE_SERVICES_JSON
+        ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON }
+        : {}),
       permissions: [
         ...(config.android?.permissions ?? []),
         "android.permission.ACCESS_LOCAL_NETWORK",

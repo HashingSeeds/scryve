@@ -9,6 +9,7 @@ import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
 import { removeDeckResult, removeUserDeckStats } from "./lib/deckResults"
 import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
+import { forgetAccountDevices } from "./lib/notifications"
 import { refreshGameOpponents, refreshMatchOpponents } from "./lib/results"
 
 const DELETED_PLAYER_NAME = "Deleted player"
@@ -571,6 +572,10 @@ export const processUserLinkedData = internalMutation({
               clientGameId: undefined,
             })
         }
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      if (await forgetAccountDevices(ctx, request.userId)) {
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

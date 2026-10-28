@@ -68,6 +68,7 @@ export default {
     linked: "アカウント付きで送信済み",
     linkedElsewhere: "別のアカウントで送信済み",
     signInToKeep: "再インストールしてもこのスレッドを残すにはサインインしてください",
+    notifyReplies: "自分のフィードバックへのすべての返信を通知する",
   },
   unavailable: "フィードバックにはScryveのクラウドが必要ですが、このビルドでは設定されていません。",
 } satisfies LocaleNamespace

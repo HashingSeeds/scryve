@@ -54,6 +54,7 @@ crons.interval(
   {},
 )
 crons.interval("prune old receipts", { hours: 24 }, internal.crons.pruneOldReceipts, {})
+crons.cron("send renewal reminders", "0 * * * *", internal.notifications.remindRenewals, {})
 crons.interval(
   "pull feedback answers from Apollo",
   { minutes: 1 },

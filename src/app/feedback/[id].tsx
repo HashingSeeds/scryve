@@ -8,6 +8,8 @@ import { feedbackErrorMessage } from "@/features/feedback/errors"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { FeedbackUnavailable } from "@/features/feedback/FeedbackUnavailable"
 import { leaveFeedback } from "@/features/feedback/navigation"
+import { pushSupported } from "@/features/notifications/device"
+import { setPushPref, usePushPref } from "@/features/notifications/prefs"
 import { translate } from "@/i18n/translate"
 import { FeedbackThreadScreen } from "@/screens/FeedbackThreadScreen"
 
@@ -29,6 +31,7 @@ function Thread({ requestId, onSignIn }: { requestId: string; onSignIn: () => vo
   const reply = useMutation(api.feedback.reply)
   const [error, setError] = useState<string>()
   const [restore, setRestore] = useState<{ id: number; text: string }>()
+  const notifyReplies = usePushPref("feedbackReplies")
   const request = thread?.request
   const unread = request?.unread === true
   useEffect(() => {
@@ -53,6 +56,11 @@ function Thread({ requestId, onSignIn }: { requestId: string; onSignIn: () => vo
         if (key && request)
           void setAccount({ key, requestId: request._id, included }).catch(() => undefined)
       }}
+      notifyReplies={
+        pushSupported
+          ? { on: notifyReplies, onChange: (on) => void setPushPref("feedbackReplies", on) }
+          : undefined
+      }
       onSignIn={onSignIn}
       onBack={leaveFeedback}
     />

@@ -76,6 +76,17 @@ export default {
         Holo: "홀로",
       },
     },
+    notifications: {
+      heading: "알림",
+      feedbackReplies: "피드백 답변",
+      renewalReminders: "갱신 알림",
+      renewalRemindersHelper: "구독 갱신 3일 전",
+      channel: "답변 및 알림",
+      feedbackReplyPreview: "피드백에 새 답변이 있습니다",
+      blockedTitle: "알림이 꺼져 있습니다",
+      blockedBody: "설정에서 Scryve 알림을 켜세요.",
+      openSettings: "설정 열기",
+    },
     privacy: {
       heading: "개인정보",
       shareUsageHelper:
@@ -285,6 +296,12 @@ export default {
     closeSignIn: "로그인 닫기",
   },
   billing: {
+    renewalPrompt: {
+      title: "갱신 전에 알려드릴까요?",
+      body: "다음 연간 결제 3일 전에 알림을 받습니다.",
+      notNow: "나중에",
+      remind: "알림 받기",
+    },
     access: {
       checking: "이용 권한 확인 중…",
       renews: "{{date}}에 갱신",

@@ -46,6 +46,12 @@
     "./modules/lazy-view-managers/app.plugin.js",
     "expo-secure-store",
     "expo-localization",
+    [
+      "expo-notifications",
+      {
+        "icon": "./assets/images/app-icon-android-adaptive-monochrome.png"
+      }
+    ],
     "expo-web-browser",
     [
       "expo-camera",

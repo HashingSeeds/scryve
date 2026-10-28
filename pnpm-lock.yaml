@@ -103,6 +103,9 @@ importers:
       expo-network:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.28)(react@19.2.3)
+      expo-notifications:
+        specifier: ~57.0.24
+        version: 57.0.24(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)
       expo-observe:
         specifier: ~57.0.25
         version: 57.0.25(@react-navigation/native@7.3.8(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(expo-router@57.0.26)(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -3435,6 +3438,9 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0
 
+  badgin@1.2.3:
+    resolution: {integrity: sha512-NQGA7LcfCpSzIbGRbkgjgdWkjy7HI+Th5VLxTJfW5EeaAf3fnS+xWQaQOCYiny+q6QSvxqoSO04vCx+4u++EJw==}
+
   bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
 
@@ -4379,6 +4385,12 @@ packages:
       expo: '*'
       react-native: '*'
 
+  expo-constants@57.0.22:
+    resolution: {integrity: sha512-+mBjnzMWMKIrQa7BP7LTDRC0W7cI+q12/sZns4HzVQJGzgGoAdRJSTEKiObxIw/3EswKXlESkRob8upiL95Q4A==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
+
   expo-crypto@57.0.4:
     resolution: {integrity: sha512-LqMMs/N6wvwZyw4deVmcl3AgXgqMwCVQ9WyWf2eaWyrk99TXSKk5da3QspiLOOjnn5Qv9f8C50cDNuoyLThpdw==}
     peerDependencies:
@@ -4515,6 +4527,13 @@ packages:
     peerDependencies:
       expo: '*'
       react: '*'
+
+  expo-notifications@57.0.24:
+    resolution: {integrity: sha512-Hi5PBQlcrDDQ3MTqkH28NkUfeTvr80cXv1xUlvYaxy4AOmgkd3jDN1s7fWzaO5CYyb42BC5mPlIin6C3DJJzxA==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
 
   expo-observe@57.0.25:
     resolution: {integrity: sha512-f1YL/vanK75pY85uGmcr06sVcjwLekmTR+xM3AY+s/vZrD0Lu4mOGR7KyZEzosGQoWrTmTH18Cii/MPJkgluqA==}
@@ -11276,6 +11295,8 @@ snapshots:
       babel-plugin-jest-hoist: 29.6.3
       babel-preset-current-node-syntax: 1.2.0(@babel/core@7.29.7)
 
+  badgin@1.2.3: {}
+
   bail@2.0.2: {}
 
   balanced-match@1.0.2: {}
@@ -12386,6 +12407,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  expo-constants@57.0.22(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)):
+    dependencies:
+      '@expo/env': 2.4.3
+      expo: 57.0.28(6c219434f8e2b5aec8e04aaa8afa6c5f)
+      react-native: 0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
+    transitivePeerDependencies:
+      - supports-color
+
   expo-crypto@57.0.4(expo@57.0.28):
     dependencies:
       expo: 57.0.28(6c219434f8e2b5aec8e04aaa8afa6c5f)
@@ -12529,6 +12558,20 @@ snapshots:
     dependencies:
       expo: 57.0.28(6c219434f8e2b5aec8e04aaa8afa6c5f)
       react: 19.2.3
+
+  expo-notifications@57.0.24(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3):
+    dependencies:
+      '@expo/image-utils': 0.11.6(typescript@6.0.3)
+      abort-controller: 3.0.0
+      badgin: 1.2.3
+      expo: 57.0.28(6c219434f8e2b5aec8e04aaa8afa6c5f)
+      expo-application: 57.0.3(expo@57.0.28)
+      expo-constants: 57.0.22(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
+      react: 19.2.3
+      react-native: 0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   expo-observe@57.0.25(@react-navigation/native@7.3.8(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(expo-router@57.0.26)(expo@57.0.28)(react-native@0.86.3(patch_hash=d8d1267bdae0e330e0840ebbb721bac43335ae73c18057da58922383fb528dab)(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3):
     dependencies:

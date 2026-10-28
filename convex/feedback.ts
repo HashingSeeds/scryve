@@ -24,6 +24,7 @@ import {
   feedbackKind,
   senderHash,
 } from "./lib/feedback"
+import { notifyFeedbackReply } from "./lib/notifications"
 
 const limiter = new RateLimiter(components.rateLimiter, {
   feedbackSubmit: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
@@ -42,7 +43,7 @@ const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 type Ctx = QueryCtx | MutationCtx
 type Viewer = { hash: string | null; user: Doc<"users"> | null }
 
-async function signedInUser(ctx: Ctx) {
+export async function signedInUser(ctx: Ctx) {
   const identity = await ctx.auth.getUserIdentity()
   if (!identity || (await hasAccountDeletion(ctx, identity.subject))) return null
   return await ctx.db
@@ -411,13 +412,11 @@ export const applyApolloEvent = internalMutation({
     const request = requestId ? await ctx.db.get(requestId) : null
     const text = event.text?.trim()
     if (!request || event.actionId !== "reply" || !text) return null
-    await ctx.db.insert("feedbackMessages", {
-      requestId: request._id,
-      from: "team",
-      body: text.slice(0, FEEDBACK_LIMITS.message),
-    })
+    const body = text.slice(0, FEEDBACK_LIMITS.message)
+    await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
     await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
     await postCard(ctx, request._id)
+    await notifyFeedbackReply(ctx, request, body)
     return null
   },
 })

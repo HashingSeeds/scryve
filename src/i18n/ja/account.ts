@@ -76,6 +76,17 @@ export default {
         Holo: "ホロ",
       },
     },
+    notifications: {
+      heading: "通知",
+      feedbackReplies: "フィードバックへの返信",
+      renewalReminders: "更新のリマインダー",
+      renewalRemindersHelper: "サブスクリプション更新の3日前",
+      channel: "返信とリマインダー",
+      feedbackReplyPreview: "フィードバックに新しい返信があります",
+      blockedTitle: "通知がオフです",
+      blockedBody: "設定でScryveの通知をオンにしてください。",
+      openSettings: "設定を開く",
+    },
     privacy: {
       heading: "プライバシー",
       shareUsageHelper:
@@ -286,6 +297,12 @@ export default {
     closeSignIn: "サインインを閉じる",
   },
   billing: {
+    renewalPrompt: {
+      title: "更新前にお知らせしますか?",
+      body: "次の年額課金の3日前に通知を受け取れます。",
+      notNow: "今はしない",
+      remind: "通知する",
+    },
     access: {
       checking: "アクセスを確認中…",
       renews: "{{date}}に更新",
