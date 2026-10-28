@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react"
 import { ConvexError } from "convex/values"
 import type { Service } from "react-native-zeroconf"
 
+import { SyncLatency } from "@/features/connected/syncLatency"
 import { createClientId } from "@/features/game/domain"
 import { connectLan, resolveLanService, type LanConnection } from "@/features/lan/lanTransport"
 import { loadString, saveString } from "@/utils/storage"
@@ -49,7 +50,13 @@ class NearbyEventClient {
   private seq = 0
   private connection: LanConnection<NearbyGuestMessage> | undefined
   private target: { service: Service; code: string; name: string } | undefined
-  private pending = new Map<number, { resolve: () => void; reject: (error: Error) => void }>()
+  private pending = new Map<
+    number,
+    { sentAt: number; resolve: () => void; reject: (error: Error) => void }
+  >()
+  // why: the host answers a command before its batched update arrives, and the stream keeps order, so the next update is the first that shows the change.
+  private confirmedAt: number[] = []
+  readonly latency = new SyncLatency({ transport: "nearby", role: "guest", scope: "event" })
   private nextId = 1
   private retry: ReturnType<typeof setTimeout> | undefined
   private joined: (outcome: "joined" | NearbyRejection) => void = () => undefined
@@ -77,6 +84,7 @@ class NearbyEventClient {
   }
 
   leave() {
+    this.latency.report()
     clearTimeout(this.retry)
     this.target = undefined
     this.connection?.close()
@@ -88,6 +96,7 @@ class NearbyEventClient {
   private failPending() {
     for (const { reject } of this.pending.values()) reject(new Error("Lost the host"))
     this.pending.clear()
+    this.confirmedAt = []
   }
 
   private async connect(resolve = false) {
@@ -151,14 +160,18 @@ class NearbyEventClient {
         if (!feed) return this.connection?.close()
         this.seq = feed.seq
         this.set({ view: feed.view, standings: feed.standings, status: "connected" })
+        const shownAt = Date.now()
+        for (const sentAt of this.confirmedAt.splice(0)) this.latency.acknowledged(shownAt - sentAt)
         return
       }
       case "done": {
         const waiting = this.pending.get(message.id)
         this.pending.delete(message.id)
         if (!waiting) return
-        if (message.error === undefined) waiting.resolve()
-        else
+        if (message.error === undefined) {
+          this.confirmedAt.push(waiting.sentAt)
+          waiting.resolve()
+        } else
           waiting.reject(
             message.code
               ? new ConvexError({ code: message.code, message: message.error })
@@ -174,7 +187,7 @@ class NearbyEventClient {
       return Promise.reject(new Error("Not connected to the host"))
     const id = this.nextId++
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
+      this.pending.set(id, { sentAt: Date.now(), resolve, reject })
       connection.send({ t: "do", id, command })
     })
   }

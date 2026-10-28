@@ -32,6 +32,7 @@ const values = {
   status: ["ready", "unsupported", "refreshing", "rate_limited", "unavailable"],
   transport: ["cloud", "nearby"],
   role: ["host", "guest"],
+  scope: ["event"],
 } as const
 
 const LATENCY_KEYS = [
@@ -90,6 +91,7 @@ type Events = {
   sync_latency: {
     transport: (typeof values.transport)[number]
     role?: (typeof values.role)[number]
+    scope?: (typeof values.scope)[number]
   } & Partial<Record<(typeof LATENCY_KEYS)[number], number>>
 }
 
@@ -105,7 +107,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   dice_armed: ["tool", "source", "system", "since_roll_ms"],
   dice_rolled: ["tool", "system"],
   deck_browse_empty: ["system", "format", "status"],
-  sync_latency: ["transport", "role", ...LATENCY_KEYS],
+  sync_latency: ["transport", "role", "scope", ...LATENCY_KEYS],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"

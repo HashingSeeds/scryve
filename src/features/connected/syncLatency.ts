@@ -9,6 +9,8 @@ const MAX_TRACKED_WRITES = 32
 const MAX_UNPAINTED = 16
 
 export type SyncTransport = { transport: "cloud" } | { transport: "nearby"; role: "host" | "guest" }
+// why: games and events report the same event; old builds send no scope, so a missing scope means a game.
+export type SyncContext = SyncTransport & { readonly scope?: "event" }
 
 export interface LatencyStats {
   count: number
@@ -61,7 +63,7 @@ export class SyncLatency {
   private writes = new Map<string, { sentAt?: number; returnedAt?: number; authorityAt?: number }>()
 
   constructor(
-    readonly context: SyncTransport,
+    readonly context: SyncContext,
     private readonly now: () => number = Date.now,
   ) {}
 
@@ -152,6 +154,7 @@ export class SyncLatency {
     captureAnalytics("sync_latency", {
       transport: this.context.transport,
       ...(this.context.transport === "nearby" ? { role: this.context.role } : {}),
+      ...(this.context.scope ? { scope: this.context.scope } : {}),
       ...(delivery && {
         delivery_count: delivery.count,
         delivery_p50: delivery.p50,
