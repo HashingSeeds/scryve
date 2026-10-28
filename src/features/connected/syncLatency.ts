@@ -9,6 +9,8 @@ const MAX_TRACKED_WRITES = 32
 const MAX_UNPAINTED = 16
 
 export type SyncTransport = { transport: "cloud" } | { transport: "nearby"; role: "host" | "guest" }
+// why: games and events report the same event; old builds send no scope, so a missing scope means a game.
+export type SyncContext = SyncTransport & { readonly scope?: "event" }
 
 export interface LatencyStats {
   count: number
@@ -58,11 +60,12 @@ export class SyncLatency {
   private acks: number[] = []
   private unpainted: { authorityAt: number; eventSequence: number }[] = []
   private paused = false
+  private backAt = 0
   private writes = new Map<string, { sentAt?: number; returnedAt?: number; authorityAt?: number }>()
 
   constructor(
-    readonly context: SyncTransport,
-    private readonly now: () => number = Date.now,
+    readonly context: SyncContext,
+    private readonly now: () => number = () => Date.now(),
   ) {}
 
   setAuthority(): void {
@@ -108,6 +111,7 @@ export class SyncLatency {
   setPaused(paused: boolean): void {
     this.paused = paused
     if (paused) this.unpainted = []
+    else this.backAt = this.now()
   }
 
   remoteChange(authorityAt: number, eventSequence: number): void {
@@ -131,6 +135,12 @@ export class SyncLatency {
     keepNewest(this.acks, durationMs)
   }
 
+  /** why: a command sent before the app went away and settled after it came back would time the time away. */
+  commandShown(sentAt: number): void {
+    if (this.paused || sentAt < this.backAt) return
+    keepNewest(this.acks, this.now() - sentAt)
+  }
+
   summary(): SyncLatencySummary {
     const { clock } = this
     const delivery = latencyStats(this.paints)
@@ -152,6 +162,7 @@ export class SyncLatency {
     captureAnalytics("sync_latency", {
       transport: this.context.transport,
       ...(this.context.transport === "nearby" ? { role: this.context.role } : {}),
+      ...(this.context.scope ? { scope: this.context.scope } : {}),
       ...(delivery && {
         delivery_count: delivery.count,
         delivery_p50: delivery.p50,

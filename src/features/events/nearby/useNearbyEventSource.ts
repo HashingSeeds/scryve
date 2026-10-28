@@ -6,6 +6,7 @@ import { nearbyEventClient, useNearbyEventClient } from "./nearbyEventClient"
 import { nearbyEventHost, useNearbyEventHost } from "./nearbyEventHost"
 import { standingsThroughRound } from "../eventLogic"
 import type { EventSource } from "../eventSource"
+import { useLatencyReports } from "../useLatencyReports"
 
 type Commands = Omit<EventSource, "view" | "standings">
 
@@ -47,6 +48,7 @@ export function useHostEventSource(): EventSource {
 
 export function useClientEventSource(): EventSource {
   const { view, standings, status } = useNearbyEventClient()
+  useLatencyReports(nearbyEventClient.latency)
   return useMemo(
     () => ({
       ...clientCommands,

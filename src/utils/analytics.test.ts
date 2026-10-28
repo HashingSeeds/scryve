@@ -361,4 +361,10 @@ it("keeps sync latency to whole milliseconds and the known transports", () => {
   )
   for (const key of ["delivery_count", "ping_ms", "name"])
     expect(properties).not.toHaveProperty(key)
+  expect(analyticsProperties("sync_latency", { transport: "cloud", scope: "event" })).toEqual(
+    expect.objectContaining({ scope: "event" }),
+  )
+  expect(
+    analyticsProperties("sync_latency", { transport: "cloud", scope: "lobby" }),
+  ).not.toHaveProperty("scope")
 })

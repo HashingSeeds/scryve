@@ -98,6 +98,20 @@ describe("SyncLatency", () => {
     },
   )
 
+  it("drops a command that was waiting while the app was away", () => {
+    const { latency, at } = meter()
+    at(1_000)
+    latency.setPaused(true)
+    at(9_000)
+    latency.setPaused(false)
+    latency.commandShown(500)
+    at(9_100)
+    latency.commandShown(9_020)
+    expect(latency.summary()).toEqual({
+      ack: expect.objectContaining({ count: 1, p50: 80 }),
+    })
+  })
+
   it("reports a stretch of play once", () => {
     const { latency } = meter()
     latency.acknowledged(45)
