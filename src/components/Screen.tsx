@@ -6,6 +6,7 @@ import {
   Platform,
   ScrollViewProps,
   StyleProp,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native"
@@ -305,15 +306,16 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.md,
 })
 
-/** why: the closed iPhone Duo puts the status bar and system controls in a rail down one side and reports it as that side's safe-area inset; content stops at the rail like a native app's. Screens already pad their content by `spacing.lg`, so the gutter only adds what the inset needs beyond that, instead of stacking the two. */
+/** why: the closed iPhone Duo puts the status bar and system controls in a rail down one side and reports it as that side's safe-area inset; content stops at the rail like a native app's. It is the only portrait screen whose side inset beats its top, so landscape notches keep their layout. Screen content pads itself by at least `spacing.md`, so the gutter adds only what the rail needs beyond that, instead of stacking the two. */
 function useSideSafeAreaGutter(enabled: boolean): ViewStyle | undefined {
-  const { left, right } = useSafeAreaInsets()
+  const { top, left, right } = useSafeAreaInsets()
+  const { width, height } = useWindowDimensions()
   const {
     theme: { spacing },
   } = useAppTheme()
-  if (!enabled || (!left && !right)) return undefined
+  if (!enabled || height <= width || Math.max(left, right) <= top) return undefined
   return {
-    paddingLeft: Math.max(left - spacing.lg, 0),
-    paddingRight: Math.max(right - spacing.lg, 0),
+    paddingLeft: Math.max(left - spacing.md, 0),
+    paddingRight: Math.max(right - spacing.md, 0),
   }
 }

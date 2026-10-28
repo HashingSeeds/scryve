@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View } from "react-native"
+import { Dimensions, ScrollView, StyleSheet, View } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -125,13 +125,34 @@ describe("Screen", () => {
     const gutter = () =>
       StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
     try {
-      expect(gutter()).toMatchObject({ paddingLeft: 0, paddingRight: 60 })
+      expect(gutter()).toMatchObject({ paddingLeft: 0, paddingRight: 68 })
 
       view.rerender(screen(true))
 
       expect(gutter().paddingRight).toBeUndefined()
     } finally {
       mockInsets.right = 0
+    }
+  })
+
+  it("leaves a landscape notch's side insets alone", () => {
+    Object.assign(mockInsets, { left: 59, right: 59 })
+    const portrait = Dimensions.get("window")
+    const landscape = { width: 852, height: 393, scale: 3, fontScale: 1 }
+    Dimensions.set({ window: landscape, screen: landscape })
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <Screen preset="fixed" contentInset="standard">
+            <Text text="Rules" />
+          </Screen>
+        </ThemeProvider>,
+      )
+      const style = StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
+      expect(style.paddingRight).toBeUndefined()
+    } finally {
+      Object.assign(mockInsets, { left: 0, right: 0 })
+      Dimensions.set({ window: portrait, screen: portrait })
     }
   })
 })
