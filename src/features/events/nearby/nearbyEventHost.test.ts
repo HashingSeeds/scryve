@@ -16,13 +16,19 @@ const token = (seat: number) => `token-${seat}-000000000`
 let accept: Accept
 
 beforeEach(() => {
+  jest.useFakeTimers()
   jest.mocked(hostLan).mockImplementation(async (name, _parse, onPeer) => {
     accept = onPeer as Accept
     return { name, stop: async () => {} }
   })
 })
 
-afterEach(() => nearbyEventHost.discard())
+afterEach(async () => {
+  await nearbyEventHost.discard()
+  jest.useRealTimers()
+})
+
+const sendBatch = () => jest.advanceTimersByTime(250)
 
 async function host(players: number) {
   let event = createHubEvent(
@@ -54,6 +60,7 @@ function guest(seat: number, patches: boolean) {
   }
   const { onMessage } = accept(peer)
   onMessage({ t: "hello", v: 1, code: CODE, name: `Player ${seat}`, token: token(seat), patches })
+  sendBatch()
   const welcome = received.find((message) => message.t === "welcome")
   const updates = () => received.filter((message) => message.t === "view" || message.t === "patch")
   let id = 0
@@ -91,6 +98,7 @@ describe("nearby event host", () => {
     const perGuest = (act: () => void) => {
       const before = guests.map(({ received }) => received.length)
       act()
+      sendBatch()
       return average(before.map((count, index) => bytes(guests[index]!.received.slice(count))))
     }
 
@@ -101,6 +109,7 @@ describe("nearby event host", () => {
     const changes: number[] = []
     for (let round = 1; round <= 3; round++) {
       nearbyEventHost.run({ kind: "startRound" })
+      sendBatch()
       for (const table of currentTables()) {
         const [first, second] = table.playerIds.map((playerId) => bySeat.get(playerId)!)
         changes.push(
@@ -112,6 +121,7 @@ describe("nearby event host", () => {
     nearbyEventHost.run({ kind: "report", tableId: hosted().tables[0]!.id, result: match([0, 2]) })
     guests[5]!.run({ kind: "drop", playerId: guests[5]!.playerId })
     nearbyEventHost.run({ kind: "finish" })
+    sendBatch()
 
     expect(Math.max(...joins)).toBeLessThan(1024)
     expect(average(changes)).toBeLessThan(1024)
@@ -123,7 +133,9 @@ describe("nearby event host", () => {
     await host(4)
     const ada = guest(1, true)
     nearbyEventHost.run({ kind: "startRound" })
+    sendBatch()
     nearbyEventHost.run({ kind: "clock", action: { kind: "pause" } })
+    sendBatch()
     const [view, , skipped] = ada.updates()
 
     expect(applyHostMessage(applyHostMessage(undefined, view!), skipped!)).toBeUndefined()
@@ -133,8 +145,10 @@ describe("nearby event host", () => {
     await host(4)
     const old = guest(1, false)
     nearbyEventHost.run({ kind: "startRound" })
+    sendBatch()
     const table = currentTables().find(({ playerIds }) => playerIds.includes(old.playerId))!
     old.run({ kind: "report", tableId: table.id, result: match([2, 0]) })
+    sendBatch()
 
     expect(old.received.some(({ t }) => t === "patch")).toBe(false)
     expect(old.received.at(-1)).toEqual({
@@ -142,5 +156,35 @@ describe("nearby event host", () => {
       seq: expect.any(Number),
       ...expected(old.playerId),
     })
+  })
+
+  it("sends a burst of results as one update, and a lone change at once", async () => {
+    await host(0)
+    const guests = Array.from({ length: 8 }, (_, index) => guest(index + 1, true))
+    const bySeat = new Map(guests.map((joined) => [joined.playerId, joined]))
+    nearbyEventHost.run({ kind: "startRound" })
+    sendBatch()
+    const renders = jest.fn()
+    const unsubscribe = nearbyEventHost.subscribe(renders)
+    const before = guests.map(({ updates }) => updates().length)
+
+    for (const table of currentTables())
+      bySeat
+        .get(table.playerIds[0]!)!
+        .run({ kind: "report", tableId: table.id, result: match([2, 1]) })
+    sendBatch()
+
+    expect(guests.map(({ updates }, index) => updates().length - before[index]!)).toEqual(
+      guests.map(() => 1),
+    )
+    expect(renders).toHaveBeenCalledTimes(1)
+    for (const { playerId, feed } of guests)
+      expect(feed()).toEqual({ seq: expect.any(Number), ...expected(playerId) })
+
+    jest.advanceTimersByTime(1000)
+    const quiet = guests[0]!.updates().length
+    nearbyEventHost.run({ kind: "clock", action: { kind: "pause" } })
+    expect(guests[0]!.updates()).toHaveLength(quiet + 1)
+    unsubscribe()
   })
 })
