@@ -797,14 +797,18 @@ function PowerStep({
   )
 }
 
-/** why: a number centred in a mark's box sits off the drawn shape for the triangle and heart, so the label follows each shape's visual middle. */
+/** why: a number centred in a mark's box sits off lopsided shapes, so the label follows each shape's visual middle: halfway between its area centroid and the centre of its largest inscribed circle, measured from the MarkArt paths and rounded to 0.5. Shapes left out sit at 22. */
 const LABEL_CENTER_Y: Partial<Record<PlayerMarkShape, number>> = {
-  triangle: 27,
-  heart: 21,
-  shield: 21,
-  star: 23.5,
-  crown: 24,
+  triangle: 25,
+  heart: 20.5,
+  star: 23,
+  crown: 23,
+  flame: 26,
+  bolt: 21.5,
+  skull: 21,
   spade: 21,
+  gem: 20,
+  tower: 22.5,
 }
 
 function CommanderBadge({
