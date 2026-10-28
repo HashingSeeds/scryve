@@ -136,6 +136,19 @@ async function addPlayer(
 
 const accountName = (user: Doc<"users">) => publicUsernameFor(user) ?? user.displayName
 
+async function claimCode(ctx: MutationCtx, candidates: string[]) {
+  assertManualCodeCandidates(candidates)
+  for (const candidate of candidates) {
+    const code = normalizeManualCode(candidate)
+    const taken = await ctx.db
+      .query("events")
+      .withIndex("by_code", (q) => q.eq("code", code))
+      .first()
+    if (!taken) return code
+  }
+  throw new Error("Event code collision; retry with fresh candidates")
+}
+
 export const create = mutation({
   args: {
     name: v.string(),
@@ -176,20 +189,7 @@ export const create = mutation({
         "event_limit",
         `Finish an event first; you can run ${MAX_OPEN_EVENTS} at once`,
       )
-    assertManualCodeCandidates(args.codeCandidates)
-    let code: string | undefined
-    for (const candidate of args.codeCandidates) {
-      const normalized = normalizeManualCode(candidate)
-      const taken = await ctx.db
-        .query("events")
-        .withIndex("by_code", (q) => q.eq("code", normalized))
-        .first()
-      if (!taken) {
-        code = normalized
-        break
-      }
-    }
-    if (!code) throw new Error("Event code collision; retry with fresh candidates")
+    const code = await claimCode(ctx, args.codeCandidates)
     const now = Date.now()
     const eventId = await ctx.db.insert("events", {
       ownerUserId: user._id,
@@ -459,6 +459,120 @@ export const remove = mutation({
     for (const player of await loadPlayers(ctx, event._id)) await ctx.db.delete(player._id)
     await ctx.db.delete(event._id)
     return null
+  },
+})
+
+const nearbyTable = v.object({
+  round: v.number(),
+  table: v.number(),
+  playerIds: v.array(v.string()),
+  status: v.union(v.literal("open"), v.literal("reported"), v.literal("confirmed")),
+  result: v.optional(eventTableResult),
+  reportedBy: v.optional(v.string()),
+})
+
+export const importNearby = mutation({
+  args: {
+    nearbyId: v.string(),
+    name: v.string(),
+    format: v.string(),
+    structure: v.union(v.literal("swiss"), v.literal("pods")),
+    bestOf: bestOfValidator,
+    points: eventPoints,
+    plannedRounds: v.number(),
+    roundMinutes: v.number(),
+    round: v.number(),
+    createdAt: v.number(),
+    finishedAt: v.number(),
+    players: v.array(
+      v.object({ id: v.string(), name: v.string(), droppedAt: v.optional(v.number()) }),
+    ),
+    tables: v.array(nearbyTable),
+    codeCandidates: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    const existing = await ctx.db
+      .query("events")
+      .withIndex("by_owner_user_and_nearby_id", (q) =>
+        q.eq("ownerUserId", user._id).eq("nearbyId", args.nearbyId),
+      )
+      .first()
+    if (existing) return { eventId: existing._id, ownerId: user.clerkUserId }
+    await limitGameRate(ctx, "eventCreate", user._id)
+    const name = assertName(args.name, assertEventName)
+    if (!name) throw new Error("Name the event")
+    if (!formatDefinition("mtg", args.format)) throw new Error("Choose a format for this game")
+    const settings = assertSettings({
+      structure: args.structure,
+      bestOf: args.bestOf,
+      points: args.points,
+    })
+    if (args.players.length > MAX_EVENT_PLAYERS)
+      throw eventError("event_full", `An event can have at most ${MAX_EVENT_PLAYERS} players`)
+    if (!Number.isInteger(args.round) || args.round < 0 || args.round > MAX_EVENT_ROUNDS)
+      throw new Error(`An event can have at most ${MAX_EVENT_ROUNDS} rounds`)
+    if (args.tables.length > MAX_EVENT_TABLES) throw new Error("Too many tables")
+    const known = new Set(args.players.map((player) => player.id))
+    if (known.size !== args.players.length) throw new Error("Duplicate player")
+    const seated = new Set<string>()
+    for (const table of args.tables) {
+      for (const key of [
+        `table:${table.round}:${table.table}`,
+        ...table.playerIds.map((id) => `seat:${table.round}:${id}`),
+      ]) {
+        if (seated.has(key)) throw new Error("A player or table appears twice in one round")
+        seated.add(key)
+      }
+      if (!Number.isInteger(table.round) || table.round < 1 || table.round > args.round)
+        throw new Error("A table belongs to a round that wasn't played")
+      if (table.playerIds.some((id) => !known.has(id))) throw new Error("Unknown player")
+      if (table.result?.kind === "bye") {
+        if (table.playerIds.length !== 1) throw new Error("Only a lone player gets a bye")
+      } else if (table.result) assertResult(table, table.result, settings, eventRules("mtg"))
+    }
+    const code = await claimCode(ctx, args.codeCandidates)
+    const now = Date.now()
+    const eventId = await ctx.db.insert("events", {
+      ownerUserId: user._id,
+      code,
+      name,
+      system: "mtg",
+      format: args.format,
+      ...settings,
+      plannedRounds: assertPlannedRounds(args.plannedRounds),
+      roundMinutes: assertRoundMinutes(args.roundMinutes),
+      status: "finished",
+      round: args.round,
+      playerCount: args.players.length,
+      createdAt: args.createdAt,
+      updatedAt: now,
+      finishedAt: args.finishedAt,
+      nearbyId: args.nearbyId,
+    })
+    const playerIds = new Map<string, Id<"eventPlayers">>()
+    for (const player of args.players)
+      playerIds.set(
+        player.id,
+        await ctx.db.insert("eventPlayers", {
+          eventId,
+          name: assertName(player.name, assertDisplayName),
+          joinedAt: args.createdAt,
+          ...(player.droppedAt === undefined ? {} : { droppedAt: player.droppedAt }),
+        }),
+      )
+    for (const table of args.tables)
+      await ctx.db.insert("eventTables", {
+        eventId,
+        round: table.round,
+        table: table.table,
+        playerIds: table.playerIds.map((id) => playerIds.get(id)!),
+        status: table.status,
+        result: table.result,
+        reportedBy: table.reportedBy === undefined ? undefined : playerIds.get(table.reportedBy),
+        updatedAt: now,
+      })
+    return { eventId, ownerId: user.clerkUserId }
   },
 })
 
