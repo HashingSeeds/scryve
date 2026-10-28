@@ -7,9 +7,10 @@ import { BottomActionBar } from "./BottomActionBar"
 import { Screen } from "./Screen"
 import { Text } from "./Text"
 
+const mockInsets = { top: 0, right: 0, bottom: 34, left: 0 }
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }))
 
 describe("Screen", () => {
@@ -109,5 +110,28 @@ describe("Screen", () => {
     expect(screenPadding().paddingBottom).toBeUndefined()
     const bar = view.UNSAFE_getByType(BottomActionBar).findByType(View)
     expect(StyleSheet.flatten(bar.props.style)).toMatchObject({ paddingBottom: 34 })
+  })
+
+  it("stops content at a side rail without stacking the screen's own padding on it", () => {
+    mockInsets.right = 84
+    const screen = (fullWidth?: boolean) => (
+      <ThemeProvider initialContext="dark">
+        <Screen preset="fixed" contentInset="standard" fullWidth={fullWidth}>
+          <Text text="Deck details" />
+        </Screen>
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    const gutter = () =>
+      StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
+    try {
+      expect(gutter()).toMatchObject({ paddingLeft: 0, paddingRight: 60 })
+
+      view.rerender(screen(true))
+
+      expect(gutter().paddingRight).toBeUndefined()
+    } finally {
+      mockInsets.right = 0
+    }
   })
 })

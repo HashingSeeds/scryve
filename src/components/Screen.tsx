@@ -14,6 +14,7 @@ import {
   KeyboardAwareScrollView,
   type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { BottomInsetClaimContext } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
@@ -41,6 +42,8 @@ interface BaseScreenProps {
   SystemBarsProps?: SystemBarsProps
   KeyboardAvoidingViewProps?: KeyboardAvoidingViewProps
   header?: HeaderProps & { collapseTitle?: boolean }
+  /** why: a game board lays out to the screen edges and keeps its own chrome clear of the camera, so it skips the side safe-area gutter every other screen gets. */
+  fullWidth?: boolean
 }
 
 interface FixedScreenProps extends BaseScreenProps {
@@ -192,6 +195,7 @@ export function Screen(props: ScreenProps) {
     safeAreaEdges,
     SystemBarsProps,
     systemBarStyle,
+    fullWidth,
   } = props
   const { titleVisible, onScroll: onTitleScroll } = useCollapsingTitle()
   const { collapseTitle = true, ...headerProps } = props.header ?? {}
@@ -206,6 +210,7 @@ export function Screen(props: ScreenProps) {
     setBottomInsetClaims((claims) => claims + 1)
     return () => setBottomInsetClaims((claims) => claims - 1)
   }, [])
+  const sideGutter = useSideSafeAreaGutter(!fullWidth)
   const $containerInsets = useSafeAreaInsetsStyle(
     bottomInsetClaims > 0 ? safeAreaEdges?.filter((edge) => edge !== "bottom") : safeAreaEdges,
   )
@@ -238,7 +243,7 @@ export function Screen(props: ScreenProps) {
         behavior={isIos ? "padding" : "height"}
         keyboardVerticalOffset={keyboardOffset}
         {...KeyboardAvoidingViewProps}
-        style={[$styles.flex1, KeyboardAvoidingViewProps?.style]}
+        style={[$styles.flex1, sideGutter, KeyboardAvoidingViewProps?.style]}
       >
         <BottomInsetClaimContext.Provider value={claimBottomInset}>
           {isNonScrolling(screenProps.preset) ? (
@@ -299,3 +304,16 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.lg,
   paddingBottom: spacing.md,
 })
+
+/** why: the closed iPhone Duo puts the status bar and system controls in a rail down one side and reports it as that side's safe-area inset; content stops at the rail like a native app's. Screens already pad their content by `spacing.lg`, so the gutter only adds what the inset needs beyond that, instead of stacking the two. */
+function useSideSafeAreaGutter(enabled: boolean): ViewStyle | undefined {
+  const { left, right } = useSafeAreaInsets()
+  const {
+    theme: { spacing },
+  } = useAppTheme()
+  if (!enabled || (!left && !right)) return undefined
+  return {
+    paddingLeft: Math.max(left - spacing.lg, 0),
+    paddingRight: Math.max(right - spacing.lg, 0),
+  }
+}
