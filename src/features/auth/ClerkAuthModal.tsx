@@ -1,5 +1,7 @@
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { Modal, Platform, Pressable, View } from "react-native"
+import { router } from "expo-router"
+import { Trans } from "react-i18next"
 
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
@@ -21,6 +23,11 @@ export function ClerkAuthModal({
   const androidTopInset = useSafeAreaInsetsStyle(["top"])
 
   const closeLabel = translate("account:cloud.closeSignIn")
+  // why: the sign-in sheet covers the app's routes, so it closes before a document opens.
+  const openDocument = (href: "/terms" | "/privacy") => {
+    onDismiss()
+    router.push(href)
+  }
   return (
     <Modal
       testID="auth-modal"
@@ -40,6 +47,29 @@ export function ClerkAuthModal({
             <Text preset="bold" tx="common:close" />
           </Pressable>
         </View>
+        <Text size="xs" style={themed($agreement)}>
+          <Trans
+            i18nKey="account:cloud.signInAgreement"
+            components={{
+              terms: (
+                <Text
+                  size="xs"
+                  accessibilityRole="link"
+                  style={themed($link)}
+                  onPress={() => openDocument("/terms")}
+                />
+              ),
+              privacy: (
+                <Text
+                  size="xs"
+                  accessibilityRole="link"
+                  style={themed($link)}
+                  onPress={() => openDocument("/privacy")}
+                />
+              ),
+            }}
+          />
+        </Text>
         <ClerkAuthView onDismiss={onDismiss} />
       </View>
     </Modal>
@@ -63,4 +93,13 @@ const $closeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minWidth: 44,
   justifyContent: "center",
   paddingHorizontal: spacing.sm,
+})
+const $agreement: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
+  color: colors.textDim,
+  paddingHorizontal: spacing.md,
+  paddingTop: spacing.sm,
+})
+const $link: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.tint,
+  textDecorationLine: "underline",
 })

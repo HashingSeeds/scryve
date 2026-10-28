@@ -77,8 +77,8 @@ without separate approval.
 After opening the app, inspect the current page and establish only the state the
 affected flow needs:
 
-1. If `Before you start` is visible, press `accept-legal-button` and wait for
-   the app to settle. This is the real Scryve consent flow. Never suppress it.
+1. If `What do you play?` is visible, choose a game type and press
+   `what-you-play-start`. This is the real Scryve first-launch flow.
 2. If the flow works signed out, continue signed out. Authentication is not a
    prerequisite for local play.
 3. If the flow requires an account and the app is signed out, open the account

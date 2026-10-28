@@ -23,6 +23,7 @@ import {
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
 import { NearbyOnlyWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
+import { translate } from "@/i18n/translate"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
@@ -151,6 +152,13 @@ export function ConfiguredAuth({
   )
 }
 
+// why: Clerk's web sign-in links the documents in its footer but takes subtitles only as plain text.
+function webSignInLocalization() {
+  const agreement = translate("account:cloud.signInAgreement").replace(/<\/?\w+>/g, "")
+  const start = { subtitle: agreement, subtitleCombined: agreement }
+  return { signIn: { start }, signUp: { start } }
+}
+
 export function CloudProviders({ children }: { children: ReactNode }) {
   const config = readPublicCloudConfig()
   if (!config.configured) {
@@ -180,6 +188,7 @@ export function CloudProviders({ children }: { children: ReactNode }) {
       // why: on a development Clerk instance, signOut builds this URL from window.location, which React Native lacks, so native sign out threw after removing the session.
       afterSignOutUrl={Platform.OS === "web" ? APP_ROOT_URL : undefined}
       __experimental_resourceCache={resourceCache}
+      localization={Platform.OS === "web" ? webSignInLocalization() : undefined}
     >
       <ConfiguredAuth convexUrl={config.value.convexUrl}>{children}</ConfiguredAuth>
     </ClerkProvider>

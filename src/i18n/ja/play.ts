@@ -31,6 +31,10 @@ export default {
     heading: "何をプレイしますか?",
     changeLater: "設定でいつでも変更できます。",
     play: "プレイ",
+    shareUsageHelper:
+      "初期設定ではオフです。共有いただくと、皆さんが求める機能の開発に役立ちます。詳しくはプライバシーポリシーをご覧ください。",
+    sharingSaveFailed:
+      "共有設定を保存できませんでした。もう一度お試しいただくか、共有をオフにして続行してください。",
     acceptance:
       "プレイすると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
   },

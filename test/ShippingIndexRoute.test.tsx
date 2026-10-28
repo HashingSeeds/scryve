@@ -59,7 +59,6 @@ jest.mock("expo-router", () => ({
     return null
   },
 }))
-jest.mock("@/features/legal/LegalConsentGate", () => ({ useLegalConsentSettled: () => true }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, openAuth: mockOpenAuth }),
 }))

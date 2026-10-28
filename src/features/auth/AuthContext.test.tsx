@@ -22,6 +22,7 @@ jest.mock("react-native/Libraries/Modal/Modal", () => {
     React.createElement(NativeView, props, children)
   return { __esModule: true, default: MockModal }
 })
+jest.mock("expo-router", () => ({ router: { push: jest.fn() } }))
 jest.mock("@clerk/expo", () => ({
   ClerkProvider: (props: { children: ReactNode }) => mockClerkProvider(props),
   useAuth: (options: unknown) => mockUseAuth(options),

@@ -14,13 +14,9 @@ import { LocalGameRepository, type StringStorage } from "./localPersistence"
 
 let mockAuth: { configured: boolean; isLoaded: boolean; isSignedIn: boolean; userId?: string }
 let mockAuthVisible = false
-let mockConsentSettled = true
 let mockPathname = "/"
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, authVisible: mockAuthVisible }),
-}))
-jest.mock("@/features/legal/LegalConsentGate", () => ({
-  useLegalConsentSettled: () => mockConsentSettled,
 }))
 jest.mock("expo-router", () => ({ usePathname: () => mockPathname }))
 
@@ -62,7 +58,6 @@ describe("LocalGameClaimPrompt", () => {
   beforeEach(() => {
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "owner-a" }
     mockAuthVisible = false
-    mockConsentSettled = true
     mockPathname = "/"
   })
 
@@ -77,9 +72,6 @@ describe("LocalGameClaimPrompt", () => {
     mockAuthVisible = true
     expect(setup(repository).queryByTestId("claim-games-dialog")).toBeNull()
     mockAuthVisible = false
-    mockConsentSettled = false
-    expect(setup(repository).queryByTestId("claim-games-dialog")).toBeNull()
-    mockConsentSettled = true
     mockAuth = { configured: true, isLoaded: true, isSignedIn: false }
     expect(setup(repository).queryByTestId("claim-games-dialog")).toBeNull()
 

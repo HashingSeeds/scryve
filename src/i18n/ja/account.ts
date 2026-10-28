@@ -295,6 +295,8 @@ export default {
     notConfigured:
       "このビルドでは通信対戦機能を利用できません。ローカルプレイは引き続き利用できます。",
     closeSignIn: "サインインを閉じる",
+    signInAgreement:
+      "続行すると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
   },
   billing: {
     renewalPrompt: {
@@ -349,59 +351,8 @@ export default {
     choose: "Foil Supporterを選ぶ",
     purchasesUnavailable: "このビルドでは購入できません。",
   },
-  legalConsent: {
-    heading: {
-      updatedPrivacy: "プライバシーポリシーを更新しました",
-      updatedTerms: "利用規約を更新しました",
-      beforeStart: "開始する前に",
-    },
-    intro: "利用規約とプライバシーポリシーをご確認ください。Scryveを使うには同意が必要です。",
-    returning: {
-      dated: {
-        terms:
-          "利用規約が{{date}}に変更されました。Scryveを引き続き使うには、更新内容をご確認ください。",
-        privacy:
-          "プライバシーポリシーが{{date}}に変更されました。Scryveを引き続き使うには、更新内容をご確認ください。",
-        both: "利用規約とプライバシーポリシーが{{date}}に変更されました。Scryveを引き続き使うには、更新内容をご確認ください。",
-      },
-      undated: {
-        terms: "利用規約が変更されました。Scryveを引き続き使うには、更新内容をご確認ください。",
-        privacy:
-          "プライバシーポリシーが変更されました。Scryveを引き続き使うには、更新内容をご確認ください。",
-        both: "利用規約とプライバシーポリシーが変更されました。Scryveを引き続き使うには、更新内容をご確認ください。",
-      },
-    },
-    acceptance: {
-      dated: {
-        terms: "「同意する」をタップすると、{{date}}付の利用規約に同意したことになります。",
-        privacy:
-          "「同意する」をタップすると、{{date}}付のプライバシーポリシーに同意したことになります。",
-        both: "「同意する」をタップすると、{{date}}付の利用規約とプライバシーポリシーに同意したことになります。",
-      },
-      undated: {
-        terms: "「同意する」をタップすると、現行の利用規約に同意したことになります。",
-        privacy: "「同意する」をタップすると、現行のプライバシーポリシーに同意したことになります。",
-        both: "「同意する」をタップすると、現行の利用規約とプライバシーポリシーに同意したことになります。",
-      },
-    },
-    readTerms: "利用規約を読む",
-    readPrivacy: "プライバシーポリシーを読む",
-    shareUsageHelper:
-      "初期設定ではオフです。共有いただくと、皆さんが求める機能の開発に役立ちます。詳細はプライバシーポリシーをご覧ください。",
-    sharingSaveFailed:
-      "共有設定を保存できませんでした。もう一度お試しいただくか、共有をオフにして続行してください。",
-    saving: "保存中…",
-    agree: "同意する",
-  },
   legalDocument: {
     lastUpdated: "最終更新日 {{date}}",
-  },
-  consentSync: {
-    syncing: "同意を同期中…",
-    stillPending: "アカウントの同期はまだ保留中です。同意はこのデバイスに保存されています。",
-    pending: "同意はこのデバイスに保存されました。アカウントの同期は保留中です。",
-    retrying: "再試行中…",
-    retryAccessibilityLabel: "アカウントの同意の同期を再試行",
   },
   updates: {
     downloading: "アップデートをダウンロード中…",

@@ -10,7 +10,6 @@ import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import { appLocale } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { entryPlayerNames, localHistoryEntry } from "@/screens/historyEntries"
@@ -328,7 +327,6 @@ export function LocalGameClaimPrompt({
   repository?: LocalGameRepository
 }) {
   const auth = useAuthAccess()
-  const consentSettled = useLegalConsentSettled()
   const running = useLocalGameRunning(repository)
   const reopened = useClaimsReopened(repository)
   const ownerId = auth.configured && auth.isLoaded && auth.isSignedIn ? auth.userId : undefined
@@ -338,7 +336,7 @@ export function LocalGameClaimPrompt({
       repository.repairClaimedDetails(ownerId)
     } catch {}
   }, [ownerId, repository])
-  if (!ownerId || auth.authVisible || !consentSettled || running) return null
+  if (!ownerId || auth.authVisible || running) return null
   return <ClaimPicker key={`${ownerId}:${reopened}`} ownerId={ownerId} repository={repository} />
 }
 
