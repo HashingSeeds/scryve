@@ -87,14 +87,24 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     title: clip(`${label}: ${request.body.split("\n")[0] ?? ""}`, 120),
     body,
     meta: {
-      ...(request.sentryEventId
-        ? { sentry: `https://matthew-chisolm.sentry.io/issues/?query=${request.sentryEventId}` }
-        : {}),
       from: account ?? "Anonymous",
       ...(request.appVersion || request.platform
         ? { app: [request.appVersion, request.platform].filter(Boolean).join(" · ") }
         : {}),
     },
-    actions: [{ id: "reply", label: "Reply", style: "primary", input: "text", repeat: true }],
+    actions: [
+      { id: "reply", label: "Reply", style: "primary", input: "text", repeat: true },
+      // why: Apollo hides a non-repeat action once the card turns into an update.
+      ...(request.sentryEventId
+        ? [
+            {
+              id: "sentry",
+              label: "Sentry",
+              url: `https://matthew-chisolm.sentry.io/issues/?query=${request.sentryEventId}`,
+              repeat: true,
+            },
+          ]
+        : []),
+    ],
   } as const
 }
