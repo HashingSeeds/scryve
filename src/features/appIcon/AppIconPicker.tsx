@@ -159,7 +159,8 @@ export function AppIconPicker() {
       <TouchableOpacity
         key={id}
         testID={`app-icon-${id}`}
-        accessibilityRole="radio"
+        // why: iOS has no radio trait, so VoiceOver read "radio" choices as plain elements instead of buttons.
+        accessibilityRole="button"
         accessibilityLabel={
           locked ? translate("account:settings.appIcon.lockedPro", { name: label }) : label
         }
@@ -182,7 +183,12 @@ export function AppIconPicker() {
           else auth.openAuth()
         }}
       >
-        <View style={[themed($frame), selected && themed($selectedFrame)]}>
+        {/* why: release builds label bundled images with their asset path, which VoiceOver would read. */}
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[themed($frame), selected && themed($selectedFrame)]}
+        >
           <View style={[$mask, { backgroundColor: background }]}>
             <Image
               source={ANDROID ? preview.android : preview.ios}
@@ -198,15 +204,13 @@ export function AppIconPicker() {
 
   return (
     <View style={themed($picker)}>
-      <View accessibilityRole="radiogroup" style={themed($picker)}>
-        <View style={themed($row)}>{options.map(renderOption)}</View>
-        {foilOptions.length > 0 ? (
-          <>
-            <Text tx="account:settings.appIcon.foilHeading" size="xs" weight="medium" />
-            <View style={themed($row)}>{foilOptions.map(renderOption)}</View>
-          </>
-        ) : null}
-      </View>
+      <View style={themed($row)}>{options.map(renderOption)}</View>
+      {foilOptions.length > 0 ? (
+        <>
+          <Text tx="account:settings.appIcon.foilHeading" size="xs" weight="medium" />
+          <View style={themed($row)}>{foilOptions.map(renderOption)}</View>
+        </>
+      ) : null}
       {planFailed ? <Text size="xs" tx="account:settings.appIcon.proFailed" /> : null}
       {error ? <Text accessibilityRole="alert" size="xs" text={error} /> : null}
     </View>
