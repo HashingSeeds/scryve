@@ -1,5 +1,11 @@
+import { Image } from "react-native"
 import { setAlternateAppIcon } from "expo-alternate-app-icons"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import {
+  fireEvent,
+  isHiddenFromAccessibility,
+  render,
+  waitFor,
+} from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -45,6 +51,19 @@ describe("AppIconPicker", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockCurrentIcon = null
+  })
+
+  it("reads each choice as a button and hides the preview image", () => {
+    const view = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false })
+    const two = view.getByRole("button", { name: "Two, Scryve Pro" })
+    expect(two.props.accessibilityHint).toBe("Opens Scryve Pro")
+    expect(view.getByRole("button", { name: "Default" }).props.accessibilityState).toEqual({
+      selected: true,
+      disabled: false,
+    })
+    const previews = view.UNSAFE_getAllByType(Image)
+    expect(previews.length).toBeGreaterThan(0)
+    expect(previews.every((preview) => isHiddenFromAccessibility(preview))).toBe(true)
   })
 
   it("sends free players to the paywall and signed-out players to sign in", () => {
