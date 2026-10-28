@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { ScrollView, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -509,26 +509,33 @@ export function CurrentGameScreen({
           accessibilityViewIsModal
           wide
         >
-          <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
-          {layoutOptions.length > 1 ? (
-            <PlayerLayoutPicker
-              playerCount={playerCount}
-              value={layoutVariant}
-              testID="layout"
-              onChange={(layout) => {
-                runtime.changeLayout(layout)
-                closePanel()
-              }}
+          {/* why: layouts plus the seat map outgrow a small phone, so they scroll and Done stays put. */}
+          <ScrollView
+            testID="layout-picker-scroll"
+            style={$layoutScroll}
+            contentContainerStyle={themed($layoutContent)}
+          >
+            <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
+            {layoutOptions.length > 1 ? (
+              <PlayerLayoutPicker
+                playerCount={playerCount}
+                value={layoutVariant}
+                testID="layout"
+                onChange={(layout) => {
+                  runtime.changeLayout(layout)
+                  closePanel()
+                }}
+              />
+            ) : null}
+            <Text tx="board:seats.title" preset="subheading" style={themed($dialogText)} />
+            <SeatArrangement
+              players={runtime.game.players}
+              layoutVariant={layoutVariant}
+              board={boardSize}
+              seatOrder={runtime.game.seatOrder}
+              onChange={runtime.changeSeatOrder}
             />
-          ) : null}
-          <Text tx="board:seats.title" preset="subheading" style={themed($dialogText)} />
-          <SeatArrangement
-            players={runtime.game.players}
-            layoutVariant={layoutVariant}
-            board={boardSize}
-            seatOrder={runtime.game.seatOrder}
-            onChange={runtime.changeSeatOrder}
-          />
+          </ScrollView>
           <Button tx="common:done" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
       ) : null}
@@ -693,6 +700,8 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $layoutScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
+const $layoutContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
 const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
