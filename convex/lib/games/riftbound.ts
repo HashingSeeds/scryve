@@ -13,6 +13,7 @@ import {
   type DatasetCard,
 } from "./cards"
 import type { DeckListRules } from "./decks"
+import { env } from "../../_generated/server"
 
 const RIFTHUNT_CARDS_URL = "https://api.rifthunt.com/bulk/cards"
 export const RIFTBOUND_NAMESPACE = "riftbound-card"
@@ -23,6 +24,12 @@ const IMAGE_HOSTS = new Set(["cmsassets.rgpub.io", "rifthunt.com"])
 const ENTITIES: Record<string, string> = { amp: "&", gt: ">", lt: "<", quot: '"', apos: "'" }
 
 const baseName = (name: string) => name.replace(VARIANT_SUFFIX, "")
+
+/** why: a review deployment can show Riot a short demo list instead of the whole community catalog. Names are `;` separated, since card names hold commas. */
+function cardAllowlist() {
+  const names = env.RIFTBOUND_CARDS?.split(";").map((name) => normalizeCardName(name.trim()))
+  return names?.some(Boolean) ? new Set(names.filter(Boolean)) : undefined
+}
 
 export function riftboundText(card: Record<string, unknown>) {
   const rich = stringValue(card.rich)
@@ -69,7 +76,7 @@ function riftboundPrinting(card: Record<string, unknown>, printingId: string) {
   }
 }
 
-export function normalizeRiftHuntCards(value: unknown): DatasetCard[] {
+export function normalizeRiftHuntCards(value: unknown, only = cardAllowlist()): DatasetCard[] {
   const dataset = objectRecord(value)
   const released = new Map(
     (Array.isArray(dataset?.sets) ? dataset.sets : []).flatMap((raw) => {
@@ -85,6 +92,7 @@ export function normalizeRiftHuntCards(value: unknown): DatasetCard[] {
     const name = stringValue(card?.name)?.trim()
     if (!card || !id || !name || card.supertype === "Token") continue
     const key = normalizeCardName(baseName(name))
+    if (only && !only.has(key)) continue
     groups.set(key, [...(groups.get(key) ?? []), { id, card }])
   }
   const order = ({ card }: { card: Record<string, unknown> }) =>
@@ -129,7 +137,9 @@ export const RIFTHUNT_DATASET = {
     })
     const modified = response.ok ? response.headers.get("last-modified") : null
     if (!modified) throw new Error(`RiftHunt bulk cards returned ${response.status} without a date`)
-    return modified
+    // why: changing the allowlist must resync, and the sweep then prunes cards left off it.
+    const only = cardAllowlist()
+    return only ? `${modified} cards:${[...only].sort().join(";")}` : modified
   },
   load: async () => normalizeRiftHuntCards(await fetchDatasetJson(RIFTHUNT_CARDS_URL)),
 } satisfies BulkDataset

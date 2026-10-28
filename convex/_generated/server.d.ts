@@ -37,6 +37,7 @@ type Env = {
   readonly REVENUECAT_ENVIRONMENT: string | undefined;
   readonly REVENUECAT_SECRET_API_KEY: string | undefined;
   readonly REVENUECAT_WEBHOOK_AUTH: string | undefined;
+  readonly RIFTBOUND_CARDS: string | undefined;
   readonly YGO_IMAGE_BASE_URL: string | undefined;
 };
 

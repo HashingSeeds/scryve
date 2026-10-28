@@ -13,6 +13,7 @@ const app = defineApp({
     REVENUECAT_SECRET_API_KEY: v.optional(v.string()),
     REVENUECAT_WEBHOOK_AUTH: v.optional(v.string()),
     REVENUECAT_ENVIRONMENT: v.optional(v.string()),
+    RIFTBOUND_CARDS: v.optional(v.string()),
     RESEND_API_KEY: v.optional(v.string()),
     MODERATION_ALERT_TO: v.optional(v.string()),
     MODERATION_ALERT_FROM: v.optional(v.string()),
