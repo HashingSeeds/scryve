@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
@@ -73,6 +74,24 @@ describe("CommanderStrip", () => {
       screenEdges: { top: true, bottom: false, left: false, right: true },
     })
     expect(inner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 55 })
+  })
+
+  it("moves to the seat's inner corner when a camera hole holds its own", () => {
+    const view = renderStrip({
+      incoming: damaged,
+      contentRotation: -90,
+      contentInsets: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        cutout: { edge: "top", side: "right", size: 84 },
+      },
+      screenEdges: { top: true, bottom: false, left: false, right: true },
+    })
+    const strip = StyleSheet.flatten(view.getByTestId("commander-strip-seat-1").props.style)
+    expect(strip).toMatchObject({ left: 8, top: 8 })
+    expect(strip.right).toBeUndefined()
   })
 
   it("shows the whole board, with the card's own seat as a muted mark", () => {

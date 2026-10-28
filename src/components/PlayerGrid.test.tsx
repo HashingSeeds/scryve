@@ -25,6 +25,7 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
+  getCornerCutout,
   getScreenCornerSquaringStyle,
   PlayerGrid,
 } from "./PlayerGrid"
@@ -553,6 +554,14 @@ describe("PlayerGrid", () => {
     expect(header(3).right).toBeGreaterThanOrEqual(44)
   })
 
+  it.each([
+    { insets: { top: 0, right: 84, bottom: 34, left: 0 }, cutout: { edge: "right", size: 84 } },
+    { insets: { top: 59, right: 0, bottom: 34, left: 0 }, cutout: undefined },
+  ])("reads a portrait side inset as a corner camera hole", ({ insets, cutout }) => {
+    expect(getCornerCutout(insets, { width: 466, height: 678 })).toEqual(cutout)
+    expect(getCornerCutout(insets, { width: 678, height: 466 })).toBeUndefined()
+  })
+
   it("squares only the corners that meet the device's rounded screen corners", () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -599,6 +608,21 @@ describe("PlayerGrid", () => {
         columnCount: columns,
         rowCount: rows,
         layout,
+      })
+    },
+  )
+
+  it.each([
+    [5, 951, 669, 2, 3],
+    [6, 951, 669, 2, 3],
+    [5, 669, 951, 3, 2],
+    [6, 669, 951, 3, 2],
+  ])(
+    "lays out %i players at %ix%i across a fold as %i columns by %i rows, an even count along the long side",
+    (playerCount, width, height, columns, rows) => {
+      expect(getPlayerGridLayout({ playerCount, width, height, spansHinge: true })).toMatchObject({
+        columnCount: columns,
+        rowCount: rows,
       })
     },
   )

@@ -1,15 +1,17 @@
-import { ScrollView, StyleSheet, View } from "react-native"
+import { Dimensions, ScrollView, StyleSheet, View } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
 import { BottomActionBar } from "./BottomActionBar"
+import { Header } from "./Header"
 import { Screen } from "./Screen"
 import { Text } from "./Text"
 
+const mockInsets = { top: 0, right: 0, bottom: 34, left: 0 }
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }))
 
 describe("Screen", () => {
@@ -109,5 +111,67 @@ describe("Screen", () => {
     expect(screenPadding().paddingBottom).toBeUndefined()
     const bar = view.UNSAFE_getByType(BottomActionBar).findByType(View)
     expect(StyleSheet.flatten(bar.props.style)).toMatchObject({ paddingBottom: 34 })
+  })
+
+  it("stops content at a side rail without stacking the screen's own padding on it", () => {
+    mockInsets.right = 84
+    const screen = (fullWidth?: boolean) => (
+      <ThemeProvider initialContext="dark">
+        <Screen preset="fixed" contentInset="standard" fullWidth={fullWidth}>
+          <Text text="Deck details" />
+        </Screen>
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    const gutter = () =>
+      StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
+    try {
+      expect(gutter()).toMatchObject({ paddingLeft: 0, paddingRight: 68 })
+
+      view.rerender(screen(true))
+
+      expect(gutter().paddingRight).toBeUndefined()
+    } finally {
+      mockInsets.right = 0
+    }
+  })
+
+  it("leaves a landscape notch's side insets alone", () => {
+    Object.assign(mockInsets, { left: 59, right: 59 })
+    const portrait = Dimensions.get("window")
+    const landscape = { width: 852, height: 393, scale: 3, fontScale: 1 }
+    Dimensions.set({ window: landscape, screen: landscape })
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <Screen preset="fixed" contentInset="standard">
+            <Text text="Rules" />
+          </Screen>
+        </ThemeProvider>,
+      )
+      const style = StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
+      expect(style.paddingRight).toBeUndefined()
+    } finally {
+      Object.assign(mockInsets, { left: 0, right: 0 })
+      Dimensions.set({ window: portrait, screen: portrait })
+    }
+  })
+  it("lets a header inside stepped-in content add only what the rail still needs", () => {
+    mockInsets.right = 84
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <Screen preset="fixed" safeAreaEdges={[]}>
+            <Header title="Decks" rightText="Add deck" onRightPress={() => {}} />
+          </Screen>
+        </ThemeProvider>,
+      )
+      const actions = view
+        .UNSAFE_getByType(Header)
+        .findAll((node) => StyleSheet.flatten(node.props.style)?.paddingEnd !== undefined)[0]
+      expect(StyleSheet.flatten(actions.props.style)).toMatchObject({ paddingEnd: 16 })
+    } finally {
+      mockInsets.right = 0
+    }
   })
 })

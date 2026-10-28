@@ -297,6 +297,41 @@ describe("LifeCard", () => {
     },
   )
 
+  it("keeps just the mark on a commander seat too short for a name beside the strip", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          contentRotation={90}
+          color="#41476E"
+          compact
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            players: commanderPlayers,
+            ...commanderSeats,
+            incoming: {},
+            lethal: 21,
+            inspection: { open: false, onToggle: jest.fn() },
+          }}
+        />
+      </ThemeProvider>,
+    )
+    const layout = (height: number) =>
+      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+        nativeEvent: { layout: { width: 225, height } },
+      })
+
+    layout(400)
+    expect(view.getByTestId("player-name-seat-1")).toBeVisible()
+
+    layout(183)
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+    expect(view.getByTestId("commander-mark-seat-1")).toBeVisible()
+  })
+
   it("uses the card origin and full bottom space for a vertical inspection grid", () => {
     const players = Array.from({ length: 5 }, (_, seat) => ({
       id: asPlayerId(`player-${seat + 1}`),
@@ -602,6 +637,43 @@ describe("LifeCard", () => {
     expect(place(400).bottom).toBe(59)
     expect(place(150).bottom).toBeLessThan(59)
     expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
+  })
+
+  it("slides a top seat's name along its edge, clear of a camera hole in its corner", () => {
+    const position = seatIdentityPlacement({
+      rotation: 180,
+      cardSize: { width: 466, height: 330 },
+      gap: 12,
+      insets: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        cutout: { edge: "right", side: "top", size: 84 },
+      },
+      screenEdges: { top: true, left: true, right: true, bottom: false },
+      markHeight: 48,
+    }).position
+    expect(position.left).toBe(12 + 84)
+    expect(position.bottom).toBe(12)
+  })
+
+  it("ends a side seat's identity row before a camera hole at its far end", () => {
+    const { rowMaxWidth } = seatIdentityPlacement({
+      rotation: -90,
+      cardSize: { width: 229, height: 222 },
+      gap: 12,
+      insets: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        cutout: { edge: "top", side: "right", size: 84 },
+      },
+      screenEdges: { top: true, left: false, right: true, bottom: false },
+      markHeight: 48,
+    })
+    expect(rowMaxWidth).toBe(222 - 12 - (84 - 11))
   })
 
   it.each([

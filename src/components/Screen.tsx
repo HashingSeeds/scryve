@@ -6,6 +6,7 @@ import {
   Platform,
   ScrollViewProps,
   StyleProp,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native"
@@ -14,10 +15,11 @@ import {
   KeyboardAwareScrollView,
   type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { BottomInsetClaimContext } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
-import { Header, type HeaderProps } from "@/components/Header"
+import { Header, type HeaderProps, SideGutterContext } from "@/components/Header"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -41,6 +43,8 @@ interface BaseScreenProps {
   SystemBarsProps?: SystemBarsProps
   KeyboardAvoidingViewProps?: KeyboardAvoidingViewProps
   header?: HeaderProps & { collapseTitle?: boolean }
+  /** why: a game board lays out to the screen edges and keeps its own chrome clear of the camera, so it skips the side safe-area gutter every other screen gets. */
+  fullWidth?: boolean
 }
 
 interface FixedScreenProps extends BaseScreenProps {
@@ -192,6 +196,7 @@ export function Screen(props: ScreenProps) {
     safeAreaEdges,
     SystemBarsProps,
     systemBarStyle,
+    fullWidth,
   } = props
   const { titleVisible, onScroll: onTitleScroll } = useCollapsingTitle()
   const { collapseTitle = true, ...headerProps } = props.header ?? {}
@@ -206,6 +211,7 @@ export function Screen(props: ScreenProps) {
     setBottomInsetClaims((claims) => claims + 1)
     return () => setBottomInsetClaims((claims) => claims - 1)
   }, [])
+  const sideGutter = useSideSafeAreaGutter(!fullWidth)
   const $containerInsets = useSafeAreaInsetsStyle(
     bottomInsetClaims > 0 ? safeAreaEdges?.filter((edge) => edge !== "bottom") : safeAreaEdges,
   )
@@ -238,15 +244,21 @@ export function Screen(props: ScreenProps) {
         behavior={isIos ? "padding" : "height"}
         keyboardVerticalOffset={keyboardOffset}
         {...KeyboardAvoidingViewProps}
-        style={[$styles.flex1, KeyboardAvoidingViewProps?.style]}
+        style={[
+          $styles.flex1,
+          sideGutter && { paddingLeft: sideGutter.left, paddingRight: sideGutter.right },
+          KeyboardAvoidingViewProps?.style,
+        ]}
       >
-        <BottomInsetClaimContext.Provider value={claimBottomInset}>
-          {isNonScrolling(screenProps.preset) ? (
-            <ScreenWithoutScrolling {...screenProps} />
-          ) : (
-            <ScreenWithScrolling {...screenProps} />
-          )}
-        </BottomInsetClaimContext.Provider>
+        <SideGutterContext.Provider value={sideGutter ?? NO_SIDE_GUTTER}>
+          <BottomInsetClaimContext.Provider value={claimBottomInset}>
+            {isNonScrolling(screenProps.preset) ? (
+              <ScreenWithoutScrolling {...screenProps} />
+            ) : (
+              <ScreenWithScrolling {...screenProps} />
+            )}
+          </BottomInsetClaimContext.Provider>
+        </SideGutterContext.Provider>
       </KeyboardAvoidingView>
     </View>
   )
@@ -299,3 +311,16 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.lg,
   paddingBottom: spacing.md,
 })
+
+/** why: the closed iPhone Duo puts the status bar and system controls in a rail down one side and reports it as that side's safe-area inset; content stops at the rail like a native app's. It is the only portrait screen whose side inset beats its top, so landscape notches keep their layout. Screen content pads itself by at least `spacing.md`, so the gutter adds only what the rail needs beyond that, instead of stacking the two. */
+const NO_SIDE_GUTTER = { left: 0, right: 0 }
+
+function useSideSafeAreaGutter(enabled: boolean) {
+  const { top, left, right } = useSafeAreaInsets()
+  const { width, height } = useWindowDimensions()
+  const {
+    theme: { spacing },
+  } = useAppTheme()
+  if (!enabled || height <= width || Math.max(left, right) <= top) return undefined
+  return { left: Math.max(left - spacing.md, 0), right: Math.max(right - spacing.md, 0) }
+}

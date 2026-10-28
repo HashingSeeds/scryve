@@ -48,7 +48,7 @@ import {
   type CommanderFacing,
   type CommanderReach,
 } from "./commanderDamageLayout"
-import { CommanderStrip, commanderDamageDealers } from "./CommanderStrip"
+import { CommanderStrip, commanderDamageDealers, commanderStripMovesInward } from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
@@ -67,6 +67,7 @@ import {
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   cornerOffset,
+  CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardScreenEdges,
@@ -467,6 +468,14 @@ export const LifeCard = memo(function LifeCard({
     screenEdges,
     markHeight: identityMetrics.mark,
   })
+  const stripAtEdge = !commanderStripMovesInward(contentRotation, contentInsets)
+  const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
+  // why: beside the commander strip a short seat cuts every name to a few letters, so in commander games such seats keep just their mark from the start; judged by seat length alone so seats of one size match.
+  const markOnly =
+    !!commanderDamage?.inspection &&
+    seatRun > 0 &&
+    seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.mark - identityMetrics.gap <
+      MIN_NAME_ROOM
   const seatIdentity = (
     <SeatIdentity
       seatNumber={seatNumber}
@@ -477,6 +486,7 @@ export const LifeCard = memo(function LifeCard({
       insetSwordColor={commanderDamage ? color : undefined}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
+      markOnly={markOnly}
     />
   )
 
@@ -732,7 +742,7 @@ export const LifeCard = memo(function LifeCard({
                   insetSwordColor={color}
                   closeIcon
                   size={identityMetrics.mark}
-                  style={markArt.trim}
+                  style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
                 />
               </BoardPressable>
             </View>
@@ -774,6 +784,11 @@ export const LifeCard = memo(function LifeCard({
               pendingDelta={preview}
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
+              obstacle={
+                commanderStripShown && stripBounds
+                  ? { edge: CONTENT_RIGHT_EDGE[contentRotation], bounds: stripBounds }
+                  : undefined
+              }
               onChange={onChange}
               onPreview={showPreview}
               onLongChange={() => setEditorOpen(true)}
@@ -906,7 +921,8 @@ export const LifeCard = memo(function LifeCard({
               style={[
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
-                commanderStripShown && { maxWidth: identityCorner.position.maxWidth },
+                commanderStripShown &&
+                  stripAtEdge && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
               {commanderDamage?.inspection ? (
@@ -1142,6 +1158,8 @@ export function proWatermarkPlacement(
   }
 }
 
+const MIN_NAME_ROOM = 48
+
 // why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
 const CUTOUT_HALF_WIDTH = 64
 
@@ -1209,8 +1227,13 @@ export function seatIdentityPlacement({
       ? Math.max(run / 2 - left - gap - (tucked ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
+  const farCutout =
+    insets?.cutout?.edge === rightEdge && insets.cutout.side === bottomEdge
+      ? insets.cutout.size - CUTOUT_ENDS_INSIDE_INSET
+      : 0
   // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
-  const rowMaxWidth = run && !tucked ? Math.max(run - left * 2, 0) : position.maxWidth
+  const rowMaxWidth =
+    run && !tucked ? Math.max(run - left - Math.max(left, farCutout), 0) : position.maxWidth
   return { layer, position, rowMaxWidth, trailing }
 }
 

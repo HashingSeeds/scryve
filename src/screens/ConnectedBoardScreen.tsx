@@ -139,6 +139,7 @@ function ConnectedBoardShell({
   return (
     <Screen
       preset="fixed"
+      fullWidth
       safeAreaEdges={[]}
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
@@ -1023,6 +1024,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   return (
     <Screen
       preset="fixed"
+      fullWidth
       safeAreaEdges={[]}
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}

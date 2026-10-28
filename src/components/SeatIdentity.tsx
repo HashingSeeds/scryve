@@ -59,6 +59,7 @@ export interface SeatIdentityProps {
   insetSwordColor?: string
   foil?: boolean
   staleSince?: number
+  markOnly?: boolean
   style?: StyleProp<ViewStyle>
 }
 
@@ -72,6 +73,7 @@ export function SeatIdentity({
   insetSwordColor,
   foil,
   staleSince,
+  markOnly,
   style,
 }: SeatIdentityProps) {
   const metrics = seatIdentityMetrics(compact)
@@ -88,16 +90,18 @@ export function SeatIdentity({
         style={[$mark, art.trim]}
       />
       <View testID={`life-status-seat-${seatNumber}`} style={$text}>
-        <Text
-          testID={`player-name-seat-${seatNumber}`}
-          text={playerName}
-          accessible={false}
-          size={metrics.name}
-          weight="medium"
-          maxFontSizeMultiplier={1.3}
-          numberOfLines={1}
-          style={{ color }}
-        />
+        {markOnly ? null : (
+          <Text
+            testID={`player-name-seat-${seatNumber}`}
+            text={playerName}
+            accessible={false}
+            size={metrics.name}
+            weight="medium"
+            maxFontSizeMultiplier={1.3}
+            numberOfLines={1}
+            style={{ color }}
+          />
+        )}
         {staleSince !== undefined ? <UpdatedAgo since={staleSince} color={color} /> : null}
       </View>
     </View>

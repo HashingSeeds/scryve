@@ -53,6 +53,7 @@ import {
   getPlayerGridRows,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
+import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
 export interface CommanderDamageGridBinding {
@@ -248,7 +249,7 @@ export function PlayerGrid({
     }
   })
   const screenInsets = useSafeAreaInsets()
-  const insets = boardOrientation?.insets
+  const reportedInsets = boardOrientation?.insets
     ? boardOrientation.insets
     : boardRotation === 90
       ? {
@@ -265,6 +266,8 @@ export function PlayerGrid({
             left: screenInsets.bottom,
           }
         : screenInsets
+  const cutout = getCornerCutout(reportedInsets, { width, height })
+  const insets = cutout ? { ...reportedInsets, [cutout.edge]: 0 } : reportedInsets
   const {
     themed,
     theme: { spacing },
@@ -281,7 +284,7 @@ export function PlayerGrid({
   if (actedFor && actedFor !== commanderDamage?.armedPlayerId) setActedFor(null)
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
-  const layout = getPlayerGridLayout({
+  const layout = usePlayerGridLayout({
     playerCount: players.length,
     width,
     height,
@@ -433,6 +436,7 @@ export function PlayerGrid({
                 bottom: screenEdges.bottom ? insets.bottom : 0,
                 left: screenEdges.left ? insets.left : 0,
                 right: screenEdges.right ? insets.right : 0,
+                cutout: seatCutout(cutout, contentRotation, screenEdges),
               }
               const fallbackMenu =
                 fallbackMenuBoundary === null
@@ -756,6 +760,34 @@ function fallbackMenuAt(
   if (column === middle - 1) return { corner: upper ? "bottomRight" : "topRight" }
   if (column === middle) return { corner: upper ? "bottomLeft" : "topLeft" }
   return undefined
+}
+
+/** why: the iPhone Duo's outer display reports the camera hole in its top corner as safe area down that whole side, the only upright screen with a side inset. Seats keep their full width and only the chrome in that corner moves. */
+export function getCornerCutout(
+  insets: LifeCardContentInsets,
+  board: { width: number; height: number },
+) {
+  if (board.height <= board.width) return undefined
+  const edge =
+    insets.right > insets.top
+      ? ("right" as const)
+      : insets.left > insets.top
+        ? ("left" as const)
+        : undefined
+  return edge && { edge, size: insets[edge] }
+}
+
+function seatCutout(
+  cutout: ReturnType<typeof getCornerCutout>,
+  rotation: LifeCardContentRotation,
+  screenEdges: Record<LifeCardEdge, boolean>,
+): LifeCardContentInsets["cutout"] {
+  if (!cutout || !screenEdges.top || !screenEdges[cutout.edge]) return undefined
+  // why: corner chrome slides along its own row, so it stays against the seat's outer edge.
+  const facesCutoutSide = rotation === (cutout.edge === "right" ? -90 : 90)
+  return facesCutoutSide
+    ? { edge: "top", side: cutout.edge, size: cutout.size }
+    : { edge: cutout.edge, side: "top", size: cutout.size }
 }
 
 /** why: on web, pass the insets. The page only reaches a rounded screen corner where the browser reports an inset; a browser tab or a solid status bar strip reports none. */

@@ -1,4 +1,4 @@
-import { ReactElement, ReactNode, useState } from "react"
+import { createContext, ReactElement, ReactNode, useContext, useState } from "react"
 import {
   LayoutChangeEvent,
   StyleProp,
@@ -9,6 +9,7 @@ import {
   View,
   ViewStyle,
 } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -92,6 +93,9 @@ interface HeaderActionProps {
   ActionComponent?: ReactElement
 }
 
+/** why: a Screen that already stepped its content in from a side rail says how far, so a Header drawn inside that content doesn't step in twice. */
+export const SideGutterContext = createContext({ left: 0, right: 0 })
+
 export function Header(props: HeaderProps) {
   const {
     theme: { colors, spacing },
@@ -127,6 +131,13 @@ export function Header(props: HeaderProps) {
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
+  // why: the iPhone Duo floats its status bar in a top corner and reports it only as a side inset, so the actions step in while the title stays centered on the screen. A Screen whose content already stepped in leaves only the rest.
+  const sideInsets = useSafeAreaInsets()
+  const sideGutter = useContext(SideGutterContext)
+  const $actionInsets: ViewStyle = {
+    paddingStart: Math.max(sideInsets.left - sideGutter.left, 0),
+    paddingEnd: Math.max(sideInsets.right - sideGutter.right, 0),
+  }
   const { fontScale } = useWindowDimensions()
   const centered = titleMode === "center" && fontScale <= CENTERED_TITLE_MAX_FONT_SCALE
 
@@ -139,7 +150,7 @@ export function Header(props: HeaderProps) {
 
   return (
     <View style={[$container, $containerInsets, { backgroundColor }, $containerStyleOverride]}>
-      <View style={[$styles.row, $wrapper, $styleOverride]}>
+      <View style={[$styles.row, $wrapper, $actionInsets, $styleOverride]}>
         <HeaderAction
           onLayout={measureAction("left")}
           tx={leftTx}
@@ -315,8 +326,9 @@ const $titleWrapperCenter: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
   height: "100%",
-  width: "100%",
   position: "absolute",
+  left: 0,
+  right: 0,
   zIndex: 1,
 }
 

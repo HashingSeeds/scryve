@@ -416,6 +416,7 @@ export function CurrentGameScreen({
   return (
     <Screen
       preset="fixed"
+      fullWidth
       safeAreaEdges={[]}
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
