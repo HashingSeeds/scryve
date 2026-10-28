@@ -186,6 +186,14 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   tower: { centerX: 22, centerY: 24.5, size: 13 },
 }
 
+// why: an X or check reads as centred at a heart's visual middle, up toward its lobes (the same spot commander numbers use), not where the sword fits.
+const GLYPH_CENTER_Y: Partial<Record<PlayerMarkShape, number>> = { heart: 20.5 }
+
+function glyphInset(shape: PlayerMarkShape) {
+  const inset = SWORD_INSET_THAT_FITS_SHAPE[shape]
+  return { ...inset, centerY: GLYPH_CENTER_Y[shape] ?? inset.centerY }
+}
+
 function CloseIconOverlay({
   shape,
   color,
@@ -195,7 +203,7 @@ function CloseIconOverlay({
   color: string
   entering: ReturnType<typeof ZoomIn.duration> | undefined
 }) {
-  const inset = SWORD_INSET_THAT_FITS_SHAPE[shape]
+  const inset = glyphInset(shape)
   return (
     <Animated.View
       testID="player-mark-close"
@@ -225,7 +233,7 @@ function CloseIconOverlay({
 
 function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
   return (
-    <G testID="player-mark-sword" transform={insetTransform(shape)}>
+    <G testID="player-mark-sword" transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}>
       <SwordShapes color={color} />
     </G>
   )
@@ -233,7 +241,7 @@ function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string })
 
 function CheckInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
   return (
-    <G testID="player-mark-check" transform={insetTransform(shape)}>
+    <G testID="player-mark-check" transform={insetTransform(glyphInset(shape))}>
       <Path
         d="M4.5 12.5 9.5 17.5 19.5 6.5"
         stroke={color}
@@ -246,8 +254,7 @@ function CheckInset({ shape, color }: { shape: PlayerMarkShape; color: string })
   )
 }
 
-function insetTransform(shape: PlayerMarkShape) {
-  const { centerX, centerY, size } = SWORD_INSET_THAT_FITS_SHAPE[shape]
+function insetTransform({ centerX, centerY, size }: ReturnType<typeof glyphInset>) {
   return `translate(${centerX - size / 2} ${centerY - size / 2}) scale(${size / SWORD_VIEW_BOX})`
 }
 
