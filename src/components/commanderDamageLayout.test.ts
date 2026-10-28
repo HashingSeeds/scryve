@@ -82,7 +82,7 @@ describe("commander damage board layout", () => {
       reach: { x: 0, y: -424, radius: 900 },
     })
     expect(takeover.badges[0].x).toBeCloseTo(0)
-    expect(takeover.badges[0].y).toBeCloseTo(-(takeover.disc + 23 + 6))
+    expect(takeover.badges[0].y).toBeCloseTo(takeover.discOffset.y - (takeover.disc + 23 + 6))
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
     expect(takeover.flood).toEqual({ x: 195, y: -214, radius: 900 })
@@ -105,6 +105,7 @@ describe("commander damage board layout", () => {
   it("slides the badge around the disc when the attacker sits across a narrow card", () => {
     const {
       badges: [badge],
+      discOffset,
       knock,
     } = commanderTakeover({
       card: { width: 193, height: 420 },
@@ -117,13 +118,29 @@ describe("commander damage board layout", () => {
     expect(Math.abs(badge.x) + badge.size / 2).toBeLessThanOrEqual(210)
     expect(Math.abs(badge.y) + badge.size / 2).toBeLessThanOrEqual(96.5)
     const outward = { x: Math.cos(badge.angle), y: Math.sin(badge.angle) }
-    expect(Math.hypot(badge.x, badge.y)).toBeCloseTo(badge.distance)
+    expect(Math.hypot(badge.x - discOffset.x, badge.y - discOffset.y)).toBeCloseTo(badge.distance)
     expect(outward.y).toBeLessThan(0)
     expect(Math.hypot(knock.x, knock.y)).toBeCloseTo(1)
   })
 
+  it("rings two digits with room past their ink, centred where the digits sit", () => {
+    const fontSize = 100
+    const { disc, discOffset, cardDiscOffset } = commanderTakeover({
+      card: { width: 420, height: 390 },
+      rotation: 90,
+      lifeFontSize: fontSize,
+      lifeDigits: 2,
+      badgeSize: 46,
+    })
+    const ink = Math.hypot(2 * 0.64 * fontSize, 0.72 * fontSize) / 2
+    expect(disc - ink).toBeCloseTo(0.08 * fontSize)
+    expect(discOffset.y).toBeLessThan(0)
+    expect(cardDiscOffset.x).toBeCloseTo(-discOffset.y)
+    expect(cardDiscOffset.y).toBeCloseTo(0)
+  })
+
   it("sets a partner's badge beside the first, both outside the ring, on the card, toward the attacker", () => {
-    const { badges, disc } = commanderTakeover({
+    const { badges, discOffset, disc } = commanderTakeover({
       card: { width: 390, height: 420 },
       rotation: 0,
       lifeFontSize: 148,
@@ -139,7 +156,9 @@ describe("commander damage board layout", () => {
     expect(first.y).toBeLessThan(0)
     expect(partner.x - first.x).toBeGreaterThanOrEqual(46)
     for (const badge of badges) {
-      expect(Math.hypot(badge.x, badge.y) - badge.size / 2).toBeGreaterThan(disc)
+      expect(
+        Math.hypot(badge.x - discOffset.x, badge.y - discOffset.y) - badge.size / 2,
+      ).toBeGreaterThan(disc)
       expect(Math.abs(badge.x) + badge.size / 2).toBeLessThanOrEqual(195)
       expect(Math.abs(badge.y) + badge.size / 2).toBeLessThanOrEqual(210)
     }

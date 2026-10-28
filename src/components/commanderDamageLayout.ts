@@ -1,6 +1,6 @@
-import type { PlayerId } from "@/features/game/types"
+import { Platform } from "react-native"
 
-import { LIFE_DIGIT_ASPECT } from "./playerCardTypes"
+import type { PlayerId } from "@/features/game/types"
 
 export interface CommanderBoardSeat {
   playerId: PlayerId
@@ -145,6 +145,8 @@ export function commanderReach(input: {
 export interface CommanderTakeover {
   content: { width: number; height: number }
   disc: number
+  discOffset: { x: number; y: number }
+  cardDiscOffset: { x: number; y: number }
   badges: { x: number; y: number; angle: number; size: number; distance: number }[]
   knock: { x: number; y: number }
   flood?: { x: number; y: number; radius: number }
@@ -154,6 +156,12 @@ export interface CommanderTakeover {
 const CORNER_CLEARANCE = 52
 const BADGE_GAP = 6
 const ANGLE_STEP = Math.PI / 90
+// why: Rubik Bold digits ink about 0.64em wide and 0.72em tall, and the disc keeps clear of the ink box's corners by DISC_CLEARANCE.
+const DIGIT_INK_WIDTH = 0.64
+const DIGIT_INK_HEIGHT = 0.72
+const DISC_CLEARANCE = 0.08
+// why: a total's line box is centred on the card, but its digits sit high in it (measured on iOS; Android and web from Rubik's metrics and each line-height model), so the disc rises to meet them.
+const DIGIT_RISE = Platform.select({ ios: 0.043, android: 0.037, default: 0.0125 })
 
 function rotate(x: number, y: number, degrees: number) {
   const radians = (degrees * Math.PI) / 180
@@ -177,13 +185,14 @@ export function commanderTakeover(input: {
   const content = sideways
     ? { width: card.height, height: card.width }
     : { width: card.width, height: card.height }
-  const textWidth = Math.max(input.lifeDigits, 2) * LIFE_DIGIT_ASPECT * lifeFontSize * 0.9
-  const textHeight = lifeFontSize * 0.74
+  const textWidth = Math.max(input.lifeDigits, 2) * DIGIT_INK_WIDTH * lifeFontSize
+  const textHeight = lifeFontSize * DIGIT_INK_HEIGHT
+  const discOffset = { x: 0, y: -DIGIT_RISE * lifeFontSize }
   const disc = Math.max(
     0,
     Math.min(
-      Math.hypot(textWidth, textHeight) / 2 + lifeFontSize * 0.06,
-      Math.min(content.width, content.height) / 2 - BADGE_GAP,
+      Math.hypot(textWidth, textHeight) / 2 + lifeFontSize * DISC_CLEARANCE,
+      Math.min(content.width, content.height) / 2 - BADGE_GAP - Math.abs(discOffset.y),
     ),
   )
   const distance = disc + badgeSize / 2 + BADGE_GAP
@@ -197,8 +206,8 @@ export function commanderTakeover(input: {
       (_, index) => center + (index - (badgeCount - 1) / 2) * spread,
     )
   const fitsOne = (angle: number) => {
-    const x = Math.cos(angle) * distance
-    const y = Math.sin(angle) * distance
+    const x = discOffset.x + Math.cos(angle) * distance
+    const y = discOffset.y + Math.sin(angle) * distance
     const inside =
       Math.abs(x) + half <= content.width / 2 && Math.abs(y) + half <= content.height / 2
     const inCorner =
@@ -218,9 +227,11 @@ export function commanderTakeover(input: {
   return {
     content,
     disc,
+    discOffset,
+    cardDiscOffset: rotate(discOffset.x, discOffset.y, rotation),
     badges: anglesAround(angle).map((badgeAngle) => ({
-      x: Math.cos(badgeAngle) * distance,
-      y: Math.sin(badgeAngle) * distance,
+      x: discOffset.x + Math.cos(badgeAngle) * distance,
+      y: discOffset.y + Math.sin(badgeAngle) * distance,
       angle: badgeAngle,
       size: badgeSize,
       distance,

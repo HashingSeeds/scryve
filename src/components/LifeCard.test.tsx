@@ -20,6 +20,7 @@ import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/
 import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
+import { TAKEOVER_MS } from "./CommanderDamageCardControls"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { LifeCard, proWatermarkPlacement, seatIdentityPlacement } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
@@ -432,7 +433,7 @@ describe("LifeCard", () => {
     }
   })
 
-  const defendingCard = (onStage = jest.fn()) => (
+  const defendingCard = (onStage = jest.fn(), armed = true) => (
     <ThemeProvider initialContext="dark">
       <LifeCard
         playerName="Grace"
@@ -448,9 +449,9 @@ describe("LifeCard", () => {
           columns: commanderSeats.columns,
           incoming: { [commanderIds[0]]: 6 },
           lethal: 21,
-          armedPlayerId: commanderIds[0],
+          armedPlayerId: armed ? commanderIds[0] : null,
           attackerName: "Ada",
-          attacker: { color: "#B85636", seatNumber: 1, rotation: 90 },
+          attacker: armed ? { color: "#B85636", seatNumber: 1, rotation: 90 } : undefined,
           facing: { x: "left" },
           reach: { x: -197, y: 0, radius: 900 },
           onStage,
@@ -472,6 +473,37 @@ describe("LifeCard", () => {
     )
     expect(view.getByLabelText("6 commander damage from Ada")).toBeTruthy()
     expect(view.getByTestId("life-total-seat-2")).toHaveTextContent("30")
+  })
+
+  it("keeps a defender's own controls under the flood until it covers them, and drains it off them after", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const timing = jest
+      .spyOn(Reanimated, "withTiming")
+      .mockImplementation((value, config, done) => {
+        setTimeout(() => done?.(true), config?.duration ?? 0)
+        return value
+      })
+    try {
+      const view = render(defendingCard())
+      fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+        nativeEvent: { layout: { width: 193, height: 420 } },
+      })
+      expect(view.getByTestId("commander-flood-seat-2")).toBeTruthy()
+      expect(view.getByTestId("life-corner-layer-seat-2")).toBeTruthy()
+      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      expect(view.queryByTestId("life-corner-layer-seat-2")).toBeNull()
+
+      view.rerender(defendingCard(jest.fn(), false))
+      expect(view.getByTestId("life-corner-layer-seat-2")).toBeTruthy()
+      expect(
+        StyleSheet.flatten(view.getByTestId("commander-flood-seat-2").props.style),
+      ).toMatchObject({ backgroundColor: "#B85636" })
+      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      expect(view.queryByTestId("commander-takeover-seat-2")).toBeNull()
+    } finally {
+      timing.mockRestore()
+      motion.mockRestore()
+    }
   })
 
   it("lands a hit on the tap even while the badge is still ramming", () => {
@@ -998,6 +1030,37 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
     expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
+  })
+
+  it("names each partner on a compact attacking card", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          compact
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            lethal: 21,
+            armedPlayerId: commanderIds[0],
+            commanders: [
+              { name: "Tymna", power: 2, total: 0 },
+              { name: "Kraum", power: 4, total: 0 },
+            ],
+            onPressSword: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Tymna")
+    expect(view.getByTestId("commander-name-seat-1-partner")).toHaveTextContent("Kraum")
   })
 
   it("turns the attacking card into its mark and commander power", () => {

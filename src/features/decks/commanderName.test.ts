@@ -14,6 +14,12 @@ describe("commanderShortName", () => {
     ["Elesh Norn, Grand Cenobite", "Norn"],
     ["Sliver Overlord", "Sliver Overlord"],
     ["Lord of Tresserhorn", "Lord of Tresserhorn"],
+    ["Commander Spock", "Spock"],
+    ["Agent Venom", "Agent Venom"],
+    ["Agent 13, Sharon Carter", "Agent 13"],
+    ["Black Widow, Super Spy", "Black Widow"],
+    ["Dark Leo & Shredder", "Dark Leo"],
+    ["Heroes in a Half Shell", "Turtles"],
   ])("calls %s %s", (cardName, spoken) => {
     expect(commanderShortName(cardName)).toBe(spoken)
   })
