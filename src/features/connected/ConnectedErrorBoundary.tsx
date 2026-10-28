@@ -29,7 +29,7 @@ export class ConnectedErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.error) return this.props.children
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentInset="standard">
         <Text accessibilityRole="header" preset="heading" tx="connected:errorBoundary.title" />
         <Text
           accessibilityRole="alert"

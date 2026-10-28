@@ -8,6 +8,7 @@ export function FeedbackUnavailable() {
     <Screen
       preset="fixed"
       safeAreaEdges={["bottom"]}
+      contentInset="standard"
       header={{
         titleTx: "feedback:mine.title",
         leftTx: "common:back",
