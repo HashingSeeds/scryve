@@ -210,7 +210,8 @@ export function useCommanderTakeover(
     }
   }, [active, duration, wave])
 
-  const shown = takeover || draining ? last.current : undefined
+  // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame.
+  const shown = takeover || draining || wasActive.current ? last.current : undefined
   return {
     takeover: shown?.takeover,
     attackerColor: shown?.attackerColor,
