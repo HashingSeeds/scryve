@@ -32,18 +32,17 @@ function Sync() {
 
   useEffect(() => {
     if (!key || isLoading || !online) return
-    if (!feedbackReplies && !renewalReminders) {
-      if (storage.getBoolean(REGISTERED))
-        void forgetDevice({ key }).then(
-          () => storage.set(REGISTERED, false),
-          () => undefined,
-        )
-      return
-    }
     let stale = false
     void (async () => {
-      const token = await pushToken()
-      if (!token || stale) return
+      // why: the token is null once notifications are off in system settings, so that forgets the device too.
+      const token = feedbackReplies || renewalReminders ? await pushToken() : null
+      if (stale) return
+      if (!token) {
+        if (!storage.getBoolean(REGISTERED)) return
+        await forgetDevice({ key })
+        storage.set(REGISTERED, false)
+        return
+      }
       // why: set before sending, so turning both off while this is in flight still forgets the device.
       storage.set(REGISTERED, true)
       await syncDevice({ key, token, locale: appLocale, feedbackReplies, renewalReminders })

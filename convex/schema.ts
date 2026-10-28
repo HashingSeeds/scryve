@@ -899,7 +899,8 @@ export default defineSchema({
     renewalReminders: v.boolean(),
   })
     .index("by_sender_hash", ["senderHash"])
-    .index("by_user_id", ["userId"]),
+    .index("by_user_id", ["userId"])
+    .index("by_token", ["token"]),
   events: defineTable({
     // why: optional so account deletion can detach an organizer without deleting other players' standings.
     ownerUserId: v.optional(v.id("users")),

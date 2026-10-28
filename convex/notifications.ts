@@ -1,4 +1,4 @@
-import { HOUR, RateLimiter } from "@convex-dev/rate-limiter"
+import { HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter"
 import { ConvexError, v } from "convex/values"
 
 import { components, internal } from "./_generated/api"
@@ -7,10 +7,12 @@ import { signedInUser } from "./feedback"
 import { senderHash } from "./lib/feedback"
 import {
   RENEWAL_REMINDER_LEAD_MS,
+  USER_DEVICES,
   notificationLocale,
   notifyRenewal,
   pushMessage,
 } from "./lib/notifications"
+import { objectRecord } from "./lib/scryfall"
 
 const limiter = new RateLimiter(components.rateLimiter, {
   pushDeviceNew: { kind: "fixed window", rate: 300, period: HOUR },
@@ -68,9 +70,20 @@ export const forgetDevice = mutation({
   },
 })
 
+function unregisteredTokens(messages: { to: string }[], body: unknown) {
+  const data = objectRecord(body)?.data
+  const tickets: unknown[] = Array.isArray(data) ? data : [data]
+  return messages
+    .filter(
+      (_, index) =>
+        objectRecord(objectRecord(tickets[index])?.details)?.error === "DeviceNotRegistered",
+    )
+    .map((message) => message.to)
+}
+
 export const send = internalAction({
-  args: { messages: v.array(pushMessage) },
-  handler: async (_ctx, { messages }) => {
+  args: { messages: v.array(pushMessage), retried: v.optional(v.boolean()) },
+  handler: async (ctx, { messages, retried }) => {
     const response = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       signal: AbortSignal.timeout(15_000),
@@ -79,7 +92,31 @@ export const send = internalAction({
         messages.map((message) => ({ ...message, sound: "default", channelId: "default" })),
       ),
     }).catch(() => null)
-    if (!response?.ok) console.warn(`Expo push failed: ${response?.status ?? "network error"}`)
+    const temporary = !response || response.status === 429 || response.status >= 500
+    if (temporary && !retried) {
+      await ctx.scheduler.runAfter(MINUTE, internal.notifications.send, { messages, retried: true })
+      return null
+    }
+    if (!response?.ok) {
+      console.warn(`Expo push failed: ${response?.status ?? "network error"}`)
+      return null
+    }
+    const tokens = unregisteredTokens(messages, await response.json().catch(() => null))
+    if (tokens.length) await ctx.runMutation(internal.notifications.forgetTokens, { tokens })
+    return null
+  },
+})
+
+export const forgetTokens = internalMutation({
+  args: { tokens: v.array(v.string()) },
+  handler: async (ctx, { tokens }) => {
+    for (const token of tokens) {
+      const devices = await ctx.db
+        .query("pushDevices")
+        .withIndex("by_token", (q) => q.eq("token", token))
+        .take(USER_DEVICES)
+      for (const device of devices) await ctx.db.delete(device._id)
+    }
     return null
   },
 })

@@ -129,4 +129,45 @@ describe("push notifications", () => {
     await remind()
     expect(sent).toHaveLength(1)
   })
+
+  it("retries a failed send once, then forgets devices Expo reports as gone", async () => {
+    const t = makeConvexTest()
+    await device(t, ME, "phone", { feedbackReplies: true })
+    await device(t, LAPTOP, "tablet", { feedbackReplies: true })
+    const fetch = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          data: [
+            { status: "ok", id: "1" },
+            { status: "error", message: "Gone", details: { error: "DeviceNotRegistered" } },
+          ],
+        }),
+      )
+    const messages = ["phone", "tablet"].map((name) => ({
+      to: token(name),
+      body: "Hi",
+      data: { url: "/feedback/mine" },
+    }))
+
+    await t.action(internal.notifications.send, { messages })
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(await devices(t)).toMatchObject([{ token: token("phone") }])
+  })
+
+  it("gives up after one retry", async () => {
+    const t = makeConvexTest()
+    jest.spyOn(console, "warn").mockImplementation(() => undefined)
+    const fetch = jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"))
+
+    await t.action(internal.notifications.send, {
+      messages: [{ to: token("phone"), body: "Hi", data: { url: "/account" } }],
+    })
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
 })
