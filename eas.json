@@ -9,7 +9,8 @@
       "extends": "production",
       "env": {
         "APP_VARIANT": "development",
-        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64"
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64",
+        "SENTRY_ALLOW_FAILURE": "true"
       },
       "distribution": "internal",
       "channel": "development",
@@ -35,7 +36,8 @@
       "extends": "production",
       "env": {
         "APP_VARIANT": "preview",
-        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64"
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64",
+        "SENTRY_ALLOW_FAILURE": "true"
       },
       "distribution": "internal",
       "channel": "preview",
@@ -52,8 +54,7 @@
       "node": "24.18.1",
       "env": {
         "APP_VARIANT": "production",
-        "EXPO_PUBLIC_INVITE_ORIGIN": "https://scryve.sow.care",
-        "SENTRY_ALLOW_FAILURE": "true"
+        "EXPO_PUBLIC_INVITE_ORIGIN": "https://scryve.sow.care"
       },
       "distribution": "store",
       "channel": "production",
