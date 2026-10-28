@@ -90,7 +90,7 @@
         "android": {
           "enableMinifyInReleaseBuilds": true,
           "enableShrinkResourcesInReleaseBuilds": true,
-          "extraProguardRules": "-keep class * extends androidx.work.InputMerger { <init>(); }"
+          "extraProguardRules": "-keep class * extends androidx.work.InputMerger { <init>(); }\n-keep enum expo.modules.** { *; }"
         }
       }
     ],
