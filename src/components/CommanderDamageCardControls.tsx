@@ -212,10 +212,10 @@ export function useCommanderTakeover(
     }
   }, [active, duration, wave])
 
-  // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame.
+  // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame. A flood with no reach is a still fill with nothing to drain.
   const shown = takeover
     ? { takeover, attackerColor }
-    : draining || wasActive.current
+    : (draining || wasActive.current) && last.current.takeover?.flood
       ? last.current
       : undefined
   return {
