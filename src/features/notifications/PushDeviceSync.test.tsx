@@ -1,4 +1,5 @@
-import { render, waitFor } from "@testing-library/react-native"
+import { AppState } from "react-native"
+import { act, render, waitFor } from "@testing-library/react-native"
 
 import { storage } from "@/utils/storage"
 
@@ -30,13 +31,13 @@ describe("PushDeviceSync", () => {
   beforeEach(() => storage.clearAll())
 
   it("forgets a registered device once notifications are off in system settings", async () => {
+    const appState = jest.spyOn(AppState, "addEventListener")
     mockToken.mockResolvedValueOnce("ExpoPushToken[phone]")
-    const { unmount } = render(<PushDeviceSync />)
+    render(<PushDeviceSync />)
     await waitFor(() => expect(mockSync).toHaveBeenCalled())
-    unmount()
 
     mockToken.mockResolvedValueOnce(null)
-    render(<PushDeviceSync />)
+    act(() => appState.mock.calls.forEach(([, listener]) => listener("active")))
     await waitFor(() => expect(mockForget).toHaveBeenCalledWith({ key: "key" }))
   })
 })

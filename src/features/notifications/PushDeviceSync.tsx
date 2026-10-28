@@ -1,4 +1,5 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { AppState } from "react-native"
 import { router } from "expo-router"
 import { useConvexAuth, useMutation } from "convex/react"
 
@@ -27,8 +28,17 @@ function Sync() {
   const online = useConvexOnline()
   const syncDevice = useMutation(api.notifications.syncDevice)
   const forgetDevice = useMutation(api.notifications.forgetDevice)
+  const [foregrounds, setForegrounds] = useState(0)
 
   useEffect(() => onNotificationOpened((url) => router.push(url)), [])
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      (state) => state === "active" && setForegrounds((count) => count + 1),
+    )
+    return () => subscription.remove()
+  }, [])
 
   useEffect(() => {
     if (!key || isLoading || !online) return
@@ -50,9 +60,10 @@ function Sync() {
     return () => {
       stale = true
     }
-    // why: signing in or out changes which account this device belongs to, and a sync that failed offline must run again once back online.
+    // why: signing in or out changes which account this device belongs to, a sync that failed offline must run again once back online, and notifications may have been turned off in system settings while away.
   }, [
     key,
+    foregrounds,
     isLoading,
     isAuthenticated,
     online,
