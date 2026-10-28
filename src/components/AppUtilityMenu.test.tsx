@@ -172,14 +172,14 @@ describe("AppUtilityMenu", () => {
     })
   })
 
-  it("lists Rules first and Settings last, growing to fit Rules", () => {
+  it("lists Decks first and Settings last, growing to fit Decks", () => {
     mockNearbyPlay = true
-    const onRules = jest.fn()
+    const onDecks = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <AppUtilityMenu
           compact
-          onRules={onRules}
+          onDecks={onDecks}
           onHistory={jest.fn()}
           onSettings={jest.fn()}
           onSupport={jest.fn()}
@@ -190,7 +190,7 @@ describe("AppUtilityMenu", () => {
     fireEvent.press(view.getByTestId("utility-menu-button"))
 
     expect(view.getAllByRole(/button|switch/).map((item) => item.props.testID)).toEqual([
-      "utility-rules-button",
+      "utility-decks-button",
       "utility-history-button",
       "utility-nearby-only-button",
       "utility-account-button",
@@ -200,8 +200,8 @@ describe("AppUtilityMenu", () => {
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
       height: 324,
     })
-    fireEvent.press(view.getByTestId("utility-rules-button"))
-    expect(onRules).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByTestId("utility-decks-button"))
+    expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
   it("lets a nearby tester cut this device off from Convex, and remembers it", () => {
