@@ -34,7 +34,6 @@ const TITLES = [
 const LEADING_TITLE = new RegExp(
   `^(?:${TITLES.map((title) => title.replaceAll(".", "\\.")).join("|")}) `,
 )
-// why: these open a name players say whole ("Black Widow", "Super Shredder"), not a title to drop.
 const JOINED = new Set(["Black", "Iron", "Living", "Super", "Dark", "Mister", "Madame", "Master"])
 
 const SPOKEN_NAMES: Record<string, string> = {
@@ -60,6 +59,7 @@ const SPOKEN_NAMES: Record<string, string> = {
   "Vial Smasher the Fierce": "Vial Smasher",
   "Auntie Ool": "Auntie Ool",
   "Heroes in a Half Shell": "Turtles",
+  "Agent Venom": "Agent Venom",
   "Pizza Face": "Pizza Face",
   "Mutagen Man": "Mutagen Man",
 }

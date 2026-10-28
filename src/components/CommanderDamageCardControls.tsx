@@ -178,7 +178,9 @@ export function useCommanderTakeover(
   const duration = motionDuration(reducedMotion, TAKEOVER_MS)
   const active = !!takeover
   const last = useRef({ takeover, attackerColor })
-  if (takeover) last.current = { takeover, attackerColor }
+  useEffect(() => {
+    if (takeover) last.current = { takeover, attackerColor }
+  })
   const [draining, setDraining] = useState(false)
   const [covered, setCovered] = useState(active && !duration)
   const wave = useSharedValue(active && !duration ? 1 : 0)
@@ -211,7 +213,11 @@ export function useCommanderTakeover(
   }, [active, duration, wave])
 
   // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame.
-  const shown = takeover || draining || wasActive.current ? last.current : undefined
+  const shown = takeover
+    ? { takeover, attackerColor }
+    : draining || wasActive.current
+      ? last.current
+      : undefined
   return {
     takeover: shown?.takeover,
     attackerColor: shown?.attackerColor,
