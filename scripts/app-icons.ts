@@ -13,9 +13,9 @@ import {
 
 const PENTAGON =
   "M241.44 174.58 Q256.00 164.00 270.56 174.58 L328.93 216.99 Q343.50 227.57 337.93 244.69 L315.64 313.31 Q310.08 330.43 292.08 330.43 L219.92 330.43 Q201.92 330.43 196.36 313.31 L174.07 244.69 Q168.50 227.57 183.07 216.99Z"
-// why: the board centers a 7-unit border on its 100-unit pentagon, so at this 2x scale the face shrinks to radius 85 and the border reaches 7 past PENTAGON.
+// why: the board centers a 7-unit border on its pentagon, so at this 2x scale the face is PENTAGON offset 7 inward (edges parallel, corners rounded 7 tighter), and the border reaches 7 past PENTAGON.
 const FACE =
-  "M242.89 180.52 Q256.00 171.00 269.11 180.52 L323.73 220.21 Q336.84 229.73 331.83 245.14 L310.97 309.36 Q305.96 324.77 289.76 324.77 L222.24 324.77 Q206.04 324.77 201.03 309.36 L180.17 245.14 Q175.16 229.73 188.27 220.21Z"
+  "M245.55 180.24 Q256.00 172.65 266.45 180.24 L324.82 222.65 Q335.27 230.24 331.28 242.52 L308.98 311.15 Q304.99 323.43 292.08 323.43 L219.92 323.43 Q207.01 323.43 203.02 311.15 L180.72 242.52 Q176.73 230.24 187.18 222.65Z"
 // why: seat order follows the in-game portrait board. The button must sit where seat corners meet, which five and six seats break.
 const LAYOUTS: Record<number, readonly (readonly [number, number, number, number])[]> = {
   2: [
