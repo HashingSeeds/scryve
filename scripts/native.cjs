@@ -3,7 +3,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const util = require("node:util")
 
-const { settleVersion } = require("./release-native.cjs")
+const { settleOffMainVersion, settleVersion } = require("./release-native.cjs")
 
 const root = path.join(__dirname, "..")
 const easCli = `eas-cli@${require("../package.json").config.easCli}`
@@ -21,10 +21,10 @@ const TARGETS = {
   "android:production": { profile: "production", output: "android-prod.aab" },
 }
 
-const USAGE = `Usage: pnpm <target> [--build] [--upload] [--nas] [--ship] [--build-path <path>]
+const USAGE = `Usage: pnpm <target> [--build] [--upload] [--nas] [--ship] [--build-path <path>] [--off-main]
 Targets: ${Object.keys(TARGETS).join(", ")}`
 
-// Reads `<target> [flags]`. No flag builds, --upload (EAS) and --nas (`builds put`) send the artifact after a build only with --build, --ship builds then uploads, and --build-path moves the artifact for every step.
+// Reads `<target> [flags]`. No flag builds, --upload (EAS) and --nas (`builds put`) send the artifact after a build only with --build, --ship builds then uploads, --build-path moves the artifact for every step, and --off-main builds a production artifact without a version commit.
 function parseArgs(args) {
   let parsed
   try {
@@ -37,6 +37,7 @@ function parseArgs(args) {
         ship: { type: "boolean" },
         nas: { type: "boolean" },
         "build-path": { type: "string" },
+        "off-main": { type: "boolean" },
       },
     })
   } catch (error) {
@@ -45,6 +46,9 @@ function parseArgs(args) {
   const { positionals, values } = parsed
   const [target, ...extra] = positionals
   if (!(target in TARGETS) || extra.length > 0) throw new Error(USAGE)
+  const offMain = Boolean(values["off-main"])
+  if (offMain && TARGETS[target].profile !== "production")
+    throw new Error(`--off-main only applies to production builds.\n${USAGE}`)
   const upload = Boolean(values.upload || values.ship)
   if (upload && target === "ios:profile")
     throw new Error("ios:profile is not an EAS build, so it cannot --upload. Use --nas.")
@@ -54,6 +58,7 @@ function parseArgs(args) {
     build: Boolean(values.build || values.ship || !(upload || nas)),
     upload,
     nas,
+    offMain,
     // why: pnpm runs scripts from the repo root, so a path typed in a subdirectory resolves against INIT_CWD.
     buildPath: values["build-path"]
       ? path.resolve(process.env.INIT_CWD ?? process.cwd(), values["build-path"])
@@ -119,9 +124,16 @@ function run([command, ...args], env) {
 function main() {
   const options = parseArgs(process.argv.slice(2))
   if (options.build) {
-    if (TARGETS[options.target].profile === "production") settleVersion()
+    const production = TARGETS[options.target].profile === "production"
+    // why: an off-main build cannot commit its version, so app.config.ts reads it from SCRYVE_APP_VERSION.
+    const offMainVersion = production && options.offMain ? settleOffMainVersion() : undefined
+    if (production && !options.offMain) settleVersion()
     fs.mkdirSync(path.dirname(options.buildPath), { recursive: true })
-    run(buildCommand(options), { ...process.env, ...buildEnv(options) })
+    run(buildCommand(options), {
+      ...process.env,
+      ...buildEnv(options),
+      ...(offMainVersion ? { SCRYVE_APP_VERSION: offMainVersion } : {}),
+    })
   }
   if (options.upload) run(uploadCommand(options), process.env)
   if (options.nas) run(nasCommand(options), process.env)

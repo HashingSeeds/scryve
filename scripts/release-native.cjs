@@ -31,6 +31,9 @@ function planVersion({ version, taggedCommit, head }) {
   return { action: "bump", version: bumpPatch(version) }
 }
 
+// why: a build for a few testers cannot bump or tag main, and a tagged version may already be live, where the App Store turns away new builds of it.
+const planOffMainVersion = ({ version, tagged }) => (tagged ? bumpPatch(version) : version)
+
 function tagCommit(tag) {
   try {
     return git("rev-parse", "--verify", "--quiet", `refs/tags/${tag}^{commit}`)
@@ -248,4 +251,21 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bumpPatch, planVersion, settleVersion }
+function settleOffMainVersion() {
+  if (git("status", "--porcelain")) throw new Error("Commit or stash your changes first.")
+  git("fetch", "--quiet", "--force", "--tags", "origin", "main")
+  const head = git("rev-parse", "HEAD")
+  if (head === git("rev-parse", MAIN))
+    throw new Error(`This is ${MAIN}'s tip; release it without --off-main.`)
+  if (!git("branch", "--remotes", "--contains", head))
+    throw new Error("Push this commit first, so the build traces back to it.")
+  const current = readVersion()
+  const version = planOffMainVersion({
+    version: current,
+    tagged: tagCommit(`v${current}`) !== null,
+  })
+  console.log(`Building ${head.slice(0, 8)} off main as ${version}, without a tag.`)
+  return version
+}
+
+module.exports = { bumpPatch, planOffMainVersion, planVersion, settleOffMainVersion, settleVersion }

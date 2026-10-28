@@ -41,6 +41,8 @@ Production builds settle the version first (`scripts/release-native.cjs`). The `
 - Building from a newer commit of main's tip bumps the patch. `main` only takes pull requests, so the script opens `chore(release): v<version> [skip ci]` from `release/v<version>`, squash-merges it, tags the merge commit, and pushes the tag. The skip keeps the bump from redeploying Convex and republishing beta. If main moves during the merge, it stops before tagging; run it again to build the new tip.
 - A version with no tag yet is used as is. For a minor or major release, merge `pnpm version minor --no-git-tag-version` (or `major`) to main before building.
 
+To put an unmerged branch in front of testers, build its pushed commit with `pnpm ios:production --off-main` and submit it with `eas submit`. The build skips the bump PR and the tag. It takes the next patch when the current version is tagged, since that version may already be live, and passes it to `app.config.ts` as `SCRYVE_APP_VERSION`. TestFlight sends it to every group with automatic distribution, and production updates from main reach it only once main shares its runtime.
+
 Builds need a clean tree. The fingerprint skips the version (`ExpoConfigVersions` in `fingerprint.config.js`), so a bump alone does not change the runtime or cut installs off from OTA updates.
 
 ## Release record
