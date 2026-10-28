@@ -1,4 +1,5 @@
 import { View } from "react-native"
+import * as Haptics from "expo-haptics"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -89,8 +90,10 @@ test("skips a card the Commander deck already holds and says so", async () => {
   show("Sol Ring")
   show("Sol Ring")
   expect(view.getByText("Sol Ring is already in the deck")).toBeTruthy()
+  expect(Haptics.notificationAsync).toHaveBeenLastCalledWith(Haptics.NotificationFeedbackType.Error)
   show()
   scan("Arcane Signet")
+  expect(Haptics.impactAsync).toHaveBeenLastCalledWith(Haptics.ImpactFeedbackStyle.Light)
   scan("Arcane Signet")
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Arcane Signet"])

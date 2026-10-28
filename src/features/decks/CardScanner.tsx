@@ -89,7 +89,7 @@ export function CardScanner({
 }) {
   const [permission, requestPermission] = useCameraPermissions()
   const view = useRef<LayoutRectangle>(undefined)
-  const frame = useRef<LayoutRectangle>(undefined)
+  const [frame, setFrame] = useState<LayoutRectangle>()
   const [added, setAdded] = useState<ScannedCard[]>([])
   const addedRef = useRef(added)
   const [status, setStatus] = useState<ScanStatus>("looking")
@@ -147,7 +147,7 @@ export function CardScanner({
 
   function add(card: Omit<ScannedCard, "id" | "state">) {
     const scanned = { ...card, id: nextId.current++, state: "adding" as const }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined)
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined)
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
       console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)
@@ -161,8 +161,8 @@ export function CardScanner({
   }
 
   function readText(photo: CardPhotoText) {
-    if (closingRef.current || !view.current || !frame.current) return
-    const framing = { view: view.current, frame: frame.current }
+    if (closingRef.current || !view.current || !frame) return
+    const framing = { view: view.current, frame }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
     if (linesFromCardTop.length) onRead?.({ linesFromCardTop, photo, framing }, match?.name)
@@ -192,12 +192,14 @@ export function CardScanner({
     accept({ ...match, alternates })
   }
 
+  function skip(name: string) {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
+    setStatus({ alreadyInDeck: name })
+  }
+
   function accept(card: Omit<ScannedCard, "id" | "state">) {
     if (BASIC_LANDS.has(card.name)) {
-      if (countedLands.current.has(card.name)) {
-        setStatus({ alreadyInDeck: card.name })
-        return
-      }
+      if (countedLands.current.has(card.name)) return skip(card.name)
       const stillAdding = addedRef.current.filter(
         (scanned) => scanned.name === card.name && scanned.state === "adding",
       ).length
@@ -212,10 +214,8 @@ export function CardScanner({
         addedRef.current.some(
           (scanned) => scanned.name === card.name && typeof scanned.state !== "object",
         ))
-    ) {
-      setStatus({ alreadyInDeck: card.name })
-      return
-    }
+    )
+      return skip(card.name)
     add(card)
   }
 
@@ -283,13 +283,11 @@ export function CardScanner({
             <CardTextCamera
               style={StyleSheet.absoluteFill}
               active={scanning}
+              guide={frame}
               onText={(event) => readText(event.nativeEvent)}
             />
             <View style={$overlay} pointerEvents="none">
-              <View
-                style={$frame}
-                onLayout={(event) => (frame.current = event.nativeEvent.layout)}
-              />
+              <View style={$frame} onLayout={(event) => setFrame(event.nativeEvent.layout)} />
               <Text size="sm" style={$hint} text={statusText(status)} />
             </View>
           </View>

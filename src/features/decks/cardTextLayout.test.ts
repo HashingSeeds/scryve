@@ -48,4 +48,19 @@ describe("framedLinesFromCardTop", () => {
     }
     expect(framedLinesFromCardTop(photo, framing)).toEqual(["Martial Coup", "Sorcery"])
   })
+
+  it("reads only the outlined card when the camera found one", () => {
+    const photo = {
+      width: 800,
+      height: 1200,
+      lines: [line("Rat King, Pale Piper", 400, 280), line("Escape Tunnel", 400, 360)],
+      cardCorners: [
+        { x: 200, y: 320 },
+        { x: 600, y: 320 },
+        { x: 600, y: 880 },
+        { x: 200, y: 880 },
+      ],
+    }
+    expect(framedLinesFromCardTop(photo, framing)).toEqual(["Escape Tunnel"])
+  })
 })
