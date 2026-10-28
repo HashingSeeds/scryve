@@ -21,7 +21,6 @@ jest.doMock("react-native", () => {
         },
         ReactNative.Image,
         {
-          // why: expo-asset calls resolveAssetSource.setCustomSourceTransformer on import, so every suite that loads expo fails without it.
           resolveAssetSource: Object.assign(
             jest.fn((_source) => mockFile), // eslint-disable-line @typescript-eslint/no-unused-vars
             { setCustomSourceTransformer: jest.fn() },
@@ -71,7 +70,6 @@ jest.mock("react-native-keyboard-controller", () => ({
     select({ isVisible: false, height: 0 }),
 }))
 
-// why: GestureDetector throws without a GestureHandlerRootView ancestor, which the app root provides but component tests don't.
 jest.mock(
   "react-native-gesture-handler/lib/module/v3/detectors/useEnsureGestureHandlerRootView",
   () => ({

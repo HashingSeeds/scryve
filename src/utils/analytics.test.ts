@@ -15,7 +15,6 @@ async function tick(ms = 100) {
   await jest.advanceTimersByTimeAsync(ms)
 }
 
-/** why: inside isolateModulesAsync the fresh expo import installs expo/fetch over the mock, so point it back. */
 function requireIsolatedAnalytics() {
   const analytics: typeof import("./analytics") = require("./analytics")
   global.fetch = fetchMock
