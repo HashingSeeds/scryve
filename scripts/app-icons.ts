@@ -13,22 +13,25 @@ import {
 
 const PENTAGON =
   "M241.44 174.58 Q256.00 164.00 270.56 174.58 L328.93 216.99 Q343.50 227.57 337.93 244.69 L315.64 313.31 Q310.08 330.43 292.08 330.43 L219.92 330.43 Q201.92 330.43 196.36 313.31 L174.07 244.69 Q168.50 227.57 183.07 216.99Z"
+// why: the board centers a 7-unit border on its pentagon, so at this 2x scale the face is PENTAGON offset 7 inward (edges parallel, corners rounded 7 tighter), and the border reaches 7 past PENTAGON.
+const FACE =
+  "M245.55 180.24 Q256.00 172.65 266.45 180.24 L324.82 222.65 Q335.27 230.24 331.28 242.52 L308.98 311.15 Q304.99 323.43 292.08 323.43 L219.92 323.43 Q207.01 323.43 203.02 311.15 L180.72 242.52 Q176.73 230.24 187.18 222.65Z"
 // why: seat order follows the in-game portrait board. The button must sit where seat corners meet, which five and six seats break.
 const LAYOUTS: Record<number, readonly (readonly [number, number, number, number])[]> = {
   2: [
-    [54, 54, 404, 194],
-    [54, 264, 404, 194],
+    [54, 54, 404, 197],
+    [54, 261, 404, 197],
   ],
   3: [
-    [54, 54, 404, 194],
-    [54, 264, 194, 194],
-    [264, 264, 194, 194],
+    [54, 54, 404, 197],
+    [54, 261, 197, 197],
+    [261, 261, 197, 197],
   ],
   4: [
-    [54, 54, 194, 194],
-    [264, 54, 194, 194],
-    [54, 264, 194, 194],
-    [264, 264, 194, 194],
+    [54, 54, 197, 197],
+    [261, 54, 197, 197],
+    [54, 261, 197, 197],
+    [261, 261, 197, 197],
   ],
 }
 // why: white bands keep each seat's color under the shimmer; a tinted foil gradient washed the colors out.
@@ -68,7 +71,7 @@ function defsFor(boardRadius: number) {
         `board-${inset}`,
         `<clipPath id="board-${inset}"><rect x="${54 + inset}" y="${54 + inset}" width="${404 - 2 * inset}" height="${404 - 2 * inset}" rx="${boardRadius - inset}"/></clipPath>`,
       ),
-    button: () => add("button", `<clipPath id="button"><path d="${PENTAGON}"/></clipPath>`),
+    button: () => add("button", `<clipPath id="button"><path d="${FACE}"/></clipPath>`),
     stripes: (index: number, color: string, y: number) =>
       add(
         `stripes-${index}-${color.replace("#", "")}`,
@@ -165,7 +168,7 @@ function mark(variant: IconArt, defs: Defs) {
     : ""
   const board = tiles(variant, defs).join("\n      ")
   const ring = variant.buttonRing
-    ? `<path d="${PENTAGON}" fill="none" stroke="${defs.paint(variant.buttonRing)}" stroke-width="16" stroke-linejoin="round" clip-path="${defs.button()}"/>`
+    ? `<path d="${FACE}" fill="none" stroke="${defs.paint(variant.buttonRing)}" stroke-width="16" stroke-linejoin="round" clip-path="${defs.button()}"/>`
     : ""
   return `${sheen}
     <g clip-path="${defs.clip(0)}">
@@ -173,7 +176,7 @@ function mark(variant: IconArt, defs: Defs) {
       ${board}
       ${variant.grid ? `<rect x="54" y="54" width="404" height="404" fill="${defs.grid()}"/>` : ""}
     </g>
-    <path d="${PENTAGON}" fill="${defs.paint(variant.button ?? "#36333D")}" stroke="${variant.background}" stroke-width="20" stroke-linejoin="round" paint-order="stroke"/>
+    <path d="${PENTAGON}" fill="${defs.paint(variant.button ?? "#36333D")}" stroke="${variant.background}" stroke-width="14" stroke-linejoin="round"/>
     ${ring}
     <g fill="${defs.paint(variant.lines ?? "#F4F2F1")}">
       <rect x="221" y="225" width="70" height="10" rx="5"/>

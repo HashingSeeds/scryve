@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
   <g transform="translate(256 256) scale(0.633) translate(-256 -256)">
-    <defs><clipPath id="board"><rect x="54" y="54" width="404" height="404" rx="120"/></clipPath><mask id="gap"><rect width="512" height="512" fill="#FFFFFF"/><path d="M241.44 174.58 Q256.00 164.00 270.56 174.58 L328.93 216.99 Q343.50 227.57 337.93 244.69 L315.64 313.31 Q310.08 330.43 292.08 330.43 L219.92 330.43 Q201.92 330.43 196.36 313.31 L174.07 244.69 Q168.50 227.57 183.07 216.99Z" stroke="#000000" stroke-width="20" stroke-linejoin="round"/></mask></defs>
+    <defs><clipPath id="board"><rect x="54" y="54" width="404" height="404" rx="120"/></clipPath><mask id="gap"><rect width="512" height="512" fill="#FFFFFF"/><path d="M241.44 174.58 Q256.00 164.00 270.56 174.58 L328.93 216.99 Q343.50 227.57 337.93 244.69 L315.64 313.31 Q310.08 330.43 292.08 330.43 L219.92 330.43 Q201.92 330.43 196.36 313.31 L174.07 244.69 Q168.50 227.57 183.07 216.99Z" stroke="#000000" stroke-width="14" stroke-linejoin="round"/></mask></defs>
     <g clip-path="url(#board)" mask="url(#gap)">
-      <rect x="54" y="54" width="194" height="194" rx="54" fill="#FFFFFF"/>
-      <rect x="264" y="54" width="194" height="194" rx="54" fill="#FFFFFF"/>
-      <rect x="54" y="264" width="194" height="194" rx="54" fill="#FFFFFF"/>
-      <rect x="264" y="264" width="194" height="194" rx="54" fill="#FFFFFF"/>
+      <rect x="54" y="54" width="197" height="197" rx="54" fill="#FFFFFF"/>
+      <rect x="261" y="54" width="197" height="197" rx="54" fill="#FFFFFF"/>
+      <rect x="54" y="261" width="197" height="197" rx="54" fill="#FFFFFF"/>
+      <rect x="261" y="261" width="197" height="197" rx="54" fill="#FFFFFF"/>
     </g>
-    <path d="M241.44 174.58 Q256.00 164.00 270.56 174.58 L328.93 216.99 Q343.50 227.57 337.93 244.69 L315.64 313.31 Q310.08 330.43 292.08 330.43 L219.92 330.43 Q201.92 330.43 196.36 313.31 L174.07 244.69 Q168.50 227.57 183.07 216.99Z M226 225H286A5 5 0 0 1 286 235H226A5 5 0 0 1 226 225Z M226 251H286A5 5 0 0 1 286 261H226A5 5 0 0 1 226 251Z M226 277H286A5 5 0 0 1 286 287H226A5 5 0 0 1 226 277Z" fill="#FFFFFF" fill-rule="evenodd"/>
+    <path d="M245.55 180.24 Q256.00 172.65 266.45 180.24 L324.82 222.65 Q335.27 230.24 331.28 242.52 L308.98 311.15 Q304.99 323.43 292.08 323.43 L219.92 323.43 Q207.01 323.43 203.02 311.15 L180.72 242.52 Q176.73 230.24 187.18 222.65Z M226 225H286A5 5 0 0 1 286 235H226A5 5 0 0 1 226 225Z M226 251H286A5 5 0 0 1 286 261H226A5 5 0 0 1 226 251Z M226 277H286A5 5 0 0 1 286 287H226A5 5 0 0 1 226 277Z" fill="#FFFFFF" fill-rule="evenodd"/>
   </g>
 </svg>
