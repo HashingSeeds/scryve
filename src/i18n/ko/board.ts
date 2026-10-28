@@ -113,8 +113,8 @@ export default {
     seat: "{{name}}님의 자리",
   },
   tableTurn: {
-    cue: "테이블용으로 돌리세요",
-    turn: "보드를 테이블 레이아웃으로 돌리세요",
+    cue: "돌려서 맞추기",
+    turn: "보드를 열린 화면에 맞게 돌리세요",
     keep: "현재 레이아웃 유지",
   },
   layoutOption: {

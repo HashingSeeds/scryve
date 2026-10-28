@@ -686,12 +686,44 @@ describe("PlayerGrid", () => {
   it.each([
     ["held upright", { spansHinge: true, holderAngle: 0, layoutVariant: "tabletop" }],
     ["closed", { spansHinge: false, holderAngle: -90, layoutVariant: "tabletop" }],
-    ["Balanced", { spansHinge: true, holderAngle: -90, layoutVariant: "auto" }],
   ] as const)("keeps the usual six-player board when %s", (_, input) => {
     expect(
-      getPlayerGridLayout({ playerCount: 6, width: 669, height: 951, ...input }).centerColumn,
+      getPlayerGridLayout({ playerCount: 6, width: 669, height: 951, ...input }).kept,
     ).toBeUndefined()
   })
+
+  it.each([
+    [2, "auto", [[0, 1]], { 0: 90, 1: -90 }, false],
+    [
+      4,
+      "auto",
+      [
+        [1, 3],
+        [0, 2],
+      ],
+      { 0: 0, 1: 180, 2: 0, 3: 180 },
+      true,
+    ],
+    [3, "auto", [[2], [0], [1]], { 0: 90, 1: 0, 2: 180 }, true],
+  ] as const)(
+    "keeps a %i-player %s board facing the edges it faced closed when the Duo opens",
+    (playerCount, layoutVariant, rows, facings, offersTurn) => {
+      const layout = getPlayerGridLayout({
+        playerCount,
+        width: 669,
+        height: 951,
+        layoutVariant,
+        spansHinge: true,
+        holderAngle: -90,
+      })
+      expect(layout.kept).toEqual({
+        rows,
+        facings,
+        middle: expect.any(Boolean),
+        offersTurn,
+      })
+    },
+  )
 
   it("supports featured and even arrangements without dropping a player", () => {
     const inputs = [
@@ -745,7 +777,7 @@ describe("PlayerGrid", () => {
     expect(getPlayerGridRows(5, invalidTabletop).flat()).toEqual([0, 1, 2, 3, 4])
   })
 
-  it("seats a Table board that landed upside down on the panel from its far end", () => {
+  it("seats a Table board turned the far way from its far end", () => {
     render(
       <ThemeProvider>
         <PlayerGrid
@@ -760,7 +792,7 @@ describe("PlayerGrid", () => {
             tableTurn: {
               angle: { value: 0 } as SharedValue<number>,
               unfolded: { value: 1 } as SharedValue<number>,
-              landed: "reversed",
+              landed: -1,
             },
           }}
           players={players(6)}

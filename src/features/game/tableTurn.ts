@@ -7,8 +7,11 @@ export interface TableTurn {
   angle: SharedValue<number>
   /** why: the seats spread from where the closed outer board drew them as the hinge opens, 0 at the switch to the inner display and 1 when flat. */
   unfolded: SharedValue<number>
-  landed?: "upright" | "reversed"
+  /** why: the way the players turned the board to land it, 1 clockwise and -1 counterclockwise; each way puts every seat in the upright layout's cell nearest where it sits. */
+  landed?: TurnWay
 }
+
+export type TurnWay = 1 | -1
 
 const UNFOLD_FROM_DEG = 25
 const UNFOLD_TO_DEG = 165
@@ -66,11 +69,6 @@ export function windowRectToPanel(
   return rotateRectAround(shifted, { x: panel.width / 2, y: panel.height / 2 }, holderAngle / 90)
 }
 
-/** why: a seat that faced another edge on the outer display turns as the board unfolds, starting turned by the difference so it reads as it did closed. */
-export function foldTurn(outerFacing: number, openFacing: number, holderAngle: number) {
-  return ((((outerFacing + holderAngle - openFacing) % 360) + 540) % 360) - 180
-}
-
 export const TABLE_TURN_GATHER_DEG = 45
 
 export function tableTurnGather(angle: number) {
@@ -79,10 +77,34 @@ export function tableTurnGather(angle: number) {
   return progress * progress * (3 - 2 * progress)
 }
 
-/** why: the players can turn either way; one way lands on the panel's own Table board, the other on that board upside down. */
-export function tableTurnLanding(angle: number, holderAngle: number): "upright" | "reversed" {
-  "worklet"
-  return Math.sign(angle) === -Math.sign(holderAngle) ? "upright" : "reversed"
+/** why: the board holds still on the table while the device turns under it, so each seat lands in the upright layout's cell nearest the spot it already sits at once the board has turned `way` a quarter. Returns the upright slot each kept slot lands in. */
+export function landingSlots(
+  kept: Map<number, LayoutRectangle>,
+  upright: Map<number, LayoutRectangle>,
+  board: { width: number; height: number },
+  way: TurnWay,
+): Map<number, number> {
+  const center = { x: board.width / 2, y: board.height / 2 }
+  const middle = (rect: LayoutRectangle) => ({
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  })
+  const pairs = [...kept].flatMap(([slot, rect]) => {
+    const { x, y } = middle(rect)
+    const turned = { x: center.x - way * (y - center.y), y: center.y + way * (x - center.x) }
+    return [...upright].map(([target, cell]) => {
+      const to = middle(cell)
+      return { slot, target, distance: Math.hypot(to.x - turned.x, to.y - turned.y) }
+    })
+  })
+  const landing = new Map<number, number>()
+  const taken = new Set<number>()
+  for (const { slot, target } of pairs.sort((a, b) => a.distance - b.distance)) {
+    if (landing.has(slot) || taken.has(target)) continue
+    landing.set(slot, target)
+    taken.add(target)
+  }
+  return landing
 }
 
 export function rotateRectAround(

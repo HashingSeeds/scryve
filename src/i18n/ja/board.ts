@@ -114,8 +114,8 @@ export default {
     seat: "{{name}}の席",
   },
   tableTurn: {
-    cue: "回してテーブル表示",
-    turn: "ボードをテーブルレイアウトに回転します",
+    cue: "向きを合わせる",
+    turn: "開いている画面に合わせてボードを回してください",
     keep: "このレイアウトを維持",
   },
   layoutOption: {

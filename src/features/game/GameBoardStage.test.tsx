@@ -171,21 +171,29 @@ describe("GameBoardStage on an open iPhone Duo", () => {
     const { renderGrid } = renderOpenDuo()
 
     expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
-    fireEvent.press(screen.getByLabelText("Turn the board to the Table layout"))
+    fireEvent.press(screen.getByLabelText("Turn the board to fit the open screen"))
 
     expect(screen.queryByTestId("table-turn-ring")).toBeNull()
-    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: "upright" })
+    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: 1 })
   })
 
-  it("unfolds any open board from the outer display without offering the turn", () => {
+  it("offers the turn to any open board with seats facing its short edges", () => {
     mockHinge.spans = true
     const { renderGrid } = renderOpenDuo({ playerCount: 4, layoutVariant: "auto" })
+
+    expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
+    expect(screen.getByTestId("table-turn-ring")).toBeTruthy()
+  })
+
+  it("unfolds a two-player board without offering the turn, since both seats already face the long edges", () => {
+    mockHinge.spans = true
+    const { renderGrid } = renderOpenDuo({ playerCount: 2, layoutVariant: "auto" })
 
     expect(lastTableTurn(renderGrid)).toMatchObject({ landed: undefined })
     expect(screen.queryByTestId("table-turn-ring")).toBeNull()
   })
 
-  it("keeps the center column when players decline, and offers again after the Duo reopens", () => {
+  it("keeps the kept board when players decline, and offers again after the Duo reopens", () => {
     mockHinge.spans = true
     const { renderGrid, rerender } = renderOpenDuo()
 

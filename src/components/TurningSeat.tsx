@@ -16,9 +16,10 @@ import { LayoutSettlingContext } from "@/utils/useSettledLayout"
 export interface SeatTurn {
   angle: SharedValue<number>
   unfolded: SharedValue<number>
-  folded: LayoutRectangle & { turn: number }
+  folded: LayoutRectangle
   cell: LayoutRectangle
-  table: LayoutRectangle
+  /** why: turned clockwise or counterclockwise the seat lands in a different upright cell, each given here as it sits before the turn. */
+  table: { clockwise: LayoutRectangle; counterclockwise: LayoutRectangle }
   board: { width: number; height: number }
   corners: {
     radius: number
@@ -44,20 +45,18 @@ const RESTING = {
 
 function placeSeat(turn: SeatTurn) {
   "worklet"
-  const { folded, cell, table, board } = turn
+  const { folded, cell, board } = turn
+  const angle = turn.angle.value
   const open = turn.unfolded.value
   const mix = (from: number, to: number) => from + (to - from) * open
-  const sideways = Math.abs(folded.turn) === 90
-  const width = mix(sideways ? folded.height : folded.width, cell.width)
-  const height = mix(sideways ? folded.width : folded.height, cell.height)
   const resting = {
-    x: mix(folded.x + folded.width / 2, cell.x + cell.width / 2) - width / 2,
-    y: mix(folded.y + folded.height / 2, cell.y + cell.height / 2) - height / 2,
-    width,
-    height,
+    x: mix(folded.x, cell.x),
+    y: mix(folded.y, cell.y),
+    width: mix(folded.width, cell.width),
+    height: mix(folded.height, cell.height),
   }
-  const placement = tableTurnPlacement({ cell: resting, table, board, angle: turn.angle.value })
-  return { ...placement, angle: placement.angle + folded.turn * (1 - open) }
+  const table = angle >= 0 ? turn.table.clockwise : turn.table.counterclockwise
+  return tableTurnPlacement({ cell: resting, table, board, angle })
 }
 
 /** why: a seat that starts or stops turning is given a fresh wrapper (PlayerGrid keys it by that), since an animated style that changes on a mounted view lands a frame after the seat moves, and that frame drew the board fully open as it switched displays. */

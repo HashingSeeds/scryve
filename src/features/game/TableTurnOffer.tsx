@@ -25,7 +25,8 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
-import { tableTurnLanding } from "./tableTurn"
+import type { PlayerGridLayoutVariant } from "./playerLayouts"
+import type { TurnWay } from "./tableTurn"
 
 // why: the default frame lets the magnetometer correct heading, and near a magnet it jumps tens of degrees mid-turn; gyro-only drift stays under a degree over a turn.
 const SENSOR_CONFIG = {
@@ -47,6 +48,8 @@ const UNWIND_BELOW = 0.6
 
 const RING = 300
 const RING_RADIUS = 112
+// why: the menu stays on the board during the offer; where it sits inside the ring, the ring circles it and leaves out the picture it would cover.
+export const TURN_RING_INSIDE = RING_RADIUS - 24
 const RING_FONT = 16
 const MINI = { width: 58, height: 84 }
 
@@ -54,15 +57,21 @@ export function TableTurnOffer({
   angle,
   unfolded,
   holderAngle,
+  playerCount,
+  layoutVariant,
   tableSlotColors,
+  menuInside = false,
   onLand,
   onKeep,
 }: {
   angle: SharedValue<number>
   unfolded: SharedValue<number>
   holderAngle: number
+  playerCount: number
+  layoutVariant: PlayerGridLayoutVariant
   tableSlotColors?: readonly string[]
-  onLand: (landing: "upright" | "reversed") => void
+  menuInside?: boolean
+  onLand: (way: TurnWay) => void
   onKeep: () => void
 }) {
   const { themed } = useAppTheme()
@@ -87,8 +96,8 @@ export function TableTurnOffer({
   const stillSince = useSharedValue(0)
   const hint = useSharedValue(0)
   const hinting = useSharedValue(false)
-  const uprightWay = -Math.sign(holderAngle)
-  const direction = useSharedValue(uprightWay)
+  const uprightWay: TurnWay = holderAngle > 0 ? -1 : 1
+  const direction = useSharedValue<number>(uprightWay)
   const chosenWay = useSharedValue(0)
   const timedTurn = useSharedValue(false)
   const [tapTurning, setTapTurning] = useState(false)
@@ -99,7 +108,7 @@ export function TableTurnOffer({
     timedTurn.set(true)
     angle.set(
       withTiming(Math.sign(shown) * 90, { duration: 220 }, (finished) => {
-        if (finished) runOnJS(onLand)(tableTurnLanding(shown, holderAngle))
+        if (finished) runOnJS(onLand)(shown < 0 ? -1 : 1)
       }),
     )
   }
@@ -139,7 +148,7 @@ export function TableTurnOffer({
     reading.set({ angle: turned, speed })
     // why: the display shows a frame or two after the reading, so the board aims ahead by the measured speed and eases toward that aim to hide sensor jitter.
     const shown = angle.value + (turned + speed * LEAD_MS - angle.value) * FOLLOW
-    // why: past a quarter turn the board stops, so turning further never carries it beyond the Table layout.
+    // why: past a quarter turn the board stops, so turning further never carries it beyond the upright layout.
     angle.set(Math.max(-90, Math.min(90, shown)))
 
     const way = shown > 5 ? 1 : shown < -5 ? -1 : 0
@@ -172,7 +181,7 @@ export function TableTurnOffer({
         uprightWay * 90,
         { duration, easing: Easing.inOut(Easing.cubic), reduceMotion: ReduceMotion.Never },
         (finished) => {
-          if (finished) runOnJS(onLand)("upright")
+          if (finished) runOnJS(onLand)(uprightWay)
         },
       ),
     )
@@ -228,7 +237,10 @@ export function TableTurnOffer({
           angle={angle}
           holderAngle={holderAngle}
           direction={direction}
+          playerCount={playerCount}
+          layoutVariant={layoutVariant}
           tableSlotColors={tableSlotColors}
+          showPicture={!menuInside}
           ringRef={ring}
           disabled={!flat}
           onPress={turnByTap}
@@ -277,12 +289,15 @@ function RingArrows({ toward, color }: { toward: 1 | -1; color: string }) {
   )
 }
 
-/** why: the cue circles and spins the way the device turns, so every side of a six-player table reads it in turn. */
+/** why: the cue circles and spins the way the device turns, so every side of the table reads it in turn. */
 function TurnRing({
   angle,
   holderAngle,
   direction,
+  playerCount,
+  layoutVariant,
   tableSlotColors,
+  showPicture,
   ringRef,
   disabled,
   onPress,
@@ -290,7 +305,10 @@ function TurnRing({
   angle: SharedValue<number>
   holderAngle: number
   direction: SharedValue<number>
+  playerCount: number
+  layoutVariant: PlayerGridLayoutVariant
   tableSlotColors?: readonly string[]
+  showPicture: boolean
   ringRef: Ref<View>
   disabled: boolean
   onPress: () => void
@@ -309,7 +327,7 @@ function TurnRing({
     if (reducedMotion !== false) spin.set(0)
   }, [reducedMotion, spin])
   const spinning = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }))
-  // why: the ring holds still on the table with the board, so its small Table picture always matches what the players will get.
+  // why: the ring holds still on the table with the board, so its small picture of the upright board always matches what the players will get.
   const heldStill = useAnimatedStyle(() => ({
     transform: [{ rotate: `${holderAngle + angle.value}deg` }],
   }))
@@ -321,8 +339,8 @@ function TurnRing({
   const cue = translate("board:tableTurn.cue").toLocaleUpperCase()
   const mini = [
     ...getPlayerGridCellRects({
-      playerCount: 6,
-      layout: getPlayerGridLayout({ playerCount: 6, ...MINI, layoutVariant: "tabletop" }),
+      playerCount,
+      layout: getPlayerGridLayout({ playerCount, ...MINI, layoutVariant, spansHinge: true }),
       board: MINI,
       gap: 2,
     }),
@@ -366,23 +384,25 @@ function TurnRing({
             <RingArrows toward={-1} color={colors.board.cue} />
           </Animated.View>
         </Animated.View>
-        <View style={$mini}>
-          {mini.map(([slot, rect]) => (
-            <View
-              key={slot}
-              style={[
-                $miniSeat,
-                {
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.width,
-                  height: rect.height,
-                  backgroundColor: tableSlotColors?.[slot] ?? colors.board.border,
-                },
-              ]}
-            />
-          ))}
-        </View>
+        {showPicture ? (
+          <View style={$mini}>
+            {mini.map(([slot, rect]) => (
+              <View
+                key={slot}
+                style={[
+                  $miniSeat,
+                  {
+                    left: rect.x,
+                    top: rect.y,
+                    width: rect.width,
+                    height: rect.height,
+                    backgroundColor: tableSlotColors?.[slot] ?? colors.board.border,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        ) : null}
       </Animated.View>
     </Pressable>
   )

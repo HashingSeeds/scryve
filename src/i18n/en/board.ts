@@ -102,9 +102,9 @@ const board = {
     seat: "{{name}}'s seat",
   },
   tableTurn: {
-    // Circles the open iPhone Duo's board. Players turn the device a quarter turn on the table to get the Table layout.
-    cue: "Turn for Table",
-    turn: "Turn the board to the Table layout",
+    // Circles the open iPhone Duo's board. Players turn the device a quarter turn on the table so the board fits the open screen.
+    cue: "Turn to fit",
+    turn: "Turn the board to fit the open screen",
     keep: "Keep this layout",
   },
   layoutOption: {

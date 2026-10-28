@@ -115,8 +115,8 @@ export default {
     seat: "Place de {{name}}",
   },
   tableTurn: {
-    cue: "Tournez pour Table",
-    turn: "Tournez le plateau vers la disposition Table",
+    cue: "Tourner pour ajuster",
+    turn: "Tournez le plateau pour l'adapter à l'écran ouvert",
     keep: "Garder cette disposition",
   },
   layoutOption: {

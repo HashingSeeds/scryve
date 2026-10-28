@@ -115,8 +115,8 @@ export default {
     seat: "Asiento de {{name}}",
   },
   tableTurn: {
-    cue: "Gira para Mesa",
-    turn: "Gira el tablero al diseño Mesa",
+    cue: "Gira para ajustar",
+    turn: "Gira el tablero para que quepa en la pantalla abierta",
     keep: "Mantener este diseño",
   },
   layoutOption: {

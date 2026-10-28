@@ -52,7 +52,7 @@ import {
   tableTurnGather,
   windowRectToPanel,
 } from "./tableTurn"
-import { TableTurnOffer } from "./TableTurnOffer"
+import { TableTurnOffer, TURN_RING_INSIDE } from "./TableTurnOffer"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import {
   SCREEN_PINNING_AVAILABLE,
@@ -132,9 +132,8 @@ function PinnedGameBoardStage({
     cancelAnimation(turnAngle)
     turnAngle.set(0)
   }, [spansHinge, metrics.holderAngle, landed, refolding, turnAngle])
-  // why: closing a Duo that landed on Table turns the board back with the hinge and folds it into the outer display, the turn played backwards; opening flat again lands it back on Table.
-  const refoldAngleOf = (landing: TableTurn["landed"]) =>
-    (landing === "upright" ? -1 : landing === "reversed" ? 1 : 0) * Math.sign(holderAngle) * 90
+  // why: closing a Duo that landed on its upright board turns the board back with the hinge and folds it into the outer display, the turn played backwards; opening flat again lands it back.
+  const refoldAngleOf = (landing: TableTurn["landed"]) => (landing ?? 0) * 90
   const refoldAngle = refoldAngleOf(refolding)
   const landedAngle = refoldAngleOf(landed)
   const beginRefold = () => {
@@ -182,7 +181,7 @@ function PinnedGameBoardStage({
     layoutVariant,
     holderAngle: landed ? undefined : holderAngle,
   })
-  const offering = !!gridLayout.centerColumn && !kept && !refolding
+  const offering = !!gridLayout.kept?.offersTurn && !kept && !refolding
   const unfolding = spansHinge && pinned && Math.abs(holderAngle) === 90
   const tableTurn = useMemo<TableTurn | undefined>(
     () => (unfolding || landed ? { angle: turnAngle, unfolded, landed } : undefined),
@@ -233,18 +232,37 @@ function PinnedGameBoardStage({
     )
     return { x: onPanel.x - boardAnchor.x * width, y: onPanel.y - boardAnchor.y * height }
   }, [unfolding, landed, playerCount, layoutVariant, width, height, holderAngle, boardAnchor])
-  // why: turning, the menu rides the board from where the center column's seats meet to the middle, where the Table's seats meet, so it is in place when the board lands. It is anchored in the middle and offset by transform, since a new anchor draws a frame before its offset does.
-  const menuAnchor = gridLayout.centerColumn ? BOARD_MIDDLE : boardAnchor
-  const turnMenu = gridLayout.centerColumn
-    ? { x: boardAnchor.x * width - width / 2, y: boardAnchor.y * height - height / 2 }
-    : undefined
+  // why: turning, the menu rides the board from where the kept seats meet to where the upright board's seats meet, so it is in place when the board lands. It is anchored in the middle and offset by transform, since a new anchor draws a frame before its offset does.
+  const menuAnchor = gridLayout.kept ? BOARD_MIDDLE : boardAnchor
+  const turnMenu = useMemo(() => {
+    if (!gridLayout.kept) return undefined
+    const upright = getPlayerGridMenuAnchor(
+      playerCount,
+      getPlayerGridLayout({
+        playerCount,
+        width,
+        height,
+        fontScale,
+        layoutVariant,
+        spansHinge: true,
+      }),
+    )
+    const lands = { x: (upright.x - 0.5) * width, y: (upright.y - 0.5) * height }
+    return {
+      from: { x: (boardAnchor.x - 0.5) * width, y: (boardAnchor.y - 0.5) * height },
+      // why: given as it sits before the board turns, so turning the board a quarter either way carries it onto the upright spot.
+      clockwise: { x: lands.y, y: -lands.x },
+      counterclockwise: { x: -lands.y, y: lands.x },
+    }
+  }, [gridLayout.kept, playerCount, width, height, fontScale, layoutVariant, boardAnchor])
   const menuTravel = useAnimatedStyle(() => {
     const away = 1 - unfolded.value
     const angle = turnAngle.value
-    const kept = turnMenu ? 1 - tableTurnGather(angle) : 1
+    const gathered = turnMenu ? tableTurnGather(angle) : 0
+    const toward = angle >= 0 ? turnMenu?.clockwise : turnMenu?.counterclockwise
     const radians = (angle * Math.PI) / 180
-    const x = (turnMenu?.x ?? 0) * kept
-    const y = (turnMenu?.y ?? 0) * kept
+    const x = (turnMenu?.from.x ?? 0) * (1 - gathered) + (toward?.x ?? 0) * gathered
+    const y = (turnMenu?.from.y ?? 0) * (1 - gathered) + (toward?.y ?? 0) * gathered
     return {
       transform: [
         { translateX: foldedMenuOffset.x * away + Math.cos(radians) * x - Math.sin(radians) * y },
@@ -252,6 +270,11 @@ function PinnedGameBoardStage({
       ],
     }
   })
+  const menuFromMiddle = {
+    x: (boardAnchor.x - 0.5) * width,
+    y: (boardAnchor.y - 0.5) * height,
+  }
+  const menuInsideRing = Math.hypot(menuFromMiddle.x, menuFromMiddle.y) < TURN_RING_INSIDE
   const closeMenu = useRef(menu.onClose)
   closeMenu.current = menu.open ? menu.onClose : () => {}
   const closeMenuWhileMoving = () => closeMenu.current()
@@ -308,7 +331,10 @@ function PinnedGameBoardStage({
             angle={turnAngle}
             unfolded={unfolded}
             holderAngle={holderAngle}
+            playerCount={playerCount}
+            layoutVariant={layoutVariant}
             tableSlotColors={tableSlotColors}
+            menuInside={menuInsideRing}
             onLand={setLanded}
             onKeep={() => {
               turnAngle.set(withTiming(0, { duration: 250 }))

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
+import type { LayoutChangeEvent, LayoutRectangle, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -13,7 +13,7 @@ import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import {
   cornersSeenTurned,
-  foldTurn,
+  landingSlots,
   rotateRectAround,
   type SquaredCorners,
   type TableTurn,
@@ -296,9 +296,8 @@ export function PlayerGrid({
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
   const tableTurn = boardOrientation?.tableTurn
-  const holderAngle = tableTurn?.landed
-    ? undefined
-    : boardOrientation?.touchRotation && -boardOrientation.touchRotation
+  const heldAt = boardOrientation?.touchRotation && -boardOrientation.touchRotation
+  const holderAngle = tableTurn?.landed ? undefined : heldAt
   const layout = usePlayerGridLayout({
     playerCount: players.length,
     width,
@@ -369,9 +368,21 @@ export function PlayerGrid({
   }
 
   const rows = getPlayerGridRows(players.length, layout)
-  // why: a Table board landed upside down on the panel puts each slot's player in the opposite slot.
+  // why: a landed board seats each player in the upright cell nearest where they sat on the kept board.
+  const landedFrom =
+    tableTurn?.landed && heldAt && seatBoard.width > 0
+      ? keptSlotsLandedIn({
+          playerCount: players.length,
+          layout,
+          board: seatBoard,
+          gap: spacing.xxs,
+          topInset: topEdgeBand,
+          holderAngle: heldAt,
+          way: tableTurn.landed,
+        })
+      : undefined
   const slotSeat = (slot: number) => {
-    const seated = tableTurn?.landed === "reversed" ? players.length - 1 - slot : slot
+    const seated = landedFrom?.get(slot) ?? slot
     return seatOrder?.[seated] ?? seated
   }
   const seatedRows = rows.map((row) => row.map((slot) => (slot === null ? null : slotSeat(slot))))
@@ -773,7 +784,9 @@ const NO_INCOMING: Record<PlayerId, number> = {}
 const LIFE_CONTROL_GUTTER = 32
 const LIFE_HEIGHT_RATIO = 0.5
 
-/** why: each seat unfolds from where the outer display drew it into its cell, and in the center column moves on toward its cell in the Table board the players will see upright, which is the panel's Table board turned back by the holder's angle. */
+type GridCells = ReturnType<typeof getPlayerGridCellRects>
+
+/** why: each seat unfolds from where the outer display drew it into its kept cell, and a board that offers the turn then moves each seat toward the upright cell it lands in, given as it sits before the board turns. */
 function tableTurnCells(input: {
   playerCount: number
   layout: ReturnType<typeof getPlayerGridLayout>
@@ -785,91 +798,112 @@ function tableTurnCells(input: {
   radius: number
 }) {
   const { playerCount, layout, board, gap, topInset, holderAngle, tableTurn, radius } = input
-  const tableLayout = getPlayerGridLayout({
-    playerCount,
-    width: board.width,
-    height: board.height,
-    layoutVariant: layout.variant,
-    spansHinge: true,
-  })
   const center = { x: board.width / 2, y: board.height / 2 }
-  const uprightTable = getPlayerGridCellRects({
-    playerCount,
-    layout: tableLayout,
-    board,
-    gap,
-    topInset,
-  })
+  const rows = getPlayerGridRows(playerCount, layout)
+  const cells = getPlayerGridCellRects({ playerCount, layout, board, gap, topInset })
   // why: closed, the outer display drew this board upright over the inner display's right half, so the seats spread out from there as the hinge opens.
   const outer = { width: board.height / 2, height: board.width }
-  const outerLayout = getPlayerGridLayout({ playerCount, ...outer, layoutVariant: layout.variant })
   const foldedBoard = getPlayerGridCellRects({
     playerCount,
-    layout: outerLayout,
+    layout: getPlayerGridLayout({ playerCount, ...outer, layoutVariant: layout.variant }),
     board: outer,
     gap,
   })
-  const tableRows = getPlayerGridRows(playerCount, tableLayout)
-  const rows = getPlayerGridRows(playerCount, layout)
-  const cells = getPlayerGridCellRects({ playerCount, layout, board, gap, topInset })
-  const outerFacings = facingsBySlot(playerCount, outerLayout)
-  const openFacings = facingsBySlot(playerCount, layout)
-  const quarter = -Math.sign(holderAngle)
+  const upright = uprightOf({ playerCount, layout, board, gap, topInset })
+  const ways = layout.kept?.offersTurn
+    ? ([1, -1] as const).map((way) => ({
+        way,
+        landing: landingSlots(cells, upright.cells, board, way),
+      }))
+    : undefined
+  const target = (slot: number, own: LayoutRectangle, way: 1 | -1) => {
+    const landsIn = ways?.find((entry) => entry.way === way)?.landing.get(slot)
+    const cell = landsIn === undefined ? undefined : upright.cells.get(landsIn)
+    return cell ? rotateRectAround(cell, center, -way) : own
+  }
   return {
     angle: tableTurn.angle,
     unfolded: tableTurn.unfolded,
-    // why: the card squares only the corners of the cell it lands in; one way round lands each player in their own Table cell, the other in the cell across the board.
+    // why: the card squares only the corners of the cell it lands in, which differs with the way the board turns.
     corners: (slot: number) => {
       const resting = squaredCornersOf(rows, slot)
-      if (!layout.centerColumn)
-        return { radius, resting, landingClockwise: resting, landingCounterclockwise: resting }
-      const upright = squaredCornersOf(tableRows, slot)
-      const reversed = squaredCornersOf(tableRows, playerCount - 1 - slot)
+      const landing = (way: 1 | -1) => {
+        const landsIn = ways?.find((entry) => entry.way === way)?.landing.get(slot)
+        return landsIn === undefined
+          ? resting
+          : cornersSeenTurned(squaredCornersOf(upright.rows, landsIn), way)
+      }
       return {
         radius,
         resting,
-        landingClockwise: cornersSeenTurned(quarter > 0 ? upright : reversed, 1),
-        landingCounterclockwise: cornersSeenTurned(quarter > 0 ? reversed : upright, -1),
+        landingClockwise: landing(1),
+        landingCounterclockwise: landing(-1),
       }
     },
     board,
     foldedCells: new Map(
       [...foldedBoard].map(([slot, rect]) => [
         slot,
-        {
-          ...windowRectToPanel({ ...rect, x: rect.x + outer.width }, board, holderAngle),
-          turn: foldTurn(outerFacings.get(slot) ?? 0, openFacings.get(slot) ?? 0, holderAngle),
-        },
+        windowRectToPanel({ ...rect, x: rect.x + outer.width }, board, holderAngle),
       ]),
     ),
     cells,
-    // why: only the center column turns on to Table; any other board stays where it unfolded.
-    tableCells: layout.centerColumn
-      ? new Map(
-          [...uprightTable].map(([slot, rect]) => [
-            slot,
-            rotateRectAround(rect, center, holderAngle / 90),
-          ]),
-        )
-      : cells,
+    tableCells: new Map(
+      [...cells].map(([slot, own]) => [
+        slot,
+        { clockwise: target(slot, own, 1), counterclockwise: target(slot, own, -1) },
+      ]),
+    ),
   }
 }
 
-function facingsBySlot(playerCount: number, layout: ReturnType<typeof getPlayerGridLayout>) {
-  return new Map(
-    getPlayerGridRows(playerCount, layout).flatMap((row, rowIndex) =>
-      row.flatMap((slot, columnIndex) =>
-        slot === null
-          ? []
-          : [
-              [
-                slot,
-                getPlayerContentRotation({ playerCount, layout, row, rowIndex, columnIndex, slot }),
-              ] as const,
-            ],
-      ),
-    ),
+/** why: the upright board is the panel's own layout, the one players see once they have turned the device a quarter. */
+function uprightOf(input: {
+  playerCount: number
+  layout: ReturnType<typeof getPlayerGridLayout>
+  board: { width: number; height: number }
+  gap: number
+  topInset: number
+}): { rows: (number | null)[][]; cells: GridCells } {
+  const { playerCount, layout, board, gap, topInset } = input
+  const uprightLayout = getPlayerGridLayout({
+    playerCount,
+    width: board.width,
+    height: board.height,
+    layoutVariant: layout.variant,
+    spansHinge: true,
+  })
+  return {
+    rows: getPlayerGridRows(playerCount, uprightLayout),
+    cells: getPlayerGridCellRects({ playerCount, layout: uprightLayout, board, gap, topInset }),
+  }
+}
+
+function keptSlotsLandedIn(input: {
+  playerCount: number
+  layout: ReturnType<typeof getPlayerGridLayout>
+  board: { width: number; height: number }
+  gap: number
+  topInset: number
+  holderAngle: number
+  way: 1 | -1
+}) {
+  const { playerCount, layout, board, gap, topInset, holderAngle, way } = input
+  const kept = getPlayerGridLayout({
+    playerCount,
+    width: board.width,
+    height: board.height,
+    layoutVariant: layout.variant,
+    spansHinge: true,
+    holderAngle,
+  })
+  const landing = landingSlots(
+    getPlayerGridCellRects({ playerCount, layout: kept, board, gap, topInset }),
+    uprightOf({ playerCount, layout, board, gap, topInset }).cells,
+    board,
+    way,
   )
+  return new Map([...landing].map(([keptSlot, uprightSlot]) => [uprightSlot, keptSlot]))
 }
 
 function squaredCornersOf(rows: (number | null)[][], slot: number): SquaredCorners {

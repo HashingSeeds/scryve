@@ -2,12 +2,11 @@ import { getPlayerGridCellRects, getPlayerGridLayout } from "@/components/player
 
 import {
   cornersSeenTurned,
-  foldTurn,
   initialUnfoldProgress,
   nextUnfoldProgress,
   rotateRectAround,
   tableTurnGather,
-  tableTurnLanding,
+  landingSlots,
   tableTurnPlacement,
   turningCornerRadii,
   windowRectToPanel,
@@ -29,16 +28,52 @@ describe("table turn", () => {
   })
 
   it.each([
-    [-90, 90, "upright"],
-    [-90, -90, "reversed"],
-    [90, -90, "upright"],
-    [90, 90, "reversed"],
+    [-90, 1, [0, 1, 2, 3, 4, 5]],
+    [-90, -1, [5, 4, 3, 2, 1, 0]],
+    [90, -1, [0, 1, 2, 3, 4, 5]],
+    [90, 1, [5, 4, 3, 2, 1, 0]],
   ] as const)(
-    "with the panel held at %i, a %i degree turn lands on the %s Table board",
-    (holderAngle, angle, landing) => {
-      expect(tableTurnLanding(angle, holderAngle)).toBe(landing)
+    "with the panel held at %i, turning the kept six-player Table %i lands each seat in the nearest Table cell",
+    (holderAngle, way, uprightSlots) => {
+      const kept = getPlayerGridLayout({
+        playerCount: 6,
+        ...board,
+        layoutVariant: "tabletop",
+        spansHinge: true,
+        holderAngle,
+      })
+      const upright = getPlayerGridLayout({
+        playerCount: 6,
+        ...board,
+        layoutVariant: "tabletop",
+        spansHinge: true,
+      })
+      const cellsOf = (layout: typeof kept) =>
+        getPlayerGridCellRects({ playerCount: 6, layout, board, gap: 4 })
+      const landing = landingSlots(cellsOf(kept), cellsOf(upright), board, way)
+      expect([0, 1, 2, 3, 4, 5].map((slot) => landing.get(slot))).toEqual(uprightSlots)
     },
   )
+
+  it("lands a five-player Even grid seat where a cell is, not where its mirror would be", () => {
+    const kept = getPlayerGridLayout({
+      playerCount: 5,
+      ...board,
+      layoutVariant: "even-grid",
+      spansHinge: true,
+      holderAngle: -90,
+    })
+    const upright = getPlayerGridLayout({
+      playerCount: 5,
+      ...board,
+      layoutVariant: "even-grid",
+      spansHinge: true,
+    })
+    const cellsOf = (layout: typeof kept) =>
+      getPlayerGridCellRects({ playerCount: 5, layout, board, gap: 4 })
+    const landing = landingSlots(cellsOf(kept), cellsOf(upright), board, -1)
+    expect(new Set(landing.values())).toEqual(new Set([0, 1, 2, 3, 4]))
+  })
 
   it("turns a rect a quarter about a point, swapping its sides", () => {
     expect(rotateRectAround({ x: 0, y: 0, width: 100, height: 20 }, { x: 50, y: 50 }, 1)).toEqual({
@@ -149,13 +184,5 @@ describe("table turn", () => {
     expect(
       turningCornerRadii({ ...corners, unfolded: 1, angle: -90 }).borderBottomRightRadius,
     ).toBeCloseTo(0)
-  })
-
-  it("turns a seat as it unfolds only when it faces another edge on the open board", () => {
-    // why: a Table end seat faces the panel's side once open, the same edge the holder saw it face closed.
-    expect(foldTurn(180, 90, -90)).toBe(0)
-    // why: a Balanced four seat on the outer display's left faces the panel's top once open.
-    expect(foldTurn(90, 90, -90)).toBe(-90)
-    expect(foldTurn(90, -90, 90)).toBe(-90)
   })
 })
