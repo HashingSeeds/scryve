@@ -187,9 +187,10 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
-  it("puts Magic rules in More, leaving the game menu's fourth action to Decks", () => {
+  it("puts Magic rules in the game menu, moving Decks to More", () => {
     jest.mocked(prefetchRules).mockClear()
     const onRules = jest.fn()
+    const onDecks = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
@@ -203,7 +204,7 @@ describe("CurrentGameScreen", () => {
             now: 1,
           })}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onDecks={jest.fn()}
+          onDecks={onDecks}
           onHistory={jest.fn()}
           onRules={onRules}
           onSettings={jest.fn()}
@@ -216,10 +217,14 @@ describe("CurrentGameScreen", () => {
 
     expect(prefetchRules).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("rules-button")).toBeNull()
-    fireEvent.press(view.getByTestId("utility-menu-button"))
-    fireEvent.press(view.getByTestId("utility-rules-button"))
+    expect(view.queryByTestId("decks-button")).toBeNull()
+    fireEvent.press(view.getByTestId("rules-button"))
     expect(onRules).toHaveBeenCalledTimes(1)
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByTestId("utility-decks-button"))
+    expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
   it("opens the dice bag over the menu, which its pentagon returns to", () => {

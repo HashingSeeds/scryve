@@ -918,8 +918,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           setPlayerActionsOpen(true)
         },
       },
-      // why: Nearby boards have no Decks route or More menu, so Rules keeps this slot there.
-      !onDecks && openGameRules
+      openGameRules
         ? {
             kind: "rules",
             label: translate("connected:board.menu.rules"),
@@ -1108,7 +1107,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           menuOpen && onHistory && onSettings && onSupport && onAccount ? (
             <FloatingAppNavigation
               accountEntry={accountEntry}
-              onRules={openGameRules}
+              onDecks={openGameRules ? onDecks : undefined}
               onHistory={onHistory}
               onSettings={onSettings}
               onSupport={onSupport}

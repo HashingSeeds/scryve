@@ -28,7 +28,7 @@ export function AppUtilityMenu({
   visible = true,
   compact = false,
   placement = "topRight",
-  onRules,
+  onDecks,
   onHistory,
   onSettings,
   onSupport,
@@ -39,7 +39,7 @@ export function AppUtilityMenu({
   visible?: boolean
   compact?: boolean
   placement?: "topRight" | "bottomLeft"
-  onRules?: () => void
+  onDecks?: () => void
   onHistory: () => void
   onSettings: () => void
   onSupport: () => void
@@ -57,7 +57,7 @@ export function AppUtilityMenu({
   const showsEvents = nearbyOnly || readPublicCloudConfig().configured
   const itemCount =
     4 +
-    Number(Boolean(onRules)) +
+    Number(Boolean(onDecks)) +
     Number(testsNearby) +
     Number(Boolean(storeUpdate)) +
     Number(showsEvents)
@@ -188,15 +188,15 @@ export function AppUtilityMenu({
               />
             </Pressable>
           ) : null}
-          {onRules ? (
+          {onDecks ? (
             <Pressable
-              testID="utility-rules-button"
+              testID="utility-decks-button"
               accessibilityRole="button"
               style={themed($item)}
-              onPress={() => choose(onRules)}
+              onPress={() => choose(onDecks)}
             >
               <Text
-                tx="board:menu.rules"
+                tx="common:appNavigation.decks"
                 weight="medium"
                 numberOfLines={1}
                 maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}

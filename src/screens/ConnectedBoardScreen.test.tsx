@@ -507,7 +507,7 @@ describe("ConnectedBoardScreen", () => {
     jest.useRealTimers()
   })
 
-  it("keeps Rules in the game menu on boards without a Decks route, like Nearby", () => {
+  it("puts Rules in the game menu and Decks in More", () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -519,14 +519,26 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("rules-button"))
     expect(openURL).toHaveBeenCalledTimes(1)
 
+    const onDecks = jest.fn()
     view.rerender(
       themed(
-        <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onDecks={jest.fn()} />,
+        <ConnectedBoardScreen
+          publicId="game-public"
+          onBack={jest.fn()}
+          onDecks={onDecks}
+          onHistory={jest.fn()}
+          onSettings={jest.fn()}
+          onSupport={jest.fn()}
+          onAccount={jest.fn()}
+        />,
       ),
     )
     openConnectedMenu()
-    expect(screen.queryByTestId("rules-button")).toBeNull()
-    expect(screen.getByTestId("decks-button")).toBeTruthy()
+    expect(screen.queryByTestId("decks-button")).toBeNull()
+    expect(screen.getByTestId("rules-button")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("utility-menu-button"))
+    fireEvent.press(screen.getByTestId("utility-decks-button"))
+    expect(onDecks).toHaveBeenCalledTimes(1)
     openURL.mockRestore()
   })
 

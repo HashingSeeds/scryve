@@ -322,13 +322,16 @@ export function CurrentGameScreen({
     setLayoutPickerOpen(false)
   }
 
-  const openGameRules =
-    rules && (rules.kind === "link" || onRules)
-      ? () => {
-          closeMenu()
-          openRules(rules, () => system && onRules?.(system))
-        }
-      : undefined
+  const openGameRules = useMemo(
+    () =>
+      rules && (rules.kind === "link" || onRules)
+        ? () => {
+            closeMenu()
+            openRules(rules, () => system && onRules?.(system))
+          }
+        : undefined,
+    [closeMenu, onRules, rules, system],
+  )
   const radialActions: GameMenuActions = useMemo(
     () => [
       {
@@ -350,15 +353,17 @@ export function CurrentGameScreen({
           onSetup?.()
         },
       },
-      {
-        kind: "decks",
-        label: translate("common:appNavigation.decks"),
-        disabled: !onDecks,
-        onPress: () => {
-          closeMenu()
-          onDecks?.()
-        },
-      },
+      openGameRules
+        ? { kind: "rules", label: translate("board:menu.rules"), onPress: openGameRules }
+        : {
+            kind: "decks",
+            label: translate("common:appNavigation.decks"),
+            disabled: !onDecks,
+            onPress: () => {
+              closeMenu()
+              onDecks?.()
+            },
+          },
       isFresh
         ? {
             kind: "connect",
@@ -386,6 +391,7 @@ export function CurrentGameScreen({
       onConnect,
       onDecks,
       onSetup,
+      openGameRules,
       showEndConfirmation,
     ],
   )
@@ -480,7 +486,7 @@ export function CurrentGameScreen({
             menuOpen && onHistory && onSettings && onSupport && onAccount ? (
               <FloatingAppNavigation
                 accountEntry={accountEntry}
-                onRules={openGameRules}
+                onDecks={openGameRules ? onDecks : undefined}
                 onHistory={onHistory}
                 onSettings={onSettings}
                 onSupport={onSupport}
