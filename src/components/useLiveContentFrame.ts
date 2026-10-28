@@ -12,8 +12,7 @@ export function useLiveContentFrame(
 ) {
   return useAnimatedStyle(() => {
     const sideways = Math.abs(rotation) === 90
-    if (!liveSize && !sideways)
-      return { width: "100%" as const, height: "100%" as const, left: 0, top: 0 }
+    // why: a percentage size resolves inside the card's padding while left and top start at its edge, which shrank the layer by the padding and pinned it to the top left; the measured size fills the card.
     const { width, height } = liveSize ? liveSize.value : measured
     return sideways
       ? { width: height, height: width, left: (width - height) / 2, top: (height - width) / 2 }
