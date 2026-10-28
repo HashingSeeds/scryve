@@ -15,6 +15,12 @@ async function tick(ms = 100) {
   await jest.advanceTimersByTimeAsync(ms)
 }
 
+function requireIsolatedAnalytics() {
+  const analytics: typeof import("./analytics") = require("./analytics")
+  global.fetch = fetchMock
+  return analytics
+}
+
 it("only uploads allowlisted, opted-in events and discards the offline queue on withdrawal", async () => {
   jest.useFakeTimers()
   global.fetch = fetchMock
@@ -121,7 +127,7 @@ it("retries loading the SDK after a failed download instead of disabling analyti
       if (sdkLoads === 1) throw new Error("chunk download failed")
       return jest.requireActual("posthog-react-native")
     })
-    const analytics: typeof import("./analytics") = require("./analytics")
+    const analytics = requireIsolatedAnalytics()
     require("@/utils/storage").storage.clearAll()
     expect(analytics.setAnalyticsEnabled(true, "first_use")).toBe(true)
     await tick()
@@ -205,7 +211,7 @@ it("sends timed sync events as sync_timing only if sharing was on when they happ
   process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
   process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
   await jest.isolateModulesAsync(async () => {
-    const analytics: typeof import("./analytics") = require("./analytics")
+    const analytics = requireIsolatedAnalytics()
     const {
       emitTelemetry,
       setTelemetryAdapter,
@@ -323,7 +329,7 @@ it("sends local turn order coverage once per completed game without player or ga
   await jest.isolateModulesAsync(async () => {
     const localStorage: typeof import("@/utils/storage") = require("@/utils/storage")
     localStorage.storage.clearAll()
-    const analytics: typeof import("./analytics") = require("./analytics")
+    const analytics = requireIsolatedAnalytics()
     analytics.setAnalyticsEnabled(true)
     for (const firstPlayerId of ["private-player", undefined]) {
       const game = { id: `private-game-${firstPlayerId}`, firstPlayerId, playerCount: 2 }

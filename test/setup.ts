@@ -21,7 +21,10 @@ jest.doMock("react-native", () => {
         },
         ReactNative.Image,
         {
-          resolveAssetSource: jest.fn((_source) => mockFile), // eslint-disable-line @typescript-eslint/no-unused-vars
+          resolveAssetSource: Object.assign(
+            jest.fn((_source) => mockFile), // eslint-disable-line @typescript-eslint/no-unused-vars
+            { setCustomSourceTransformer: jest.fn() },
+          ),
           getSize: jest.fn(
             (
               uri: string, // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -67,11 +70,23 @@ jest.mock("react-native-keyboard-controller", () => ({
     select({ isVisible: false, height: 0 }),
 }))
 
+jest.mock(
+  "react-native-gesture-handler/lib/module/v3/detectors/useEnsureGestureHandlerRootView",
+  () => ({
+    useEnsureGestureHandlerRootView: () => undefined,
+  }),
+)
+
 jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"))
 jest.mock("react-native-reanimated", () => ({
   ...require("react-native-reanimated/mock"),
   // why: Reanimated's mock leaves this out.
   LayoutAnimationConfig: ({ children }: { children: ReactNode }) => children,
+}))
+
+jest.mock("expo-notifications", () => ({
+  ...jest.requireActual("expo-notifications"),
+  setNotificationHandler: jest.fn(),
 }))
 
 jest.mock("react-native-safe-area-context", () => ({

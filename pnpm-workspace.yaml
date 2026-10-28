@@ -18,14 +18,14 @@ patchedDependencies:
   # switching twice left both icons enabled and a reset to the default did nothing. It also switched
   # at once, which closed the app; the patch waits until the app is in the background.
   expo-alternate-app-icons@8.0.0: patches/expo-alternate-app-icons@8.0.0.patch
-  # react-native-screens 4.26.2 misses the screens stack when expo-dev-launcher wraps it, so
+  # react-native-screens 4.30.0 misses the screens stack when expo-dev-launcher wraps it, so
   # statusBarHidden is ignored in iOS dev builds.
-  react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
+  react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch
   # react-native-tcp-socket 6.4.3 crashes iOS when a peer leaves before its connection is reported,
   # as guests do while a nearby host is in the background. Upstream fix: Rapsssito/react-native-tcp-socket#245.
   react-native-tcp-socket@6.4.3: patches/react-native-tcp-socket@6.4.3.patch
-  # react-native 0.86.3 spreads BridgelessUIManager into UIManager, which builds constants for
+  # react-native 0.88.0 spreads BridgelessUIManager into UIManager, which builds constants for
   # every native view manager at launch (~30ms on a Pixel 6a). JS-only patches live in js-patches/
   # because the native fingerprint hashes patches/, which would block OTA updates.
   # scripts/js-patches.test.cjs keeps native files and build scripts out of js-patches/.
-  react-native@0.86.3: js-patches/react-native@0.86.3.patch
+  react-native@0.88.0: js-patches/react-native@0.88.0.patch
