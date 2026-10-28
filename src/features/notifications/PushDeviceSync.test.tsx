@@ -8,6 +8,7 @@ import { PushDeviceSync } from "./PushDeviceSync"
 const mockSync = jest.fn()
 const mockForget = jest.fn()
 const mockToken = jest.fn<Promise<string | null>, []>()
+let mockPushOn = true
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }))
 jest.mock("convex/react", () => ({
@@ -20,7 +21,7 @@ jest.mock("../../../convex/_generated/api", () => ({
 jest.mock("@/features/auth/AuthContext", () => ({ useAuthAccess: () => ({ configured: true }) }))
 jest.mock("@/features/connected/useConvexOnline", () => ({ useConvexOnline: () => true }))
 jest.mock("@/features/feedback/feedbackKey", () => ({ useFeedbackKey: () => "key" }))
-jest.mock("./prefs", () => ({ usePushPref: () => true }))
+jest.mock("./prefs", () => ({ usePushPref: () => mockPushOn }))
 jest.mock("./device", () => ({
   pushSupported: true,
   pushToken: () => mockToken(),
@@ -28,7 +29,11 @@ jest.mock("./device", () => ({
 }))
 
 describe("PushDeviceSync", () => {
-  beforeEach(() => storage.clearAll())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    storage.clearAll()
+    mockPushOn = true
+  })
 
   it("forgets a registered device once notifications are off in system settings", async () => {
     const appState = jest.spyOn(AppState, "addEventListener")
@@ -39,5 +44,26 @@ describe("PushDeviceSync", () => {
     mockToken.mockResolvedValueOnce(null)
     act(() => appState.mock.calls.forEach(([, listener]) => listener("active")))
     await waitFor(() => expect(mockForget).toHaveBeenCalledWith({ key: "key" }))
+  })
+
+  it("still forgets after turning off, on, and off again while the first forget is in flight", async () => {
+    let finishForget = () => undefined
+    mockForget.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (finishForget = () => resolve(undefined))),
+    )
+    storage.set("notifications.registered", true)
+    mockPushOn = false
+    const { rerender } = render(<PushDeviceSync />)
+    await waitFor(() => expect(mockForget).toHaveBeenCalledTimes(1))
+
+    mockPushOn = true
+    mockToken.mockResolvedValueOnce("ExpoPushToken[phone]")
+    rerender(<PushDeviceSync />)
+    await waitFor(() => expect(mockSync).toHaveBeenCalled())
+    await act(async () => finishForget())
+
+    mockPushOn = false
+    rerender(<PushDeviceSync />)
+    await waitFor(() => expect(mockForget).toHaveBeenCalledTimes(2))
   })
 })

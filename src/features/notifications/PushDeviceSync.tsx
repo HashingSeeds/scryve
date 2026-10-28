@@ -50,7 +50,7 @@ function Sync() {
       if (!token) {
         if (!storage.getBoolean(REGISTERED)) return
         await forgetDevice({ key })
-        storage.set(REGISTERED, false)
+        if (!stale) storage.set(REGISTERED, false)
         return
       }
       // why: set before sending, so turning both off while this is in flight still forgets the device.
