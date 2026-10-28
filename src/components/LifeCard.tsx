@@ -10,6 +10,7 @@ import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
 import Animated, {
   FadeIn,
   FadeOut,
+  LayoutAnimationConfig,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -84,6 +85,8 @@ import { Text } from "./Text"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const COMMANDER_OVERVIEW_MS = 220
+// why: matches the commander controls' entrance, so the life total and its − and + cross-fade with them.
+const LIFE_FADE_MS = 160
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -181,6 +184,7 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
+  const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
   const locked = !!out && out.cause !== "life"
   const frozen = disabled || locked
   const inspectDisabled = disabled && ownership !== "unowned"
@@ -394,6 +398,10 @@ export const LifeCard = memo(function LifeCard({
           }
         : undefined
   const attackerSide = commanderCardMode?.kind === "source"
+  const lifeMuted = attackerSide || (!localCommander && commanderOverviewOpen)
+  const lifeFadeStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
+  }))
   const knock = useSharedValue(0)
   const defenderTotal =
     commanderCardMode?.kind === "target"
@@ -450,6 +458,7 @@ export const LifeCard = memo(function LifeCard({
       commanderDamage.incoming,
     ).length > 0
   const identityMetrics = seatIdentityMetrics(compact)
+  const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
     cardSize,
@@ -566,7 +575,7 @@ export const LifeCard = memo(function LifeCard({
           defenderColor={color}
         />
       ) : null}
-      <View
+      <Animated.View
         pointerEvents={
           commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
         }
@@ -578,11 +587,7 @@ export const LifeCard = memo(function LifeCard({
             ? "no-hide-descendants"
             : "auto"
         }
-        style={[
-          themed($content),
-          (attackerSide || (!localCommander && commanderOverviewOpen)) && themed($mutedContent),
-          localOverviewVisible && $overviewReadout,
-        ]}
+        style={[themed($content), lifeFadeStyle, localOverviewVisible && $overviewReadout]}
       >
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
@@ -639,7 +644,7 @@ export const LifeCard = memo(function LifeCard({
             lifeTotal(lifeFontStyle, contentRotationStyle)
           )}
         </Animated.View>
-      </View>
+      </Animated.View>
       {out ? (
         <View
           testID={`life-eliminated-seat-${seatNumber}`}
@@ -727,46 +732,55 @@ export const LifeCard = memo(function LifeCard({
                   insetSwordColor={color}
                   closeIcon
                   size={identityMetrics.mark}
-                  style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
+                  style={markArt.trim}
                 />
               </BoardPressable>
             </View>
           ) : null}
         </Animated.View>
       ) : null}
-      {commanderCardMode ? (
-        <CommanderDamageCardControls
-          seatNumber={seatNumber}
-          playerName={displayName}
-          foreground={foreground}
-          contentRotation={contentRotation}
-          contentInsets={contentInsets}
-          menuCorner={menuCorner}
-          compact={compact}
-          mode={commanderCardMode}
-        />
-      ) : lifeControlsShown ? (
-        <LifeControls
-          playerName={displayName}
-          seatNumber={seatNumber}
-          disabled={disabled}
-          lockedReason={locked ? outLabel : undefined}
-          reducedMotion={reducedMotion}
-          contrastCheckedForeground={foreground}
-          compact={compact}
-          contentRotation={contentRotation}
-          system={system}
-          lifeStep={lifeStep}
-          recentDelta={recentDelta}
-          pendingDelta={preview}
-          lifeFontSize={resolvedLifeFontSize}
-          lifeDigits={shownDigits}
-          onChange={onChange}
-          onPreview={showPreview}
-          onLongChange={() => setEditorOpen(true)}
-          style={out?.cause === "life" ? $aboveOutOverlay : undefined}
-        />
-      ) : null}
+      {/* why: the − and + fade out as commander mode or a sheet takes the card and back in after, but not when the board first draws. */}
+      <LayoutAnimationConfig skipEntering>
+        {commanderCardMode ? (
+          <CommanderDamageCardControls
+            seatNumber={seatNumber}
+            playerName={displayName}
+            foreground={foreground}
+            contentRotation={contentRotation}
+            contentInsets={contentInsets}
+            menuCorner={menuCorner}
+            compact={compact}
+            mode={commanderCardMode}
+          />
+        ) : lifeControlsShown ? (
+          <Animated.View
+            entering={lifeFadeDuration ? FadeIn.duration(lifeFadeDuration) : undefined}
+            exiting={lifeFadeDuration ? FadeOut.duration(lifeFadeDuration) : undefined}
+            pointerEvents="box-none"
+            style={[StyleSheet.absoluteFill, out?.cause === "life" && $aboveOutOverlay]}
+          >
+            <LifeControls
+              playerName={displayName}
+              seatNumber={seatNumber}
+              disabled={disabled}
+              lockedReason={locked ? outLabel : undefined}
+              reducedMotion={reducedMotion}
+              contrastCheckedForeground={foreground}
+              compact={compact}
+              contentRotation={contentRotation}
+              system={system}
+              lifeStep={lifeStep}
+              recentDelta={recentDelta}
+              pendingDelta={preview}
+              lifeFontSize={resolvedLifeFontSize}
+              lifeDigits={shownDigits}
+              onChange={onChange}
+              onPreview={showPreview}
+              onLongChange={() => setEditorOpen(true)}
+            />
+          </Animated.View>
+        ) : null}
+      </LayoutAnimationConfig>
       {commanderCardMode?.kind === "source" ? (
         // why: the mark and name opened this mode, so the same spot finishes it: an X until a hit lands, then a check.
         <View
@@ -804,7 +818,7 @@ export const LifeCard = memo(function LifeCard({
               closeIcon={!commanderCardMode.acted}
               insetCheck={commanderCardMode.acted}
               size={identityMetrics.mark}
-              style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
+              style={markArt.trim}
             />
           </BoardPressable>
         </View>
@@ -869,6 +883,8 @@ export const LifeCard = memo(function LifeCard({
             style={[
               $cornerRow,
               {
+                // why: the row is the trimmed mark's height so a taller name, status, or chip centers on the mark instead of lifting it off the spot the commander exit mark takes.
+                height: markArt.height,
                 gap: identityMetrics.gap,
                 left: identityCorner.position.left,
                 bottom: identityCorner.position.bottom,
@@ -1226,8 +1242,6 @@ const $overviewClose: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
   zIndex: 3,
 })
-
-const $mutedContent: ThemedStyle<ViewStyle> = () => ({ opacity: 0 })
 
 const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,

@@ -528,6 +528,32 @@ describe("LifeCard", () => {
     expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
   })
 
+  it.each([false, true])(
+    "keeps the mark on the corner line under a taller name and status (compact %s)",
+    (compact) => {
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <LifeCard
+            playerName="Ada"
+            seatNumber={1}
+            shape="eye"
+            life={20}
+            color="#41476E"
+            compact={compact}
+            staleSince={Date.now() - 42_000}
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+
+      const art = MARK_ART_BOUNDS.eye
+      const scale = (compact ? 48 : 64) / 44
+      expect(
+        StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style).height,
+      ).toBeCloseTo((art.bottom - art.top) * scale)
+    },
+  )
+
   it.each([0, 90, -90, 180] as const)(
     "turns the identity layer with the content at %s degrees and keeps the pair bottom left",
     (contentRotation) => {
