@@ -4,6 +4,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import { BottomActionBar } from "./BottomActionBar"
+import { Header } from "./Header"
 import { Screen } from "./Screen"
 import { Text } from "./Text"
 
@@ -153,6 +154,24 @@ describe("Screen", () => {
     } finally {
       Object.assign(mockInsets, { left: 0, right: 0 })
       Dimensions.set({ window: portrait, screen: portrait })
+    }
+  })
+  it("lets a header inside stepped-in content add only what the rail still needs", () => {
+    mockInsets.right = 84
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <Screen preset="fixed" safeAreaEdges={[]}>
+            <Header title="Decks" rightText="Add deck" onRightPress={() => {}} />
+          </Screen>
+        </ThemeProvider>,
+      )
+      const actions = view
+        .UNSAFE_getByType(Header)
+        .findAll((node) => StyleSheet.flatten(node.props.style)?.paddingEnd !== undefined)[0]
+      expect(StyleSheet.flatten(actions.props.style)).toMatchObject({ paddingEnd: 16 })
+    } finally {
+      mockInsets.right = 0
     }
   })
 })

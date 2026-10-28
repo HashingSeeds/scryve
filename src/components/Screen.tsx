@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { BottomInsetClaimContext } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
-import { Header, type HeaderProps } from "@/components/Header"
+import { Header, type HeaderProps, SideGutterContext } from "@/components/Header"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -244,15 +244,21 @@ export function Screen(props: ScreenProps) {
         behavior={isIos ? "padding" : "height"}
         keyboardVerticalOffset={keyboardOffset}
         {...KeyboardAvoidingViewProps}
-        style={[$styles.flex1, sideGutter, KeyboardAvoidingViewProps?.style]}
+        style={[
+          $styles.flex1,
+          sideGutter && { paddingLeft: sideGutter.left, paddingRight: sideGutter.right },
+          KeyboardAvoidingViewProps?.style,
+        ]}
       >
-        <BottomInsetClaimContext.Provider value={claimBottomInset}>
-          {isNonScrolling(screenProps.preset) ? (
-            <ScreenWithoutScrolling {...screenProps} />
-          ) : (
-            <ScreenWithScrolling {...screenProps} />
-          )}
-        </BottomInsetClaimContext.Provider>
+        <SideGutterContext.Provider value={sideGutter ?? NO_SIDE_GUTTER}>
+          <BottomInsetClaimContext.Provider value={claimBottomInset}>
+            {isNonScrolling(screenProps.preset) ? (
+              <ScreenWithoutScrolling {...screenProps} />
+            ) : (
+              <ScreenWithScrolling {...screenProps} />
+            )}
+          </BottomInsetClaimContext.Provider>
+        </SideGutterContext.Provider>
       </KeyboardAvoidingView>
     </View>
   )
@@ -307,15 +313,14 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 /** why: the closed iPhone Duo puts the status bar and system controls in a rail down one side and reports it as that side's safe-area inset; content stops at the rail like a native app's. It is the only portrait screen whose side inset beats its top, so landscape notches keep their layout. Screen content pads itself by at least `spacing.md`, so the gutter adds only what the rail needs beyond that, instead of stacking the two. */
-function useSideSafeAreaGutter(enabled: boolean): ViewStyle | undefined {
+const NO_SIDE_GUTTER = { left: 0, right: 0 }
+
+function useSideSafeAreaGutter(enabled: boolean) {
   const { top, left, right } = useSafeAreaInsets()
   const { width, height } = useWindowDimensions()
   const {
     theme: { spacing },
   } = useAppTheme()
   if (!enabled || height <= width || Math.max(left, right) <= top) return undefined
-  return {
-    paddingLeft: Math.max(left - spacing.md, 0),
-    paddingRight: Math.max(right - spacing.md, 0),
-  }
+  return { left: Math.max(left - spacing.md, 0), right: Math.max(right - spacing.md, 0) }
 }
