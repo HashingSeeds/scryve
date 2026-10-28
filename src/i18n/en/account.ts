@@ -297,6 +297,8 @@ const account = {
     notConfigured:
       "Connected features are unavailable in this build. Local play remains available.",
     closeSignIn: "Close sign in",
+    signInAgreement:
+      "By continuing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
   },
   billing: {
     // Asked right after someone buys a yearly plan.
@@ -354,58 +356,8 @@ const account = {
     choose: "Choose Foil Supporter",
     purchasesUnavailable: "Purchases are unavailable in this build.",
   },
-  legalConsent: {
-    heading: {
-      updatedPrivacy: "We have updated our privacy policy",
-      updatedTerms: "We have updated our terms",
-      beforeStart: "Before you start",
-    },
-    intro:
-      "Please review our Terms of Use and Privacy Policy. You need to accept them to use Scryve.",
-    returning: {
-      dated: {
-        terms:
-          "Our Terms of Use changed on {{date}}. Please review the update to keep using Scryve.",
-        privacy:
-          "Our Privacy Policy changed on {{date}}. Please review the update to keep using Scryve.",
-        both: "Our Terms of Use and Privacy Policy changed on {{date}}. Please review the update to keep using Scryve.",
-      },
-      undated: {
-        terms: "Our Terms of Use have changed. Please review the updates to keep using Scryve.",
-        privacy: "Our Privacy Policy have changed. Please review the updates to keep using Scryve.",
-        both: "Our Terms of Use and Privacy Policy have changed. Please review the updates to keep using Scryve.",
-      },
-    },
-    acceptance: {
-      dated: {
-        terms: 'By tapping "I agree" you accept the Terms of Use dated {{date}}.',
-        privacy: 'By tapping "I agree" you accept the Privacy Policy dated {{date}}.',
-        both: 'By tapping "I agree" you accept the Terms of Use and Privacy Policy dated {{date}}.',
-      },
-      undated: {
-        terms: 'By tapping "I agree" you accept the current Terms of Use.',
-        privacy: 'By tapping "I agree" you accept the current Privacy Policy.',
-        both: 'By tapping "I agree" you accept the current Terms of Use and Privacy Policy.',
-      },
-    },
-    readTerms: "Read the Terms of Use",
-    readPrivacy: "Read the Privacy Policy",
-    shareUsageHelper:
-      "Off by default. Sharing helps us build what you want. Details in Privacy Policy.",
-    sharingSaveFailed:
-      "Could not save your sharing choice. Try again or turn sharing off to continue.",
-    saving: "Saving…",
-    agree: "I agree",
-  },
   legalDocument: {
     lastUpdated: "Last updated {{date}}",
-  },
-  consentSync: {
-    syncing: "Syncing your agreement…",
-    stillPending: "Account sync is still pending. Your agreement is saved on this device.",
-    pending: "Agreement saved on this device. Account sync pending.",
-    retrying: "Retrying…",
-    retryAccessibilityLabel: "Retry account consent sync",
   },
   updates: {
     downloading: "Downloading update…",

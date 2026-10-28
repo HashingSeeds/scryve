@@ -77,8 +77,8 @@ without separate approval.
 After opening the app, inspect the current page and establish only the state the
 affected flow needs:
 
-1. If `Before you start` is visible, press `accept-legal-button` and wait for
-   the app to settle. This is the real Scryve consent flow. Never suppress it.
+1. If `What do you play?` is visible, choose a game type and press
+   `what-you-play-start`. This is the real Scryve first-launch flow.
 2. If the flow works signed out, continue signed out. Authentication is not a
    prerequisite for local play.
 3. If the flow requires an account and the app is signed out, open the account
@@ -89,10 +89,9 @@ affected flow needs:
    yet: finish creating it on dev or preview for a `*+clerk_test@sow.care`
    address, and stop and report for anything else.
 4. Wait for authentication to finish and confirm the account action reflects
-   the signed-in state. If signed-in consent appears, accept it through the
-   same `accept-legal-button` flow and wait for its backend sync.
-5. Refresh the page once. Confirm the Clerk session and current consent persist
-   before navigating to the changed screen.
+   the signed-in state.
+5. Refresh the page once. Confirm the Clerk session persists before navigating
+   to the changed screen.
 
 The test addresses and fixed OTP work only with Clerk test mode. Never enable
 Clerk test mode in production and never request or store a Clerk secret key in

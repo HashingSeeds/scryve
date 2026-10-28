@@ -298,6 +298,8 @@ export default {
     notConfigured:
       "Las funciones conectadas no están disponibles en esta versión. El juego local sigue disponible.",
     closeSignIn: "Cerrar inicio de sesión",
+    signInAgreement:
+      "Al continuar, aceptas los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
   },
   billing: {
     renewalPrompt: {
@@ -354,61 +356,8 @@ export default {
     choose: "Elegir Foil Supporter",
     purchasesUnavailable: "Las compras no están disponibles en esta versión.",
   },
-  legalConsent: {
-    heading: {
-      updatedPrivacy: "Hemos actualizado nuestra política de privacidad",
-      updatedTerms: "Hemos actualizado nuestros términos",
-      beforeStart: "Antes de empezar",
-    },
-    intro:
-      "Revisa nuestros Términos de uso y la Política de privacidad. Debes aceptarlos para usar Scryve.",
-    returning: {
-      dated: {
-        terms:
-          "Nuestros Términos de uso cambiaron el {{date}}. Revisa la actualización para seguir usando Scryve.",
-        privacy:
-          "Nuestra Política de privacidad cambió el {{date}}. Revisa la actualización para seguir usando Scryve.",
-        both: "Nuestros Términos de uso y la Política de privacidad cambiaron el {{date}}. Revisa la actualización para seguir usando Scryve.",
-      },
-      undated: {
-        terms:
-          "Nuestros Términos de uso han cambiado. Revisa las actualizaciones para seguir usando Scryve.",
-        privacy:
-          "Nuestra Política de privacidad ha cambiado. Revisa las actualizaciones para seguir usando Scryve.",
-        both: "Nuestros Términos de uso y la Política de privacidad han cambiado. Revisa las actualizaciones para seguir usando Scryve.",
-      },
-    },
-    acceptance: {
-      dated: {
-        terms: 'Al tocar "Acepto", aceptas los Términos de uso con fecha {{date}}.',
-        privacy: 'Al tocar "Acepto", aceptas la Política de privacidad con fecha {{date}}.',
-        both: 'Al tocar "Acepto", aceptas los Términos de uso y la Política de privacidad con fecha {{date}}.',
-      },
-      undated: {
-        terms: 'Al tocar "Acepto", aceptas los Términos de uso vigentes.',
-        privacy: 'Al tocar "Acepto", aceptas la Política de privacidad vigente.',
-        both: 'Al tocar "Acepto", aceptas los Términos de uso y la Política de privacidad vigentes.',
-      },
-    },
-    readTerms: "Leer los Términos de uso",
-    readPrivacy: "Leer la Política de privacidad",
-    shareUsageHelper:
-      "Desactivado por defecto. Compartir nos ayuda a crear lo que quieres. Detalles en la Política de privacidad.",
-    sharingSaveFailed:
-      "No se pudo guardar tu elección de compartir. Inténtalo de nuevo o desactiva compartir para continuar.",
-    saving: "Guardando…",
-    agree: "Acepto",
-  },
   legalDocument: {
     lastUpdated: "Última actualización: {{date}}",
-  },
-  consentSync: {
-    syncing: "Sincronizando tu aceptación…",
-    stillPending:
-      "La sincronización de la cuenta sigue pendiente. Tu aceptación está guardada en este dispositivo.",
-    pending: "Aceptación guardada en este dispositivo. Sincronización de la cuenta pendiente.",
-    retrying: "Reintentando…",
-    retryAccessibilityLabel: "Reintentar la sincronización del consentimiento de la cuenta",
   },
   updates: {
     downloading: "Descargando actualización…",

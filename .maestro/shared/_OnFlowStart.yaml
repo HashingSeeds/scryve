@@ -37,16 +37,6 @@ appId: ${MAESTRO_APP_ID}
       - waitForAnimationToEnd
       - tapOn: "Close" # dismiss the bottom sheet
 
-# a cleared install always lands on the legal consent gate before Play,
-# so accept it here to keep individual flows starting from a usable app.
-- runFlow:
-    when:
-      visible: "Before you start"
-    commands:
-      - tapOn:
-          id: "accept-legal-button"
-      - waitForAnimationToEnd
-
 # a cleared install asks what the player plays, and "Play" accepts the legal
 # documents. "No system" keeps the 2 players at 20 life that flows assert against.
 - runFlow:

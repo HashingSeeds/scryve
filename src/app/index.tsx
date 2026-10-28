@@ -14,7 +14,6 @@ import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/
 import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
 import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { lanPlayAvailable, savedHostedGame } from "@/features/lan/lanAvailability"
-import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import { rulesHref } from "@/features/rules/gameRules"
 import { openStorePage, STORE_PAGE } from "@/features/updates/storeUpdate"
 import { translate } from "@/i18n/translate"
@@ -115,11 +114,6 @@ export default function Index() {
     })
     return () => subscription.remove()
   }, [reload])
-  const consentSettled = useLegalConsentSettled()
-  // why: the first-launch consent screen answers "What do you play?" while this route sits hidden behind it.
-  useEffect(() => {
-    if (consentSettled && settings.askWhatYouPlay) reload()
-  }, [consentSettled, reload, settings.askWhatYouPlay])
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
   const newestResumeGame = useNewestResumeGame()
   const resumeRedirect = resumeRedirectFor(
@@ -139,7 +133,6 @@ export default function Index() {
   if (restoringAccount) return null
 
   if (settings.askWhatYouPlay && !activeGame && !prepared) {
-    if (!consentSettled) return null
     return (
       <WhatYouPlayScreen
         defaultPlayerCount={settings.defaultPlayerCount}

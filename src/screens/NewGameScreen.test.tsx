@@ -31,6 +31,7 @@ import {
   themed,
 } from "../../test/support/connectedHarness"
 
+jest.mock("expo-router", () => ({ router: { push: jest.fn() } }))
 jest.mock("@clerk/expo", () =>
   jest
     .requireActual<typeof import("../../test/support/connectedHarness")>(

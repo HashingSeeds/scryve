@@ -8,7 +8,7 @@ import { reportCrash } from "@/utils/crashReporting"
 export const LAUNCH_DEADLINE_MS = 8000
 export const LAUNCH_FALLBACK_REVEAL_MS = 700
 
-export function useLaunchReadiness(isConsentResolved: boolean) {
+export function useLaunchReadiness() {
   const [fontsLoaded, fontError] = useFonts(fontsToLoad)
   const [launchDeadlineReached, setLaunchDeadlineReached] = useState(false)
   const [fallbackRevealReached, setFallbackRevealReached] = useState(false)
@@ -30,11 +30,10 @@ export function useLaunchReadiness(isConsentResolved: boolean) {
   }, [fontError])
 
   useEffect(() => {
-    if (nativeSplashHidden.current || (!fallbackRevealReached && !(ready && isConsentResolved)))
-      return
+    if (nativeSplashHidden.current || (!fallbackRevealReached && !ready)) return
     nativeSplashHidden.current = true
     void SplashScreen.hideAsync().catch(reportCrash)
-  }, [fallbackRevealReached, isConsentResolved, ready])
+  }, [fallbackRevealReached, ready])
 
   return ready
 }

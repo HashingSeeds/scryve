@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
+import { router } from "expo-router"
 import { Trans } from "react-i18next"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -36,23 +37,12 @@ const FIRST_GAME_TYPES = {
   more: gameTypesBySystem(MORE_GAME_TYPES),
 }
 
-export interface LegalAcceptance {
-  isSubmitting?: boolean
-  onOpenTerms: () => void
-  onOpenPrivacy: () => void
-}
-
 export interface WhatYouPlayScreenProps {
   defaultPlayerCount: number
-  acceptsLegal?: LegalAcceptance
   onChoose: (type: GameType) => void
 }
 
-export function WhatYouPlayScreen({
-  defaultPlayerCount,
-  acceptsLegal,
-  onChoose,
-}: WhatYouPlayScreenProps) {
+export function WhatYouPlayScreen({ defaultPlayerCount, onChoose }: WhatYouPlayScreenProps) {
   const { themed } = useAppTheme()
   const [chosen, setChosen] = useState<GameType>()
   const { configured, sharing, setSharing, saveFailed, saveSharing } = useFirstUseSharing()
@@ -81,53 +71,51 @@ export function WhatYouPlayScreen({
       </View>
       <BottomActionBar style={$bar}>
         <View style={themed($footer)}>
-          {acceptsLegal && configured ? (
+          {configured ? (
             <Switch
               testID="first-use-analytics-switch"
               labelTx="account:shareUsage"
               value={sharing}
               labelPosition="left"
-              helperTx="account:legalConsent.shareUsageHelper"
+              helperTx="play:whatYouPlay.shareUsageHelper"
               HelperTextProps={{ size: "xs", style: themed($muted) }}
               onValueChange={setSharing}
             />
           ) : null}
           {saveFailed ? (
-            <Text accessibilityRole="alert" size="xs" tx="account:legalConsent.sharingSaveFailed" />
+            <Text accessibilityRole="alert" size="xs" tx="play:whatYouPlay.sharingSaveFailed" />
           ) : null}
-          {acceptsLegal ? (
-            <Text size="xs" style={themed($muted)}>
-              <Trans
-                i18nKey="play:whatYouPlay.acceptance"
-                components={{
-                  terms: (
-                    <Text
-                      size="xs"
-                      accessibilityRole="link"
-                      style={themed($link)}
-                      onPress={acceptsLegal.onOpenTerms}
-                    />
-                  ),
-                  privacy: (
-                    <Text
-                      size="xs"
-                      accessibilityRole="link"
-                      style={themed($link)}
-                      onPress={acceptsLegal.onOpenPrivacy}
-                    />
-                  ),
-                }}
-              />
-            </Text>
-          ) : null}
+          <Text size="xs" style={themed($muted)}>
+            <Trans
+              i18nKey="play:whatYouPlay.acceptance"
+              components={{
+                terms: (
+                  <Text
+                    size="xs"
+                    accessibilityRole="link"
+                    style={themed($link)}
+                    onPress={() => router.push("/terms")}
+                  />
+                ),
+                privacy: (
+                  <Text
+                    size="xs"
+                    accessibilityRole="link"
+                    style={themed($link)}
+                    onPress={() => router.push("/privacy")}
+                  />
+                ),
+              }}
+            />
+          </Text>
           <Button
             testID="what-you-play-start"
             tx="play:whatYouPlay.play"
             preset="reversed"
             style={themed($primaryAction)}
-            disabled={!chosen || acceptsLegal?.isSubmitting}
+            disabled={!chosen}
             onPress={() => {
-              if (!chosen || (acceptsLegal && !saveSharing())) return
+              if (!chosen || !saveSharing()) return
               onChoose(chosen)
             }}
           />

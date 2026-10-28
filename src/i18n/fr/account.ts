@@ -299,6 +299,8 @@ export default {
     notConfigured:
       "Les fonctions connectées sont indisponibles dans cette version. Le jeu local reste disponible.",
     closeSignIn: "Fermer la connexion",
+    signInAgreement:
+      "En continuant, vous acceptez les <terms>Conditions d'utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
   },
   billing: {
     renewalPrompt: {
@@ -356,64 +358,8 @@ export default {
     choose: "Choisir Foil Supporter",
     purchasesUnavailable: "Les achats ne sont pas disponibles dans cette version.",
   },
-  legalConsent: {
-    heading: {
-      updatedPrivacy: "Nous avons mis à jour notre politique de confidentialité",
-      updatedTerms: "Nous avons mis à jour nos conditions",
-      beforeStart: "Avant de commencer",
-    },
-    intro:
-      "Veuillez lire nos Conditions d'utilisation et notre Politique de confidentialité. Vous devez les accepter pour utiliser Scryve.",
-    returning: {
-      dated: {
-        terms:
-          "Nos Conditions d'utilisation ont changé le {{date}}. Veuillez consulter la mise à jour pour continuer à utiliser Scryve.",
-        privacy:
-          "Notre Politique de confidentialité a changé le {{date}}. Veuillez consulter la mise à jour pour continuer à utiliser Scryve.",
-        both: "Nos Conditions d'utilisation et notre Politique de confidentialité ont changé le {{date}}. Veuillez consulter la mise à jour pour continuer à utiliser Scryve.",
-      },
-      undated: {
-        terms:
-          "Nos Conditions d'utilisation ont changé. Veuillez consulter les mises à jour pour continuer à utiliser Scryve.",
-        privacy:
-          "Notre Politique de confidentialité a changé. Veuillez consulter les mises à jour pour continuer à utiliser Scryve.",
-        both: "Nos Conditions d'utilisation et notre Politique de confidentialité ont changé. Veuillez consulter les mises à jour pour continuer à utiliser Scryve.",
-      },
-    },
-    acceptance: {
-      dated: {
-        terms:
-          "En touchant « J'accepte », vous acceptez les Conditions d'utilisation datées du {{date}}.",
-        privacy:
-          "En touchant « J'accepte », vous acceptez la Politique de confidentialité datée du {{date}}.",
-        both: "En touchant « J'accepte », vous acceptez les Conditions d'utilisation et la Politique de confidentialité datées du {{date}}.",
-      },
-      undated: {
-        terms: "En touchant « J'accepte », vous acceptez les Conditions d'utilisation en vigueur.",
-        privacy:
-          "En touchant « J'accepte », vous acceptez la Politique de confidentialité en vigueur.",
-        both: "En touchant « J'accepte », vous acceptez les Conditions d'utilisation et la Politique de confidentialité en vigueur.",
-      },
-    },
-    readTerms: "Lire les Conditions d'utilisation",
-    readPrivacy: "Lire la Politique de confidentialité",
-    shareUsageHelper:
-      "Désactivé par défaut. Le partage nous aide à créer ce que vous voulez. Détails dans la Politique de confidentialité.",
-    sharingSaveFailed:
-      "Impossible d'enregistrer votre choix de partage. Réessayez ou désactivez le partage pour continuer.",
-    saving: "Enregistrement…",
-    agree: "J'accepte",
-  },
   legalDocument: {
     lastUpdated: "Dernière mise à jour : {{date}}",
-  },
-  consentSync: {
-    syncing: "Synchronisation de votre accord…",
-    stillPending:
-      "La synchronisation du compte est toujours en attente. Votre accord est enregistré sur cet appareil.",
-    pending: "Accord enregistré sur cet appareil. Synchronisation du compte en attente.",
-    retrying: "Nouvelle tentative…",
-    retryAccessibilityLabel: "Réessayer la synchronisation du consentement du compte",
   },
   updates: {
     downloading: "Téléchargement de la mise à jour…",

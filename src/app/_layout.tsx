@@ -1,6 +1,6 @@
 import "react-native-url-polyfill/auto"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect } from "react"
 import type { ViewStyle } from "react-native"
 import { AppMetrics, ObserveRoot } from "expo-observe"
 import {
@@ -20,7 +20,7 @@ import { CloudProviders } from "@/features/auth/AuthContext"
 import { LocalGameClaimPrompt } from "@/features/game/LocalGameClaimPrompt"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
-import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
+import { AccountLegalAcceptance } from "@/features/legal/AccountLegalAcceptance"
 import { PushDeviceSync } from "@/features/notifications/PushDeviceSync"
 import { RestartCurtain } from "@/features/updates/RestartCurtain"
 import { UpdateReadyToastWithForegroundChecks } from "@/features/updates/UpdateReadyToast"
@@ -54,9 +54,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 function Root() {
-  const [isConsentResolved, setIsConsentResolved] = useState(false)
-  const resolveConsent = useCallback(() => setIsConsentResolved(true), [])
-  const ready = useLaunchReadiness(isConsentResolved)
+  const ready = useLaunchReadiness()
   const navigationRef = useNavigationContainerRef()
 
   useEffect(() => {
@@ -64,11 +62,11 @@ function Root() {
   }, [navigationRef])
 
   useEffect(() => {
-    if (ready && isConsentResolved) {
+    if (ready) {
       AppMetrics.markInteractive()
       initAnalytics()
     }
-  }, [isConsentResolved, ready])
+  }, [ready])
 
   if (!ready) {
     return <LaunchFallback />
@@ -80,14 +78,13 @@ function Root() {
         <CloudProviders>
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
             <KeyboardProvider>
-              <LegalConsentGate onResolved={resolveConsent}>
-                <AccountDeletionSessionGuard />
-                <PushDeviceSync />
-                <LocalGameClaimPrompt />
-                <AppStack />
-                <UpdateReadyToastWithForegroundChecks />
-                <RestartCurtain />
-              </LegalConsentGate>
+              <AccountDeletionSessionGuard />
+              <AccountLegalAcceptance />
+              <PushDeviceSync />
+              <LocalGameClaimPrompt />
+              <AppStack />
+              <UpdateReadyToastWithForegroundChecks />
+              <RestartCurtain />
             </KeyboardProvider>
           </SafeAreaProvider>
         </CloudProviders>

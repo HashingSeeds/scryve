@@ -19,7 +19,10 @@ export function ClerkAuthModal({
   useEffect(() => {
     if (!visible) return
     clerk.openSignIn({
-      appearance: getClerkAppearance(theme),
+      appearance: {
+        ...getClerkAppearance(theme),
+        options: { termsPageUrl: `${APP_ROOT_URL}terms`, privacyPageUrl: `${APP_ROOT_URL}privacy` },
+      },
       withSignUp: true,
       oauthFlow: "popup",
       fallbackRedirectUrl: APP_ROOT_URL,

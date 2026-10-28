@@ -30,6 +30,9 @@ export default {
     heading: "어떤 게임을 하시나요?",
     changeLater: "설정에서 변경할 수 있습니다.",
     play: "플레이",
+    shareUsageHelper:
+      "기본값은 꺼짐입니다. 공유하시면 여러분이 원하는 기능을 만드는 데 도움이 됩니다. 자세한 내용은 개인정보 처리방침을 확인하세요.",
+    sharingSaveFailed: "공유 설정을 저장하지 못했습니다. 다시 시도하거나 공유를 끄고 계속하세요.",
     acceptance:
       "플레이하면 <terms>이용약관</terms> 및 <privacy>개인정보 처리방침</privacy>에 동의하는 것으로 간주됩니다.",
   },

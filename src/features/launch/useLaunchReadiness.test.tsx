@@ -34,20 +34,17 @@ describe("useLaunchReadiness", () => {
     let fontsLoaded = false
     useFontsMock.mockImplementation(() => [fontsLoaded, null])
 
-    const hook = renderHook<boolean, { consentResolved: boolean }>(
-      ({ consentResolved }) => useLaunchReadiness(consentResolved),
-      { initialProps: { consentResolved: false } },
-    )
+    const hook = renderHook(() => useLaunchReadiness())
 
     expect(hook.result.current).toBe(false)
     expect(hideSplashMock).not.toHaveBeenCalled()
 
     fontsLoaded = true
-    hook.rerender({ consentResolved: false })
+    hook.rerender({})
     expect(hook.result.current).toBe(true)
-    expect(hideSplashMock).not.toHaveBeenCalled()
+    expect(hideSplashMock).toHaveBeenCalledTimes(1)
 
-    hook.rerender({ consentResolved: true })
+    hook.rerender({})
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
   })
 
@@ -55,7 +52,7 @@ describe("useLaunchReadiness", () => {
     const fontError = new Error("font unavailable")
     useFontsMock.mockReturnValue([false, fontError])
 
-    const hook = renderHook(() => useLaunchReadiness(false))
+    const hook = renderHook(() => useLaunchReadiness())
 
     await waitFor(() => expect(hook.result.current).toBe(true))
     expect(reportCrashMock).toHaveBeenCalledWith(fontError)
@@ -65,7 +62,7 @@ describe("useLaunchReadiness", () => {
     jest.useFakeTimers()
     useFontsMock.mockReturnValue([false, null])
 
-    const hook = renderHook(() => useLaunchReadiness(false))
+    const hook = renderHook(() => useLaunchReadiness())
 
     act(() => void jest.advanceTimersByTime(LAUNCH_FALLBACK_REVEAL_MS - 1))
     expect(hook.result.current).toBe(false)
@@ -80,7 +77,7 @@ describe("useLaunchReadiness", () => {
     jest.useFakeTimers()
     useFontsMock.mockReturnValue([false, null])
 
-    const hook = renderHook(() => useLaunchReadiness(true))
+    const hook = renderHook(() => useLaunchReadiness())
 
     act(() => void jest.advanceTimersByTime(LAUNCH_FALLBACK_REVEAL_MS))
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
@@ -90,26 +87,6 @@ describe("useLaunchReadiness", () => {
 
     act(() => void jest.advanceTimersByTime(1))
     expect(hook.result.current).toBe(true)
-    expect(hideSplashMock).toHaveBeenCalledTimes(1)
-  })
-
-  it("never hides the splash until readiness and consent both hold", () => {
-    let fontsLoaded = false
-    useFontsMock.mockImplementation(() => [fontsLoaded, null])
-
-    const hook = renderHook<boolean, { consentResolved: boolean }>(
-      ({ consentResolved }) => useLaunchReadiness(consentResolved),
-      { initialProps: { consentResolved: false } },
-    )
-
-    hook.rerender({ consentResolved: true })
-    expect(hideSplashMock).not.toHaveBeenCalled()
-
-    fontsLoaded = true
-    hook.rerender({ consentResolved: true })
-    expect(hideSplashMock).toHaveBeenCalledTimes(1)
-
-    hook.rerender({ consentResolved: true })
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
   })
 })

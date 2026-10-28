@@ -294,6 +294,8 @@ export default {
     notConfigured:
       "이 빌드에서는 연결 기능을 사용할 수 없습니다. 로컬 플레이는 계속 사용할 수 있습니다.",
     closeSignIn: "로그인 닫기",
+    signInAgreement:
+      "계속하면 <terms>이용약관</terms> 및 <privacy>개인정보 처리방침</privacy>에 동의하는 것으로 간주합니다.",
   },
   billing: {
     renewalPrompt: {
@@ -347,57 +349,8 @@ export default {
     choose: "Foil Supporter 선택",
     purchasesUnavailable: "이 빌드에서는 구매할 수 없습니다.",
   },
-  legalConsent: {
-    heading: {
-      updatedPrivacy: "개인정보 처리방침이 업데이트되었습니다",
-      updatedTerms: "이용약관이 업데이트되었습니다",
-      beforeStart: "시작하기 전에",
-    },
-    intro: "이용약관과 개인정보 처리방침을 확인하세요. Scryve를 사용하려면 동의해야 합니다.",
-    returning: {
-      dated: {
-        terms:
-          "이용약관이 {{date}}에 변경되었습니다. Scryve를 계속 사용하려면 변경 내용을 확인하세요.",
-        privacy:
-          "개인정보 처리방침이 {{date}}에 변경되었습니다. Scryve를 계속 사용하려면 변경 내용을 확인하세요.",
-        both: "이용약관과 개인정보 처리방침이 {{date}}에 변경되었습니다. Scryve를 계속 사용하려면 변경 내용을 확인하세요.",
-      },
-      undated: {
-        terms: "이용약관이 변경되었습니다. Scryve를 계속 사용하려면 변경 내용을 확인하세요.",
-        privacy:
-          "개인정보 처리방침이 변경되었습니다. Scryve를 계속 사용하려면 변경 내용을 확인하세요.",
-        both: "이용약관과 개인정보 처리방침이 변경되었습니다. Scryve를 계속 사용하려면 변경 내용을 확인하세요.",
-      },
-    },
-    acceptance: {
-      dated: {
-        terms: '"동의"를 누르면 {{date}}자 이용약관에 동의하는 것입니다.',
-        privacy: '"동의"를 누르면 {{date}}자 개인정보 처리방침에 동의하는 것입니다.',
-        both: '"동의"를 누르면 {{date}}자 이용약관과 개인정보 처리방침에 동의하는 것입니다.',
-      },
-      undated: {
-        terms: '"동의"를 누르면 현재 이용약관에 동의하는 것입니다.',
-        privacy: '"동의"를 누르면 현재 개인정보 처리방침에 동의하는 것입니다.',
-        both: '"동의"를 누르면 현재 이용약관과 개인정보 처리방침에 동의하는 것입니다.',
-      },
-    },
-    readTerms: "이용약관 읽기",
-    readPrivacy: "개인정보 처리방침 읽기",
-    shareUsageHelper:
-      "기본값은 꺼짐입니다. 공유하면 여러분이 원하는 기능을 만드는 데 도움이 됩니다. 자세한 내용은 개인정보 처리방침을 확인하세요.",
-    sharingSaveFailed: "공유 설정을 저장하지 못했습니다. 다시 시도하거나 공유를 끄고 계속하세요.",
-    saving: "저장 중…",
-    agree: "동의",
-  },
   legalDocument: {
     lastUpdated: "최종 업데이트 {{date}}",
-  },
-  consentSync: {
-    syncing: "동의 내용 동기화 중…",
-    stillPending: "계정 동기화가 아직 대기 중입니다. 동의 내용은 이 기기에 저장되었습니다.",
-    pending: "동의 내용이 이 기기에 저장되었습니다. 계정 동기화 대기 중입니다.",
-    retrying: "다시 시도 중…",
-    retryAccessibilityLabel: "계정 동의 동기화 다시 시도",
   },
   updates: {
     downloading: "업데이트 다운로드 중…",

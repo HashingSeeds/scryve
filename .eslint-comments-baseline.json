@@ -273,10 +273,6 @@
       "ec1b8dd681feb158c467267746690fd03d9ca4f6479da69cfb7c201fc9efcb93": 1,
       "fb8edcddce205e6a36f751d188ede8416c066260f10f68282c41df2a58bf9a5b": 1
     },
-    "src/features/legal/LegalConsentGate.tsx": {
-      "e63352e063deaf97db321b02bf35054ca662227ce4623027857263097d88b1b1": 1,
-      "fddeee419d936617e2d0ac42ff1bc65ab5924538ce3780d97a11dfd6024ef4e3": 1
-    },
     "src/features/sync/outboxController.ts": {
       "03977268e2f734839aa733c61b8f93d21ff8635ac28214febd6f702239b34cb4": 1
     },

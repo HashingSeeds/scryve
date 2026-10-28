@@ -29,6 +29,10 @@ const play = {
     heading: "What do you play?",
     changeLater: "You can change this in Settings.",
     play: "Play",
+    shareUsageHelper:
+      "Off by default. Sharing helps us build what you want. Details in Privacy Policy.",
+    sharingSaveFailed:
+      "Could not save your sharing choice. Try again or turn sharing off to continue.",
     acceptance:
       "By playing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
   },

@@ -31,6 +31,10 @@ export default {
     heading: "¿A qué juegas?",
     changeLater: "Puedes cambiarlo en Ajustes.",
     play: "Jugar",
+    shareUsageHelper:
+      "Desactivado por defecto. Compartir nos ayuda a crear lo que quieres. Detalles en la Política de privacidad.",
+    sharingSaveFailed:
+      "No se pudo guardar tu elección de compartir. Inténtalo de nuevo o desactiva compartir para continuar.",
     acceptance:
       "Al jugar, aceptas los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
   },
