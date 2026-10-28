@@ -92,10 +92,11 @@ function defsFor(boardRadius: number) {
         id,
         `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#000000"/>${content}</mask>`,
       ),
+    // why: a fine grid vanished at home screen size. Lines every 64 units run down the gaps between seats.
     grid: () =>
       add(
         "grid",
-        `<pattern id="grid" x="54" y="54" width="21" height="21" patternUnits="userSpaceOnUse"><path d="M21 0H0V21" fill="none" stroke="#FFFFFF" stroke-opacity="0.13" stroke-width="2"/></pattern>`,
+        `<pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse"><path d="M64 0H0V64" fill="none" stroke="#FFFFFF" stroke-opacity="0.32" stroke-width="5"/></pattern>`,
       ),
   }
 }
@@ -174,8 +175,8 @@ function mark(variant: IconArt, defs: Defs) {
     <g clip-path="${defs.clip(0)}">
       ${variant.glow ? `<g filter="${defs.glow()}" opacity="0.9">${board}</g>` : ""}
       ${board}
-      ${variant.grid ? `<rect x="54" y="54" width="404" height="404" fill="${defs.grid()}"/>` : ""}
     </g>
+    ${variant.grid ? `<rect x="-256" y="-256" width="1024" height="1024" fill="${defs.grid()}"/>` : ""}
     <path d="${PENTAGON}" fill="${defs.paint(variant.button ?? "#36333D")}" stroke="${variant.background}" stroke-width="14" stroke-linejoin="round"/>
     ${ring}
     <g fill="${defs.paint(variant.lines ?? "#F4F2F1")}">
