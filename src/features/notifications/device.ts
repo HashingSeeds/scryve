@@ -1,6 +1,7 @@
 import { Platform } from "react-native"
 import Constants from "expo-constants"
 import * as Notifications from "expo-notifications"
+import { AndroidImportance } from "expo-notifications"
 
 import { translate } from "@/i18n/translate"
 
@@ -22,7 +23,7 @@ async function prepare() {
   if (Platform.OS === "android")
     await Notifications.setNotificationChannelAsync("default", {
       name: translate("account:settings.notifications.channel"),
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: AndroidImportance.DEFAULT,
     })
   else
     await Notifications.setNotificationCategoryAsync(FEEDBACK_REPLY_CATEGORY, [], {

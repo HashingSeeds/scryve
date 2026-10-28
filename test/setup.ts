@@ -86,6 +86,12 @@ jest.mock("react-native-reanimated", () => ({
   LayoutAnimationConfig: ({ children }: { children: ReactNode }) => children,
 }))
 
+// why: jest-expo's native mock gives listeners no remove(), so setting the foreground handler a second time throws.
+jest.mock("expo-notifications", () => ({
+  ...jest.requireActual("expo-notifications"),
+  setNotificationHandler: jest.fn(),
+}))
+
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
   SafeAreaProvider: ({ children }: { children: ReactNode }) => children,
