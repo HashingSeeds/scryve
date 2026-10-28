@@ -2,7 +2,7 @@ import { useEffect, useId } from "react"
 import { Alert, StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
-import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
@@ -545,6 +545,25 @@ describe("CurrentGameScreen", () => {
     })
     expect(view.queryByTestId("layout-wide-grid")).toBeNull()
     expect(view.getByTestId("layout-featured-first")).toBeTruthy()
+  })
+
+  it("scrolls the layout choices and seat map while Done stays reachable", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game(5)}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("layout-button"))
+    const scroll = within(view.getByTestId("layout-picker-scroll"))
+    expect(scroll.getByTestId("seat-arrangement")).toBeTruthy()
+    expect(scroll.queryByText("Done")).toBeNull()
+    expect(within(view.getByTestId("layout-picker-dialog")).getByText("Done")).toBeTruthy()
   })
 
   it("changes and persists the four-player layout from the radial menu", async () => {
