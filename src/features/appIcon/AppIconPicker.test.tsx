@@ -63,7 +63,7 @@ describe("AppIconPicker", () => {
     })
     const previews = view.UNSAFE_getAllByType(Image)
     expect(previews.length).toBeGreaterThan(0)
-    expect(previews.every(isHiddenFromAccessibility)).toBe(true)
+    expect(previews.every((preview) => isHiddenFromAccessibility(preview))).toBe(true)
   })
 
   it("sends free players to the paywall and signed-out players to sign in", () => {
