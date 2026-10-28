@@ -357,6 +357,51 @@ describe("feedback", () => {
     })
   })
 
+  it("links an issue from Matthew's reply, ignoring anything but a number", async () => {
+    const t = makeConvexTest()
+    const requestId = await submit(t)
+    const issue = () => t.run(async (ctx) => (await ctx.db.get(requestId))?.issue ?? null)
+    await apollo(t, requestId, "link_issue", "soon")
+    await apollo(t, requestId, "link_issue", "#0")
+    expect(await issue()).toBeNull()
+    await apollo(t, requestId, "link_issue", " #123 ")
+    expect(await issue()).toBe(123)
+    await apollo(t, requestId, "link_issue", "124")
+    expect(await issue()).toBe(124)
+  })
+
+  it("marks only unfixed requests linked to a shipped issue as fixed", async () => {
+    const t = makeConvexTest()
+    const [fixed, linked, other, unlinked] = [
+      await submit(t),
+      await submit(t),
+      await submit(t),
+      await submit(t),
+    ]
+    const earlier = { commit: "old", at: 1, runtimes: {} }
+    await t.run(async (ctx) => {
+      await ctx.db.patch(fixed, { issue: 7, fixedIn: earlier })
+      await ctx.db.patch(linked, { issue: 7 })
+      await ctx.db.patch(other, { issue: 8 })
+    })
+    await t.mutation(internal.feedback.shipFixes, {
+      commit: "abcdef1234",
+      issues: [7, 9],
+      runtimes: { ios: "rt-1" },
+    })
+    const fixedIn = await t.run(async (ctx) =>
+      Promise.all(
+        [fixed, linked, other, unlinked].map(async (id) => (await ctx.db.get(id))?.fixedIn ?? null),
+      ),
+    )
+    expect(fixedIn).toEqual([
+      earlier,
+      { commit: "abcdef1234", at: expect.any(Number), runtimes: { ios: "rt-1" } },
+      null,
+      null,
+    ])
+  })
+
   it("caps sends across every install, not just each one", async () => {
     const t = makeConvexTest()
     const sender = (n: number) => String(n).padStart(64, "d")
@@ -399,7 +444,7 @@ describe("feedbackCard", () => {
       meta: { from: "Anonymous" },
     })
     expect(card.body).toBe(`${request.body}\n\nPlayer: http://a.test`)
-    expect(card.actions.map(({ id }) => id)).toEqual(["reply"])
+    expect(card.actions.map(({ id }) => id)).toEqual(["reply", "file_issue", "link_issue"])
   })
 
   it("pushes a generic line for a new request, never the player's text", () => {
@@ -415,6 +460,93 @@ describe("feedbackCard", () => {
       messages: [message("player", "hi"), message("team", "done")],
     })
     expect(card).toMatchObject({ kind: "update", phase: "player:m" })
+  })
+
+  it("files a new issue with a canonical link under the issues prefix", () => {
+    const card = feedbackCard({
+      request: { ...request, kind: "bug", body: `Crash: 50% & "more"…\n${"x".repeat(1500)}` },
+      messages: [],
+    })
+    const action = card.actions.find(({ id }) => id === "file_issue")
+    const url = action && "url" in action ? action.url : ""
+    expect(url.startsWith("https://github.com/HashingSeeds/scryve/issues/new?")).toBe(true)
+    expect(new URL(url).href).toBe(url)
+    expect(new URL(url).searchParams.get("labels")).toBe("bug")
+    expect(new URL(url).searchParams.get("body")?.length).toBeLessThanOrEqual(1000)
+  })
+
+  it("links the issue once Matthew names it", () => {
+    const card = feedbackCard({ request: { ...request, issue: 123 }, messages: [] })
+    expect(card.meta).toMatchObject({ issue: "#123" })
+    expect(card.actions.map(({ id }) => id)).toEqual(["reply", "issue", "link_issue"])
+    expect(card.actions[1]).toMatchObject({
+      label: "#123",
+      url: "https://github.com/HashingSeeds/scryve/issues/123",
+    })
+  })
+
+  describe("a shipped fix", () => {
+    const fixedIn = { commit: "abcdef1234", at: 10, runtimes: { ios: "rt-1", android: "rt-a" } }
+    const fixed = (runtimeVersion?: string, platform = "ios") =>
+      feedbackCard({
+        request: {
+          ...request,
+          platform,
+          issue: 7,
+          fixedIn,
+          ...(runtimeVersion ? { runtimeVersion } : {}),
+        },
+        messages: [message("team", "Looking")],
+      })
+    const prefill = ({ actions: [reply] }: ReturnType<typeof feedbackCard>) =>
+      reply && "prefill" in reply ? reply.prefill : undefined
+
+    it("asks Matthew to tell the player how to get it", () => {
+      const card = fixed("rt-1")
+      expect(card).toMatchObject({
+        kind: "approval",
+        pushText: "Fix shipped",
+        meta: { fixed: "abcdef1 · update" },
+      })
+      expect(card.phase).toMatch(/^fixed:abcdef1:/)
+      expect(card.phase.length).toBeLessThanOrEqual(40)
+      expect(prefill(card)).toBe("Thanks for the idea! It is out. Restart Scryve to get it.")
+      expect(
+        prefill(
+          feedbackCard({
+            request: {
+              ...request,
+              kind: "bug",
+              platform: "ios",
+              issue: 7,
+              fixedIn,
+              runtimeVersion: "rt-1",
+            },
+            messages: [],
+          }),
+        ),
+      ).toBe("Thanks for the report! The fix is out. Restart Scryve to get it.")
+    })
+
+    it("points at the store when the player's runtime can't load the update", () => {
+      const card = fixed("rt-0")
+      expect(card.meta).toMatchObject({ fixed: "abcdef1 · App Store" })
+      expect(prefill(card)).toContain("Update from the App Store once it's out.")
+      expect(prefill(fixed("rt-0", "android"))).toContain("Update from Google Play")
+    })
+
+    it("covers both when the runtime is unknown", () => {
+      expect(prefill(fixed())).toContain("Restart Scryve, and if you don't see it, update")
+    })
+
+    it("goes back to an update with the fixed meta once Matthew replied", () => {
+      const card = feedbackCard({
+        request: { ...request, issue: 7, fixedIn },
+        messages: [message("team", "Fixed!")].map((m) => ({ ...m, _creationTime: 11 })),
+      })
+      expect(card).toMatchObject({ kind: "update", meta: { fixed: "abcdef1 · update" } })
+      expect(prefill(card)).toBeUndefined()
+    })
   })
 
   it("drops the oldest text first so the newest reply always shows", () => {

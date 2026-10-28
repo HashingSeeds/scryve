@@ -2,6 +2,7 @@ import { Platform } from "react-native"
 import * as Application from "expo-application"
 import Constants from "expo-constants"
 import * as ImagePicker from "expo-image-picker"
+import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
 const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
@@ -51,6 +52,7 @@ export function captureBugReport({
         platform: Platform.OS,
         appVersion: appVersion() ?? "unknown",
         build: Application.nativeBuildVersion ?? "unknown",
+        runtime: Updates.runtimeVersion ?? "unknown",
       },
     },
     {

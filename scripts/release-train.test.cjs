@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { pickRelease, releaseNotes, summarizeGroup } = require("./release-train.cjs")
+const { pickRelease, prNumbers, releaseNotes, summarizeGroup } = require("./release-train.cjs")
 
 const commits = (...subjects) =>
   subjects.map((subject, index) => ({ commit: `c${index}`, subject }))
@@ -47,6 +47,7 @@ const group = (commit, platform, minutesAgo, attempt = "") =>
       id: `${commit}${attempt}-${platform}`,
       group: `g-${commit}${attempt}-${platform}`,
       platform,
+      runtimeVersion: `rt-${platform}`,
       gitCommitHash: commit,
       message: `merge ${commit}`,
       createdAt: new Date(100 * MINUTE - minutesAgo * MINUTE).toISOString(),
@@ -68,6 +69,7 @@ test("a release carries every platform's group for its commit", () => {
   assert.deepEqual(candidate.updateIds, ["old-ios", "old-android"])
   assert.equal(candidate.firstPublishedAt, 29 * MINUTE)
   assert.equal(candidate.lastPublishedAt, 30 * MINUTE)
+  assert.deepEqual(candidate.runtimes, { ios: "rt-ios", android: "rt-android" })
   assert.deepEqual(
     soaking.map((release) => release.commit),
     ["new"],
@@ -100,4 +102,26 @@ test("a commit published twice promotes only its newest groups", () => {
     "g-same-rerun-ios",
     "g-same-rerun-android",
   ])
+})
+
+test("shipped PRs come from squash subjects, minus reverted ones", () => {
+  assert.deepEqual(
+    prNumbers([
+      "fix(decks): pasted cards match again (#303)",
+      "chore: no PR",
+      'Revert "fix(decks): pasted cards match again (#303)" (#305)\n\nReverts HashingSeeds/scryve#303',
+      "feat(game): lock the board to portrait (#264)",
+      "revert(game): let the board rotate to landscape again (#267)\n\nReverts #264. Players need landscape.",
+      "fix(sync): faster merges (#310)\n\nFixes #12",
+      "Merge pull request #630 from HashingSeeds/docs/adr-0002-phases\n\ndocs: phases ADR",
+      "Merge pull request #640 from HashingSeeds/feat/sync\n\nfeat: sync",
+      'Merge pull request #641 from HashingSeeds/revert-640-feat/sync\n\nRevert "feat: sync"',
+      "feat(board): bigger dice (#660)",
+      "fix(board): dice roll again (#661)\n\nRevert to the behavior from #660.",
+      'Revert "fix: support upstream/tool#630" (#670)',
+      "feat(game): faster dice (#680)",
+      'Merge pull request #681 from HashingSeeds/undo-dice\n\nRevert "feat(game): faster dice (#680)"',
+    ]),
+    [305, 267, 310, 630, 641, 660, 661, 670, 681],
+  )
 })

@@ -21,6 +21,7 @@ import {
   cleanText,
   deletedFeedbackCard,
   feedbackCard,
+  feedbackFix,
   feedbackKind,
   senderHash,
 } from "./lib/feedback"
@@ -39,6 +40,8 @@ const ACCOUNT_DELETE_BATCH = 10
 const DELETE_MESSAGES_PER_MUTATION = 400
 const APOLLO_BATCH = 100
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
+const ISSUE_NUMBER = /^#?(\d{1,9})$/
+const FIXES_PER_ISSUE = 100
 
 type Ctx = QueryCtx | MutationCtx
 type Viewer = { hash: string | null; user: Doc<"users"> | null }
@@ -174,6 +177,7 @@ export const submit = mutation({
     appVersion: v.optional(v.string()),
     platform: v.optional(v.string()),
     sentryEventId: v.optional(v.string()),
+    runtimeVersion: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const who = await sender(ctx, args.key)
@@ -190,6 +194,7 @@ export const submit = mutation({
       userId,
       appVersion: args.appVersion?.slice(0, FEEDBACK_LIMITS.version),
       platform: args.platform?.slice(0, FEEDBACK_LIMITS.version),
+      runtimeVersion: args.runtimeVersion?.slice(0, FEEDBACK_LIMITS.runtime),
       sentryEventId:
         args.sentryEventId && SENTRY_EVENT_ID.test(args.sentryEventId)
           ? args.sentryEventId
@@ -411,12 +416,39 @@ export const applyApolloEvent = internalMutation({
       : null
     const request = requestId ? await ctx.db.get(requestId) : null
     const text = event.text?.trim()
-    if (!request || event.actionId !== "reply" || !text) return null
+    if (!request || !text) return null
+    if (event.actionId === "link_issue") {
+      const issue = Number(ISSUE_NUMBER.exec(text)?.[1] ?? 0)
+      if (issue > 0 && issue !== request.issue) {
+        await ctx.db.patch(request._id, { issue, fixedIn: undefined })
+        await postCard(ctx, request._id)
+      }
+      return null
+    }
+    if (event.actionId !== "reply") return null
     const body = text.slice(0, FEEDBACK_LIMITS.message)
     await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
     await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
     await postCard(ctx, request._id)
     await notifyFeedbackReply(ctx, request, body)
+    return null
+  },
+})
+
+export const shipFixes = internalMutation({
+  args: { ...feedbackFix.omit("at").fields, issues: v.array(v.number()) },
+  handler: async (ctx, { issues, ...fix }) => {
+    const at = Date.now()
+    for (const issue of new Set(issues)) {
+      const requests = await ctx.db
+        .query("feedbackRequests")
+        .withIndex("by_issue_and_fixed_in", (q) => q.eq("issue", issue).eq("fixedIn", undefined))
+        .take(FIXES_PER_ISSUE)
+      for (const request of requests) {
+        await ctx.db.patch(request._id, { fixedIn: { ...fix, at } })
+        await postCard(ctx, request._id)
+      }
+    }
     return null
   },
 })
