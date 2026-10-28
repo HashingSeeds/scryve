@@ -46,20 +46,33 @@ describe("RiftHunt normalizer", () => {
     )
     expect(card("Fury Rune").printings[0].faces[0].text).toBeUndefined()
   })
+})
 
-  it("files a pasted list by its headings, or by card type without them", async () => {
+describe("RiftHunt sync", () => {
+  beforeEach(() =>
     jest
       .spyOn(global, "fetch")
       .mockImplementation(async (_url, init) =>
         init?.method === "HEAD"
           ? new Response(null, { headers: { "Last-Modified": "Mon, 26 Oct 2026 00:00:00 GMT" } })
           : new Response(JSON.stringify(riftHunt)),
-      )
-    const t = makeConvexTest()
+      ),
+  )
+  afterEach(() => {
+    jest.restoreAllMocks()
+    delete process.env.RIFTBOUND_CARDS
+  })
+
+  async function synced(t = makeConvexTest()) {
     jest.useFakeTimers()
     await t.action(internal.cardDatasetSync.sync, { game: "riftbound" })
     await t.finishAllScheduledFunctions(() => jest.runAllTimers())
     jest.useRealTimers()
+    return t
+  }
+
+  it("files a pasted list by its headings, or by card type without them", async () => {
+    const t = await synced()
     const actor = t.withIdentity({ subject: "riftbound-player" })
     const imported = async (list: string) =>
       (await actor.action(api.deckImports.resolvePasted, { game: "riftbound", list })).cards
@@ -76,6 +89,18 @@ describe("RiftHunt normalizer", () => {
       { name: "Fury Rune", section: "runes" },
       { name: "Pouty Poro", section: "main" },
     ])
-    jest.restoreAllMocks()
+  })
+
+  it("keeps only RIFTBOUND_CARDS when set, and drops cards already synced", async () => {
+    const t = await synced()
+    const names = async () =>
+      (await t.run(async (ctx) => await ctx.db.query("gameCards").take(20)))
+        .map(({ name }) => name)
+        .sort()
+    expect(await names()).toHaveLength(5)
+
+    process.env.RIFTBOUND_CARDS = "Jinx, Loose Cannon; fury rune"
+    await synced(t)
+    expect(await names()).toEqual(["Fury Rune", "Jinx, Loose Cannon"])
   })
 })
