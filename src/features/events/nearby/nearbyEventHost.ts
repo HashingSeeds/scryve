@@ -17,6 +17,8 @@ import {
 import type { EventActor } from "../../../../convex/lib/events/commands"
 
 const STORAGE_KEY = "events.nearby.hosted"
+// why: every change cost the host a screen render and a write per guest, so a round's burst of results from 127 players queued for 13 to 17 s on a Pixel 6a. Sending at once when the last send was long ago still sent every change, since each send outlasted the gap; waiting 250 ms after a player's change brought that under half a second.
+const BATCH_MS = 250
 
 export type HostStatus = "idle" | "starting" | "hosting" | "error"
 
@@ -54,6 +56,7 @@ class NearbyEventHost {
   private guests = new Map<LanConnection<NearbyHostMessage>, Guest>()
   private server: LanHost | undefined
   private feed: HostFeed | undefined
+  private batch: ReturnType<typeof setTimeout> | undefined
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener)
@@ -67,14 +70,25 @@ class NearbyEventHost {
     for (const listener of this.listeners) listener()
   }
 
+  private sendWithBatch() {
+    this.batch ??= setTimeout(() => this.send(), BATCH_MS)
+  }
+
+  private send() {
+    clearTimeout(this.batch)
+    this.batch = undefined
+    this.broadcast()
+    this.set({})
+  }
+
   private commit(
     event: HubEvent,
     hostPlayerId = this.state.hostPlayerId,
     importedFor = this.state.importedFor,
   ) {
     save(STORAGE_KEY, { event, hostPlayerId, importedFor })
-    this.set({ event, hostPlayerId, importedFor })
-    this.broadcast()
+    this.state = { ...this.state, event, hostPlayerId, importedFor }
+    this.sendWithBatch()
   }
 
   markImported(accountId: string, imported: HubEvent) {
@@ -123,6 +137,8 @@ class NearbyEventHost {
   async stop() {
     const server = this.server
     this.server = undefined
+    clearTimeout(this.batch)
+    this.batch = undefined
     for (const peer of this.guests.keys()) peer.close()
     this.guests.clear()
     if (server) await server.stop()
@@ -139,6 +155,7 @@ class NearbyEventHost {
     const { event } = this.state
     if (!event) throw new Error("No nearby event")
     this.commit(applyHubCommand(event, { kind: "organizer" }, command, Date.now()))
+    this.send()
   }
 
   private admit(peer: LanConnection<NearbyHostMessage>) {
@@ -169,7 +186,7 @@ class NearbyEventHost {
         guest.patches = message.patches === true
         peer.send({ t: "welcome", playerId: joined.playerId })
         if (joined.event !== event) this.commit(joined.event)
-        else this.broadcast()
+        else this.sendWithBatch()
       } catch (cause) {
         peer.sendAndClose({ t: "rejected", reason: "invalid", code: convexErrorCode(cause) })
       }
