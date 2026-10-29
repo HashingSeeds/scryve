@@ -158,7 +158,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     push: "alert",
     // why: the lock screen and Expo's servers get only this line, never what the player wrote.
     pushText:
-      fix && (lastPlayer?._creationTime ?? 0) < fix.at
+      fix && ((lastPlayer?._creationTime ?? 0) < fix.at || messages.at(-1)?.from === "team")
         ? request.awaitingStore
           ? "Fix waiting on the store"
           : "Fix shipped, player told"

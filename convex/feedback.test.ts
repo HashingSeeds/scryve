@@ -610,6 +610,14 @@ describe("feedbackCard", () => {
       expect(store.phase).not.toBe(waiting.phase)
       expect(store.phase.length).toBeLessThanOrEqual(40)
       expect(fixed({ runtimeVersion: "rt-1" }).meta).toMatchObject({ fixed: "abcdef1 · update" })
+      const repliedWhileWaiting = feedbackCard({
+        request: { ...request, platform: "ios", issue: 7, fixedIn, runtimeVersion: "rt-0" },
+        messages: [
+          { ...message("player", "Any news?"), _creationTime: 11 },
+          { ...message("team", "We fixed this bug"), _creationTime: 12 },
+        ],
+      })
+      expect(repliedWhileWaiting.pushText).toBe("Fix shipped, player told")
     })
   })
 })
