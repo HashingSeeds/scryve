@@ -1,17 +1,6 @@
-import { convexTest } from "convex-test"
-
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const syncCard = {
   oracleId: "11111111-1111-1111-1111-111111111111",
@@ -23,20 +12,14 @@ const syncCard = {
 
 const otherCard = { ...syncCard, name: "Other card", quantity: 2 }
 
-async function synced(t: ReturnType<typeof convexTest>, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
-}
-
 describe("deck version lifecycle sync", () => {
-  async function seedDeck(t: ReturnType<typeof convexTest>, subject: string) {
-    const actor = await synced(t, subject)
+  async function seedDeck(t: ConvexTestHarness, subject: string) {
+    const actor = await signedIn(t, subject)
     const deckId = await actor.mutation(api.decks.create, { name: "Deck", format: "commander" })
     await grantPremium(t, deckId)
     return { actor, deckId }
   }
-  async function grantPremium(t: ReturnType<typeof convexTest>, deckId: Id<"decks">) {
+  async function grantPremium(t: ConvexTestHarness, deckId: Id<"decks">) {
     await t.run(async (ctx) => {
       const deck = await ctx.db.get(deckId)
       if (!deck) throw new Error("expected a deck")
@@ -51,7 +34,7 @@ describe("deck version lifecycle sync", () => {
   }
 
   it("replays a create once per operation ID without consuming capacity twice", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId } = await seedDeck(t, "lifecycle-create-owner")
     const args = {
       deckId,
@@ -74,7 +57,7 @@ describe("deck version lifecycle sync", () => {
   })
 
   it("rejects a reused operation ID with a changed payload", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId } = await seedDeck(t, "lifecycle-mismatch-owner")
     const args = {
       deckId,
@@ -99,7 +82,7 @@ describe("deck version lifecycle sync", () => {
   })
 
   it("keeps ownership boundaries for create, update, and delete", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId } = await seedDeck(t, "lifecycle-realtor")
     const saved = await actor.mutation(api.decks.syncCreateVersion, {
       deckId,
@@ -108,7 +91,7 @@ describe("deck version lifecycle sync", () => {
       cards: [syncCard],
     })
     const versionId = saved.versionId
-    const stranger = await synced(t, "lifecycle-stranger")
+    const stranger = await signedIn(t, "lifecycle-stranger")
     await expect(
       stranger.mutation(api.decks.syncCreateVersion, {
         deckId,
@@ -135,7 +118,7 @@ describe("deck version lifecycle sync", () => {
   })
 
   it("refuses an update on a stale revision and reports the current version", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId } = await seedDeck(t, "lifecycle-conflict-owner")
     const saved = await actor.mutation(api.decks.syncCreateVersion, {
       deckId,
@@ -160,7 +143,7 @@ describe("deck version lifecycle sync", () => {
   })
 
   it("replays rename and delete receipts with the preserved result after later state", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId } = await seedDeck(t, "lifecycle-replay-owner")
     const saved = await actor.mutation(api.decks.syncCreateVersion, {
       deckId,
@@ -209,31 +192,17 @@ describe("deck version lifecycle sync", () => {
     ).resolves.toMatchObject({ status: "conflict", version: { deleted: true, revision: 3 } })
   })
 
-  it("guards the last version and version capacity", async () => {
-    const t = convexTest(schema, modules)
-    const { actor, deckId } = await seedDeck(t, "lifecycle-guard-owner")
-    const detail = await actor.query(api.decks.detail, { deckId })
-    const versionId = detail.versions[0]._id
+  it("guards the last version and stops creations once the version capacity is reached", async () => {
+    const t = makeConvexTest()
+    const { actor, deckId } = await seedDeck(t, "lifecycle-capacity-owner")
+    const [onlyVersion] = (await actor.query(api.decks.detail, { deckId })).versions
     await expect(
       actor.mutation(api.decks.syncDeleteVersion, {
-        versionId,
+        versionId: onlyVersion._id,
         operationId: "aaaaaa08-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         expectedRevision: 1,
       }),
     ).rejects.toMatchObject({ data: { code: "last_version" } })
-    const saved = await actor.mutation(api.decks.syncCreateVersion, {
-      deckId,
-      operationId: "aaaaaa09-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      name: "Second",
-      cards: [syncCard],
-    })
-    const stored = await t.run(async (ctx) => await ctx.db.get(saved.versionId))
-    expect(stored).toMatchObject({ syncRevision: 1 })
-  })
-
-  it("stops creations once the version capacity is reached", async () => {
-    const t = convexTest(schema, modules)
-    const { actor, deckId } = await seedDeck(t, "lifecycle-capacity-owner")
     for (let index = 0; index < 4; index++)
       await actor.mutation(api.decks.syncCreateVersion, {
         deckId,
@@ -252,7 +221,7 @@ describe("deck version lifecycle sync", () => {
   })
 
   it("coexists with legacy calls and revisions stay coherent", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId } = await seedDeck(t, "lifecycle-mixed-owner")
     const saved = await actor.mutation(api.decks.syncCreateVersion, {
       deckId,

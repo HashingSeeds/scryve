@@ -1,37 +1,12 @@
-import { convexTest, type TestConvex } from "convex-test"
-
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./history.ts": async () => jest.requireActual("./history"),
-  "./matches.ts": async () => jest.requireActual("./matches"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const MATCH_AT = Date.UTC(2026, 9, 3)
 const GAME_AT = Date.UTC(2026, 9, 2)
 const PUBLIC_ID = "manual-match-000001"
 
-async function signedIn(t: TestConvex<typeof schema>, subject: string, displayName: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName })
-  const userId = await t.run(async (ctx) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", subject))
-      .unique()
-    return user!._id
-  })
-  return { actor, userId }
-}
-
-async function seedGame(t: TestConvex<typeof schema>, userId: Id<"users">) {
+async function seedGame(t: ConvexTestHarness, userId: Id<"users">) {
   await t.run(async (ctx) => {
     const gameId = await ctx.db.insert("games", {
       publicId: "history-game-0000000000000001",
@@ -64,7 +39,7 @@ async function seedGame(t: TestConvex<typeof schema>, userId: Id<"users">) {
   })
 }
 
-async function recordMatch(actor: ReturnType<TestConvex<typeof schema>["withIdentity"]>) {
+async function recordMatch(actor: ReturnType<ConvexTestHarness["withIdentity"]>) {
   return await actor.mutation(api.matches.recordManualMatch, {
     publicId: PUBLIC_ID,
     bestOf: 3,
@@ -78,9 +53,9 @@ async function recordMatch(actor: ReturnType<TestConvex<typeof schema>["withIden
 
 describe("history.entries", () => {
   it("lists manual matches and Scryve games in one page, newest first", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
-    const { actor, userId } = await signedIn(t, "history-owner", "Alice")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "history-owner", "Alice")
+    const { userId } = actor
     await seedGame(t, userId)
     const { matchId } = await recordMatch(actor)
 
@@ -150,9 +125,8 @@ function scryveMatchGame(gameNumber: number, winner: "me" | "them") {
 
 describe("history.entries Scryve matches", () => {
   it("adds the match summary to every game of a Scryve match", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
-    const { actor } = await signedIn(t, "history-owner", "Alice")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "history-owner", "Alice")
     const page = async () =>
       (await actor.query(api.history.entries, { paginationOpts: { cursor: null, numItems: 10 } }))
         .page
@@ -207,9 +181,9 @@ describe("history.entries Scryve matches", () => {
 
 describe("history.manualMatch", () => {
   it("lets a player without a username save, open, and delete a result", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
-    const { actor, userId } = await signedIn(t, "history-no-username", "Jane")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "history-no-username", "Jane")
+    const { userId } = actor
     const user = await t.run((ctx) => ctx.db.get(userId))
     expect(user?.username).toBeUndefined()
     const { matchId } = await recordMatch(actor)
@@ -227,10 +201,9 @@ describe("history.manualMatch", () => {
   })
 
   it("returns the owner's match and hides it from everyone else", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
-    const { actor } = await signedIn(t, "history-owner", "Alice")
-    const stranger = (await signedIn(t, "history-stranger", "Mallory")).actor
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "history-owner", "Alice")
+    const stranger = await signedIn(t, "history-stranger", "Mallory")
     const { matchId } = await recordMatch(actor)
 
     await expect(

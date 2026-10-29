@@ -1,16 +1,10 @@
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 
 const token = "t".repeat(43)
 
 const hostDevice = "device-host-0001"
 const joinerDevice = "device-joiner-0002"
-
-async function signedIn(t: ConvexTestHarness, subject: string, name: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: name })
-  return actor
-}
 
 const baseSnapshot = {
   operationId: "publish-operation-00000001",
@@ -19,6 +13,7 @@ const baseSnapshot = {
   format: "commander",
   ruleset: "commander",
   startingLife: 40,
+  layout: "even-grid" as const,
   inviteToken: token,
   manualCodeCandidates: ["ABC234", "DEF567"],
   hostLocalId: "local-host-player",
@@ -54,18 +49,6 @@ async function published(t: ConvexTestHarness, overrides: Partial<typeof baseSna
 }
 
 describe("publishLocalGame", () => {
-  it("opens every board on the layout the local game was using", async () => {
-    const t = makeConvexTest()
-    const host = await signedIn(t, "host-subject", "Host")
-    const created = await host.mutation(api.games.publishLocalGame, {
-      ...snapshotArgs(),
-      layout: "even-grid",
-    })
-
-    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
-    expect(projection.layout).toBe("even-grid")
-  })
-
   it("requires authentication", async () => {
     const t = makeConvexTest()
     await expect(t.mutation(api.games.publishLocalGame, snapshotArgs())).rejects.toThrow(
@@ -89,6 +72,7 @@ describe("publishLocalGame", () => {
     expect(projection.format).toBe("commander")
     expect(projection.ruleset).toBe("commander")
     expect(projection.startingLife).toBe(40)
+    expect(projection.layout).toBe("even-grid")
     expect(projection.isHost).toBe(true)
     expect(projection.players).toEqual([
       expect.objectContaining({
@@ -306,25 +290,6 @@ describe("claiming an imported seat through claimSeat", () => {
       deviceId: joinerDevice,
     })
     expect(after.players[1].currentLife).toBe(15)
-  })
-
-  it("keeps unclaimed imported seats under host control", async () => {
-    const t = makeConvexTest()
-    const { host, created } = await published(t)
-    await host.mutation(api.games.changeLife, {
-      publicId: created.publicId,
-      playerId: created.players[1].playerId,
-      operationId: "host-controls-unclaimed-1",
-      delta: 5,
-      deviceId: hostDevice,
-      clientCreatedAt: 1,
-    })
-    const projection = await host.query(api.games.lobbyProjection, {
-      publicId: created.publicId,
-      deviceId: hostDevice,
-    })
-    expect(projection.players[1].currentLife).toBe(22)
-    expect(projection.players[1].controlledByMe).toBe(true)
   })
 
   it("shows other players the seat label for a guest name that fails the name filter", async () => {

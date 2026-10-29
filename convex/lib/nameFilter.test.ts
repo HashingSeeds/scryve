@@ -163,15 +163,11 @@ describe("username filter", () => {
       expect(describeUsernameMatches("kys-loser")).toEqual(["kys"])
       expect(describeUsernameMatches("sh1t-nazi")).toEqual(["shit", "nazi"])
       expect(describeUsernameMatches("nazi-kys-spic")).toEqual(["nazi", "kys", "spic"])
+      expect(describeUsernameMatches("clever-otter-01")).toEqual([])
     })
   })
 
   describe("what the operator queue is told", () => {
-    it("reports the matched dataset words", () => {
-      expect(describeUsernameMatches("sh1t-lord")).toContain("shit")
-      expect(describeUsernameMatches("clever-otter-01")).toEqual([])
-    })
-
     it("deduplicates a word padded into several variants", () => {
       expect(describeUsernameMatches("fuuuck-f4ck")).toEqual(["fuck"])
     })

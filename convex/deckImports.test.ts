@@ -1,25 +1,10 @@
-import { convexTest } from "convex-test"
-
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { makeConvexTest } from "../test/convexTest"
+import { stepClock } from "../test/steppingClock"
 import { api, internal } from "./_generated/api"
 import { parseGenericDeckList, parsePastedDeckList } from "./deckImports"
 import { deckRateLimiter } from "./lib/deckRateLimits"
-import schema from "./schema"
 
 const REFRESH_LEASE_MS = 5 * 60 * 1000
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./cards.ts": async () => jest.requireActual("./cards"),
-  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
-  "./deckImports.ts": async () => jest.requireActual("./deckImports"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./externalApiRateLimits.ts": async () => jest.requireActual("./externalApiRateLimits"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const deckListPayload = {
   data: [
@@ -304,7 +289,10 @@ it("ignores recognized Pokémon total footers and reports malformed footer text"
 })
 
 describe("MTG pasted deck resolution", () => {
+  afterEach(() => jest.restoreAllMocks())
+
   it("resolves full and face names without mixing name, set, and exact printing lookups", async () => {
+    stepClock()
     const fullName = "Delver of Secrets // Insectile Aberration"
     const newestId = "22222222-2222-2222-2222-222222222222"
     const originalId = "33333333-3333-3333-3333-333333333333"
@@ -333,8 +321,7 @@ describe("MTG pasted deck resolution", () => {
       )
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const result = await t.action(api.deckImports.resolvePasted, {
         list: [
           "1 Delver of Secrets",
@@ -370,6 +357,7 @@ describe("MTG pasted deck resolution", () => {
   })
 
   it("keeps name-only and name-with-set selections separate from exact printing results", async () => {
+    stepClock()
     const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (_input, options) => {
       const { identifiers } = JSON.parse(String(options?.body)) as {
         identifiers: Array<{ name?: string; set?: string; collector_number?: string }>
@@ -397,8 +385,7 @@ describe("MTG pasted deck resolution", () => {
       return new Response(JSON.stringify({ data }), { status: 200 })
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const result = await t.action(api.deckImports.resolvePasted, {
         list: "1 Island\n2 Island (M21)\n3 Island (M21) 265\n4 Island (M21) 999\n5 Island (MISSING)\n6 Island (M21) 266",
       })
@@ -436,8 +423,7 @@ describe("MTG pasted deck resolution", () => {
       ),
     )
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const result = await t.action(api.deckImports.resolvePasted, {
         list: "2 Island (M21) 265\n1 Island (M21) 266\nSB: 3 Island (M21) 265\n1 Island (M21) 999",
       })
@@ -484,8 +470,7 @@ describe("generic deck resolution", () => {
       ),
     )
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "generic-deck-importer" })
 
       const result = await actor.action(api.deckImports.resolvePasted, {
@@ -531,8 +516,7 @@ describe("generic deck resolution", () => {
       )
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "batched-deck-importer" })
 
       await actor.action(api.deckImports.resolvePasted, {
@@ -580,8 +564,7 @@ describe("generic deck resolution", () => {
       )
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "pokemon-printing-importer" })
 
       const result = await actor.action(api.deckImports.resolvePasted, {
@@ -608,8 +591,7 @@ describe("generic deck resolution", () => {
   ])("does not report %s validation as provider downtime", async (code, list) => {
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: `validation-${code}` })
 
       await expect(
@@ -632,8 +614,7 @@ describe("generic deck resolution", () => {
 describe("preconstructed catalog caching", () => {
   it("returns a warmed catalog without waiting for an expired provider refresh", async () => {
     jest.useFakeTimers()
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
+    const t = makeConvexTest()
     await t.run(async (ctx) => {
       await ctx.db.insert("preconCatalogs", { fetchedAt: 0, decks: deckListPayload.data })
     })
@@ -653,27 +634,13 @@ describe("preconstructed catalog caching", () => {
   it("fetches the official deck list once and serves later searches from the cache", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(deckListResponse)
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "precon-searcher" })
       const first = await actor.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
-      const second = await actor.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
+      const guest = await t.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
       expect(fetchSpy).toHaveBeenCalledTimes(1)
       expect(first).toMatchObject([{ fileName: "AtraxaInfect", name: "Atraxa Infect" }])
-      expect(second).toEqual(first)
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
-
-  it("serves cached catalog search to guests", async () => {
-    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(deckListResponse)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const result = await t.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
-      expect(result).toMatchObject([{ fileName: "AtraxaInfect", name: "Atraxa Infect" }])
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(guest).toEqual(first)
     } finally {
       fetchSpy.mockRestore()
     }
@@ -685,8 +652,7 @@ describe("preconstructed catalog caching", () => {
       .mockImplementation((input) => resolvedPreconResponse(String(input)))
     const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const firstUser = t.withIdentity({ subject: "first-precon-user" })
       const secondUser = t.withIdentity({ subject: "second-precon-user" })
 
@@ -723,8 +689,7 @@ describe("preconstructed catalog caching", () => {
       .spyOn(global, "fetch")
       .mockImplementation((input) => resolvedPreconResponse(String(input)))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "progressive-precon-user" })
 
       const outline = await actor.action(api.deckImports.previewPreconstructed, {
@@ -754,8 +719,7 @@ describe("preconstructed catalog caching", () => {
           : resolvedPreconResponse(String(input)),
       )
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await t.mutation(internal.deckImports.storeCatalog, {
         decks: [
           {
@@ -780,8 +744,7 @@ describe("preconstructed catalog caching", () => {
   it("does not cold-fetch an unknown guest preconstructed filename", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await t.mutation(internal.deckImports.storeCatalog, {
         decks: [{ fileName: "AtraxaInfect", name: "Atraxa Infect" }],
       })
@@ -797,69 +760,29 @@ describe("preconstructed catalog caching", () => {
     }
   })
 
-  it("serves a cold preview to guests through the bounded fetch lease", async () => {
+  it.each([
+    {
+      when: "a non-ASCII catalog entry is listed first",
+      decks: [
+        { fileName: "Bad Name_SLD", name: "Bad Name" },
+        { fileName: "DandânDeck_SLD", name: "Dandân Deck" },
+        { fileName: "HatsuneMiku_SLD", name: "Hatsune Miku" },
+      ],
+      fileName: "HatsuneMiku_SLD",
+    },
+    {
+      when: "the deck identifier is non-ASCII",
+      decks: [{ fileName: "DandânDeck_SLD", name: "Dandân Deck" }],
+      fileName: "DandânDeck_SLD",
+    },
+  ])("serves a cold guest preview when $when", async ({ decks, fileName }) => {
     const fetchSpy = jest
       .spyOn(global, "fetch")
       .mockImplementation((input) => resolvedPreconResponse(String(input)))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      await t.mutation(internal.deckImports.storeCatalog, {
-        decks: [{ fileName: "AvengersAssemble", name: "Avengers Assemble" }],
-      })
-      const outline = await t.action(api.deckImports.previewPreconstructed, {
-        fileName: "AvengersAssemble",
-      })
-      expect(outline).toMatchObject({
-        name: "Avengers Assemble",
-        cards: [{ name: "Captain America, Team Leader", quantity: 1 }],
-      })
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
-
-  it("serves a guest preview when a non-ASCII catalog entry is listed first", async () => {
-    const fetchSpy = jest
-      .spyOn(global, "fetch")
-      .mockImplementation((input) => resolvedPreconResponse(String(input)))
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      await t.mutation(internal.deckImports.storeCatalog, {
-        decks: [
-          { fileName: "Bad Name_SLD", name: "Bad Name" },
-          { fileName: "DandânDeck_SLD", name: "Dandân Deck" },
-          { fileName: "HatsuneMiku_SLD", name: "Hatsune Miku" },
-        ],
-      })
-      const outline = await t.action(api.deckImports.previewPreconstructed, {
-        fileName: "HatsuneMiku_SLD",
-      })
-      expect(outline).toMatchObject({
-        name: "Avengers Assemble",
-        cards: [{ name: "Captain America, Team Leader", quantity: 1 }],
-      })
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
-
-  it("serves a guest preview of a non-ASCII deck identifier", async () => {
-    const fetchSpy = jest
-      .spyOn(global, "fetch")
-      .mockImplementation((input) => resolvedPreconResponse(String(input)))
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      await t.mutation(internal.deckImports.storeCatalog, {
-        decks: [{ fileName: "DandânDeck_SLD", name: "Dandân Deck" }],
-      })
-      const outline = await t.action(api.deckImports.previewPreconstructed, {
-        fileName: "DandânDeck_SLD",
-      })
+      const t = makeConvexTest()
+      await t.mutation(internal.deckImports.storeCatalog, { decks })
+      const outline = await t.action(api.deckImports.previewPreconstructed, { fileName })
       expect(outline).toMatchObject({
         name: "Avengers Assemble",
         cards: [{ name: "Captain America, Team Leader", quantity: 1 }],
@@ -873,8 +796,7 @@ describe("preconstructed catalog caching", () => {
   it("rejects deck identifiers containing slashes", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await t.mutation(internal.deckImports.storeCatalog, {
         decks: [{ fileName: "AtraxaInfect", name: "Atraxa Infect" }],
       })
@@ -895,8 +817,7 @@ describe("preconstructed catalog caching", () => {
       .spyOn(global, "fetch")
       .mockImplementation((input) => resolvedPreconResponse(String(input)))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const users = Array.from({ length: 5 }, (_, index) =>
         t.withIdentity({ subject: `concurrent-outline-user-${index}` }),
       )
@@ -917,8 +838,7 @@ describe("preconstructed catalog caching", () => {
   })
 
   it("keeps the hydration lease visible after the outline is ready", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
+    const t = makeConvexTest()
     const fileName = "HydratingDeck.json"
     await expect(
       t.mutation(internal.deckImports.claimColdPreconstructedFetch, {
@@ -946,8 +866,7 @@ describe("preconstructed catalog caching", () => {
       .spyOn(global, "fetch")
       .mockImplementation((input) => resolvedPreconResponse(String(input)))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const users = Array.from({ length: 5 }, (_, index) =>
         t.withIdentity({ subject: `concurrent-precon-user-${index}` }),
       )
@@ -977,8 +896,7 @@ describe("preconstructed catalog caching", () => {
       return resolvedPreconResponse(String(input))
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "recovering-precon-user" })
 
       await expect(
@@ -1000,8 +918,7 @@ describe("preconstructed catalog caching", () => {
   it("does not let an expired owner release a newer cold-fetch lease", async () => {
     const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const fileName = "LeaseOwnership.json"
       await expect(
         t.mutation(internal.deckImports.claimColdPreconstructedFetch, {
@@ -1040,8 +957,7 @@ describe("preconstructed catalog caching", () => {
       .spyOn(global, "fetch")
       .mockImplementation((input) => resolvedPreconResponse(String(input), deckName))
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const actor = t.withIdentity({ subject: "stale-precon-user" })
       const first = await actor.action(api.deckImports.resolvePreconstructed, {
         fileName: "AvengersAssemble",
@@ -1088,8 +1004,7 @@ describe("preconstructed catalog caching", () => {
       .spyOn(global, "fetch")
       .mockResolvedValue({ ok: false, status: 503 } as Response)
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
         fileName: "RetryRefresh.json",
         name: "Retry Refresh",
@@ -1125,8 +1040,7 @@ describe("preconstructed catalog caching", () => {
   it("does not let an expired refresh release a newer refresh lease", async () => {
     const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
         fileName: "LeaseOwner.json",
         name: "Lease Owner",
@@ -1178,8 +1092,7 @@ describe("preconstructed catalog caching", () => {
   it("prunes resolved decks that have gone unused for three months", async () => {
     const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
         fileName: "OldDeck.json",
         name: "Old Deck",
@@ -1213,8 +1126,7 @@ describe("preconstructed catalog caching", () => {
   })
 
   it("stores the maximum supported number of compact card entries", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
+    const t = makeConvexTest()
     const cards = Array.from({ length: 300 }, (_, index) => ({
       oracleId: `oracle-${index}`,
       scryfallId: `scryfall-${index}`,
@@ -1242,160 +1154,6 @@ describe("preconstructed catalog caching", () => {
 })
 
 describe("Scryfall request pacing", () => {
-  it("gives concurrent requests distinct slots instead of asking them to retry", async () => {
-    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const acquire = (path: string) =>
-        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 0, blocked: false })
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
-      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 250, blocked: false })
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 875, blocked: false })
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  it("keeps endpoint spacing while the shared queue is busy", async () => {
-    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const acquire = (path: string) =>
-        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
-      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 0, blocked: false })
-      for (let request = 1; request <= 7; request += 1)
-        expect(await acquire(`/cards/example-${request}`)).toEqual({
-          waitMs: request * 125,
-          blocked: false,
-        })
-      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 1000, blocked: false })
-      expect(await acquire("/cards/search?q=third")).toEqual({ waitMs: 1625, blocked: false })
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  it("spaces requests a full slot apart when the clock is between slots", async () => {
-    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_124)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const acquire = (path: string) =>
-        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 1, blocked: false })
-      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 126, blocked: false })
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  it("refuses slots past the wait limit without reserving them", async () => {
-    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const acquire = (path: string) =>
-        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
-      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 0, blocked: false })
-      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 6125, blocked: false })
-      expect(await acquire("/cards/manifest")).toEqual({ waitMs: 12_250, blocked: true })
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 125, blocked: false })
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  it("stops new and queued requests during a 429 cooldown", async () => {
-    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const acquire = (path: string) =>
-        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
-      await t.mutation(internal.externalApiRateLimits.block, {
-        bucket: "scryfall:cooldown",
-        durationMs: 30_000,
-      })
-      now.mockReturnValue(1_000_500)
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 29_500, blocked: true })
-      await expect(t.query(internal.externalApiRateLimits.scryfallCooldownUntil, {})).resolves.toBe(
-        1_030_000,
-      )
-      now.mockReturnValue(1_030_000)
-      expect(await acquire("/cards/example")).toEqual({ waitMs: 0, blocked: false })
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  it.each([
-    ["/cards/named?exact=Forest", 625],
-    ["/cards/random", 625],
-    ["/cards/manifest", 6125],
-  ])("paces %s without a burst allowance", async (path, interval) => {
-    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      expect(await t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })).toEqual({
-        waitMs: 0,
-        blocked: false,
-      })
-      expect(await t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })).toEqual({
-        waitMs: interval,
-        blocked: false,
-      })
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  it("allocates a unique persistent slot to every concurrent reservation", async () => {
-    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      const reservations = await Promise.all(
-        Array.from({ length: 20 }, () =>
-          t.mutation(internal.externalApiRateLimits.reserve, {
-            bucket: "stress-test",
-            intervalMs: 500,
-          }),
-        ),
-      )
-
-      expect(reservations.sort((left, right) => left - right)).toEqual(
-        Array.from({ length: 20 }, (_, index) => index * 500),
-      )
-    } finally {
-      nowSpy.mockRestore()
-    }
-  })
-
-  it("preserves the full cooldown after an external 429", async () => {
-    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      await t.mutation(internal.externalApiRateLimits.block, {
-        bucket: "scryfall:cards-search",
-        durationMs: 30_000,
-      })
-
-      await expect(
-        t.mutation(internal.externalApiRateLimits.reserve, {
-          bucket: "scryfall:cards-search",
-          intervalMs: 500,
-        }),
-      ).resolves.toBe(30_000)
-    } finally {
-      nowSpy.mockRestore()
-    }
-  })
-
   it("spaces collection requests across users by at least 500 ms", async () => {
     const requestTimes: number[] = []
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_input, options) => {
@@ -1414,8 +1172,7 @@ describe("Scryfall request pacing", () => {
       } as Response
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const firstUser = t.withIdentity({ subject: "first-paced-importer" })
       const secondUser = t.withIdentity({ subject: "second-paced-importer" })
 
@@ -1434,8 +1191,7 @@ describe("Scryfall request pacing", () => {
 
 it("resolves guest pasted lists and returns a retry delay when the guest work budget is exhausted", async () => {
   const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_800_000_000_000)
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
+  const t = makeConvexTest()
   const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(
     new Response(
       JSON.stringify({

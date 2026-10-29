@@ -1,4 +1,4 @@
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import { deletedIdentityHash } from "./lib/auth"
 import { readRevenueCatSnapshot } from "./lib/revenueCat"
@@ -53,12 +53,6 @@ function sendWebhook(t: ConvexTestHarness, event: Record<string, unknown>) {
   return t.fetch("/revenuecat/webhooks", webhook(event))
 }
 
-async function createUser(t: ConvexTestHarness, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
-}
-
 async function entitlements(t: ConvexTestHarness, clerkUserId: string) {
   return await t.run(async (ctx) => {
     const user = await ctx.db
@@ -89,7 +83,7 @@ describe("RevenueCat entitlement sync", () => {
 
   it("authenticates webhooks and syncs every premium feature for an alias once", async () => {
     const t = makeConvexTest()
-    await createUser(t, "clerk_alias")
+    await signedIn(t, "clerk_alias")
     const fetchSpy = jest
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(subscriberResponse({ enabled: true, observedAt: 200 }))
@@ -128,7 +122,7 @@ describe("RevenueCat entitlement sync", () => {
 
   it("keeps the newest fetched state when webhook delivery is out of order", async () => {
     const t = makeConvexTest()
-    await createUser(t, "clerk_ordered")
+    await signedIn(t, "clerk_ordered")
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 200 }))
     fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: false, observedAt: 100 }))
@@ -155,7 +149,7 @@ describe("RevenueCat entitlement sync", () => {
 
   it("returns a retryable failure without deduping a failed subscriber fetch", async () => {
     const t = makeConvexTest()
-    await createUser(t, "clerk_retry")
+    await signedIn(t, "clerk_retry")
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     fetchSpy.mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
     fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 300 }))
@@ -196,7 +190,7 @@ describe("RevenueCat entitlement sync", () => {
       ).status,
     ).toBe(200)
 
-    await createUser(t, "clerk_later")
+    await signedIn(t, "clerk_later")
     expect(await entitlements(t, "clerk_later")).toEqual(
       expect.arrayContaining([expect.objectContaining({ feature: "full_history", enabled: true })]),
     )
@@ -234,89 +228,73 @@ describe("RevenueCat entitlement sync", () => {
     expect(await t.run((ctx) => ctx.db.query("revenueCatCustomerStates").collect())).toEqual([])
   })
 
-  it("revokes transfer source with shared subscriber data and ignores sandbox events", async () => {
-    const t = makeConvexTest()
-    await createUser(t, "clerk_source")
-    await createUser(t, "clerk_destination")
-    const fetchSpy = jest
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async () => subscriberResponse({ enabled: true, observedAt: 500 }))
-    await t.withIdentity({ subject: "clerk_source" }).action(api.revenuecat.syncCurrent, {})
-    expect((await entitlements(t, "clerk_source"))[0]).toMatchObject({ enabled: true })
-    expect(
-      (
-        await sendWebhook(t, {
-          id: "event-transfer",
-          type: "TRANSFER",
-          event_timestamp_ms: 500,
-          environment: "PRODUCTION",
-          transferred_from: ["clerk_source"],
-          transferred_to: ["clerk_destination"],
-        })
-      ).status,
-    ).toBe(200)
-    expect((await entitlements(t, "clerk_source"))[0]).toMatchObject({ enabled: false })
-    expect((await entitlements(t, "clerk_destination"))[0]).toMatchObject({ enabled: true })
+  it.each([
+    ["scryve_pro_monthly", "pro_decks_limit"],
+    ["foil_yearly", "foil"],
+  ])(
+    "revokes a transferred-away %s subscription's %s and ignores sandbox events",
+    async (productIdentifier, feature) => {
+      const t = makeConvexTest()
+      await signedIn(t, "clerk_source")
+      await signedIn(t, "clerk_destination")
+      const fetchSpy = jest
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () =>
+          subscriberResponse({ enabled: true, observedAt: 500, productIdentifier }),
+        )
+      const enabled = async (clerkUserId: string) =>
+        (await entitlements(t, clerkUserId)).find((row) => row.feature === feature)?.enabled
+      await t.withIdentity({ subject: "clerk_source" }).action(api.revenuecat.syncCurrent, {})
+      expect(await enabled("clerk_source")).toBe(true)
+      expect(
+        (
+          await sendWebhook(t, {
+            id: "event-transfer",
+            type: "TRANSFER",
+            event_timestamp_ms: 500,
+            environment: "PRODUCTION",
+            transferred_from: ["clerk_source"],
+            transferred_to: ["clerk_destination"],
+          })
+        ).status,
+      ).toBe(200)
+      expect(await enabled("clerk_source")).toBe(false)
+      expect(await enabled("clerk_destination")).toBe(true)
 
-    expect(
-      (
-        await sendWebhook(t, {
-          id: "event-sandbox",
-          type: "RENEWAL",
-          event_timestamp_ms: 600,
-          environment: "SANDBOX",
-          app_user_id: "clerk_destination",
-          original_app_user_id: "clerk_destination",
-          aliases: [],
-        })
-      ).status,
-    ).toBe(200)
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+      expect(
+        (
+          await sendWebhook(t, {
+            id: "event-sandbox",
+            type: "RENEWAL",
+            event_timestamp_ms: 600,
+            environment: "SANDBOX",
+            app_user_id: "clerk_destination",
+            original_app_user_id: "clerk_destination",
+            aliases: [],
+          })
+        ).status,
+      ).toBe(200)
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
 
-    expect(
-      (
-        await sendWebhook(t, {
-          id: "event-test",
-          type: "TEST",
-          event_timestamp_ms: 700,
-          environment: "PRODUCTION",
-        })
-      ).status,
-    ).toBe(200)
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
-  })
-
-  it("revokes foil from a transferred-away Foil subscription", async () => {
-    const t = makeConvexTest()
-    await createUser(t, "clerk_foil_source")
-    await createUser(t, "clerk_foil_destination")
-    jest
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async () =>
-        subscriberResponse({ enabled: true, observedAt: 500, productIdentifier: "foil_yearly" }),
-      )
-    const foil = async (clerkUserId: string) =>
-      (await entitlements(t, clerkUserId)).find(({ feature }) => feature === "foil")?.enabled
-    await t.withIdentity({ subject: "clerk_foil_source" }).action(api.revenuecat.syncCurrent, {})
-    expect(await foil("clerk_foil_source")).toBe(true)
-
-    await sendWebhook(t, {
-      id: "event-foil-transfer",
-      type: "TRANSFER",
-      event_timestamp_ms: 500,
-      environment: "PRODUCTION",
-      transferred_from: ["clerk_foil_source"],
-      transferred_to: ["clerk_foil_destination"],
-    })
-    expect(await foil("clerk_foil_source")).toBe(false)
-    expect(await foil("clerk_foil_destination")).toBe(true)
-  })
+      expect(
+        (
+          await sendWebhook(t, {
+            id: "event-test",
+            type: "TEST",
+            event_timestamp_ms: 700,
+            environment: "PRODUCTION",
+          })
+        ).status,
+      ).toBe(200)
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+    },
+  )
 
   it.each(["scryve_pro_monthly", "foil_yearly"])(
     "maps %s subscription state to the same Pro access",
     async (productIdentifier) => {
       const t = makeConvexTest()
-      const actor = await createUser(t, "clerk_status")
+      const actor = await signedIn(t, "clerk_status")
       const fetchSpy = jest.spyOn(globalThis, "fetch")
       fetchSpy.mockResolvedValueOnce(
         subscriberResponse({ enabled: true, observedAt: 700, productIdentifier }),
@@ -369,7 +347,7 @@ describe("RevenueCat entitlement sync", () => {
 
   it("requires a matching subscription before granting Pro access", async () => {
     const t = makeConvexTest()
-    const actor = await createUser(t, "clerk_without_subscription")
+    const actor = await signedIn(t, "clerk_without_subscription")
     jest.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({
         request_date_ms: 700,
@@ -394,7 +372,7 @@ describe("RevenueCat entitlement sync", () => {
 
   it("grants foil only to an active Foil subscription", async () => {
     const t = makeConvexTest()
-    const actor = await createUser(t, "clerk_foil")
+    const actor = await signedIn(t, "clerk_foil")
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     const foil = async () =>
       (await entitlements(t, "clerk_foil")).find(({ feature }) => feature === "foil")?.enabled
@@ -418,7 +396,7 @@ describe("RevenueCat entitlement sync", () => {
 
   it("lets only the authenticated caller refresh their current state", async () => {
     const t = makeConvexTest()
-    const actor = await createUser(t, "clerk_action")
+    const actor = await signedIn(t, "clerk_action")
     const fetchSpy = jest
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(subscriberResponse({ enabled: true, observedAt: 700 }))

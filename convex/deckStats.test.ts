@@ -1,27 +1,8 @@
 import type { FunctionArgs } from "convex/server"
-import { convexTest } from "convex-test"
 
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import { addDeckResult } from "./lib/deckResults"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./deckStats.ts": async () => jest.requireActual("./deckStats"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./matches.ts": async () => jest.requireActual("./matches"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
-
-async function signedIn(subject = "owner") {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return { t, actor }
-}
 
 const T = 1_700_000_000_000
 const list = (n: number) => `v1:${String(n).repeat(64)}`
@@ -59,7 +40,8 @@ function game(
 }
 
 it("breaks a deck's results down by source, list and pod size for its owner only", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   await actor.mutation(
     api.games.publishFinishedLocalGame,
     game("local-game-000000001", { win: true, fingerprint: list(1), finishedAt: T + 1_000 }),
@@ -123,8 +105,7 @@ it("breaks a deck's results down by source, list and pod size for its owner only
     ]),
   )
 
-  const other = t.withIdentity({ subject: "other" })
-  await other.mutation(api.users.syncCurrent, { displayName: "other" })
+  const other = await signedIn(t, "other")
   expect(await other.query(api.deckStats.summary, { deckKey: "burn" })).toMatchObject({
     all: null,
     lists: [],
@@ -134,7 +115,7 @@ it("breaks a deck's results down by source, list and pod size for its owner only
 })
 
 it("pages a deck's games newest first with filters and the ids History opens", async () => {
-  const { actor } = await signedIn()
+  const actor = await signedIn(makeConvexTest(), "owner")
   for (const [index, fingerprint] of [list(1), undefined, list(1)].entries())
     await actor.mutation(
       api.games.publishFinishedLocalGame,
@@ -176,7 +157,8 @@ it("pages a deck's games newest first with filters and the ids History opens", a
 })
 
 it("caps breakdowns at 200 recent results while keeping exact lifetime and list totals", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   await t.run(async (ctx) => {
     const userId = (await ctx.db.query("users").first())!._id
     for (let index = 0; index < 200; index++)
@@ -220,7 +202,8 @@ it("caps breakdowns at 200 recent results while keeping exact lifetime and list 
 })
 
 it("masks a blocked opponent's name the way History does", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   await actor.mutation(
     api.games.publishFinishedLocalGame,
     game("local-game-000000009", { win: true, finishedAt: T }),
@@ -264,7 +247,8 @@ it("masks a blocked opponent's name the way History does", async () => {
 })
 
 it("counts a connected match through its games only", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const userId = (await t.run(async (ctx) => ctx.db.query("users").first()))!._id
   await t.run(async (ctx) => {
     for (const [resultId, kind, outcome] of [
@@ -294,7 +278,8 @@ it("counts a connected match through its games only", async () => {
 })
 
 it("lists each of the caller's deck keys with its total record", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   await actor.mutation(
     api.games.publishFinishedLocalGame,
     game("local-game-000000001", { win: true, fingerprint: list(1), finishedAt: T }),
@@ -302,13 +287,13 @@ it("lists each of the caller's deck keys with its total record", async () => {
   expect(await actor.query(api.deckStats.totalsByKey, {})).toEqual([
     { deckKey: "burn", games: 1, wins: 1, losses: 0, draws: 0, unknown: 0 },
   ])
-  const other = t.withIdentity({ subject: "other" })
-  await other.mutation(api.users.syncCurrent, { displayName: "other" })
+  const other = await signedIn(t, "other")
   expect(await other.query(api.deckStats.totalsByKey, {})).toEqual([])
 })
 
 it("includes manual match totals in each deck key's total", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   await t.run(async (ctx) => {
     await addDeckResult(ctx, {
       userId: (await ctx.db.query("users").first())!._id,
@@ -335,7 +320,8 @@ it("includes manual match totals in each deck key's total", async () => {
 })
 
 it("separates true, false and untracked turn order slices and combines game filters", async () => {
-  const { t, actor } = await signedIn()
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   for (const [index, firstPlayerLocalId] of ["seat-0", "seat-1", undefined].entries()) {
     await actor.mutation(api.games.publishFinishedLocalGame, {
       ...game(`turn-order-game-00000${index}`, {
@@ -370,8 +356,7 @@ it("separates true, false and untracked turn order slices and combines game filt
     paginationOpts: { numItems: 10, cursor: null },
   })
   expect(all.page).toHaveLength(3)
-  const other = t.withIdentity({ subject: "other" })
-  await other.mutation(api.users.syncCurrent, { displayName: "Other" })
+  const other = await signedIn(t, "other", "Other")
   expect(
     await other.query(api.deckStats.games, {
       deckKey: "burn",

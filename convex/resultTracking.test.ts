@@ -1,9 +1,6 @@
-import { convexTest } from "convex-test"
-
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type * as Definitions from "./lib/systems/definitions"
-import schema from "./schema"
 
 jest.mock("./lib/systems/definitions", () => {
   const actual: typeof Definitions = jest.requireActual("./lib/systems/definitions")
@@ -13,20 +10,9 @@ jest.mock("./lib/systems/definitions", () => {
   }
 })
 
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./matches.ts": async () => jest.requireActual("./matches"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
-
 it("a system without result tracking keeps the game but writes no deck results or stats", async () => {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
-  const actor = t.withIdentity({ subject: "owner" })
-  await actor.mutation(api.users.syncCurrent, { displayName: "owner" })
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const deckId = await actor.mutation(api.decks.create, {
     name: "Burn",
     format: "modern",

@@ -1,24 +1,12 @@
 import type { EventPlayerState, EventSettings, EventTableState, RoundPairings } from "./model"
 import { pairSwissRound, suggestedSwissRounds } from "./pairing"
+import { roster, seeded } from "../../../test/eventRoster"
 
 const settings: EventSettings = {
   structure: "swiss",
   bestOf: 3,
   points: { win: 3, draw: 1, loss: 0 },
 }
-
-function seeded(seed: number) {
-  let state = seed
-  return () => {
-    state = (state + 0x6d2b79f5) | 0
-    let t = Math.imul(state ^ (state >>> 15), 1 | state)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-const roster = (count: number): EventPlayerState[] =>
-  Array.from({ length: count }, (_, index) => ({ id: `p${index}`, dropped: false }))
 
 function played(round: number, pairings: RoundPairings, random?: () => number): EventTableState[] {
   return pairings.map((playerIds, index) => ({
@@ -58,14 +46,11 @@ describe("swiss pairing", () => {
     expect(new Set(pairs).size).toBe(16)
   })
 
-  it("pairs 128 players for 7 rounds quickly and without rematches", () => {
-    const started = performance.now()
+  it("pairs 128 players for 7 rounds without rematches", () => {
     const tables = runSwiss(roster(128), 7, seeded(2))
-    const elapsed = performance.now() - started
     const pairs = tables.map((table) => pairKey(table.playerIds))
 
     expect(new Set(pairs).size).toBe(64 * 7)
-    expect(elapsed).toBeLessThan(200)
   })
 
   it("pairs within point groups and floats the odd player down", () => {

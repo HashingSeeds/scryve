@@ -1,4 +1,4 @@
-import { makeConvexTest } from "../test/convexTest"
+import { makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import { RECEIPT_PRUNE_BATCH_SIZE, RECEIPT_RETENTION_MS } from "./crons"
 
@@ -95,8 +95,7 @@ describe("receipt pruning", () => {
 
   it("still deduplicates a retried operation inside the retention window", async () => {
     const t = makeConvexTest()
-    const owner = t.withIdentity({ subject: "retry-owner" })
-    await owner.mutation(api.users.syncCurrent, { displayName: "retry-owner" })
+    const owner = await signedIn(t, "retry-owner")
     const createOperation = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     const created = await owner.mutation(
       api.decks.syncWrite,
@@ -122,8 +121,7 @@ describe("receipt pruning", () => {
 
   it("keeps deck version receipts so an old version create still replays once", async () => {
     const t = makeConvexTest()
-    const owner = t.withIdentity({ subject: "version-owner" })
-    await owner.mutation(api.users.syncCurrent, { displayName: "version-owner" })
+    const owner = await signedIn(t, "version-owner")
     const deckId = await owner.mutation(api.decks.create, { name: "Deck", format: "commander" })
     await t.run(async (ctx) => {
       const deck = await ctx.db.get(deckId)
@@ -166,8 +164,7 @@ describe("receipt pruning", () => {
 
   it("turns a game publish or completion retried after pruning into no new writes", async () => {
     const t = makeConvexTest()
-    const host = t.withIdentity({ subject: "publish-host" })
-    await host.mutation(api.users.syncCurrent, { displayName: "Host" })
+    const host = await signedIn(t, "publish-host", "Host")
     const publish = {
       operationId: "publish-operation-00000001",
       publicId: "published-game-id-00001",

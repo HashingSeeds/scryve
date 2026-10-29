@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 
 import { registerRateLimiter } from "./registerRateLimiter"
+import { api } from "../convex/_generated/api"
 import schema from "../convex/schema"
 
 const convexDirectory = join(__dirname, "../convex")
@@ -29,3 +30,9 @@ export function makeConvexTest() {
 }
 
 export type ConvexTestHarness = ReturnType<typeof makeConvexTest>
+
+export async function signedIn(t: ConvexTestHarness, subject: string, displayName = subject) {
+  const actor = t.withIdentity({ subject })
+  const userId = await actor.mutation(api.users.syncCurrent, { displayName })
+  return Object.assign(actor, { userId })
+}

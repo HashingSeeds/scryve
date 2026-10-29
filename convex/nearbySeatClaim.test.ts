@@ -1,21 +1,8 @@
 import type { FunctionArgs } from "convex/server"
-import { convexTest } from "convex-test"
 
+import { makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import { hashSeatPassToken } from "./lib/seatPass"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const FINISHED_AT = 1_700_000_900_000
 const PUBLIC_ID = "lan_0123456789abcdef0123456789abcdef-1"
@@ -24,12 +11,6 @@ const OTHER_TOKEN = "token_other"
 
 type PublishArgs = FunctionArgs<typeof api.games.publishFinishedLocalGame>
 type Players = PublishArgs["players"]
-
-async function synced(t: ReturnType<typeof convexTest>, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
-}
 
 async function nearbyGame(players?: Players, publicId = PUBLIC_ID): Promise<PublishArgs> {
   return {
@@ -71,20 +52,20 @@ async function nearbyGame(players?: Players, publicId = PUBLIC_ID): Promise<Publ
   }
 }
 
-async function ownedDeck(actor: Awaited<ReturnType<typeof synced>>, format = "commander") {
+async function ownedDeck(actor: Awaited<ReturnType<typeof signedIn>>, format = "commander") {
   const deckId = await actor.mutation(api.decks.create, { name: "Atraxa", format })
   const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
   return { deckId, versionId }
 }
 
-const historyOf = (actor: Awaited<ReturnType<typeof synced>>) =>
+const historyOf = (actor: Awaited<ReturnType<typeof signedIn>>) =>
   actor.query(api.games.connectedHistory, { paginationOpts: { numItems: 10, cursor: null } })
 
 describe("claimNearbySeat", () => {
   it("waits for the host's upload, then files the game under the guest once", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const guest = await synced(t, "guest")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
     const claim = { publicId: PUBLIC_ID, token: GUEST_TOKEN }
 
     await expect(guest.mutation(api.games.claimNearbySeat, claim)).resolves.toEqual({
@@ -123,9 +104,9 @@ describe("claimNearbySeat", () => {
   })
 
   it("counts the guest's own deck toward its stats once", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const guest = await synced(t, "guest")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
     const { deckId, versionId } = await ownedDeck(guest)
     await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
     const claim = { publicId: PUBLIC_ID, token: GUEST_TOKEN, deckVersionId: versionId }
@@ -151,10 +132,10 @@ describe("claimNearbySeat", () => {
   })
 
   it("still files the seat when the deck isn't the guest's own or doesn't fit the game", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const guest = await synced(t, "guest")
-    const other = await synced(t, "other")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
+    const other = await signedIn(t, "other")
     const { versionId: hostDeck } = await ownedDeck(host)
     const { versionId: modernDeck } = await ownedDeck(other, "modern")
     await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
@@ -180,10 +161,10 @@ describe("claimNearbySeat", () => {
   })
 
   it("finds no seat for a wrong pass, and refuses a held seat or a second seat for one account", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const guest = await synced(t, "guest")
-    const intruder = await synced(t, "intruder")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
+    const intruder = await signedIn(t, "intruder")
     const { publicId } = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
 
     await expect(
@@ -206,8 +187,8 @@ describe("claimNearbySeat", () => {
   })
 
   it("refuses a seat to the host of a game it holds no seat in", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
     const [mine, guest, other] = (await nearbyGame()).players
     const { publicId } = await host.mutation(
       api.games.publishFinishedLocalGame,
@@ -224,8 +205,8 @@ describe("claimNearbySeat", () => {
   })
 
   it("rejects a pass hash on the host's own seat, a malformed hash, and a repeated hash", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
     const valid = await nearbyGame()
     const [mine, guest, other] = valid.players
     const hash = guest.seatPassHash!
@@ -241,10 +222,10 @@ describe("claimNearbySeat", () => {
   })
 
   it("keeps the host's upload and every claim working when a guest publishes under the round first", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const hostile = await synced(t, "hostile")
-    const other = await synced(t, "other")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const hostile = await signedIn(t, "hostile")
+    const other = await signedIn(t, "other")
     const [mine, guestSeat, otherSeat] = (await nearbyGame()).players
     const plain = [
       mine,
@@ -269,9 +250,9 @@ describe("claimNearbySeat", () => {
   })
 
   it("files each round a pass was reused in under that round", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const guest = await synced(t, "guest")
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
     const secondRound = "lan_0123456789abcdef0123456789abcdef-2"
     const first = await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
     const second = await host.mutation(
@@ -293,34 +274,39 @@ describe("claimNearbySeat", () => {
     jest.useFakeTimers()
     const previousClerkSecret = process.env.CLERK_SECRET_KEY
     process.env.CLERK_SECRET_KEY = "sk_test_nearby_claim"
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "host")
-    const guest = await synced(t, "guest")
-    const intruder = await synced(t, "intruder")
-    await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
-    const claim = { publicId: PUBLIC_ID, token: GUEST_TOKEN }
-    await guest.mutation(api.games.claimNearbySeat, claim)
-    const request = await guest.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
-      confirmation: "DELETE",
-    })
-    await t.mutation(internal.accountDeletion.processMemberships, { requestId: request.requestId })
+    try {
+      const t = makeConvexTest()
+      const host = await signedIn(t, "host")
+      const guest = await signedIn(t, "guest")
+      const intruder = await signedIn(t, "intruder")
+      await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+      const claim = { publicId: PUBLIC_ID, token: GUEST_TOKEN }
+      await guest.mutation(api.games.claimNearbySeat, claim)
+      const request = await guest.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+        confirmation: "DELETE",
+      })
+      await t.mutation(internal.accountDeletion.processMemberships, {
+        requestId: request.requestId,
+      })
 
-    await expect(intruder.mutation(api.games.claimNearbySeat, claim)).resolves.toEqual({
-      status: "pending",
-    })
-    expect((await historyOf(intruder)).page).toHaveLength(0)
-    const seat = await t.run((ctx) =>
-      ctx.db
-        .query("gamePlayers")
-        .filter((q) => q.eq(q.field("seat"), 2))
-        .unique(),
-    )
-    expect(seat).not.toHaveProperty("userId")
-    expect(seat).not.toHaveProperty("seatPassHash")
-    expect(seat?.deletedAt).toEqual(expect.any(Number))
-    jest.clearAllTimers()
-    jest.useRealTimers()
-    if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY
-    else process.env.CLERK_SECRET_KEY = previousClerkSecret
+      await expect(intruder.mutation(api.games.claimNearbySeat, claim)).resolves.toEqual({
+        status: "pending",
+      })
+      expect((await historyOf(intruder)).page).toHaveLength(0)
+      const seat = await t.run((ctx) =>
+        ctx.db
+          .query("gamePlayers")
+          .filter((q) => q.eq(q.field("seat"), 2))
+          .unique(),
+      )
+      expect(seat).not.toHaveProperty("userId")
+      expect(seat).not.toHaveProperty("seatPassHash")
+      expect(seat?.deletedAt).toEqual(expect.any(Number))
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+      if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY
+      else process.env.CLERK_SECRET_KEY = previousClerkSecret
+    }
   })
 })

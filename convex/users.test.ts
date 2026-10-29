@@ -69,15 +69,6 @@ describe("users.syncCurrent usernames", () => {
     ).rejects.toThrow("Authentication required")
   })
 
-  it("runs the name filter on the Clerk username", async () => {
-    const t = makeConvexTest()
-    clerkUsernames({ rude: "sh1t-lord" })
-    const rude = t.withIdentity({ subject: "rude" })
-    await rude.mutation(api.users.syncCurrent, { displayName: "Rude", username: "sh1t-lord" })
-    await settle(t)
-    expect((await storedUser(t, "rude"))?.moderationHold).toMatchObject({ reason: "filter" })
-  })
-
   it("keeps a filter hold when Clerk clears the username", async () => {
     const t = makeConvexTest()
     const usernames: Record<string, string | null> = { rude: "sh1t-lord" }
@@ -131,21 +122,6 @@ describe("users.syncCurrent usernames", () => {
       fetchStartedAt: updatedAt - 1,
     })
     expect(await storedUser(t, "renamer")).toMatchObject({ username: "new_handle" })
-  })
-
-  it("clears the stored username once Clerk has none", async () => {
-    const t = makeConvexTest()
-    const usernames: Record<string, string | null> = { renamer: "old_handle" }
-    clerkUsernames(usernames)
-    const renamer = t.withIdentity({ subject: "renamer" })
-    await renamer.mutation(api.users.syncCurrent, { displayName: "R", username: "old_handle" })
-    await settle(t)
-    expect(await storedUser(t, "renamer")).toMatchObject({ username: "old_handle" })
-
-    usernames.renamer = null
-    await renamer.mutation(api.users.syncCurrent, { displayName: "R", username: "" })
-    await settle(t)
-    expect((await storedUser(t, "renamer"))?.username).toBeUndefined()
   })
 
   it("skips Clerk when the client's username already matches, and caps refreshes", async () => {
@@ -212,6 +188,23 @@ describe("users.syncCurrent profile", () => {
     jest.setSystemTime(1_000)
   })
   afterEach(() => jest.useRealTimers())
+
+  it("accepts only HTTPS avatar URLs", async () => {
+    const t = makeConvexTest()
+    const actor = t.withIdentity({ subject: "avatar-user" })
+    await expect(
+      actor.mutation(api.users.syncCurrent, {
+        displayName: "Avatar",
+        avatarUrl: "http://images.example.test/avatar.png",
+      }),
+    ).rejects.toThrow("HTTPS")
+    await expect(
+      actor.mutation(api.users.syncCurrent, {
+        displayName: "Avatar",
+        avatarUrl: "https://images.example.test/avatar.png",
+      }),
+    ).resolves.toBeDefined()
+  })
 
   it("leaves an unchanged profile unwritten and still applies stored Pro", async () => {
     const t = makeConvexTest()

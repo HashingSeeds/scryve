@@ -1,44 +1,16 @@
 import type { FunctionArgs } from "convex/server"
-import { convexTest } from "convex-test"
 
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { makeConvexTest, signedIn, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import { deckFingerprint } from "./lib/deckFingerprint"
 import { assertDeckKey } from "./lib/deckKeys"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { addDeckResult, canonicalResultId, removeDeckResult } from "./lib/deckResults"
-import schema from "./schema"
 
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./matches.ts": async () => jest.requireActual("./matches"),
-  "./users.ts": async () => jest.requireActual("./users"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-}
-function setup() {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
-  return t
-}
-type Tester = ReturnType<typeof setup>
-async function account(t: Tester, subject = "owner") {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  const userId = await t.run(
-    async (ctx) =>
-      (await ctx.db
-        .query("users")
-        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", subject))
-        .unique())!._id,
-  )
-  return { actor, userId }
-}
-async function deck(t: Tester, key = "deck-key") {
-  const { actor, userId } = await account(t)
+async function deck(t: ConvexTestHarness, key = "deck-key") {
+  const actor = await signedIn(t, "owner")
+  const { userId } = actor
   const deckId = await actor.mutation(api.decks.create, {
     name: "Burn",
     format: "modern",
@@ -79,7 +51,7 @@ function manual(
     opponents: [{ seat: 2, displayName: "Them", outcome: "loss", gamesWon: 1, gamesDrawn: 1 }],
   }
 }
-async function moveVersion(t: Tester, deckId: Id<"decks">) {
+async function moveVersion(t: ConvexTestHarness, deckId: Id<"decks">) {
   return t.run(async (ctx) => {
     const current = await ctx.db
       .query("deckVersions")
@@ -91,20 +63,13 @@ async function moveVersion(t: Tester, deckId: Id<"decks">) {
     return version ? { id: version._id, updatedAt: version.updatedAt ?? version.createdAt } : null
   })
 }
-async function assertNoLegacyWrites(t: Tester) {
-  await t.run(async (ctx) => {
-    expect(await ctx.db.query("deckStats").collect()).toEqual([])
-    expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
-    expect(await ctx.db.query("deckMatchResults").collect()).toEqual([])
-  })
-}
-async function allStats(t: Tester) {
+async function allStats(t: ConvexTestHarness) {
   return await t.run(async (ctx) => ctx.db.query("deckKeyStats").collect())
 }
 
 it("writer adds once and reverses the stored deltas exactly, including envelopes", async () => {
-  const t = setup()
-  const { userId } = await account(t)
+  const t = makeConvexTest()
+  const { userId } = await signedIn(t, "owner")
   const result = {
     resultId: "match:one:1",
     userId,
@@ -182,9 +147,9 @@ it("uses the same ids for device, cloud, match and historical results", () => {
   expect(canonicalResultId({ kind: "match", publicId: "match", seat: 2 })).toBe("match:match:2")
 })
 
-it("publishes local deck keys without legacy rows, keeps local ids, and replays once", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+it("publishes local deck keys, keeps local ids, and replays once", async () => {
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const args = publish()
   args.players[0] = { ...args.players[0], deckKey: "local-only", deckFingerprint: fingerprint }
   const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
@@ -192,7 +157,6 @@ it("publishes local deck keys without legacy rows, keeps local ids, and replays 
   const state = await t.run(async (ctx) => ({
     summary: await ctx.db.get(ack.summaryId),
     results: await ctx.db.query("deckResults").collect(),
-    legacy: await ctx.db.query("deckGameResults").collect(),
   }))
   expect(state.summary).toMatchObject({
     clientGameId: args.publicId,
@@ -208,7 +172,6 @@ it("publishes local deck keys without legacy rows, keeps local ids, and replays 
       fingerprint,
     }),
   ])
-  expect(state.legacy).toEqual([])
   expect((await actor.query(api.decks.statsForKey, { deckKey: "local-only" })).all).toMatchObject({
     games: 1,
     wins: 1,
@@ -218,7 +181,7 @@ it("publishes local deck keys without legacy rows, keeps local ids, and replays 
 it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as const)(
   "records %s versions from installed clients",
   async (kind) => {
-    const t = setup()
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await deck(t)
     await t.run(async (ctx) => {
       if (kind === "missing") await ctx.db.delete(versionId)
@@ -244,16 +207,14 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
       expect(summary.players[0].deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.fingerprint).toBeUndefined()
-      expect(await ctx.db.query("deckGameResults").collect()).toHaveLength(0)
     })
-    await assertNoLegacyWrites(t)
   },
 )
 
 it("keeps each account's copy of a seat result even when ids collide", async () => {
-  const t = setup()
-  const { userId } = await account(t)
-  const other = await account(t, "other")
+  const t = makeConvexTest()
+  const { userId } = await signedIn(t, "owner")
+  const other = await signedIn(t, "other")
   const shared = {
     resultId: "game:nearby:seat-1",
     kind: "game" as const,
@@ -273,8 +234,8 @@ it("keeps each account's copy of a seat result even when ids collide", async () 
 })
 
 it("counts a deckless result for the deck its seat is later claimed with", async () => {
-  const t = setup()
-  const { userId } = await account(t)
+  const t = makeConvexTest()
+  const { userId } = await signedIn(t, "owner")
   const result = {
     resultId: "game:nearby:seat-1",
     userId,
@@ -300,7 +261,7 @@ it("counts a deckless result for the deck its seat is later claimed with", async
 it.each([true, false])(
   "attaches version counters once on a late claim, with existing key=%s",
   async (hasKey) => {
-    const t = setup()
+    const t = makeConvexTest()
     const { userId, deckId, versionId } = await deck(t)
     const result = {
       resultId: "game:late-claim:seat",
@@ -337,12 +298,11 @@ it.each([true, false])(
         losses: 0,
       })
     })
-    await assertNoLegacyWrites(t)
   },
 )
 
 it("keeps a new client's pinned key and deck name for a moved deck", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId, versionId } = await deck(t)
   await actor.mutation(api.decks.moveToDevice, {
     deckId,
@@ -368,11 +328,10 @@ it("keeps a new client's pinned key and deck name for a moved deck", async () =>
       podSize: 2,
     })
   })
-  await assertNoLegacyWrites(t)
 })
 
 it("fingerprints a new client's synced deck from its version when the device had no cards cached", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const args = { ...publish(), startedAt: Date.now(), finishedAt: Date.now() }
   args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "deck-key" }
@@ -382,7 +341,7 @@ it("fingerprints a new client's synced deck from its version when the device had
 })
 
 it("leaves the list unknown when a synced deck changed after its uncached game started", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const args = publish()
   args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "deck-key" }
@@ -393,7 +352,7 @@ it("leaves the list unknown when a synced deck changed after its uncached game s
 })
 
 it("counts synced and device-only games together", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const synced = publish("synced-game-000000001")
   synced.players[0] = { ...synced.players[0], deckVersionId: versionId, deckKey: "deck-key" }
@@ -404,12 +363,11 @@ it("counts synced and device-only games together", async () => {
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 2,
   })
-  await assertNoLegacyWrites(t)
 })
 
 it("names a local deck's results from the name its device sends", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const args = publish()
   args.players[0] = { ...args.players[0], deckKey: "local-only", deckName: "  Mono Red  " }
   const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
@@ -418,8 +376,8 @@ it("names a local deck's results from the name its device sends", async () => {
 })
 
 it("lists a synced deck with totals from games it played while only on a device", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const args = publish()
   args.players[0] = { ...args.players[0], deckKey: "deck-key", deckName: "Burn" }
   await actor.mutation(api.games.publishFinishedLocalGame, args)
@@ -443,7 +401,7 @@ it("lists a synced deck with totals from games it played while only on a device"
 })
 
 it("settles a device copy onto the live deck that already has its key", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId } = await deck(t)
   const copy = await actor.mutation(api.decks.importGuest, {
     localId: "00000000-0000-4000-8000-000000000002",
@@ -467,19 +425,19 @@ it("settles a device copy onto the live deck that already has its key", async ()
 })
 
 it("rejects another account's version even when archived", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { deckId, versionId } = await deck(t)
-  const other = await account(t, "other")
+  const other = await signedIn(t, "other")
   await t.run(async (ctx) => ctx.db.patch(deckId, { archivedAt: 1 }))
   const args = publish()
   args.players[0].deckVersionId = versionId
-  await expect(other.actor.mutation(api.games.publishFinishedLocalGame, args)).rejects.toThrow(
+  await expect(other.mutation(api.games.publishFinishedLocalGame, args)).rejects.toThrow(
     "Deck version not found",
   )
 })
 
-it("records local games and manual create/delete without legacy writes, and keeps totals when moved", async () => {
-  const t = setup()
+it("records local games and manual create/delete, and keeps totals when moved", async () => {
+  const t = makeConvexTest()
   const { actor, deckId, versionId } = await deck(t)
   const game = publish()
   game.players[0].deckVersionId = versionId
@@ -487,7 +445,6 @@ it("records local games and manual create/delete without legacy writes, and keep
   const match = manual()
   match.me.deckVersionId = versionId
   const ack = await actor.mutation(api.matches.recordManualMatch, match)
-  await assertNoLegacyWrites(t)
   expect(
     (await t.run(async (ctx) => ctx.db.query("deckResults").collect())).map(
       (row) => row.deckVersionId,
@@ -523,7 +480,6 @@ it("records local games and manual create/delete without legacy writes, and keep
   ).toEqual(moved)
   expect(await allStats(t)).toEqual(before)
   await actor.mutation(api.matches.deleteManualMatch, { matchId: ack.matchId })
-  await assertNoLegacyWrites(t)
   expect((await allStats(t))[0]).toMatchObject({
     games: 1,
     manualMatches: { total: 0 },
@@ -532,8 +488,8 @@ it("records local games and manual create/delete without legacy writes, and keep
 })
 
 it("manual local decks record a fingerprint and name without a version", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const args = manual()
   args.me.deckKey = "offline"
   args.me.deckFingerprint = fingerprint
@@ -552,9 +508,9 @@ it("manual local decks record a fingerprint and name without a version", async (
 })
 
 it("pins cloud deck keys and lists at start and copies them at finish", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId, versionId, userId } = await deck(t)
-  const second = await account(t, "second")
+  const second = await signedIn(t, "second")
   const publicId = "cloud-pinned-game-0001"
   await actor.mutation(api.games.createLobby, {
     publicId,
@@ -566,7 +522,7 @@ it("pins cloud deck keys and lists at start and copies them at finish", async ()
     hostDisplayName: "Owner",
     hostColor: "#123456",
   })
-  await second.actor.mutation(api.games.claimSeat, {
+  await second.mutation(api.games.claimSeat, {
     token: "t".repeat(43),
     displayName: "Second",
     color: "#654321",
@@ -605,7 +561,6 @@ it("pins cloud deck keys and lists at start and copies them at finish", async ()
   const results = await t.run(async (ctx) => ctx.db.query("deckResults").collect())
   expect(results).toHaveLength(2)
   expect(results[0].resultId).toBe(`game:${publicId}:${summary!.players[0].playerId}`)
-  await assertNoLegacyWrites(t)
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 1,
   })
@@ -613,8 +568,8 @@ it("pins cloud deck keys and lists at start and copies them at finish", async ()
 })
 
 it("imports guest localId, revives the same row by key and rejects live conflicts", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const localId = "00000000-0000-4000-8000-000000000001"
   const args = { localId, localUpdatedAt: 1, name: "Guest", format: "modern", cards: [] }
   const ack = await actor.mutation(api.decks.importGuest, args)
@@ -645,8 +600,8 @@ it("imports guest localId, revives the same row by key and rejects live conflict
 it.each(["", "has spaces", "x".repeat(129), "unsafe:colon"])(
   "validates deck key %j",
   async (key) => {
-    const t = setup()
-    const { actor } = await account(t)
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "owner")
     await expect(
       actor.mutation(api.decks.create, { name: "Invalid", format: "modern", deckKey: key }),
     ).rejects.toThrow("Deck key")
@@ -654,9 +609,10 @@ it.each(["", "has spaces", "x".repeat(129), "unsafe:colon"])(
 )
 
 it("statsForKey is authenticated and scoped to the caller, with at most 50 lists", async () => {
-  const t = setup()
-  const { actor, userId } = await account(t)
-  const other = await account(t, "other")
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const { userId } = actor
+  const other = await signedIn(t, "other")
   await t.run(async (ctx) => {
     for (let i = 0; i < 55; i++)
       await addDeckResult(ctx, {
@@ -674,7 +630,7 @@ it("statsForKey is authenticated and scoped to the caller, with at most 50 lists
   await expect(t.query(api.decks.statsForKey, { deckKey: "key" })).rejects.toThrow(
     "Authentication required",
   )
-  expect(await other.actor.query(api.decks.statsForKey, { deckKey: "key" })).toEqual({
+  expect(await other.query(api.decks.statsForKey, { deckKey: "key" })).toEqual({
     all: null,
     fingerprints: [],
   })
@@ -684,7 +640,7 @@ it("statsForKey is authenticated and scoped to the caller, with at most 50 lists
 })
 
 it("local uploads use the resolved deck's key over the client's key", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const args = publish()
   args.players[0] = { ...args.players[0], deckVersionId: versionId, deckKey: "some-other-key" }
@@ -693,11 +649,10 @@ it("local uploads use the resolved deck's key over the client's key", async () =
     deckKey: "deck-key",
   })
   expect((await actor.query(api.decks.statsForKey, { deckKey: "some-other-key" })).all).toBeNull()
-  await assertNoLegacyWrites(t)
 })
 
 it("manual matches use the resolved deck's key over the client's key", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const args = manual()
   args.me = { ...args.me, deckVersionId: versionId, deckKey: "some-other-key" }
@@ -709,12 +664,11 @@ it("manual matches use the resolved deck's key over the client's key", async () 
     deckKey: "deck-key",
   })
   expect((await actor.query(api.decks.statsForKey, { deckKey: "some-other-key" })).all).toBeNull()
-  await assertNoLegacyWrites(t)
 })
 
 it("generates a valid key when a caller creates a deck without one", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const deckId = await actor.mutation(api.decks.create, { name: "Burn", format: "modern" })
   const stored = await t.run(async (ctx) => ctx.db.get(deckId))
   if (!stored) throw new Error("Expected a deck")
@@ -722,7 +676,7 @@ it("generates a valid key when a caller creates a deck without one", async () =>
 })
 
 it("reimports an archived migrated guest deck without duplicating its alias", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId } = await deck(t)
   const localId = "00000000-0000-4000-8000-000000000001"
   await t.run(async (ctx) =>
@@ -755,9 +709,9 @@ it("reimports an archived migrated guest deck without duplicating its alias", as
 })
 
 it("only restores a moved account copy for an account with its key or alias", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor: jane, deckId } = await deck(t)
-  const { actor: john } = await account(t, "john")
+  const john = await signedIn(t, "john")
   await jane.mutation(api.decks.moveToDevice, {
     deckId,
     expectedRevision: 0,
@@ -792,7 +746,7 @@ it("only restores a moved account copy for an account with its key or alias", as
 })
 
 it("rejects a move when a card save changed the version since detail was read", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId, versionId } = await deck(t)
   const detail = await actor.query(api.decks.detail, { deckId })
   const version = detail.version!
@@ -826,7 +780,7 @@ it("rejects a move when a card save changed the version since detail was read", 
 })
 
 it("deleting a manual match reverses stored deltas when its seats lose version and score fields", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const game = publish()
   game.players[0].deckVersionId = versionId
@@ -849,7 +803,6 @@ it("deleting a manual match reverses stored deltas when its seats lose version a
     actor.mutation(api.matches.deleteManualMatch, { matchId: storedMatch._id }),
   ).rejects.toThrow("Match not found")
   await t.run(async (ctx) => {
-    expect(await ctx.db.query("deckMatchResults").collect()).toEqual([])
     expect(await ctx.db.query("deckVersionStats").unique()).toMatchObject({
       games: 1,
       wins: 1,
@@ -860,7 +813,7 @@ it("deleting a manual match reverses stored deltas when its seats lose version a
 })
 
 it("counts games from different versions sharing a fingerprint", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const secondVersion = await t.run(async (ctx) => {
     const { _id: _, _creationTime: __, ...version } = (await ctx.db.get(versionId))!
@@ -875,8 +828,9 @@ it("counts games from different versions sharing a fingerprint", async () => {
 })
 
 it("limits free manual results to 50 daily, replays free, deletion does not refund, Pro bypasses", async () => {
-  const t = setup()
-  const { actor, userId } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const { userId } = actor
   const first = manual()
   const ack = await actor.mutation(api.matches.recordManualMatch, first)
   await t.run(async (ctx) => {
@@ -904,8 +858,9 @@ it("limits free manual results to 50 daily, replays free, deletion does not refu
 })
 
 it("only throttles opted-in local uploads after checking replays", async () => {
-  const t = setup()
-  const { actor, userId } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const { userId } = actor
   const args = { ...publish(), retriesThrottled: true }
   const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
   await t.run(async (ctx) => {
@@ -926,7 +881,7 @@ it("only throttles opted-in local uploads after checking replays", async () => {
 })
 
 it("sync creation defaults to syncId and explicit keys revive archived rows without resetting revisions", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId } = await deck(t)
   const id = "00000000-0000-4000-8000-000000000002"
   const metadata = {
@@ -1007,11 +962,11 @@ it("sync creation defaults to syncId and explicit keys revive archived rows with
 })
 
 it("revival replaces deck content without creating a duplicate version and requires ownership", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId, versionId } = await deck(t)
-  const other = await account(t, "other")
+  const other = await signedIn(t, "other")
   await expect(
-    other.actor.mutation(api.decks.moveToDevice, {
+    other.mutation(api.decks.moveToDevice, {
       deckId,
       expectedRevision: 0,
       expectedVersion: await moveVersion(t, deckId),
@@ -1046,7 +1001,7 @@ it("revival replaces deck content without creating a duplicate version and requi
 })
 
 it("preserves old guestLocalId as an owner-scoped alias for a migrated deck", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, deckId } = await deck(t)
   const alias = "00000000-0000-4000-8000-000000000011"
   await t.run(async (ctx) => ctx.db.patch(deckId, { deckKey: String(deckId), guestLocalId: alias }))
@@ -1060,7 +1015,7 @@ it("preserves old guestLocalId as an owner-scoped alias for a migrated deck", as
 })
 
 it("keeps a connected match's first fingerprint across uploads and dual-writes the finished match", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const matchPublicId = "connected-match-key-0001"
   for (let gameNumber = 1; gameNumber <= 2; gameNumber++) {
@@ -1087,7 +1042,6 @@ it("keeps a connected match's first fingerprint across uploads and dual-writes t
   expect(results).toHaveLength(3)
   expect(results.every((row) => row.fingerprint === fingerprint)).toBe(true)
   expect(results.find((row) => row.kind === "match")?.resultId).toBe(`match:${matchPublicId}:1`)
-  await assertNoLegacyWrites(t)
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 2,
     connectedMatches: tally,
@@ -1095,8 +1049,9 @@ it("keeps a connected match's first fingerprint across uploads and dual-writes t
 })
 
 it("abandoned games leave history without results, and the same user in two seats gets two results", async () => {
-  const t = setup()
-  const { actor, userId } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const { userId } = actor
   const publicId = "cloud-abandoned-game-001"
   await actor.mutation(api.games.createLobby, {
     publicId,
@@ -1128,15 +1083,15 @@ it("abandoned games leave history without results, and the same user in two seat
 })
 
 it("nearby rewriting preserves canonical ids, and seat claims write results without a deck", async () => {
-  const t = setup()
-  const host = await account(t)
-  const secondHost = await account(t, "second-host")
-  const guest = await account(t, "guest")
+  const t = makeConvexTest()
+  const host = await signedIn(t, "owner")
+  const secondHost = await signedIn(t, "second-host")
+  const guest = await signedIn(t, "guest")
   const { hashSeatPassToken } =
     jest.requireActual<typeof import("./lib/seatPass")>("./lib/seatPass")
   const args = publish()
   args.players[1].seatPassHash = await hashSeatPassToken("first-seat-token")
-  await host.actor.mutation(api.games.publishFinishedLocalGame, args)
+  await host.mutation(api.games.publishFinishedLocalGame, args)
   const secondArgs = publish()
   secondArgs.players[0] = { ...secondArgs.players[0], localId: "second-host-me" }
   secondArgs.players[1] = {
@@ -1145,14 +1100,14 @@ it("nearby rewriting preserves canonical ids, and seat claims write results with
     seatPassHash: await hashSeatPassToken("second-seat-token"),
   }
   secondArgs.result = { kind: "win", winnerLocalIds: ["second-host-me"] }
-  const ack = await secondHost.actor.mutation(api.games.publishFinishedLocalGame, secondArgs)
+  const ack = await secondHost.mutation(api.games.publishFinishedLocalGame, secondArgs)
   expect(ack.publicId).not.toBe(args.publicId)
-  const claimed = await guest.actor.mutation(api.games.claimNearbySeat, {
+  const claimed = await guest.mutation(api.games.claimNearbySeat, {
     publicId: secondArgs.publicId,
     token: "second-seat-token",
   })
   expect(claimed.status).toBe("claimed")
-  await guest.actor.mutation(api.games.claimNearbySeat, {
+  await guest.mutation(api.games.claimNearbySeat, {
     publicId: secondArgs.publicId,
     token: "second-seat-token",
   })
@@ -1171,14 +1126,14 @@ it("nearby rewriting preserves canonical ids, and seat claims write results with
 it("scrubs a deleted publisher without changing another player's result id", async () => {
   jest.useFakeTimers()
   try {
-    const t = setup()
+    const t = makeConvexTest()
     const host = await deck(t)
-    const guest = await account(t, "guest")
-    const guestDeck = await guest.actor.mutation(api.decks.create, {
+    const guest = await signedIn(t, "guest")
+    const guestDeck = await guest.mutation(api.decks.create, {
       name: "Guest",
       format: "modern",
     })
-    const guestVersion = await guest.actor.mutation(api.decks.saveVersion, {
+    const guestVersion = await guest.mutation(api.decks.saveVersion, {
       deckId: guestDeck,
       cards: [],
     })
@@ -1193,7 +1148,7 @@ it("scrubs a deleted publisher without changing another player's result id", asy
     }
     args.players[1].seatPassHash = await hashSeatPassToken("delete-host-token")
     const ack = await host.actor.mutation(api.games.publishFinishedLocalGame, args)
-    await guest.actor.mutation(api.games.claimNearbySeat, {
+    await guest.mutation(api.games.claimNearbySeat, {
       publicId: args.publicId,
       token: "delete-host-token",
       deckVersionId: guestVersion,
@@ -1232,8 +1187,8 @@ it("scrubs a deleted publisher without changing another player's result id", asy
     expect(after.summary?.players[0].resultId).toBeUndefined()
     expect(after.results).toEqual(before.map((result) => ({ ...result, opponents: [] })))
     expect(after.stats).toEqual([])
-    const guestStats = await guest.actor.query(api.decks.statsForKey, {
-      deckKey: (await guest.actor.query(api.decks.detail, { deckId: guestDeck })).deck.deckKey,
+    const guestStats = await guest.query(api.decks.statsForKey, {
+      deckKey: (await guest.query(api.decks.detail, { deckId: guestDeck })).deck.deckKey,
     })
     expect(guestStats.all?.games).toBe(1)
   } finally {
@@ -1245,7 +1200,7 @@ it("scrubs a deleted publisher without changing another player's result id", asy
 it("account deletion removes new results and leftover legacy rows", async () => {
   jest.useFakeTimers()
   try {
-    const t = setup()
+    const t = makeConvexTest()
     const { actor, userId, deckId, versionId } = await deck(t)
     const game = publish()
     game.players[0].deckVersionId = versionId
@@ -1314,7 +1269,7 @@ it("account deletion removes new results and leftover legacy rows", async () => 
 })
 
 it("continues installed-client matches whose first seats have no pinned fields", async () => {
-  const t = setup()
+  const t = makeConvexTest()
   const { actor, versionId } = await deck(t)
   const args = publish()
   args.match = { publicId: "old-client-match-000001", bestOf: 3, gameNumber: 1 }
@@ -1333,12 +1288,11 @@ it("continues installed-client matches whose first seats have no pinned fields",
       match: { ...args.match, gameNumber: 2 },
     }),
   ).resolves.toHaveProperty("summaryId")
-  await assertNoLegacyWrites(t)
 })
 
 it("reviving by key preserves the sync id installed clients already use", async () => {
-  const t = setup()
-  const { actor } = await account(t)
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
   const id = "00000000-0000-4000-8000-000000000020"
   const args = {
     id,

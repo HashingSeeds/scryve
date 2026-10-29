@@ -1,4 +1,4 @@
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import { MATCHUP_SCAN } from "./deckStats"
@@ -10,19 +10,6 @@ const partners = [
   { cardId: "thrasios", name: "Thrasios, Triton Hero" },
   { cardId: "tymna", name: "Tymna the Weaver" },
 ]
-
-async function account(t: ConvexTestHarness, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  const userId = await t.run(
-    async (ctx) =>
-      (await ctx.db
-        .query("users")
-        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", subject))
-        .unique())!._id,
-  )
-  return { actor, userId }
-}
 
 let next = 0
 function result(
@@ -49,8 +36,9 @@ function result(
 describe("deckStats.matchups", () => {
   it("groups a deck's games by commander, opponent deck, and opponent player", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
-    const friend = await account(t, "friend")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
+    const friend = await signedIn(t, "friend")
     const ana = {
       displayName: "Ana",
       userId: friend.userId,
@@ -112,8 +100,9 @@ describe("deckStats.matchups", () => {
 
   it("lists every deck of the caller when no deck is named, and only the caller's", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
-    const other = await account(t, "other")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
+    const other = await signedIn(t, "other")
     await result(t, userId, { deckKey: "burn", opponents: [{ displayName: "Ana" }] })
     await result(t, userId, { deckKey: "elves", opponents: [{ displayName: "Ana" }] })
     await result(t, userId, { deckKey: undefined, opponents: [{ displayName: "Ana" }] })
@@ -130,8 +119,9 @@ describe("deckStats.matchups", () => {
 
   it("hides a blocked opponent's name and deck but keeps their commander", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
-    const blocked = await account(t, "blocked")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
+    const blocked = await signedIn(t, "blocked")
     await t.run(async (ctx) =>
       ctx.db.insert("userBlocks", {
         blockerUserId: userId,
@@ -159,7 +149,8 @@ describe("deckStats.matchups", () => {
 
   it("never returns a deck or guest name the name gate hides", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
     await result(t, userId, {
       opponents: [
         { displayName: "kkk", deck: { name: "Hitler Youth", identity: atraxa } },
@@ -185,8 +176,9 @@ describe("deckStats.matchups", () => {
 
   it("shows a held opponent's placeholder, not the name stored on the result", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
-    const held = await account(t, "held")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
+    const held = await signedIn(t, "held")
     await t.run((ctx) =>
       ctx.db.patch(held.userId, {
         username: "oldname",
@@ -217,7 +209,8 @@ describe("deckStats.matchups", () => {
 
   it(`reads at most the ${MATCHUP_SCAN} most recent results`, async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
     await t.run(async (ctx) => {
       for (let index = 0; index <= MATCHUP_SCAN; index += 1)
         await ctx.db.insert("deckResults", {

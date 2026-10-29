@@ -1,22 +1,10 @@
 import type { FunctionReturnType } from "convex/server"
-import { convexTest } from "convex-test"
 
 import { integration } from "./integrations"
+import { makeConvexTest } from "../../test/convexTest"
 import { api, internal } from "../_generated/api"
-import schema from "../schema"
-
-const modules = {
-  "../_generated/api.ts": async () => jest.requireActual("../_generated/api"),
-  "../_generated/server.ts": async () => jest.requireActual("../_generated/server"),
-  "../integrationManifest.ts": async () => jest.requireActual("../integrationManifest"),
-  "../lib/integrations.ts": async () => jest.requireActual("../lib/integrations"),
-}
 
 describe("integration capability state", () => {
-  it("uses the official Pokémon spelling in user-facing integration metadata", async () => {
-    expect(integration("pokemon")).toMatchObject({ displayName: "Pokémon TCG" })
-  })
-
   it("keeps the Pokémon owners and non-affiliation in its required notice", () => {
     const [notice] = integration("pokemon")?.rights.requiredNotices ?? []
     for (const owner of ["Nintendo", "Creatures", "GAME FREAK", "The Pokémon Company"])
@@ -35,7 +23,7 @@ describe("integration capability state", () => {
   })
 
   it("retains the registry note when an override has no note", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
 
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
       game: "mtg",

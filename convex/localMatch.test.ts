@@ -1,22 +1,8 @@
 import type { FunctionArgs } from "convex/server"
-import { convexTest, type TestConvex } from "convex-test"
 
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./matches.ts": async () => jest.requireActual("./matches"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const STARTED_AT = 1_700_000_000_000
 const MATCH_ID = "match_local_bo3_000001"
@@ -29,9 +15,8 @@ type SeatResult = {
   outcome: "win" | "loss" | "draw"
 }
 
-async function owner(t: TestConvex<typeof schema>, subject = "owner") {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: "Ada" })
+async function owner(t: ConvexTestHarness, subject = "owner") {
+  const actor = await signedIn(t, subject, "Ada")
   const deckId = await actor.mutation(api.decks.create, { name: "Burn", format: "modern" })
   const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
   return { actor, deckId, versionId }
@@ -83,7 +68,7 @@ function finish(seats: SeatResult[], gameCount = 3) {
 }
 
 async function publishBestOfThree(
-  actor: ReturnType<TestConvex<typeof schema>["withIdentity"]>,
+  actor: ReturnType<ConvexTestHarness["withIdentity"]>,
   versionId?: Id<"deckVersions">,
 ) {
   for (const [number, winner] of [
@@ -94,7 +79,7 @@ async function publishBestOfThree(
     await actor.mutation(api.games.publishFinishedLocalGame, matchGame(number, winner, versionId))
 }
 
-async function rows(t: TestConvex<typeof schema>) {
+async function rows(t: ConvexTestHarness) {
   return await t.run(async (ctx) => ({
     matches: (await ctx.db.query("matches").collect()).filter(
       (match): match is Extract<Doc<"matches">, { source: "connected" }> =>
@@ -122,7 +107,7 @@ function gameOrder(games: Doc<"games">[], gameIds: Id<"games">[]) {
 
 describe("publishFinishedLocalGame with a match", () => {
   it("creates the match with the first game and links every later game", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await owner(t)
     await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me", versionId))
     const first = await rows(t)
@@ -156,7 +141,7 @@ describe("publishFinishedLocalGame with a match", () => {
   })
 
   it("orders games published out of order and refuses a repeated or eleventh game", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor } = await owner(t)
     for (const number of [3, 2, 1])
       await actor.mutation(
@@ -186,7 +171,7 @@ describe("publishFinishedLocalGame with a match", () => {
   })
 
   it("refuses to attach a game to another account's match", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const ada = await owner(t)
     const bob = await owner(t, "bob")
     await ada.actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
@@ -199,7 +184,7 @@ describe("publishFinishedLocalGame with a match", () => {
   })
 
   it("keeps the account's seat and deck for every game of the match", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, versionId } = await owner(t)
     const otherDeck = await actor.mutation(api.decks.create, { name: "Zoo", format: "modern" })
     const otherVersion = await actor.mutation(api.decks.saveVersion, {
@@ -224,7 +209,7 @@ describe("publishFinishedLocalGame with a match", () => {
 
 describe("finishScryveMatch", () => {
   it("finalizes once, records the deck result, and counts the match for the deck", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await owner(t)
     await publishBestOfThree(actor, versionId)
     const args = finish(TWO_ONE)
@@ -262,7 +247,7 @@ describe("finishScryveMatch", () => {
   })
 
   it("waits for every game, then closes the match to further games", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor } = await owner(t)
     await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
     await actor.mutation(api.games.publishFinishedLocalGame, matchGame(3, "me"))
@@ -283,7 +268,7 @@ describe("finishScryveMatch", () => {
   })
 
   it("finalizes a pod best of three whose wins spread across seats", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor } = await owner(t)
     const third = {
       localId: "player_c",
@@ -316,7 +301,7 @@ describe("finishScryveMatch", () => {
   })
 
   it("draws a called pod round for the seats still playing", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, versionId } = await owner(t)
     await actor.mutation(api.games.publishFinishedLocalGame, {
       ...matchGame(1, "draw", versionId, 1),
@@ -372,7 +357,7 @@ describe("finishScryveMatch", () => {
       message: "every seat exactly once",
     },
   ])("rejects $name and leaves the match active", async ({ seats, message }) => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor } = await owner(t)
     await publishBestOfThree(actor)
     await expect(actor.mutation(api.matches.finishScryveMatch, finish(seats))).rejects.toThrow(
@@ -382,7 +367,7 @@ describe("finishScryveMatch", () => {
   })
 
   it("only lets the owner finish", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const ada = await owner(t)
     const bob = await owner(t, "bob")
     await publishBestOfThree(ada.actor)
@@ -400,7 +385,7 @@ describe("account deletion", () => {
   })
 
   it("anonymizes a deleted player's seat on a match someone else owns", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const ada = await owner(t)
     await owner(t, "bob")
     await ada.actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
