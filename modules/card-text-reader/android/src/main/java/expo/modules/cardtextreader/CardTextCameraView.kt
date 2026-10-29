@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
+import android.util.Range
 import android.util.Size
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -41,8 +42,11 @@ private fun msBetweenReads(heat: String) = when (heat) {
 }
 private val ANALYSIS_SIZE = Size(1280, 960)
 private const val DETECTION_SHORT_SIDE = 200
-// why: hiding the outline the first frame the card is missed makes it flicker on a steady card.
-private const val MISSES_BEFORE_LOSING_CARD = 3
+// why: hiding the outline the first frame the card is missed makes it flicker on a steady card,
+// but reads slow down when the phone is hot, so a count of misses would leave it up too long.
+private const val LOSE_CARD_AFTER_MS = 350L
+// why: frames are read at most about 8 a second, so 30 fps only heats the phone.
+private val CAMERA_FPS = Range(15, 20)
 
 class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onText by EventDispatcher()
@@ -57,7 +61,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
   private var lastFrameAt = 0L
   private var released = false
   private var plane = ByteArray(0)
-  private var missedFrames = 0
+  private var lastCardAt = 0L
   private var showingCard = false
 
   @Volatile var active = false
@@ -103,6 +107,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     val fourByThree = AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
     val preview = Preview.Builder()
       .setResolutionSelector(ResolutionSelector.Builder().setAspectRatioStrategy(fourByThree).build())
+      .setTargetFrameRate(CAMERA_FPS)
       .build()
       .also { it.surfaceProvider = previewView.surfaceProvider }
     val analysis = ImageAnalysis.Builder()
@@ -191,17 +196,16 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     val detection = CardDetector.detect(luma, guide)
     val card = detection.card
     if (card != null && cover != null) {
-      missedFrames = 0
+      lastCardAt = SystemClock.elapsedRealtime()
       showingCard = true
       outline.show(card.corners.map(cover::toView))
-    } else if (showingCard && ++missedFrames >= MISSES_BEFORE_LOSING_CARD) {
+    } else if (showingCard && SystemClock.elapsedRealtime() - lastCardAt >= LOSE_CARD_AFTER_MS) {
       lose()
     }
     return detection
   }
 
   private fun lose() {
-    missedFrames = 0
     showingCard = false
     outline.show(null)
   }

@@ -13,8 +13,9 @@ private func secondsBetweenReads(_ state: ProcessInfo.ThermalState) -> TimeInter
   default: 0.4
   }
 }
-// why: hiding the outline the moment one read misses the card makes it flicker on a steady card.
-private let missesBeforeLosingCard = 3
+// why: hiding the outline the moment one read misses the card makes it flicker on a steady card,
+// but reads slow down when the phone is hot, so a count of misses would leave it up too long.
+private let loseCardAfter: TimeInterval = 0.35
 // why: a little room around the outline keeps a name that touches the card's edge whole.
 private let readMargin: CGFloat = 0.03
 // why: rejects the art box, the text box, and cards only partly in view.
@@ -40,7 +41,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   private let reads = DispatchQueue(label: "card-text-camera.reads")
   private var reading = false
   private var lastFrameAt = Date.distantPast
-  private var missedFrames = 0
+  private var lastCardAt = Date.distantPast
   private var outlined = false
   private var viewSize = CGSize.zero
   private var imageSize = CGSize(width: 1080, height: 1920)
@@ -178,16 +179,12 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   // from this frame, so a card that moved on is never read through its old outline.
   private func show(_ quad: VNRectangleObservation?) {
     guard quad != nil || outlined else { return }
-    if quad == nil {
-      missedFrames += 1
-      if missedFrames < missesBeforeLosingCard { return }
-    }
-    missedFrames = 0
+    if quad != nil { lastCardAt = Date() }
+    if quad == nil, Date().timeIntervalSince(lastCardAt) < loseCardAfter { return }
     draw(quad)
   }
 
   private func lose() {
-    missedFrames = 0
     draw(nil)
   }
 
