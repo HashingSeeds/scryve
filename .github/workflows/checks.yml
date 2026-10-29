@@ -89,7 +89,12 @@ jobs:
         run: pnpm check:ygo-worker
 
   checks:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # TRIAL: compare runners on the same commit. Do not merge.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [blacksmith-4vcpu-ubuntu-2404, ubuntu-latest]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - name: Check out repository
