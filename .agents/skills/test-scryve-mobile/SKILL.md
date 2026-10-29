@@ -20,12 +20,23 @@ requested), driven through [agent-device](https://oss.callstack.com/agent-device
 
 ## Choose the lightest valid launch path
 
-- JavaScript, TypeScript, or asset-only changes: reuse the installed
-  development client and start Metro. Do not rebuild native code merely to
-  load a new bundle.
-- Native source, native dependencies, entitlements, config plugins, or
-  generated project changes: rebuild is required. If rebuilding was not
-  agreed to, stop and report instead of building.
+Take the first path that applies:
+
+1. **Installed client.** JavaScript, TypeScript, or asset-only changes: reuse
+   the installed development client when its native-build provenance is
+   credible, and start Metro. Do not rebuild native code merely to load a new
+   bundle.
+2. **NAS build.** Otherwise, get a development build for the current
+   fingerprint from the shared build store (`builds` skill), run from this
+   worktree:
+   `builds get --platform <ios|android> --profile <development|development:device> --fingerprint current --to <dir>`.
+   Use `development` for a simulator or emulator and `development:device` for
+   a lab device. Install it with `agent-device reinstall com.sowinghope.count.dev <path>`,
+   or `agent-device-mini reinstall com.sowinghope.count.dev <path>` on a lab device.
+   `builds find` with the same filters lists matches without downloading.
+3. **EAS build.** If the NAS has no match, check EAS (below).
+4. **Stop.** If neither has a match, report that a new `development` build is
+   required.
 
 Development identity:
 
@@ -39,14 +50,11 @@ Development identity:
   on production.
 
 Bundle presence proves the variant, not native compatibility. An Expo
-fingerprint can prove that an EAS build matches this worktree's native runtime,
-but it proves the installed client matches only when the installed client's EAS
-build ID is known.
+fingerprint can prove that a NAS or EAS build matches this worktree's native
+runtime, but it proves the installed client matches only when the installed
+client's build is known.
 
-Reuse the installed client without a fingerprint check when the current changes
-are JavaScript, TypeScript, or assets only and its native-build provenance is
-otherwise credible. If native inputs changed or the installed build's
-compatibility is uncertain:
+To check EAS:
 
 1. Compute the current platform fingerprint with
    `eas fingerprint:generate --platform <ios|android> --build-profile development --json --non-interactive`.
@@ -56,11 +64,12 @@ compatibility is uncertain:
    environment overrides affect native configuration and can otherwise produce a false mismatch.
 3. If a matching simulator or emulator build exists, stop and report its build
    ID and artifact URL as the compatible build to install.
-4. If none matches, stop and report that a new `development` build is required.
 
-Do not start, download, or install an EAS build during this verification pass
-unless the user separately approved it. Do not claim the currently installed
-binary matches merely because EAS has a compatible build.
+Do not start a new build (EAS or local), or download or install an EAS build,
+during this verification pass unless the user separately approved it.
+Getting and installing a matching NAS build is part of the pass. Do not claim
+the currently installed binary matches merely because a compatible build
+exists.
 
 ## Setup
 
@@ -75,8 +84,8 @@ binary matches merely because EAS has a compatible build.
    state exists and note connected-play gaps in the report.
 4. Open the app with one stable session:
    `agent-device open com.sowinghope.count.dev --platform ios --session scryve-mobile-check`.
-   The development build must already be installed; if it isn't, stop and
-   report — never kick off an EAS or local build inside this pass.
+   If the development build isn't installed, follow the launch path above;
+   never kick off an EAS or local build inside this pass.
 
 Bind the first `open` to one explicit `agent-device` session and use that same
 session for every snapshot, action, close, and reopen in the pass. Do not rely
