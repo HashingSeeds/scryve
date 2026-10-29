@@ -183,7 +183,7 @@ export function CardScanner({
 
   function add(card: Omit<ScannedCard, "id" | "state">) {
     const scanned = { ...card, id: nextId.current++, state: "adding" as const }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined)
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
       console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)

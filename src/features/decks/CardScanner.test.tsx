@@ -94,7 +94,7 @@ test("skips a card the Commander deck already holds and says so", async () => {
   expect(Haptics.notificationAsync).toHaveBeenLastCalledWith(Haptics.NotificationFeedbackType.Error)
   show()
   scan("Arcane Signet")
-  expect(Haptics.impactAsync).toHaveBeenLastCalledWith(Haptics.ImpactFeedbackStyle.Light)
+  expect(Haptics.impactAsync).toHaveBeenLastCalledWith(Haptics.ImpactFeedbackStyle.Medium)
   scan("Arcane Signet")
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Arcane Signet"])
