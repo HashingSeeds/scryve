@@ -1,5 +1,6 @@
 import type { ViewProps } from "react-native"
 import { requireNativeView, requireOptionalNativeModule } from "expo"
+import * as Haptics from "expo-haptics"
 
 export type CardTextLine = {
   text: string
@@ -33,8 +34,31 @@ type CardTextCameraProps = ViewProps & {
   onText: (event: { nativeEvent: CardPhotoText }) => void
 }
 
+type CardTextReaderModule = {
+  haptic?: (kind: ScanHaptic) => Promise<void>
+  prepareHaptics?: () => Promise<void>
+}
+type ScanHaptic = "added" | "skipped"
+
+const nativeModule = requireOptionalNativeModule<CardTextReaderModule>("CardTextReader")
+
 /** why: null on web, Jest, and binaries built before the module existed. */
-export const canReadCardText = requireOptionalNativeModule("CardTextReader") !== null
+export const canReadCardText = nativeModule !== null
+
+/** why: binaries without the native haptic fall back to expo-haptics. */
+export function scanHaptic(kind: ScanHaptic) {
+  const played = nativeModule?.haptic
+    ? nativeModule.haptic(kind)
+    : kind === "skipped"
+      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+  void played.catch(() => undefined)
+}
+
+/** why: called when a card is about to be accepted, so its haptic plays without warm-up lag. */
+export function prepareScanHaptics() {
+  void nativeModule?.prepareHaptics?.().catch(() => undefined)
+}
 
 const NativeCardTextCamera = canReadCardText
   ? requireNativeView<CardTextCameraProps>("CardTextReader")

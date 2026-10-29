@@ -350,6 +350,13 @@ export default {
     retryingCount: "{{count}} दोबारा कोशिश जारी",
     failedCount: "{{count}} जोड़े नहीं गए",
     wrongCard: "गलत कार्ड",
+    review: "स्कैन किए गए कार्ड देखें",
+    keepScanning: "स्कैन करते रहें",
+    state: {
+      adding: "जोड़ा जा रहा है",
+      retrying: "दोबारा कोशिश हो रही है",
+      failed: "जोड़ा नहीं गया",
+    },
     whichCard: "यह कौन सा कार्ड है?",
     removeIt: "हटाएँ",
     addFailed: "स्कैन किए गए कार्ड जोड़े नहीं जा सके। अपना कनेक्शन जाँचें।",

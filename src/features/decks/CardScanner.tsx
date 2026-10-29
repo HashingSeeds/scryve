@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { Linking, Modal, StyleSheet, View } from "react-native"
+import { FlatList, Linking, Modal, StyleSheet, TouchableOpacity, View } from "react-native"
 import type { ImageStyle, LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { useCameraPermissions } from "expo-camera"
-import * as Haptics from "expo-haptics"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { useMMKVString } from "react-native-mmkv"
 
@@ -28,7 +27,12 @@ import {
 } from "./cardNameMatch"
 import { CardScanStats } from "./CardScanStats"
 import { framedLinesFromCardTop, type ScanFraming } from "./cardTextLayout"
-import { CardTextCamera, type CardPhotoText } from "../../../modules/card-text-reader"
+import {
+  CardTextCamera,
+  prepareScanHaptics,
+  scanHaptic,
+  type CardPhotoText,
+} from "../../../modules/card-text-reader"
 
 export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; framing: ScanFraming }
 export type ScannedCardAdd =
@@ -107,6 +111,7 @@ export function CardScanner({
   const addedRef = useRef(added)
   const [status, setStatus] = useState<ScanStatus>("looking")
   const [fixing, setFixing] = useState<ScannedCard>()
+  const [reviewing, setReviewing] = useState(false)
   const [landCount, setLandCount] = useState<LandCount>()
   const landCountOpen = useRef(false)
   const countedLands = useRef(new Set<string>())
@@ -194,7 +199,7 @@ export function CardScanner({
 
   function add(card: Omit<ScannedCard, "id" | "state">) {
     const scanned = { ...card, id: nextId.current++, state: "adding" as const }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)
+    scanHaptic("added")
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
       console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)
@@ -237,6 +242,7 @@ export function CardScanner({
     if (match.name === nameInFrame.current) return
     if (match.name !== candidateName.current) {
       candidateName.current = match.name
+      prepareScanHaptics()
       setStatus("steady")
       return
     }
@@ -251,7 +257,7 @@ export function CardScanner({
 
   function skip(name: string) {
     session.current.skipped += 1
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
+    scanHaptic("skipped")
     setStatus({ alreadyInDeck: name })
   }
 
@@ -348,7 +354,7 @@ export function CardScanner({
   ]
     .filter(Boolean)
     .join(" · ")
-  const scanning = Boolean(permission?.granted) && !fixing && !landCount && !closing
+  const scanning = Boolean(permission?.granted) && !fixing && !landCount && !closing && !reviewing
 
   return (
     <Modal visible animationType="slide" onRequestClose={() => void close()}>
@@ -383,6 +389,38 @@ export function CardScanner({
               <Text size="sm" style={$hint} text={statusText(status)} />
             </View>
             {showStats && lastPhoto ? <CardScanStats photo={lastPhoto} /> : null}
+            {reviewing ? (
+              <View style={[StyleSheet.absoluteFill, themed($review)]}>
+                <FlatList
+                  testID="card-scan-review-list"
+                  data={added}
+                  keyExtractor={(card) => `${card.id}`}
+                  renderItem={({ item }) => (
+                    <View style={themed($reviewRow)}>
+                      <View style={$addedName}>
+                        <Text numberOfLines={1} text={cardLabel(item)} />
+                        {item.state !== "added" ? (
+                          <Text
+                            size="xs"
+                            style={{ color: theme.colors.textDim }}
+                            tx={`decks:cardScan.state.${item.state}`}
+                          />
+                        ) : null}
+                      </View>
+                      {removeCard ? (
+                        <Button tx="decks:cardScan.wrongCard" onPress={() => setFixing(item)} />
+                      ) : null}
+                    </View>
+                  )}
+                />
+                <Button
+                  testID="card-scan-keep-scanning"
+                  preset="reversed"
+                  tx="decks:cardScan.keepScanning"
+                  onPress={() => setReviewing(false)}
+                />
+              </View>
+            ) : null}
           </View>
         ) : (
           <View style={themed($permission)}>
@@ -429,17 +467,25 @@ export function CardScanner({
               </>
             ) : last ? (
               <>
-                <CardImage
-                  game={game}
-                  source={last.imageUrl}
-                  compact
-                  style={$addedImage}
-                  accessibilityLabel={last.name}
-                />
-                <View style={$addedName}>
-                  <Text weight="medium" numberOfLines={2} text={cardLabel(last)} />
-                  <Text size="xs" style={{ color: theme.colors.textDim }} text={addedSummary} />
-                </View>
+                <TouchableOpacity
+                  testID="card-scan-review"
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("decks:cardScan.review")}
+                  style={$addedCard}
+                  onPress={() => setReviewing(true)}
+                >
+                  <CardImage
+                    game={game}
+                    source={last.imageUrl}
+                    compact
+                    style={$addedImage}
+                    accessibilityLabel={last.name}
+                  />
+                  <View style={$addedName}>
+                    <Text weight="medium" numberOfLines={2} text={cardLabel(last)} />
+                    <Text size="xs" style={{ color: theme.colors.textDim }} text={addedSummary} />
+                  </View>
+                </TouchableOpacity>
                 {removeCard ? (
                   <Button
                     testID="card-scan-wrong"
@@ -507,5 +553,17 @@ const $added: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.sm,
 })
 const $addedImage: ImageStyle = { width: 46, height: 64 }
+const $addedCard: ViewStyle = { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }
+const $review: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  backgroundColor: colors.background,
+  padding: spacing.md,
+  gap: spacing.sm,
+})
+const $reviewRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingVertical: spacing.xs,
+})
 const $addedName: ViewStyle = { flex: 1 }
 const $alternates: ViewStyle = { gap: 8 }

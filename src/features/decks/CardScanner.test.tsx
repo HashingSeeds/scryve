@@ -1,6 +1,5 @@
 import { View } from "react-native"
-import * as Haptics from "expo-haptics"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
@@ -8,7 +7,7 @@ import { captureAnalytics } from "@/utils/analytics"
 
 import { cardNameIndex } from "./cardNameMatch"
 import { CardScanner, type ScannedCardAdd } from "./CardScanner"
-import type { CardPhotoText } from "../../../modules/card-text-reader"
+import { scanHaptic, type CardPhotoText } from "../../../modules/card-text-reader"
 
 let mockOnText: ((event: { nativeEvent: CardPhotoText }) => void) | undefined
 jest.mock("../../../modules/card-text-reader", () => ({
@@ -16,6 +15,8 @@ jest.mock("../../../modules/card-text-reader", () => ({
     mockOnText = props.onText
     return null
   },
+  scanHaptic: jest.fn(),
+  prepareScanHaptics: jest.fn(),
 }))
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
@@ -93,10 +94,10 @@ test("skips a card the Commander deck already holds and says so", async () => {
   show("Sol Ring")
   show("Sol Ring")
   expect(view.getByText("Sol Ring is already in the deck")).toBeTruthy()
-  expect(Haptics.notificationAsync).toHaveBeenLastCalledWith(Haptics.NotificationFeedbackType.Error)
+  expect(scanHaptic).toHaveBeenLastCalledWith("skipped")
   show()
   scan("Arcane Signet")
-  expect(Haptics.impactAsync).toHaveBeenLastCalledWith(Haptics.ImpactFeedbackStyle.Medium)
+  expect(scanHaptic).toHaveBeenLastCalledWith("added")
   scan("Arcane Signet")
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Arcane Signet"])
@@ -154,6 +155,25 @@ test("Wrong card removes a card whose add was still in flight once it lands", as
     expect(removeCard).not.toHaveBeenCalled()
     await slow.land()
     expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("an earlier scanned card can be checked and removed from the review list", async () => {
+  jest.useFakeTimers()
+  try {
+    const { view, removeCard } = renderScanner({ singleton: true })
+    scan("Sol Ring")
+    scan("Arcane Signet")
+    await act(async () => jest.advanceTimersByTime(1500))
+    fireEvent.press(view.getByTestId("card-scan-review"))
+    const list = view.getByTestId("card-scan-review-list")
+    expect(within(list).getByText("Sol Ring")).toBeTruthy()
+    fireEvent.press(within(list).getAllByText("Wrong card")[1])
+    await act(async () => fireEvent.press(view.getByText("Remove it")))
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(within(list).queryByText("Sol Ring")).toBeNull()
   } finally {
     jest.useRealTimers()
   }

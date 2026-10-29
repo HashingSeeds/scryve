@@ -2,7 +2,17 @@ import AVFoundation
 import ExpoModulesCore
 import Vision
 
-private let minFrameInterval: TimeInterval = 0.12
+// why: reading text is most of the phone's work, so reads slow down as it heats up, and the
+// camera runs at the rate frames are read rather than 30 fps.
+private let cameraFramesPerSecond: Int32 = 20
+private func secondsBetweenReads(_ state: ProcessInfo.ThermalState) -> TimeInterval {
+  switch state {
+  case .nominal: 0.12
+  case .fair: 0.16
+  case .serious: 0.25
+  default: 0.4
+  }
+}
 // why: hiding the outline the moment one read misses the card makes it flicker on a steady card.
 private let missesBeforeLosingCard = 3
 // why: a little room around the outline keeps a name that touches the card's edge whole.
@@ -78,6 +88,11 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     session.sessionPreset = .hd1920x1080
     if session.canAddInput(input) { session.addInput(input) }
     if session.canAddOutput(output) { session.addOutput(output) }
+    if (try? camera.lockForConfiguration()) != nil {
+      camera.activeVideoMinFrameDuration = CMTime(value: 1, timescale: cameraFramesPerSecond)
+      camera.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: cameraFramesPerSecond)
+      camera.unlockForConfiguration()
+    }
     session.commitConfiguration()
     if window != nil { session.startRunning() }
   }
@@ -91,7 +106,9 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       if outlined { lose() }
       return
     }
-    guard !reading, Date().timeIntervalSince(lastFrameAt) >= minFrameInterval else { return }
+    let thermalState = ProcessInfo.processInfo.thermalState
+    guard !reading, Date().timeIntervalSince(lastFrameAt) >= secondsBetweenReads(thermalState)
+    else { return }
     lastFrameAt = Date()
     reading = true
     // why: the back camera delivers landscape buffers; the scanner is locked to portrait,
@@ -102,7 +119,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     show(card)
     let size = imageSize
     let detection: [String: Any] = [
-      "rectangles": rectangles, "thermal": heat(ProcessInfo.processInfo.thermalState),
+      "rectangles": rectangles, "thermal": heat(thermalState),
     ]
     reads.async { [weak self] in
       self?.read(buffer, size: size, card: card, detection: detection)

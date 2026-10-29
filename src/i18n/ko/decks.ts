@@ -341,6 +341,13 @@ export default {
     retryingCount: "{{count}}장 재시도 중",
     failedCount: "{{count}}장 추가되지 않음",
     wrongCard: "다른 카드예요",
+    review: "스캔한 카드 보기",
+    keepScanning: "계속 스캔하세요",
+    state: {
+      adding: "추가 중",
+      retrying: "다시 시도 중",
+      failed: "추가되지 않음",
+    },
     whichCard: "어떤 카드인가요?",
     removeIt: "제거",
     addFailed: "스캔한 카드를 추가하지 못했습니다. 연결 상태를 확인하세요.",

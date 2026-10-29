@@ -368,6 +368,13 @@ export default {
     retryingCount: "{{count}} reintentando",
     failedCount: "{{count}} sin añadir",
     wrongCard: "Carta errónea",
+    review: "Revisar cartas escaneadas",
+    keepScanning: "Seguir escaneando",
+    state: {
+      adding: "Añadiendo",
+      retrying: "Reintentando",
+      failed: "No añadida",
+    },
     whichCard: "¿Qué carta es?",
     removeIt: "Quitarla",
     addFailed: "No se pudieron añadir las cartas escaneadas. Revisa tu conexión.",

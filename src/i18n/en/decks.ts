@@ -371,6 +371,16 @@ const decks = {
     failedCount: "{{count}} not added",
     // Button next to the last scanned card when the scanner picked the wrong one.
     wrongCard: "Wrong card",
+    // Accessibility label for tapping the last scanned card to see every card scanned so far.
+    review: "Review scanned cards",
+    // Closes the list of scanned cards and goes back to the camera.
+    keepScanning: "Keep scanning",
+    // A scanned card's add status in the review list. Added cards show no status.
+    state: {
+      adding: "Adding",
+      retrying: "Retrying",
+      failed: "Not added",
+    },
     whichCard: "Which card is it?",
     removeIt: "Remove it",
     addFailed: "Couldn't add the scanned cards. Check your connection.",

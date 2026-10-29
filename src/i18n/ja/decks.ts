@@ -346,6 +346,13 @@ export default {
     retryingCount: "{{count}}件再試行中",
     failedCount: "{{count}}件未追加",
     wrongCard: "違うカード",
+    review: "スキャンしたカードを確認",
+    keepScanning: "スキャンを続ける",
+    state: {
+      adding: "追加中",
+      retrying: "再試行中",
+      failed: "未追加",
+    },
     whichCard: "どのカードですか?",
     removeIt: "削除",
     addFailed: "スキャンしたカードを追加できませんでした。接続を確認してください。",

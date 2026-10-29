@@ -373,6 +373,13 @@ export default {
     retryingCount: "{{count}} nouvelle tentative",
     failedCount: "{{count}} non ajoutée(s)",
     wrongCard: "Mauvaise carte",
+    review: "Voir les cartes scannées",
+    keepScanning: "Continuer à scanner",
+    state: {
+      adding: "Ajout en cours",
+      retrying: "Nouvelle tentative",
+      failed: "Non ajoutée",
+    },
     whichCard: "De quelle carte s'agit-il ?",
     removeIt: "Retirer",
     addFailed: "Impossible d'ajouter les cartes scannées. Vérifiez votre connexion.",
