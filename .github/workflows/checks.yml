@@ -45,6 +45,9 @@ jobs:
           filters: |
             ygo:
               - 'workers/ygo-image-mirror/**'
+              # why: the app Jest project skips workers/, so only this job runs their Jest tests.
+              - 'jest.config.js'
+              - 'babel.config.js'
               - 'pnpm-lock.yaml'
               - 'package.json'
             exportable:
@@ -89,7 +92,7 @@ jobs:
         run: pnpm check:ygo-worker
 
   checks:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
