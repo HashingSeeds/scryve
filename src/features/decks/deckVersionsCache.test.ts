@@ -2,28 +2,9 @@ import { observe } from "@legendapp/state"
 import type { ConvexReactClient } from "convex/react"
 import { getFunctionName } from "convex/server"
 
-import {
-  DeckVersionCacheController,
-  DeckVersionCacheRepository,
-  type DeckVersionCacheStorage,
-} from "./deckVersionsCache"
+import { DeckVersionCacheController, DeckVersionCacheRepository } from "./deckVersionsCache"
 import type { Id } from "../../../convex/_generated/dataModel"
-
-class MemoryStorage implements DeckVersionCacheStorage {
-  values = new Map<string, string>()
-
-  getString(key: string) {
-    return this.values.get(key)
-  }
-
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const deckId = "deck-1" as Id<"decks">
 const flush = async (rounds = 3) => {

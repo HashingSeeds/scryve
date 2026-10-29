@@ -1,22 +1,10 @@
 import { asActorId, canUndo, commanderDamageBetween } from "@/features/game/domain"
-import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 
 import { buildSeededGame, seedGame } from "./gameSeed"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 import { runSeed } from "./index"
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 const repository = () => new LocalGameRepository(new MemoryStorage())
 

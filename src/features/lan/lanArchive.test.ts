@@ -1,5 +1,5 @@
 import { buildFinishedLocalGameSnapshot } from "@/features/connected/localGameSnapshot"
-import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { PlayerId } from "@/features/game/types"
 
 import { lanLocalGame } from "./lanArchive"
@@ -13,22 +13,10 @@ import {
   setLanDeck,
   startLanRound,
 } from "./lanGame"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const NOW = 1_700_000_000_000
 const HASH = "a".repeat(64)
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function finishedRound(hostDeck?: Parameters<typeof setLanDeck>[2]) {
   const lobby = createLanGame(

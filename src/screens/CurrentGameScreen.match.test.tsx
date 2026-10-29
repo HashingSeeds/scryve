@@ -1,10 +1,11 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { createLocalGame } from "@/features/game/domain"
-import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
+import { MemoryStorage } from "../../test/support/memoryStorage"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
 
@@ -12,19 +13,6 @@ jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
 }))
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function matchGame(bestOf: 1 | 3 | 5, playerCount = 2) {
   return createLocalGame({

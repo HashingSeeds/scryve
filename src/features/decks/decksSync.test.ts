@@ -6,22 +6,10 @@ import {
   getDeckSyncController,
   isDeckSyncEnabled,
   setDeckSyncEnabled,
-  type DeckSyncStorage,
 } from "./decksSync"
 import type { Id } from "../../../convex/_generated/dataModel"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 import { storage } from "../../utils/storage"
-
-class MemoryStorage implements DeckSyncStorage {
-  values = new Map<string, string>()
-
-  getString(key: string) {
-    return this.values.get(key)
-  }
-
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-}
 
 const deckId = "deck-1" as Id<"decks">
 

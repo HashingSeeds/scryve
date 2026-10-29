@@ -10,27 +10,7 @@ import { DeckVersionCacheController } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { makeConvexTest } from "../../../test/convexTest"
-import type { DurableStringStorage } from "../sync/durableOutbox"
-
-class MemoryStorage implements DurableStringStorage {
-  values = new Map<string, string>()
-
-  getString(key: string) {
-    return this.values.get(key)
-  }
-
-  getAllKeys() {
-    return [...this.values.keys()]
-  }
-
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const deckId = "deck-1" as Id<"decks">
 const versionId = "version-1" as Id<"deckVersions">

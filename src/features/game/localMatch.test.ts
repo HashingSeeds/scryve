@@ -17,21 +17,9 @@ import {
   restartMatchGame,
 } from "./domain"
 import { defaultMatchOutcomes } from "./LocalMatchEndDialog"
-import { LocalGameRepository, type StringStorage } from "./localPersistence"
+import { LocalGameRepository } from "./localPersistence"
 import type { LocalGame } from "./types"
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 function matchGame(bestOf: 1 | 3 | 5 = 3, now = 1) {
   return createLocalGame({

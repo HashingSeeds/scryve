@@ -2,23 +2,9 @@ import { drainConnectedOutbox } from "./drainOutbox"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
 import { overlayPendingDeltas } from "./reconciliation"
+import { projection } from "../../../test/fixtures/connectedProjection"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
-
-class MemoryStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  getAllKeys() {
-    return [...this.values.keys()]
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 const operationId = asOperationId("operation-ordering-0001")
 const pending: PendingLifeAction = {
@@ -36,36 +22,7 @@ const pending: PendingLifeAction = {
   queuedAt: 1,
   attempts: 0,
 }
-const base: ConnectedProjection = {
-  schemaVersion: 1,
-  publicId: "game-public",
-  status: "active",
-  playerCount: 2,
-  startingLife: 20,
-  ruleset: "standard",
-  isHost: true,
-  eventSequence: 0,
-  serverUpdatedAt: 1,
-  recentOperationIds: [],
-  players: [
-    {
-      playerId: "player-1",
-      seat: 1,
-      displayName: "Ada",
-      color: "#111111",
-      currentLife: 20,
-      controlledByMe: true,
-    },
-    {
-      playerId: "player-2",
-      seat: 2,
-      displayName: "Grace",
-      color: "#222222",
-      currentLife: 20,
-      controlledByMe: false,
-    },
-  ],
-}
+const base = projection(0, 20)
 const committed: ConnectedProjection = {
   ...base,
   eventSequence: 1,

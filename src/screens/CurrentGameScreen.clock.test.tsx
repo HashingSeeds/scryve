@@ -1,25 +1,13 @@
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { createLocalGame } from "@/features/game/domain"
-import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
+import { MemoryStorage } from "../../test/support/memoryStorage"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function mountTimedGame() {
   const repository = new LocalGameRepository(new MemoryStorage())

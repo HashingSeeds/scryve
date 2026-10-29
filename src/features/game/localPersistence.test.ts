@@ -14,22 +14,9 @@ import {
   LocalGameRepository,
   MAX_ACTIVE_EVENTS,
   MAX_HISTORY_GAMES,
-  type StringStorage,
 } from "./localPersistence"
 import type { LocalGame } from "./types"
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 function makeGame(now = 1) {
   return createLocalGame({

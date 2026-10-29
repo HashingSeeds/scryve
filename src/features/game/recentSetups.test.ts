@@ -1,24 +1,12 @@
 import { createLocalGame } from "./domain"
-import { LocalGameRepository, type StringStorage } from "./localPersistence"
+import { LocalGameRepository } from "./localPersistence"
 import {
   MAX_RECENT_SETUPS,
   parseRecentSetup,
   withRecentSetup,
   type NewRecentSetup,
 } from "./recentSetups"
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const local = (names: string[], startingLife = 40): NewRecentSetup => ({
   mode: "local",
