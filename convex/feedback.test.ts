@@ -402,6 +402,127 @@ describe("feedback", () => {
     ])
   })
 
+  describe("telling players a fix shipped", () => {
+    const ship = (t: ConvexTestHarness, runtimes: { ios?: string }) =>
+      t.mutation(internal.feedback.shipFixes, { commit: "abcdef1234", issues: [7], runtimes })
+    const setup = async (
+      t: ConvexTestHarness,
+      patch: { kind?: "bug"; runtimeVersion?: string },
+    ) => {
+      const requestId = await submit(t)
+      await t.run((ctx) => ctx.db.patch(requestId, { issue: 7, ...patch }))
+      return requestId
+    }
+    const told = (t: ConvexTestHarness, requestId: Id<"feedbackRequests">) =>
+      t.run(async (ctx) => {
+        const messages = await ctx.db
+          .query("feedbackMessages")
+          .withIndex("by_request", (q) => q.eq("requestId", requestId))
+          .collect()
+        const request = await ctx.db.get(requestId)
+        return { messages: messages.map(({ body }) => body), awaiting: request?.awaitingStore }
+      })
+    const live = async (t: ConvexTestHarness, runtimeVersion: string, commitAt?: number) => {
+      await t.mutation(internal.storeReleases.setLive, {
+        platform: "ios",
+        version: "0.3.0",
+        runtimeVersion,
+        ...(commitAt === undefined ? {} : { commitAt }),
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    }
+
+    it("tells the player at promote when their build loads the update", async () => {
+      const t = makeConvexTest()
+      const requestId = await setup(t, { kind: "bug", runtimeVersion: "rt-1" })
+      await ship(t, { ios: "rt-1" })
+      expect(await told(t, requestId)).toEqual({
+        messages: ["We fixed this bug 🐞 😁 Restart Scryve to update."],
+        awaiting: undefined,
+      })
+      expect(await t.query(api.feedback.mine, { key: ME })).toMatchObject([{ unread: true }])
+    })
+
+    it("waits for the store build that loads the fix, then tells the player", async () => {
+      const t = makeConvexTest()
+      const requestId = await setup(t, { runtimeVersion: "rt-0" })
+      await live(t, "rt-0")
+      await ship(t, { ios: "rt-1" })
+      expect(await told(t, requestId)).toEqual({ messages: [], awaiting: "ios" })
+      await live(t, "rt-1")
+      expect(await told(t, requestId)).toEqual({
+        messages: ["We added this feature! 🎉 Update Scryve from the App Store."],
+        awaiting: undefined,
+      })
+      const android = await submit(t)
+      await t.run((ctx) =>
+        ctx.db.patch(android, { issue: 8, platform: "android", runtimeVersion: "rt-a0" }),
+      )
+      await t.mutation(internal.storeReleases.setLive, {
+        platform: "android",
+        version: "0.3.0",
+        runtimeVersion: "rt-a1",
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      await t.mutation(internal.feedback.shipFixes, {
+        commit: "abcdef1234",
+        issues: [8],
+        runtimes: { android: "rt-a1" },
+      })
+      expect((await told(t, android)).messages).toEqual([
+        "We added this feature! 🎉 Update Scryve from Google Play.",
+      ])
+    })
+
+    it("counts a store build tagged after the promote, but not one tagged before", async () => {
+      const t = makeConvexTest()
+      const requestId = await setup(t, { runtimeVersion: "rt-0" })
+      await ship(t, { ios: "rt-1" })
+      const at = await t.run(async (ctx) => (await ctx.db.get(requestId))!.fixedIn!.at)
+      await live(t, "rt-2", at - 1)
+      expect((await told(t, requestId)).awaiting).toBe("ios")
+      await live(t, "rt-2", at)
+      expect((await told(t, requestId)).messages).toHaveLength(1)
+    })
+
+    it("tells every waiting player, past one page", async () => {
+      const t = makeConvexTest()
+      const fixedIn = { commit: "abcdef1234", at: 1, runtimes: { ios: "rt-1" } }
+      await t.run(async (ctx) => {
+        for (let n = 0; n < 101; n++)
+          await ctx.db.insert("feedbackRequests", {
+            kind: "bug",
+            body: "Crash",
+            senderHash: "h",
+            platform: "ios",
+            runtimeVersion: "rt-0",
+            fixedIn,
+            awaitingStore: "ios",
+            unread: false,
+            updatedAt: 0,
+          })
+      })
+      await live(t, "rt-1")
+      const waiting = await t.run((ctx) =>
+        ctx.db
+          .query("feedbackRequests")
+          .withIndex("by_awaiting_store", (q) => q.eq("awaitingStore", "ios"))
+          .collect(),
+      )
+      expect(waiting).toEqual([])
+    })
+
+    it("covers both ways when the player's runtime is unknown", async () => {
+      const t = makeConvexTest()
+      const requestId = await setup(t, {})
+      await live(t, "rt-1")
+      await ship(t, { ios: "rt-1" })
+      expect((await told(t, requestId)).messages).toEqual([
+        "We added this feature! 🎉 Restart Scryve to update. Still not there? Update from the App Store.",
+      ])
+    })
+  })
+
   it("caps sends across every install, not just each one", async () => {
     const t = makeConvexTest()
     const sender = (n: number) => String(n).padStart(64, "d")
@@ -485,70 +606,6 @@ describe("feedbackCard", () => {
     })
   })
 
-  describe("a shipped fix", () => {
-    const fixedIn = { commit: "abcdef1234", at: 10, runtimes: { ios: "rt-1", android: "rt-a" } }
-    const fixed = (runtimeVersion?: string, platform = "ios") =>
-      feedbackCard({
-        request: {
-          ...request,
-          platform,
-          issue: 7,
-          fixedIn,
-          ...(runtimeVersion ? { runtimeVersion } : {}),
-        },
-        messages: [message("team", "Looking")],
-      })
-    const prefill = ({ actions: [reply] }: ReturnType<typeof feedbackCard>) =>
-      reply && "prefill" in reply ? reply.prefill : undefined
-
-    it("asks Matthew to tell the player how to get it", () => {
-      const card = fixed("rt-1")
-      expect(card).toMatchObject({
-        kind: "approval",
-        pushText: "Fix shipped",
-        meta: { fixed: "abcdef1 · update" },
-      })
-      expect(card.phase).toMatch(/^fixed:abcdef1:/)
-      expect(card.phase.length).toBeLessThanOrEqual(40)
-      expect(prefill(card)).toContain("Restart Scryve to get it.")
-      expect(
-        prefill(
-          feedbackCard({
-            request: {
-              ...request,
-              kind: "bug",
-              platform: "ios",
-              issue: 7,
-              fixedIn,
-              runtimeVersion: "rt-1",
-            },
-            messages: [],
-          }),
-        ),
-      ).toContain("The fix is out.")
-    })
-
-    it("points at the store when the player's runtime can't load the update", () => {
-      const card = fixed("rt-0")
-      expect(card.meta).toMatchObject({ fixed: "abcdef1 · App Store" })
-      expect(prefill(card)).toContain("Update from the App Store once it's out.")
-      expect(prefill(fixed("rt-0", "android"))).toContain("Update from Google Play")
-    })
-
-    it("covers both when the runtime is unknown", () => {
-      expect(prefill(fixed())).toContain("Restart Scryve, and if you don't see it, update")
-    })
-
-    it("goes back to an update with the fixed meta once Matthew replied", () => {
-      const card = feedbackCard({
-        request: { ...request, issue: 7, fixedIn },
-        messages: [message("team", "Fixed!")].map((m) => ({ ...m, _creationTime: 11 })),
-      })
-      expect(card).toMatchObject({ kind: "update", meta: { fixed: "abcdef1 · update" } })
-      expect(prefill(card)).toBeUndefined()
-    })
-  })
-
   it("drops the oldest text first so the newest reply always shows", () => {
     const card = feedbackCard({
       request: { ...request, body: "a".repeat(2000) },
@@ -556,5 +613,41 @@ describe("feedbackCard", () => {
     })
     expect(card.body.length).toBeLessThanOrEqual(4000)
     expect(card.body.endsWith("Player: newest")).toBe(true)
+  })
+
+  describe("a shipped fix", () => {
+    const fixedIn = { commit: "abcdef1234", at: 10, runtimes: { ios: "rt-1" } }
+    const fixed = (patch: { awaitingStore?: "ios"; runtimeVersion?: string }, from = "team") =>
+      feedbackCard({
+        request: { ...request, platform: "ios", issue: 7, fixedIn, ...patch },
+        messages: [
+          { ...message(from === "team" ? "team" : "player", "Fixed!"), _creationTime: 11 },
+        ],
+      })
+
+    it("shows where the fix stands and pushes when the player is told", () => {
+      const waiting = fixed({ awaitingStore: "ios", runtimeVersion: "rt-0" })
+      expect(waiting).toMatchObject({
+        kind: "update",
+        pushText: "Fix waiting on the store",
+        meta: { fixed: "abcdef1 · waiting on App Store" },
+      })
+      const store = fixed({ runtimeVersion: "rt-0" })
+      expect(store).toMatchObject({
+        pushText: "Fix shipped, player told",
+        meta: { fixed: "abcdef1 · App Store" },
+      })
+      expect(store.phase).not.toBe(waiting.phase)
+      expect(store.phase.length).toBeLessThanOrEqual(40)
+      expect(fixed({ runtimeVersion: "rt-1" }).meta).toMatchObject({ fixed: "abcdef1 · update" })
+      const repliedWhileWaiting = feedbackCard({
+        request: { ...request, platform: "ios", issue: 7, fixedIn, runtimeVersion: "rt-0" },
+        messages: [
+          { ...message("player", "Any news?"), _creationTime: 11 },
+          { ...message("team", "We fixed this bug"), _creationTime: 12 },
+        ],
+      })
+      expect(repliedWhileWaiting.pushText).toBe("Fix shipped, player told")
+    })
   })
 })
