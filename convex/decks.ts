@@ -399,7 +399,7 @@ async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   const result = await ctx.db
     .query("deckResults")
     .withIndex("by_user_and_deck_key_and_finished_at", (q) =>
-      q.eq("userId", deck.ownerUserId).eq("deckKey", deckKeyOf(deck)),
+      q.eq("userId", deck.ownerUserId).eq("deckKey", deck.deckKey),
     )
     .order("desc")
     .first()

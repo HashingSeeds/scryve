@@ -3,7 +3,6 @@ import { convexTest, type TestConvex } from "convex-test"
 import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import { deckKeyOf } from "./lib/deckKeys"
 import schema from "./schema"
 
 const modules = {
@@ -56,7 +55,7 @@ async function statsFor(t: TestConvex<typeof schema>, deckId: Id<"decks">) {
       .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
         q
           .eq("userId", storedDeck.ownerUserId)
-          .eq("deckKey", deckKeyOf(storedDeck))
+          .eq("deckKey", storedDeck.deckKey)
           .eq("fingerprint", "all"),
       )
       .unique()
