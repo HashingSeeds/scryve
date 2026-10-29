@@ -412,7 +412,7 @@ describe("LifeCard", () => {
     }
   })
 
-  const defendingCard = (onStage = jest.fn(), armed = true) => (
+  const defendingCard = (onStage = jest.fn(), armed = true, attackerColor = "#B85636") => (
     <ThemeProvider initialContext="dark">
       <LifeCard
         playerName="Grace"
@@ -426,7 +426,7 @@ describe("LifeCard", () => {
           incoming: { [commanderIds[0]]: 6 },
           armedPlayerId: armed ? commanderIds[0] : null,
           attackerName: "Ada",
-          attacker: armed ? { color: "#B85636", seatNumber: 1, rotation: 90 } : undefined,
+          attacker: armed ? { color: attackerColor, seatNumber: 1, rotation: 90 } : undefined,
           facing: { x: "left" },
           reach: {
             x: -197,
@@ -539,6 +539,16 @@ describe("LifeCard", () => {
     const progress = view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" })
     const circumference = 2 * Math.PI * progress.props.r
     expect(progress.props.strokeDashoffset).toBeCloseTo(circumference * (1 - 6 / 21))
+  })
+
+  it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
+    const view = render(defendingCard(jest.fn(), true, "#F2E6A0"))
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 193, height: 420 } },
+    })
+    expect(view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" }).props.stroke).toBe(
+      "#FFFFFF",
+    )
   })
 
   it("fixes the total from the badge without counting a hit", () => {

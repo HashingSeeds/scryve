@@ -357,8 +357,9 @@ export function deepShade(color: string) {
   return mixColorsInLinearLight(color, "#000000", 0.87)
 }
 
-// why: every shadow is dark enough for white ink, so chips on a flooded card share one ring.
-const SHADOW_CHIP_RING = overlayTint("#FFFFFF", 0.5)
+// why: every shadow is dark enough for white ink, so a defender's controls, and the ring on its chips, read in white over it whatever the attacker's color.
+const SHADOW_INK = "#FFFFFF"
+const SHADOW_CHIP_RING = overlayTint(SHADOW_INK, 0.5)
 
 export function CommanderTakeoverBackdrop({
   seatNumber,
@@ -500,7 +501,6 @@ function DefenderControls({
   )
   const dealt = steps.reduce((sum, step) => sum + step, 0)
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
-  const attackerForeground = accessibleForeground(attackerColor)
   const badges = takeover?.badges ?? []
   const partners = commanders.length > 1
 
@@ -606,7 +606,7 @@ function DefenderControls({
               cx={ring / 2}
               cy={ring / 2}
               r={progressRadius}
-              stroke={attackerForeground}
+              stroke={SHADOW_INK}
               strokeWidth={DISC_RING}
               strokeLinecap="round"
               strokeDasharray={`${circumference} ${circumference}`}
@@ -627,7 +627,7 @@ function DefenderControls({
             <PulseRing
               testID={`commander-target-pulse-seat-${seatNumber}`}
               size={disc * 2 + 12}
-              color={attackerForeground}
+              color={SHADOW_INK}
             />
           </View>
         ) : null}
@@ -652,7 +652,7 @@ function DefenderControls({
                 {
                   width: editWidth,
                   height: editHeight,
-                  borderColor: overlayTint(attackerForeground, 0.6),
+                  borderColor: overlayTint(SHADOW_INK, 0.6),
                 },
               ]}
             >
@@ -660,7 +660,7 @@ function DefenderControls({
                 testID={`commander-edit-down-seat-${suffix}`}
                 label={translate("board:commander.undoHit", { damage: 1 })}
                 glyph="−"
-                color={attackerForeground}
+                color={SHADOW_INK}
                 disabled={total <= 0}
                 onPress={() => mode.onChange(-1, index)}
               />
@@ -675,7 +675,7 @@ function DefenderControls({
                 testID={`commander-edit-up-seat-${suffix}`}
                 label={translate("board:commander.dealTo", { damage: 1, name: playerName })}
                 glyph="+"
-                color={attackerForeground}
+                color={SHADOW_INK}
                 disabled={total >= MAX_COMMANDER_DAMAGE}
                 onPress={() => mode.onChange(1, index)}
               />
@@ -700,7 +700,7 @@ function DefenderControls({
               hidden={!!mode.arriving}
               color={attackerColor}
               ring={SHADOW_CHIP_RING}
-              pipColor={attackerForeground}
+              pipColor={SHADOW_INK}
               size={badgeSize}
               impact={takeover ? RAM_MS : 0}
               onPress={() => setEditing(index)}
@@ -723,7 +723,7 @@ function DefenderControls({
             },
           ]}
         >
-          <UndoGlyph size={compact ? 22 : 28} color={attackerForeground} />
+          <UndoGlyph size={compact ? 22 : 28} color={SHADOW_INK} />
         </BoardPressable>
       ) : null}
     </>
