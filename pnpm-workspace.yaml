@@ -14,6 +14,11 @@ onlyBuiltDependencies:
 # convex-test 0.0.54 leaves its event-loop MessagePorts open after scheduled functions finish.
 patchedDependencies:
   convex-test@0.0.54: js-patches/convex-test@0.0.54.patch
+  # convex 1.42.3 adds performance.now() to Date.now() for its clock, but React Native counts
+  # performance.now() from device boot, so the server's clock skew is off by the device's uptime.
+  # A reused sign-in token is then refreshed far too late, expires, and the next mutation drops the
+  # socket to re-authenticate. Still unfixed in 1.48.0.
+  convex@1.42.3: js-patches/convex@1.42.3.patch
   # expo-alternate-app-icons 8.0.0 reads the current Android icon from the launching activity, so
   # switching twice left both icons enabled and a reset to the default did nothing. It also switched
   # at once, which closed the app; the patch waits until the app is in the background.

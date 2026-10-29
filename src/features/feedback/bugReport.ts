@@ -37,9 +37,11 @@ export async function pickScreenshot(): Promise<BugScreenshot | null> {
 }
 
 export function captureBugReport({
+  kind,
   body,
   screenshot,
 }: {
+  kind: "feature" | "bug"
   body: string
   screenshot?: BugScreenshot
 }) {
@@ -48,7 +50,7 @@ export function captureBugReport({
     {
       message: body,
       tags: {
-        kind: "bug",
+        kind,
         platform: Platform.OS,
         appVersion: appVersion() ?? "unknown",
         build: Application.nativeBuildVersion ?? "unknown",

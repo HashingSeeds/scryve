@@ -79,6 +79,7 @@ export default {
     notifications: {
       heading: "通知",
       feedbackReplies: "フィードバックへの返信",
+      feedbackRepliesHelper: "返信は常に「あなたのフィードバック」に表示されます",
       renewalReminders: "更新のリマインダー",
       renewalRemindersHelper: "サブスクリプション更新の3日前",
       channel: "返信とリマインダー",

@@ -18,7 +18,6 @@ export default {
     kind: "種類を選択",
     feature: "機能",
     bug: "バグ",
-    bodyLabel: "メッセージ",
     bodyPlaceholder: {
       feature: "どんな機能がほしいですか?どんなときに使いますか?",
       bug: "何が起きましたか?どうなると思っていましたか?",
@@ -27,7 +26,8 @@ export default {
     removeScreenshot: "スクリーンショットを削除",
     selectedScreenshot: "選択したスクリーンショット",
     screenshotFailed: "スクリーンショットを追加できませんでした。別の画像をお試しください。",
-    bugDisclosure: "バグ報告では、デバイスの情報とスクリーンショットもSentryに送信されます。",
+    sentryDisclosure:
+      "バグ報告やスクリーンショットを送ると、お使いのデバイス情報も Sentry に送信されます。",
     translationNotice:
       "どの言語でも書けます。翻訳にAIツールを使うことがあります。<privacy>プライバシーポリシー</privacy>をご覧ください。",
     includeAccount: "アカウントを含める",
@@ -36,7 +36,6 @@ export default {
     anonymous:
       "アカウントなしで送信されます。返信はこのデバイスに表示され、再インストールすると失われることがあります。",
     signInToKeep: "サインインして保持",
-    send: "送信",
     sendFailed: "送信できませんでした。もう一度お試しください。",
     rateLimited_other: "送信回数が多すぎます。{{count}}分後にもう一度お試しください。",
   },
@@ -58,17 +57,22 @@ export default {
     missing: "このフィードバックは削除されました。",
     you: "あなた",
     team: "Scryve",
-    replyLabel: "返信",
     replyPlaceholder: "詳細の追加や質問への回答をどうぞ",
     send: "送信",
+    sending: "送信中…",
+    sent: "送信済み",
     sendFailed: "送信できませんでした。もう一度お試しください。",
-    includeAccount: "アカウントを含める",
-    includeAccountHelper:
-      "ユーザー名が運営に表示され、このスレッドがすべてのデバイスで保持されます。",
     linked: "アカウント付きで送信済み",
     linkedElsewhere: "別のアカウントで送信済み",
-    signInToKeep: "再インストールしてもこのスレッドを残すにはサインインしてください",
-    notifyReplies: "自分のフィードバックへのすべての返信を通知する",
+    notLinked: "アカウントなしで送信しました。",
+    includeAccount: "含める",
+    signInToKeep: "サインインして保存",
+  },
+  notifyPrompt: {
+    title: "返信を通知で受け取りますか?",
+    body: "どちらを選んでも、返信は Scryve のここに表示されます。",
+    notNow: "今はしない",
+    notify: "通知する",
   },
   unavailable: "フィードバックにはScryveのクラウドが必要ですが、このビルドでは設定されていません。",
 } satisfies LocaleNamespace

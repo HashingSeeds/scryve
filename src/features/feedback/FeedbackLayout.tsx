@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useRef, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, useWindowDimensions, View } from "react-native"
 
@@ -13,6 +13,7 @@ import type { ThemedStyle } from "@/theme/types"
 export function FeedbackLayout({
   title,
   heading = true,
+  chat = false,
   offline,
   onBack,
   footer,
@@ -20,6 +21,7 @@ export function FeedbackLayout({
 }: {
   title: string
   heading?: boolean
+  chat?: boolean
   offline: boolean
   onBack: () => void
   footer?: ReactNode
@@ -29,7 +31,8 @@ export function FeedbackLayout({
   const { titleVisible, onScroll } = useCollapsingTitle()
   // why: at the largest text sizes a pinned footer covers most of the screen, so it scrolls with the content instead.
   const { fontScale } = useWindowDimensions()
-  const pinFooter = Boolean(footer) && fontScale <= MAX_PINNED_FONT_SCALE
+  const pinFooter = Boolean(footer) && (chat || fontScale <= MAX_PINNED_FONT_SCALE)
+  const scroll = useRef<ScrollView>(null)
   return (
     <Screen
       preset="fixed"
@@ -52,6 +55,8 @@ export function FeedbackLayout({
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
         onScroll={onScroll}
+        ref={scroll}
+        onContentSizeChange={chat ? () => scroll.current?.scrollToEnd() : undefined}
       >
         {heading ? <Text text={title} preset="heading" accessibilityRole="header" /> : null}
         {children}

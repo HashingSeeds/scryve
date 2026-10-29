@@ -79,6 +79,7 @@ export default {
     notifications: {
       heading: "नोटिफ़िकेशन",
       feedbackReplies: "फ़ीडबैक के जवाब",
+      feedbackRepliesHelper: "जवाब हमेशा आपके फ़ीडबैक में दिखाई देते हैं",
       renewalReminders: "नवीनीकरण रिमाइंडर",
       renewalRemindersHelper: "आपकी सदस्यता के नवीनीकरण से 3 दिन पहले",
       channel: "जवाब और रिमाइंडर",

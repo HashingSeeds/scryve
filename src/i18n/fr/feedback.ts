@@ -20,7 +20,6 @@ export default {
     kind: "De quoi s'agit-il ?",
     feature: "Fonctionnalité",
     bug: "Bug",
-    bodyLabel: "Message",
     bodyPlaceholder: {
       feature: "Que souhaiteriez-vous, et quand l'utiliseriez-vous ?",
       bug: "Que s'est-il passé ? Qu'attendiez-vous ?",
@@ -29,8 +28,8 @@ export default {
     removeScreenshot: "Retirer la capture d'écran",
     selectedScreenshot: "Capture d'écran sélectionnée",
     screenshotFailed: "Impossible d'ajouter cette capture d'écran. Essayez une autre image.",
-    bugDisclosure:
-      "Les signalements de bug envoient aussi les informations de votre appareil et toute capture d'écran à Sentry.",
+    sentryDisclosure:
+      "Les signalements de bugs et les captures d'écran envoient aussi les détails de votre appareil à Sentry.",
     translationNotice:
       "Écrivez dans la langue de votre choix. Nous pouvons utiliser des outils d'IA pour la traduire. Consultez notre <privacy>Politique de confidentialité</privacy>.",
     includeAccount: "Inclure mon compte",
@@ -39,7 +38,6 @@ export default {
     anonymous:
       "Envoyé sans votre compte. Les réponses s'affichent sur cet appareil, et une réinstallation peut les faire perdre.",
     signInToKeep: "Connectez-vous pour la conserver",
-    send: "Envoyer",
     sendFailed: "Envoi impossible. Réessayez.",
     rateLimited_one: "Trop d'envois. Réessayez dans {{count}} minute.",
     rateLimited_many: "Trop d'envois. Réessayez dans {{count}} de minutes.",
@@ -62,17 +60,22 @@ export default {
     missing: "Ce retour n'existe plus.",
     you: "Vous",
     team: "Scryve",
-    replyLabel: "Réponse",
     replyPlaceholder: "Ajoutez un détail ou répondez à une question",
     send: "Envoyer",
+    sending: "Envoi en cours…",
+    sent: "Envoyé",
     sendFailed: "Envoi impossible. Réessayez.",
-    includeAccount: "Inclure mon compte",
-    includeAccountHelper:
-      "Nous permet de voir votre nom d'utilisateur et garde cette conversation sur tous vos appareils.",
     linked: "Envoyé avec votre compte",
     linkedElsewhere: "Envoyé avec un autre compte",
-    signInToKeep: "Connectez-vous pour conserver cette conversation si vous réinstallez",
-    notifyReplies: "Me notifier des réponses à tous mes retours",
+    notLinked: "Envoyé sans votre compte.",
+    includeAccount: "L'inclure",
+    signInToKeep: "Connectez-vous pour le conserver",
+  },
+  notifyPrompt: {
+    title: "Recevoir une notification pour les réponses ?",
+    body: "Dans tous les cas, les réponses apparaissent toujours ici dans Scryve.",
+    notNow: "Pas maintenant",
+    notify: "Me notifier",
   },
   unavailable:
     "Les retours nécessitent le cloud de Scryve, qui n'est pas configuré dans cette version.",

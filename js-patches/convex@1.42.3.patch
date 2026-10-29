@@ -1,0 +1,48 @@
+diff --git a/dist/cjs/browser/sync/web_socket_manager.js b/dist/cjs/browser/sync/web_socket_manager.js
+index 8f686cd92137b7d30191d2b07c7087a3bf285447..00b4005a6bb4fd5c68fbbb2ab45985a7f2c3f418 100644
+--- a/dist/cjs/browser/sync/web_socket_manager.js
++++ b/dist/cjs/browser/sync/web_socket_manager.js
+@@ -29,6 +29,7 @@ const CLOSE_GOING_AWAY = 1001;
+ const CLOSE_NO_STATUS = 1005;
+ const CLOSE_NOT_FOUND = 4040;
+ let firstTime;
++let firstPerformanceNow;
+ function monotonicMillis() {
+   if (firstTime === void 0) {
+     firstTime = Date.now();
+@@ -36,7 +37,10 @@ function monotonicMillis() {
+   if (typeof performance === "undefined" || !performance.now) {
+     return Date.now();
+   }
+-  return Math.round(firstTime + performance.now());
++  if (firstPerformanceNow === void 0) {
++    firstPerformanceNow = performance.now();
++  }
++  return Math.round(firstTime + performance.now() - firstPerformanceNow);
+ }
+ function prettyNow() {
+   return `t=${Math.round((monotonicMillis() - firstTime) / 100) / 10}s`;
+diff --git a/dist/esm/browser/sync/web_socket_manager.js b/dist/esm/browser/sync/web_socket_manager.js
+index 14a000bccd16b869fb097e992efc2ca8a6fd7ee6..7c3adb68a790cbcb3fb09ac9bb52722c8ef6ce9b 100644
+--- a/dist/esm/browser/sync/web_socket_manager.js
++++ b/dist/esm/browser/sync/web_socket_manager.js
+@@ -11,6 +11,7 @@ const CLOSE_GOING_AWAY = 1001;
+ const CLOSE_NO_STATUS = 1005;
+ const CLOSE_NOT_FOUND = 4040;
+ let firstTime;
++let firstPerformanceNow;
+ function monotonicMillis() {
+   if (firstTime === void 0) {
+     firstTime = Date.now();
+@@ -18,7 +19,10 @@ function monotonicMillis() {
+   if (typeof performance === "undefined" || !performance.now) {
+     return Date.now();
+   }
+-  return Math.round(firstTime + performance.now());
++  if (firstPerformanceNow === void 0) {
++    firstPerformanceNow = performance.now();
++  }
++  return Math.round(firstTime + performance.now() - firstPerformanceNow);
+ }
+ function prettyNow() {
+   return `t=${Math.round((monotonicMillis() - firstTime) / 100) / 10}s`;

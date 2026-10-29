@@ -79,6 +79,7 @@ const account = {
     notifications: {
       heading: "Notifications",
       feedbackReplies: "Feedback replies",
+      feedbackRepliesHelper: "Replies always show up in Your feedback",
       renewalReminders: "Renewal reminders",
       renewalRemindersHelper: "3 days before your subscription renews",
       // Android's name for Scryve's notification channel, shown in system settings.
