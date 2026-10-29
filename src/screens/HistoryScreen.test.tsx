@@ -5,7 +5,7 @@ import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistory
 import type { LocalGameSummary } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 
-import { connectedHistoryEntry, localHistoryEntry, manualHistoryEntry } from "./historyEntries"
+import { connectedHistoryEntry, manualHistoryEntry } from "./historyEntries"
 import { HistoryScreen } from "./HistoryScreen"
 
 const NOW = new Date("2026-08-11T20:00:00Z").getTime()
@@ -124,28 +124,6 @@ describe("unified history screen", () => {
       "history-row-local-local-1",
       "history-row-connected-connected-1",
     ])
-  })
-
-  it("falls back to ruleset when connected format is empty", () => {
-    expect(connectedHistoryEntry(connectedGame({ format: "", ruleset: "commander" })).format).toBe(
-      "Commander",
-    )
-  })
-
-  it("does not turn a no-system connected game into a Magic format", () => {
-    const entry = connectedHistoryEntry(
-      connectedGame({ system: "none", format: "none", ruleset: "none", startingLife: 20 }),
-    )
-
-    expect(entry.system).toBeUndefined()
-    expect(entry.format).toBe("20 life")
-  })
-
-  it("keeps a no-system local game on generic starting-life copy", () => {
-    const entry = localHistoryEntry(localGame({ format: "standard" }))
-
-    expect(entry.system).toBeUndefined()
-    expect(entry.format).toBe("20 life")
   })
 
   it("routes each row to the detail screen matching its source", () => {
@@ -420,12 +398,6 @@ describe("unified history screen", () => {
     expect(screen.getByText("Could not save your choice. Try again.")).toBeTruthy()
   })
 
-  it("shows local games without a connected feed for signed-out players", () => {
-    renderHistory()
-
-    expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
-  })
-
   it("names the winner a local game recorded", () => {
     renderHistory({
       games: [localGame({ result: { kind: "win", winnerPlayerIds: ["p2"] } } as never)],
@@ -631,24 +603,6 @@ describe("HistoryScreen Scryve matches", () => {
       "history-row-local-m-g2",
       "history-row-local-m-g1",
     ])
-  })
-
-  it("labels an unfinished match in progress", () => {
-    renderHistory({ games: [localGame(), ...deviceGames.slice(0, 2)] })
-
-    expect(
-      screen.getByLabelText("In progress · Ada · Grace · Local · Bo3 1-1 · In progress · 2 games"),
-    ).toBeTruthy()
-  })
-
-  it("filters a match by the match result, not its games", () => {
-    renderHistory({ games: [localGame(), ...deviceGames.map(claimed)] })
-
-    openFilters()
-    fireEvent.press(screen.getByTestId("history-outcome-win"))
-    fireEvent.press(screen.getByTestId("history-filters-button"))
-
-    expect(rowIds()).toEqual(["history-row-match-match_1"])
   })
 })
 

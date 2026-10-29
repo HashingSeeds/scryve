@@ -149,12 +149,22 @@ describe("game summary", () => {
     expect(counterChangeLabel("pokemon", 2)).toBe("2 prize cards changes")
   })
 
-  it("summarises a local game above its life totals", () => {
+  it("summarises a local game above each seat's final life and swing", () => {
     renderLocal()
 
     expect(screen.getByText("Finished")).toBeTruthy()
     expect(screen.getByText("2 players · 20 life · 34 min · 0 life changes")).toBeTruthy()
     expect(screen.getByText("Final Life")).toBeTruthy()
+    expect(screen.getByText("Seat 1")).toBeTruthy()
+    expect(screen.getByText("Seat 2")).toBeTruthy()
+    expect(screen.queryByText("Seat 0")).toBeNull()
+    expect(screen.getByText("3")).toBeTruthy()
+    expect(screen.getByText("-17 from start")).toBeTruthy()
+    expect(screen.getByText("unchanged")).toBeTruthy()
+    expect(screen.getByText("No life changes were recorded.")).toBeTruthy()
+    expect(screen.getByTestId("summary-timeline-toggle").props.accessibilityState.disabled).toBe(
+      true,
+    )
   })
 
   it("keeps a no-system local summary on generic starting-life copy", () => {
@@ -162,22 +172,6 @@ describe("game summary", () => {
 
     expect(model.system).toBeUndefined()
     expect(model.format).toBe("20 life")
-  })
-
-  it("numbers local seats for humans, starting at one like the board does", () => {
-    renderLocal()
-
-    expect(screen.getByText("Seat 1")).toBeTruthy()
-    expect(screen.getByText("Seat 2")).toBeTruthy()
-    expect(screen.queryByText("Seat 0")).toBeNull()
-  })
-
-  it("shows each player's final life and swing from the starting total", () => {
-    renderLocal()
-
-    expect(screen.getByText("3")).toBeTruthy()
-    expect(screen.getByText("-17 from start")).toBeTruthy()
-    expect(screen.getByText("unchanged")).toBeTruthy()
   })
 
   it("keeps the life-change timeline collapsed until asked for", () => {
@@ -226,15 +220,6 @@ describe("game summary", () => {
 
     expect(localChanges(game)).toEqual([{ id: "op-1", playerId: "p1", delta: -21, undo: false }])
     expect(localSummaryModel(game).changeCount).toBe(1)
-  })
-
-  it("states plainly when no life changes were recorded", () => {
-    renderLocal()
-
-    expect(screen.getByText("No life changes were recorded.")).toBeTruthy()
-    expect(screen.getByTestId("summary-timeline-toggle").props.accessibilityState.disabled).toBe(
-      true,
-    )
   })
 
   it("ranks a local game by the winner its host recorded", () => {

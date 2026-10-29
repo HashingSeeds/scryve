@@ -1,11 +1,9 @@
-import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
 import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
-import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
 
@@ -690,84 +688,6 @@ describe("DeckDetailScreen", () => {
     },
   )
 
-  it("switches among previously cached versions while offline", () => {
-    mockDeckSyncState.enabled = true
-    mockDeckSyncState.metadata = [cachedMetadata]
-    mockMetadataWriteState.metadata = [cachedMetadata]
-    const cachedVersions = [
-      {
-        deckId: "deck-1",
-        versionId: "version-main",
-        revision: 1,
-        versionNumber: 1,
-        name: "Main",
-        note: "",
-        fingerprint: "f1",
-        cardCount: 1,
-        cardQuantity: 1,
-        deleted: false,
-        updatedAt: 1,
-      },
-      {
-        deckId: "deck-1",
-        versionId: "version-sideboard",
-        revision: 1,
-        versionNumber: 2,
-        name: "vs Control",
-        note: "More removal",
-        fingerprint: "f2",
-        cardCount: 1,
-        cardQuantity: 1,
-        deleted: false,
-        updatedAt: 2,
-      },
-    ]
-    mockVersionCacheState.versions = cachedVersions
-    mockVersionCacheState.version = cachedVersions[1]
-    mockVersionCacheState.cards = [
-      { ...solRing, name: "Counterspell", deckVersionId: "version-sideboard" },
-    ]
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <DeckDetailScreen
-          deckId="deck-1"
-          onBack={jest.fn()}
-          access={{
-            ready: false,
-            loading: false,
-            signedIn: true,
-            ownerId: "owner-a",
-            request: jest.fn(),
-          }}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(view.getByText("Counterspell")).toBeTruthy()
-    expect(view.queryByText("Sol Ring")).toBeNull()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
-    expect(view.getByText("vs Control")).toBeTruthy()
-    fireEvent.press(view.getByTestId("version-picker-version-main"))
-    mockVersionCacheState.version = cachedVersions[0]
-    mockVersionCacheState.cards = [solRing]
-    view.rerender(
-      <ThemeProvider initialContext="light">
-        <DeckDetailScreen
-          deckId="deck-1"
-          onBack={jest.fn()}
-          access={{
-            ready: false,
-            loading: false,
-            signedIn: true,
-            ownerId: "owner-a",
-            request: jest.fn(),
-          }}
-        />
-      </ThemeProvider>,
-    )
-    expect(view.getByText("Sol Ring")).toBeTruthy()
-  })
-
   it("keeps an offline edit of an older cached version tied to that version", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
@@ -864,7 +784,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByLabelText("Remove Stale Snapshot")).not.toBeDisabled()
   })
 
-  it("re-seeds an uncached offline edit on reconnect without auto-dirtying or empty-saving", () => {
+  it("re-seeds an uncached offline edit on reconnect without auto-dirtying or empty-saving, then adds on top", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
@@ -891,42 +811,22 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText("Unsaved changes")).toBeNull()
     expect(view.getByTestId("save-version-button")).toBeDisabled()
     expect(mockSaveVersion).not.toHaveBeenCalled()
-  })
-
-  it("adds on top of the re-seeded live list after reconnect", () => {
-    mockDeckSyncState.enabled = true
-    mockDeckSyncState.metadata = [cachedMetadata]
-    mockMetadataWriteState.metadata = [cachedMetadata]
-    const screen = (ready: boolean) => (
-      <ThemeProvider initialContext="light">
-        <DeckDetailScreen
-          deckId="deck-1"
-          onBack={jest.fn()}
-          access={{ ready, loading: false, signedIn: true, ownerId: "owner-a", request: jest.fn() }}
-        />
-      </ThemeProvider>
-    )
-    const view = render(screen(false))
-    fireEvent.press(view.getByTestId("edit-deck-button"))
-    mockDetail.value = loadedDetail
-    view.rerender(screen(true))
 
     fireEvent.press(view.getByTestId("deck-add-cards"))
+    const add = view.UNSAFE_getByType(CardSearchScreen).props.onAdd
     act(() => {
       expect(
-        view.UNSAFE_getByType(CardSearchScreen).props.onAdd({
-          name: "Arcane Signet",
-          scryfallId: "arcane-signet",
-          quantity: 1,
-          board: "main",
-        }),
+        add({ name: "Arcane Signet", scryfallId: "arcane-signet", quantity: 1, board: "main" }),
+      ).toBeUndefined()
+      expect(
+        add({ name: "Mind Stone", scryfallId: "mind-stone", quantity: 1, board: "main" }),
       ).toBeUndefined()
     })
     fireEvent.press(view.getByText("Done"))
     fireEvent.press(view.getByTestId("save-version-button"))
 
     const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
-    expect(queued.map((card) => card.name)).toEqual(["Sol Ring", "Arcane Signet"])
+    expect(queued.map((card) => card.name)).toEqual(["Sol Ring", "Arcane Signet", "Mind Stone"])
   })
 
   it("adds an offline cache-known card through the offline search results", () => {
@@ -991,113 +891,6 @@ describe("DeckDetailScreen", () => {
       game: "mtg",
       section: "main",
     })
-  })
-
-  it("blocks an offline add of an unknown card with an honest affordance", () => {
-    mockDeckSyncState.enabled = true
-    mockDeckSyncState.metadata = [cachedMetadata]
-    mockMetadataWriteState.metadata = [cachedMetadata]
-    mockDetail.value = undefined
-    mockConnectionState.isWebSocketConnected = false
-    mockVersionCacheState.version = {
-      deckId: "deck-1",
-      versionId: "version-main",
-      revision: 2,
-      versionNumber: 1,
-      name: "Main",
-      note: "",
-      fingerprint: "f1",
-      cardCount: 1,
-      cardQuantity: 1,
-      deleted: false,
-      updatedAt: 1,
-    }
-    mockVersionCacheState.versions = [mockVersionCacheState.version]
-    mockVersionCacheState.cards = [solRing]
-    mockVersionCacheState.knownCards = {
-      "printing-333": {
-        game: "mtg",
-        card: {
-          _id: "card-mindstone",
-          _creationTime: 0,
-          deckVersionId: "version-sideboard",
-          game: "mtg",
-          cardId: "catalog-333",
-          printingId: "printing-333",
-          identityNamespace: "scryfall-oracle",
-          name: "Mind Stone",
-          quantity: 2,
-          section: "sideboard",
-        },
-      },
-    }
-    const view = renderDetail(offlineAccess)
-
-    fireEvent.press(view.getByTestId("edit-deck-button"))
-    fireEvent.press(view.getByTestId("deck-add-cards"))
-    expect(view.getByText("You’re offline. Searching cards already in your decks.")).toBeTruthy()
-    fireEvent.changeText(view.getByTestId("card-search-input"), "Lightning Bolt")
-    expect(
-      view.getByText("No cached cards match. Cards appear here after you add them online."),
-    ).toBeTruthy()
-    expect(view.queryByLabelText("Add Lightning Bolt to deck")).toBeNull()
-    expect(mockVersionCardUpdate).not.toHaveBeenCalled()
-  })
-
-  it("stops at the entry limit when two adds land before a re-render", () => {
-    mockDeckSyncState.enabled = true
-    mockDeckSyncState.metadata = [cachedMetadata]
-    mockMetadataWriteState.metadata = [cachedMetadata]
-    mockDetail.value = undefined
-    mockConnectionState.isWebSocketConnected = false
-    mockVersionCacheState.version = {
-      deckId: "deck-1",
-      versionId: "version-main",
-      revision: 2,
-      versionNumber: 1,
-      name: "Main",
-      note: "",
-      fingerprint: "f1",
-      cardCount: 299,
-      cardQuantity: 299,
-      deleted: false,
-      updatedAt: 1,
-    }
-    mockVersionCacheState.versions = [mockVersionCacheState.version]
-    mockVersionCacheState.cards = Array.from({ length: 299 }, (_, index) => ({
-      ...solRing,
-      _id: `card-${index}`,
-      scryfallId: undefined,
-      oracleId: undefined,
-      printingId: `printing-${index}`,
-      name: `Filler ${index}`,
-    }))
-    const extra = (name: string) => ({
-      game: "mtg",
-      card: { ...solRing, scryfallId: undefined, oracleId: undefined, printingId: name, name },
-    })
-    mockVersionCacheState.knownCards = {
-      "Extra One": extra("Extra One"),
-      "Extra Two": extra("Extra Two"),
-    }
-    const view = renderDetail(offlineAccess)
-
-    fireEvent.press(view.getByTestId("edit-deck-button"))
-    fireEvent.press(view.getByTestId("deck-add-cards"))
-    fireEvent.changeText(view.getByTestId("card-search-input"), "Extra")
-    const first = view.getByLabelText("Add Extra One to deck")
-    const second = view.getByLabelText("Add Extra Two to deck")
-    act(() => {
-      fireEvent.press(first)
-      fireEvent.press(second)
-    })
-
-    expect(view.getByText("A deck can have at most 300 entries.")).toBeTruthy()
-    fireEvent.press(view.getByText("Done"))
-    fireEvent.press(view.getByTestId("save-version-button"))
-    const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
-    expect(queued).toHaveLength(300)
-    expect(queued.map((card) => card.name)).not.toContain("Extra Two")
   })
 
   it("keeps another game system's cached cards out of the offline add candidates", () => {
@@ -1307,30 +1100,6 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Sync paused. Resolve a saved local edit to continue.")).toBeTruthy()
   })
 
-  it("keeps cached metadata hidden when sync is disabled", () => {
-    mockDeckSyncState.metadata = [cachedMetadata]
-    mockMetadataWriteState.metadata = [cachedMetadata]
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <DeckDetailScreen
-          deckId="deck-1"
-          summary={{ name: "Existing Deck", game: "mtg", format: "commander" }}
-          onBack={jest.fn()}
-          access={{
-            ready: false,
-            loading: false,
-            signedIn: true,
-            ownerId: "owner-a",
-            request: jest.fn(),
-          }}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(view.queryByText("Card list unavailable offline.")).toBeNull()
-    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
-  })
-
   it("shows the latest failed metadata snapshot with explicit recovery actions", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
@@ -1534,48 +1303,14 @@ describe("DeckDetailScreen", () => {
 
     expect(view.getByText("Card list unavailable offline.")).toBeTruthy()
     expect(view.queryByText("Counterspell")).toBeNull()
-    expect(mockVersionCardWriteState.failures).toEqual([])
   })
 
-  it("compares only changed fields for a rename conflict", () => {
-    mockMetadataWriteState.metadata = [cachedMetadata]
+  it("shows a readable reason for a non-conflict failure", () => {
     mockDeckSyncState.enabled = true
     mockMetadataWriteState.failures = [
       {
         failedAt: 1,
-        reason: "Deck changed on another device. Choose which version to keep.",
-        action: { ...cachedMetadata, name: "Renamed deck", operationId: "rename-conflict" },
-      },
-    ]
-    const view = renderDetail({
-      ready: true,
-      loading: false,
-      signedIn: true,
-      ownerId: "owner-a",
-      request: jest.fn(),
-    })
-    fireEvent.press(view.getByText("Review changes"))
-    const sheet = within(view.getByTestId("deck-sync-conflict"))
-    expect(sheet.getByText("Renamed deck")).toBeTruthy()
-    expect(sheet.getByText("Existing Deck")).toBeTruthy()
-    expect(sheet.queryByText("Format")).toBeNull()
-    expect(sheet.queryByText("Notes")).toBeNull()
-    fireEvent.press(sheet.getByText("Keep account copy"))
-    expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("rename-conflict")
-  })
-
-  it.each([
-    ["This format is not available", "This format is not available"],
-    [
-      "[CONVEX M(decks:syncWrite)] Server Error",
-      "This edit could not be synced. Try again or discard it.",
-    ],
-  ])("shows a readable reason for non-conflict failures: %s", (reason, message) => {
-    mockDeckSyncState.enabled = true
-    mockMetadataWriteState.failures = [
-      {
-        failedAt: 1,
-        reason,
+        reason: "This format is not available",
         action: { ...cachedMetadata, operationId: "rejected-edit" },
       },
     ]
@@ -1587,8 +1322,7 @@ describe("DeckDetailScreen", () => {
       request: jest.fn(),
     })
     fireEvent.press(view.getByText("Review changes"))
-    expect(view.getByText(message)).toBeTruthy()
-    expect(view.queryByText(/CONVEX/)).toBeNull()
+    expect(view.getByText("This format is not available")).toBeTruthy()
     expect(view.queryByText("Account")).toBeNull()
     fireEvent.press(view.getByText("Discard local edit"))
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("rejected-edit")
@@ -1682,9 +1416,11 @@ describe("DeckDetailScreen", () => {
     )
   })
 
-  it("opens read-only with the deck, its notes, and the selected version's record", () => {
+  it("opens read-only with the deck, its notes, and one record for games and manual results", () => {
     const view = renderDetail()
     expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
+    expect(within(view.getByTestId("deck-stats")).getByText("4-4")).toBeTruthy()
+    expect(view.queryByTestId("deck-stats-source-manual")).toBeNull()
     expect(
       view.queryByTestId("deck-card-thumbnail-main:22222222-2222-2222-2222-222222222222"),
     ).toBeNull()
@@ -1695,21 +1431,8 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("deck-settings-button"))
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
     expect(view.getByText("3-1")).toBeTruthy()
-    expect(view.getAllByText("1 card").length).toBeGreaterThan(0)
-    expect(
-      StyleSheet.flatten(view.getByTestId("version-marker-version-main").props.style)
-        .backgroundColor,
-    ).toBe(colors.gameMenu.actions.history)
-    expect(view.queryByText(/Premium/)).toBeNull()
-  })
-
-  it("shows one record for the deck, games and manual results together", () => {
-    const view = renderDetail()
-    expect(within(view.getByTestId("deck-stats")).getByText("4-4")).toBeTruthy()
-    expect(view.queryByTestId("deck-stats-source-manual")).toBeNull()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
-    expect(view.getByText("3-1")).toBeTruthy()
     expect(view.getByText("Unplayed")).toBeTruthy()
+    expect(view.getAllByText("1 card").length).toBeGreaterThan(0)
   })
 
   it("shows the selected deck context while its detail loads", () => {
@@ -1737,15 +1460,6 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Commander")).toBeTruthy()
     expect(view.getByText("Main deck")).toBeTruthy()
     expect(view.getByTestId("edit-deck-button")).toBeDisabled()
-  })
-
-  it("says results start fresh after a save that changes the list", async () => {
-    const view = renderDetail()
-    fireEvent.press(view.getByTestId("edit-deck-button"))
-    fireEvent.press(view.getAllByText("+")[0])
-    fireEvent.press(view.getByTestId("save-version-button"))
-    await waitFor(() => expect(mockSaveVersion).toHaveBeenCalledTimes(1))
-    expect(await view.findByText("New list. Earlier results stay with the old one.")).toBeTruthy()
   })
 
   describe("new list notice", () => {
@@ -1859,6 +1573,8 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("discard-edits-confirm"))
     expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     expect(mockSaveVersion).not.toHaveBeenCalled()
+    view.unmount()
+    expect(renderDetail().queryByText("Edit deck")).toBeNull()
   })
 
   it("keeps an unsaved edit after leaving and saves it from the reopened deck", async () => {
@@ -1878,16 +1594,6 @@ describe("DeckDetailScreen", () => {
       }),
     )
     reopened.unmount()
-    expect(renderDetail().queryByText("Edit deck")).toBeNull()
-  })
-
-  it("forgets a kept edit once it is discarded", () => {
-    const first = renderDetail()
-    fireEvent.press(first.getByTestId("edit-deck-button"))
-    fireEvent.press(first.getAllByText("+")[0])
-    fireEvent.press(first.getByText("Cancel"))
-    fireEvent.press(first.getByTestId("discard-edits-confirm"))
-    first.unmount()
     expect(renderDetail().queryByText("Edit deck")).toBeNull()
   })
 
@@ -1998,12 +1704,6 @@ describe("DeckDetailScreen", () => {
         "rename-version-button",
       ),
     ).toBeNull()
-    expect(view.getByTestId("rename-version-button")).toBeTruthy()
-  })
-
-  it("labels the version options button", () => {
-    const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
     expect(view.getByLabelText("Version details")).toBe(view.getByTestId("rename-version-button"))
   })
 

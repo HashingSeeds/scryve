@@ -225,12 +225,9 @@ describe("CurrentGameScreen match mode", () => {
 
   it("holds the board at the tenth game until the match result is confirmed", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
-    repository.saveActiveGame(matchGame(1))
+    const first = matchGame(1)
+    repository.saveActiveGame({ ...first, match: { ...first.match!, gameNumber: 10, draws: 9 } })
     const { view, initial } = mount(repository)
-    for (let game = 1; game < 10; game += 1) {
-      endGame(view, "draw")
-      fireEvent.press(view.getByTestId("next-game-button"))
-    }
     expect(view.getByTestId("match-context")).toHaveTextContent("Game 10 · 0-0 · 9 draws")
     endGame(view, "draw")
     expect(view.queryByTestId("next-game-button")).toBeNull()

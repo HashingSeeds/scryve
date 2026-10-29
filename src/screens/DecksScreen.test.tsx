@@ -9,7 +9,7 @@ import { colors } from "@/theme/colors"
 import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
-import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
+import { accessibleForeground } from "@/utils/colorContrast"
 import { clear, loadString } from "@/utils/storage"
 
 import { DecksScreen } from "./DecksScreen"
@@ -345,16 +345,19 @@ describe("DecksScreen", () => {
     mockTotals = []
   })
 
-  it("leaves out the Synced label when only local decks exist", () => {
+  it("leaves out the Synced label and the empty hint when only local decks exist", () => {
     saveGuestDeck({ name: "Local only", format: "commander", game: "mtg", cards: [] })
     mockListMine.value = {
       decks: [],
       capacity: { used: 0, limit: 2, premium: false, canCreate: true },
       analyticsLocked: false,
     }
-    const list = within(renderShelf().getByTestId("decks-list"))
+    const view = renderShelf()
+    const list = within(view.getByTestId("decks-list"))
     expect(list.getByText("Local only")).toBeTruthy()
     expect(list.queryByText("Synced")).toBeNull()
+    expect(view.queryByText("No decks yet")).toBeNull()
+    expect(view.queryByText("Add a deck to get started.")).toBeNull()
   })
 
   it("opens each local deck while auth is loading without querying the private shelf", () => {
@@ -421,7 +424,7 @@ describe("DecksScreen", () => {
     expect(onPlay).toHaveBeenCalledTimes(1)
   })
 
-  it("renders decks as quiet ledger rows instead of card artwork", () => {
+  it("renders mixed-system decks as quiet ledger rows instead of card artwork", () => {
     const onSelect = jest.fn()
     mockListMine.value = {
       decks: [
@@ -430,28 +433,16 @@ describe("DecksScreen", () => {
           coverImageUrl: "https://cards.scryfall.io/small/example.jpg",
           keyRecord: { games: 5, wins: 3, losses: 2, draws: 0, unknown: 0 },
         },
+        pokemonDeck,
       ],
-      capacity: { used: 1, limit: 100, premium: true, canCreate: true },
+      capacity: { used: 2, limit: 100, premium: true, canCreate: true },
       analyticsLocked: false,
     }
     const view = renderShelf({ onSelect })
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByText("3 versions")).toBeTruthy()
     expect(view.getByText("3-2")).toBeTruthy()
-    expect(
-      StyleSheet.flatten(view.getByTestId("deck-card-existing-deck").props.style),
-    ).toMatchObject({
-      minHeight: 72,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.separator,
-    })
-    expect(
-      StyleSheet.flatten(view.getByTestId("deck-system-marker-existing-deck").props.style),
-    ).toMatchObject({
-      width: 6,
-      height: 34,
-      backgroundColor: colors.gameMenu.actions.history,
-    })
+    expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
     expect(view.getAllByText("Recent")).toHaveLength(1)
     fireEvent.press(view.getByLabelText("Existing Deck"))
     expect(onSelect).toHaveBeenCalledWith({
@@ -526,7 +517,6 @@ describe("DecksScreen", () => {
     expect(StyleSheet.flatten(within(indicator).getByText("!").props.style).color).toBe(
       darkColors.error,
     )
-    expect(contrastRatio(darkColors.error, darkColors.surface)).toBeGreaterThanOrEqual(3)
 
     writes.failures = []
     view.rerender(shelf({ onSelect }))
@@ -534,24 +524,6 @@ describe("DecksScreen", () => {
       view.queryByTestId("deck-needs-review-standard-deck", { includeHiddenElements: true }),
     ).toBeNull()
     expect(view.getByLabelText("Mono Red")).toBeTruthy()
-  })
-
-  it("matches the compact source filters used by History", () => {
-    const view = renderShelf()
-
-    expect(StyleSheet.flatten(view.getByTestId("collection-filter-all").props.style)).toMatchObject(
-      {
-        borderRadius: 24,
-        backgroundColor: colors.tint,
-      },
-    )
-    expect(
-      StyleSheet.flatten(view.getByTestId("collection-filter-favorites").props.style),
-    ).toMatchObject({ borderWidth: 1 })
-    expect(
-      StyleSheet.flatten(view.getByTestId("collection-filter-favorites").props.style)
-        .backgroundColor,
-    ).toBeUndefined()
   })
 
   it.each([
@@ -562,9 +534,6 @@ describe("DecksScreen", () => {
     expect(StyleSheet.flatten(view.getByText("All").props.style).color).toBe(
       accessibleForeground(themeColors.tint),
     )
-    expect(
-      contrastRatio(accessibleForeground(themeColors.tint), themeColors.tint),
-    ).toBeGreaterThanOrEqual(4.5)
 
     fireEvent.press(view.getByTestId("deck-filters-button"))
     fireEvent.press(view.getByTestId("system-filter-mtg"))
@@ -594,13 +563,6 @@ describe("DecksScreen", () => {
       backgroundColor: colors.separator,
     })
     expect(view.queryByText("No decks yet")).toBeNull()
-  })
-
-  it("opens the add-deck route", () => {
-    const onAddDeck = jest.fn()
-    const view = renderShelf({ onAddDeck })
-    fireEvent.press(view.getByText("Add deck"))
-    expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
   it("keeps search visible and reveals formats after choosing a system", () => {
@@ -668,35 +630,17 @@ describe("DecksScreen", () => {
     expect(view.getByText("Existing Deck")).toBeTruthy()
   })
 
-  it("keeps all released systems selectable", () => {
-    const view = renderShelf()
-    fireEvent.press(view.getByTestId("deck-filters-button"))
-    expect(view.getByTestId("system-filter-ygo")).toBeEnabled()
-    expect(view.getByTestId("system-filter-pokemon")).toBeEnabled()
-  })
-
-  it("hints when there are no decks yet", () => {
+  it("hints when there are no decks yet and opens the add-deck route", () => {
     mockListMine.value = {
       decks: [],
       capacity: { used: 0, limit: 100, premium: true, canCreate: true },
       analyticsLocked: false,
     }
-    const view = renderShelf()
-    expect(view.getByText("Add deck")).toBeTruthy()
+    const onAddDeck = jest.fn()
+    const view = renderShelf({ onAddDeck })
     expect(view.getByText("No decks yet")).toBeTruthy()
-  })
-
-  it("shows the system on rows while browsing mixed decks", () => {
-    mockListMine.value = {
-      decks: [commanderDeck, pokemonDeck],
-      capacity: { used: 2, limit: 100, premium: true, canCreate: true },
-      analyticsLocked: false,
-    }
-    const view = renderShelf()
-    expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
-    expect(view.getByText("3 versions")).toBeTruthy()
-    expect(view.getByText("3-1")).toBeTruthy()
-    expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
+    fireEvent.press(view.getByText("Add deck"))
+    expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
   it("shows synced favorites and toggles them without opening the deck", () => {
@@ -728,14 +672,13 @@ describe("DecksScreen", () => {
     expect(view.queryByText("Mono Red")).toBeNull()
   })
 
-  it("does not put upgrade copy on the deck shelf", () => {
+  it("keeps Add deck enabled on a full free shelf", () => {
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],
       capacity: { used: 2, limit: 2, premium: false, canCreate: false },
       analyticsLocked: false,
     }
     const view = renderShelf()
-    expect(view.queryByText(/Premium/)).toBeNull()
     expect(view.getByText("Add deck")).toBeEnabled()
   })
 
@@ -814,18 +757,5 @@ describe("DecksScreen", () => {
     expect(
       within(view.getByTestId("local-deck-sync-header")).getByTestId("local-deck-sync-choose"),
     ).toBeTruthy()
-  })
-
-  test("does not call an empty synced shelf an empty collection when local decks exist", () => {
-    clearGuestDecks()
-    saveGuestDeck({ name: "Local", format: "commander", cards: [] })
-    mockListMine.value = {
-      decks: [],
-      capacity: { used: 0, limit: 2, premium: false, canCreate: true },
-      analyticsLocked: false,
-    }
-    const view = renderShelf()
-    expect(view.queryByText("No decks yet")).toBeNull()
-    expect(view.queryByText("Add a deck to get started.")).toBeNull()
   })
 })

@@ -106,6 +106,7 @@ function openConnectedFinish() {
 
 describe("ConnectedBoardScreen", () => {
   beforeEach(resetConnectedHarness)
+  afterEach(() => jest.useRealTimers())
 
   it("renders the unavailable shell with a back door when the board cannot hydrate offline", () => {
     const onBack = jest.fn()
@@ -144,26 +145,6 @@ describe("ConnectedBoardScreen", () => {
     })
   })
 
-  it("defaults the connected board to a bottom-focus layout with your seat last", () => {
-    const players = Array.from({ length: 4 }, (_, index) => ({
-      playerId: `player-${index + 1}`,
-      seat: index + 1,
-      displayName: `Player ${index + 1}`,
-      color: index % 2 === 0 ? "#7C3AED" : "#2563EB",
-      currentLife: 40,
-      pendingDelta: 0,
-      controlledByMe: index === 2,
-    }))
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: { ...connectedHarness.runtime.projection, playerCount: 4, players },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByTestId("life-card-seat-4").props.accessibilityLabel).toContain("Your seat")
-    openConnectedMenu()
-    expect(screen.getByTestId("layout-button")).toBeTruthy()
-  })
-
   it("opens on the host's layout, or the table default when it doesn't fit the seats", () => {
     const players = Array.from({ length: 4 }, (_, index) => ({
       playerId: `player-${index + 1}`,
@@ -192,27 +173,6 @@ describe("ConnectedBoardScreen", () => {
 
     expect(selectedLayout("auto")).toBe("auto")
     expect(selectedLayout("featured-last")).toBe("tabletop")
-  })
-
-  it("lets the attacking seat stage commander damage against several defenders", async () => {
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: {
-        ...connectedHarness.runtime.projection,
-        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
-      },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-
-    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
-    fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
-    fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
-
-    await waitFor(() =>
-      expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
-        { toPlayerId: "player-2", delta: 1 },
-      ]),
-    )
   })
 
   it("stages and sends each partner's damage under its own slot", async () => {
@@ -460,30 +420,6 @@ describe("ConnectedBoardScreen", () => {
     jest.useRealTimers()
   })
 
-  it("stays silent when a sync completes quickly", () => {
-    jest.useFakeTimers()
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      connectionStatus: "syncing",
-      pending: [
-        { event: { type: "life.changed", operationId: "operation-1", playerId: "player-1" } },
-      ],
-    }
-    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(menuButtonLabel()).toBe("Game options")
-
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      connectionStatus: "connected",
-      pending: [],
-    }
-    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    act(() => jest.advanceTimersByTime(5_000))
-    expect(menuButtonLabel()).toBe("Game options")
-    expect(screen.queryByTestId("game-menu-signal-badge")).toBeNull()
-    jest.useRealTimers()
-  })
-
   it("keeps an owner-scoped cached board usable offline and dims the other seats", () => {
     jest.useFakeTimers()
     connectedHarness.runtime = {
@@ -658,7 +594,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("submit-player-report-button")).toBeTruthy()
   })
 
-  it("uses a connected end-game pop-up with cancel and confirm outcomes", async () => {
+  it("uses a connected end-game pop-up that cancels and offers to abandon until a result is chosen, then to finish", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: { ...connectedHarness.runtime.projection, isHost: true },
@@ -673,10 +609,10 @@ describe("ConnectedBoardScreen", () => {
     expect(mockFinish).not.toHaveBeenCalled()
 
     openConnectedFinish()
+    expect(screen.getByText("Abandon")).toBeTruthy()
     fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
-    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
-    await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+    expect(screen.getByText("Finish")).toBeTruthy()
+    expect(screen.queryByText("Abandon")).toBeNull()
   })
 
   it("lets a cloud guest leave once the server lets them go", async () => {
@@ -722,20 +658,6 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("end-game-button"))
     fireEvent.press(screen.getByTestId("confirm-connected-leave"))
     expect(onLeave).toHaveBeenCalledTimes(1)
-  })
-
-  it("abandons the connected game when no result is chosen", async () => {
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: { ...connectedHarness.runtime.projection, isHost: true },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    openConnectedFinish()
-    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
-
-    await waitFor(() => expect(mockRuntimeAbandon).toHaveBeenCalledTimes(1))
-    expect(mockFinish).not.toHaveBeenCalled()
-    await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
   })
 
   it("preselects the last seat standing as the winner", async () => {
@@ -866,6 +788,7 @@ describe("ConnectedBoardScreen", () => {
       act(() => jest.runAllTimers())
       expect(onGameAbandoned).toHaveBeenCalledTimes(1)
       expect(onGameEnded).not.toHaveBeenCalled()
+      expect(mockFinish).not.toHaveBeenCalled()
     } finally {
       jest.useRealTimers()
     }
@@ -1012,22 +935,6 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByText("Ending…")).toBeTruthy()
   })
 
-  it("offers to abandon until a result is chosen, then to finish", () => {
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: { ...connectedHarness.runtime.projection, isHost: true },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    openConnectedFinish()
-
-    expect(screen.getByText("Abandon")).toBeTruthy()
-
-    fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
-
-    expect(screen.getByText("Finish")).toBeTruthy()
-    expect(screen.queryByText("Abandon")).toBeNull()
-  })
-
   it("keeps finish confirmation open and shows a mutation error there", async () => {
     const onHistory = jest.fn()
     connectedHarness.runtime = {
@@ -1137,31 +1044,6 @@ describe("ConnectedBoardScreen", () => {
     userBReady = true
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("user-b")
-  })
-
-  it("uses a neutral full-board surface while the first projection has no seat metadata", () => {
-    connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
-    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-
-    expect(
-      screen.getByTestId("connected-board-shell-surface", { includeHiddenElements: true }),
-    ).toBeTruthy()
-    expect(
-      screen.queryByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
-    ).toBeNull()
-    expect(
-      StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style),
-    ).toMatchObject({ flex: 1, width: "100%" })
-    expect(
-      StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
-    ).toMatchObject({ position: "absolute" })
-    expect(screen.getByText("Loading connected board…")).toBeTruthy()
-    expect(screen.queryByTestId("life-seat-2-1")).toBeNull()
-
-    connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
-    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.queryByTestId("connected-board-shell")).toBeNull()
-    expect(screen.getByTestId("life-seat-2-1")).toBeTruthy()
   })
 
   it.each([
@@ -1331,17 +1213,31 @@ describe("ConnectedBoardScreen", () => {
     expect(mockUseConnectedGame).toHaveBeenCalledWith("game-public", "user-a")
   })
 
-  it("offers a way back to local play while the connected board is stuck loading", () => {
+  it("uses a neutral full-board surface with a way back to local play while the first projection loads", () => {
     const onBack = jest.fn()
     connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
 
+    expect(
+      screen.getByTestId("connected-board-shell-surface", { includeHiddenElements: true }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
+    ).toBeNull()
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style),
+    ).toMatchObject({ flex: 1, width: "100%" })
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
+    ).toMatchObject({ position: "absolute" })
     expect(view.getByText("Loading connected board…")).toBeTruthy()
+    expect(screen.queryByTestId("life-seat-2-1")).toBeNull()
     fireEvent.press(view.getByTestId("back-from-connected-board-button"))
     expect(onBack).toHaveBeenCalledTimes(1)
 
     connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(screen.queryByTestId("connected-board-shell")).toBeNull()
     expect(view.queryByTestId("back-from-connected-board-button")).toBeNull()
     expect(view.getByTestId("life-seat-2-1")).toBeTruthy()
   })

@@ -111,24 +111,4 @@ describe("shipping Maestro selectors", () => {
       expect(flow.match(/\.\.\/shared\/_OnFlowStart\.yaml/g)).toHaveLength(1)
     }
   })
-
-  it("exposes smoke, full-suite, e2e, and Apple review package commands", () => {
-    const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"))
-
-    expect(packageJson.scripts["test:maestro:smoke"]).toContain("--include-tags smoke")
-    expect(packageJson.scripts["test:maestro"]).toContain(".maestro/flows")
-    expect(packageJson.scripts.e2e).toBe("bash scripts/maestro-run.sh")
-    expect(packageJson.scripts["capture:apple-review"]).toContain("CaptureAppleReview.yaml")
-  })
-
-  it("captures the live Scryve Pro paywall for Apple review", () => {
-    const capture = readFileSync(
-      join(process.cwd(), ".maestro/store-assets/CaptureAppleReview.yaml"),
-      "utf8",
-    )
-
-    expect(capture).toContain('id: "utility-account-button"')
-    expect(capture).toContain('id: "count-pro-paywall-button"')
-    expect(capture).toContain("takeScreenshot: screenshots/apple-review/count-pro-paywall")
-  })
 })

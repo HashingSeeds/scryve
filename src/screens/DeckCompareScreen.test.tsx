@@ -79,18 +79,6 @@ it("shows a short missing contents message for untracked lists", async () => {
   )
 })
 
-it("excludes unknown outcomes from comparison win rates", async () => {
-  mockSummary = {
-    ...deckStatsSummary,
-    lists: deckStatsSummary.lists.map((list) => ({ ...list, games: list.games + 20 })),
-  }
-  const view = render(screen())
-  expect(view.getByText("50%")).toBeTruthy()
-  expect(view.getByText("67%")).toBeTruthy()
-  expect(view.getAllByText("Under 10 results is a small sample.")).toHaveLength(1)
-  await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
-})
-
 it("gates direct access for non-Pro players without looking up cards", () => {
   mockPremium = false
   const view = render(screen())

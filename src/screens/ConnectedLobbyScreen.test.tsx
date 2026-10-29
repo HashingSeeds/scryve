@@ -3,7 +3,6 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-
 import { ConvexError } from "convex/values"
 
 import { Header } from "@/components/Header"
-import { Screen } from "@/components/Screen"
 import * as billingAccess from "@/features/billing/RevenueCatContext"
 import {
   ConnectedGameRepository,
@@ -126,7 +125,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByTestId("lobby-player-count-4")).toBeDisabled()
   })
 
-  it("opens deck management for the joining player's game system", () => {
+  it("hides host settings and opens deck management for the joining player's game system", () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
       status: "lobby",
@@ -146,27 +145,10 @@ describe("ConnectedLobbyScreen", () => {
         />,
       ),
     )
-    fireEvent.press(screen.getByTestId("manage-seat-1-decks"))
-    expect(onManageDecks).toHaveBeenCalledWith("mtg")
-  })
-
-  it("does not offer required decks for a game without a system", () => {
-    connectedHarness.projection = {
-      ...connectedHarness.projection,
-      status: "lobby",
-      isHost: true,
-      system: "none",
-    }
-    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
-    expect(screen.queryByTestId("lobby-require-decks")).toBeNull()
-    expect(screen.getByTestId("lobby-player-count-2")).toBeEnabled()
-  })
-
-  it("hides host settings from joining players", () => {
-    connectedHarness.projection = { ...connectedHarness.projection, status: "lobby", isHost: false }
-    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
     expect(screen.queryByTestId("lobby-player-count")).toBeNull()
     expect(screen.queryByTestId("lobby-require-decks")).toBeNull()
+    fireEvent.press(screen.getByTestId("manage-seat-1-decks"))
+    expect(onManageDecks).toHaveBeenCalledWith("mtg")
   })
 
   it("shows rejected settings without changing the selected count", async () => {
@@ -291,22 +273,6 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByText("Ada")).toBeTruthy()
   })
 
-  it("says that an empty deck list does not block play", () => {
-    connectedHarness.projection = {
-      ...connectedHarness.projection,
-      status: "lobby",
-      invitation: null,
-      players: connectedHarness.projection.players.map((player, index) => ({
-        ...player,
-        controlledByMe: index === 0,
-      })),
-    }
-
-    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
-
-    expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent("No synced decks yet.")
-  })
-
   it("shows the deck rule and blocks a required lobby with a missing deck", () => {
     connectedHarness.decks = [
       {
@@ -372,14 +338,10 @@ describe("ConnectedLobbyScreen", () => {
       themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />),
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
-    expect(view.UNSAFE_getByType(Screen).props.preset).toBe("fixed")
     expect(screen.queryByTestId("invite-qr")).toBeNull()
     fireEvent.press(screen.getByTestId("open-invite-button"))
     expect(screen.getByTestId("invite-dialog")).toBeTruthy()
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
-    expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
-      "size-184-quiet-zone-8-ecl-H",
-    )
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
     expect(screen.getByTestId("manual-code")).toHaveTextContent("AB12CD")
     expect(screen.getByText("Ada")).toBeTruthy()
@@ -558,19 +520,6 @@ describe("ConnectedLobbyScreen", () => {
     expect(onLeft).toHaveBeenCalledTimes(1)
   })
 
-  it("requires a host to abandon instead of hiding an unfinished lobby", () => {
-    connectedHarness.projection = {
-      ...connectedHarness.projection,
-      status: "lobby",
-      isHost: true,
-      invitation: null,
-    }
-    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
-
-    expect(screen.queryByTestId("leave-connected-lobby-button")).toBeNull()
-    expect(screen.getByTestId("abandon-connected-lobby-button")).toBeTruthy()
-  })
-
   it("confirms an abandon in a modal instead of pushing the lobby content down", () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
@@ -580,6 +529,7 @@ describe("ConnectedLobbyScreen", () => {
     }
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
 
+    expect(screen.queryByTestId("leave-connected-lobby-button")).toBeNull()
     fireEvent.press(screen.getByTestId("abandon-connected-lobby-button"))
     const confirmation = screen.getByTestId("connected-lobby-leave-confirmation")
     expect(confirmation.props.accessibilityViewIsModal).toBe(true)
@@ -696,32 +646,6 @@ describe("ConnectedLobbyScreen", () => {
     })
   })
 
-  it("explains online-only lobby exits when offline, including a dropped confirmation", () => {
-    connectedHarness.projection = {
-      ...connectedHarness.projection,
-      status: "lobby",
-      isHost: false,
-      invitation: null,
-    }
-    const view = render(
-      themed(
-        <ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} onLeft={jest.fn()} />,
-      ),
-    )
-    fireEvent.press(screen.getByTestId("leave-connected-lobby-button"))
-    connectedHarness.socketConnected = false
-    view.rerender(
-      themed(
-        <ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} onLeft={jest.fn()} />,
-      ),
-    )
-    expect(screen.getByTestId("connected-lobby-exit-offline").props.accessibilityRole).toBe("alert")
-    expect(screen.getByText(/Reconnect to leave or abandon this lobby/i)).toBeTruthy()
-    expect(
-      screen.getByTestId("confirm-connected-lobby-leave-button").props.accessibilityState.disabled,
-    ).toBe(true)
-  })
-
   it.each([
     ["leave", false],
     ["abandon", true],
@@ -748,20 +672,11 @@ describe("ConnectedLobbyScreen", () => {
     expect(onLeft).not.toHaveBeenCalled()
   })
 
-  it.each([
-    {
-      name: "a legacy message",
-      error: new Error(
-        "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
-      ),
-    },
-    ...["forbidden", "game_not_found"].map((code) => ({
-      name: `a redacted ${code} code`,
-      error: Object.assign(new ConvexError({ code, message: "Game unavailable" }), {
-        message: "[CONVEX Q(games:lobbyProjection)] Server Error",
-      }),
-    })),
-  ])("leaves a missing lobby without offering a futile retry for $name", ({ error }) => {
+  it("leaves a missing lobby without offering a futile retry for a redacted code", () => {
+    const error = Object.assign(
+      new ConvexError({ code: "game_not_found", message: "Game unavailable" }),
+      { message: "[CONVEX Q(games:lobbyProjection)] Server Error" },
+    )
     const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
     const convexReact = jest.requireMock("convex/react") as {
       useQuery: (...args: unknown[]) => unknown

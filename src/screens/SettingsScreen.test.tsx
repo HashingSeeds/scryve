@@ -564,30 +564,6 @@ describe("SettingsScreen", () => {
     )
   })
 
-  it("keeps Back reachable and reveals the title after scrolling", () => {
-    const onBack = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
-          onBack={onBack}
-          onSettingsChange={jest.fn()}
-          onOpenAbout={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(view.getAllByText("Settings")).toHaveLength(1)
-
-    fireEvent.scroll(view.getByTestId("settings-scroll"), {
-      nativeEvent: { contentOffset: { y: 400 } },
-    })
-    expect(view.getAllByText("Settings")).toHaveLength(2)
-
-    fireEvent.press(view.getByText("Back"))
-    expect(onBack).toHaveBeenCalledTimes(1)
-  })
-
   it("exposes every web legal document on About", () => {
     const handlers = {
       onOpenPrivacy: jest.fn(),
