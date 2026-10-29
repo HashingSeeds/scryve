@@ -24,7 +24,7 @@ export type CardPhotoText = {
   height: number
   lines: CardTextLine[]
   cardCorners?: Point[]
-  detection?: { tracked: boolean; rectangles: CardRectangle[] }
+  detection?: { rectangles: CardRectangle[]; thermal?: "nominal" | "fair" | "serious" | "critical" }
 }
 
 type CardTextCameraProps = ViewProps & {

@@ -190,6 +190,29 @@ it("records which die was armed, from where, and how soon after the last roll", 
   expect(unknown).toEqual(expect.objectContaining({ system: "none" }))
 })
 
+it("keeps scan counts and heat but nothing else from a finished scan", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  const properties = analyticsProperties("card_scan_completed", {
+    duration_ms: 61_000.4,
+    added_count: 88,
+    read_count: 900,
+    peak_heat: "serious",
+    name: "Sol Ring",
+  })
+  expect(properties).toEqual(
+    expect.objectContaining({
+      duration_ms: 61_000,
+      added_count: 88,
+      read_count: 900,
+      peak_heat: "serious",
+    }),
+  )
+  expect(properties).not.toHaveProperty("name")
+  expect(analyticsProperties("card_scan_completed", { peak_heat: "melting" })).not.toHaveProperty(
+    "peak_heat",
+  )
+})
+
 it("allowlists completion entry points without adding them to game starts", () => {
   const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
   for (const end_source of ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"])

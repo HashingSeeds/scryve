@@ -121,6 +121,13 @@ export function setBetaUpdates(enabled: boolean) {
 
 const PR_CHANNEL = /^pr-[0-9]+$/
 
+/** why: features still being tried reach beta, PR previews, and development builds, never production. */
+export function prereleaseBuild() {
+  return (
+    __DEV__ || betaUpdatesChosen() || Updates.channel === "preview" || isPrChannel(Updates.channel)
+  )
+}
+
 export function isPrChannel(channel: string | null | undefined): channel is string {
   return !!channel && PR_CHANNEL.test(channel)
 }

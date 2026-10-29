@@ -6,8 +6,9 @@ import { translate } from "@/i18n/translate"
 import type { CardPhotoText } from "../../../modules/card-text-reader"
 
 export function CardScanStats({ photo }: { photo: CardPhotoText }) {
-  const outline = !photo.cardCorners ? "none" : photo.detection?.tracked ? "tracked" : "found"
+  const outline = photo.cardCorners ? "found" : "none"
   const rectangles = photo.detection?.rectangles ?? []
+  const thermal = photo.detection?.thermal
   return (
     <View pointerEvents="none" testID="card-scan-stats" style={$stats}>
       <Text
@@ -17,6 +18,15 @@ export function CardScanStats({ photo }: { photo: CardPhotoText }) {
           state: translate(`decks:cardScan.stats.${outline}`),
         })}
       />
+      {thermal ? (
+        <Text
+          size="xxs"
+          style={$line}
+          text={translate("decks:cardScan.stats.heat", {
+            state: translate(`decks:cardScan.stats.${thermal}`),
+          })}
+        />
+      ) : null}
       {rectangles.length ? (
         rectangles.map((rectangle, index) => (
           <Text

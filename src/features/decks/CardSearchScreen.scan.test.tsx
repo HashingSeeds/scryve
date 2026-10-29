@@ -14,6 +14,8 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => mockConnection,
 }))
 jest.mock("../../../modules/card-text-reader", () => ({ canReadCardText: true }))
+let mockPrerelease = true
+jest.mock("@/features/updates/appUpdate", () => ({ prereleaseBuild: () => mockPrerelease }))
 let mockAddCards: ((names: string[]) => Promise<ScannedCardAdd[]>) | undefined
 jest.mock("./CardScanner", () => ({
   CardScanner: (props: { addCards: typeof mockAddCards }) => {
@@ -33,6 +35,20 @@ function scanInto(onAdd: () => string | undefined) {
   )
   fireEvent.press(view.getByTestId("card-scan-button"))
 }
+
+test("production builds don't offer the scanner yet", () => {
+  mockPrerelease = false
+  try {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearchScreen game="mtg" format="commander" onAdd={jest.fn()} onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(view.queryByTestId("card-scan-button")).toBeNull()
+  } finally {
+    mockPrerelease = true
+  }
+})
 
 test("a scanned card the deck refused while offline is retried", async () => {
   mockConnection.isWebSocketConnected = false

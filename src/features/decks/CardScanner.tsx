@@ -17,6 +17,7 @@ import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 import { storage } from "@/utils/storage"
 
 import {
@@ -62,6 +63,8 @@ const BASIC_LANDS = new Set([
   "Snow-Covered Forest",
   "Snow-Covered Wastes",
 ])
+
+const HEAT = ["nominal", "fair", "serious", "critical"] as const
 
 function statusText(status: ScanStatus) {
   if (typeof status === "object")
@@ -120,6 +123,14 @@ export function CardScanner({
   const closingRef = useRef(false)
   const nextId = useRef(0)
   const lastAcceptedAt = useRef(Date.now())
+  const session = useRef<{
+    startedAt: number
+    reads: number
+    outlinedReads: number
+    skipped: number
+    fixed: number
+    peakHeat?: NonNullable<NonNullable<CardPhotoText["detection"]>["thermal"]>
+  }>({ startedAt: Date.now(), reads: 0, outlinedReads: 0, skipped: 0, fixed: 0 })
   const { themed, theme } = useAppTheme()
 
   useEffect(() => {
@@ -197,6 +208,15 @@ export function CardScanner({
     queue(scanned)
   }
 
+  function count({ cardCorners, detection }: CardPhotoText) {
+    const scan = session.current
+    scan.reads += 1
+    if (cardCorners) scan.outlinedReads += 1
+    const heat = detection?.thermal
+    if (heat && HEAT.indexOf(heat) > (scan.peakHeat ? HEAT.indexOf(scan.peakHeat) : -1))
+      scan.peakHeat = heat
+  }
+
   function readText(photo: CardPhotoText) {
     if (closingRef.current || !view.current || !frame) return
     const framing = { view: view.current, frame }
@@ -230,6 +250,7 @@ export function CardScanner({
   }
 
   function skip(name: string) {
+    session.current.skipped += 1
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
     setStatus({ alreadyInDeck: name })
   }
@@ -267,6 +288,7 @@ export function CardScanner({
   }
 
   function correct(wrong: ScannedCard, name?: string) {
+    session.current.fixed += 1
     const correction = replace(wrong, name).finally(() => corrections.current.delete(correction))
     corrections.current.add(correction)
   }
@@ -300,7 +322,18 @@ export function CardScanner({
       return
     }
     await addWaitingCards()
-    await Promise.all(lookups.current.values())
+    const results = await Promise.all(lookups.current.values())
+    const failed = results.filter((result) => "error" in result).length
+    captureAnalytics("card_scan_completed", {
+      duration_ms: Date.now() - session.current.startedAt,
+      added_count: results.length - failed,
+      failed_count: failed,
+      skipped_count: session.current.skipped,
+      fixed_count: session.current.fixed,
+      read_count: session.current.reads,
+      outlined_read_count: session.current.outlinedReads,
+      ...(session.current.peakHeat && { peak_heat: session.current.peakHeat }),
+    })
     onClose()
   }
 
@@ -340,6 +373,7 @@ export function CardScanner({
               active={scanning}
               guide={frame}
               onText={(event) => {
+                count(event.nativeEvent)
                 readText(event.nativeEvent)
                 if (showStats) setLastPhoto(event.nativeEvent)
               }}

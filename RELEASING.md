@@ -203,7 +203,7 @@ Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a re
 - Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. SDK initialization and event processing are scheduled after the current task, but that is not a measured performance guarantee.
 
 The explicit events are `app_opened`, `game_started`, `game_completed`,
-`connection_attempt`, `deck_used`, `stats_viewed`, `dice_armed`, `dice_rolled`, and `deck_browse_empty`. A local start means the first
+`connection_attempt`, `deck_used`, `stats_viewed`, `dice_armed`, `dice_rolled`, `deck_browse_empty`, and `card_scan_completed`. A local start means the first
 accepted gameplay action, not rendering the fresh board. Completed local games include
 `end_source`: `game_menu`, `new_game_prompt`, or `stale_game_prompt`. A cancelled
 prompt does not label a later manual finish. Connected completion observations
@@ -219,6 +219,7 @@ since this installation's last roll in the same game; short gaps mean players
 wanted several rolls in a row. `deck_browse_empty` fires when an unsearched Browse
 list answers with no decks, naming the game, format, and catalog status, so an empty
 Browse screen can be told apart from a format that really has no lists.
+`card_scan_completed` fires when the card scanner closes (prerelease builds only). It carries counts, never card names: cards added (including any later fixed with Wrong card), not added, skipped as already in the deck, fixed, reads, reads where the card was outlined, the session length, and the phone's peak heat (`nominal` to `critical`).
 
 Use `consent_source = first_use` for activation cohorts from the optional, unchecked
 choice on the first-use legal screen. `consent_source = settings` includes existing

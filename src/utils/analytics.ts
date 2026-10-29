@@ -33,6 +33,7 @@ const values = {
   transport: ["cloud", "nearby"],
   role: ["host", "guest"],
   scope: ["event"],
+  peak_heat: ["nominal", "fair", "serious", "critical"],
 } as const
 
 const LATENCY_KEYS = [
@@ -48,11 +49,20 @@ const LATENCY_KEYS = [
   "ack_p99",
   "ping_ms",
 ] as const
+const SCAN_COUNT_KEYS = [
+  "added_count",
+  "skipped_count",
+  "fixed_count",
+  "failed_count",
+  "read_count",
+  "outlined_read_count",
+] as const
 const NUMBER_KEYS = new Set<string>([
   "duration_ms",
   "attempt_count",
   "since_roll_ms",
   ...LATENCY_KEYS,
+  ...SCAN_COUNT_KEYS,
 ])
 
 export type GameEndSource = (typeof values.end_source)[number]
@@ -93,6 +103,10 @@ type Events = {
     role?: (typeof values.role)[number]
     scope?: (typeof values.scope)[number]
   } & Partial<Record<(typeof LATENCY_KEYS)[number], number>>
+  card_scan_completed: {
+    duration_ms: number
+    peak_heat?: (typeof values.peak_heat)[number]
+  } & Record<(typeof SCAN_COUNT_KEYS)[number], number>
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -108,6 +122,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   dice_rolled: ["tool", "system"],
   deck_browse_empty: ["system", "format", "status"],
   sync_latency: ["transport", "role", "scope", ...LATENCY_KEYS],
+  card_scan_completed: ["duration_ms", "peak_heat", ...SCAN_COUNT_KEYS],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"

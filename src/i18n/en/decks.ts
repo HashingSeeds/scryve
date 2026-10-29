@@ -389,11 +389,15 @@ const decks = {
     stats: {
       // {{state}} is one of the words below.
       outline: "Outline: {{state}}",
-      // The outline follows the card from the last frame.
-      tracked: "tracked",
-      // The outline was just found.
+      // The card was found and outlined.
       found: "found",
       none: "none",
+      // How hot the phone is. {{state}} is one of the four words below, coolest first.
+      heat: "Heat: {{state}}",
+      nominal: "normal",
+      fair: "warm",
+      serious: "hot",
+      critical: "very hot",
       noRectangles: "No rectangles",
       // One detected rectangle: width over height, its size as a percent of the frame, then a verdict word below.
       rectangle: "{{aspect}} · {{share}}% · {{verdict}}",

@@ -4,6 +4,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { cardNameIndex } from "./cardNameMatch"
 import { CardScanner, type ScannedCardAdd } from "./CardScanner"
@@ -19,6 +20,7 @@ jest.mock("../../../modules/card-text-reader", () => ({
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
 }))
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 jest.mock("expo-camera", () => ({
   useCameraPermissions: () => [{ granted: true, canAskAgain: true }, jest.fn()],
 }))
@@ -308,6 +310,36 @@ test("a land retry counts copies still being added", async () => {
   await act(async () => landSecondBatch())
 })
 
+test("Done reports how the scan went without naming any card", async () => {
+  const { view } = renderScanner({ singleton: true, inDeck: { "Sol Ring": 1 } })
+  show("Sol Ring")
+  show("Sol Ring")
+  show()
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [],
+        cardCorners: [],
+        detection: { rectangles: [], thermal: "fair" },
+      },
+    }),
+  )
+  scan("Arcane Signet")
+  await finish(view)
+  expect(captureAnalytics).toHaveBeenCalledWith("card_scan_completed", {
+    duration_ms: expect.any(Number),
+    added_count: 1,
+    failed_count: 0,
+    skipped_count: 1,
+    fixed_count: 0,
+    read_count: 7,
+    outlined_read_count: 1,
+    peak_heat: "fair",
+  })
+})
+
 test("Stats for nerds shows why each rectangle was or wasn't taken as the card", () => {
   act(() => localGameRepository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, syncStats: true }))
   try {
@@ -319,7 +351,7 @@ test("Stats for nerds shows why each rectangle was or wasn't taken as the card",
           height: 1280,
           lines: [],
           detection: {
-            tracked: false,
+            thermal: "serious",
             rectangles: [
               { aspect: 0.714, share: 0.82 },
               { aspect: 0.95, share: 0.4, rejected: "shape" },
@@ -329,6 +361,7 @@ test("Stats for nerds shows why each rectangle was or wasn't taken as the card",
       }),
     )
     expect(view.getByText("Outline: none")).toBeTruthy()
+    expect(view.getByText("Heat: hot")).toBeTruthy()
     expect(view.getByText("0.71 · 82% · card")).toBeTruthy()
     expect(view.getByText("0.95 · 40% · shape")).toBeTruthy()
   } finally {
