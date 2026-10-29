@@ -365,6 +365,8 @@ export default {
     failed: "No se pudo leer la carta. Inténtalo de nuevo.",
     empty: "Las cartas escaneadas se añaden al mazo y aparecen aquí.",
     addedCount: "Añadidas: {{count}}",
+    retryingCount: "{{count}} reintentando",
+    failedCount: "{{count}} sin añadir",
     wrongCard: "Carta errónea",
     whichCard: "¿Qué carta es?",
     removeIt: "Quitarla",

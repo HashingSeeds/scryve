@@ -286,6 +286,8 @@
   "cardScan.failed": "6a0fe126094e",
   "cardScan.empty": "adf60058c0bf",
   "cardScan.addedCount": "51de80770247",
+  "cardScan.retryingCount": "de73d2e740f4",
+  "cardScan.failedCount": "927b2f770352",
   "cardScan.wrongCard": "5bb503aa0b02",
   "cardScan.whichCard": "5382bb5b71cd",
   "cardScan.removeIt": "53aa85751fa0",

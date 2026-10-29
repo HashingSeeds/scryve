@@ -347,6 +347,8 @@ export default {
     failed: "कार्ड नहीं पढ़ा जा सका। फिर से कोशिश करें।",
     empty: "स्कैन किए गए कार्ड डेक में जुड़ जाते हैं और यहाँ दिखते हैं।",
     addedCount: "{{count}} जुड़े",
+    retryingCount: "{{count}} दोबारा कोशिश जारी",
+    failedCount: "{{count}} जोड़े नहीं गए",
     wrongCard: "गलत कार्ड",
     whichCard: "यह कौन सा कार्ड है?",
     removeIt: "हटाएँ",

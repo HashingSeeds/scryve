@@ -235,6 +235,43 @@ test("a card whose add failed can be scanned again in a Commander deck", async (
   }
 })
 
+test("retries a card whose lookup failed until it is added", async () => {
+  jest.useFakeTimers()
+  try {
+    const addCards = jest
+      .fn<Promise<ScannedCardAdd[]>, [string[]]>()
+      .mockResolvedValueOnce([{ error: "Lookups paused", retryable: true, retryAfterMs: 4000 }])
+      .mockImplementation(async (names) => names.map(() => ({})))
+    const { view } = renderScanner({ singleton: true, addCards })
+    scan("Sol Ring")
+    await act(async () => jest.advanceTimersByTime(1500))
+    expect(view.getByText("0 added · 1 retrying")).toBeTruthy()
+    await act(async () => jest.advanceTimersByTime(4000 + 1500))
+    expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Sol Ring"])
+    expect(view.getByText("1 added")).toBeTruthy()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("Done waits out retries and counts cards that were never added", async () => {
+  jest.useFakeTimers()
+  try {
+    const addCards = jest.fn(async (names: string[]): Promise<ScannedCardAdd[]> =>
+      names.map(() => ({ error: "Lookups paused", retryable: true })),
+    )
+    const { view, onClose } = renderScanner({ singleton: true, addCards })
+    scan("Sol Ring")
+    fireEvent.press(view.getByText("Done"))
+    for (let step = 0; step < 6; step++) await act(async () => jest.advanceTimersByTime(30_000))
+    expect(addCards).toHaveBeenCalledTimes(5)
+    expect(view.getByText("0 added · 1 not added")).toBeTruthy()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test("a land retry counts copies still being added", async () => {
   let landSecondBatch: () => void = () => undefined
   const addCards = jest
