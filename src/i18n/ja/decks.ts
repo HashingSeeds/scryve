@@ -346,6 +346,8 @@ export default {
     failed: "カードを読み取れませんでした。もう一度お試しください。",
     empty: "スキャンしたカードはデッキに追加され、ここに表示されます。",
     addedCount: "{{count}}枚追加",
+    retryingCount: "{{count}}件再試行中",
+    failedCount: "{{count}}件未追加",
     wrongCard: "違うカード",
     whichCard: "どのカードですか?",
     removeIt: "削除",

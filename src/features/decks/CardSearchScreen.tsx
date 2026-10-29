@@ -410,14 +410,9 @@ export function CardSearchScreen({
       return names.map((name) => {
         const card = byName.get(name)
         if (!card)
-          return {
-            error: translate(
-              lookupFailed ? "decks:cardScan.addFailed" : "decks:cardScan.notFound",
-              {
-                card: name,
-              },
-            ),
-          }
+          return lookupFailed
+            ? { error: translate("decks:cardScan.addFailed"), retryable: true }
+            : { error: translate("decks:cardScan.notFound", { card: name }) }
         const error = add(card)
         if (error) return { error }
         scannedEntries.current.set(name, searchEntry(card))
@@ -426,7 +421,8 @@ export function CardSearchScreen({
       })
     } catch (cause) {
       const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
-      return names.map(() => ({ error }))
+      const retryAfterMs = convexRetryAfterMs(cause)
+      return names.map(() => ({ error, retryable: true, retryAfterMs }))
     }
   }
 

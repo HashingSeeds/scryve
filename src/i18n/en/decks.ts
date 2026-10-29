@@ -369,6 +369,10 @@ const decks = {
     empty: "Scanned cards are added to the deck and show here.",
     // How many cards this scanner session has added to the deck.
     addedCount: "{{count}} added",
+    // Scanned cards whose lookup failed and will be tried again shortly.
+    retryingCount: "{{count}} retrying",
+    // Scanned cards that still failed after retrying and are not in the deck.
+    failedCount: "{{count}} not added",
     // Button next to the last scanned card when the scanner picked the wrong one.
     wrongCard: "Wrong card",
     whichCard: "Which card is it?",
