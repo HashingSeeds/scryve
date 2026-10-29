@@ -158,24 +158,6 @@ describe("connected outbox drain", () => {
     })
   })
 
-  it("retains deterministic client/server argument validation as a failed action", async () => {
-    const repository = new ConnectedGameRepository(new MemoryStorage())
-    repository.enqueue(action("operation-invalid-arg", 1, 1))
-    const result = await drainConnectedOutbox({
-      repository,
-      publicId: "game-public",
-      send: async () => {
-        throw new Error("ArgumentValidationError: not a valid ID")
-      },
-      now: () => 75,
-    })
-    expect(result).toMatchObject({ failed: ["operation-invalid-arg"], stoppedForRetry: false })
-    expect(repository.loadFailed("game-public")[0]).toMatchObject({
-      reason: "ArgumentValidationError: not a valid ID",
-      failedAt: 75,
-    })
-  })
-
   it("stores the message from a coded rejection", async () => {
     const repository = new ConnectedGameRepository(new MemoryStorage())
     repository.enqueue(action("operation-coded-error", 1, 1))

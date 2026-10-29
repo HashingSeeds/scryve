@@ -120,32 +120,26 @@ describe("EventScreen", () => {
     expect(screen.getByTestId("table-4")).toHaveTextContent(/Grace vs Ada/)
   })
 
-  it("offers Finish instead of another round after the last planned round", () => {
+  it.each([
+    ["after the last planned round", view().players],
+    [
+      "after a drop leaves too few to pair",
+      [
+        { id: "ada", name: "Ada", guest: false, dropped: true },
+        { id: "grace", name: "Grace", guest: false, dropped: false },
+      ],
+    ],
+  ])("offers the organizer Finish instead of another round %s", (_case, players) => {
     const done = {
       ...openTable,
       status: "confirmed" as const,
       result: { kind: "match" as const, gamesWon: [2, 1], gamesDrawn: 0 },
     }
-    renderEvent(source(view({ isOrganizer: true, myPlayerId: null, round: 3, tables: [done] })))
-
-    expect(screen.queryByTestId("start-round-button")).toBeNull()
-    expect(screen.getByTestId("finish-event-footer-button")).toBeEnabled()
-  })
-
-  it("lets the organizer finish the last round after a drop leaves too few to pair", () => {
-    const done = {
-      ...openTable,
-      status: "confirmed" as const,
-      result: { kind: "match" as const, gamesWon: [2, 1], gamesDrawn: 0 },
-    }
-    const players = [
-      { id: "ada", name: "Ada", guest: false, dropped: true },
-      { id: "grace", name: "Grace", guest: false, dropped: false },
-    ]
     renderEvent(
       source(view({ isOrganizer: true, myPlayerId: null, round: 3, tables: [done], players })),
     )
 
+    expect(screen.queryByTestId("start-round-button")).toBeNull()
     expect(screen.getByTestId("finish-event-footer-button")).toBeEnabled()
   })
 })

@@ -61,44 +61,48 @@ describe("useConnectedProfile", () => {
     mockSyncCurrent.mockResolvedValue("convex-user-a")
   })
 
-  it("reports a signed-out Clerk session without starting a sync", () => {
-    mockUserId = undefined
+  it.each([
+    [
+      "a signed-out Clerk session",
+      () => (mockUserId = undefined),
+      { status: "error", reason: "signedOut" },
+    ],
+    [
+      "Convex authentication loading",
+      () => {
+        mockConvexAuthenticated = false
+        mockConvexLoading = true
+      },
+      { status: "loading", reason: "authentication", profile: { userId: "user-a" } },
+    ],
+    [
+      "Clerk session loading",
+      () => (mockUserLoaded = false),
+      { status: "loading", reason: "session" },
+    ],
+    [
+      "offline with the known account and a retry",
+      () => (mockSocketConnected = false),
+      { status: "offline", profile: { userId: "user-a" }, retry: expect.any(Function) },
+    ],
+    [
+      "a Convex authentication refresh",
+      () => (mockConvexRefreshing = true),
+      { status: "loading", reason: "authentication" },
+    ],
+    [
+      "offline when authentication refresh starts without a connection",
+      () => {
+        mockSocketConnected = false
+        mockConvexRefreshing = true
+      },
+      { status: "offline" },
+    ],
+  ])("reports %s without starting a sync", (_case, setup, expected) => {
+    setup()
     const { result } = renderHook(useConnectedProfile, { wrapper })
 
-    expect(result.current).toMatchObject({ status: "error", reason: "signedOut" })
-    expect(mockSyncCurrent).not.toHaveBeenCalled()
-  })
-
-  it("reports Convex authentication loading explicitly", () => {
-    mockConvexAuthenticated = false
-    mockConvexLoading = true
-    const { result } = renderHook(useConnectedProfile, { wrapper })
-
-    expect(result.current).toMatchObject({
-      status: "loading",
-      reason: "authentication",
-      profile: { userId: "user-a" },
-    })
-    expect(mockSyncCurrent).not.toHaveBeenCalled()
-  })
-
-  it("reports Clerk session loading explicitly", () => {
-    mockUserLoaded = false
-    const { result } = renderHook(useConnectedProfile, { wrapper })
-
-    expect(result.current).toMatchObject({ status: "loading", reason: "session" })
-    expect(mockSyncCurrent).not.toHaveBeenCalled()
-  })
-
-  it("reports offline with the known account and keeps retry available", () => {
-    mockSocketConnected = false
-    const { result } = renderHook(useConnectedProfile, { wrapper })
-
-    expect(result.current).toMatchObject({
-      status: "offline",
-      profile: { userId: "user-a" },
-    })
-    expect(result.current.retry).toEqual(expect.any(Function))
+    expect(result.current).toMatchObject(expected)
     expect(mockSyncCurrent).not.toHaveBeenCalled()
   })
 
@@ -112,23 +116,6 @@ describe("useConnectedProfile", () => {
       avatarUrl: "https://example.test/user-a.png",
       username: "ada_lovelace",
     })
-  })
-
-  it("waits for Convex authentication refresh before syncing the profile", async () => {
-    mockConvexRefreshing = true
-    const { result } = renderHook(useConnectedProfile, { wrapper })
-
-    expect(result.current).toMatchObject({ status: "loading", reason: "authentication" })
-    expect(mockSyncCurrent).not.toHaveBeenCalled()
-  })
-
-  it("stays offline when authentication refresh starts without a connection", () => {
-    mockSocketConnected = false
-    mockConvexRefreshing = true
-    const { result } = renderHook(useConnectedProfile, { wrapper })
-
-    expect(result.current).toMatchObject({ status: "offline" })
-    expect(mockSyncCurrent).not.toHaveBeenCalled()
   })
 
   it("returns to authentication loading when refresh starts after profile sync", async () => {

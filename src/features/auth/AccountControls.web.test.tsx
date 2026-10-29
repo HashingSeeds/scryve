@@ -46,16 +46,12 @@ describe("web AccountControls", () => {
       </ThemeProvider>,
     )
 
-  it("shows who is signed in without opening Clerk on arrival", () => {
+  it("shows who is signed in and opens Clerk profile management only on request", () => {
     const view = renderProfile()
 
     expect(view.getByText("Ada Lovelace")).toBeTruthy()
     expect(view.getByText("ada@example.com")).toBeTruthy()
     expect(mockOpenUserProfile).not.toHaveBeenCalled()
-  })
-
-  it("opens Clerk profile management on request", () => {
-    const view = renderProfile()
 
     fireEvent.press(view.getByTestId("manage-profile-item"))
 

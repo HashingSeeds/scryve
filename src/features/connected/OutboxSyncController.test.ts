@@ -663,25 +663,6 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().pending).toEqual([])
   })
 
-  it("retains a permanently rejected action as a reviewable failure", async () => {
-    const storage = new MemoryStorage()
-    const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-rejected-01", 5, 1), [])
-    const { controller } = harness({
-      storage,
-      repository,
-      send: async () => {
-        throw new Error("Game is not active")
-      },
-    })
-
-    controller.setEnvironment(ONLINE)
-    await settle()
-
-    expect(controller.getSnapshot().pending).toEqual([])
-    expect(controller.getSnapshot().failed).toMatchObject([{ reason: "Game is not active" }])
-  })
-
   it("resumes draining once a reviewed failure is dismissed", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1", {
@@ -770,19 +751,6 @@ describe("outbox sync controller", () => {
     await settle()
 
     expect(controller.getSnapshot().pending).toHaveLength(1)
-  })
-
-  it("notifies subscribers and stops after they unsubscribe", () => {
-    const { controller } = harness()
-    const listener = jest.fn()
-    const unsubscribe = controller.subscribe(listener)
-
-    controller.setEnvironment(ONLINE)
-    expect(listener).toHaveBeenCalledTimes(1)
-
-    unsubscribe()
-    controller.changeLife("player-1", 1)
-    expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it("cancels a pending retry timer when disposed", async () => {

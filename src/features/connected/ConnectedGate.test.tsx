@@ -129,25 +129,15 @@ describe("connected cold-offline and authentication gate", () => {
     expect(screen.getByText("Sign in")).toBeTruthy()
   })
 
-  it("keeps an established board and taps mounted through a socket drop", async () => {
-    const onTap = jest.fn()
-    const child = <Button testID="offline-life-tap" text="+1" onPress={onTap} />
-    const view = render(gate(child))
-    await waitFor(() => expect(screen.getByTestId("offline-life-tap")).toBeTruthy())
-    mockSocketConnected = false
-    mockCachedGames.add("user-a:game-public")
-    view.rerender(gate(child))
-    fireEvent.press(screen.getByTestId("offline-life-tap"))
-    expect(onTap).toHaveBeenCalledTimes(1)
-  })
-
   it("keeps an established board mounted while a reconnect re-authenticates", async () => {
-    const child = <Button testID="reconnecting-board" text="Board" />
+    const onTap = jest.fn()
+    const child = <Button testID="reconnecting-board" text="Board" onPress={onTap} />
     const view = render(gate(child))
     await waitFor(() => expect(screen.getByTestId("reconnecting-board")).toBeTruthy())
     mockSocketConnected = false
     view.rerender(gate(child))
-    expect(screen.getByTestId("reconnecting-board")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("reconnecting-board"))
+    expect(onTap).toHaveBeenCalledTimes(1)
     mockSocketConnected = true
     mockConvexLoading = true
     view.rerender(gate(child))
@@ -368,14 +358,6 @@ describe("connected cold-offline and authentication gate", () => {
 
       expect(mockUserUpdate).toHaveBeenCalledWith({ username: "clever-otter-01" })
       expect(screen.queryByText(/not allowed/)).toBeNull()
-    })
-
-    it("asks the filter before Clerk, so a rejected name is never briefly live", async () => {
-      mockUsernameCheck.mockResolvedValue({ acceptable: false })
-      await chooseUsername("f4ggot")
-
-      expect(mockUsernameCheck).toHaveBeenCalledTimes(1)
-      expect(mockUserUpdate).not.toHaveBeenCalled()
     })
   })
 

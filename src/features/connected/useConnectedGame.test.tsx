@@ -2,7 +2,11 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 
 import { recordReviewCompletion } from "@/utils/storeReview"
 
-import { mergeDrainSnapshot, useConnectedGame } from "./useConnectedGame"
+import {
+  CONNECTED_GAME_UNAVAILABLE_MS,
+  mergeDrainSnapshot,
+  useConnectedGame,
+} from "./useConnectedGame"
 
 jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: jest.fn() }))
 
@@ -200,15 +204,6 @@ describe("useConnectedGame connection readiness", () => {
     expect(mockDrain).not.toHaveBeenCalled()
   })
 
-  it("keeps a no-cache board loading until the first remote projection arrives", () => {
-    mockRemote = undefined
-
-    const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
-
-    expect(result.current).toMatchObject({ status: "loading", projection: null })
-    expect(mockDrain).not.toHaveBeenCalled()
-  })
-
   it("does not drain the outbox while Convex refreshes authentication", async () => {
     mockSocketConnected = true
     mockConvexRefreshing = true
@@ -384,10 +379,15 @@ describe("useConnectedGame connection readiness", () => {
   })
 
   it("declares the board unavailable only after staying offline without cache or remote", async () => {
+    jest.useFakeTimers()
     mockRemote = undefined
     const hook = renderHook(() => useConnectedGame("game-public", "user-1"))
+    expect(hook.result.current).toMatchObject({ status: "loading", projection: null })
+    expect(mockDrain).not.toHaveBeenCalled()
+    act(() => jest.advanceTimersByTime(CONNECTED_GAME_UNAVAILABLE_MS - 1))
     expect(hook.result.current.status).toBe("loading")
-    await waitFor(() => expect(hook.result.current.status).toBe("unavailable"), { timeout: 4_000 })
+    act(() => jest.advanceTimersByTime(1))
+    expect(hook.result.current.status).toBe("unavailable")
     if (hook.result.current.status !== "unavailable") throw new Error("Expected unavailable")
     expect(hook.result.current.message).toContain("Reconnect")
     mockSocketConnected = true
@@ -397,5 +397,6 @@ describe("useConnectedGame connection readiness", () => {
     hook.rerender(undefined)
     expect(hook.result.current.status).toBe("ready")
     hook.unmount()
+    jest.useRealTimers()
   })
 })

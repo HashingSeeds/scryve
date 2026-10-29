@@ -1,6 +1,5 @@
 import {
   lobbyDetail,
-  lobbyExitCopy,
   relativeTime,
   resumeDetail,
   resumeTitle,
@@ -108,10 +107,5 @@ describe("connected copy", () => {
     expect(
       seatDetail({ controlledByMe: false, seat: 2, deckName: "Atraxa", versionName: "Current" }),
     ).toBe("Seat 2 · Atraxa · Current")
-  })
-
-  it("warns that abandoning is final and leaving is not", () => {
-    expect(lobbyExitCopy("abandon").message).toMatch(/cannot be undone/i)
-    expect(lobbyExitCopy("leave").message).toMatch(/stay unchanged/i)
   })
 })

@@ -91,17 +91,18 @@ describe("ConnectedSummarySource", () => {
     })
   })
 
-  it("skips the timeline query until the viewer asks for it", () => {
+  it("skips the timeline query until a single press expands it", () => {
     renderRouteComposition()
 
     expect(mockPaginated).toHaveBeenCalledWith("games:connectedEvents", "skip", {
       initialNumItems: 20,
     })
+    expect(mockPaginated).not.toHaveBeenCalledWith(
+      "games:connectedEvents",
+      { publicId: "game-1" },
+      expect.anything(),
+    )
     expect(screen.getByText("Show")).toBeTruthy()
-  })
-
-  it("expands the timeline on a single press", () => {
-    renderRouteComposition()
 
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
 

@@ -1,6 +1,3 @@
-import { spawnSync } from "node:child_process"
-import { join } from "node:path"
-
 import {
   DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
@@ -532,14 +529,14 @@ describe("durable outbox provenance", () => {
       new RegExp([operationId, writer.update, writer.runtime, writer.commit].join("|")),
     )
     const [, real] = reported(report)
-    const lookup = spawnSync(
-      process.execPath,
-      [
-        join(__dirname, "../../../scripts/outbox-provenance-lookup.cjs"),
-        real.writtenBy === "unknown" ? "" : real.writtenBy.update,
-      ],
-      { input: `${operationId}\n${writer.update}\n`, encoding: "utf8" },
-    )
-    expect(lookup.stdout.trim().split(" ")[1]).toBe(writer.update)
+    const { lookup } = jest.requireActual<{
+      lookup: (digests: string[], candidates: string[]) => string[]
+    }>("../../../scripts/outbox-provenance-lookup.cjs")
+    expect(
+      lookup(
+        [real.writtenBy === "unknown" ? "" : real.writtenBy.update],
+        [operationId, writer.update],
+      ),
+    ).toEqual([writer.update])
   })
 })
