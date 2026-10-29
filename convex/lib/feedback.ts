@@ -71,32 +71,49 @@ export function deletedFeedbackCard(requestId: Id<"feedbackRequests">) {
 }
 
 const STORES = { ios: "App Store", android: "Google Play" } as const
+export type StorePlatform = keyof typeof STORES
 
-function isStorePlatform(platform: string | undefined): platform is keyof typeof STORES {
+export function isStorePlatform(platform: string | undefined): platform is StorePlatform {
   return platform === "ios" || platform === "android"
 }
 
-function fixReach(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
+type LiveStoreRelease = Pick<Doc<"storeReleases">, "runtimeVersion" | "commitAt">
+
+export function fixReach(
+  request: Doc<"feedbackRequests">,
+  fix: FeedbackFix,
+  store: LiveStoreRelease | null,
+) {
   if (request.platform === "web") return "update"
-  const shipped = isStorePlatform(request.platform) ? fix.runtimes[request.platform] : undefined
-  if (!shipped || !request.runtimeVersion) return "unknown"
-  return shipped === request.runtimeVersion ? "update" : "store"
+  if (!isStorePlatform(request.platform)) return "unknown"
+  const shipped = fix.runtimes[request.platform]
+  if (shipped && shipped === request.runtimeVersion) return "update"
+  // why: a live build loads the fix's update when it shares its runtime, and holds the fix itself when it was tagged on main after the promote.
+  const live = !!store && (store.runtimeVersion === shipped || (store.commitAt ?? 0) >= fix.at)
+  if (!live) return "waiting"
+  return request.runtimeVersion ? "store" : "unknown"
 }
 
-function fixedReply(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
-  const reach = fixReach(request, fix)
-  const [thanks, change] =
-    request.kind === "bug" ? ["Thanks for the report!", "The fix"] : ["Thanks for the idea!", "It"]
-  if (reach === "update") return `${thanks} ${change} is out. Restart Scryve to get it.`
-  if (reach === "unknown")
-    return `${thanks} ${change} is out. Restart Scryve, and if you don't see it, update Scryve from the store.`
-  const store = request.platform === "android" ? "Google Play" : "the App Store"
-  return `${thanks} ${change} is in the next Scryve version. Update from ${store} once it's out.`
+export function fixedReply(
+  request: Doc<"feedbackRequests">,
+  reach: Exclude<ReturnType<typeof fixReach>, "waiting">,
+) {
+  const news = request.kind === "bug" ? "We fixed this bug 🐞 😁" : "We added this feature! 🎉"
+  const store =
+    request.platform === "ios"
+      ? "the App Store"
+      : request.platform === "android"
+        ? "Google Play"
+        : "the store"
+  if (reach === "update") return `${news} Restart Scryve to update.`
+  if (reach === "store") return `${news} Update Scryve from ${store}.`
+  return `${news} Restart Scryve to update. Still not there? Update from ${store}.`
 }
 
 function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
-  const where =
-    fixReach(request, fix) === "store" && isStorePlatform(request.platform)
+  const where = request.awaitingStore
+    ? `waiting on ${STORES[request.awaitingStore]}`
+    : isStorePlatform(request.platform) && fix.runtimes[request.platform] !== request.runtimeVersion
       ? STORES[request.platform]
       : "update"
   return `${fix.commit.slice(0, 7)} · ${where}`
@@ -123,9 +140,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
   // why: the message window is bounded, so a count would stop changing on long threads; the newest player message's id always does.
   const playerTurn = lastPlayer?._id ?? "request"
   const fix = request.fixedIn
-  const announcing =
-    !!fix && !messages.some((message) => message.from === "team" && message._creationTime > fix.at)
-  const awaitingTeam = (messages.at(-1)?.from ?? "player") === "player" || announcing
+  const awaitingTeam = (messages.at(-1)?.from ?? "player") === "player"
   const title = clip(`${label}: ${request.body.split("\n")[0] ?? ""}`, 120)
   const app = [request.appVersion, request.platform].filter(Boolean).join(" · ") || undefined
   const thread = messages
@@ -138,13 +153,15 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     key: `${APOLLO_KEY_PREFIX}${request._id}`,
     kind: awaitingTeam ? "approval" : "update",
     phase: fix
-      ? `fixed:${fix.commit.slice(0, 7)}:${Math.round(lastPlayer?._creationTime ?? request._creationTime)}`
+      ? `fixed:${fix.commit.slice(0, 7)}:${request.awaitingStore ? "w" : "s"}:${Math.round(lastPlayer?._creationTime ?? request._creationTime)}`
       : `player:${playerTurn}`,
     push: "alert",
     // why: the lock screen and Expo's servers get only this line, never what the player wrote.
     pushText:
-      announcing && (lastPlayer?._creationTime ?? 0) < fix.at
-        ? "Fix shipped"
+      fix && (lastPlayer?._creationTime ?? 0) < fix.at
+        ? request.awaitingStore
+          ? "Fix waiting on the store"
+          : "Fix shipped, player told"
         : playerTurn === "request"
           ? `New ${request.kind === "bug" ? "bug report" : "idea"}`
           : "Player replied",
@@ -163,7 +180,6 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
         style: "primary",
         input: "text",
         repeat: true,
-        ...(announcing ? { prefill: fixedReply(request, fix) } : {}),
       },
       // why: Apollo hides a non-repeat action once the card turns into an update.
       ...(request.sentryEventId

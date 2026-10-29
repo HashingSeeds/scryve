@@ -23,7 +23,11 @@ import {
   feedbackCard,
   feedbackFix,
   feedbackKind,
+  fixReach,
+  fixedReply,
+  isStorePlatform,
   senderHash,
+  type StorePlatform,
 } from "./lib/feedback"
 import { notifyFeedbackReply } from "./lib/notifications"
 
@@ -420,7 +424,7 @@ export const applyApolloEvent = internalMutation({
     if (event.actionId === "link_issue") {
       const issue = Number(ISSUE_NUMBER.exec(text)?.[1] ?? 0)
       if (issue > 0 && issue !== request.issue) {
-        await ctx.db.patch(request._id, { issue, fixedIn: undefined })
+        await ctx.db.patch(request._id, { issue, fixedIn: undefined, awaitingStore: undefined })
         await postCard(ctx, request._id)
       }
       return null
@@ -444,14 +448,48 @@ export const shipFixes = internalMutation({
         .query("feedbackRequests")
         .withIndex("by_issue_and_fixed_in", (q) => q.eq("issue", issue).eq("fixedIn", undefined))
         .take(FIXES_PER_ISSUE)
-      for (const request of requests) {
-        await ctx.db.patch(request._id, { fixedIn: { ...fix, at } })
-        await postCard(ctx, request._id)
-      }
+      for (const request of requests) await tellFix(ctx, { ...request, fixedIn: { ...fix, at } })
     }
     return null
   },
 })
+
+export async function tellStoreFixes(ctx: MutationCtx, platform: StorePlatform) {
+  const requests = await ctx.db
+    .query("feedbackRequests")
+    .withIndex("by_awaiting_store", (q) => q.eq("awaitingStore", platform))
+    .take(APOLLO_BATCH)
+  for (const request of requests) await tellFix(ctx, request)
+}
+
+async function tellFix(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
+  const fix = request.fixedIn
+  if (!fix) return
+  const platform = isStorePlatform(request.platform) ? request.platform : undefined
+  const store = platform
+    ? await ctx.db
+        .query("storeReleases")
+        .withIndex("by_platform", (q) => q.eq("platform", platform))
+        .unique()
+    : null
+  const reach = fixReach(request, fix, store)
+  if (reach === "waiting") {
+    if (request.awaitingStore === platform) return
+    await ctx.db.patch(request._id, { fixedIn: fix, awaitingStore: platform })
+    await postCard(ctx, request._id)
+    return
+  }
+  const body = fixedReply(request, reach)
+  await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
+  await ctx.db.patch(request._id, {
+    fixedIn: fix,
+    awaitingStore: undefined,
+    unread: true,
+    updatedAt: Date.now(),
+  })
+  await postCard(ctx, request._id)
+  await notifyFeedbackReply(ctx, request, body)
+}
 
 export const pullApollo = internalAction({
   args: {},

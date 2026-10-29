@@ -799,6 +799,7 @@ export default defineSchema({
     platform: v.union(v.literal("ios"), v.literal("android")),
     version: v.string(),
     runtimeVersion: v.string(),
+    commitAt: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_platform", ["platform"]),
 
@@ -874,12 +875,14 @@ export default defineSchema({
     runtimeVersion: v.optional(v.string()),
     issue: v.optional(v.number()),
     fixedIn: v.optional(feedbackFix),
+    awaitingStore: v.optional(v.union(v.literal("ios"), v.literal("android"))),
     unread: v.boolean(),
     updatedAt: v.number(),
   })
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
     .index("by_user_and_updated_at", ["userId", "updatedAt"])
-    .index("by_issue_and_fixed_in", ["issue", "fixedIn"]),
+    .index("by_issue_and_fixed_in", ["issue", "fixedIn"])
+    .index("by_awaiting_store", ["awaitingStore"]),
 
   feedbackMessages: defineTable({
     requestId: v.id("feedbackRequests"),
