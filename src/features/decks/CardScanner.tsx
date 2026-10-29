@@ -254,6 +254,7 @@ export function CardScanner({
   function addLands({ card, inDeck, count }: LandCount) {
     landCountOpen.current = false
     setLandCount(undefined)
+    if (count <= inDeck) return
     countedLands.current.add(card.name)
     for (let copy = inDeck; copy < count; copy++) add(card)
   }
@@ -362,7 +363,7 @@ export function CardScanner({
                   accessibilityLabel={translate("decks:cardRow.decrease", {
                     card: landCount.card.name,
                   })}
-                  disabled={landCount.count <= 1}
+                  disabled={landCount.count <= landCount.inDeck}
                   onPress={() => setLandCount({ ...landCount, count: landCount.count - 1 })}
                 />
                 <Text weight="medium" testID="card-scan-land-count" text={`${landCount.count}`} />
@@ -375,7 +376,9 @@ export function CardScanner({
                 />
                 <Button
                   testID="card-scan-add-lands"
-                  tx="decks:cardScan.addLands"
+                  tx={
+                    landCount.count > landCount.inDeck ? "decks:cardScan.addLands" : "common:close"
+                  }
                   onPress={() => addLands(landCount)}
                 />
               </>

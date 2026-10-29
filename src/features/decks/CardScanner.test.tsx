@@ -272,6 +272,20 @@ test("Done waits out retries and counts cards that were never added", async () =
   }
 })
 
+test("a misread basic land can be closed without adding it", async () => {
+  const { view, addCards } = renderScanner({ singleton: true })
+  scan("Forest")
+  fireEvent.press(view.getByLabelText("Decrease Forest"))
+  expect(view.getByTestId("card-scan-land-count")).toHaveTextContent("0")
+  fireEvent.press(view.getByTestId("card-scan-add-lands"))
+  scan("Sol Ring")
+  scan("Forest")
+  expect(view.getByText("How many in the deck?")).toBeTruthy()
+  fireEvent.press(view.getByTestId("card-scan-add-lands"))
+  await finish(view)
+  expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Forest"])
+})
+
 test("a land retry counts copies still being added", async () => {
   let landSecondBatch: () => void = () => undefined
   const addCards = jest
