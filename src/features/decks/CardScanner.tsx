@@ -128,6 +128,9 @@ export function CardScanner({
   const closingRef = useRef(false)
   const nextId = useRef(0)
   const lastAcceptedAt = useRef(Date.now())
+  // why: retry timers outlive renders, so a retry after reconnecting must use the latest addCards.
+  const addCardsRef = useRef(addCards)
+  addCardsRef.current = addCards
   const session = useRef<{
     startedAt: number
     reads: number
@@ -177,7 +180,7 @@ export function CardScanner({
     clearTimeout(batchTimer.current)
     const batch = waiting.current.splice(0)
     if (!batch.length) return
-    const results = await addCards(batch.map((card) => card.name))
+    const results = await addCardsRef.current(batch.map((card) => card.name))
     batch.forEach((card, index) => {
       const result = results[index] ?? { error: translate("decks:cardScan.failed") }
       const retry = retries.current.get(card.id) ?? 0

@@ -38,23 +38,30 @@ function renderScanner(props: {
   )
   const removeCard = jest.fn()
   const onClose = jest.fn()
-  const view = render(
+  const scanner = (adding: typeof addCards) => (
     <ThemeProvider initialContext="dark">
       <CardScanner
         game="mtg"
         nameIndex={nameIndex}
         singleton={props.singleton}
         copiesInDeck={(name) => props.inDeck?.[name] ?? 0}
-        addCards={addCards}
+        addCards={adding}
         removeCard={removeCard}
         onClose={onClose}
       />
-    </ThemeProvider>,
+    </ThemeProvider>
   )
+  const view = render(scanner(addCards))
   const layout = { x: 0, y: 0, width: 400, height: 700 }
   for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
     fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
-  return { view, addCards, removeCard, onClose }
+  return {
+    view,
+    addCards,
+    removeCard,
+    onClose,
+    rerenderWith: (adding: typeof addCards) => view.rerender(scanner(adding)),
+  }
 }
 
 function show(...texts: string[]) {
@@ -253,6 +260,27 @@ test("a card whose add failed can be scanned again in a Commander deck", async (
     expect(view.queryByText("Sol Ring is already in the deck")).toBeNull()
     await act(async () => jest.advanceTimersByTime(1500))
     expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Sol Ring"])
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("a retry after reconnecting adds through the deck's latest add", async () => {
+  jest.useFakeTimers()
+  try {
+    const offline = jest.fn(async (names: string[]): Promise<ScannedCardAdd[]> =>
+      names.map(() => ({ error: "You're offline.", retryable: true })),
+    )
+    const online = jest.fn(async (names: string[]): Promise<ScannedCardAdd[]> =>
+      names.map(() => ({})),
+    )
+    const { view, rerenderWith } = renderScanner({ singleton: true, addCards: offline })
+    scan("Sol Ring")
+    await act(async () => jest.advanceTimersByTime(1500))
+    rerenderWith(online)
+    await act(async () => jest.advanceTimersByTime(2000 + 1500))
+    expect(online.mock.calls.flat(2)).toEqual(["Sol Ring"])
+    expect(view.getByText("1 added")).toBeTruthy()
   } finally {
     jest.useRealTimers()
   }
