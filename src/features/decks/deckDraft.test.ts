@@ -208,54 +208,34 @@ it("keeps the entry limit when a hero joins a full deck", () => {
 })
 
 describe("planDeckSave", () => {
-  it("queues card edits and lets the note follow whichever route it can", () => {
-    expect(
-      planDeckSave({
-        changes: { cards: true, note: true },
-        canQueueCards: true,
-        canQueueNote: false,
-      }),
-    ).toEqual({ cards: "queue", note: "mutation", immediate: true })
-  })
-
-  it("queues a note-only edit without waiting on the network", () => {
-    expect(
-      planDeckSave({
-        changes: { cards: false, note: true },
-        canQueueCards: false,
-        canQueueNote: true,
-      }),
-    ).toEqual({ cards: "none", note: "queue", immediate: true })
-  })
-
-  it("saves both parts through the server when sync is off", () => {
-    expect(
-      planDeckSave({
-        changes: { cards: true, note: true },
-        canQueueCards: false,
-        canQueueNote: false,
-      }),
-    ).toEqual({ cards: "mutation", note: "mutation", immediate: false })
-  })
-
-  it("writes nothing when the draft has no changes", () => {
-    expect(
-      planDeckSave({
-        changes: { cards: false, note: false },
-        canQueueCards: true,
-        canQueueNote: true,
-      }),
-    ).toEqual({ cards: "none", note: "none", immediate: false })
-  })
-
-  it("saves through the server when cards cannot queue", () => {
-    expect(
-      planDeckSave({
-        changes: { cards: true, note: true },
-        canQueueCards: false,
-        canQueueNote: true,
-      }),
-    ).toEqual({ cards: "mutation", note: "queue", immediate: false })
+  it.each([
+    [
+      "queues card edits and lets the note follow whichever route it can",
+      { changes: { cards: true, note: true }, canQueueCards: true, canQueueNote: false },
+      { cards: "queue", note: "mutation", immediate: true },
+    ],
+    [
+      "queues a note-only edit without waiting on the network",
+      { changes: { cards: false, note: true }, canQueueCards: false, canQueueNote: true },
+      { cards: "none", note: "queue", immediate: true },
+    ],
+    [
+      "saves both parts through the server when sync is off",
+      { changes: { cards: true, note: true }, canQueueCards: false, canQueueNote: false },
+      { cards: "mutation", note: "mutation", immediate: false },
+    ],
+    [
+      "writes nothing when the draft has no changes",
+      { changes: { cards: false, note: false }, canQueueCards: true, canQueueNote: true },
+      { cards: "none", note: "none", immediate: false },
+    ],
+    [
+      "saves through the server when cards cannot queue",
+      { changes: { cards: true, note: true }, canQueueCards: false, canQueueNote: true },
+      { cards: "mutation", note: "queue", immediate: false },
+    ],
+  ])("%s", (_name, input, plan) => {
+    expect(planDeckSave(input)).toEqual(plan)
   })
 })
 

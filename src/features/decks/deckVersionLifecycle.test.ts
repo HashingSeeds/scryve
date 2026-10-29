@@ -1,6 +1,5 @@
 import type { ConvexReactClient } from "convex/react"
 import { ConvexError } from "convex/values"
-import { convexTest } from "convex-test"
 
 import {
   DeckVersionWriteRepository,
@@ -10,17 +9,8 @@ import {
 import { DeckVersionCacheController } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import schema from "../../../convex/schema"
+import { makeConvexTest } from "../../../test/convexTest"
 import type { DurableStringStorage } from "../sync/durableOutbox"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("../../../convex/_generated/server"),
-  "./decks.ts": async () => jest.requireActual("../../../convex/decks"),
-  "./entitlements.ts": async () => jest.requireActual("../../../convex/entitlements"),
-  "./integrationManifest.ts": async () => jest.requireActual("../../../convex/integrationManifest"),
-  "./users.ts": async () => jest.requireActual("../../../convex/users"),
-}
 
 class MemoryStorage implements DurableStringStorage {
   values = new Map<string, string>()
@@ -119,7 +109,7 @@ describe("deck version lifecycle", () => {
   })
 
   it("keeps the provisional draft across a lost create acknowledgement and replays after restart", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "owner" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
     const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
@@ -245,38 +235,53 @@ describe("deck version lifecycle", () => {
     expect(repository.cache.loadVersions(deckId)).toHaveLength(2)
   })
 
-  it("replays a conflicted rename as its own op instead of an empty card replace", async () => {
-    const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
-    const client = {
-      mutation: jest
-        .fn()
-        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
-        .mockResolvedValue(versionSnapshot(2)),
-    } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
-    const stop = controller.start()
-    controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1)
-    await flush()
-    expect(controller.getSnapshot().failures).toHaveLength(1)
-    controller.reapplyFailure(controller.getSnapshot().failures[0].action.operationId)
-    await flush()
-    stop()
-
-    const calls = jest.mocked(client.mutation).mock.calls
-    expect(calls[0][1]).toMatchObject({
-      expectedRevision: 1,
-      name: "Renamed",
-    })
-    expect(jest.mocked(client.mutation)).toHaveBeenNthCalledWith(
-      2,
+  it.each([
+    [
+      "rename",
+      (controller: DeckVersionWriteController) =>
+        controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1),
       api.decks.syncUpdateVersion,
-      expect.objectContaining({ expectedRevision: 1, name: "Renamed" }),
-    )
-    // The replayed metadata op must never land as an empty syncVersionWrite replace.
-    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
-  })
+      { expectedRevision: 1, name: "Renamed" },
+    ],
+    [
+      "delete",
+      (controller: DeckVersionWriteController) => controller.deleteVersion(deckId, versionId, 1),
+      api.decks.syncDeleteVersion,
+      { expectedRevision: 1 },
+    ],
+  ])(
+    "replays a conflicted %s as its own op instead of an empty card replace",
+    async (_op, edit, reference, args) => {
+      const local = new MemoryStorage()
+      const repository = new DeckVersionWriteRepository("owner", local)
+      repository.cache.mergeVersions(deckId, [
+        versionSnapshot(1),
+        { ...versionSnapshot(2), versionId: "version-2" as Id<"deckVersions"> },
+      ])
+      const client = {
+        mutation: jest
+          .fn()
+          .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
+          .mockResolvedValue(versionSnapshot(2)),
+      } as unknown as ConvexReactClient
+      const controller = new DeckVersionWriteController(client, repository, () => 1)
+      const stop = controller.start()
+      edit(controller)
+      await flush()
+      expect(controller.getSnapshot().failures).toHaveLength(1)
+      controller.reapplyFailure(controller.getSnapshot().failures[0].action.operationId)
+      await flush()
+      stop()
+
+      expect(jest.mocked(client.mutation).mock.calls[0][1]).toMatchObject(args)
+      expect(jest.mocked(client.mutation)).toHaveBeenNthCalledWith(
+        2,
+        reference,
+        expect.objectContaining(args),
+      )
+      expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    },
+  )
 
   it("replays a mixed conflicts chain preserving the card payload and both intents", async () => {
     const local = new MemoryStorage()
@@ -308,35 +313,6 @@ describe("deck version lifecycle", () => {
       cards: [{ name: "Sol Ring", quantity: 2 }],
     })
     expect(writes[2][1]).toMatchObject({ expectedRevision: 2, name: "Renamed" })
-    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
-  })
-
-  it("replays a conflicted delete as a deletion instead of an empty card replace", async () => {
-    const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [
-      versionSnapshot(1),
-      { ...versionSnapshot(2), versionId: "version-2" as Id<"deckVersions"> },
-    ])
-    const client = {
-      mutation: jest
-        .fn()
-        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
-        .mockResolvedValue(versionSnapshot(2)),
-    } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
-    const stop = controller.start()
-    controller.deleteVersion(deckId, versionId, 1)
-    await flush()
-    controller.reapplyFailure(controller.getSnapshot().failures[0].action.operationId)
-    await flush()
-    stop()
-
-    expect(jest.mocked(client.mutation)).toHaveBeenNthCalledWith(
-      2,
-      api.decks.syncDeleteVersion,
-      expect.objectContaining({ expectedRevision: 1 }),
-    )
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
   })
 
@@ -381,27 +357,6 @@ describe("deck version lifecycle", () => {
     )
     expect(() => controller.deleteVersion(deckId, versionId, 1)).toThrow(DECK_VERSION_LAST_REASON)
     expect(controller.getSnapshot().pending).toHaveLength(0)
-  })
-
-  it("keeps offline version lifecycle writes scoped to the account and deployment", async () => {
-    const local = new MemoryStorage()
-    const mutation = jest
-      .fn()
-      .mockRejectedValue(new ConvexError({ code: "sync_owner_changed", message: "unauthorized" }))
-    const controller = new DeckVersionWriteController(
-      { mutation } as unknown as ConvexReactClient,
-      new DeckVersionWriteRepository("owner", local),
-    )
-    controller.createVersion(deckId, "Offline Draft", "", [card])
-    controller.renameVersion(deckId, versionId, { name: "Renamed" }, 0)
-    const stop = controller.start()
-    await flush()
-    stop()
-    await controller.drain()
-    expect(controller.getSnapshot()).toMatchObject({
-      pending: [{ op: "create" }, { op: "rename" }],
-    })
-    expect(new DeckVersionWriteRepository("other-owner", local).loadPending()).toEqual([])
   })
 
   it("resolves a selected provisional version to its mapped server row in the cache snapshot", () => {

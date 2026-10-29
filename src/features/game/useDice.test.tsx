@@ -126,24 +126,19 @@ describe("useDice", () => {
     expect(announce).toHaveBeenLastCalledWith("Grace, d20, 11")
   })
 
-  it("leads Yu-Gi-Oh! with its coin and rolls a d6 from the bag, never a d20", () => {
-    jest.spyOn(Math, "random").mockReturnValue(0.5)
-    const view = renderTable("ygo")
-    expect(view.queryByTestId("dice-d20")).toBeNull()
-    expect(view.getByTestId("dice-coin")).toBeTruthy()
-
-    fireEvent.press(view.getByTestId("dice-bag"))
-    fireEvent.press(view.getByTestId("dice-bag-d6"))
-    fireEvent.press(view.getByTestId("dice-seat-2"))
-    expect(view.getByTestId("dice-chip-2-d6")).toHaveTextContent("4")
+  it.each([
+    ["mtg", "d20"],
+    ["ygo", "coin"],
+    ["pokemon", "coin"],
+  ])("leads %s with its %s", (system, tool) => {
+    const view = renderTable(system)
+    expect(view.getAllByTestId(/^dice-(d\d+|coin)$/).map(({ props }) => props.testID)).toEqual([
+      `dice-${tool}`,
+    ])
   })
 
-  it("leads with the system's die, or Pokémon's coin, until the bag picks another tool", () => {
+  it("leads with the bag's pick once one is chosen", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
-    const pokemon = renderTable("pokemon")
-    expect(pokemon.getByTestId("dice-coin")).toBeTruthy()
-    pokemon.unmount()
-
     const view = renderTable()
     fireEvent.press(view.getByTestId("dice-bag"))
     expect(view.getByTestId("dice-bag").props.accessibilityState.expanded).toBe(true)

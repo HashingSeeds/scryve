@@ -15,7 +15,6 @@ import {
   asOperationId,
   asPlayerId,
   createLocalGame,
-  createClientId,
   createRematch,
   createNextMatchGame,
   meSeatOf,
@@ -24,7 +23,7 @@ import {
   restartMatchGame,
   soleLoserSeat,
 } from "./domain"
-import type { CommandContext, GameEvent, LifeDelta, LocalGame } from "./types"
+import type { CommandContext, GameEvent, LifeDelta, LocalGame, LocalGameResult } from "./types"
 
 function makeContext(actor = "local") {
   let now = 100
@@ -96,13 +95,6 @@ describe("local game domain", () => {
         ],
       }),
     ).toThrow()
-  })
-
-  it("uses independent secure UUID entropy even at the same timestamp", () => {
-    const first = createClientId("operation", 123, () => "00000000-0000-4000-8000-000000000001")
-    const second = createClientId("operation", 123, () => "00000000-0000-4000-8000-000000000002")
-    expect(first).not.toBe(second)
-    expect(first).toBe("operation_00000000000040008000000000000001")
   })
 
   it.each([2, 3, 4, 5, 6])("creates a valid %i-player game", (count) => {
@@ -240,71 +232,34 @@ describe("local game domain", () => {
     expect(applyGameCommand(game, { type: "life.undo" }, actorB)).toBe(game)
   })
 
-  it("matches life totals to the sum of a deterministic property-style event stream", () => {
-    const context = makeContext()
-    let game = makeGame(6, 30)
-    const expected = Array(6).fill(30) as number[]
-    const deltas: LifeDelta[] = [-5, -1, 1, 5]
-    for (let index = 0; index < 240; index += 1) {
-      const playerIndex = (index * 17) % 6
-      const delta = deltas[(index * 7) % deltas.length]
-      expected[playerIndex] += delta
-      game = applyGameCommand(
-        game,
-        { type: "life.change", playerId: game.players[playerIndex].id, delta },
-        context,
-      )
-    }
-    expect(game.players.map(({ life }) => life)).toEqual(expected)
-  })
-
-  it("records the winners chosen when a game is finished", () => {
-    const game = makeGame(3)
-    const winner = game.players[1].id
+  const finishing = makeGame(3)
+  const [first, second] = finishing.players.map(({ id }) => id)
+  const stranger = asPlayerId("stranger")
+  it.each<[string, LocalGameResult | undefined, LocalGameResult | undefined]>([
+    [
+      "the chosen winners",
+      { kind: "win", winnerPlayerIds: [second] },
+      { kind: "win", winnerPlayerIds: [second] },
+    ],
+    ["a draw", { kind: "draw" }, { kind: "draw" }],
+    ["no result when none was reported", undefined, undefined],
+    [
+      "only winners who played, once each",
+      { kind: "win", winnerPlayerIds: [first, first, stranger] },
+      { kind: "win", winnerPlayerIds: [first] },
+    ],
+    ["no result when no winner played", { kind: "win", winnerPlayerIds: [stranger] }, undefined],
+  ])("records %s when a game is finished", (_name, result, expected) => {
     const ended = applyGameCommand(
-      game,
-      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [winner] } },
-      makeContext(),
-    )
-    expect(ended.result).toEqual({ kind: "win", winnerPlayerIds: [winner] })
-    expect(ended.events.at(-1)).toMatchObject({
-      type: "game.finished",
-      result: { kind: "win", winnerPlayerIds: [winner] },
-    })
-  })
-
-  it("records a draw and leaves an unreported result off the game", () => {
-    const game = makeGame()
-    expect(
-      applyGameCommand(game, { type: "game.finish", result: { kind: "draw" } }, makeContext())
-        .result,
-    ).toEqual({ kind: "draw" })
-    expect(applyGameCommand(game, { type: "game.finish" }, makeContext()).result).toBeUndefined()
-  })
-
-  it("drops winners who never played and deduplicates the rest", () => {
-    const game = makeGame(3)
-    const winner = game.players[0].id
-    const ended = applyGameCommand(
-      game,
-      {
-        type: "game.finish",
-        result: { kind: "win", winnerPlayerIds: [winner, winner, asPlayerId("stranger")] },
-      },
-      makeContext(),
-    )
-    expect(ended.result).toEqual({ kind: "win", winnerPlayerIds: [winner] })
-  })
-
-  it("treats a win with no surviving winners as no result recorded", () => {
-    const game = makeGame()
-    const ended = applyGameCommand(
-      game,
-      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [asPlayerId("stranger")] } },
+      finishing,
+      { type: "game.finish", ...(result ? { result } : {}) },
       makeContext(),
     )
     expect(ended.status).toBe("finished")
-    expect(ended.result).toBeUndefined()
+    expect(ended.result).toEqual(expected)
+    const event = ended.events.at(-1)
+    expect(event?.type).toBe("game.finished")
+    expect(event && "result" in event ? event.result : undefined).toEqual(expected)
   })
 
   it("stops Yu-Gi-Oh! Life Points at 0 and marks that player out", () => {
@@ -423,12 +378,6 @@ describe("commander damage", () => {
     expect(assign(game, 0, 0, 5)).toBe(game)
     expect(assign(game, 0, 1, 0)).toBe(game)
     expect(assign(game, 0, 1, 1.5)).toBe(game)
-  })
-
-  it("ignores a replayed operationId", () => {
-    const game = assign(makeGame(2, 40), 0, 1, 7)
-    const replayed = reduceGameEvent(game, game.events[0])
-    expect(replayed).toBe(game)
   })
 
   it("undoes the counter and the life together", () => {

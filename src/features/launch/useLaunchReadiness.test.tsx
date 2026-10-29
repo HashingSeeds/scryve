@@ -58,7 +58,7 @@ describe("useLaunchReadiness", () => {
     expect(reportCrashMock).toHaveBeenCalledWith(fontError)
   })
 
-  it("reveals the React launch fallback when startup takes longer than 700ms", () => {
+  it("reveals the React launch fallback after 700ms and enters the degraded path at 8000ms", () => {
     jest.useFakeTimers()
     useFontsMock.mockReturnValue([false, null])
 
@@ -70,16 +70,6 @@ describe("useLaunchReadiness", () => {
 
     act(() => void jest.advanceTimersByTime(1))
     expect(hook.result.current).toBe(false)
-    expect(hideSplashMock).toHaveBeenCalledTimes(1)
-  })
-
-  it("enters the degraded path at the existing 8000ms deadline", () => {
-    jest.useFakeTimers()
-    useFontsMock.mockReturnValue([false, null])
-
-    const hook = renderHook(() => useLaunchReadiness())
-
-    act(() => void jest.advanceTimersByTime(LAUNCH_FALLBACK_REVEAL_MS))
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
 
     act(() => void jest.advanceTimersByTime(LAUNCH_DEADLINE_MS - LAUNCH_FALLBACK_REVEAL_MS - 1))

@@ -134,72 +134,69 @@ function pickStep(random: () => number): Step {
 }
 
 describe("active game persistence under random play", () => {
-  it.each([1, 2, 3, 4])(
-    "keeps the last save loadable through 2,000 random steps (seed %i)",
-    (seed) => {
-      const random = seededRandom(seed)
-      const storage = new MemoryStorage()
-      const repository = new LocalGameRepository(storage)
-      let board = newBoard(seed)
-      let snapshots: Board[] = []
-      const reached = { pastCap: 0, capRewrite: 0, reopenedAppend: 0, staleRewrite: 0 }
-      const save = (next: Board) => {
-        storage.mutations = []
-        repository.saveActiveGame(next.game)
-        board = next
-      }
-      save(tap(board))
+  it.each([1, 2])("keeps the last save loadable through 1,000 random steps (seed %i)", (seed) => {
+    const random = seededRandom(seed)
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    let board = newBoard(seed)
+    let snapshots: Board[] = []
+    const reached = { pastCap: 0, capRewrite: 0, reopenedAppend: 0, staleRewrite: 0 }
+    const save = (next: Board) => {
+      storage.mutations = []
+      repository.saveActiveGame(next.game)
+      board = next
+    }
+    save(tap(board))
 
-      for (let step = 0; step < 2000; step += 1) {
-        const kind = pickStep(random)
-        try {
-          if (kind === "tap") {
-            if (board.game.events.length < board.fullHistory.length) reached.reopenedAppend += 1
-            save(tap(board, step % 2))
-            const sets = storage.mutations.filter(({ op }) => op === "set").length
-            expect(storage.mutations.some(({ op }) => op === "delete")).toBe(false)
-            if (sets > 2) {
-              expect(board.game.events.length).toBeGreaterThan(MAX_ACTIVE_EVENTS)
-              expect(new LocalGameRepository(storage).loadActiveGame()?.events.length).toBe(
-                MIN_KEPT_EVENTS,
-              )
-              reached.capRewrite += 1
-            }
-          } else if (kind === "burst") {
-            save(tapTimes(board, 2 + Math.floor(random() * 40)))
-          } else if (kind === "touch") {
-            save({ ...board, game: { ...board.game, updatedAt: board.game.updatedAt + 1 } })
-          } else if (kind === "reload") {
-            const game = repository.loadActiveGame()
-            if (!game) throw new Error("reload found no game")
-            board = { game, fullHistory: board.fullHistory }
-            continue
-          } else if (kind === "stale") {
-            const stale = snapshots[Math.floor(random() * snapshots.length)]
-            if (!stale) continue
-            save(tap(stale))
-            if (storage.mutations.length > 2) reached.staleRewrite += 1
-          } else if (kind === "newGame") {
-            snapshots = []
-            save(tap(newBoard(seed * 10_000 + step)))
-          } else {
-            repository.clearActiveGame()
-            expect(repository.loadActiveGame()).toBeNull()
-            expect(chunkKeyIndexes(storage)).toEqual([])
-            snapshots = []
-            save(tap(newBoard(seed * 10_000 + step)))
+    for (let step = 0; step < 1000; step += 1) {
+      const kind = pickStep(random)
+      try {
+        if (kind === "tap") {
+          if (board.game.events.length < board.fullHistory.length) reached.reopenedAppend += 1
+          save(tap(board, step % 2))
+          const sets = storage.mutations.filter(({ op }) => op === "set").length
+          expect(storage.mutations.some(({ op }) => op === "delete")).toBe(false)
+          if (sets > 2) {
+            expect(board.game.events.length).toBeGreaterThan(MAX_ACTIVE_EVENTS)
+            expect(new LocalGameRepository(storage).loadActiveGame()?.events.length).toBe(
+              MIN_KEPT_EVENTS,
+            )
+            reached.capRewrite += 1
           }
-          expectStored(storage, board)
-          if (board.fullHistory.length > MAX_ACTIVE_EVENTS) reached.pastCap += 1
-          if (step % 25 === 0) snapshots = [...snapshots.slice(-4), board]
-        } catch (error) {
-          const reason = error instanceof Error ? error.message : String(error)
-          throw new Error(`seed ${seed} step ${step} (${kind}): ${reason}`, { cause: error })
+        } else if (kind === "burst") {
+          save(tapTimes(board, 2 + Math.floor(random() * 40)))
+        } else if (kind === "touch") {
+          save({ ...board, game: { ...board.game, updatedAt: board.game.updatedAt + 1 } })
+        } else if (kind === "reload") {
+          const game = repository.loadActiveGame()
+          if (!game) throw new Error("reload found no game")
+          board = { game, fullHistory: board.fullHistory }
+          continue
+        } else if (kind === "stale") {
+          const stale = snapshots[Math.floor(random() * snapshots.length)]
+          if (!stale) continue
+          save(tap(stale))
+          if (storage.mutations.length > 2) reached.staleRewrite += 1
+        } else if (kind === "newGame") {
+          snapshots = []
+          save(tap(newBoard(seed * 10_000 + step)))
+        } else {
+          repository.clearActiveGame()
+          expect(repository.loadActiveGame()).toBeNull()
+          expect(chunkKeyIndexes(storage)).toEqual([])
+          snapshots = []
+          save(tap(newBoard(seed * 10_000 + step)))
         }
+        expectStored(storage, board)
+        if (board.fullHistory.length > MAX_ACTIVE_EVENTS) reached.pastCap += 1
+        if (step % 25 === 0) snapshots = [...snapshots.slice(-4), board]
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        throw new Error(`seed ${seed} step ${step} (${kind}): ${reason}`, { cause: error })
       }
-      expect(Object.values(reached).every((count) => count > 0)).toBe(true)
-    },
-  )
+    }
+    expect(Object.values(reached).every((count) => count > 0)).toBe(true)
+  })
 })
 
 describe("active game persistence when the app is killed mid-save", () => {

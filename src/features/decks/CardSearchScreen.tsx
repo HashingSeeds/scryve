@@ -46,7 +46,7 @@ const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 
-function scryfallQuery({
+export function scryfallQuery({
   text,
   commander,
   colors,

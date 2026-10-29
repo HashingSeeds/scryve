@@ -1,7 +1,13 @@
 import * as Updates from "expo-updates"
-import { renderHook, waitFor } from "@testing-library/react-native"
+import { act, renderHook } from "@testing-library/react-native"
 
-import { newReleaseNotes, openPrPreview, restartToUpdate, useRestarting } from "./appUpdate"
+import {
+  newReleaseNotes,
+  openPrPreview,
+  RESTART_FADE_MS,
+  restartToUpdate,
+  useRestarting,
+} from "./appUpdate"
 
 const mockUpdates = { channel: "preview", available: false }
 jest.mock("expo-updates", () => ({
@@ -73,11 +79,15 @@ describe("openPrPreview", () => {
 
 describe("restartToUpdate", () => {
   it("lifts the curtain when the reload fails so the app is not left black", async () => {
+    jest.useFakeTimers()
     jest.mocked(Updates.reloadAsync).mockRejectedValueOnce(new Error("no runtime"))
     const { result } = renderHook(useRestarting)
-    restartToUpdate()
-    await waitFor(() => expect(result.current).toBe(true))
-    await waitFor(() => expect(result.current).toBe(false))
+    act(() => restartToUpdate())
+    expect(result.current).toBe(true)
+    expect(Updates.reloadAsync).not.toHaveBeenCalled()
+    await act(async () => jest.advanceTimersByTime(RESTART_FADE_MS))
+    expect(result.current).toBe(false)
     expect(Updates.reloadAsync).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
   })
 })

@@ -245,22 +245,15 @@ describe("LocalGameClaimPrompt", () => {
     expect(repository.pendingPublishes("owner-a")).toHaveLength(3)
   })
 
-  it("changes no game when dismissed", () => {
-    const repository = new LocalGameRepository(new MemoryStorage())
-    repository.archiveGame(finishedGame(1))
-    const before = repository.loadHistory()
-    setup(repository)
-    fireEvent.press(screen.getByTestId("claim-games-dismiss"))
-    expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
-    expect(repository.loadHistory()).toEqual(before)
-  })
-
   it("stays away after Not now or Decide later until a new game can be added", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
     repository.archiveGame(finishedGame(1))
+    const before = repository.loadHistory()
     const first = setup(repository)
     fireEvent.press(screen.getByTestId("claim-games-dismiss"))
+    expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
+    expect(repository.loadHistory()).toEqual(before)
     first.unmount()
 
     const reloaded = new LocalGameRepository(storage)

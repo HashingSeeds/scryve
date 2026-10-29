@@ -128,19 +128,6 @@ test("does not move server content if saving the local copy fails", async () => 
   write.mockRestore()
 })
 
-test("deletes only the new copy when the server refuses the move", async () => {
-  const other = saveGuestDeck(deck)
-  mockMove.mockRejectedValue(new ConvexError({ code: "sync_conflict" }))
-  await expect(renderSync().keepOnDevice(deckId)).rejects.toBeInstanceOf(ConvexError)
-  expect(loadGuestDecks()).toEqual([other])
-  expect(reportCrash).not.toHaveBeenCalled()
-  expect(captureAnalytics).toHaveBeenCalledTimes(1)
-  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
-    action: "move_to_device",
-    outcome: "conflict",
-  })
-})
-
 test.each(["unauthenticated", "rate_limited"])(
   "counts a %s move as failed without reporting it",
   async (code) => {
@@ -354,6 +341,12 @@ test("a card conflict preserves the server and existing device decks and explain
   )
   expect(loadGuestDecks()).toEqual([other])
   expect(mockAcceptMetadata).not.toHaveBeenCalled()
+  expect(reportCrash).not.toHaveBeenCalled()
+  expect(captureAnalytics).toHaveBeenCalledTimes(1)
+  expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
+    action: "move_to_device",
+    outcome: "conflict",
+  })
 })
 
 test.each([0, 100, undefined])(

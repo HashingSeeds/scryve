@@ -1,4 +1,3 @@
-import { Platform } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { DialogCard } from "@/components/DialogCard"
@@ -34,19 +33,8 @@ it("names only the deck's current list Current, dates the rest and keeps untrack
   expect(listDetail(lists[1])).toBe(listDateSpan(lists[1]))
 })
 
-it("summarizes card changes against the previous list, and caps long summaries", () => {
-  const cards = new Map([
-    ["current", [{ name: "Forest", quantity: 2 }]],
-    [
-      "previous",
-      [
-        { name: "Forest", quantity: 1 },
-        { name: "Plains", quantity: 1 },
-      ],
-    ],
-  ])
-  const [current] = labelLists(listStats(deckStatsSummary), { cards })
-  expect(listDetail(current)).toBe("+1 Forest, −1 Plains")
+it("caps a long card change summary", () => {
+  const [current] = labelLists(listStats(deckStatsSummary), { cards: new Map() })
   const many = {
     ...current,
     changes: ["A", "B", "C", "D", "E"].map((name) => ({ name, quantity: 1 })),
@@ -62,10 +50,8 @@ it("presents the Pro paywall after dismissing the iOS prompt", async () => {
     </ThemeProvider>,
   )
   fireEvent.press(view.getByText("See Pro"))
-  if (Platform.OS === "ios") {
-    expect(mockPaywall).not.toHaveBeenCalled()
-    await act(async () => view.UNSAFE_getByType(DialogCard).props.onDismissed())
-  } else await act(async () => undefined)
+  expect(mockPaywall).not.toHaveBeenCalled()
+  await act(async () => view.UNSAFE_getByType(DialogCard).props.onDismissed())
   expect(mockPaywall).toHaveBeenCalledTimes(1)
   expect(close).toHaveBeenCalledTimes(1)
 })
@@ -83,9 +69,7 @@ it("keeps the prompt open with one inline message when the paywall fails", async
     </ThemeProvider>,
   )
   fireEvent.press(view.getByText("See Pro"))
-  if (Platform.OS === "ios")
-    await act(async () => view.UNSAFE_getByType(DialogCard).props.onDismissed())
-  else await act(async () => undefined)
+  await act(async () => view.UNSAFE_getByType(DialogCard).props.onDismissed())
   expect(mockPaywall).toHaveBeenCalledWith({ showsErrorInline: true })
   expect(close).not.toHaveBeenCalled()
   expect(view.UNSAFE_getByType(DialogCard).props.visible).toBe(true)

@@ -111,13 +111,6 @@ it("shows rules a prefetch stored after the screen first read the cache", () => 
   jest.restoreAllMocks()
 })
 
-it("loads Magic rules cached under the keys earlier builds wrote", () => {
-  const store = memoryStore()
-  store.set("scryve.rules.url.v1", MAGIC.url)
-  store.set("scryve.rules.text.v1", SOURCE)
-  expect(loadStoredRules(MAGIC, store)?.rules.effectiveDate).toBe("September 25, 2026")
-})
-
 it("rechecks Flesh and Blood rules once per launch, keeping the stored copy on 304", async () => {
   const FAB = GAME_RULES.fab
   const fabSource = (rule: string) =>

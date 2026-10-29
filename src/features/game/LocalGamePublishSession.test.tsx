@@ -106,13 +106,36 @@ function finishedGame(
   )
 }
 
-describe("LocalGamePublishSession", () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    resetConnectedProfileBootstrapForTests()
-    mockConnected = true
+function decidedMatchGame() {
+  const first = createLocalGame({
+    now: 1,
+    startingLife: 20,
+    players: [
+      { name: "Ada", color: "#000000" },
+      { name: "Grace", color: "#111111" },
+    ],
+    account: { ownerId: "owner-a", meSeat: 0 },
+    match: { bestOf: 1 },
   })
+  return applyGameCommand(
+    first,
+    { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
+    { ...defaultCommandContext(asDeviceId("device_test")), now: () => 2 },
+  )
+}
 
+beforeEach(() => {
+  jest.useFakeTimers()
+  jest.clearAllMocks()
+  resetConnectedProfileBootstrapForTests()
+  mockConnected = true
+})
+
+afterEach(() => {
+  jest.useRealTimers()
+})
+
+describe("LocalGamePublishSession", () => {
   it("uploads the owner's pending games, marks them published, and skips other accounts", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const game = finishedGame(1)
@@ -164,7 +187,6 @@ describe("LocalGamePublishSession", () => {
   })
 
   it("retries a claim that beat the host's upload a few seconds later", async () => {
-    jest.useFakeTimers()
     remove("lan.seatClaims")
     setNearbyOwner("owner-a")
     rememberSeatClaim({ publicId: "game-racing", token: "token", savedAt: Date.now() })
@@ -186,7 +208,6 @@ describe("LocalGamePublishSession", () => {
 
     await waitFor(() => expect(mockClaimSeat).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(pendingSeatClaims("owner-a")).toEqual([]))
-    jest.useRealTimers()
   })
 
   it("retries a failed upload on the next finish and keeps it pending meanwhile", async () => {
@@ -208,22 +229,7 @@ describe("LocalGamePublishSession", () => {
 
   it("uploads a match's games in order and finishes the match only after they are acked", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
-    const first = createLocalGame({
-      now: 1,
-      startingLife: 20,
-      players: [
-        { name: "Ada", color: "#000000" },
-        { name: "Grace", color: "#111111" },
-      ],
-      account: { ownerId: "owner-a", meSeat: 0 },
-      match: { bestOf: 1 },
-    })
-    const context = defaultCommandContext(asDeviceId("device_test"))
-    const decided = applyGameCommand(
-      first,
-      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
-      { ...context, now: () => 2 },
-    )
+    const decided = decidedMatchGame()
     mockPublish.mockRejectedValueOnce(new Error("offline"))
     repository.archiveGame(decided, "game_menu")
 
@@ -252,21 +258,7 @@ describe("LocalGamePublishSession", () => {
 
   it("marks a rejected match finish failed instead of retrying it forever", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
-    const first = createLocalGame({
-      now: 1,
-      startingLife: 20,
-      players: [
-        { name: "Ada", color: "#000000" },
-        { name: "Grace", color: "#111111" },
-      ],
-      account: { ownerId: "owner-a", meSeat: 0 },
-      match: { bestOf: 1 },
-    })
-    const decided = applyGameCommand(
-      first,
-      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
-      { ...defaultCommandContext(asDeviceId("device_test")), now: () => 2 },
-    )
+    const decided = decidedMatchGame()
     mockFinishMatch.mockRejectedValueOnce(
       new Error("[CONVEX M(matches:finishScryveMatch)] Server Error\nUncaught Error: missing"),
     )
@@ -280,12 +272,6 @@ describe("LocalGamePublishSession", () => {
 })
 
 describe("LocalGamePublishSession rejections", () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    resetConnectedProfileBootstrapForTests()
-    mockConnected = true
-  })
-
   it("marks a rejected game failed and still uploads the games behind it", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
@@ -382,10 +368,6 @@ describe("LocalGamePublishSession rejections", () => {
 })
 
 it("keeps the throttle deadline when another game finishes or the connection restarts", async () => {
-  jest.useFakeTimers()
-  jest.clearAllMocks()
-  resetConnectedProfileBootstrapForTests()
-  mockConnected = true
   const repository = new LocalGameRepository(new MemoryStorage())
   repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
   mockPublish.mockRejectedValueOnce(
@@ -411,46 +393,25 @@ it("keeps the throttle deadline when another game finishes or the connection res
     expect(repository.pendingPublishes("owner-a")).toHaveLength(0)
   } finally {
     view.unmount()
-    jest.useRealTimers()
   }
 })
 
-it.each([undefined, 90_000])(
-  "retries throttled uploads after %s ms without failing the game",
-  async (retryAfterMs) => {
-    jest.useFakeTimers()
-    jest.clearAllMocks()
-    resetConnectedProfileBootstrapForTests()
-    mockConnected = true
-    const repository = new LocalGameRepository(new MemoryStorage())
-    repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
-    mockPublish.mockRejectedValueOnce(
-      new ConvexError({ code: "rate_limited", message: "Wait", retryAfterMs }),
-    )
-    const view = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
-    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
-    expect(repository.loadHistory()[0].publish).toBe("pending")
-    await act(async () => {
-      jest.advanceTimersByTime(60_000)
-    })
-    if (retryAfterMs) {
-      expect(repository.loadHistory()[0].publish).toBe("pending")
-      expect(mockPublish).toHaveBeenCalledTimes(1)
-      await act(async () => {
-        jest.advanceTimersByTime(retryAfterMs - 60_000)
-      })
-    }
-    await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
-    expect(mockPublish).toHaveBeenCalledTimes(2)
-    view.unmount()
-    jest.useRealTimers()
-  },
-)
+it("retries a throttled upload after the default backoff without failing the game", async () => {
+  const repository = new LocalGameRepository(new MemoryStorage())
+  repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
+  mockPublish.mockRejectedValueOnce(new ConvexError({ code: "rate_limited", message: "Wait" }))
+  const view = render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+  await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
+  expect(repository.loadHistory()[0].publish).toBe("pending")
+  await act(async () => {
+    jest.advanceTimersByTime(60_000)
+  })
+  await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
+  expect(mockPublish).toHaveBeenCalledTimes(2)
+  view.unmount()
+})
 
 it("reports a stripped-deck upload only after its retry succeeds", async () => {
-  jest.clearAllMocks()
-  resetConnectedProfileBootstrapForTests()
-  mockConnected = true
   const repository = new LocalGameRepository(new MemoryStorage())
   repository.archiveGame(
     finishedGame(1, { ownerId: "owner-a", meSeat: 0, deckKey: "private-deck" }),

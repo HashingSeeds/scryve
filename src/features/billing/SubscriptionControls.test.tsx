@@ -179,18 +179,15 @@ describe("SubscriptionControls", () => {
     expect(view.getByText("Scryve Pro purchases are unavailable in this build.")).toBeTruthy()
   })
 
-  it("surfaces billing errors to the subscriber", () => {
+  it.each([
+    ["with no customer info", null],
+    ["without promising a free plan when customer info is stale", { entitlements: { all: {} } }],
+  ])("surfaces billing errors to the subscriber %s", (_name, customerInfo) => {
     mockBilling.error = "The purchase could not be completed."
+    mockBilling.customerInfo = customerInfo
 
     const view = renderControls()
     expect(view.getByText("Status unavailable")).toBeTruthy()
     expect(view.getByText("The purchase could not be completed.")).toBeTruthy()
-  })
-
-  it("does not promise a free plan while a refresh failed with stale customer info", () => {
-    mockBilling.error = "Connect to the internet and try again."
-    mockBilling.customerInfo = { entitlements: { all: {} } }
-
-    expect(renderControls().getByText("Status unavailable")).toBeTruthy()
   })
 })

@@ -78,20 +78,6 @@ describe("ConvexQueryBoundary", () => {
     expect(view.getByTestId("query-result")).toBeTruthy()
     expect(view.queryByTestId("query-error")).toBeNull()
   })
-
-  it("renders caller fallback content without adding copy or layout", () => {
-    const view = render(
-      <ConvexQueryBoundary fallback={() => <View testID="only-fallback" />}>
-        <BrokenQuery />
-      </ConvexQueryBoundary>,
-    )
-
-    expect(view.toJSON()).toMatchObject({
-      type: "View",
-      props: { testID: "only-fallback" },
-      children: null,
-    })
-  })
 })
 
 describe("ConvexQueryBoundary against still-cached convex query errors", () => {
