@@ -97,7 +97,7 @@ export function FeedbackConversation({
 
   async function send() {
     const body = draft.trim()
-    if (!body || !key || !online || sending) return
+    if (!body || !key || !online || sending || (requestId !== undefined && !request)) return
     const attached = screenshot
     setError(undefined)
     setSending(true)

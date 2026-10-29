@@ -73,7 +73,8 @@ export function FeedbackConversationScreen({
   const messages = thread?.messages ?? []
   const lastFromPlayer = messages.filter((message) => message.from === "player").at(-1)
   const firstIsLatest = !outgoing && !lastFromPlayer
-  const canSend = Boolean(draft.trim()) && !offline && outgoing === undefined
+  const canSend =
+    Boolean(draft.trim()) && !offline && outgoing === undefined && (!started || Boolean(request))
   const opened = started || outgoing !== undefined
 
   return (

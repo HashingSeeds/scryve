@@ -57,7 +57,7 @@ function renderConversation(overrides: Partial<FeedbackConversationScreenProps> 
 }
 
 describe("FeedbackConversationScreen", () => {
-  it("sends a typed message, but not an empty one or while offline", () => {
+  it("sends a typed message, but not an empty one, offline, or before its thread loads", () => {
     const { props, view } = renderConversation({ draft: "Crash on rotate" })
     fireEvent.press(view.getByLabelText("Add screenshot"))
     expect(props.onPickScreenshot).toHaveBeenCalled()
@@ -71,6 +71,10 @@ describe("FeedbackConversationScreen", () => {
     const offline = renderConversation({ draft: "Please", offline: true })
     fireEvent.press(offline.view.getByLabelText("Send"))
     expect(offline.props.onSend).not.toHaveBeenCalled()
+
+    const loading = renderConversation({ draft: "Please", started: true, thread: undefined })
+    fireEvent.press(loading.view.getByLabelText("Send"))
+    expect(loading.props.onSend).not.toHaveBeenCalled()
   })
 
   it("shows the thread as messages, marking the player's latest as sent", () => {
