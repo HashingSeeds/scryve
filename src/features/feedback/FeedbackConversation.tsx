@@ -51,12 +51,12 @@ export function FeedbackConversation({
   const [error, setError] = useState<string>()
   // why: if the player left while a send was out, its result has no screen to land on.
   const mounted = useRef(true)
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true
+    return () => {
       mounted.current = false
-    },
-    [],
-  )
+    }
+  }, [])
 
   // why: a new thread's query loads only after submit resolves, so the sent message stays until it does.
   if (outgoing !== undefined && !sending && thread !== undefined) setOutgoing(undefined)
