@@ -15,6 +15,10 @@ private let minCardShareOfGuide: CGFloat = 0.4
 private let cardAspect: CGFloat = 63 / 88
 private let cardAspectTolerance: CGFloat = 0.07
 
+private enum Rejection: String {
+  case shape, position, size
+}
+
 class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate {
   let onText = EventDispatcher()
   var active = false
@@ -32,6 +36,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   private var missedFrames = 0
   private var tracking: VNTrackRectangleRequest?
   private var card: VNRectangleObservation?
+  private var rectangles: [[String: Any]] = []
   private var viewSize = CGSize.zero
   private var imageSize = CGSize(width: 1080, height: 1920)
 
@@ -105,8 +110,9 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     reading = true
     let size = imageSize
     let card = card
+    let detection: [String: Any] = ["tracked": tracking != nil, "rectangles": rectangles]
     reads.async { [weak self] in
-      self?.read(buffer, size: size, card: card)
+      self?.read(buffer, size: size, card: card, detection: detection)
       self?.frames.async { self?.reading = false }
     }
   }
@@ -121,7 +127,9 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     request.minimumConfidence = 0.5
     request.maximumObservations = 6
     try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .right).perform([request])
-    let found = (request.results ?? []).filter(isCardInGuide).min {
+    let results = request.results ?? []
+    rectangles = results.map(describe)
+    let found = results.filter { rejection($0) == nil }.min {
       abs(widthOverHeight($0) - cardAspect) < abs(widthOverHeight($1) - cardAspect)
     }
     guard let found else { return miss() }
@@ -137,7 +145,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     guard
       let followed = tracking.results?.first as? VNRectangleObservation,
       followed.confidence > 0.3,
-      isCardInGuide(followed)
+      rejection(followed) == nil
     else {
       self.tracking = nil
       return miss()
@@ -146,12 +154,27 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     show(followed)
   }
 
-  private func isCardInGuide(_ quad: VNRectangleObservation) -> Bool {
-    guard abs(widthOverHeight(quad) - cardAspect) <= cardAspectTolerance else { return false }
-    guard let guide, guide.width > 0 else { return true }
+  private func rejection(_ quad: VNRectangleObservation) -> Rejection? {
+    guard abs(widthOverHeight(quad) - cardAspect) <= cardAspectTolerance else { return .shape }
+    guard let guide, guide.width > 0 else { return nil }
     let points = onScreen(corners(quad))
-    return guide.insetBy(dx: -guide.width * 0.1, dy: -guide.height * 0.1).contains(midpoint(points))
-      && polygonArea(points) >= guide.width * guide.height * minCardShareOfGuide
+    guard guide.insetBy(dx: -guide.width * 0.1, dy: -guide.height * 0.1).contains(midpoint(points))
+    else { return .position }
+    return shareOfGuide(points) < minCardShareOfGuide ? .size : nil
+  }
+
+  private func shareOfGuide(_ points: [CGPoint]) -> CGFloat {
+    guard let guide, guide.width > 0 else { return 0 }
+    return polygonArea(points) / (guide.width * guide.height)
+  }
+
+  private func describe(_ quad: VNRectangleObservation) -> [String: Any] {
+    var description: [String: Any] = [
+      "aspect": Double(widthOverHeight(quad)),
+      "share": Double(shareOfGuide(onScreen(corners(quad)))),
+    ]
+    if let rejected = rejection(quad) { description["rejected"] = rejected.rawValue }
+    return description
   }
 
   private func widthOverHeight(_ quad: VNRectangleObservation) -> CGFloat {
@@ -202,7 +225,9 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     }
   }
 
-  private func read(_ buffer: CVPixelBuffer, size: CGSize, card: VNRectangleObservation?) {
+  private func read(
+    _ buffer: CVPixelBuffer, size: CGSize, card: VNRectangleObservation?, detection: [String: Any]
+  ) {
     let width = Double(size.width)
     let height = Double(size.height)
     let request = VNRecognizeTextRequest()
@@ -226,7 +251,9 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       ]
     }
     guard active else { return }
-    var photo: [String: Any] = ["width": width, "height": height, "lines": lines]
+    var photo: [String: Any] = [
+      "width": width, "height": height, "lines": lines, "detection": detection,
+    ]
     if let card {
       photo["cardCorners"] = corners(card).map { ["x": $0.x * width, "y": (1 - $0.y) * height] }
     }

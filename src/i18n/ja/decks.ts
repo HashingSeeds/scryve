@@ -362,6 +362,18 @@ export default {
       "カメラへのアクセスが拒否されています。カードをスキャンするには、システム設定で許可してください。",
     allow: "カメラを許可",
     openSettings: "設定を開く",
+    stats: {
+      outline: "輪郭: {{state}}",
+      tracked: "追跡中",
+      found: "検出",
+      none: "なし",
+      noRectangles: "矩形なし",
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      accepted: "カード",
+      shape: "形状",
+      position: "中心外れ",
+      size: "小さすぎ",
+    },
   },
   deckLimit: {
     countLabel: "同期済みデッキ {{used}}/{{limit}}個",

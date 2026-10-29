@@ -389,6 +389,27 @@ const decks = {
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",
     allow: "Allow camera",
     openSettings: "Open settings",
+    // Technical card detection details shown over the camera with "Stats for nerds" on. Keep labels very short.
+    stats: {
+      // {{state}} is one of the words below.
+      outline: "Outline: {{state}}",
+      // The outline follows the card from the last frame.
+      tracked: "tracked",
+      // The outline was just found.
+      found: "found",
+      none: "none",
+      noRectangles: "No rectangles",
+      // One detected rectangle: width over height, its size as a percent of the frame, then a verdict word below.
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      // A rectangle the scanner accepted as the card.
+      accepted: "card",
+      // Rejected because its shape is not a card's.
+      shape: "shape",
+      // Rejected because it is not centered in the frame.
+      position: "off-center",
+      // Rejected because it is too small to be the card.
+      size: "too small",
+    },
   },
 
   deckLimit: {

@@ -123,7 +123,7 @@ export default {
     syncStats: {
       label: "Estadísticas para nerds",
       helper:
-        "Muestra cuánto tardan los cambios en llegar a cada dispositivo en partidas en línea y cercanas.",
+        "Muestra cuánto tardan los cambios en llegar a cada dispositivo en las partidas en línea y cercanas, y cómo encuentra las cartas el escáner de cartas.",
     },
   },
   support: {

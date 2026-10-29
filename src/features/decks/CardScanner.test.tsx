@@ -2,6 +2,7 @@ import { View } from "react-native"
 import * as Haptics from "expo-haptics"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
 import { cardNameIndex } from "./cardNameMatch"
@@ -305,4 +306,38 @@ test("a land retry counts copies still being added", async () => {
   scan("Forest")
   expect(view.getByTestId("card-scan-land-count")).toHaveTextContent("10")
   await act(async () => landSecondBatch())
+})
+
+test("Stats for nerds shows why each rectangle was or wasn't taken as the card", () => {
+  act(() => localGameRepository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, syncStats: true }))
+  try {
+    const { view } = renderScanner({ singleton: true })
+    act(() =>
+      mockOnText?.({
+        nativeEvent: {
+          width: 960,
+          height: 1280,
+          lines: [],
+          detection: {
+            tracked: false,
+            rectangles: [
+              { aspect: 0.714, share: 0.82 },
+              { aspect: 0.95, share: 0.4, rejected: "shape" },
+            ],
+          },
+        },
+      }),
+    )
+    expect(view.getByText("Outline: none")).toBeTruthy()
+    expect(view.getByText("0.71 · 82% · card")).toBeTruthy()
+    expect(view.getByText("0.95 · 40% · shape")).toBeTruthy()
+  } finally {
+    act(() => localGameRepository.saveSettings(DEFAULT_LOCAL_SETTINGS))
+  }
+})
+
+test("the scanner hides detection details with Stats for nerds off", () => {
+  const { view } = renderScanner({ singleton: true })
+  show("Sol Ring")
+  expect(view.queryByTestId("card-scan-stats")).toBeNull()
 })

@@ -394,6 +394,18 @@ export default {
       "L'accès à l'appareil photo est refusé. Activez-le dans les réglages du système pour scanner des cartes.",
     allow: "Autoriser l'appareil photo",
     openSettings: "Ouvrir les réglages",
+    stats: {
+      outline: "Contour : {{state}}",
+      tracked: "suivi",
+      found: "trouvé",
+      none: "aucun",
+      noRectangles: "Aucun rectangle",
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      accepted: "carte",
+      shape: "forme",
+      position: "décentré",
+      size: "trop petit",
+    },
   },
   deckLimit: {
     countLabel: "{{used}} sur {{limit}} decks synchronisés",
