@@ -169,15 +169,21 @@ export function hostLan<In, Out>(
         })
         .then((published) => {
           listening = true
+          // why: Android updates TXT by unregistering and registering again, so an overlapping update or unpublish finds no service and the table stays advertised.
+          let updating: Promise<unknown> = Promise.resolve()
           resolve({
             name: published.name,
-            advertise: (next) =>
-              void zeroconf()
-                .updateService(published.name, { txt: { [STATUS_KEY]: next } })
-                .catch(() => null),
+            advertise: (next) => {
+              updating = updating.then(() =>
+                zeroconf()
+                  .updateService(published.name, { txt: { [STATUS_KEY]: next } })
+                  .catch(() => null),
+              )
+            },
             stop: async () => {
               listening = false
               server.close()
+              await updating
               await zeroconf()
                 .unpublishService(published.name)
                 .catch(() => null)

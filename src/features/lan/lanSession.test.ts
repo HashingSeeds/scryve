@@ -481,6 +481,28 @@ describe("nearby host", () => {
     expect(advertise).toHaveBeenLastCalledWith("finished")
   })
 
+  it("advertises a resumed game that finishes while its service is still publishing", async () => {
+    await startedGame()
+    jest.mocked(AppState.addEventListener).mock.calls.at(-1)?.[1]("background")
+    let publish = () => {}
+    jest.mocked(hostLan).mockImplementationOnce(
+      (name) =>
+        new Promise((resolve) => {
+          advertise = jest.fn()
+          publish = () => resolve({ name, stop: jest.fn(async () => {}), advertise })
+        }),
+    )
+
+    const resumed = new LanSession()
+    resumed.resumeHostedGame()
+    await resumed.finish()
+    publish()
+    await jest.advanceTimersByTimeAsync(50)
+
+    expect(jest.mocked(hostLan).mock.lastCall?.[4]).toBe("active")
+    expect(advertise).toHaveBeenLastCalledWith("finished")
+  })
+
   it("closes a finished table when it hosts another, which starts empty", async () => {
     const { session, alice } = await startedGame()
     await session.finish()

@@ -277,6 +277,12 @@ export class LanSession {
       if (session !== this.session) return void server.stop()
       this.server = server
       this.advertisedStatus = status
+      // why: the game can finish while the service publishes, and that flush had no server to advertise on.
+      const current = this.game?.status ?? "lobby"
+      if (current !== status) {
+        this.advertisedStatus = current
+        server.advertise(current)
+      }
       this.set({ status: "connected", serviceName: server.name, error: undefined })
     } catch (error) {
       if (session !== this.session) return
