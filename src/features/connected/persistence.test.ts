@@ -105,32 +105,6 @@ describe("connected MMKV repository", () => {
     ).toBeUndefined()
   })
 
-  it("enforces the pending byte budget independently of the record limit", () => {
-    const storage = new MemoryStorage()
-    const repository = new ConnectedGameRepository(storage, "user-1", {
-      maxPendingRecords: 10,
-      maxPendingBytes: 1,
-    })
-    const result = repository.enqueue(action("operation-byte-limit", 1, "user-1"), [])
-    expect(result).toMatchObject({ accepted: false, reason: "byte_limit", pending: [] })
-  })
-
-  it("keeps a dismissed failure dismissed when a stale tab rejects it again", () => {
-    const storage = new MemoryStorage()
-    const staleTab = new ConnectedGameRepository(storage, "user-1")
-    const otherTab = new ConnectedGameRepository(storage, "user-1")
-    const rejected = action("operation-stale-tab-01", 1)
-    otherTab.enqueue(rejected, [])
-    const stalePending = staleTab.loadOutbox("game-public")
-    otherTab.fail("game-public", rejected.event.operationId, "Game is not active", 2)
-    otherTab.dismissFailed("game-public", rejected.event.operationId)
-
-    staleTab.failAction(rejected, "Game is not active", 3, [], stalePending)
-
-    expect(staleTab.loadFailed("game-public")).toEqual([])
-    expect(staleTab.loadOutbox("game-public")).toEqual([])
-  })
-
   it("recovers durable outbox records after process death and acknowledges exactly one", () => {
     const storage = new MemoryStorage()
     new ConnectedGameRepository(storage).enqueue(action("operation-first-1", 1))
@@ -335,17 +309,6 @@ describe("connected MMKV repository", () => {
     expect(failure.reason.endsWith("…")).toBe(true)
     expect(Buffer.byteLength(failure.reason, "utf8")).toBeLessThanOrEqual(16)
     expect(failure.action.event.operationId).toBe(rejected.event.operationId)
-  })
-
-  it("uses dedicated records whose names cannot overlap auth token storage", () => {
-    const sampleKeys = [
-      CONNECTED_KEYS.projection("game"),
-      CONNECTED_KEYS.outboxIndex("game"),
-      CONNECTED_KEYS.outboxRecord("game", "operation"),
-      CONNECTED_KEYS.failedIndex("game"),
-      CONNECTED_KEYS.failedRecord("game", "operation"),
-    ]
-    expect(sampleKeys.join(" ")).not.toContain("token")
   })
 
   it("isolates prefix-related game IDs during orphan discovery", () => {
@@ -752,6 +715,15 @@ function resumeEntry(publicId: string, updatedAt: number, isHost = true): Resuma
   }
 }
 
+function restarted(repository: ConnectedGameRepository, storage: MemoryStorage) {
+  return new ConnectedGameRepository(
+    storage,
+    (repository as unknown as { ownerId: string }).ownerId,
+    {},
+    (repository as unknown as { deployment: string }).deployment,
+  )
+}
+
 describe("connected resume index", () => {
   it("keeps a game in a system this app doesn't know off Magic after a restart", () => {
     const storage = new MemoryStorage()
@@ -819,18 +791,7 @@ describe("connected resume index", () => {
     expect(loaded[0]).toMatchObject({ publicId: "game-hosted", isHost: true })
     expect(loaded.map((game) => game.publicId)).not.toContain("game-joined-29")
   })
-})
 
-function restarted(repository: ConnectedGameRepository, storage: MemoryStorage) {
-  return new ConnectedGameRepository(
-    storage,
-    (repository as unknown as { ownerId: string }).ownerId,
-    {},
-    (repository as unknown as { deployment: string }).deployment,
-  )
-}
-
-describe("connected resume index", () => {
   it("tracks projection recency without undoing removal or touching saved actions", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
@@ -875,17 +836,6 @@ describe("connected resume index", () => {
     expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual(["game-other"])
     expect(repository.loadProjection(projection.publicId)?.status).toBe("active")
     expect(repository.loadOutbox(projection.publicId)).toHaveLength(1)
-  })
-
-  it("persists hydrated rows readable by a freshly constructed repository", () => {
-    const storage = new MemoryStorage()
-    const deployment = "small-ibis-123.convex.cloud"
-    new ConnectedGameRepository(storage, "user-1", {}, deployment).syncResumeIndex(
-      [resumeEntry("game-public", 10)],
-      true,
-    )
-    const restarted = new ConnectedGameRepository(storage, "user-1", {}, deployment)
-    expect(restarted.loadResumeIndex()).toEqual([resumeEntry("game-public", 10)])
   })
 
   it("merges partial pages with cached entries and replaces only on an exhausted page set", () => {

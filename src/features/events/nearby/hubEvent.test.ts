@@ -92,21 +92,6 @@ describe("nearby hub event", () => {
     expect(hubStandings(event, 1)[0]).toMatchObject({ playerId: first, points: 3 })
   })
 
-  it("refuses a result the engine doesn't know", () => {
-    const event = applyHubCommand(
-      withPlayers(swiss(), ["Ada", "Grace"]),
-      organizer,
-      { kind: "startRound" },
-      NOW,
-    )
-    const table = event.tables[0]!
-    const forged = { kind: "forfeit" } as unknown as null
-
-    expect(() =>
-      applyHubCommand(event, organizer, { kind: "report", tableId: table.id, result: forged }, NOW),
-    ).toThrow("Enter a valid result")
-  })
-
   it("stores only the fields a result has, and refuses one that isn't there", () => {
     const event = applyHubCommand(
       withPlayers(swiss(), ["Ada", "Grace"]),
@@ -125,14 +110,15 @@ describe("nearby hub event", () => {
     )
 
     expect(reported.tables[0]!.result).toEqual({ kind: "match", gamesWon: [2, 0], gamesDrawn: 0 })
-    expect(() =>
-      applyHubCommand(
-        event,
-        player,
-        { kind: "report", tableId: table.id, result: false as unknown as null },
-        NOW,
-      ),
-    ).toThrow("Enter a valid result")
+    for (const forged of [false, { kind: "forfeit" }])
+      expect(() =>
+        applyHubCommand(
+          event,
+          player,
+          { kind: "report", tableId: table.id, result: forged as unknown as null },
+          NOW,
+        ),
+      ).toThrow("Enter a valid result")
   })
 
   it("keeps a player removed before round 1 from rejoining on reconnect", () => {

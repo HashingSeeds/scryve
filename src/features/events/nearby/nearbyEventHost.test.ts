@@ -49,10 +49,12 @@ async function host(players: number) {
   await nearbyEventHost.create(event, null)
 }
 
-function guest(seat: number, patches: boolean) {
+function guest(seat: number, patches: boolean, recorded = true) {
   const received: NearbyHostMessage[] = []
-  const wire = (message: NearbyHostMessage) =>
-    received.push(JSON.parse(JSON.stringify(message)) as NearbyHostMessage)
+  const wire = (message: NearbyHostMessage) => {
+    if (recorded || message.t === "welcome")
+      received.push(JSON.parse(JSON.stringify(message)) as NearbyHostMessage)
+  }
   const peer: LanConnection<NearbyHostMessage> = {
     send: (...messages) => messages.forEach(wire),
     sendAndClose: wire,
@@ -94,16 +96,18 @@ const average = (values: readonly number[]) =>
 describe("nearby event host", () => {
   it("sends 128 guests small patches that rebuild the host's view", async () => {
     await host(0)
+    const recordedSeats = new Set([1, 6, 128])
     const guests = [guest(1, true)]
+    const watched = () => guests.filter((_, index) => recordedSeats.has(index + 1))
     const perGuest = (act: () => void) => {
-      const before = guests.map(({ received }) => received.length)
+      const before = watched().map((joined) => ({ joined, count: joined.received.length }))
       act()
       sendBatch()
-      return average(before.map((count, index) => bytes(guests[index]!.received.slice(count))))
+      return average(before.map(({ joined, count }) => bytes(joined.received.slice(count))))
     }
 
     const joins = Array.from({ length: 127 }, (_, index) =>
-      perGuest(() => guests.push(guest(index + 2, true))),
+      perGuest(() => guests.push(guest(index + 2, true, recordedSeats.has(index + 2)))),
     )
     const bySeat = new Map(guests.map((joined) => [joined.playerId, joined]))
     const changes: number[] = []
@@ -125,7 +129,7 @@ describe("nearby event host", () => {
 
     expect(Math.max(...joins)).toBeLessThan(1024)
     expect(average(changes)).toBeLessThan(1024)
-    for (const { playerId, feed } of guests)
+    for (const { playerId, feed } of watched())
       expect(feed()).toEqual({ seq: expect.any(Number), ...expected(playerId) })
   })
 

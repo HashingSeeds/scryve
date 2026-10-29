@@ -67,29 +67,17 @@ describe("AccountDeletionSessionGuard", () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1)
   })
 
-  it("stays signed in when nothing is being deleted", () => {
-    mockDeletion = null
+  it.each([
+    ["nothing is being deleted", null],
+    ["the deletion check fails", new Error("Server Error")],
+    ["a deletion failed and can be retried", { status: "failed", receiptToken: "f".repeat(64) }],
+  ])("stays signed in when %s", (_case, deletion) => {
+    mockDeletion = deletion
 
     render(<AccountDeletionSessionGuard />)
 
     expect(mockSignOut).not.toHaveBeenCalled()
     expect(mockSaveReceiptToken).not.toHaveBeenCalled()
-  })
-
-  it("stays signed in when the deletion check fails", () => {
-    mockDeletion = new Error("Server Error")
-
-    render(<AccountDeletionSessionGuard />)
-
-    expect(mockSignOut).not.toHaveBeenCalled()
-  })
-
-  it("stays signed in for a failed deletion so it can be retried", () => {
-    mockDeletion = { status: "failed", receiptToken: "f".repeat(64) }
-
-    render(<AccountDeletionSessionGuard />)
-
-    expect(mockSignOut).not.toHaveBeenCalled()
   })
 
   it("renders nothing when auth is not configured", () => {
