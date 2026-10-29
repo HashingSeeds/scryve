@@ -13,7 +13,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
-import { storage } from "@/utils/storage"
 
 import { useGuestDecks } from "./guestDeck"
 import { useLocalDeckSync } from "./localDeckSync"
@@ -26,50 +25,30 @@ function useUnsyncedDecks(excludedLocalIds?: ReadonlySet<string>) {
   )
 }
 
-function dismissedKey(ownerId: string) {
-  return `scryve.decks.syncPickerDismissed.v1.${ownerId}`
-}
-
-export function LocalDeckSyncNotice({
+export function LocalDeckSyncHeader({
   access,
   excludedLocalIds,
 }: {
-  access: CloudAccess
+  access?: CloudAccess
   excludedLocalIds?: ReadonlySet<string>
 }) {
   const { themed } = useAppTheme()
-  const ownerId = access.ownerId
+  const ownerId = access?.ownerId
   const localDecks = useUnsyncedDecks(excludedLocalIds)
-  const capacity = useQuery(api.decks.capacity, access.ready && ownerId ? {} : "skip")
-  const [dismissedOwner, setDismissedOwner] = useState<string>()
-  const dismissed =
-    ownerId !== undefined &&
-    (dismissedOwner === ownerId || storage.getBoolean(dismissedKey(ownerId)) === true)
+  const capacity = useQuery(api.decks.capacity, access?.ready && ownerId ? {} : "skip")
   const [picking, setPicking] = useState(false)
   const free = capacity ? capacity.limit - capacity.used : 0
-  if (!ownerId || !capacity || dismissed || free < 1 || !localDecks.length) return null
   return (
-    <View testID="local-deck-sync-notice" style={themed($notice)}>
-      <Text size="sm" tx="decks:localSync.notice" txOptions={{ count: localDecks.length, free }} />
-      <View style={themed($row)}>
+    <View testID="local-deck-sync-header" style={themed($row)}>
+      <Text size="xs" tx="decks:shelf.onDevice" style={$flex1} />
+      {ownerId && capacity && free > 0 && localDecks.length ? (
         <Button
           testID="local-deck-sync-choose"
-          tx="decks:localSync.choose"
-          preset="reversed"
-          style={$flex1}
+          tx="decks:localSync.sync"
           onPress={() => setPicking(true)}
         />
-        <Button
-          testID="local-deck-sync-dismiss"
-          tx="decks:localSync.keepLocal"
-          style={$flex1}
-          onPress={() => {
-            storage.set(dismissedKey(ownerId), true)
-            setDismissedOwner(ownerId)
-          }}
-        />
-      </View>
-      {picking ? (
+      ) : null}
+      {ownerId && capacity && picking ? (
         <LocalDeckSyncPicker
           ownerId={ownerId}
           excludedLocalIds={excludedLocalIds}
@@ -196,7 +175,6 @@ function LocalDeckSyncPicker({
   )
 }
 
-const $notice: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dialog: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({

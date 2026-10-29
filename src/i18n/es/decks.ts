@@ -197,13 +197,6 @@ export default {
     invalid: "Los datos del mazo de invitado no son válidos.",
   },
   localSync: {
-    notice_one: "{{count}} mazo solo está en este dispositivo. Puedes sincronizar {{free}} más.",
-    notice_many:
-      "{{count}} de mazos solo están en este dispositivo. Puedes sincronizar {{free}} más.",
-    notice_other:
-      "{{count}} mazos solo están en este dispositivo. Puedes sincronizar {{free}} más.",
-    choose: "Elige mazos para sincronizar",
-    keepLocal: "Mantener en el dispositivo",
     pickTitle_one: "Elige {{count}} mazo para sincronizar",
     pickTitle_many: "Elige hasta {{count}} de mazos para sincronizar",
     pickTitle_other: "Elige hasta {{count}} mazos para sincronizar",
@@ -542,25 +535,16 @@ export default {
     sourceTournament: "Mazo de torneo",
     sourceExample: "Mazo de ejemplo",
     otherSection: "Otros",
-    checkingLimit: "Comprobando límite de mazos…",
-    limitUnavailable: "Límite de mazos no disponible.",
     saveLocalFailed: "No se pudo guardar el mazo localmente",
-    savesOnDevice:
-      "Tus mazos sincronizados están llenos, así que este mazo se guarda en este dispositivo.",
     loadDecksFailed: "No se pudieron cargar los mazos",
-    createFailed: "No se pudo crear el mazo",
     previewFailed: "No se pudo cargar este mazo",
-    importOfficialFailed: "No se pudo importar el mazo oficial",
-    importTopDeckFailed: "No se pudo importar el Top Deck",
     overflowAfterMatch:
       "{{card}} tiene más de 999 copias tras la coincidencia. Corrige el origen antes de revisar.",
     linkFailed: "No se pudo cargar este mazo. Inténtalo de nuevo o pega su exportación de texto.",
     resolveFailed: "No se pudo resolver la lista del mazo. Inténtalo de nuevo.",
     overflowOnFormat:
       "{{card}} superaría las 999 copias. Reduce su cantidad antes de cambiar de formato.",
-    waitForSave: "Espera a que el mazo termine de guardarse.",
     reviewFirst: "Revisa la importación antes de añadir cartas.",
-    importListFailed: "No se pudo importar la lista del mazo",
     notes: "Notas",
     optional: "Opcional",
     noMatches: "No hay mazos que coincidan",
@@ -586,7 +570,6 @@ export default {
     problemsRemoved_other:
       "Se eliminaron {{count}} líneas sin coincidencia o no válidas de esta importación. El texto original se conserva en el formulario de importación.",
     saveOnDevice: "Guardar en el dispositivo",
-    saveDeck: "Guardar mazo",
     previewTitle: "Vista previa del mazo",
     datedExample: "Ejemplo antiguo. Es posible que las cartas ya no sean legales en este formato.",
     openSourceFailed: "No se pudo abrir el origen del mazo.",
@@ -594,9 +577,7 @@ export default {
     previewReady: "Vista previa lista",
     loadingTopDeck: "Cargando Top Deck",
     previewCard: "Vista previa de {{card}}",
-    importing: "Importando…",
     saveDeckOnDevice: "Guardar mazo en este dispositivo",
-    importDeck: "Importar mazo",
     originalPrecon:
       "Lista original del mazo preconstruido. Es posible que las cartas ya no sean legales en este formato.",
     loadingImages: "Cargando imágenes de cartas",
@@ -642,7 +623,6 @@ export default {
     reloadSource: "Recargar origen",
     reviewSourceDeck: "Revisar mazo de {{source}}",
     reviewList: "Revisar lista del mazo",
-    creating: "Creando…",
     createDeck: "Crear mazo",
   },
   saveStatus: {

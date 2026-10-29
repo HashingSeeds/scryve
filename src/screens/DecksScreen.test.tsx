@@ -802,7 +802,7 @@ describe("DecksScreen", () => {
     fireEvent.press(view.getAllByText("Back to lobby")[0])
     expect(onBack).toHaveBeenCalledTimes(1)
   })
-  test("keeps the sync notice in the list header above both sections", () => {
+  test("offers Sync on the on-device section, below synced decks", () => {
     for (let index = 0; index < 30; index++)
       saveGuestDeck({ name: `Local ${index}`, format: "commander", game: "mtg", cards: [] })
     const view = renderShelf({
@@ -810,11 +810,10 @@ describe("DecksScreen", () => {
     })
     const sectionList = view.UNSAFE_getByType(require("react-native").SectionList)
     expect(sectionList.props.sections[0].key).toBe("synced")
+    expect(sectionList.props.sections[1].key).toBe("local")
     expect(
-      within(view.getByTestId("decks-list")).getByTestId("local-deck-sync-notice"),
+      within(view.getByTestId("local-deck-sync-header")).getByTestId("local-deck-sync-choose"),
     ).toBeTruthy()
-    const header = sectionList.props.ListHeaderComponent
-    expect(header.props.children[0].type.name).toBe("LocalDeckSyncNotice")
   })
 
   test("does not call an empty synced shelf an empty collection when local decks exist", () => {

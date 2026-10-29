@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/theme/context"
 import { clear } from "@/utils/storage"
 
 import { clearGuestDecks, loadGuestDecks, saveGuestDeck } from "./guestDeck"
-import { LocalDeckSyncNotice } from "./LocalDeckSyncNotice"
+import { LocalDeckSyncHeader } from "./LocalDeckSyncHeader"
 
 const mockImportGuest = jest.fn()
 const mockPresentPaywall = jest.fn()
@@ -31,19 +31,15 @@ const access: CloudAccess = {
   request: jest.fn(),
 }
 
-function notice(cloud = access) {
-  return (
+function renderHeader(cloud = access) {
+  return render(
     <ThemeProvider initialContext="light">
-      <LocalDeckSyncNotice access={cloud} />
-    </ThemeProvider>
+      <LocalDeckSyncHeader access={cloud} />
+    </ThemeProvider>,
   )
 }
 
-function renderNotice() {
-  return render(notice())
-}
-
-describe("local deck sync notice", () => {
+describe("local deck sync header", () => {
   beforeEach(() => {
     clear()
     clearGuestDecks()
@@ -59,9 +55,8 @@ describe("local deck sync notice", () => {
       deckId: "deck-1",
       localUpdatedAt: first.updatedAt,
     })
-    const view = renderNotice()
+    const view = renderHeader()
     expect(mockImportGuest).not.toHaveBeenCalled()
-    expect(view.getByText("2 decks are only on this device. You can sync 1 more.")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("local-deck-sync-choose"))
     fireEvent.press(view.getByTestId(`local-deck-sync-choice-${first.localId}`))
@@ -74,27 +69,14 @@ describe("local deck sync notice", () => {
     expect(mockImportGuest).toHaveBeenCalledTimes(1)
   })
 
-  it("stays hidden once the player keeps their decks on the device", () => {
-    saveGuestDeck({ name: "Elves", format: "commander", cards: [] })
-    const view = renderNotice()
-    fireEvent.press(view.getByTestId("local-deck-sync-dismiss"))
-    expect(view.queryByTestId("local-deck-sync-notice")).toBeNull()
-    view.unmount()
-    expect(renderNotice().queryByTestId("local-deck-sync-notice")).toBeNull()
-  })
-
-  it("stays hidden when the account finishes loading after the notice mounts", () => {
-    saveGuestDeck({ name: "Elves", format: "commander", cards: [] })
-    const first = renderNotice()
-    fireEvent.press(first.getByTestId("local-deck-sync-dismiss"))
-    first.unmount()
-    const view = render(notice({ ...access, ready: false, ownerId: undefined }))
-    view.rerender(notice())
-    expect(view.queryByTestId("local-deck-sync-notice")).toBeNull()
-  })
-
   it("ignores a deck the player moved off their account", () => {
     saveGuestDeck({ name: "Elves", format: "commander", cards: [] }, { movedFromAccount: true })
-    expect(renderNotice().queryByTestId("local-deck-sync-notice")).toBeNull()
+    expect(renderHeader().queryByTestId("local-deck-sync-choose")).toBeNull()
+  })
+
+  it("offers no sync without an account", () => {
+    saveGuestDeck({ name: "Elves", format: "commander", cards: [] })
+    const signedOut = { ...access, ready: false, signedIn: false, ownerId: undefined }
+    expect(renderHeader(signedOut).queryByTestId("local-deck-sync-choose")).toBeNull()
   })
 })

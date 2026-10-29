@@ -181,9 +181,6 @@ export default {
     invalid: "ゲストデッキのデータが無効です。",
   },
   localSync: {
-    notice_other: "{{count}}個のデッキがこのデバイスにのみあります。あと{{free}}個同期できます。",
-    choose: "同期するデッキを選択",
-    keepLocal: "デバイスに残す",
     pickTitle_other: "同期するデッキを最大{{count}}個選択",
     pro: "Proなら最大{{premiumLimit}}個のデッキを同期でき、デッキのバージョン管理も使えます。",
     seePro: "Proを見る",
@@ -513,15 +510,9 @@ export default {
     sourceTournament: "大会デッキ",
     sourceExample: "デッキ例",
     otherSection: "その他",
-    checkingLimit: "デッキ上限を確認中…",
-    limitUnavailable: "デッキ上限を利用できません。",
     saveLocalFailed: "デッキをデバイスに保存できませんでした",
-    savesOnDevice: "同期できるデッキがいっぱいのため、このデッキはこのデバイスに保存されます。",
     loadDecksFailed: "デッキを読み込めませんでした",
-    createFailed: "デッキを作成できませんでした",
     previewFailed: "このデッキを読み込めませんでした",
-    importOfficialFailed: "公式デッキをインポートできませんでした",
-    importTopDeckFailed: "Top Deckをインポートできませんでした",
     overflowAfterMatch:
       "照合後、{{card}}が999枚を超えています。確認の前に元データを修正してください。",
     linkFailed:
@@ -529,9 +520,7 @@ export default {
     resolveFailed: "デッキリストを解決できませんでした。もう一度お試しください。",
     overflowOnFormat:
       "{{card}}が999枚を超えてしまいます。フォーマットを変更する前に枚数を減らしてください。",
-    waitForSave: "デッキの保存が完了するまでお待ちください。",
     reviewFirst: "カードを追加する前にインポート内容を確認してください。",
-    importListFailed: "デッキリストをインポートできませんでした",
     notes: "メモ",
     optional: "任意",
     noMatches: "一致するデッキがありません",
@@ -554,7 +543,6 @@ export default {
     problemsRemoved_other:
       "このインポートから未一致または無効な行を{{count}}件削除しました。元のテキストはインポートフォームに残っています。",
     saveOnDevice: "デバイスに保存",
-    saveDeck: "デッキを保存",
     previewTitle: "デッキのプレビュー",
     datedExample: "過去の例です。このフォーマットでは使えないカードが含まれる場合があります。",
     openSourceFailed: "デッキのソースを開けませんでした。",
@@ -562,9 +550,7 @@ export default {
     previewReady: "プレビューの準備完了",
     loadingTopDeck: "Top Deckを読み込み中",
     previewCard: "{{card}}をプレビュー",
-    importing: "インポート中…",
     saveDeckOnDevice: "このデバイスにデッキを保存",
-    importDeck: "デッキをインポート",
     originalPrecon:
       "元のプレコンのリストです。このフォーマットでは使えないカードが含まれる場合があります。",
     loadingImages: "カード画像を読み込み中",
@@ -600,7 +586,6 @@ export default {
     reloadSource: "ソースを再読み込み",
     reviewSourceDeck: "{{source}}のデッキを確認",
     reviewList: "デッキリストを確認",
-    creating: "作成中…",
     createDeck: "デッキを作成",
   },
   saveStatus: {
