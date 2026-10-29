@@ -410,23 +410,20 @@ export function CardSearchScreen({
       return names.map((name) => {
         const card = byName.get(name)
         if (!card)
-          return {
-            error: translate(
-              lookupFailed ? "decks:cardScan.addFailed" : "decks:cardScan.notFound",
-              {
-                card: name,
-              },
-            ),
-          }
+          return lookupFailed
+            ? { error: translate("decks:cardScan.addFailed"), retryable: true }
+            : { error: translate("decks:cardScan.notFound", { card: name }) }
         const error = add(card)
-        if (error) return { error }
+        // why: a deck refuses uncached cards while offline; a retry adds them once it reconnects.
+        if (error) return { error, retryable: offline }
         scannedEntries.current.set(name, searchEntry(card))
         if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: card.name })}`)
         return { imageUrl: card.smallImageUrl ?? card.imageUrl }
       })
     } catch (cause) {
       const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
-      return names.map(() => ({ error }))
+      const retryAfterMs = convexRetryAfterMs(cause)
+      return names.map(() => ({ error, retryable: true, retryAfterMs }))
     }
   }
 

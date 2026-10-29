@@ -1,6 +1,7 @@
 import type { CardPhotoText } from "../../../modules/card-text-reader"
 
 type Size = { width: number; height: number }
+type Point = { x: number; y: number }
 
 export type ScanFraming = { view: Size; frame: Size & { x: number; y: number } }
 
@@ -15,6 +16,14 @@ function circularMeanRadians(lines: CardPhotoText["lines"]) {
     cos += Math.cos(radians) * line.text.length
   }
   return Math.atan2(sin, cos)
+}
+
+function insideCard(cardCorners: Point[], point: Point) {
+  const sides = cardCorners.map((corner, index) => {
+    const next = cardCorners[(index + 1) % cardCorners.length] ?? corner
+    return (next.x - corner.x) * (point.y - corner.y) - (next.y - corner.y) * (point.x - corner.x)
+  })
+  return sides.every((side) => side >= 0) || sides.every((side) => side <= 0)
 }
 
 /**
@@ -41,7 +50,13 @@ export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFramin
     x: line.x + line.width / 2 - photo.width / 2,
     y: line.y + line.height / 2 - photo.height / 2,
   }))
-  const framed = centered.filter(({ x, y }) => Math.abs(x) <= half.x && Math.abs(y) <= half.y)
+  // why: a card the camera outlined excludes text from the card peeking out behind it.
+  const { cardCorners } = photo
+  const framed = cardCorners
+    ? centered.filter(({ line }) =>
+        insideCard(cardCorners, { x: line.x + line.width / 2, y: line.y + line.height / 2 }),
+      )
+    : centered.filter(({ x, y }) => Math.abs(x) <= half.x && Math.abs(y) <= half.y)
   const cardRotation = circularMeanRadians(framed.map(({ line }) => line))
   const downTheCard = ({ x, y }: { x: number; y: number }) =>
     -x * Math.sin(cardRotation) + y * Math.cos(cardRotation)

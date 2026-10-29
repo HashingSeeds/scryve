@@ -529,16 +529,17 @@ function DeckDetailContent({
     discardEdits()
   }
 
-  function addCard(card: DeckCard) {
-    if (knownDeleted) return
+  function addCard(card: DeckCard): string | undefined {
+    if (knownDeleted) return undefined
     const alreadyInDraft = latestDraft.current.cards.some(
       (candidate) => printingKey(candidate) === printingKey(card),
     )
     if (!alreadyInDraft && offline) {
       const entry = offlineCardEntry(card)
       if (!entry) {
-        setError(translate("decks:detail.offlineCard"))
-        return
+        const offlineError = translate("decks:detail.offlineCard")
+        setError(offlineError)
+        return offlineError
       }
       // The cached card carries the full server identity; the candidate may not.
       card = {
@@ -549,6 +550,7 @@ function DeckDetailContent({
       }
     }
     setDraft((current) => addDraftCard(current, card))
+    return undefined
   }
 
   /**
@@ -1157,8 +1159,7 @@ function DeckDetailContent({
             }
             const limitError = cardLimitError(latestDraft.current.cards, card)
             if (limitError) return limitError
-            addCard(card)
-            return undefined
+            return addCard(card)
           }}
         />
       ) : null}

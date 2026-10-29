@@ -1,4 +1,5 @@
 import { View } from "react-native"
+import * as Haptics from "expo-haptics"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -89,8 +90,10 @@ test("skips a card the Commander deck already holds and says so", async () => {
   show("Sol Ring")
   show("Sol Ring")
   expect(view.getByText("Sol Ring is already in the deck")).toBeTruthy()
+  expect(Haptics.notificationAsync).toHaveBeenLastCalledWith(Haptics.NotificationFeedbackType.Error)
   show()
   scan("Arcane Signet")
+  expect(Haptics.impactAsync).toHaveBeenLastCalledWith(Haptics.ImpactFeedbackStyle.Light)
   scan("Arcane Signet")
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Arcane Signet"])
@@ -230,6 +233,57 @@ test("a card whose add failed can be scanned again in a Commander deck", async (
   } finally {
     jest.useRealTimers()
   }
+})
+
+test("retries a card whose lookup failed until it is added", async () => {
+  jest.useFakeTimers()
+  try {
+    const addCards = jest
+      .fn<Promise<ScannedCardAdd[]>, [string[]]>()
+      .mockResolvedValueOnce([{ error: "Lookups paused", retryable: true, retryAfterMs: 4000 }])
+      .mockImplementation(async (names) => names.map(() => ({})))
+    const { view } = renderScanner({ singleton: true, addCards })
+    scan("Sol Ring")
+    await act(async () => jest.advanceTimersByTime(1500))
+    expect(view.getByText("0 added · 1 retrying")).toBeTruthy()
+    await act(async () => jest.advanceTimersByTime(4000 + 1500))
+    expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Sol Ring"])
+    expect(view.getByText("1 added")).toBeTruthy()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("Done waits out retries and counts cards that were never added", async () => {
+  jest.useFakeTimers()
+  try {
+    const addCards = jest.fn(async (names: string[]): Promise<ScannedCardAdd[]> =>
+      names.map(() => ({ error: "Lookups paused", retryable: true })),
+    )
+    const { view, onClose } = renderScanner({ singleton: true, addCards })
+    scan("Sol Ring")
+    fireEvent.press(view.getByText("Done"))
+    for (let step = 0; step < 6; step++) await act(async () => jest.advanceTimersByTime(30_000))
+    expect(addCards).toHaveBeenCalledTimes(5)
+    expect(view.getByText("0 added · 1 not added")).toBeTruthy()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("a misread basic land can be closed without adding it", async () => {
+  const { view, addCards } = renderScanner({ singleton: true })
+  scan("Forest")
+  fireEvent.press(view.getByLabelText("Decrease Forest"))
+  expect(view.getByTestId("card-scan-land-count")).toHaveTextContent("0")
+  fireEvent.press(view.getByTestId("card-scan-add-lands"))
+  scan("Sol Ring")
+  scan("Forest")
+  expect(view.getByText("How many in the deck?")).toBeTruthy()
+  fireEvent.press(view.getByTestId("card-scan-add-lands"))
+  await finish(view)
+  expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Forest"])
 })
 
 test("a land retry counts copies still being added", async () => {

@@ -370,6 +370,8 @@ export default {
     failed: "Impossible de lire la carte. Réessayez.",
     empty: "Les cartes scannées sont ajoutées au deck et s'affichent ici.",
     addedCount: "{{count}} ajoutée(s)",
+    retryingCount: "{{count}} nouvelle tentative",
+    failedCount: "{{count}} non ajoutée(s)",
     wrongCard: "Mauvaise carte",
     whichCard: "De quelle carte s'agit-il ?",
     removeIt: "Retirer",

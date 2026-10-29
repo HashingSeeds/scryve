@@ -338,6 +338,8 @@ export default {
     failed: "카드를 읽지 못했습니다. 다시 시도하세요.",
     empty: "스캔한 카드는 덱에 추가되며 여기에 표시됩니다.",
     addedCount: "{{count}}장 추가됨",
+    retryingCount: "{{count}}장 재시도 중",
+    failedCount: "{{count}}장 추가되지 않음",
     wrongCard: "다른 카드예요",
     whichCard: "어떤 카드인가요?",
     removeIt: "제거",

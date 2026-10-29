@@ -26,13 +26,14 @@ import { framedLinesFromCardTop, type ScanFraming } from "./cardTextLayout"
 import { CardTextCamera, type CardPhotoText } from "../../../modules/card-text-reader"
 
 export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; framing: ScanFraming }
-export type ScannedCardAdd = { imageUrl?: string } | { error: string }
+export type ScannedCardAdd =
+  { imageUrl?: string } | { error: string; retryable?: boolean; retryAfterMs?: number }
 
 type ScannedCard = CardNameMatch & {
   id: number
   alternates: string[]
   imageUrl?: string
-  state: "adding" | "added" | { error: string }
+  state: "adding" | "retrying" | "added" | "failed"
 }
 type ScanStatus =
   "looking" | "loading" | "steady" | "unsure" | { error: string } | { alreadyInDeck: string }
@@ -41,6 +42,8 @@ type LandCount = { card: Omit<ScannedCard, "id" | "state">; inDeck: number; coun
 const ALTERNATE_COUNT = 5
 const ADD_BATCH_SIZE = 10
 const ADD_BATCH_WAIT_MS = 1500
+// why: Scryfall pauses lookups for 30 seconds after a 429, so the last waits outlast a pause.
+const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000]
 const BASIC_LANDS = new Set([
   "Plains",
   "Island",
@@ -89,7 +92,7 @@ export function CardScanner({
 }) {
   const [permission, requestPermission] = useCameraPermissions()
   const view = useRef<LayoutRectangle>(undefined)
-  const frame = useRef<LayoutRectangle>(undefined)
+  const [frame, setFrame] = useState<LayoutRectangle>()
   const [added, setAdded] = useState<ScannedCard[]>([])
   const addedRef = useRef(added)
   const [status, setStatus] = useState<ScanStatus>("looking")
@@ -102,6 +105,9 @@ export function CardScanner({
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const lookups = useRef(new Map<number, Promise<ScannedCardAdd>>())
+  const settleLookup = useRef(new Map<number, (result: ScannedCardAdd) => void>())
+  const retries = useRef(new Map<number, number>())
+  const retryTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>())
   const corrections = useRef(new Set<Promise<void>>())
   const [closing, setClosing] = useState(false)
   const closingRef = useRef(false)
@@ -117,8 +123,10 @@ export function CardScanner({
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
       () => undefined,
     )
+    const timers = retryTimers.current
     return () => {
       clearTimeout(batchTimer.current)
+      for (const timer of timers.values()) clearTimeout(timer)
       void ScreenOrientation.unlockAsync().catch(() => undefined)
     }
   }, [])
@@ -127,42 +135,64 @@ export function CardScanner({
     setAdded((current) => current.map((card) => (card.id === id ? { ...card, ...change } : card)))
   }
 
+  function queue(card: ScannedCard) {
+    waiting.current.push(card)
+    clearTimeout(batchTimer.current)
+    if (waiting.current.length >= ADD_BATCH_SIZE) void addWaitingCards()
+    else batchTimer.current = setTimeout(() => void addWaitingCards(), ADD_BATCH_WAIT_MS)
+  }
+
+  function settle(card: ScannedCard, result: ScannedCardAdd) {
+    settleLookup.current.get(card.id)?.(result)
+    settleLookup.current.delete(card.id)
+    if (!("error" in result)) return updateCard(card.id, { ...result, state: "added" })
+    countedLands.current.delete(card.name)
+    updateCard(card.id, { state: "failed" })
+  }
+
   async function addWaitingCards() {
     clearTimeout(batchTimer.current)
     const batch = waiting.current.splice(0)
     if (!batch.length) return
-    const results = addCards(batch.map((card) => card.name))
-    await Promise.all(
-      batch.map(async (card, index) => {
-        const lookup = results.then(
-          (all) => all[index] ?? { error: translate("decks:cardScan.failed") },
-        )
-        lookups.current.set(card.id, lookup)
-        const result = await lookup
-        if ("error" in result) countedLands.current.delete(card.name)
-        updateCard(card.id, "error" in result ? { state: result } : { ...result, state: "added" })
-      }),
-    )
+    const results = await addCards(batch.map((card) => card.name))
+    batch.forEach((card, index) => {
+      const result = results[index] ?? { error: translate("decks:cardScan.failed") }
+      const retry = retries.current.get(card.id) ?? 0
+      const delay = RETRY_DELAYS_MS[retry]
+      if (!("error" in result) || !result.retryable || delay === undefined)
+        return settle(card, result)
+      retries.current.set(card.id, retry + 1)
+      updateCard(card.id, { state: "retrying" })
+      const timer = setTimeout(
+        () => {
+          retryTimers.current.delete(card.id)
+          queue(card)
+        },
+        Math.max(delay, result.retryAfterMs ?? 0),
+      )
+      retryTimers.current.set(card.id, timer)
+    })
   }
 
   function add(card: Omit<ScannedCard, "id" | "state">) {
     const scanned = { ...card, id: nextId.current++, state: "adding" as const }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined)
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined)
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
       console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)
     }
     lastAcceptedAt.current = Date.now()
     setAdded((current) => [scanned, ...current])
-    waiting.current.push(scanned)
-    clearTimeout(batchTimer.current)
-    if (waiting.current.length >= ADD_BATCH_SIZE) void addWaitingCards()
-    else batchTimer.current = setTimeout(() => void addWaitingCards(), ADD_BATCH_WAIT_MS)
+    lookups.current.set(
+      scanned.id,
+      new Promise((resolve) => settleLookup.current.set(scanned.id, resolve)),
+    )
+    queue(scanned)
   }
 
   function readText(photo: CardPhotoText) {
-    if (closingRef.current || !view.current || !frame.current) return
-    const framing = { view: view.current, frame: frame.current }
+    if (closingRef.current || !view.current || !frame) return
+    const framing = { view: view.current, frame }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
     if (linesFromCardTop.length) onRead?.({ linesFromCardTop, photo, framing }, match?.name)
@@ -192,14 +222,18 @@ export function CardScanner({
     accept({ ...match, alternates })
   }
 
+  function skip(name: string) {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined)
+    setStatus({ alreadyInDeck: name })
+  }
+
   function accept(card: Omit<ScannedCard, "id" | "state">) {
     if (BASIC_LANDS.has(card.name)) {
-      if (countedLands.current.has(card.name)) {
-        setStatus({ alreadyInDeck: card.name })
-        return
-      }
+      if (countedLands.current.has(card.name)) return skip(card.name)
       const stillAdding = addedRef.current.filter(
-        (scanned) => scanned.name === card.name && scanned.state === "adding",
+        (scanned) =>
+          scanned.name === card.name &&
+          (scanned.state === "adding" || scanned.state === "retrying"),
       ).length
       const inDeck = copiesInDeck(card.name) + stillAdding
       landCountOpen.current = true
@@ -210,18 +244,17 @@ export function CardScanner({
       singleton &&
       (copiesInDeck(card.name) > 0 ||
         addedRef.current.some(
-          (scanned) => scanned.name === card.name && typeof scanned.state !== "object",
+          (scanned) => scanned.name === card.name && scanned.state !== "failed",
         ))
-    ) {
-      setStatus({ alreadyInDeck: card.name })
-      return
-    }
+    )
+      return skip(card.name)
     add(card)
   }
 
   function addLands({ card, inDeck, count }: LandCount) {
     landCountOpen.current = false
     setLandCount(undefined)
+    if (count <= inDeck) return
     countedLands.current.add(card.name)
     for (let copy = inDeck; copy < count; copy++) add(card)
   }
@@ -235,8 +268,14 @@ export function CardScanner({
     setFixing(undefined)
     setAdded((current) => current.filter((card) => card.id !== wrong.id))
     const stillWaiting = waiting.current.findIndex((card) => card.id === wrong.id)
-    if (stillWaiting >= 0) waiting.current.splice(stillWaiting, 1)
-    else {
+    const retryTimer = retryTimers.current.get(wrong.id)
+    if (stillWaiting >= 0 || retryTimer) {
+      if (stillWaiting >= 0) waiting.current.splice(stillWaiting, 1)
+      clearTimeout(retryTimer)
+      retryTimers.current.delete(wrong.id)
+      settleLookup.current.get(wrong.id)?.({ error: translate("decks:cardScan.failed") })
+      settleLookup.current.delete(wrong.id)
+    } else {
       const result = await lookups.current.get(wrong.id)
       if (result && !("error" in result)) removeCard?.(wrong.name)
     }
@@ -260,6 +299,15 @@ export function CardScanner({
 
   const canAsk = permission?.canAskAgain !== false
   const last = added[0]
+  const failedCount = added.filter((card) => card.state === "failed").length
+  const retryingCount = added.filter((card) => card.state === "retrying").length
+  const addedSummary = [
+    translate("decks:cardScan.addedCount", { count: added.length - failedCount - retryingCount }),
+    retryingCount ? translate("decks:cardScan.retryingCount", { count: retryingCount }) : "",
+    failedCount ? translate("decks:cardScan.failedCount", { count: failedCount }) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ")
   const scanning = Boolean(permission?.granted) && !fixing && !landCount && !closing
 
   return (
@@ -283,13 +331,11 @@ export function CardScanner({
             <CardTextCamera
               style={StyleSheet.absoluteFill}
               active={scanning}
+              guide={frame}
               onText={(event) => readText(event.nativeEvent)}
             />
             <View style={$overlay} pointerEvents="none">
-              <View
-                style={$frame}
-                onLayout={(event) => (frame.current = event.nativeEvent.layout)}
-              />
+              <View style={$frame} onLayout={(event) => setFrame(event.nativeEvent.layout)} />
               <Text size="sm" style={$hint} text={statusText(status)} />
             </View>
           </View>
@@ -317,7 +363,7 @@ export function CardScanner({
                   accessibilityLabel={translate("decks:cardRow.decrease", {
                     card: landCount.card.name,
                   })}
-                  disabled={landCount.count <= 1}
+                  disabled={landCount.count <= landCount.inDeck}
                   onPress={() => setLandCount({ ...landCount, count: landCount.count - 1 })}
                 />
                 <Text weight="medium" testID="card-scan-land-count" text={`${landCount.count}`} />
@@ -330,7 +376,9 @@ export function CardScanner({
                 />
                 <Button
                   testID="card-scan-add-lands"
-                  tx="decks:cardScan.addLands"
+                  tx={
+                    landCount.count > landCount.inDeck ? "decks:cardScan.addLands" : "common:close"
+                  }
                   onPress={() => addLands(landCount)}
                 />
               </>
@@ -345,15 +393,7 @@ export function CardScanner({
                 />
                 <View style={$addedName}>
                   <Text weight="medium" numberOfLines={2} text={cardLabel(last)} />
-                  <Text
-                    size="xs"
-                    style={{ color: theme.colors.textDim }}
-                    text={
-                      typeof last.state === "object"
-                        ? last.state.error
-                        : translate("decks:cardScan.addedCount", { count: added.length })
-                    }
-                  />
+                  <Text size="xs" style={{ color: theme.colors.textDim }} text={addedSummary} />
                 </View>
                 {removeCard ? (
                   <Button

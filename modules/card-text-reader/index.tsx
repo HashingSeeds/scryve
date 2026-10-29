@@ -11,10 +11,18 @@ export type CardTextLine = {
   confidence: number
 }
 
-export type CardPhotoText = { width: number; height: number; lines: CardTextLine[] }
+type Point = { x: number; y: number }
+
+export type CardPhotoText = {
+  width: number
+  height: number
+  lines: CardTextLine[]
+  cardCorners?: Point[]
+}
 
 type CardTextCameraProps = ViewProps & {
   active: boolean
+  guide?: Point & { width: number; height: number }
   onText: (event: { nativeEvent: CardPhotoText }) => void
 }
 
