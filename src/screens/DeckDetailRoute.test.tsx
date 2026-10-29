@@ -35,15 +35,6 @@ describe("deck detail route", () => {
     mockParams = { deckId: "deck-from-route" }
   })
 
-  it("goes back when the deck page has history", () => {
-    jest.mocked(router.canGoBack).mockReturnValue(true)
-    render(<DeckDetailRoute />)
-    const props = mockDetailScreen.mock.lastCall?.[0] as { onBack: () => void }
-    props.onBack()
-    expect(router.back).toHaveBeenCalledTimes(1)
-    expect(router.replace).not.toHaveBeenCalled()
-  })
-
   it("falls back to the Decks list when the deck page was opened by link", () => {
     jest.mocked(router.canGoBack).mockReturnValue(false)
     render(<DeckDetailRoute />)

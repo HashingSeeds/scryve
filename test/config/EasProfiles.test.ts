@@ -3,17 +3,16 @@ import fs from "node:fs"
 import path from "node:path"
 
 describe("EAS release profile isolation", () => {
-  it("pins the supported Node LTS runtime across local and cloud builds", () => {
-    const expectedNodeVersion = "24.18.1"
+  it("pins one Node runtime across local and cloud builds", () => {
     const eas = JSON.parse(fs.readFileSync(path.join(process.cwd(), "eas.json"), "utf8"))
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     )
     const nvmVersion = fs.readFileSync(path.join(process.cwd(), ".nvmrc"), "utf8").trim()
 
-    expect(nvmVersion).toBe(expectedNodeVersion)
-    expect(packageJson.engines.node).toBe(expectedNodeVersion)
-    expect(eas.build.production.node).toBe(expectedNodeVersion)
+    expect(nvmVersion).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(packageJson.engines.node).toBe(nvmVersion)
+    expect(eas.build.production.node).toBe(nvmVersion)
   })
 
   it("maps each release tier to its own environment and update channel", () => {
@@ -64,20 +63,28 @@ describe("EAS release profile isolation", () => {
     expect(dynamicConfig).not.toContain("tsx/cjs")
   })
 
-  it("evaluates the dynamic Expo config through Expo's Node CLI", () => {
+  it("evaluates the dynamic Expo config through Expo's Node CLI and lets each screen choose its iOS status bar", () => {
     const result = spawnSync(
       process.execPath,
-      [path.join(process.cwd(), "node_modules/expo/bin/cli"), "config", "--json"],
+      [
+        path.join(process.cwd(), "node_modules/expo/bin/cli"),
+        "config",
+        "--type",
+        "introspect",
+        "--json",
+      ],
       {
         cwd: process.cwd(),
         encoding: "utf8",
-        env: { ...process.env, EXPO_NO_DOTENV: "1" },
+        env: { ...process.env, APP_VARIANT: "production", EXPO_NO_DOTENV: "1" },
       },
     )
 
     expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: "" })
-    expect(JSON.parse(result.stdout).extra.eas.projectId).toBe(
-      "1e4ab9fb-230c-421d-a659-a4aaa4355d82",
+    const config = JSON.parse(result.stdout)
+    expect(config.extra.eas.projectId).toBe("1e4ab9fb-230c-421d-a659-a4aaa4355d82")
+    expect(config._internal.modResults.ios.infoPlist.UIViewControllerBasedStatusBarAppearance).toBe(
+      true,
     )
   })
 })

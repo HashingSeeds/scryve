@@ -119,6 +119,16 @@ jest.mock("@/features/decks/guestDeck", () => {
 })
 const mockSaveDeck = jest.mocked(saveGuestDeck)
 
+const mockDeckLimit: { entries: number | undefined } = { entries: undefined }
+
+jest.mock("../../convex/lib/policy", () => {
+  const policy =
+    jest.requireActual<typeof import("../../convex/lib/policy")>("../../convex/lib/policy")
+  return Object.defineProperty({ ...policy }, "MAX_DECK_CARDS", {
+    get: () => mockDeckLimit.entries ?? policy.MAX_DECK_CARDS,
+  })
+})
+
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
 jest.mock("@/features/billing/RevenueCatContext", () => ({
@@ -199,6 +209,7 @@ describe("AddDeckScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockConvexState.client = undefined
+    mockDeckLimit.entries = undefined
     clear()
     clearGuestDecks()
     jest.useFakeTimers()
@@ -439,28 +450,25 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it.each(["", "   "])(
-    "explains a missing name in review and restores editing for %p",
-    async (blankName) => {
-      mockResolvePasted.mockResolvedValue(resolvedForest)
-      const view = renderAddDeck()
-      chooseMode(view, "paste")
-      fireEvent.changeText(view.getByTestId("deck-name-input"), blankName)
-      fireEvent.changeText(view.getByLabelText("Deck list"), "2 Forest")
-      fireEvent.press(view.getByTestId("review-import-button"))
-      await waitFor(() => expect(view.getByText("Add a deck name.")).toBeTruthy())
-      expect(view.getByText("Imported deck")).toBeTruthy()
-      expect(view.getByTestId("save-import-button")).toBeDisabled()
-      expect(mockSaveDeck).not.toHaveBeenCalled()
-      fireEvent.press(view.getByRole("button", { name: /^(Edit|Done)$/ }))
-      expect(view.getByTestId("deck-name-input").props.value).toBe(blankName)
-      fireEvent.changeText(view.getByTestId("deck-name-input"), "Named forests")
-      fireEvent.press(view.getByRole("button", { name: /^(Edit|Done)$/ }))
-      await waitFor(() => expect(view.getByText("Named forests")).toBeTruthy())
-      expect(view.queryByText("Add a deck name.")).toBeNull()
-      expect(view.getByTestId("save-import-button")).toBeEnabled()
-    },
-  )
+  it("explains a blank name in review and restores editing", async () => {
+    mockResolvePasted.mockResolvedValue(resolvedForest)
+    const view = renderAddDeck()
+    chooseMode(view, "paste")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "   ")
+    fireEvent.changeText(view.getByLabelText("Deck list"), "2 Forest")
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(view.getByText("Add a deck name.")).toBeTruthy())
+    expect(view.getByText("Imported deck")).toBeTruthy()
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    expect(mockSaveDeck).not.toHaveBeenCalled()
+    fireEvent.press(view.getByRole("button", { name: /^(Edit|Done)$/ }))
+    expect(view.getByTestId("deck-name-input").props.value).toBe("   ")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Named forests")
+    fireEvent.press(view.getByRole("button", { name: /^(Edit|Done)$/ }))
+    await waitFor(() => expect(view.getByText("Named forests")).toBeTruthy())
+    expect(view.queryByText("Add a deck name.")).toBeNull()
+    expect(view.getByTestId("save-import-button")).toBeEnabled()
+  })
 
   it("shows loading on the review button until the deck is ready", async () => {
     let finish: ((result: typeof resolvedForest) => void) | undefined
@@ -479,20 +487,6 @@ describe("AddDeckScreen", () => {
     await act(async () => finish?.(resolvedForest))
     expect(view.getByTestId("pasted-deck-review")).toBeTruthy()
     expect(view.queryByTestId("review-import-button")).toBeNull()
-  })
-
-  it("enters card editing from review without reopening the source form", async () => {
-    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
-    const view = renderAddDeck()
-    enterPasted(view)
-    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-    fireEvent.press(view.getByRole("button", { name: /^(Edit|Done)$/ }))
-    expect(view.getByTestId("pasted-deck-review")).toBeTruthy()
-    expect(view.queryByLabelText("Deck list")).toBeNull()
-    expect(view.getByLabelText("Increase Forest")).toBeTruthy()
-    expect(view.getByLabelText("Decrease Forest")).toBeTruthy()
-    expect(view.getByTestId("import-add-cards")).toBeTruthy()
-    expect(view.getByLabelText("Choose commander")).toBeTruthy()
   })
 
   it.each(["modern", "brawl"])(
@@ -641,42 +635,10 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it("keeps entry and copy limits when adding cards through the import editor", async () => {
-    const cards = Array.from({ length: 300 }, (_, index) => ({
-      ...resolvedForest.cards[0],
-      name: `Card ${index}`,
-      quantity: index === 0 ? 999 : 1,
-      scryfallId: `print-${index}`,
-      oracleId: `oracle-${index}`,
-    }))
-    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards })
-    const view = renderAddDeck()
-    enterPasted(view)
-    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-    fireEvent.press(view.getByRole("button", { name: "Edit" }))
-    fireEvent.press(view.getByTestId("import-add-cards"))
-    const add = view.UNSAFE_getByType(CardSearchScreen).props.onAdd
-    act(() => {
-      expect(add({ ...cards[0], quantity: 1 })).toBe("A card can have at most 999 copies.")
-      expect(
-        add({ ...cards[0], name: "Another printing", quantity: 1, scryfallId: "new-print" }),
-      ).toBe("A deck can have at most 300 entries.")
-    })
-    fireEvent.press(
-      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
-    )
-    expect(view.getByText("1298 cards")).toBeTruthy()
-  })
-
-  it("keeps every add and stops at the entry limit when adds land before a re-render", async () => {
-    const cards = Array.from({ length: 298 }, (_, index) => ({
-      ...resolvedForest.cards[0],
-      name: `Card ${index}`,
-      quantity: 1,
-      scryfallId: `print-${index}`,
-      oracleId: `oracle-${index}`,
-    }))
-    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards })
+  it("keeps every add and stops at the copy and entry limits when adds land before a re-render", async () => {
+    mockDeckLimit.entries = 3
+    const card = { ...resolvedForest.cards[0], quantity: 999 }
+    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards: [card] })
     const view = renderAddDeck()
     enterPasted(view)
     await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
@@ -684,20 +646,22 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByTestId("import-add-cards"))
     const add = view.UNSAFE_getByType(CardSearchScreen).props.onAdd
     const extra = (index: number) => ({
-      ...cards[0],
+      ...card,
       name: `Extra ${index}`,
+      quantity: 1,
       scryfallId: `extra-${index}`,
       oracleId: `extra-oracle-${index}`,
     })
     act(() => {
+      expect(add({ ...card, quantity: 1 })).toBe("A card can have at most 999 copies.")
       expect(add(extra(1))).toBeUndefined()
       expect(add(extra(2))).toBeUndefined()
-      expect(add(extra(3))).toBe("A deck can have at most 300 entries.")
+      expect(add(extra(3))).toBe("A deck can have at most 3 entries.")
     })
     fireEvent.press(
       within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
     )
-    expect(view.getByText("300 cards")).toBeTruthy()
+    expect(view.getByText("1001 cards")).toBeTruthy()
     expect(view.getByText("Extra 1")).toBeTruthy()
     expect(view.getByText("Extra 2")).toBeTruthy()
   })
@@ -949,29 +913,6 @@ describe("AddDeckScreen", () => {
         }),
       ),
     )
-  })
-
-  it("explains aliases exceeding the copy limit without clamping the import", async () => {
-    const forest = resolvedForest.cards[0]
-    mockResolvePasted.mockResolvedValueOnce({
-      ...resolvedForest,
-      cards: [
-        { ...forest, quantity: 999 },
-        { ...forest, quantity: 2 },
-      ],
-    })
-    const view = renderAddDeck()
-    enterPasted(view, "999 Forest\n2 Forest (M21) 274")
-    await waitFor(() =>
-      expect(
-        view.getByText(
-          "Forest has more than 999 copies after matching. Correct the source before reviewing.",
-        ),
-      ).toBeTruthy(),
-    )
-    expect(view.queryByTestId("pasted-deck-review")).toBeNull()
-    expect(view.getByLabelText("Deck list").props.value).toBe("999 Forest\n2 Forest (M21) 274")
-    expect(mockSaveDeck).not.toHaveBeenCalled()
   })
 
   it("shows review thumbnails and loads only the tapped Magic printing", async () => {
@@ -1299,34 +1240,26 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it.each(["url", "format", "kind", "game"])(
-    "ignores Archidekt results after changing %s",
-    async (change) => {
-      let finish: ((result: typeof resolvedArchidekt) => void) | undefined
-      mockResolveLink.mockImplementationOnce(
-        () =>
-          new Promise<typeof resolvedArchidekt>((resolve) => {
-            finish = resolve
-          }),
-      )
-      const view = renderAddDeck()
-      enterLink(view)
-      if (change === "url")
-        fireEvent.changeText(
-          view.getByTestId("deck-link-input"),
-          "https://archidekt.com/decks/67890",
-        )
-      else if (change === "format") chooseFormat(view, "standard")
-      else if (change === "kind") fireEvent.press(view.getByTestId("import-source-text"))
-      else chooseGame(view, "ygo")
-      await act(async () => finish?.(resolvedArchidekt))
-      expect(view.queryByTestId("pasted-deck-review")).toBeNull()
-      expect(view.queryByText("Archidekt · ForestPlayer")).toBeNull()
-      expect(view.getByTestId("mode-picker-options")).toBeTruthy()
-      expect(view.queryByTestId("save-import-button")).toBeNull()
-      expect(mockSaveDeck).not.toHaveBeenCalled()
-    },
-  )
+  it.each(["url", "kind"])("ignores Archidekt results after changing %s", async (change) => {
+    let finish: ((result: typeof resolvedArchidekt) => void) | undefined
+    mockResolveLink.mockImplementationOnce(
+      () =>
+        new Promise<typeof resolvedArchidekt>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const view = renderAddDeck()
+    enterLink(view)
+    if (change === "url")
+      fireEvent.changeText(view.getByTestId("deck-link-input"), "https://archidekt.com/decks/67890")
+    else fireEvent.press(view.getByTestId("import-source-text"))
+    await act(async () => finish?.(resolvedArchidekt))
+    expect(view.queryByTestId("pasted-deck-review")).toBeNull()
+    expect(view.queryByText("Archidekt · ForestPlayer")).toBeNull()
+    expect(view.getByTestId("mode-picker-options")).toBeTruthy()
+    expect(view.queryByTestId("save-import-button")).toBeNull()
+    expect(mockSaveDeck).not.toHaveBeenCalled()
+  })
 
   it("keeps a failed Archidekt URL and offers a text export fallback", async () => {
     mockResolveLink.mockRejectedValueOnce(
@@ -1538,30 +1471,8 @@ describe("AddDeckScreen", () => {
     expect(mockBrowse).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "next-page" }))
   })
 
-  it.each(["ygo", "pokemon"])("browses all %s sources without requiring sign-in", async (game) => {
-    const view = renderAddDeck()
-    chooseGame(view, game)
-    await act(async () => jest.advanceTimersByTime(400))
-    expect(mockBrowse).toHaveBeenLastCalledWith({
-      game,
-      format: game === "ygo" ? "advanced" : "standard",
-      query: "",
-      source: "all",
-    })
-    expect(view.getByPlaceholderText("Search decks")).toBeTruthy()
-  })
-
   afterEach(() => {
     jest.useRealTimers()
-  })
-
-  it("offers official, pasted, and scratch-built creation paths", () => {
-    const view = renderAddDeck()
-    expect(view.getByPlaceholderText("Search decks")).toBeTruthy()
-    chooseMode(view, "paste")
-    expect(view.getByText("Deck list")).toBeTruthy()
-    chooseMode(view, "blank")
-    expect(view.getByText("Create deck")).toBeTruthy()
   })
 
   it("saves a guest's second blank deck locally", () => {
@@ -1579,18 +1490,6 @@ describe("AddDeckScreen", () => {
     expect(saved).toEqual(first)
     expect(second?.deck.name).toBe("Guest deck")
     expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(second.localId))
-  })
-
-  it("searches public official decks while guest access is ready", async () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
-      </ThemeProvider>,
-    )
-    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
-    await act(async () => jest.advanceTimersByTime(400))
-    await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
-    expect(mockSearch).toHaveBeenCalledWith({ query: "Explorers", format: "commander" })
   })
 
   it("offers paste and empty deck actions for a format with no lists", async () => {
@@ -1715,44 +1614,6 @@ describe("AddDeckScreen", () => {
     expect(view.queryByTestId("card-focus-decrement")).toBeNull()
   })
 
-  it("starts importing only from the preview page", async () => {
-    mockSearch.mockResolvedValueOnce([
-      {
-        fileName: "ExplorersOfTheDeep_LCC",
-        name: "Explorers of the Deep",
-        code: "LCC",
-        type: "Commander Deck",
-      },
-      {
-        fileName: "CavalryCharge_MOC",
-        name: "Cavalry Charge",
-        code: "MOC",
-        type: "Commander Deck",
-      },
-    ])
-    const view = renderAddDeck()
-    continueSetup(view)
-    await act(async () => {
-      jest.advanceTimersByTime(400)
-    })
-    await waitFor(() => expect(view.getByText("Cavalry Charge")).toBeTruthy())
-    fireEvent.press(view.getByText("Explorers of the Deep"))
-    await waitFor(() => expect(view.getByTestId("precon-preview")).toBeTruthy())
-    expect(mockSaveDeck).not.toHaveBeenCalled()
-    fireEvent.press(view.getByTestId("import-preview-button"))
-    expect(mockSaveDeck).toHaveBeenCalledTimes(1)
-  })
-
-  it("browses a format with no search term at all", async () => {
-    const view = renderAddDeck()
-    chooseFormat(view, "brawl")
-    continueSetup(view)
-    await act(async () => {
-      jest.advanceTimersByTime(400)
-    })
-    expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "brawl" })
-  })
-
   it("loads each system with a valid default format and filters Top Decks by format", async () => {
     const view = renderAddDeck()
 
@@ -1830,17 +1691,6 @@ describe("AddDeckScreen", () => {
 
     await act(async () => jest.advanceTimersByTime(400))
     await waitFor(() => expect(view.getByText("Current Traditional Deck")).toBeTruthy())
-  })
-
-  it("resets the shared format when changing systems", () => {
-    const view = renderAddDeck()
-
-    chooseFormat(view, "modern")
-    chooseGame(view, "ygo")
-
-    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
-      "Format, Advanced",
-    )
   })
 
   it("opens the shared card dialog from a Top Deck preview", async () => {

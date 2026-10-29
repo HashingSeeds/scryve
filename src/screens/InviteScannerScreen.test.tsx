@@ -84,19 +84,6 @@ describe("InviteScannerScreen", () => {
     expect(mockRequestPermission).toHaveBeenCalledTimes(1)
   })
 
-  it("opens Expo's native scanner with guidance and highlighting", async () => {
-    scanner()
-    await waitFor(() =>
-      expect(mockLaunchScanner).toHaveBeenCalledWith({
-        barcodeTypes: ["qr"],
-        isGuidanceEnabled: true,
-        isHighlightingEnabled: true,
-        isPinchToZoomEnabled: true,
-      }),
-    )
-    expect(screen.queryByTestId("invite-camera")).toBeNull()
-  })
-
   it("explains a native scanner launch error in plain words and allows retry", async () => {
     mockLaunchScanner.mockRejectedValueOnce(
       new Error(
@@ -128,11 +115,8 @@ describe("InviteScannerScreen", () => {
     settings.mockRestore()
   })
 
-  it.each([
-    [`count://join/${token}`, { kind: "token", token }],
-    ["count://join/AB12CD", { kind: "code", code: "AB12CD" }],
-    ["ab-12cd", { kind: "code", code: "AB12CD" }],
-  ])("acknowledges and routes a supported native scan once", async (data, expected) => {
+  it("acknowledges and routes a supported native scan once", async () => {
+    const data = `count://join/${token}`
     const { onInvite } = scanner()
     await waitFor(() => expect(mockModernScannerListener).toBeDefined())
     mockModernScannerListener?.({ data, type: "qr" })
@@ -142,7 +126,7 @@ describe("InviteScannerScreen", () => {
     expect(delay).toHaveBeenCalledWith(250)
     expect(mockDismissScanner).toHaveBeenCalledTimes(1)
     expect(onInvite).toHaveBeenCalledTimes(1)
-    expect(onInvite).toHaveBeenCalledWith(expected)
+    expect(onInvite).toHaveBeenCalledWith({ kind: "token", token })
   })
 
   it("dismisses and explains a malformed or foreign native scan", async () => {

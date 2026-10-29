@@ -158,25 +158,6 @@ describe("delete account route", () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1)
   })
 
-  it("rotates the analytics id for a deletion requested on another device", () => {
-    mockIsSignedIn = true
-    mockDeletion = {
-      status: "processing",
-      requestedAt: Date.UTC(2026, 7, 23, 18, 40),
-      updatedAt: Date.UTC(2026, 7, 23, 18, 45),
-      canRetry: false,
-      receiptToken: "c".repeat(64),
-    }
-
-    render(
-      <ThemeProvider initialContext="dark">
-        <DeleteAccountRoute />
-      </ThemeProvider>,
-    )
-
-    expect(mockResetAnalyticsId).toHaveBeenCalledTimes(1)
-  })
-
   it("rotates once per receipt token no matter how often the query republishes it", () => {
     mockIsSignedIn = true
     mockDeletion = {

@@ -244,6 +244,8 @@ test("supports removing the last copy, Undo, and cancelling an edit", () => {
   fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
   expect(view.getByText("2×")).toBeTruthy()
   expect(view.onBack).not.toHaveBeenCalled()
+  view.unmount()
+  expect(renderScreen().getByText("2×")).toBeTruthy()
 })
 
 test("keeps an unsaved edit after leaving and saves it from the reopened deck", () => {
@@ -262,43 +264,38 @@ test("keeps an unsaved edit after leaving and saves it from the reopened deck", 
   expect(renderScreen().queryByText("Cancel")).toBeNull()
 })
 
-test("forgets a kept edit once it is discarded", () => {
-  const first = renderScreen()
-  fireEvent.press(first.getByTestId("edit-deck-button"))
-  fireEvent.press(first.getByLabelText("Decrease Sol Ring"))
-  fireEvent(first.UNSAFE_getByType(Header), "leftPress")
-  fireEvent.press(first.getByTestId("guest-deck-discard-confirm"))
-  first.unmount()
-  expect(renderScreen().getByText("2×")).toBeTruthy()
-})
-
 test("searches new cards into Main deck by default and saves merged copies", async () => {
-  mockSearchCards.mockResolvedValue([
-    {
-      name: "Island",
-      scryfallId: "island",
-      oracleId: "island-oracle",
-      imageUrl: "https://cards.example/island.jpg",
-      manaCost: "",
-    },
-  ])
-  const view = renderScreen()
-  fireEvent.press(view.getByTestId("deck-add-cards"))
-  fireEvent.changeText(view.getByTestId("card-search-input"), "Island")
-  await waitFor(() => expect(view.getByLabelText("Add Island to deck")).toBeTruthy())
-  fireEvent.press(view.getByLabelText("Add Island to deck"))
-  fireEvent.press(view.getByLabelText("Add Island to deck"))
-  fireEvent.press(view.getByText("Done"))
-  fireEvent.press(view.getByTestId("save-version-button"))
-  expect(mockSaveGuestDeck).toHaveBeenCalledWith(
-    expect.objectContaining({
-      cards: expect.arrayContaining([
-        expect.objectContaining({ name: "Island", quantity: 2, section: "main" }),
-      ]),
-    }),
-    expect.anything(),
-  )
-  expect(mockSaveGuestDeck.mock.calls[0][0].cards[1]).not.toHaveProperty("manaCost")
+  jest.useFakeTimers()
+  try {
+    mockSearchCards.mockResolvedValue([
+      {
+        name: "Island",
+        scryfallId: "island",
+        oracleId: "island-oracle",
+        imageUrl: "https://cards.example/island.jpg",
+        manaCost: "",
+      },
+    ])
+    const view = renderScreen()
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Island")
+    await waitFor(() => expect(view.getByLabelText("Add Island to deck")).toBeTruthy())
+    fireEvent.press(view.getByLabelText("Add Island to deck"))
+    fireEvent.press(view.getByLabelText("Add Island to deck"))
+    fireEvent.press(view.getByText("Done"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockSaveGuestDeck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cards: expect.arrayContaining([
+          expect.objectContaining({ name: "Island", quantity: 2, section: "main" }),
+        ]),
+      }),
+      expect.anything(),
+    )
+    expect(mockSaveGuestDeck.mock.calls[0][0].cards[1]).not.toHaveProperty("manaCost")
+  } finally {
+    jest.useRealTimers()
+  }
 })
 
 test("keeps every card the scanner adds through an onAdd from an earlier render", () => {

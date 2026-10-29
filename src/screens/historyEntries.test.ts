@@ -58,6 +58,15 @@ describe("localHistoryEntry", () => {
       localHistoryEntry(game({ account: { ownerId: "owner" }, result: { kind: "draw" } })).outcome,
     ).toBe("unrecorded")
   })
+
+  it("keeps a no-system local game on generic starting-life copy", () => {
+    const entry = localHistoryEntry(
+      game({ system: undefined, format: "standard", startingLife: 20 }),
+    )
+
+    expect(entry.system).toBeUndefined()
+    expect(entry.format).toBe("20 life")
+  })
 })
 
 describe("connectedHistoryEntry", () => {
@@ -74,6 +83,27 @@ describe("connectedHistoryEntry", () => {
     expect(
       connectedHistoryEntry({ publicId: "c1", eventCount: 1, finishedAt: 2, players: [] }).key,
     ).toBe("connected:c1")
+  })
+
+  const connected = { publicId: "c1", eventCount: 1, finishedAt: 2, players: [] }
+
+  it("falls back to ruleset when connected format is empty", () => {
+    expect(connectedHistoryEntry({ ...connected, format: "", ruleset: "commander" }).format).toBe(
+      "Commander",
+    )
+  })
+
+  it("does not turn a no-system connected game into a Magic format", () => {
+    const entry = connectedHistoryEntry({
+      ...connected,
+      system: "none",
+      format: "none",
+      ruleset: "none",
+      startingLife: 20,
+    })
+
+    expect(entry.system).toBeUndefined()
+    expect(entry.format).toBe("20 life")
   })
 })
 

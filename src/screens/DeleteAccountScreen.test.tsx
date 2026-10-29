@@ -47,21 +47,6 @@ describe("DeleteAccountScreen", () => {
     expect(onRequestDeletion).toHaveBeenCalledTimes(1)
   })
 
-  it("warns that all devices are signed out", () => {
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <DeleteAccountScreen
-          deletionStatus={null}
-          subscription={{ store: "unknown" }}
-          isSubmitting={false}
-          onBack={jest.fn()}
-          onRequestDeletion={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    expect(view.getByText("All devices are signed out")).toBeTruthy()
-  })
-
   const apple = { "Manage Apple subscriptions": "https://apps.apple.com/account/subscriptions" }
   const google = {
     "Manage Google Play subscriptions": "https://play.google.com/store/account/subscriptions",

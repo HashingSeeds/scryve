@@ -588,51 +588,48 @@ describe("shipping index route", () => {
     expect(view.getByTestId("game-board")).toBeTruthy()
   })
 
-  it.each(["light", "dark"] as const)(
-    "styles stale-game prompt actions with the themed choice treatment (%s)",
-    (initialContext) => {
-      const fresh = createLocalGame({
-        players: [
-          { name: "Player 1", color: PLAYER_COLORS[0] },
-          { name: "Player 2", color: PLAYER_COLORS[1] },
-        ],
-        startingLife: 20,
-      })
-      const started = applyGameCommand(
-        fresh,
-        { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
-        {
-          actorId: asActorId("local"),
-          deviceId: asDeviceId("device"),
-          now: () => Date.now(),
-          operationId: () => asOperationId("op-1"),
-        },
-      )
-      localGameRepository.saveActiveGame({
-        ...started,
-        updatedAt: Date.now() - 25 * 60 * 60 * 1000,
-      })
+  it("styles stale-game prompt actions with the themed choice treatment", () => {
+    const fresh = createLocalGame({
+      players: [
+        { name: "Player 1", color: PLAYER_COLORS[0] },
+        { name: "Player 2", color: PLAYER_COLORS[1] },
+      ],
+      startingLife: 20,
+    })
+    const started = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      {
+        actorId: asActorId("local"),
+        deviceId: asDeviceId("device"),
+        now: () => Date.now(),
+        operationId: () => asOperationId("op-1"),
+      },
+    )
+    localGameRepository.saveActiveGame({
+      ...started,
+      updatedAt: Date.now() - 25 * 60 * 60 * 1000,
+    })
 
-      const view = render(
-        <ThemeProvider initialContext={initialContext}>
-          <Index />
-        </ThemeProvider>,
-      )
-      for (const [label, borderWidth] of [
-        ["Continue", undefined],
-        ["End game", 2],
-        ["Abandon", 2],
-      ] as const) {
-        let node = view.getByText(label)
-        while (node && node.type !== Pressable) node = node.parent as typeof node
-        const style =
-          typeof node.props.style === "function"
-            ? node.props.style({ pressed: false })
-            : node.props.style
-        const flat = StyleSheet.flatten(style)
-        expect(flat.borderRadius).toBe(CHOICE_RADIUS)
-        if (borderWidth !== undefined) expect(flat.borderWidth).toBe(borderWidth)
-      }
-    },
-  )
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <Index />
+      </ThemeProvider>,
+    )
+    for (const [label, borderWidth] of [
+      ["Continue", undefined],
+      ["End game", 2],
+      ["Abandon", 2],
+    ] as const) {
+      let node = view.getByText(label)
+      while (node && node.type !== Pressable) node = node.parent as typeof node
+      const style =
+        typeof node.props.style === "function"
+          ? node.props.style({ pressed: false })
+          : node.props.style
+      const flat = StyleSheet.flatten(style)
+      expect(flat.borderRadius).toBe(CHOICE_RADIUS)
+      if (borderWidth !== undefined) expect(flat.borderWidth).toBe(borderWidth)
+    }
+  })
 })

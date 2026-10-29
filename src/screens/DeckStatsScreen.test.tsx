@@ -129,28 +129,6 @@ it("shows one record with games and manual results together, and filters paginat
   )
 })
 
-it("calls a list Current only when it is the deck's current list, and says what changed", () => {
-  const view = render(screen())
-  expect(view.queryByText("Current")).toBeNull()
-  mockListCards = {
-    currentFingerprint: "previous",
-    cards: new Map([
-      ["current", [{ name: "Forest", quantity: 2 }]],
-      [
-        "previous",
-        [
-          { name: "Forest", quantity: 1 },
-          { name: "Plains", quantity: 1 },
-        ],
-      ],
-    ]),
-  }
-  view.rerender(screen())
-  expect(within(view.getByTestId("stats-list-previous")).getByText("Current")).toBeTruthy()
-  expect(within(view.getByTestId("stats-list-current")).queryByText("Current")).toBeNull()
-  expect(view.getByText("+1 Forest, −1 Plains")).toBeTruthy()
-})
-
 it("explains small samples once and dims their rows instead of repeating too few", () => {
   const view = render(screen())
   expect(view.queryByText("too few")).toBeNull()
@@ -278,18 +256,23 @@ it("offers retry when stats fail", () => {
   error.mockRestore()
 })
 
-it.each([true, false, null])("shows honest turn order rates and filters %s", (wentFirst) => {
+it("shows honest turn order rates and filters games by each", () => {
   const view = render(screen())
   expect(view.getByText("Turn order")).toBeTruthy()
   expect(within(view.getByTestId("stats-turn-order-true")).getByText("4-4")).toBeTruthy()
   expect(within(view.getByTestId("stats-turn-order-false")).getByText("67%")).toBeTruthy()
   expect(view.getByText("Turn order not tracked")).toBeTruthy()
-  fireEvent.press(view.getByTestId(`stats-turn-order-${wentFirst}`))
-  expect(mockPagination).toHaveBeenLastCalledWith(
-    "games",
-    { deckKey: "key", wentFirst },
-    { initialNumItems: 20 },
-  )
+  view.unmount()
+  for (const wentFirst of [true, false, null]) {
+    const filtered = render(screen())
+    fireEvent.press(filtered.getByTestId(`stats-turn-order-${wentFirst}`))
+    expect(mockPagination).toHaveBeenLastCalledWith(
+      "games",
+      { deckKey: "key", wentFirst },
+      { initialNumItems: 20 },
+    )
+    filtered.unmount()
+  }
 })
 
 it("leaves out turn order rows with no games", () => {

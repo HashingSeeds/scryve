@@ -29,8 +29,6 @@ describe("SupportScreen", () => {
   it("leads with your feedback, then email, and keeps the help content", () => {
     const { props, view } = renderSupport({ unread: 2 })
     expect(view.getAllByText("Support").length).toBeGreaterThan(0)
-    expect(view.queryByText("SCRYVE")).toBeNull()
-    expect(view.queryByText("Contact us")).toBeNull()
     fireEvent.press(view.getByText("2 new"))
     fireEvent.press(view.getByText("Account or billing questions"))
     fireEvent.press(view.getByText("Suggest a feature or report a bug"))

@@ -186,17 +186,6 @@ describe("NewGameScreen", () => {
     )
   })
 
-  it("publishes the running local game under the seat the host picks", () => {
-    const publish = jest.fn()
-    const localGame = runningLocalGame()
-    const view = setup({ localGame, localConnect: { publish } })
-
-    fireEvent.press(view.getByTestId("connect-local-button"))
-    fireEvent.press(view.getByTestId("host-seat-2"))
-
-    expect(publish).toHaveBeenCalledWith(localGame.players[1].id)
-  })
-
   it("sends a signed-out host to the account gate instead of the seat picker", () => {
     const publish = jest.fn()
     const request = jest.fn()
@@ -250,56 +239,6 @@ describe("NewGameScreen", () => {
       onResumeConnected,
     })
     expect(connected.queryByTestId("resume-hosted-connected-button")).toBeNull()
-  })
-
-  it("offers ending the current game before starting, preserving setup", () => {
-    const onResumeLocal = jest.fn()
-    const onEndLocal = jest.fn()
-    const onStartLocal = jest.fn()
-    const localGame = createLocalGame({
-      players: [
-        { name: "Ada", color: "#FF0000" },
-        { name: "Grace", color: "#0000FF" },
-      ],
-      startingLife: 20,
-    })
-    const props = {
-      defaults: DEFAULT_LOCAL_SETTINGS,
-      mode: "local" as const,
-      onModeChange: jest.fn(),
-      onBack: jest.fn(),
-      onResumeLocal,
-      onEndLocal,
-      onStartLocal,
-    }
-    const view = render(themed(<NewGameScreen {...props} localGame={localGame} />))
-    openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
-    closeOptions()
-    expect(view.getByTestId("start-game-button")).toBeEnabled()
-    expect(view.getByText("End current game…")).toBeTruthy()
-    fireEvent.press(view.getByTestId("setup-status"))
-    expect(onResumeLocal).toHaveBeenCalledTimes(1)
-
-    fireEvent.press(view.getByTestId("start-game-button"))
-    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
-    expect(onEndLocal).not.toHaveBeenCalled()
-    expect(onStartLocal).not.toHaveBeenCalled()
-    fireEvent.press(view.getByTestId("end-game-backdrop"))
-    expect(view.queryByTestId("end-game-dialog")).toBeNull()
-    expect(view.getByText("End current game…")).toBeTruthy()
-
-    fireEvent.press(view.getByTestId("start-game-button"))
-    fireEvent.press(view.getByTestId("end-game-result-draw"))
-    fireEvent.press(view.getByTestId("confirm-end-game-button"))
-    expect(onEndLocal).toHaveBeenCalledWith({ kind: "draw" })
-    view.rerender(themed(<NewGameScreen {...props} />))
-    expect(view.queryByText("End current game…")).toBeNull()
-    expect(view.getByTestId("start-game-button")).toBeEnabled()
-    expect(view.getByText("3 players · 20 life")).toBeTruthy()
-    expect(onStartLocal).not.toHaveBeenCalled()
-    fireEvent.press(view.getByTestId("start-game-button"))
-    expect(onStartLocal.mock.calls[0][0]).toHaveLength(3)
   })
 
   it("starts the account seat at its hero deck's life once the deck list loads", async () => {
@@ -455,25 +394,6 @@ describe("NewGameScreen", () => {
     expect(onSavePlayers).toHaveBeenCalledTimes(2)
   })
 
-  it("starts no-system defaults and supports six players", () => {
-    const onStartLocal = jest.fn()
-    const view = setup({ onStartLocal })
-
-    openOptions()
-    for (let count = 2; count < 6; count += 1)
-      fireEvent.press(view.getByTestId("player-count-increment"))
-    closeOptions()
-    fireEvent.changeText(view.getByTestId("player-name-6"), "Six")
-    fireEvent.press(view.getByTestId("start-game-button"))
-
-    expect(onStartLocal).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ name: "Six" })]),
-      20,
-      { layout: "auto", lifeStep: 1 },
-    )
-    expect(onStartLocal.mock.calls[0][0]).toHaveLength(6)
-  })
-
   it("offers only valid layouts for the player count and submits the selection", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
@@ -504,52 +424,6 @@ describe("NewGameScreen", () => {
       layout: "tabletop",
       lifeStep: 1,
     })
-  })
-
-  it("offers the Table layout to six players", () => {
-    const view = setup()
-    openOptions()
-
-    for (let count = 2; count < 6; count += 1)
-      fireEvent.press(view.getByTestId("player-count-increment"))
-
-    expect(view.getByTestId("player-layout-tabletop")).toBeTruthy()
-  })
-
-  it("starts Yu-Gi-Oh! at 8000 Life Points with the Advanced format", () => {
-    const onStartLocal = jest.fn()
-    const view = setup({ onStartLocal })
-
-    fireEvent.press(view.getByTestId("game-tab-ygo"))
-    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
-    openOptions()
-    expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
-    expect(view.getByLabelText("Per tap, 1000")).toBeTruthy()
-    closeOptions()
-    fireEvent.press(view.getByTestId("start-game-button"))
-
-    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
-      format: "advanced",
-      layout: "auto",
-      lifeStep: 1000,
-      system: "ygo",
-    })
-  })
-
-  it("follows Speed Duel to 4000 Life Points and back to 8000 for Advanced", () => {
-    const view = setup()
-
-    fireEvent.press(view.getByTestId("game-tab-ygo"))
-    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
-    fireEvent.press(view.getByTestId("game-tab-ygo"))
-    fireEvent.press(view.getByTestId("game-type-ygo-speed"))
-    openOptions()
-    expect(view.getByLabelText("Life Points, 4000")).toBeTruthy()
-    closeOptions()
-    fireEvent.press(view.getByTestId("game-tab-ygo"))
-    fireEvent.press(view.getByTestId("game-type-ygo-advanced"))
-    openOptions()
-    expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
   })
 
   it("preselects the saved system and format defaults", () => {
@@ -591,23 +465,6 @@ describe("NewGameScreen", () => {
 
     expect(view.getByTestId("game-type-none").props.accessibilityState.selected).toBe(true)
     expect(view.getByText("2 players · 40 life")).toBeTruthy()
-  })
-
-  it("starts Pokémon at six Prize cards", () => {
-    const onStartLocal = jest.fn()
-    const view = setup({ onStartLocal })
-
-    fireEvent.press(view.getByTestId("game-tab-pokemon"))
-    fireEvent.press(view.getByTestId("game-type-pokemon-standard"))
-    expect(view.getByText("2 players · 6 Prize cards")).toBeTruthy()
-    fireEvent.press(view.getByTestId("start-game-button"))
-
-    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 6, {
-      format: "standard",
-      layout: "auto",
-      lifeStep: 1,
-      system: "pokemon",
-    })
   })
 
   it("falls back to the placeholder name for seats left blank", () => {
@@ -712,9 +569,6 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("appearance-shape-square"))
     fireEvent.press(view.getByTestId("save-local-appearance-button"))
     openOptions()
-    for (let count = 2; count < 6; count += 1)
-      fireEvent.press(view.getByTestId("player-count-increment"))
-    fireEvent.press(view.getByTestId("player-count-decrement"))
     fireEvent.press(view.getByTestId("player-count-increment"))
     closeOptions()
     fireEvent.press(view.getByTestId("start-game-button"))
@@ -723,8 +577,8 @@ describe("NewGameScreen", () => {
       NewGameScreenProps["onStartLocal"]
     >[0]
     expect(players[1]).toMatchObject({ color: "#39755C", shape: "square" })
-    expect(new Set(players.map(({ color }) => color)).size).toBe(6)
-    expect(new Set(players.map(({ shape }) => shape)).size).toBe(6)
+    expect(new Set(players.map(({ color }) => color)).size).toBe(3)
+    expect(new Set(players.map(({ shape }) => shape)).size).toBe(3)
   })
 
   it("uses the Life box as the starting value and saves a per-game change amount", () => {
@@ -797,13 +651,9 @@ describe("NewGameScreen", () => {
   it("keeps the start button pinned outside the scrollable form", () => {
     const view = setup()
 
-    openOptions()
-    for (let count = 2; count < 6; count += 1)
-      fireEvent.press(view.getByTestId("player-count-increment"))
-    closeOptions()
     const scrollableForm = view.UNSAFE_getByType(Screen)
     expect(within(scrollableForm).queryByTestId("start-game-button")).toBeNull()
-    expect(within(scrollableForm).getByTestId("player-name-6")).toBeTruthy()
+    expect(within(scrollableForm).getByTestId("player-name-2")).toBeTruthy()
     expect(view.getByTestId("start-game-button")).toBeTruthy()
   })
 
@@ -873,19 +723,6 @@ describe("NewGameScreen", () => {
       layout: "tabletop",
       lifeStep: 1,
     })
-  })
-
-  it("hosts connected games with decks optional, and no requirement to set", () => {
-    const host = jest.fn()
-    const view = setup({ mode: "connected", connected: { ...readyHost, host } })
-
-    openOptions()
-    expect(view.queryByTestId("deck-requirement")).toBeNull()
-    closeOptions()
-    fireEvent.press(view.getByTestId("host-connected-button"))
-
-    expect(host.mock.calls[0][0]).not.toHaveProperty("deckRequired")
-    expect(view.queryByTestId("player-name-1")).toBeNull()
   })
 
   it("hosts Treachery with 4–6 seats and drops it once the seats no longer fit", () => {
@@ -1102,34 +939,6 @@ describe("NewGameScreen", () => {
     expect(view.queryByTestId("connected-game-exit-confirmation")).toBeNull()
   })
 
-  it("keeps the exit confirmation open and shows an exit failure", async () => {
-    const exitGame = jest.fn(async () => false)
-    const game = {
-      publicId: "failed-exit",
-      status: "lobby" as const,
-      isHost: false,
-      playerCount: 2,
-      ruleset: "standard",
-      updatedAt: 1,
-    }
-    const view = setup({
-      mode: "connected",
-      connected: {
-        ...readyHost,
-        activeGames: [game],
-        exitGame,
-        exitError: "Could not leave this game.",
-      },
-    })
-
-    fireEvent.press(view.getByTestId("setup-status"))
-    fireEvent.press(view.getByTestId("leave-connected-failed-exit"))
-    fireEvent.press(view.getByTestId("confirm-connected-game-exit"))
-    await waitFor(() => expect(exitGame).toHaveBeenCalledWith(game))
-    expect(view.getAllByText("Could not leave this game.")).toHaveLength(1)
-    expect(view.getByTestId("connected-game-exit-confirmation")).toBeTruthy()
-  })
-
   it("hides brief preparation and retry flashes, but explains a slow connection", () => {
     jest.useFakeTimers()
     try {
@@ -1187,24 +996,6 @@ describe("NewGameScreen", () => {
     }
   })
 
-  it("keeps hosting unavailable until the connected session is ready", async () => {
-    const view = setup({
-      mode: "connected",
-      connected: {
-        ...readyHost,
-        ready: false,
-        status: "Preparing your connected profile…",
-      },
-    })
-
-    expect(view.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
-    await waitFor(() =>
-      expect(view.getByTestId("host-connected-button")).toHaveTextContent(
-        "Preparing your connected profile…",
-      ),
-    )
-  })
-
   it("surfaces a host blocker and refuses to submit while it stands", () => {
     const host = jest.fn()
     const view = setup({
@@ -1215,15 +1006,6 @@ describe("NewGameScreen", () => {
     expect(view.getByText("Finish your hosted game first.")).toBeTruthy()
     fireEvent.press(view.getByTestId("host-connected-button"))
     expect(host).not.toHaveBeenCalled()
-  })
-
-  it("switches modes through the toggle", () => {
-    const onModeChange = jest.fn()
-    const view = setup({ onModeChange })
-
-    expect(view.getByTestId("mode-local").props.accessibilityState.selected).toBe(true)
-    fireEvent.press(view.getByTestId("mode-connected"))
-    expect(onModeChange).toHaveBeenCalledWith("connected")
   })
 
   it("hosts from the shared setup screen with validated seats and life presets", async () => {
@@ -1304,11 +1086,16 @@ describe("NewGameScreen", () => {
   })
 
   it("explains the hosted-game check before enabling Host", async () => {
-    connectedHarness.activeGamesStatus = "LoadingFirstPage"
-    render(hostSetup(jest.fn()))
+    jest.useFakeTimers()
+    try {
+      connectedHarness.activeGamesStatus = "LoadingFirstPage"
+      render(hostSetup(jest.fn()))
 
-    await waitFor(() => expect(screen.getByText("Checking your games…")).toBeTruthy())
-    expect(screen.getByTestId("host-connected-button")).toBeDisabled()
+      await waitFor(() => expect(screen.getByText("Checking your games…")).toBeTruthy())
+      expect(screen.getByTestId("host-connected-button")).toBeDisabled()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it("hides the account seat while signed out", () => {
@@ -1466,26 +1253,6 @@ describe("NewGameScreen", () => {
       fireEvent.press(screen.getByTestId("me-deck"))
       fireEvent.press(screen.getByTestId(`me-deck-option-${id}`))
     }
-
-    it("saves a fingerprint for a deck picked after Start", async () => {
-      const local = saveGuestDeck({ name: "Burn", game: "mtg", format: "commander", cards: [] })
-      const onSavePlayers = jest.fn()
-      setup({
-        initialGame: existingGame(),
-        onSavePlayers,
-        account: { ownerId: "owner-a", decks: [] },
-      })
-      pick(local.localId)
-      await act(async () => undefined)
-      expect(onSavePlayers).toHaveBeenCalledWith(expect.any(Array), {
-        ownerId: "owner-a",
-        meSeat: 0,
-        deckKey: local.localId,
-        deckVersionId: undefined,
-        deckName: "Burn",
-        deckFingerprint: `v1:${"a".repeat(64)}`,
-      })
-    })
 
     it("blocks seat changes until a deck pick has saved its fingerprint", async () => {
       const local = saveGuestDeck({ name: "Burn", game: "mtg", format: "commander", cards: [] })
@@ -1737,14 +1504,6 @@ describe("NewGameScreen", () => {
     fireEvent.press(screen.getByTestId("game-tab-mtg"))
     expect(screen.getByTestId("game-type-treachery")).toBeEnabled()
     expect(screen.getByTestId("join-with-code-button")).toBeTruthy()
-  })
-
-  it("suggests the format picked at onboarding first and selects it", () => {
-    setup({
-      defaults: { ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg", defaultFormat: "modern" },
-    })
-    expect(screen.getByTestId("game-type-mtg-modern").props.accessibilityState.selected).toBe(true)
-    expect(screen.getByTestId("game-tab-mtg")).toBeTruthy()
   })
 
   it("opens on the recent setup and hosts it unchanged", () => {

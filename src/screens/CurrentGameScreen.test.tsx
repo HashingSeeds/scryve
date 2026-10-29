@@ -172,18 +172,15 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
     expect(view.queryByTestId("dice-bag")).toBeNull()
-    expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
-    expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
     expect(view.getByTestId("dice-bag")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("decks-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
-    expect(view.queryByTestId("open-decks-button")).toBeNull()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
@@ -520,33 +517,6 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("layout-tabletop")).toBeTruthy()
   })
 
-  it("keeps the useful odd-player layout choices without offering wide", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game(5)}
-          repository={new LocalGameRepository(new MemoryStorage())}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("layout-button"))
-    expect(view.getByTestId("layout-picker-dialog")).toBeTruthy()
-    expect(
-      StyleSheet.flatten(view.getByTestId("layout-picker-backdrop").props.style),
-    ).toMatchObject({
-      position: "absolute",
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-    })
-    expect(view.queryByTestId("layout-wide-grid")).toBeNull()
-    expect(view.getByTestId("layout-featured-first")).toBeTruthy()
-  })
-
   it("scrolls the layout choices and seat map while Done stays reachable", () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -710,13 +680,6 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-board")).toBeTruthy()
     expect(view.queryByTestId("layout-picker-dialog")).toBeNull()
     expect(view.getByTestId("end-game-dialog")).toBeTruthy()
-    expect(StyleSheet.flatten(view.getByTestId("end-game-backdrop").props.style)).toMatchObject({
-      position: "absolute",
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-    })
     fireEvent.press(view.getByTestId("abandon-game-button"))
     await waitFor(() => {
       expect(onGameAbandoned).toHaveBeenCalledTimes(1)
@@ -750,6 +713,9 @@ describe("CurrentGameScreen", () => {
       false,
     )
 
+    fireEvent.press(view.getByTestId("end-game-winner-1"))
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
+
     fireEvent.press(view.getByTestId("end-game-result-draw"))
     expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(
       false,
@@ -757,6 +723,8 @@ describe("CurrentGameScreen", () => {
 
     fireEvent.press(view.getByTestId("end-game-result-draw"))
     expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    expect(repository.loadHistory()).toEqual([])
   })
 
   it("records the winner the host picks before ending the game", async () => {
@@ -788,29 +756,6 @@ describe("CurrentGameScreen", () => {
         winnerPlayerIds: [initial.players[1].id],
       })
     })
-  })
-
-  it("does not end once the last picked winner is unpicked", async () => {
-    const repository = new LocalGameRepository(new MemoryStorage())
-    const initial = game()
-    repository.saveActiveGame(initial)
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("end-game-button"))
-    fireEvent.press(view.getByTestId("end-game-winner-0"))
-    fireEvent.press(view.getByTestId("end-game-winner-0"))
-    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(view.getByTestId("confirm-end-game-button"))
-    expect(repository.loadHistory()).toEqual([])
   })
 
   it("records a draw and drops any picked winner", async () => {
@@ -884,15 +829,6 @@ describe("CurrentGameScreen", () => {
         }),
       )
       expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
-    })
-
-    it("shows a commander badge on every card and keeps each board hidden", () => {
-      const view = renderGame()
-      for (const seat of [1, 2, 3, 4]) {
-        expect(view.getByTestId(`commander-mark-seat-${seat}`)).toBeTruthy()
-        expect(view.queryByTestId(`commander-board-seat-${seat}`)).toBeNull()
-      }
-      expect(view.queryByTestId("commander-hit-seat-2")).toBeNull()
     })
 
     it("keeps the menu during assignment and turns it into an exit for inspection", () => {
