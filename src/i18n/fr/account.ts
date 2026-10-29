@@ -125,7 +125,7 @@ export default {
     syncStats: {
       label: "Stats pour les geeks",
       helper:
-        "Affiche le temps que mettent les changements à atteindre chaque appareil dans les parties en ligne et à proximité.",
+        "Affiche le temps que mettent les modifications à atteindre chaque appareil dans les parties en ligne et à proximité, ainsi que la manière dont le scanner de cartes trouve les cartes.",
     },
   },
   support: {

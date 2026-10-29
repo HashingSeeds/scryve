@@ -13,11 +13,18 @@ export type CardTextLine = {
 
 type Point = { x: number; y: number }
 
+export type CardRectangle = {
+  aspect: number
+  share: number
+  rejected?: "shape" | "position" | "size"
+}
+
 export type CardPhotoText = {
   width: number
   height: number
   lines: CardTextLine[]
   cardCorners?: Point[]
+  detection?: { tracked: boolean; rectangles: CardRectangle[] }
 }
 
 type CardTextCameraProps = ViewProps & {

@@ -363,6 +363,18 @@ export default {
       "कैमरे की अनुमति नहीं है। कार्ड स्कैन करने के लिए इसे सिस्टम सेटिंग में चालू करें।",
     allow: "कैमरे की अनुमति दें",
     openSettings: "सेटिंग खोलें",
+    stats: {
+      outline: "आउटलाइन: {{state}}",
+      tracked: "ट्रैक्ड",
+      found: "मिली",
+      none: "कोई नहीं",
+      noRectangles: "कोई आयत नहीं",
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      accepted: "कार्ड",
+      shape: "आकार",
+      position: "केंद्र से हटकर",
+      size: "बहुत छोटा",
+    },
   },
   deckLimit: {
     countLabel: "{{limit}} में से {{used}} सिंक किए गए डेक",

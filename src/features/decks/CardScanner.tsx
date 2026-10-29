@@ -4,6 +4,7 @@ import type { ImageStyle, LayoutRectangle, TextStyle, ViewStyle } from "react-na
 import { useCameraPermissions } from "expo-camera"
 import * as Haptics from "expo-haptics"
 import * as ScreenOrientation from "expo-screen-orientation"
+import { useMMKVString } from "react-native-mmkv"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
@@ -12,9 +13,11 @@ import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { storage } from "@/utils/storage"
 
 import {
   closestNamesFromCardTop,
@@ -22,6 +25,7 @@ import {
   type CardNameIndex,
   type CardNameMatch,
 } from "./cardNameMatch"
+import { CardScanStats } from "./CardScanStats"
 import { framedLinesFromCardTop, type ScanFraming } from "./cardTextLayout"
 import { CardTextCamera, type CardPhotoText } from "../../../modules/card-text-reader"
 
@@ -91,6 +95,9 @@ export function CardScanner({
   onClose: () => void
 }) {
   const [permission, requestPermission] = useCameraPermissions()
+  const [settings] = useMMKVString(LOCAL_KEYS.settings, storage)
+  const showStats = syncStatsEnabled(settings)
+  const [lastPhoto, setLastPhoto] = useState<CardPhotoText>()
   const view = useRef<LayoutRectangle>(undefined)
   const [frame, setFrame] = useState<LayoutRectangle>()
   const [added, setAdded] = useState<ScannedCard[]>([])
@@ -332,12 +339,16 @@ export function CardScanner({
               style={StyleSheet.absoluteFill}
               active={scanning}
               guide={frame}
-              onText={(event) => readText(event.nativeEvent)}
+              onText={(event) => {
+                readText(event.nativeEvent)
+                if (showStats) setLastPhoto(event.nativeEvent)
+              }}
             />
             <View style={$overlay} pointerEvents="none">
               <View style={$frame} onLayout={(event) => setFrame(event.nativeEvent.layout)} />
               <Text size="sm" style={$hint} text={statusText(status)} />
             </View>
+            {showStats && lastPhoto ? <CardScanStats photo={lastPhoto} /> : null}
           </View>
         ) : (
           <View style={themed($permission)}>

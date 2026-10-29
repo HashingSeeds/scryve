@@ -353,6 +353,18 @@ export default {
     permissionDenied: "카메라 접근이 거부되었습니다. 카드를 스캔하려면 시스템 설정에서 허용하세요.",
     allow: "카메라 허용",
     openSettings: "설정 열기",
+    stats: {
+      outline: "윤곽: {{state}}",
+      tracked: "추적 중",
+      found: "찾음",
+      none: "없음",
+      noRectangles: "사각형 없음",
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      accepted: "카드",
+      shape: "모양",
+      position: "중앙 벗어남",
+      size: "너무 작음",
+    },
   },
   deckLimit: {
     countLabel: "동기화된 덱 {{used}}/{{limit}}개",

@@ -381,6 +381,18 @@ export default {
       "El acceso a la cámara está denegado. Actívalo en los ajustes del sistema para escanear cartas.",
     allow: "Permitir cámara",
     openSettings: "Abrir ajustes",
+    stats: {
+      outline: "Contorno: {{state}}",
+      tracked: "seguido",
+      found: "detectado",
+      none: "ninguno",
+      noRectangles: "Sin rectángulos",
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      accepted: "carta",
+      shape: "forma",
+      position: "descentrado",
+      size: "muy pequeño",
+    },
   },
   deckLimit: {
     countLabel: "{{used}} de {{limit}} mazos sincronizados",
