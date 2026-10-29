@@ -954,7 +954,7 @@ const BOX_RATIO = 2
 const MIN_BOX = 44
 
 /** why: an attacker's name sits over its power box, and partners share the card's width side by side, since a card runs out of height before width. Each box shrinks to its lane, down to a tappable minimum. */
-function attackerLayout({
+export function attackerLayout({
   space,
   count,
   compact,
@@ -967,7 +967,8 @@ function attackerLayout({
   const lane = space ? (space.width - UNIT_GAP * (count + 1)) / count : Infinity
   const room = space ? space.height - NAME_HEIGHT - UNIT_GAP * 2 : Infinity
   const height = Math.floor(Math.max(MIN_BOX, Math.min(largest, lane / BOX_RATIO, room)))
-  return { height, width: Math.round(height * BOX_RATIO) }
+  // why: below the tappable minimum height a box narrows instead, so partners never run past a short seat's edges.
+  return { height, width: Math.max(0, Math.floor(Math.min(lane, height * BOX_RATIO))) }
 }
 
 const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber}-partner`]
