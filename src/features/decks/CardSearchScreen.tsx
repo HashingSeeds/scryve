@@ -414,7 +414,8 @@ export function CardSearchScreen({
             ? { error: translate("decks:cardScan.addFailed"), retryable: true }
             : { error: translate("decks:cardScan.notFound", { card: name }) }
         const error = add(card)
-        if (error) return { error }
+        // why: a deck refuses uncached cards while offline; a retry adds them once it reconnects.
+        if (error) return { error, retryable: offline }
         scannedEntries.current.set(name, searchEntry(card))
         if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: card.name })}`)
         return { imageUrl: card.smallImageUrl ?? card.imageUrl }
