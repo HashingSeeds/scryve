@@ -23,6 +23,7 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -508,7 +509,7 @@ export function CardSearchScreen({
               onChangeText={setQuery}
               containerStyle={$queryField}
             />
-            {CAN_READ_CARDS && filtersCards && !choosingCommander ? (
+            {CAN_READ_CARDS && prereleaseBuild() && filtersCards && !choosingCommander ? (
               <Button
                 testID="card-scan-button"
                 tx="decks:cardSearch.scan"

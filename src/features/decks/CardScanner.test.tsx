@@ -1,12 +1,13 @@
 import { View } from "react-native"
-import * as Haptics from "expo-haptics"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render, within } from "@testing-library/react-native"
 
+import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { cardNameIndex } from "./cardNameMatch"
 import { CardScanner, type ScannedCardAdd } from "./CardScanner"
-import type { CardPhotoText } from "../../../modules/card-text-reader"
+import { scanHaptic, type CardPhotoText } from "../../../modules/card-text-reader"
 
 let mockOnText: ((event: { nativeEvent: CardPhotoText }) => void) | undefined
 jest.mock("../../../modules/card-text-reader", () => ({
@@ -14,10 +15,13 @@ jest.mock("../../../modules/card-text-reader", () => ({
     mockOnText = props.onText
     return null
   },
+  scanHaptic: jest.fn(),
+  prepareScanHaptics: jest.fn(),
 }))
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
 }))
+jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 jest.mock("expo-camera", () => ({
   useCameraPermissions: () => [{ granted: true, canAskAgain: true }, jest.fn()],
 }))
@@ -34,23 +38,30 @@ function renderScanner(props: {
   )
   const removeCard = jest.fn()
   const onClose = jest.fn()
-  const view = render(
+  const scanner = (adding: typeof addCards) => (
     <ThemeProvider initialContext="dark">
       <CardScanner
         game="mtg"
         nameIndex={nameIndex}
         singleton={props.singleton}
         copiesInDeck={(name) => props.inDeck?.[name] ?? 0}
-        addCards={addCards}
+        addCards={adding}
         removeCard={removeCard}
         onClose={onClose}
       />
-    </ThemeProvider>,
+    </ThemeProvider>
   )
+  const view = render(scanner(addCards))
   const layout = { x: 0, y: 0, width: 400, height: 700 }
   for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
     fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
-  return { view, addCards, removeCard, onClose }
+  return {
+    view,
+    addCards,
+    removeCard,
+    onClose,
+    rerenderWith: (adding: typeof addCards) => view.rerender(scanner(adding)),
+  }
 }
 
 function show(...texts: string[]) {
@@ -90,10 +101,10 @@ test("skips a card the Commander deck already holds and says so", async () => {
   show("Sol Ring")
   show("Sol Ring")
   expect(view.getByText("Sol Ring is already in the deck")).toBeTruthy()
-  expect(Haptics.notificationAsync).toHaveBeenLastCalledWith(Haptics.NotificationFeedbackType.Error)
+  expect(scanHaptic).toHaveBeenLastCalledWith("skipped")
   show()
   scan("Arcane Signet")
-  expect(Haptics.impactAsync).toHaveBeenLastCalledWith(Haptics.ImpactFeedbackStyle.Light)
+  expect(scanHaptic).toHaveBeenLastCalledWith("added")
   scan("Arcane Signet")
   await finish(view)
   expect(addCards.mock.calls.flat(2)).toEqual(["Arcane Signet"])
@@ -151,6 +162,25 @@ test("Wrong card removes a card whose add was still in flight once it lands", as
     expect(removeCard).not.toHaveBeenCalled()
     await slow.land()
     expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("an earlier scanned card can be checked and removed from the review list", async () => {
+  jest.useFakeTimers()
+  try {
+    const { view, removeCard } = renderScanner({ singleton: true })
+    scan("Sol Ring")
+    scan("Arcane Signet")
+    await act(async () => jest.advanceTimersByTime(1500))
+    fireEvent.press(view.getByTestId("card-scan-review"))
+    const list = view.getByTestId("card-scan-review-list")
+    expect(within(list).getByText("Sol Ring")).toBeTruthy()
+    fireEvent.press(within(list).getAllByText("Wrong card")[1])
+    await act(async () => fireEvent.press(view.getByText("Remove it")))
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(within(list).queryByText("Sol Ring")).toBeNull()
   } finally {
     jest.useRealTimers()
   }
@@ -235,6 +265,27 @@ test("a card whose add failed can be scanned again in a Commander deck", async (
   }
 })
 
+test("a retry after reconnecting adds through the deck's latest add", async () => {
+  jest.useFakeTimers()
+  try {
+    const offline = jest.fn(async (names: string[]): Promise<ScannedCardAdd[]> =>
+      names.map(() => ({ error: "You're offline.", retryable: true })),
+    )
+    const online = jest.fn(async (names: string[]): Promise<ScannedCardAdd[]> =>
+      names.map(() => ({})),
+    )
+    const { view, rerenderWith } = renderScanner({ singleton: true, addCards: offline })
+    scan("Sol Ring")
+    await act(async () => jest.advanceTimersByTime(1500))
+    rerenderWith(online)
+    await act(async () => jest.advanceTimersByTime(2000 + 1500))
+    expect(online.mock.calls.flat(2)).toEqual(["Sol Ring"])
+    expect(view.getByText("1 added")).toBeTruthy()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test("retries a card whose lookup failed until it is added", async () => {
   jest.useFakeTimers()
   try {
@@ -305,4 +356,69 @@ test("a land retry counts copies still being added", async () => {
   scan("Forest")
   expect(view.getByTestId("card-scan-land-count")).toHaveTextContent("10")
   await act(async () => landSecondBatch())
+})
+
+test("Done reports how the scan went without naming any card", async () => {
+  const { view } = renderScanner({ singleton: true, inDeck: { "Sol Ring": 1 } })
+  show("Sol Ring")
+  show("Sol Ring")
+  show()
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [],
+        cardCorners: [],
+        detection: { rectangles: [], thermal: "fair" },
+      },
+    }),
+  )
+  scan("Arcane Signet")
+  await finish(view)
+  expect(captureAnalytics).toHaveBeenCalledWith("card_scan_completed", {
+    duration_ms: expect.any(Number),
+    added_count: 1,
+    failed_count: 0,
+    skipped_count: 1,
+    fixed_count: 0,
+    read_count: 7,
+    outlined_read_count: 1,
+    peak_heat: "fair",
+  })
+})
+
+test("Stats for nerds shows why each rectangle was or wasn't taken as the card", () => {
+  act(() => localGameRepository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, syncStats: true }))
+  try {
+    const { view } = renderScanner({ singleton: true })
+    act(() =>
+      mockOnText?.({
+        nativeEvent: {
+          width: 960,
+          height: 1280,
+          lines: [],
+          detection: {
+            thermal: "serious",
+            rectangles: [
+              { aspect: 0.714, share: 0.82 },
+              { aspect: 0.95, share: 0.4, rejected: "shape" },
+            ],
+          },
+        },
+      }),
+    )
+    expect(view.getByText("Outline: none")).toBeTruthy()
+    expect(view.getByText("Heat: hot")).toBeTruthy()
+    expect(view.getByText("0.71 · 82% · card")).toBeTruthy()
+    expect(view.getByText("0.95 · 40% · shape")).toBeTruthy()
+  } finally {
+    act(() => localGameRepository.saveSettings(DEFAULT_LOCAL_SETTINGS))
+  }
+})
+
+test("the scanner hides detection details with Stats for nerds off", () => {
+  const { view } = renderScanner({ singleton: true })
+  show("Sol Ring")
+  expect(view.queryByTestId("card-scan-stats")).toBeNull()
 })

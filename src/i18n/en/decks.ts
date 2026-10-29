@@ -371,6 +371,16 @@ const decks = {
     failedCount: "{{count}} not added",
     // Button next to the last scanned card when the scanner picked the wrong one.
     wrongCard: "Wrong card",
+    // Accessibility label for tapping the last scanned card to see every card scanned so far.
+    review: "Review scanned cards",
+    // Closes the list of scanned cards and goes back to the camera.
+    keepScanning: "Keep scanning",
+    // A scanned card's add status in the review list. Added cards show no status.
+    state: {
+      adding: "Adding",
+      retrying: "Retrying",
+      failed: "Not added",
+    },
     whichCard: "Which card is it?",
     removeIt: "Remove it",
     addFailed: "Couldn't add the scanned cards. Check your connection.",
@@ -385,6 +395,31 @@ const decks = {
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",
     allow: "Allow camera",
     openSettings: "Open settings",
+    // Technical card detection details shown over the camera with "Stats for nerds" on. Keep labels very short.
+    stats: {
+      // {{state}} is one of the words below.
+      outline: "Outline: {{state}}",
+      // The card was found and outlined.
+      found: "found",
+      none: "none",
+      // How hot the phone is. {{state}} is one of the four words below, coolest first.
+      heat: "Heat: {{state}}",
+      nominal: "normal",
+      fair: "warm",
+      serious: "hot",
+      critical: "very hot",
+      noRectangles: "No rectangles",
+      // One detected rectangle: width over height, its size as a percent of the frame, then a verdict word below.
+      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      // A rectangle the scanner accepted as the card.
+      accepted: "card",
+      // Rejected because its shape is not a card's.
+      shape: "shape",
+      // Rejected because it is not centered in the frame.
+      position: "off-center",
+      // Rejected because it is too small to be the card.
+      size: "too small",
+    },
   },
 
   deckLimit: {

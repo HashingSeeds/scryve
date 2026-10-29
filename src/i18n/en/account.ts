@@ -125,7 +125,8 @@ const account = {
     syncStats: {
       // Playful name for a hidden switch that shows technical timing numbers on the game board.
       label: "Stats for nerds",
-      helper: "Shows how long changes take to reach each device in online and nearby games.",
+      helper:
+        "Shows how long changes take to reach each device in online and nearby games, and how the card scanner finds cards.",
     },
   },
   support: {

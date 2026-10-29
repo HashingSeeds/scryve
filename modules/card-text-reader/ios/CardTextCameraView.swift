@@ -2,18 +2,32 @@ import AVFoundation
 import ExpoModulesCore
 import Vision
 
-private let minFrameInterval: TimeInterval = 0.12
-// why: detecting is far slower than tracking, so it runs every few frames to catch new cards
-// and correct drift while the tracker follows the card on the frames in between.
-private let framesBetweenDetections = 6
-// why: hiding the outline the moment the tracker slips makes it flicker on a steady card.
-private let missesBeforeLosingCard = 3
+// why: reading text is most of the phone's work, so reads slow down as it heats up, and the
+// camera runs at the rate frames are read rather than 30 fps.
+private let cameraFramesPerSecond: Int32 = 20
+private func secondsBetweenReads(_ state: ProcessInfo.ThermalState) -> TimeInterval {
+  switch state {
+  case .nominal: 0.12
+  case .fair: 0.16
+  case .serious: 0.25
+  default: 0.4
+  }
+}
+// why: hiding the outline the moment one read misses the card makes it flicker on a steady card,
+// but reads slow down when the phone is hot, so a count of misses would leave it up too long.
+private let loseCardAfter: TimeInterval = 0.35
+// why: a little room around the outline keeps a name that touches the card's edge whole.
+private let readMargin: CGFloat = 0.03
 // why: rejects the art box, the text box, and cards only partly in view.
 private let minCardShareOfGuide: CGFloat = 0.4
 // why: an MTG card is 63x88. The area inside its border and a stack with a card peeking out
 // are also card-like rectangles, but their shapes are further from it than a sleeve's.
 private let cardAspect: CGFloat = 63 / 88
 private let cardAspectTolerance: CGFloat = 0.07
+
+private enum Rejection: String {
+  case shape, position, size
+}
 
 class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate {
   let onText = EventDispatcher()
@@ -25,13 +39,10 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   private let outline = CAShapeLayer()
   private let frames = DispatchQueue(label: "card-text-camera.frames")
   private let reads = DispatchQueue(label: "card-text-camera.reads")
-  private let sequence = VNSequenceRequestHandler()
   private var reading = false
   private var lastFrameAt = Date.distantPast
-  private var frameCount = 0
-  private var missedFrames = 0
-  private var tracking: VNTrackRectangleRequest?
-  private var card: VNRectangleObservation?
+  private var lastCardAt = Date.distantPast
+  private var outlined = false
   private var viewSize = CGSize.zero
   private var imageSize = CGSize(width: 1080, height: 1920)
 
@@ -78,6 +89,11 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     session.sessionPreset = .hd1920x1080
     if session.canAddInput(input) { session.addInput(input) }
     if session.canAddOutput(output) { session.addOutput(output) }
+    if (try? camera.lockForConfiguration()) != nil {
+      camera.activeVideoMinFrameDuration = CMTime(value: 1, timescale: cameraFramesPerSecond)
+      camera.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: cameraFramesPerSecond)
+      camera.unlockForConfiguration()
+    }
     session.commitConfiguration()
     if window != nil { session.startRunning() }
   }
@@ -88,30 +104,31 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     from connection: AVCaptureConnection
   ) {
     guard active, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-      if card != nil || missedFrames > 0 { lose() }
+      if outlined { lose() }
       return
     }
+    let thermalState = ProcessInfo.processInfo.thermalState
+    guard !reading, Date().timeIntervalSince(lastFrameAt) >= secondsBetweenReads(thermalState)
+    else { return }
+    lastFrameAt = Date()
+    reading = true
     // why: the back camera delivers landscape buffers; the scanner is locked to portrait,
     // so `.right` makes Vision read them upright and swaps width and height.
     imageSize = CGSize(width: CVPixelBufferGetHeight(buffer), height: CVPixelBufferGetWidth(buffer))
-    frameCount += 1
-    if frameCount % (tracking == nil ? 2 : framesBetweenDetections) == 0 {
-      detect(buffer)
-    } else if tracking != nil {
-      track(buffer)
-    }
-    guard !reading, Date().timeIntervalSince(lastFrameAt) >= minFrameInterval else { return }
-    lastFrameAt = Date()
-    reading = true
+    // why: looking for the card only on the frames that are read keeps the phone from heating up.
+    let (card, rectangles) = detect(buffer)
+    show(card)
     let size = imageSize
-    let card = card
+    let detection: [String: Any] = [
+      "rectangles": rectangles, "thermal": heat(thermalState),
+    ]
     reads.async { [weak self] in
-      self?.read(buffer, size: size, card: card)
+      self?.read(buffer, size: size, card: card, detection: detection)
       self?.frames.async { self?.reading = false }
     }
   }
 
-  private func detect(_ buffer: CVPixelBuffer) {
+  private func detect(_ buffer: CVPixelBuffer) -> (VNRectangleObservation?, [[String: Any]]) {
     let request = VNDetectRectanglesRequest()
     // why: MTG cards are 63x88 (0.716); the range allows for the card being tilted.
     request.minimumAspectRatio = 0.55
@@ -121,37 +138,34 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     request.minimumConfidence = 0.5
     request.maximumObservations = 6
     try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .right).perform([request])
-    let found = (request.results ?? []).filter(isCardInGuide).min {
+    let results = request.results ?? []
+    let found = results.filter { rejection($0) == nil }.min {
       abs(widthOverHeight($0) - cardAspect) < abs(widthOverHeight($1) - cardAspect)
     }
-    guard let found else { return miss() }
-    let tracker = VNTrackRectangleRequest(rectangleObservation: found)
-    tracker.trackingLevel = .fast
-    tracking = tracker
-    show(found)
+    return (found, results.map(describe))
   }
 
-  private func track(_ buffer: CVPixelBuffer) {
-    guard let tracking else { return }
-    try? sequence.perform([tracking], on: buffer, orientation: .right)
-    guard
-      let followed = tracking.results?.first as? VNRectangleObservation,
-      followed.confidence > 0.3,
-      isCardInGuide(followed)
-    else {
-      self.tracking = nil
-      return miss()
-    }
-    tracking.inputObservation = followed
-    show(followed)
-  }
-
-  private func isCardInGuide(_ quad: VNRectangleObservation) -> Bool {
-    guard abs(widthOverHeight(quad) - cardAspect) <= cardAspectTolerance else { return false }
-    guard let guide, guide.width > 0 else { return true }
+  private func rejection(_ quad: VNRectangleObservation) -> Rejection? {
+    guard abs(widthOverHeight(quad) - cardAspect) <= cardAspectTolerance else { return .shape }
+    guard let guide, guide.width > 0 else { return nil }
     let points = onScreen(corners(quad))
-    return guide.insetBy(dx: -guide.width * 0.1, dy: -guide.height * 0.1).contains(midpoint(points))
-      && polygonArea(points) >= guide.width * guide.height * minCardShareOfGuide
+    guard guide.insetBy(dx: -guide.width * 0.1, dy: -guide.height * 0.1).contains(midpoint(points))
+    else { return .position }
+    return shareOfGuide(points) < minCardShareOfGuide ? .size : nil
+  }
+
+  private func shareOfGuide(_ points: [CGPoint]) -> CGFloat {
+    guard let guide, guide.width > 0 else { return 0 }
+    return polygonArea(points) / (guide.width * guide.height)
+  }
+
+  private func describe(_ quad: VNRectangleObservation) -> [String: Any] {
+    var description: [String: Any] = [
+      "aspect": Double(widthOverHeight(quad)),
+      "share": Double(shareOfGuide(onScreen(corners(quad)))),
+    ]
+    if let rejected = rejection(quad) { description["rejected"] = rejected.rawValue }
+    return description
   }
 
   private func widthOverHeight(_ quad: VNRectangleObservation) -> CGFloat {
@@ -163,22 +177,19 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
 
   // why: the outline stays up briefly to avoid flicker, but text is only filtered by an outline
   // from this frame, so a card that moved on is never read through its old outline.
-  private func miss() {
-    card = nil
-    missedFrames += 1
-    if missedFrames >= missesBeforeLosingCard { lose() }
+  private func show(_ quad: VNRectangleObservation?) {
+    guard quad != nil || outlined else { return }
+    if quad != nil { lastCardAt = Date() }
+    if quad == nil, Date().timeIntervalSince(lastCardAt) < loseCardAfter { return }
+    draw(quad)
   }
 
   private func lose() {
-    tracking?.isLastFrame = true
-    tracking = nil
-    missedFrames = 0
-    show(nil)
+    draw(nil)
   }
 
-  private func show(_ quad: VNRectangleObservation?) {
-    if quad != nil { missedFrames = 0 }
-    card = quad
+  private func draw(_ quad: VNRectangleObservation?) {
+    outlined = quad != nil
     let path = quad.map { quad in
       let path = CGMutablePath()
       path.addLines(between: onScreen(corners(quad)))
@@ -202,19 +213,30 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     }
   }
 
-  private func read(_ buffer: CVPixelBuffer, size: CGSize, card: VNRectangleObservation?) {
+  private func read(
+    _ buffer: CVPixelBuffer, size: CGSize, card: VNRectangleObservation?, detection: [String: Any]
+  ) {
     let width = Double(size.width)
     let height = Double(size.height)
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = false
+    // why: reading only the outlined card roughly halves the work of reading the whole frame.
+    let region = card.map(readRegion) ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+    request.regionOfInterest = region
     guard (try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .right).perform([request])) != nil
     else { return }
     let lines: [[String: Any]] = (request.results ?? []).compactMap { observation in
       guard let candidate = observation.topCandidates(1).first else { return nil }
-      let box = observation.boundingBox
-      let dx = (observation.topRight.x - observation.topLeft.x) * width
-      let dy = (observation.topLeft.y - observation.topRight.y) * height
+      // why: Vision reports text inside the region of interest relative to that region.
+      let inRegion = observation.boundingBox
+      let box = CGRect(
+        x: region.minX + inRegion.minX * region.width,
+        y: region.minY + inRegion.minY * region.height,
+        width: inRegion.width * region.width,
+        height: inRegion.height * region.height)
+      let dx = (observation.topRight.x - observation.topLeft.x) * region.width * width
+      let dy = (observation.topLeft.y - observation.topRight.y) * region.height * height
       return [
         "text": candidate.string,
         "x": box.minX * width,
@@ -226,12 +248,35 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       ]
     }
     guard active else { return }
-    var photo: [String: Any] = ["width": width, "height": height, "lines": lines]
+    var photo: [String: Any] = [
+      "width": width, "height": height, "lines": lines, "detection": detection,
+    ]
     if let card {
       photo["cardCorners"] = corners(card).map { ["x": $0.x * width, "y": (1 - $0.y) * height] }
     }
     onText(photo)
   }
+}
+
+private func heat(_ state: ProcessInfo.ThermalState) -> String {
+  switch state {
+  case .nominal: "nominal"
+  case .fair: "fair"
+  case .serious: "serious"
+  case .critical: "critical"
+  @unknown default: "critical"
+  }
+}
+
+private func readRegion(_ quad: VNRectangleObservation) -> CGRect {
+  let points = corners(quad)
+  let xs = points.map(\.x)
+  let ys = points.map(\.y)
+  return CGRect(
+    x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!
+  )
+  .insetBy(dx: -readMargin, dy: -readMargin)
+  .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
 }
 
 private func corners(_ quad: VNRectangleObservation) -> [CGPoint] {

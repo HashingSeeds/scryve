@@ -4,8 +4,10 @@ import { act, renderHook } from "@testing-library/react-native"
 import {
   newReleaseNotes,
   openPrPreview,
+  prereleaseBuild,
   RESTART_FADE_MS,
   restartToUpdate,
+  setBetaUpdates,
   useRestarting,
 } from "./appUpdate"
 
@@ -16,6 +18,7 @@ jest.mock("expo-updates", () => ({
   checkForUpdateAsync: jest.fn(() => Promise.resolve({ isAvailable: mockUpdates.available })),
   fetchUpdateAsync: jest.fn(() => Promise.resolve()),
   reloadAsync: jest.fn(() => Promise.resolve()),
+  isEnabled: true,
   get channel() {
     return mockUpdates.channel
   },
@@ -36,6 +39,36 @@ describe("newReleaseNotes", () => {
     expect(newReleaseNotes(update, undefined)).toEqual(update.releaseNotes)
     expect(newReleaseNotes(update, "ancient")).toEqual(update.releaseNotes)
     expect(newReleaseNotes({ releaseNotes: ["Faster sync"] }, "middle")).toEqual(["Faster sync"])
+  })
+})
+
+describe("prereleaseBuild", () => {
+  const runtime = globalThis as typeof globalThis & { __DEV__: boolean }
+  const dev = __DEV__
+  beforeEach(() => {
+    runtime.__DEV__ = false
+  })
+  afterEach(() => {
+    runtime.__DEV__ = dev
+    setBetaUpdates(false)
+  })
+
+  it("is off for production and on for beta, PR previews, and development", () => {
+    mockUpdates.channel = "production"
+    expect(prereleaseBuild()).toBe(false)
+    for (const channel of ["beta", "preview", "pr-12"]) {
+      mockUpdates.channel = channel
+      expect(prereleaseBuild()).toBe(true)
+    }
+    mockUpdates.channel = "production"
+    runtime.__DEV__ = true
+    expect(prereleaseBuild()).toBe(true)
+  })
+
+  it("turns on as soon as a production install switches to beta", () => {
+    mockUpdates.channel = "production"
+    setBetaUpdates(true)
+    expect(prereleaseBuild()).toBe(true)
   })
 })
 
