@@ -203,14 +203,6 @@ export default {
     invalid: "Les données du deck invité sont invalides.",
   },
   localSync: {
-    notice_one:
-      "{{count}} deck n'est que sur cet appareil. Vous pouvez en synchroniser {{free}} de plus.",
-    notice_many:
-      "{{count}} de decks ne sont que sur cet appareil. Vous pouvez en synchroniser {{free}} de plus.",
-    notice_other:
-      "{{count}} decks ne sont que sur cet appareil. Vous pouvez en synchroniser {{free}} de plus.",
-    choose: "Choisir les decks à synchroniser",
-    keepLocal: "Garder sur l'appareil",
     pickTitle_one: "Choisir {{count}} deck à synchroniser",
     pickTitle_many: "Choisir jusqu'à {{count}} de decks à synchroniser",
     pickTitle_other: "Choisir jusqu'à {{count}} decks à synchroniser",
@@ -549,25 +541,16 @@ export default {
     sourceTournament: "Deck de tournoi",
     sourceExample: "Deck d'exemple",
     otherSection: "Autre",
-    checkingLimit: "Vérification de la limite de decks…",
-    limitUnavailable: "Limite de decks indisponible.",
     saveLocalFailed: "Impossible d’enregistrer le deck localement",
-    savesOnDevice:
-      "Vos decks synchronisés sont au complet, ce deck est donc enregistré sur cet appareil.",
     loadDecksFailed: "Impossible de charger les decks",
-    createFailed: "Impossible de créer le deck",
     previewFailed: "Impossible de charger ce deck",
-    importOfficialFailed: "Impossible d’importer le deck officiel",
-    importTopDeckFailed: "Impossible d’importer le Top Deck",
     overflowAfterMatch:
       "{{card}} compte plus de 999 exemplaires après la correspondance. Corrigez la source avant de vérifier.",
     linkFailed: "Impossible de charger ce deck. Réessayez ou collez son export texte.",
     resolveFailed: "Impossible de résoudre la liste du deck. Réessayez.",
     overflowOnFormat:
       "{{card}} dépasserait 999 exemplaires. Réduisez sa quantité avant de changer de format.",
-    waitForSave: "Attendez la fin de l’enregistrement du deck.",
     reviewFirst: "Vérifiez l’import avant d’ajouter des cartes.",
-    importListFailed: "Impossible d’importer la liste du deck",
     notes: "Notes",
     optional: "Facultatif",
     noMatches: "Aucun deck correspondant",
@@ -594,7 +577,6 @@ export default {
     problemsRemoved_other:
       "{{count}} lignes sans correspondance ou non valides supprimées de cet import. Texte d’origine conservé dans le formulaire d’import.",
     saveOnDevice: "Enregistrer sur l'appareil",
-    saveDeck: "Enregistrer le deck",
     previewTitle: "Aperçu du deck",
     datedExample: "Exemple ancien. Certaines cartes peuvent ne plus être légales dans ce format.",
     openSourceFailed: "Impossible d’ouvrir la source du deck.",
@@ -602,9 +584,7 @@ export default {
     previewReady: "Aperçu prêt",
     loadingTopDeck: "Chargement du Top Deck",
     previewCard: "Aperçu de {{card}}",
-    importing: "Import en cours…",
     saveDeckOnDevice: "Enregistrer le deck sur cet appareil",
-    importDeck: "Importer le deck",
     originalPrecon:
       "Liste précon d’origine. Certaines cartes peuvent ne plus être légales dans ce format.",
     loadingImages: "Chargement des images des cartes",
@@ -650,7 +630,6 @@ export default {
     reloadSource: "Recharger la source",
     reviewSourceDeck: "Vérifier le deck {{source}}",
     reviewList: "Vérifier la liste du deck",
-    creating: "Création…",
     createDeck: "Créer le deck",
   },
   saveStatus: {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Keyboard, Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
-import { useAction, useMutation, useQuery } from "convex/react"
+import { useAction, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -18,8 +18,6 @@ import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
-import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
-import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
@@ -71,10 +69,6 @@ const DECK_LIST_HELPERS = {
 } as const satisfies Record<SystemId, TxKeyPath>
 
 type CreationMode = "precon" | "paste" | "blank"
-
-type DeckCapacity = FunctionReturnType<typeof api.decks.capacity>
-
-type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckCapacity }
 
 const MODES = [
   { id: "precon", labelTx: "decks:addDeck.modeBrowse" },
@@ -233,37 +227,6 @@ type CatalogDeck = {
   publishedAt?: number
 }
 
-function CapacityQuery({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
-  const { themed } = useAppTheme()
-  const capacity = useQuery(api.decks.capacity)
-
-  useEffect(() => {
-    if (capacity) onReady(capacity)
-  }, [capacity, onReady])
-
-  return capacity ? null : (
-    <Text size="xs" style={themed($label)} tx="decks:addDeck.checkingLimit" />
-  )
-}
-
-function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
-  const { themed } = useAppTheme()
-  return (
-    <View testID="deck-capacity-status" style={themed($capacityStatus)}>
-      <ConvexQueryBoundary
-        fallback={({ retry }) => (
-          <View style={themed($inlineStatus)}>
-            <Text size="xs" style={themed($label)} tx="decks:addDeck.limitUnavailable" />
-            <Button testID="retry-deck-capacity" tx="common:retry" onPress={retry} />
-          </View>
-        )}
-      >
-        <CapacityQuery onReady={onReady} />
-      </ConvexQueryBoundary>
-    </View>
-  )
-}
-
 function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
   return cards.map((card) => ({
     name: card.name,
@@ -398,33 +361,17 @@ function previewSections(
 export function AddDeckScreen({
   onBack,
   onCreated,
-  access,
 }: {
   onBack: () => void
   onCreated: (deckId: string) => void
-  access?: CloudAccess
 }) {
   const { themed } = useAppTheme()
-  const [capacityState, setCapacityState] = useState<CapacityState>({ status: "checking" })
-  const capacity = capacityState.status === "ready" ? capacityState.capacity : undefined
-  const signedIn = access?.signedIn ?? Boolean(access?.ownerId)
-  const guestMode = Boolean(access && !access.loading && !signedIn)
-  const capacityReady = guestMode || ((access?.ready ?? true) && capacityState.status === "ready")
-  const atCapacity = !guestMode && capacityReady && capacity?.canCreate === false
-  const saveLocally = guestMode || atCapacity
-  const canRequestAccess = Boolean(access && !access.ready && !access.loading)
-  useEffect(() => {
-    if (access && !access.ready) setCapacityState({ status: "checking" })
-  }, [access])
-  const createDeck = useMutation(api.decks.create)
-  const createImportedDeck = useMutation(api.decks.importResolved)
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
   const resolveLink = useAction(api.deckImports.resolveLink)
   const searchTopDecks = useAction(api.deckCatalogs.browse)
-  const importCatalog = useMutation(api.decks.importCatalog)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState(() => startingMode(game))
@@ -481,7 +428,6 @@ export function AddDeckScreen({
     retryDetails: retryPreviewDetails,
   } = useCardDetails(focusedPreviewCard)
   const [error, setError] = useState<string>()
-  const [busy, setBusy] = useState(false)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string>()
   const online = useConvexOnline()
@@ -502,15 +448,6 @@ export function AddDeckScreen({
     api.deckCatalogs.detail,
     selectedCatalogDeck ? { catalogDeckId: selectedCatalogDeck._id } : "skip",
   )
-  const handleCapacity = useCallback(
-    (next: DeckCapacity) => setCapacityState({ status: "ready", capacity: next }),
-    [],
-  )
-  function begin() {
-    setBusy(true)
-    setError(undefined)
-  }
-
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
   }
@@ -644,27 +581,8 @@ export function AddDeckScreen({
     wasOnline.current = online
   }, [online])
 
-  async function createBlank() {
-    if (saveLocally) {
-      saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
-      return
-    }
-    if (access && !access.ready) {
-      access.request()
-      return
-    }
-    if (!capacityReady) return
-    try {
-      begin()
-      const deckId = await createDeck({ name, format, game, ...(note.trim() ? { note } : {}) })
-      setName("")
-      setNote("")
-      onCreated(deckId)
-    } catch (cause) {
-      fail(cause, translate("decks:addDeck.createFailed"))
-    } finally {
-      setBusy(false)
-    }
+  function createBlank() {
+    saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
   }
 
   const previewPrecon = useCallback(
@@ -752,71 +670,29 @@ export function AddDeckScreen({
     setFocusedPreviewCard(focused)
   }
 
-  async function importPrecon() {
-    if (saveLocally && selectedPrecon && resolvedPrecon && !resolvedPrecon.unresolved.length) {
-      saveGuest({
-        name: resolvedPrecon.name || selectedPrecon.name,
-        format: format ? format : preconstructedFormat(selectedPrecon.type),
-        game,
-        cards: importCards(resolvedPrecon.cards),
-      })
-      return
-    }
-    if (access && !access.ready) {
-      access.request()
-      return
-    }
-    if (!capacityReady || !selectedPrecon || !resolvedPrecon || resolvedPrecon.unresolved.length)
-      return
-    try {
-      begin()
-      const deckId = await createImportedDeck({
-        name: resolvedPrecon.name || selectedPrecon.name,
-        format: format ? format : preconstructedFormat(selectedPrecon.type),
-        game,
-        cards: importCards(resolvedPrecon.cards),
-      })
-      onCreated(deckId)
-    } catch (cause) {
-      fail(cause, translate("decks:addDeck.importOfficialFailed"))
-    } finally {
-      setBusy(false)
-    }
+  function importPrecon() {
+    if (!selectedPrecon || !resolvedPrecon || resolvedPrecon.unresolved.length) return
+    saveGuest({
+      name: resolvedPrecon.name || selectedPrecon.name,
+      format: format ? format : preconstructedFormat(selectedPrecon.type),
+      game,
+      cards: importCards(resolvedPrecon.cards),
+    })
   }
 
-  async function importTopDeck() {
-    if (saveLocally && selectedCatalogDeck && catalogDetail) {
-      saveGuest({
-        name: selectedCatalogDeck.name,
-        format: selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
-        game: selectedCatalogDeck.game,
-        cards: catalogDetail.entries.map(
-          ({ _id, _creationTime, catalogDeckId: _catalogDeckId, ...entry }) => entry,
-        ),
-      })
-      return
-    }
-    if (access && !access.ready) {
-      access.request()
-      return
-    }
-    if (!capacityReady || !selectedCatalogDeck) return
-    try {
-      begin()
-      const deckId = await importCatalog({ catalogDeckId: selectedCatalogDeck._id })
-      onCreated(deckId)
-    } catch (cause) {
-      fail(cause, translate("decks:addDeck.importTopDeckFailed"))
-    } finally {
-      setBusy(false)
-    }
+  function importTopDeck() {
+    if (!selectedCatalogDeck || !catalogDetail) return
+    saveGuest({
+      name: selectedCatalogDeck.name,
+      format: selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
+      game: selectedCatalogDeck.game,
+      cards: catalogDetail.entries.map(
+        ({ _id, _creationTime, catalogDeckId: _catalogDeckId, ...entry }) => entry,
+      ),
+    })
   }
 
   async function reviewPasted() {
-    if (!guestMode && access && !access.ready) {
-      access.request()
-      return
-    }
     const token = ++pastedToken.current
     setResolvingPasted(true)
     setError(undefined)
@@ -883,7 +759,6 @@ export function AddDeckScreen({
   }
 
   function changeImportSource() {
-    if (busy) return
     invalidatePasted()
     setFocusedPreviewCard(undefined)
     setAddingPastedCard(false)
@@ -894,7 +769,6 @@ export function AddDeckScreen({
   }
 
   function editImport() {
-    if (busy) return
     setFocusedPreviewCard(undefined)
     if (editingPasted) Keyboard.dismiss()
     setEditingPasted((current) => !current)
@@ -913,13 +787,13 @@ export function AddDeckScreen({
 
   function changeImportQuantity(card: DeckCard, delta: number) {
     const draft = latestPastedDraft.current
-    if (!draft || busy) return
+    if (!draft) return
     if (card.quantity + delta <= 0) setFocusedPreviewCard(undefined)
     setPastedDraft({ ...draft, cards: adjustCardQuantity(draft.cards, card, delta) })
   }
 
   function changeImportFormat(next?: string) {
-    if (!next || !pastedDraft || busy) return
+    if (!next || !pastedDraft) return
     const normalized = normalizeImportedCards(pastedDraft.cards, game, next)
     if ("overflow" in normalized) {
       setError(translate("decks:addDeck.overflowOnFormat", { card: normalized.overflow }))
@@ -932,7 +806,6 @@ export function AddDeckScreen({
   }
 
   function addImportCard(card: GuestDeckPayload["cards"][number]) {
-    if (busy) return translate("decks:addDeck.waitForSave")
     const draft = latestPastedDraft.current
     if (!draft) return translate("decks:addDeck.reviewFirst")
     const cards = importableCards(draft)
@@ -951,7 +824,7 @@ export function AddDeckScreen({
     return undefined
   }
 
-  async function importPasted() {
+  function importPasted() {
     if (
       !pastedDraft ||
       !pastedDraftCurrent ||
@@ -960,31 +833,13 @@ export function AddDeckScreen({
       pastedCards.length === 0
     )
       return
-    if (!guestMode && access && !access.ready) {
-      access.request()
-      return
-    }
-    if (!capacityReady) return
-    const payload = {
+    saveGuest({
       name,
       format,
       game,
       ...(sourceAttribution ? { note: sourceAttribution } : {}),
       cards: pastedCards,
-    }
-    if (saveLocally) {
-      saveGuest(payload)
-      return
-    }
-    try {
-      begin()
-      const deckId = await createImportedDeck(payload)
-      onCreated(deckId)
-    } catch (cause) {
-      fail(cause, translate("decks:addDeck.importListFailed"))
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
   const noteField = (
@@ -997,9 +852,7 @@ export function AddDeckScreen({
       numberOfLines={3}
       textAlignVertical="top"
       maxLength={1000}
-      editable={!busy}
       onChangeText={(next) => {
-        if (busy) return
         setNote(next)
       }}
     />
@@ -1026,31 +879,15 @@ export function AddDeckScreen({
       {...(editingPasted && focusedImportCard
         ? {
             onIncrement:
-              busy ||
               focusedImportCard.quantity >= 999 ||
               isCommanderPick({ game, format }, focusedImportCard)
                 ? undefined
                 : () => changeImportQuantity(focusedImportCard, 1),
-            onDecrement: busy ? undefined : () => changeImportQuantity(focusedImportCard, -1),
+            onDecrement: () => changeImportQuantity(focusedImportCard, -1),
           }
         : {})}
     />
   ) : null
-  const capacityStatus =
-    !guestMode && (access?.ready ?? true) ? (
-      <>
-        <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
-        {atCapacity ? (
-          <Text
-            testID="saves-on-device-note"
-            size="xs"
-            style={themed($label)}
-            tx="decks:addDeck.savesOnDevice"
-          />
-        ) : null}
-      </>
-    ) : null
-
   const emptyCatalog = (
     <View style={themed($stack)}>
       <Text
@@ -1118,9 +955,9 @@ export function AddDeckScreen({
         <Header
           titleTx={editingPasted ? "decks:deckView.editTitle" : "decks:addDeck.reviewTitle"}
           leftTx="common:back"
-          onLeftPress={busy ? undefined : changeImportSource}
+          onLeftPress={changeImportSource}
           rightTx={editingPasted ? "common:done" : "common:edit"}
-          onRightPress={busy ? undefined : editImport}
+          onRightPress={editImport}
         />
         <ScrollView
           testID="pasted-deck-review"
@@ -1138,9 +975,7 @@ export function AddDeckScreen({
                   value={name}
                   maxLength={80}
                   helper={deckNameWarning(name)}
-                  editable={!busy}
                   onChangeText={(next) => {
-                    if (busy) return
                     setName(next)
                   }}
                 />
@@ -1149,7 +984,6 @@ export function AddDeckScreen({
                   label={translate("decks:settings.format")}
                   field="format"
                   value={format}
-                  disabled={busy}
                   options={deckFormats(game)}
                   onSelect={changeImportFormat}
                 />
@@ -1222,7 +1056,7 @@ export function AddDeckScreen({
               <Button
                 testID="omit-import-problems"
                 tx="decks:addDeck.removeProblems"
-                disabled={!pastedDraftCurrent || busy || resolvingPasted}
+                disabled={!pastedDraftCurrent || resolvingPasted}
                 onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
               />
             </View>
@@ -1237,11 +1071,9 @@ export function AddDeckScreen({
               <DeckCardSectionHeader
                 label={section.label}
                 quantity={section.entries.reduce((total, card) => total + card.quantity, 0)}
-                disabled={busy}
                 onChooseCommander={
                   editingPasted && singleCommander && section.id === "commander"
                     ? () => {
-                        if (busy) return
                         setFocusedPreviewCard(undefined)
                         setChoosingPastedCommander(true)
                         setAddingPastedCard(true)
@@ -1258,7 +1090,6 @@ export function AddDeckScreen({
                     game={game}
                     format={format}
                     editing={editingPasted}
-                    disabled={busy}
                     testID={`import-card-${section.id}-${index}`}
                     imageTestID={`import-card-thumbnail-${section.id}-${index}`}
                     imageSource={
@@ -1277,7 +1108,6 @@ export function AddDeckScreen({
           ))}
         </ScrollView>
         <BottomActionBar>
-          {capacityStatus}
           {commanderWarnings.map((warning) => (
             <Text key={warning} size="xs" text={warning} />
           ))}
@@ -1287,33 +1117,23 @@ export function AddDeckScreen({
                 testID="import-add-cards"
                 tx="decks:deckView.addCards"
                 onPress={() => {
-                  if (busy) return
                   setChoosingPastedCommander(false)
                   setAddingPastedCard(true)
                 }}
-                disabled={busy}
                 style={$flex1}
               />
             ) : null}
             <Button
               testID="save-import-button"
-              tx={
-                busy
-                  ? "decks:saving"
-                  : saveLocally
-                    ? "decks:addDeck.saveOnDevice"
-                    : "decks:addDeck.saveDeck"
-              }
+              tx="decks:addDeck.saveOnDevice"
               preset="reversed"
               style={$flex1}
               disabled={
-                busy ||
                 resolvingPasted ||
                 !pastedDraftCurrent ||
                 (!pastedDraft.omitted && pastedProblems.length > 0) ||
                 pastedCards.length === 0 ||
-                !name.trim() ||
-                (!capacityReady && !canRequestAccess)
+                !name.trim()
               }
               onPress={importPasted}
             />
@@ -1456,23 +1276,13 @@ export function AddDeckScreen({
           })}
         </ScrollView>
         <BottomActionBar>
-          {capacityStatus}
-          {!guestMode && access?.message ? (
-            <Button text={access.actionLabel ?? access.message} onPress={access.request} />
-          ) : null}
           {error ? <AlertNote text={error} /> : null}
 
           <Button
             testID="import-catalog-deck"
-            tx={
-              busy
-                ? "decks:addDeck.importing"
-                : saveLocally
-                  ? "decks:addDeck.saveDeckOnDevice"
-                  : "decks:addDeck.importDeck"
-            }
+            tx="decks:addDeck.saveDeckOnDevice"
             preset="reversed"
-            disabled={busy || (!capacityReady && !canRequestAccess) || !catalogDetail}
+            disabled={!catalogDetail}
             onPress={importTopDeck}
           />
         </BottomActionBar>
@@ -1495,12 +1305,7 @@ export function AddDeckScreen({
     const configuredSections = localizedDeckSections(game, previewFormat)
     const sections = previewSections(cards, configuredSections)
     const unresolved = resolvedPrecon?.unresolved.length ?? 0
-    const cannotImport =
-      busy ||
-      (!capacityReady && !canRequestAccess) ||
-      previewLoading ||
-      !resolvedPrecon ||
-      unresolved > 0
+    const cannotImport = previewLoading || !resolvedPrecon || unresolved > 0
 
     return (
       <Screen
@@ -1563,9 +1368,6 @@ export function AddDeckScreen({
               testID="retry-precon-preview"
             />
           ) : null}
-          {!guestMode && access?.message ? (
-            <Button text={access.actionLabel ?? access.message} onPress={access.request} />
-          ) : null}
           {error ? <AlertNote text={error} /> : null}
           {unresolved > 0 ? (
             <AlertNote text={translate("decks:addDeck.unresolvedCards", { count: unresolved })} />
@@ -1610,8 +1412,6 @@ export function AddDeckScreen({
           )}
         </ScrollView>
         <BottomActionBar>
-          {capacityStatus}
-
           <TouchableOpacity
             testID="import-preview-button"
             accessibilityRole="button"
@@ -1626,13 +1426,7 @@ export function AddDeckScreen({
             <Text
               weight="bold"
               style={themed($previewImportButtonText)}
-              tx={
-                busy
-                  ? "decks:addDeck.importing"
-                  : saveLocally
-                    ? "decks:addDeck.saveDeckOnDevice"
-                    : "decks:addDeck.importDeck"
-              }
+              tx="decks:addDeck.saveDeckOnDevice"
             />
           </TouchableOpacity>
         </BottomActionBar>
@@ -1889,9 +1683,9 @@ export function AddDeckScreen({
               <Button
                 testID="return-import-review-button"
                 tx="decks:addDeck.returnToReview"
-                disabled={resolvingPasted || busy}
+                disabled={resolvingPasted}
                 onPress={() => {
-                  if (resolvingPasted || busy) return
+                  if (resolvingPasted) return
                   Keyboard.dismiss()
                   setReviewingPasted(true)
                 }}
@@ -1911,7 +1705,7 @@ export function AddDeckScreen({
                         : translate("decks:addDeck.reviewList")
               }
               preset="reversed"
-              disabled={busy || resolvingPasted || !importSource.trim()}
+              disabled={resolvingPasted || !importSource.trim()}
               onPress={reviewPasted}
             />
           </View>
@@ -1929,19 +1723,15 @@ export function AddDeckScreen({
             />
             {noteField}
             <Button
-              tx={busy ? "decks:addDeck.creating" : "decks:addDeck.createDeck"}
+              tx="decks:addDeck.createDeck"
               preset="reversed"
-              disabled={busy || (!capacityReady && !canRequestAccess) || !name.trim()}
+              disabled={!name.trim()}
               onPress={createBlank}
             />
           </View>
         ) : null}
 
-        {!guestMode && access?.message ? (
-          <Button text={access.actionLabel ?? access.message} onPress={access.request} />
-        ) : null}
         {error ? <AlertNote text={error} /> : null}
-        {capacityStatus}
       </View>
     </Screen>
   )
@@ -1956,10 +1746,6 @@ const $flex1 = { flex: 1 } as const
 const $configRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xs,
-})
-const $capacityStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  justifyContent: "center",
-  paddingVertical: spacing.xxxs,
 })
 const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,

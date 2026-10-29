@@ -304,7 +304,7 @@ describe("ConnectedLobbyScreen", () => {
 
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
 
-    expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent("No decks yet.")
+    expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent("No synced decks yet.")
   })
 
   it("shows the deck rule and blocks a required lobby with a missing deck", () => {

@@ -25,7 +25,7 @@ import { allRecord, keyStatsRecord, type DeckStatsRecord } from "@/features/deck
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
-import { LocalDeckSyncNotice } from "@/features/decks/LocalDeckSyncNotice"
+import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import { translate } from "@/i18n/translate"
@@ -452,13 +452,6 @@ function DeckShelf({
       stickySectionHeadersEnabled={false}
       ListHeaderComponent={
         <View>
-          {access?.ready ? (
-            <LocalDeckSyncNotice
-              key={access.ownerId}
-              access={access}
-              excludedLocalIds={leftovers.localIds}
-            />
-          ) : null}
           {leftovers.error ? (
             <View>
               <Text tx="decks:localSync.failed" />
@@ -484,7 +477,11 @@ function DeckShelf({
       }
       renderSectionHeader={({ section }) =>
         section.key === "local" ? (
-          <Text size="xs" tx="decks:shelf.onDevice" />
+          <LocalDeckSyncHeader
+            key={access?.ownerId}
+            access={access}
+            excludedLocalIds={leftovers.localIds}
+          />
         ) : (
           <Text size="xs" tx="decks:shelf.synced" />
         )
