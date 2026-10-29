@@ -74,6 +74,16 @@ describe("local deck sync header", () => {
     expect(renderHeader().queryByTestId("local-deck-sync-choose")).toBeNull()
   })
 
+  it("asks to make room instead of syncing when synced decks are full", () => {
+    mockCapacity = { used: 2, limit: 2, premium: false, canCreate: false }
+    saveGuestDeck({ name: "Elves", format: "commander", cards: [] })
+    const view = renderHeader()
+    fireEvent.press(view.getByTestId("local-deck-sync-choose"))
+    expect(view.getByTestId("deck-limit-dialog")).toBeTruthy()
+    expect(view.queryByTestId("local-deck-sync-picker")).toBeNull()
+    expect(mockImportGuest).not.toHaveBeenCalled()
+  })
+
   it("offers no sync without an account", () => {
     saveGuestDeck({ name: "Elves", format: "commander", cards: [] })
     const signedOut = { ...access, ready: false, signedIn: false, ownerId: undefined }

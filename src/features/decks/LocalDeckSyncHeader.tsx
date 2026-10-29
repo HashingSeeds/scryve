@@ -14,6 +14,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { DeckLimitDialog } from "./DeckLimit"
 import { useGuestDecks } from "./guestDeck"
 import { useLocalDeckSync } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
@@ -37,18 +38,29 @@ export function LocalDeckSyncHeader({
   const localDecks = useUnsyncedDecks(excludedLocalIds)
   const capacity = useQuery(api.decks.capacity, access?.ready && ownerId ? {} : "skip")
   const [picking, setPicking] = useState(false)
+  const [makingRoom, setMakingRoom] = useState(false)
   const free = capacity ? capacity.limit - capacity.used : 0
   return (
     <View testID="local-deck-sync-header" style={themed($row)}>
       <Text size="xs" tx="decks:shelf.onDevice" style={$flex1} />
-      {ownerId && capacity && free > 0 && localDecks.length ? (
+      {ownerId && capacity && localDecks.length ? (
         <Button
           testID="local-deck-sync-choose"
           tx="decks:localSync.sync"
-          onPress={() => setPicking(true)}
+          onPress={() => (free > 0 ? setPicking(true) : setMakingRoom(true))}
         />
       ) : null}
-      {ownerId && capacity && picking ? (
+      {makingRoom ? (
+        <DeckLimitDialog
+          access={access}
+          onClose={() => setMakingRoom(false)}
+          onRoomMade={() => {
+            setMakingRoom(false)
+            setPicking(true)
+          }}
+        />
+      ) : null}
+      {ownerId && capacity && picking && free > 0 ? (
         <LocalDeckSyncPicker
           ownerId={ownerId}
           excludedLocalIds={excludedLocalIds}
