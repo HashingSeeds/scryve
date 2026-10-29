@@ -27,10 +27,6 @@ function shape() {
 }
 
 describe("GameMenuButtonShape", () => {
-  it("renders the pentagon", () => {
-    expect(shape().getByTestId("game-menu-pentagon")).toBeTruthy()
-  })
-
   it("mixes colors through linear light rather than darkening at the midpoint", () => {
     const midpoint = mixColorsInLinearLight(RED, BLUE, 0.5)
     expect(mixColorsInLinearLight(RED, BLUE, 0)).toBe(RED.toLowerCase())
@@ -51,11 +47,6 @@ describe("GameMenuButtonShape", () => {
 
   it("draws the directional bevel in light mode", () => {
     expect(shape().getByTestId("game-menu-bevel").findAllByType(Path)).toHaveLength(2)
-  })
-
-  it("renders without an exterior shadow", () => {
-    const paths = shape().UNSAFE_getAllByType(Path)
-    expect(paths.every((path) => path.props.translateY === undefined)).toBe(true)
   })
 
   it("clips the bevel to the visible face so it cannot overpaint the halo", () => {

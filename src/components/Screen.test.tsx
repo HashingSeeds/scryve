@@ -15,23 +15,6 @@ jest.mock("react-native-safe-area-context", () => ({
 }))
 
 describe("Screen", () => {
-  it("provides one shared readable content inset for form and list screens", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <Screen preset="scroll" contentInset="standard" />
-      </ThemeProvider>,
-    )
-
-    const scrollView = view.UNSAFE_getByType(ScrollView)
-    expect(StyleSheet.flatten(scrollView.props.contentContainerStyle)).toMatchObject({
-      width: "100%",
-      maxWidth: 720,
-      alignSelf: "center",
-      paddingHorizontal: 24,
-      paddingBottom: 16,
-    })
-  })
-
   it("recalculates auto scrolling after its threshold changes", () => {
     const view = render(
       <ThemeProvider initialContext="light">

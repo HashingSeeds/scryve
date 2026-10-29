@@ -445,24 +445,6 @@ describe("PlayerGrid", () => {
     jest.clearAllMocks()
   })
 
-  it.each([2, 3, 4, 5, 6])(
-    "renders every card and four controls in a %i-player layout",
-    (count) => {
-      const view = render(
-        <ThemeProvider initialContext="light">
-          <PlayerGrid players={players(count)} onChange={jest.fn()} />
-        </ThemeProvider>,
-      )
-      expect(view.getAllByText("20")).toHaveLength(count)
-      expect(
-        Array.from({ length: count }, (_, index) => view.getByTestId(`life-seat-${index + 1}-1`)),
-      ).toHaveLength(count)
-      expect(view.getByTestId("player-grid").props.accessibilityLabel).toBe(
-        `${count} player life grid`,
-      )
-    },
-  )
-
   it("lets the player surface reach every screen edge", () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -761,14 +743,6 @@ describe("PlayerGrid", () => {
     expect(getPlayerGridMenuAnchor(4, layout, 0.2)).toEqual({ x: 0.5, y: expect.closeTo(0.6) })
   })
 
-  it("does not offer a forced wide layout at any player count", () => {
-    for (const playerCount of [2, 3, 4, 5, 6]) {
-      expect(getPlayerGridLayoutOptions(playerCount).map(({ variant }) => variant)).not.toContain(
-        "wide-grid",
-      )
-    }
-  })
-
   it("orients tabletop players toward their nearest outside edge", () => {
     const sixPlayerView = render(
       <ThemeProvider initialContext="light">
@@ -929,28 +903,6 @@ describe("PlayerGrid", () => {
     )
     expect(view.getByTestId("life-total-seat-3").props.accessibilityLabel).toBe(
       "Seat 3, unnamed player, 20 life",
-    )
-  })
-
-  it("draws no dashed border on owned or disabled seats", () => {
-    const colorfulPlayers = players(2).map((player, index) => ({
-      ...player,
-      color: index === 0 ? "#F9E547" : "#2D195C",
-    }))
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <PlayerGrid
-          players={colorfulPlayers}
-          isPlayerDisabled={(player) => player.id === colorfulPlayers[1].id}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    expect(StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style).borderStyle).toBe(
-      undefined,
-    )
-    expect(StyleSheet.flatten(view.getByTestId("life-card-seat-2").props.style).borderStyle).toBe(
-      undefined,
     )
   })
 

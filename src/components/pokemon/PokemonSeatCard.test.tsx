@@ -228,22 +228,6 @@ describe("PokemonSeatCard", () => {
     expect(onPress).toHaveBeenCalledTimes(1)
   })
 
-  it("shows the Active's remaining HP and moves it by the damage step from the tap halves", () => {
-    const table = pokemonTable(["Ada", "Grace"])
-    const me = table.game().players[0].id
-    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
-    render(<Seat harness={table} seat={0} />)
-
-    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("330")
-    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
-    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
-    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("310")
-    expect(screen.getByText("20 damage · 330 HP")).toBeTruthy()
-
-    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1--10"))
-    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("320")
-  })
-
   it("lowers HP from the − side and raises it from the + side", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const me = table.game().players[0].id
@@ -258,6 +242,7 @@ describe("PokemonSeatCard", () => {
     const hero = within(screen.getByTestId("pokemon-hero-seat-1"))
     fireEvent.press(hero.getByText("−"))
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("270")
+    expect(screen.getByText("60 damage · 330 HP")).toBeTruthy()
     expect(hero.getByText("-10")).toBeTruthy()
 
     fireEvent.press(hero.getByText("+"))
@@ -488,12 +473,21 @@ describe("PokemonSeatCard", () => {
     table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
     table.actions.placePokemon(me, "bench", { name: "Pidgeot ex", hp: 280, prizes: 2 })
     const onChangePrizes = jest.fn()
-    render(<Seat harness={table} seat={0} ownership="unowned" onChangePrizes={onChangePrizes} />)
+    render(
+      <Seat
+        harness={table}
+        seat={0}
+        prizes={4}
+        ownership="unowned"
+        onChangePrizes={onChangePrizes}
+      />,
+    )
 
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("330")
     expect(screen.queryByTestId("pokemon-damage-seat-1-10")).toBeNull()
     expect(screen.queryByTestId("pokemon-bench-add-seat-1")).toBeNull()
     fireEvent.press(screen.getByTestId("pokemon-prizes-seat-1"))
+    fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "keyDown", { key: "ArrowUp" })
     expect(onChangePrizes).not.toHaveBeenCalled()
   })
 
@@ -640,22 +634,6 @@ describe("PokemonSeatCard", () => {
     fireEvent(prizes, "accessibilityAction", { nativeEvent: { actionName: "longpress" } })
     fireEvent(prizes, "keyDown", { key: "ArrowUp" })
     expect(onChangePrizes.mock.calls).toEqual([[1], [1]])
-  })
-
-  it("ignores prize shortcuts on a seat this device does not control", () => {
-    const table = pokemonTable(["Ada", "Grace"])
-    const onChangePrizes = jest.fn()
-    render(
-      <Seat
-        harness={table}
-        seat={0}
-        prizes={4}
-        ownership="unowned"
-        onChangePrizes={onChangePrizes}
-      />,
-    )
-    fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "keyDown", { key: "ArrowUp" })
-    expect(onChangePrizes).not.toHaveBeenCalled()
   })
 
   it("keeps a bench Pokémon focused when its chip is tapped again", () => {

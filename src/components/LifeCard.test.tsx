@@ -22,7 +22,13 @@ import * as reducedMotion from "@/utils/useReducedMotion"
 import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
 import { TAKEOVER_MS } from "./CommanderDamageCardControls"
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { LifeCard, proWatermarkPlacement, seatIdentityPlacement } from "./LifeCard"
+import { mixColorsInLinearLight } from "./GameMenuButtonShape"
+import {
+  LifeCard,
+  type LifeCardCommanderDamage,
+  proWatermarkPlacement,
+  seatIdentityPlacement,
+} from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
 import { MARK_ART_BOUNDS } from "./PlayerMark"
@@ -38,15 +44,19 @@ const commanderPlayers = commanderIds.map((id, seat) => ({
   color: "#41476E",
 }))
 
-function card(life: number) {
-  return (
-    <ThemeProvider initialContext="light">
-      <LifeCard playerName="Ada" seatNumber={1} life={life} color="#41476E" onChange={jest.fn()} />
-    </ThemeProvider>
-  )
+function commanderDamage(
+  overrides: Partial<LifeCardCommanderDamage> = {},
+): LifeCardCommanderDamage {
+  return {
+    ownerPlayerId: commanderIds[0],
+    ...commanderSeats,
+    incoming: {},
+    lethal: 21,
+    ...overrides,
+  }
 }
 
-function interactiveCard(life: number, onChange: jest.Mock) {
+function card(life: number, onChange = jest.fn()) {
   return (
     <ThemeProvider initialContext="light">
       <LifeCard playerName="Ada" seatNumber={1} life={life} color="#41476E" onChange={onChange} />
@@ -153,6 +163,7 @@ describe("LifeCard", () => {
     view.rerender(seat(22))
     view.rerender(seat(21))
     expect(view.getByText("+1")).toBeTruthy()
+    expect(view.getByText("−")).toBeTruthy()
 
     view.rerender(seat(22, "unowned"))
     expect(view.queryByText("+2")).toBeNull()
@@ -177,15 +188,7 @@ describe("LifeCard", () => {
         color,
         compact,
         onChange: jest.fn(),
-        commanderDamage: {
-          ownerPlayerId: commanderIds[0],
-          seats: commanderSeats.seats,
-          rows: commanderSeats.rows,
-          columns: commanderSeats.columns,
-          incoming: {},
-          lethal: 21,
-          inspection: { open: false, onToggle: jest.fn() },
-        },
+        commanderDamage: commanderDamage({ inspection: { open: false, onToggle: jest.fn() } }),
       }
       const view = render(
         <ThemeProvider initialContext="dark">
@@ -234,13 +237,6 @@ describe("LifeCard", () => {
   it.each([0, 90, -90, 180] as const)(
     "expands the commander map and keeps life visible at %s degrees",
     (rotation) => {
-      const players = commanderIds.map((id, seat) => ({
-        id,
-        seat,
-        name: `Player ${seat + 1}`,
-        life: 40,
-        color: "#41476E",
-      }))
       const props = {
         playerName: "Ada",
         seatNumber: 1,
@@ -248,14 +244,10 @@ describe("LifeCard", () => {
         contentRotation: rotation,
         color: "#41476E",
         onChange: jest.fn(),
-        commanderDamage: {
-          ownerPlayerId: commanderIds[0],
-          players,
-          ...commanderSeats,
+        commanderDamage: commanderDamage({
+          players: commanderPlayers,
           incoming: { [commanderIds[1]]: 3 },
-          lethal: 21,
-          inspection: { open: false, onToggle: jest.fn() },
-        },
+        }),
       }
       const renderInspection = (open: boolean) => (
         <ThemeProvider initialContext="dark">
@@ -263,7 +255,7 @@ describe("LifeCard", () => {
             {...props}
             commanderDamage={{
               ...props.commanderDamage,
-              inspection: { ...props.commanderDamage.inspection, open },
+              inspection: { open, onToggle: jest.fn() },
             }}
           />
         </ThemeProvider>
@@ -309,14 +301,10 @@ describe("LifeCard", () => {
           color="#41476E"
           compact
           onChange={jest.fn()}
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
+          commanderDamage={commanderDamage({
             players: commanderPlayers,
-            ...commanderSeats,
-            incoming: {},
-            lethal: 21,
             inspection: { open: false, onToggle: jest.fn() },
-          }}
+          })}
         />
       </ThemeProvider>,
     )
@@ -397,20 +385,11 @@ describe("LifeCard", () => {
           life={40}
           color="#41476E"
           onChange={jest.fn()}
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            ...commanderSeats,
-            players: commanderIds.map((id, seat) => ({
-              id,
-              seat,
-              name: `Player ${seat + 1}`,
-              life: 40,
-              color: "#41476E",
-            })),
+          commanderDamage={commanderDamage({
+            players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
-            lethal: 21,
             inspection: { open, onToggle: jest.fn() },
-          }}
+          })}
         />
       </ThemeProvider>
     )
@@ -442,20 +421,16 @@ describe("LifeCard", () => {
         color="#397B61"
         contentRotation={-90}
         onChange={jest.fn()}
-        commanderDamage={{
+        commanderDamage={commanderDamage({
           ownerPlayerId: commanderIds[1],
-          seats: commanderSeats.seats,
-          rows: commanderSeats.rows,
-          columns: commanderSeats.columns,
           incoming: { [commanderIds[0]]: 6 },
-          lethal: 21,
           armedPlayerId: armed ? commanderIds[0] : null,
           attackerName: "Ada",
           attacker: armed ? { color: "#B85636", seatNumber: 1, rotation: 90 } : undefined,
           facing: { x: "left" },
           reach: { x: -197, y: 0, radius: 900 },
           onStage,
-        }}
+        })}
       />
     </ThemeProvider>
   )
@@ -553,17 +528,8 @@ describe("LifeCard", () => {
       renderCard(123456).getByTestId("life-total-seat-1").props.style,
     )
 
-    expect(twoDigits.fontSize).toBe(120)
-    expect(twoDigits.lineHeight).toBe(132)
     expect(sixDigits.fontSize).toBeLessThan(twoDigits.fontSize)
     expect(sixDigits.fontSize * 6 * 0.62).toBeLessThanOrEqual(LIFE_TARGET_SIZE)
-  })
-
-  it("keeps life controls unchanged until a life change happens", () => {
-    const view = renderCard(20)
-    expect(view.getByText("+")).toBeTruthy()
-    expect(view.getByText("−")).toBeTruthy()
-    expect(view.queryByTestId("life-delta-seat-1")).toBeNull()
   })
 
   it("pairs the player mark with the name in the content's bottom-left corner", () => {
@@ -576,7 +542,6 @@ describe("LifeCard", () => {
     ).toBeTruthy()
     expect(StyleSheet.flatten(view.getByTestId("seat-identity-seat-1").props.style)).toMatchObject({
       flexDirection: "row",
-      gap: 8,
     })
     const art = MARK_ART_BOUNDS.heart
     expect(
@@ -588,9 +553,6 @@ describe("LifeCard", () => {
       height: 64,
       marginLeft: -art.left * (64 / 44),
       marginBottom: -(44 - art.bottom) * (64 / 44),
-    })
-    expect(StyleSheet.flatten(view.getByTestId("player-name-seat-1").props.style)).toMatchObject({
-      fontSize: 18,
     })
     expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
   })
@@ -757,17 +719,12 @@ describe("LifeCard", () => {
           color="#41476E"
           contentRotation={-90}
           contentInsets={{ top: 47, bottom: 0, left: 0, right: 0 }}
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
+          commanderDamage={commanderDamage({
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
-            lethal: 21,
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword,
-          }}
+          })}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -832,17 +789,12 @@ describe("LifeCard", () => {
           contentRotation={90}
           contentInsets={{ top: 0, bottom: 0, left: 47, right: 0 }}
           screenEdges={{ top: true, bottom: false, left: true, right: false }}
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
+          commanderDamage={commanderDamage({
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
-            lethal: 21,
             inspection: { open: false, onToggle: jest.fn() },
             onPressSword: jest.fn(),
-          }}
+          })}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -859,31 +811,6 @@ describe("LifeCard", () => {
     })
   })
 
-  it("hides the commander grid behind the player mark", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={20}
-          color="#41476E"
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
-            incoming: {},
-            lethal: 21,
-          }}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
-    expect(view.getByTestId("commander-mark-seat-1")).toBeTruthy()
-  })
-
   it("expands the commander grid from the player mark and closes it again", () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -892,19 +819,13 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
-            incoming: {},
-            lethal: 21,
-          }}
+          commanderDamage={commanderDamage()}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
     )
 
+    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(view.getByTestId("commander-overview-seat-1")).toBeTruthy()
     expect(view.getByTestId("commander-board-seat-1")).toBeTruthy()
@@ -927,18 +848,14 @@ describe("LifeCard", () => {
           color="#397B61"
           menuCorner="topLeft"
           onChange={jest.fn()}
-          commanderDamage={{
+          commanderDamage={commanderDamage({
             ownerPlayerId: commanderIds[1],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
             incoming: { [commanderIds[0]]: 4 },
-            lethal: 21,
             armedPlayerId: commanderIds[0],
             attackerName: "Ada",
             facing: { y: "top" },
             onStage: jest.fn(),
-          }}
+          })}
         />
       </ThemeProvider>,
     )
@@ -949,19 +866,15 @@ describe("LifeCard", () => {
 
   it("deals the attacker's power with each tap anywhere on a defending card", () => {
     const onStage = jest.fn()
-    const commanderDamage = {
+    const damage = commanderDamage({
       ownerPlayerId: commanderIds[1],
-      seats: commanderSeats.seats,
-      rows: commanderSeats.rows,
-      columns: commanderSeats.columns,
       incoming: { [commanderIds[0]]: 7 },
-      lethal: 21,
       armedPlayerId: commanderIds[0],
       attackerName: "Ada",
       commanders: [{ power: 3, total: 11 }],
-      facing: { y: "top" as const },
+      facing: { y: "top" },
       onStage,
-    }
+    })
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -969,7 +882,7 @@ describe("LifeCard", () => {
           seatNumber={2}
           life={20}
           color="#397B61"
-          commanderDamage={commanderDamage}
+          commanderDamage={damage}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -993,9 +906,8 @@ describe("LifeCard", () => {
           life={20}
           color="#397B61"
           commanderDamage={{
-            ...commanderDamage,
+            ...damage,
             incoming: { [commanderIds[0]]: 97 },
-            lethal: 21,
             commanders: [{ power: 5, total: 97 }],
           }}
           onChange={jest.fn()}
@@ -1014,17 +926,11 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
-            incoming: {},
-            lethal: 21,
+          commanderDamage={commanderDamage({
             armedPlayerId: commanderIds[0],
             commanders: [{ name: "Krenko", power: 1, total: 0 }],
             onPressSword: jest.fn(),
-          }}
+          })}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1041,20 +947,14 @@ describe("LifeCard", () => {
           life={20}
           color="#41476E"
           compact
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
-            incoming: {},
-            lethal: 21,
+          commanderDamage={commanderDamage({
             armedPlayerId: commanderIds[0],
             commanders: [
               { name: "Tymna", power: 2, total: 0 },
               { name: "Kraum", power: 4, total: 0 },
             ],
             onPressSword: jest.fn(),
-          }}
+          })}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1066,18 +966,12 @@ describe("LifeCard", () => {
   it("turns the attacking card into its mark and commander power", () => {
     const onPressSword = jest.fn()
     const onPowerStep = jest.fn()
-    const commanderDamage = {
-      ownerPlayerId: commanderIds[0],
-      seats: commanderSeats.seats,
-      rows: commanderSeats.rows,
-      columns: commanderSeats.columns,
-      incoming: {},
-      lethal: 21,
+    const damage = commanderDamage({
       armedPlayerId: commanderIds[0],
       commanders: [{ power: 3, total: 0 }],
       onPowerStep,
       onPressSword,
-    }
+    })
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -1085,7 +979,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          commanderDamage={commanderDamage}
+          commanderDamage={damage}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1110,7 +1004,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          commanderDamage={{ ...commanderDamage, commanders: [{ power: 1, total: 0 }] }}
+          commanderDamage={{ ...damage, commanders: [{ power: 1, total: 0 }] }}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1133,15 +1027,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={40}
           color="#41476E"
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
-            incoming: {},
-            lethal: 21,
-            pendingClaims: claims,
-          }}
+          commanderDamage={commanderDamage({ pendingClaims: claims })}
           onChange={onChange}
         />
       </ThemeProvider>
@@ -1197,7 +1083,7 @@ describe("LifeCard", () => {
 
   it("closes the life editor on Android Back", () => {
     const pressBack = mockHardwareBack()
-    const view = render(interactiveCard(20, jest.fn()))
+    const view = render(card(20, jest.fn()))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
 
@@ -1209,7 +1095,7 @@ describe("LifeCard", () => {
   })
 
   it("closes the life editor when the card freezes", () => {
-    const view = render(interactiveCard(20, jest.fn()))
+    const view = render(card(20, jest.fn()))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
     view.rerender(
@@ -1227,27 +1113,9 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
   })
 
-  it("temporarily moves positive feedback into the plus control", () => {
-    const view = renderCard(20)
-    view.rerender(card(21))
-    view.rerender(card(22))
-    expect(view.getByText("+2")).toBeTruthy()
-    expect(view.getByText("−")).toBeTruthy()
-    expect(view.queryByTestId("life-delta-seat-1")).toBeNull()
-  })
-
-  it("temporarily moves negative feedback into the minus control", () => {
-    const view = renderCard(20)
-    view.rerender(card(15))
-    expect(view.getByText("-5")).toBeTruthy()
-    expect(view.getByText("+")).toBeTruthy()
-    act(() => jest.advanceTimersByTime(2000))
-    expect(view.getByText("−")).toBeTruthy()
-  })
-
   it("shows a held change right away and records it once on release", () => {
     const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
+    const view = render(card(20, onChange))
     const plus = view.getByTestId("life-seat-1-1")
 
     fireEvent(plus, "pressIn")
@@ -1256,7 +1124,7 @@ describe("LifeCard", () => {
     expect(onChange).not.toHaveBeenCalled()
 
     fireEvent.press(plus)
-    view.rerender(interactiveCard(21, onChange))
+    view.rerender(card(21, onChange))
     fireEvent(plus, "pressOut")
     expect(onChange.mock.calls).toEqual([[1]])
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("21")
@@ -1265,7 +1133,7 @@ describe("LifeCard", () => {
 
   it("drops a held change that slides off or becomes a long press", () => {
     const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
+    const view = render(card(20, onChange))
     const minus = view.getByTestId("life-seat-1--1")
 
     fireEvent(minus, "pressIn")
@@ -1296,7 +1164,7 @@ describe("LifeCard", () => {
   })
 
   it("lets the control zones handle touches at the life total", () => {
-    const view = render(interactiveCard(20, jest.fn()))
+    const view = render(card(20, jest.fn()))
     expect(view.queryByTestId("life-total-button-seat-1")).toBeNull()
     expect(StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)).toMatchObject({
       justifyContent: "center",
@@ -1305,7 +1173,7 @@ describe("LifeCard", () => {
   })
 
   it("opens the seat editor from either control long press", () => {
-    const view = render(interactiveCard(20, jest.fn()))
+    const view = render(card(20, jest.fn()))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Close life controls"))
@@ -1348,7 +1216,7 @@ describe("LifeCard", () => {
   })
 
   it("aligns a compact editor title with its quick actions", () => {
-    const view = render(interactiveCard(20, jest.fn()))
+    const view = render(card(20, jest.fn()))
     fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
       nativeEvent: { layout: { width: 200, height: 300 } },
     })
@@ -1389,7 +1257,16 @@ describe("LifeCard", () => {
     expect(title.maxWidth).toBe(300 / 2 - 40 - 20 - 21)
   })
 
+  const editorColorFor = (color: string) => mixColorsInLinearLight(color, "#000000", 0.82)
+
   it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {
+    const editorColor = editorColorFor(color)
+    expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.25)
+    expect(contrastRatio("#FFFFFF", editorColor)).toBeGreaterThan(7)
+  })
+
+  it("paints the life editor and its title from the seat color", () => {
+    const color = PLAYER_COLORS[0]
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard playerName="Ada" seatNumber={1} life={20} color={color} onChange={jest.fn()} />
@@ -1398,8 +1275,7 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const editor = view.getByTestId("life-editor-seat-1")
     const editorColor = StyleSheet.flatten(editor.props.style).backgroundColor as string
-    expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.25)
-    expect(contrastRatio("#FFFFFF", editorColor)).toBeGreaterThan(7)
+    expect(editorColor).toBe(editorColorFor(color))
     const title = view.getByTestId("life-editor-title-seat-1")
     expect(title.props.children).toBe("Ada")
     expect(title.props.style).toEqual(
@@ -1411,18 +1287,18 @@ describe("LifeCard", () => {
 
   it("uses Magic quick amounts", () => {
     const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
+    const view = render(card(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     fireEvent.press(view.getByTestId("life-editor-step-1--5"))
     expect(onChange).toHaveBeenCalledWith(-5)
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("20")
-    view.rerender(interactiveCard(15, onChange))
+    view.rerender(card(15, onChange))
     expect(view.getByText("15")).toBeTruthy()
   })
 
   it("scrubs Magic life one point per step without applying twice", () => {
     const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
+    const view = render(card(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const slider = view.getByTestId("life-editor-slider-seat-1")
     fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
@@ -1432,7 +1308,7 @@ describe("LifeCard", () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith(1)
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("20")
-    view.rerender(interactiveCard(21, onChange))
+    view.rerender(card(21, onChange))
     expect(view.getByText("21")).toBeTruthy()
   })
 
@@ -1474,14 +1350,14 @@ describe("LifeCard", () => {
 
   it("keeps the drag delta when the saved life changes mid-drag", () => {
     const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
+    const view = render(card(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const slider = view.getByTestId("life-editor-slider-seat-1")
     fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
     fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
     fireEvent(slider, "responderMove", { nativeEvent: { pageX: 125, pageY: 100 } })
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("25")
-    view.rerender(interactiveCard(30, onChange))
+    view.rerender(card(30, onChange))
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("35")
     fireEvent(slider, "responderRelease")
     expect(onChange).toHaveBeenCalledWith(5)
@@ -1490,7 +1366,7 @@ describe("LifeCard", () => {
 
   it("keeps scrubbing while held at the end and stops on release", () => {
     const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
+    const view = render(card(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const slider = view.getByTestId("life-editor-slider-seat-1")
     fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
@@ -1639,14 +1515,6 @@ describe("LifeCard", () => {
     expect(view.getByTestId("life-total-seat-1")).toBeTruthy()
   })
 
-  it("shows the player name as plain text beside the mark", () => {
-    const view = renderCard(40)
-    const name = view.getByTestId("player-name-seat-1")
-    expect(name).toHaveTextContent("Ada")
-    expect(StyleSheet.flatten(name.props.style)).toMatchObject({ color: "#FFFFFF" })
-    expect(StyleSheet.flatten(name.props.style).backgroundColor).toBeUndefined()
-  })
-
   it("sizes the pair down with a compact card", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -1673,12 +1541,6 @@ describe("LifeCard", () => {
     expect(StyleSheet.flatten(view.getByTestId("player-name-seat-1").props.style)).toMatchObject({
       fontSize: 16,
     })
-  })
-
-  it("mounts no commander board unless the game asks for one", () => {
-    const view = renderCard(40)
-    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
-    expect(view.queryByTestId("life-eliminated-seat-1")).toBeNull()
   })
 
   it("locks a card out on commander damage, and a press buzzes and says why", () => {

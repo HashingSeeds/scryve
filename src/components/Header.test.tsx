@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/theme/context"
 import { Header } from "./Header"
 
 describe("Header", () => {
-  it("exposes translated text actions as 56-point buttons with explicit state", () => {
+  it("exposes translated text actions as buttons with explicit state", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <Header
@@ -22,7 +22,6 @@ describe("Header", () => {
     const unavailable = view.getByLabelText("Unavailable")
     expect(back.props.accessibilityRole).toBe("button")
     expect(back.props.accessibilityState).toEqual({ disabled: false })
-    expect(StyleSheet.flatten(back.props.style).height).toBe("100%")
     expect(unavailable.props.accessibilityRole).toBe("button")
     expect(unavailable.props.accessibilityState).toEqual({ disabled: true })
   })

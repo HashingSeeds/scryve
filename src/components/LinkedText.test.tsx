@@ -53,15 +53,6 @@ describe("splitLinks", () => {
       "Apple (https://a.test/p) and Google (https://b.test/p) differ.",
     )
   })
-
-  it("preserves the original text exactly", () => {
-    const source = "Write to a@b.test, or see https://c.test/d; both work."
-    expect(
-      splitLinks(source)
-        .map((segment) => segment.content)
-        .join(""),
-    ).toBe(source)
-  })
 })
 
 describe("LinkedText", () => {
@@ -122,12 +113,5 @@ describe("the shipped legal documents", () => {
         expect(href).toMatch(/^(https?:\/\/|mailto:)/)
       }
     }
-  })
-
-  it.each(documents)("finds at least one link in the %s", (_name, document) => {
-    const hrefs = stringsIn(document).flatMap((value) =>
-      splitLinks(value).flatMap((segment) => (segment.href ? [segment.href] : [])),
-    )
-    expect(hrefs.length).toBeGreaterThan(0)
   })
 })

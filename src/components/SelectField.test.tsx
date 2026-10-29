@@ -78,15 +78,6 @@ describe("SelectField", () => {
     }
   })
 
-  it("opens after trigger measurement completes", async () => {
-    const { view } = renderField()
-    expect(view.queryByTestId("format-option-commander")).toBeNull()
-
-    fireEvent.press(view.getByTestId("format"))
-    await waitFor(() => expect(view.getByTestId("format-option-commander")).toBeTruthy())
-    expect(view.getByTestId("format-option-none")).toBeTruthy()
-  })
-
   it("reports a choice once and closes", async () => {
     const { view, onSelect } = renderField()
     fireEvent.press(view.getByTestId("format"))

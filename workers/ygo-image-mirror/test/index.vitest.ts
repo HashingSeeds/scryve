@@ -45,6 +45,7 @@ describe("Yu-Gi-Oh image mirror Worker runtime", () => {
     const missing = await worker.fetch(new Request(URL), env)
     expect(missing.status).toBe(404)
     expect(missing.headers.get("cache-control")).toBe("no-store")
+    expect(missing.headers.get("access-control-allow-origin")).toBe("*")
 
     const unauthorized = await worker.fetch(
       new Request("https://images.example/mirror", {

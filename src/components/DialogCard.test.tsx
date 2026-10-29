@@ -33,16 +33,10 @@ function renderDialog(props: Partial<React.ComponentProps<typeof DialogCard>> = 
 }
 
 describe("DialogCard", () => {
-  it("renders children behind the labelled backdrop and dialog testIDs", () => {
-    const { view } = renderDialog()
-
-    expect(view.getByTestId("dialog-backdrop").props.accessibilityLabel).toBe("Close the dialog")
-    expect(view.getByTestId("dialog-card")).toBeTruthy()
-    expect(view.getByText("Dialog body")).toBeTruthy()
-  })
-
   it("closes when the backdrop is pressed and swallows dialog taps", () => {
     const { view, onClose } = renderDialog()
+    expect(view.getByTestId("dialog-backdrop").props.accessibilityLabel).toBe("Close the dialog")
+    expect(view.getByText("Dialog body")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("dialog-card"))
     expect(onClose).not.toHaveBeenCalled()

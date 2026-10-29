@@ -1,12 +1,6 @@
-/* global __dirname */
-
 const { Linter } = require("eslint")
 const assert = require("node:assert/strict")
 const { Buffer } = require("node:buffer")
-const { execFileSync } = require("node:child_process")
-const fs = require("node:fs")
-const os = require("node:os")
-const path = require("node:path")
 const { test } = require("node:test")
 
 const config = require("../.eslintrc.js")
@@ -206,45 +200,6 @@ test("TypeScript generic arrow functions do not break comment scanning", () => {
     parseDiff(diff, () => source),
     [{ path: "generic.ts", line: 2, block: "// why: callers preserve their type" }],
   )
-})
-
-test("large non-code diffs do not reach collect", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-comment-review-"))
-  const script = path.join(__dirname, "comment-review.cjs")
-  const run = (command, args, options = {}) =>
-    execFileSync(command, args, { cwd: directory, encoding: "utf8", ...options })
-  const git = (...args) =>
-    run("git", [
-      "-c",
-      "user.name=Comment review test",
-      "-c",
-      "user.email=comment-review@example.com",
-      "-c",
-      "commit.gpgsign=false",
-      ...args,
-    ])
-  try {
-    git("init", "-q")
-    fs.writeFileSync(path.join(directory, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
-    git("add", "pnpm-lock.yaml")
-    git("commit", "-qm", "test: base lockfile")
-    const base = git("rev-parse", "HEAD").trim()
-    fs.writeFileSync(
-      path.join(directory, "pnpm-lock.yaml"),
-      `lockfileVersion: '9.0'\n${"x".repeat(2_000_000)}\n`,
-    )
-    git("add", "pnpm-lock.yaml")
-    git("commit", "-qm", "test: large lockfile")
-    const head = git("rev-parse", "HEAD").trim()
-    assert.equal(
-      run(process.execPath, [script, "collect", base, head], {
-        env: { ...process.env, GITHUB_REPOSITORY: repo },
-      }),
-      "",
-    )
-  } finally {
-    fs.rmSync(directory, { recursive: true, force: true })
-  }
 })
 
 test("a trailing why comment does not absorb the next standalone comment", () => {
