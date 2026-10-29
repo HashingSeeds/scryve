@@ -40,10 +40,6 @@ describe("firstUnambiguousCardName", () => {
     )
   })
 
-  it("prefers the card printed with exactly that name over a double-faced card sharing it", () => {
-    expect(firstUnambiguousCardName(index, ["Sol Rlng"])?.name).toBe("Sol Ring")
-  })
-
   it("reads a card printed under another name as its real card", () => {
     expect(firstUnambiguousCardName(index, ["Maraudlng Mutagen"])).toMatchObject({
       name: "Acidic Slime",

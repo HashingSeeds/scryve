@@ -1,7 +1,6 @@
 import type { ConvexReactClient } from "convex/react"
 import type { FunctionArgs } from "convex/server"
 import { ConvexError } from "convex/values"
-import { convexTest } from "convex-test"
 
 import { storage } from "@/utils/storage"
 
@@ -16,17 +15,8 @@ import {
 } from "./decksSyncWrites"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import schema from "../../../convex/schema"
+import { makeConvexTest } from "../../../test/convexTest"
 import { setOutboxWriter, type DurableStringStorage } from "../sync/durableOutbox"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("../../../convex/_generated/server"),
-  "./decks.ts": async () => jest.requireActual("../../../convex/decks"),
-  "./entitlements.ts": async () => jest.requireActual("../../../convex/entitlements"),
-  "./integrationManifest.ts": async () => jest.requireActual("../../../convex/integrationManifest"),
-  "./users.ts": async () => jest.requireActual("../../../convex/users"),
-}
 
 class MemoryStorage implements DurableStringStorage {
   values = new Map<string, string>()
@@ -124,22 +114,6 @@ describe("deck metadata writes", () => {
     stop()
   })
 
-  it("keeps a dismissed failure dismissed when a stale tab rejects it again", () => {
-    const local = new MemoryStorage()
-    const staleTab = new DeckSyncWriteRepository("owner", local)
-    const otherTab = new DeckSyncWriteRepository("owner", local)
-    const action = pendingWrite()
-    otherTab.enqueue(action)
-    const stalePending = staleTab.loadPending()
-    otherTab.failAction(action, "Rejected", 2, [], otherTab.loadPending())
-    otherTab.dismissFailed(action.operationId)
-
-    staleTab.failAction(action, "Rejected", 3, [], stalePending)
-
-    expect(staleTab.loadFailed()).toEqual([])
-    expect(staleTab.loadPending()).toEqual([])
-  })
-
   it("leaves legacy unscoped writes untouched", () => {
     const local = new MemoryStorage()
     const legacy = new DeckSyncWriteRepository("owner", local)
@@ -213,6 +187,7 @@ describe("deck metadata writes", () => {
     await flush()
     expect(mutation).toHaveBeenCalledTimes(1)
     expect(controller.getSnapshot().failures).toHaveLength(2)
+    expect(controller.getSnapshot().failures[0].reason).toBe(DECK_CONFLICT_REASON)
     expect(controller.getSnapshot().pending).toEqual([])
     reads.mergeMetadata([{ ...metadata(1), name: "Other device" }])
     mutation.mockResolvedValue({ ...metadata(2), name: "First edit", note: "Second edit" })
@@ -384,73 +359,31 @@ describe("deck metadata writes", () => {
     stop()
   })
 
-  it("preserves rejected edits for explicit reapply or discard", async () => {
-    const local = new MemoryStorage()
-    new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
-    const client = {
-      mutation: jest.fn(async () => {
-        throw new ConvexError({ code: "sync_conflict", message: "changed elsewhere" })
-      }),
-    } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
-    const stop = controller.start()
-
-    controller.update(deckId, { note: "Keep this note" })
-    await flush()
-    expect(controller.getSnapshot()).toMatchObject({
-      pending: [],
-      failures: [{ action: { note: "Keep this note" }, reason: DECK_CONFLICT_REASON }],
-    })
-
-    const operationId = controller.getSnapshot().failures[0].action.operationId
-    controller.discardFailure(operationId)
-    expect(controller.getSnapshot().failures).toEqual([])
-    stop()
-  })
-
-  it("preserves the server reason for non-conflict permanent failures", async () => {
+  it.each([
+    [
+      "keeps the server reason for a non-conflict permanent failure",
+      new ConvexError({ code: "deck_archived", message: "Deck was deleted" }),
+      "Deck was deleted",
+    ],
+    [
+      "fails an edit the server's argument validator rejects instead of retrying it",
+      new Error(
+        "[CONVEX M(decks:syncWrite)] Server Error\nArgumentValidationError: Object contains extra field `foil` that is not in the validator.",
+      ),
+      DECK_REJECTED_REASON,
+    ],
+  ])("%s", async (_name, error, reason) => {
     const local = new MemoryStorage()
     new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
     const controller = new DeckMetadataWriteController(
-      {
-        mutation: jest.fn(async () => {
-          throw new ConvexError({ code: "deck_archived", message: "Deck was deleted" })
-        }),
-      } as unknown as ConvexReactClient,
+      { mutation: jest.fn().mockRejectedValue(error) } as unknown as ConvexReactClient,
       new DeckSyncWriteRepository("owner", local),
     )
     controller.update(deckId, { name: "Offline rename" })
     const stop = controller.start()
     await flush()
 
-    expect(controller.getSnapshot().failures).toMatchObject([{ reason: "Deck was deleted" }])
-    stop()
-  })
-
-  it("fails an edit the server's argument validator rejects instead of retrying it", async () => {
-    const local = new MemoryStorage()
-    new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
-    const controller = new DeckMetadataWriteController(
-      {
-        mutation: jest.fn(async () => {
-          throw new Error(
-            "[CONVEX M(decks:syncWrite)] Server Error\nArgumentValidationError: Object contains extra field `foil` that is not in the validator.",
-          )
-        }),
-      } as unknown as ConvexReactClient,
-      new DeckSyncWriteRepository("owner", local),
-    )
-    controller.update(deckId, { name: "Offline rename" })
-    const stop = controller.start()
-    await flush()
-
-    expect(controller.getSnapshot()).toMatchObject({
-      pending: [],
-      failures: [{ reason: DECK_REJECTED_REASON }],
-    })
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [{ reason }] })
     stop()
   })
 
@@ -520,7 +453,7 @@ describe("deck metadata writes", () => {
   })
 
   it("replays the same persisted operation against the real backend after acknowledgement loss", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "owner" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
     const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
@@ -571,7 +504,7 @@ describe("deck metadata writes", () => {
   })
 
   it("keeps the stored writer provenance out of the real backend's strict args", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "owner" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
     const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })

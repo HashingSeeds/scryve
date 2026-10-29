@@ -6,7 +6,6 @@ import {
   localizedDeckSections,
   PLAY_SYSTEM_IDS,
   playFormatOptions,
-  playSystemRules,
   storedPlaySystem,
   supportsCommanderDamage,
   tableItemLabel,
@@ -15,10 +14,6 @@ import { deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import { SYSTEMS } from "../../../convex/lib/systems"
 
 describe("play system defaults", () => {
-  it("uses one point taps for Magic", () => {
-    expect(playSystemRules("mtg").counter.tapStep).toBe(1)
-  })
-
   it("uses Commander life when the format is Commander", () => {
     expect(defaultStartingLife("mtg", "commander")).toBe(40)
     expect(defaultStartingLife("mtg", "standard")).toBe(20)

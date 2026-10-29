@@ -15,9 +15,19 @@ jest.mock("expo-screen-orientation", () => ({
   addOrientationChangeListener: jest.fn(() => ({ remove: jest.fn() })),
 }))
 
+const initialWindow = Dimensions.get("window")
+const initialScreen = Dimensions.get("screen")
+
+beforeEach(() => {
+  jest.clearAllMocks()
+})
+
+afterEach(() => {
+  Dimensions.set({ window: initialWindow, screen: initialScreen })
+  jest.restoreAllMocks()
+})
+
 it("preserves portrait board dimensions and maps its menu junction in both landscape directions", async () => {
-  const window = Dimensions.get("window")
-  const screen = Dimensions.get("screen")
   Dimensions.set({
     window: { width: 844, height: 390, scale: 3, fontScale: 1 },
     screen: { width: 844, height: 390, scale: 3, fontScale: 1 },
@@ -43,7 +53,7 @@ it("preserves portrait board dimensions and maps its menu junction in both lands
   expect(view.result.current.rotation).toBe(-90)
   expect(rotateGameBoardAnchor(anchor, 90)).toEqual({ x: expect.closeTo(9 / 14), y: 0.5 })
   act(() => {
-    Dimensions.set({ window, screen })
+    Dimensions.set({ window: initialWindow, screen: initialScreen })
     listener({
       orientationInfo: { orientation: ScreenOrientation.Orientation.PORTRAIT_UP },
       orientationLock: ScreenOrientation.OrientationLock.DEFAULT,
@@ -58,8 +68,6 @@ it("preserves portrait board dimensions and maps its menu junction in both lands
 })
 
 it("refreshes Android landscape direction even when the window size stays the same", async () => {
-  const window = Dimensions.get("window")
-  const screen = Dimensions.get("screen")
   jest.replaceProperty(Platform, "OS", "android")
   Dimensions.set({
     window: { width: 844, height: 390, scale: 3, fontScale: 1 },
@@ -76,15 +84,11 @@ it("refreshes Android landscape direction even when the window size stays the sa
   act(() => DeviceEventEmitter.emit("namedOrientationDidChange", { rotationDegrees: -90 }))
   await waitFor(() => expect(view.result.current.rotation).toBe(-90))
   view.unmount()
-  Dimensions.set({ window, screen })
-  jest.restoreAllMocks()
 })
 
 it.each(["dimensions-first", "orientation-first"])(
   "keeps rotation coherent with %s events",
   async (order) => {
-    const window = Dimensions.get("window")
-    const screen = Dimensions.get("screen")
     Dimensions.set({
       window: { width: 390, height: 844, scale: 3, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 3, fontScale: 1 },
@@ -117,7 +121,6 @@ it.each(["dimensions-first", "orientation-first"])(
     act(order === "dimensions-first" ? rotate : resize)
     const finalRotation = view.result.current.rotation
     view.unmount()
-    act(() => Dimensions.set({ window, screen }))
     expect(intermediate).toMatchObject({ rotation: 0, screenWidth: 390, screenHeight: 844 })
     expect(finalRotation).toBe(-90)
     expect(rotations).not.toContain(90)
@@ -125,8 +128,6 @@ it.each(["dimensions-first", "orientation-first"])(
 )
 
 it("updates a portrait-shaped split window on a landscape screen", async () => {
-  const window = Dimensions.get("window")
-  const screen = Dimensions.get("screen")
   Dimensions.set({
     window: { width: 400, height: 800, scale: 2, fontScale: 1 },
     screen: { width: 1200, height: 800, scale: 2, fontScale: 1 },
@@ -144,15 +145,12 @@ it("updates a portrait-shaped split window on a landscape screen", async () => {
   )
   const board = view.result.current
   view.unmount()
-  act(() => Dimensions.set({ window, screen }))
   expect(board).toMatchObject({ width: 500, height: 800, screenWidth: 500, rotation: 0 })
 })
 
 it.each([-90, 90])(
   "uses Android's immediate angle %i without waiting for an async read",
   async (rotationDegrees) => {
-    const window = Dimensions.get("window")
-    const screen = Dimensions.get("screen")
     jest.replaceProperty(Platform, "OS", "android")
     Dimensions.set({ window: { width: 390, height: 844, scale: 3, fontScale: 1 } })
     jest
@@ -172,8 +170,6 @@ it.each([-90, 90])(
     act(() => Dimensions.set({ window: { width: 390, height: 844, scale: 3, fontScale: 1 } }))
     const portrait = view.result.current
     view.unmount()
-    Dimensions.set({ window, screen })
-    jest.restoreAllMocks()
     expect(beforeResize).toMatchObject({ rotation: 0, screenWidth: 390 })
     expect(landscape).toMatchObject({ rotation: rotationDegrees, screenWidth: 844 })
     expect(beforeReturn).toEqual(landscape)
@@ -182,8 +178,6 @@ it.each([-90, 90])(
 )
 
 it("handles an Android tablet with a naturally landscape display", async () => {
-  const window = Dimensions.get("window")
-  const screen = Dimensions.get("screen")
   jest.replaceProperty(Platform, "OS", "android")
   Dimensions.set({ window: { width: 1200, height: 800, scale: 2, fontScale: 1 } })
   jest
@@ -195,8 +189,6 @@ it("handles an Android tablet with a naturally landscape display", async () => {
   await waitFor(() => expect(view.result.current.rotation).toBe(90))
   const board = view.result.current
   view.unmount()
-  Dimensions.set({ window, screen })
-  jest.restoreAllMocks()
   expect(board).toMatchObject({ width: 800, height: 1200, screenWidth: 1200 })
 })
 
@@ -217,8 +209,6 @@ it.each([
 )
 
 it("keeps the portrait board unrotated when the keyboard makes the window wide", async () => {
-  const window = Dimensions.get("window")
-  const screen = Dimensions.get("screen")
   const portrait = { width: 390, height: 844, scale: 3, fontScale: 1 }
   Dimensions.set({ window: portrait, screen: portrait })
   jest
@@ -229,7 +219,6 @@ it("keeps the portrait board unrotated when the keyboard makes the window wide",
   act(() => Dimensions.set({ window: { ...portrait, height: 300 }, screen: portrait }))
   const board = view.result.current
   view.unmount()
-  Dimensions.set({ window, screen })
   expect(board.rotation).toBe(0)
   expect(board.nativeFrame).toBeUndefined()
 })

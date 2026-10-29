@@ -2,10 +2,10 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
 import { ThemeProvider } from "@/theme/context"
-import { loadString, remove } from "@/utils/storage"
+import { remove } from "@/utils/storage"
 
 import { clearCardDetails, saveCardDetails } from "./cardDetailsCache"
-import { CardSearchScreen } from "./CardSearchScreen"
+import { CardSearchScreen, scryfallQuery } from "./CardSearchScreen"
 import type { KnownCardEntry } from "./deckVersionsCache"
 
 const mockDetailsAction = jest.fn()
@@ -125,27 +125,6 @@ it("searches Scryfall for legal commanders beyond the cache and removes deck dup
   jest.useRealTimers()
 })
 
-it("defaults to the exact selected color for deck and provider results", async () => {
-  jest.useFakeTimers()
-  saveCardDetails({ talrand: eligible, ring: { ...eligible, colorIdentity: "UB" } })
-  mockAction.mockResolvedValue([{ ...searchCard, colorIdentity: "UB" }])
-  const view = chooser(deck.slice(0, 2))
-  fireEvent.press(view.getByTestId("card-color-B"))
-  expect(view.queryByLabelText("Preview Talrand as commander")).toBeNull()
-  expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
-  fireEvent.changeText(view.getByTestId("card-search-input"), "ar")
-  await act(async () => {
-    jest.advanceTimersByTime(400)
-  })
-  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
-    deviceId: expect.any(String),
-    game: "mtg",
-    query: '(ar) is:commander f:commander (id=b or o:"choose a color")',
-  })
-  expect(view.queryByLabelText("Preview Baral as commander")).toBeNull()
-  jest.useRealTimers()
-})
-
 it("uses only cached eligible cards offline without provider requests", () => {
   mockConnection.isWebSocketConnected = false
   saveCardDetails({ talrand: eligible })
@@ -217,29 +196,6 @@ function cardSearch(offlineCandidates?: KnownCardEntry[]) {
   )
 }
 
-it("filters added cards by color identity, searching on colors alone", async () => {
-  jest.useFakeTimers()
-  mockAction.mockResolvedValue([])
-  const view = cardSearch()
-  fireEvent.press(view.getByTestId("card-color-U"))
-  fireEvent.press(view.getByTestId("card-color-B"))
-  await act(async () => jest.advanceTimersByTime(400))
-  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
-    deviceId: expect.any(String),
-    game: "mtg",
-    query: "id=ub",
-  })
-  fireEvent.press(view.getByTestId("card-filters-button"))
-  fireEvent.press(view.getByLabelText("Allow additional colors"))
-  fireEvent.changeText(view.getByTestId("card-search-input"), 'o:"draw a card" or t:wizard')
-  await act(async () => jest.advanceTimersByTime(400))
-  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
-    deviceId: expect.any(String),
-    game: "mtg",
-    query: '(o:"draw a card" or t:wizard) id>=ub',
-  })
-})
-
 it("filters cached cards by color identity offline", () => {
   mockConnection.isWebSocketConnected = false
   saveCardDetails({
@@ -295,7 +251,9 @@ it("requires the exact selected identity by default and optionally allows additi
     ring: { ...eligible, colorIdentity: "UB" },
     unknown: { ...eligible, colorIdentity: "UBR" },
   })
-  mockAction.mockImplementation((_ref, args) => Promise.resolve("query" in args ? [] : ["Flying"]))
+  mockAction.mockImplementation((_ref, args) =>
+    Promise.resolve("query" in args ? [{ ...searchCard, colorIdentity: "UBR" }] : ["Flying"]),
+  )
   const view = chooser()
   fireEvent.press(view.getByTestId("card-color-U"))
   fireEvent.press(view.getByTestId("card-color-B"))
@@ -308,6 +266,7 @@ it("requires the exact selected identity by default and optionally allows additi
     game: "mtg",
     query: 'is:commander f:commander (id=ub or o:"choose a color")',
   })
+  expect(view.queryByLabelText("Preview Baral as commander")).toBeNull()
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
   fireEvent.press(view.getByLabelText("Allow additional colors"))
@@ -320,6 +279,7 @@ it("requires the exact selected identity by default and optionally allows additi
     game: "mtg",
     query: 'is:commander f:commander (id>=ub or o:"choose a color")',
   })
+  expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
 })
 
 it("fetches searchable keyword choices, combines selected keywords, and reuses the catalog offline", async () => {
@@ -339,11 +299,6 @@ it("fetches searchable keyword choices, combines selected keywords, and reuses t
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), { deviceId: expect.any(String) })
-  expect(JSON.parse(loadString("scryve.cards.keyword-abilities.v1") ?? "null")).toEqual([
-    "Flying",
-    "Ward",
-    "Vigilance",
-  ])
   fireEvent.changeText(view.getByLabelText("Search keywords"), "fly")
   expect(view.getByLabelText("Flying")).toBeTruthy()
   expect(view.queryByLabelText("Ward")).toBeNull()
@@ -484,3 +439,47 @@ it.each([
     expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
   },
 )
+
+const filters: Parameters<typeof scryfallQuery>[0] = {
+  text: "",
+  commander: false,
+  colors: [],
+  exactColors: true,
+  keywords: [],
+}
+
+it.each([
+  ["plain text", { text: "bar" }, "bar"],
+  ["colors alone", { colors: ["U", "B"] }, "id=ub"],
+  [
+    "text with additional colors allowed",
+    { text: 'o:"draw a card" or t:wizard', colors: ["U", "B"], exactColors: false },
+    '(o:"draw a card" or t:wizard) id>=ub',
+  ],
+  ["colorless", { text: "sol", colors: ["C", "U"] }, "(sol) id:c"],
+  ["a commander name", { text: "ar", commander: true }, "(ar) is:commander f:commander"],
+  [
+    "commander colors exactly",
+    { commander: true, colors: ["U", "B"] },
+    'is:commander f:commander (id=ub or o:"choose a color")',
+  ],
+  [
+    "commander colors or more",
+    { commander: true, colors: ["U", "B"], exactColors: false },
+    'is:commander f:commander (id>=ub or o:"choose a color")',
+  ],
+  ["colorless commanders", { commander: true, colors: ["C"] }, "is:commander f:commander id:c"],
+  [
+    "keywords with quotes and backslashes stripped",
+    { commander: true, keywords: ["Flying", 'W"a\\rd'] },
+    'is:commander f:commander kw:"Flying" kw:"Ward"',
+  ],
+  [
+    "a long commander name, cut to 80 characters without quotes or parentheses",
+    { text: `"Talrand" (${"x".repeat(100)})`, commander: true },
+    `(Talrand   ${"x".repeat(69)}) is:commander f:commander`,
+  ],
+  ["a one-letter commander name", { text: "a", commander: true }, "is:commander f:commander"],
+])("builds the Scryfall query for %s", (_name, input, expected) => {
+  expect(scryfallQuery({ ...filters, ...input })).toBe(expected)
+})

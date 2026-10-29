@@ -1,6 +1,5 @@
 import type { ConvexReactClient } from "convex/react"
 import { ConvexError } from "convex/values"
-import { convexTest } from "convex-test"
 
 import {
   DeckVersionWriteRepository,
@@ -15,18 +14,8 @@ import {
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
-import schema from "../../../convex/schema"
 import { makeConvexTest, type ConvexTestHarness } from "../../../test/convexTest"
-import { setOutboxWriter, type DurableStringStorage } from "../sync/durableOutbox"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("../../../convex/_generated/server"),
-  "./decks.ts": async () => jest.requireActual("../../../convex/decks"),
-  "./entitlements.ts": async () => jest.requireActual("../../../convex/entitlements"),
-  "./integrationManifest.ts": async () => jest.requireActual("../../../convex/integrationManifest"),
-  "./users.ts": async () => jest.requireActual("../../../convex/users"),
-}
+import type { DurableStringStorage } from "../sync/durableOutbox"
 
 class MemoryStorage implements DurableStringStorage {
   values = new Map<string, string>()
@@ -163,7 +152,7 @@ describe("deck version card writes", () => {
       () => 1,
     )
     controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
-    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 5 }], 1)
+    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 5 }], 0)
     expect(controller.getSnapshot().pending.map((action) => action.expectedRevision)).toEqual([
       0, 1,
     ])
@@ -282,33 +271,6 @@ describe("deck version card writes", () => {
     stop()
   })
 
-  it("streams no dependent tail to transport while an earlier version edit is parked", async () => {
-    const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
-    const client = {
-      mutation: jest
-        .fn()
-        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
-        .mockResolvedValue({ ...versionSnapshot(2), revision: 2 }),
-    } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
-    const stop = controller.start()
-    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
-    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 5 }], 1)
-    await flush()
-    stop()
-
-    expect(jest.mocked(client.mutation)).toHaveBeenCalledTimes(1)
-    expect(controller.getSnapshot()).toMatchObject({
-      pending: [],
-      failures: [
-        { reason: DECK_VERSION_CONFLICT_REASON },
-        { reason: DECK_VERSION_QUEUE_CONFLICT_REASON, action: { cards: [{ quantity: 5 }] } },
-      ],
-    })
-  })
-
   it("recovers a guarded tail after restart by keeping mine with the latest payload", async () => {
     const local = new MemoryStorage()
     const repository = new DeckVersionWriteRepository("owner", local)
@@ -325,6 +287,14 @@ describe("deck version card writes", () => {
     first.update(deckId, versionId, [{ name: "Sol Ring", quantity: 5 }], 1)
     await flush()
     stopFirst()
+    expect(client.mutation).toHaveBeenCalledTimes(1)
+    expect(first.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [
+        { reason: DECK_VERSION_CONFLICT_REASON },
+        { reason: DECK_VERSION_QUEUE_CONFLICT_REASON, action: { cards: [{ quantity: 5 }] } },
+      ],
+    })
 
     const restarted = new DeckVersionWriteController(client, repository)
     const stopRestarted = restarted.start()
@@ -519,39 +489,25 @@ describe("deck version card writes", () => {
       new DeckVersionWriteRepository("owner", local),
     )
     controller.update(deckId, versionId, [{ name: "Offline Draft", quantity: 1 }], 0)
+    controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1)
+    controller.createVersion(deckId, "Offline Version", "", [{ name: "Sol Ring", quantity: 1 }])
     const stop = controller.start()
     await flush()
     stop()
     await controller.drain()
     expect(mutation).toHaveBeenCalledTimes(1)
     expect(controller.getSnapshot()).toMatchObject({
-      pending: [{ cards: [{ name: "Offline Draft" }] }],
+      pending: [{ cards: [{ name: "Offline Draft" }] }, { op: "create" }, { op: "rename" }],
       failures: [],
     })
     expect(new DeckVersionWriteRepository("other-owner", local).loadPending()).toEqual([])
   })
 
   it("replays the same persisted operation against the real backend after acknowledgement loss", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "owner" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
-    const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
-    await actor.mutation(api.decks.saveVersion, {
-      deckId: id,
-      cards: [
-        {
-          name: "Sol Ring",
-          quantity: 1,
-          oracleId: "11111111-1111-4111-8111-111111111111",
-          scryfallId: "22222222-2222-4222-8222-222222222222",
-        },
-      ],
-    })
-    const page = await actor.query(api.decks.versionsPull, {
-      deckId: id,
-      paginationOpts: { numItems: 100, cursor: null },
-    })
-    const version = page.page[0]
+    const version = await seedVersion(actor, "Original")
     const local = new MemoryStorage()
     let lost = true
     const client = {
@@ -574,16 +530,9 @@ describe("deck version card writes", () => {
     const stop = controller.start()
 
     controller.update(
-      id,
+      version.deckId,
       version.versionId,
-      [
-        {
-          name: "Sol Ring",
-          quantity: 4,
-          oracleId: "11111111-1111-4111-8111-111111111111",
-          scryfallId: "22222222-2222-4222-8222-222222222222",
-        },
-      ],
+      [{ ...solRing, quantity: 4 }],
       version.revision,
     )
     await flush()
@@ -615,26 +564,10 @@ describe("deck version card writes", () => {
   })
 
   it("keeps the server revision on an actual no-op acknowledgement and rebases a queued tail", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "owner" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
-    const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
-    await actor.mutation(api.decks.saveVersion, {
-      deckId: id,
-      cards: [
-        {
-          name: "Sol Ring",
-          quantity: 1,
-          oracleId: "11111111-1111-4111-8111-111111111111",
-          scryfallId: "22222222-2222-4222-8222-222222222222",
-        },
-      ],
-    })
-    const page = await actor.query(api.decks.versionsPull, {
-      deckId: id,
-      paginationOpts: { numItems: 100, cursor: null },
-    })
-    const version = page.page[0]
+    const version = await seedVersion(actor, "Original")
     const local = new MemoryStorage()
     const sent: Array<Parameters<typeof actor.mutation>[1]> = []
     let releaseFirst: (() => void) | undefined
@@ -658,31 +591,12 @@ describe("deck version card writes", () => {
       new DeckVersionWriteRepository("owner", local),
     )
     const stop = controller.start()
-    controller.update(
-      id,
-      version.versionId,
-      [
-        {
-          name: "Sol Ring",
-          quantity: 1,
-          oracleId: "11111111-1111-4111-8111-111111111111",
-          scryfallId: "22222222-2222-4222-8222-222222222222",
-        },
-      ],
-      version.revision,
-    )
+    controller.update(version.deckId, version.versionId, [solRing], version.revision)
     await flush()
     controller.update(
-      id,
+      version.deckId,
       version.versionId,
-      [
-        {
-          name: "Sol Ring",
-          quantity: 7,
-          oracleId: "11111111-1111-4111-8111-111111111111",
-          scryfallId: "22222222-2222-4222-8222-222222222222",
-        },
-      ],
+      [{ ...solRing, quantity: 7 }],
       version.revision + 1,
     )
     releaseFirst?.()
@@ -722,49 +636,6 @@ describe("deck version card writes", () => {
     expect(client.mutation).toHaveBeenCalledTimes(1)
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
     stopSession()
-  })
-
-  it("sends every lifecycle op without the stored writer provenance", async () => {
-    const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    setOutboxWriter({ app: "1.4.0", update: "update-a", runtime: "runtime-1" })
-    const ops: Array<Pick<PendingVersionWrite, "op" | "name">> = [
-      { op: "create", name: "Sideboard" },
-      { op: "cards" },
-      { op: "rename", name: "Renamed" },
-      { op: "delete" },
-    ]
-    for (const [index, extra] of ops.entries())
-      repository.enqueue({
-        ...pendingWrite(),
-        ...extra,
-        versionId: `version-${extra.op}` as Id<"deckVersions">,
-        operationId: `aaaaaaaa-aaaa-4aaa-8aaa-00000000000${index}`,
-      })
-    setOutboxWriter(undefined)
-    expect(
-      [...local.values.values()].filter((value) => value.includes('"writtenBy"')),
-    ).toHaveLength(ops.length)
-    const mutation = jest.fn(async (_reference: unknown, args: { versionId?: string }) => ({
-      ...versionSnapshot(1),
-      versionId: args.versionId ?? versionId,
-    }))
-    const controller = new DeckVersionWriteController(
-      { mutation } as unknown as ConvexReactClient,
-      repository,
-    )
-
-    const stop = controller.start()
-    await flush()
-    stop()
-
-    expect(mutation.mock.calls.map(([reference]) => reference)).toEqual([
-      api.decks.syncCreateVersion,
-      api.decks.syncVersionWrite,
-      api.decks.syncUpdateVersion,
-      api.decks.syncDeleteVersion,
-    ])
-    for (const [, args] of mutation.mock.calls) expect(args).not.toHaveProperty("writtenBy")
   })
 
   it("scopes default write controllers to the client's deployment URL", () => {

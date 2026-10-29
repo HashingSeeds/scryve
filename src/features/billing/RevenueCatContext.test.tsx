@@ -119,7 +119,8 @@ describe("RevenueCatProvider", () => {
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(monthlyPackage)
   })
 
-  it("blocks checkout when the signed-in account has no billing user ID", async () => {
+  it("blocks checkout and explains a paywall tap when the account has no billing user ID", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
     const { result } = renderHook(() => useRevenueCat(), {
       wrapper: ({ children }: { children: ReactNode }) => (
         <RevenueCatProvider apiKey="test_public">{children}</RevenueCatProvider>
@@ -132,6 +133,11 @@ describe("RevenueCatProvider", () => {
     })
     expect(Purchases.purchasePackage).not.toHaveBeenCalled()
     expect(presentCountProPaywall).not.toHaveBeenCalled()
+    expect(alert).toHaveBeenCalledTimes(1)
+    expect(alert).toHaveBeenCalledWith(
+      "Scryve Pro didn't open",
+      "Wait for billing to connect to your account, then try again.",
+    )
   })
 
   it("blocks checkout while RevenueCat is switching away from a stale account", async () => {
@@ -161,23 +167,6 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "failed" })
     })
     expect(Purchases.purchasePackage).not.toHaveBeenCalled()
-  })
-
-  it("tells the player when a paywall tap fails before billing connects", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
-    const { result } = renderHook(() => useRevenueCat(), {
-      wrapper: ({ children }: { children: ReactNode }) => (
-        <RevenueCatProvider apiKey="test_public">{children}</RevenueCatProvider>
-      ),
-    })
-    await act(async () => {
-      expect(await result.current.presentPaywall()).toBe("error")
-    })
-    expect(alert).toHaveBeenCalledTimes(1)
-    expect(alert).toHaveBeenCalledWith(
-      "Scryve Pro didn't open",
-      "Wait for billing to connect to your account, then try again.",
-    )
   })
 
   it("tells the player when the paywall itself errors, and stays quiet when they close it", async () => {

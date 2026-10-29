@@ -723,21 +723,13 @@ describe("deck version cache", () => {
 
     repository.saveCards("version-1", 1, [secondSolRing])
     repository.saveCards("version-2", 1, [ygoCard])
+    repository.saveCards("version-3", 1, [cardRow])
     await flush()
 
     const known = repository.loadKnownCards()
     expect(Object.keys(known).sort()).toEqual(["14558127", "22222222-2222-2222-2222-222222222222"])
     // First complete-identity entry wins across decks; later payloads never overwrite it.
     expect(known["14558127"]).toMatchObject({ game: "ygo", card: { quantity: 3 } })
-  })
-
-  it("keeps identity-poor legacy rows out of the offline index", async () => {
-    const storage = new MemoryStorage()
-    const repository = new DeckVersionCacheRepository("owner-a", storage)
-    repository.saveCards("version-1", 1, [cardRow])
-    await flush()
-
-    expect(repository.loadKnownCards()).toEqual({})
   })
 
   it("scopes the known-cards index by account and deployment", async () => {

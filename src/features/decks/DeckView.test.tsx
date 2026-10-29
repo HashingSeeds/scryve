@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -9,22 +10,21 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => ({ isWebSocketConnected: false }),
 }))
 
-it("keeps the back action available in read-only mode", () => {
-  const onBack = jest.fn()
+function renderDeckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
   const noop = jest.fn()
-  const view = render(
-    <ThemeProvider initialContext="light">
+  return render(
+    <ThemeProvider initialContext="dark">
       <DeckView
         tab="cards"
         onTabChange={noop}
-        name="Offline rename"
+        name="Deck"
         game="mtg"
         format="commander"
-        cards={[]}
+        cards={[{ name: "Forest", quantity: 1, scryfallId: "forest" }]}
         note=""
         editing={false}
         dirty={false}
-        onBack={onBack}
+        onBack={noop}
         onEdit={noop}
         onSave={noop}
         onCancel={noop}
@@ -34,9 +34,15 @@ it("keeps the back action available in read-only mode", () => {
         onFocus={noop}
         onIncrement={noop}
         onDecrement={noop}
+        {...overrides}
       />
     </ThemeProvider>,
   )
+}
+
+it("keeps the back action available in read-only mode", () => {
+  const onBack = jest.fn()
+  const view = renderDeckView({ cards: [], onBack })
 
   fireEvent.press(view.getByLabelText("Back"))
   expect(onBack).toHaveBeenCalledTimes(1)
@@ -48,33 +54,14 @@ it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)
     const onIncrement = jest.fn()
     const onDecrement = jest.fn()
     const onFocus = jest.fn()
-    const noop = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <DeckView
-          tab="cards"
-          onTabChange={noop}
-          name="Cached deck"
-          game="mtg"
-          format="commander"
-          cards={[{ name: "Forest", quantity: 1, scryfallId: "forest" }]}
-          note=""
-          editing
-          dirty
-          {...{ [disabledState]: true }}
-          onBack={noop}
-          onEdit={noop}
-          onSave={noop}
-          onCancel={noop}
-          onDetails={noop}
-          onAdd={noop}
-          onNoteChange={noop}
-          onFocus={onFocus}
-          onIncrement={onIncrement}
-          onDecrement={onDecrement}
-        />
-      </ThemeProvider>,
-    )
+    const view = renderDeckView({
+      editing: true,
+      dirty: true,
+      [disabledState]: true,
+      onFocus,
+      onIncrement,
+      onDecrement,
+    })
     expect(view.getByLabelText("Remove Forest")).toBeDisabled()
     expect(view.getByLabelText("Increase Forest")).toBeDisabled()
     fireEvent.press(view.getByLabelText("Remove Forest"))
@@ -87,45 +74,15 @@ it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)
 )
 
 describe("analysis commander nudge", () => {
-  const renderAnalysis = (onChooseCommander?: () => void) => {
-    const noop = jest.fn()
-    return render(
-      <ThemeProvider initialContext="dark">
-        <DeckView
-          tab="analysis"
-          onTabChange={noop}
-          name="No commander"
-          game="mtg"
-          format="commander"
-          cards={[{ name: "Forest", quantity: 1, scryfallId: "forest" }]}
-          note=""
-          editing={false}
-          dirty={false}
-          onBack={noop}
-          onEdit={noop}
-          onSave={noop}
-          onCancel={noop}
-          onDetails={noop}
-          onAdd={noop}
-          onChooseCommander={onChooseCommander}
-          onNoteChange={noop}
-          onFocus={noop}
-          onIncrement={noop}
-          onDecrement={noop}
-        />
-      </ThemeProvider>,
-    )
-  }
-
   it("opens the commander chooser", () => {
     const onChooseCommander = jest.fn()
-    const view = renderAnalysis(onChooseCommander)
+    const view = renderDeckView({ tab: "analysis", onChooseCommander })
     fireEvent.press(view.getByLabelText("Choose commander"))
     expect(onChooseCommander).toHaveBeenCalledTimes(1)
   })
 
   it("is plain text when the deck cannot be edited", () => {
-    const view = renderAnalysis()
+    const view = renderDeckView({ tab: "analysis" })
     expect(view.getByTestId("deck-analysis-no-commander")).toBeTruthy()
     expect(view.queryByTestId("deck-analysis-choose-commander")).toBeNull()
   })
