@@ -136,14 +136,12 @@ describe("claimNearbySeat", () => {
     const rows = await t.run(async (ctx) => ({
       results: await ctx.db.query("deckGameResults").collect(),
       stats: await ctx.db
-        .query("deckStats")
-        .withIndex("by_deck", (q) => q.eq("deckId", deckId))
+        .query("deckVersionStats")
+        .withIndex("by_version", (q) => q.eq("deckVersionId", versionId))
         .unique(),
       summary: await ctx.db.query("gameSummaries").unique(),
     }))
-    expect(rows.results).toEqual([
-      expect.objectContaining({ deckVersionId: versionId, outcome: "loss" }),
-    ])
+    expect(rows.results).toEqual([])
     expect(rows.stats).toMatchObject({ games: 1, losses: 1 })
     expect(rows.summary?.players.find((player) => player.seat === 2)).toMatchObject({
       deckId,

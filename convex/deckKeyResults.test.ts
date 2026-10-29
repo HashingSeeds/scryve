@@ -1,4 +1,4 @@
-import type { FunctionArgs, FunctionReturnType } from "convex/server"
+import type { FunctionArgs } from "convex/server"
 import { convexTest } from "convex-test"
 
 import { registerRateLimiter } from "../test/registerRateLimiter"
@@ -8,7 +8,6 @@ import { deckFingerprint } from "./lib/deckFingerprint"
 import { assertDeckKey } from "./lib/deckKeys"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { addDeckResult, canonicalResultId, removeDeckResult } from "./lib/deckResults"
-import { removeGameResult } from "./lib/results"
 import schema from "./schema"
 
 const modules = {
@@ -18,7 +17,6 @@ const modules = {
   "./games.ts": async () => jest.requireActual("./games"),
   "./matches.ts": async () => jest.requireActual("./matches"),
   "./users.ts": async () => jest.requireActual("./users"),
-  "./resultsBackfill.ts": async () => jest.requireActual("./resultsBackfill"),
   "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
 }
 function setup() {
@@ -81,23 +79,6 @@ function manual(
     opponents: [{ seat: 2, displayName: "Them", outcome: "loss", gamesWon: 1, gamesDrawn: 1 }],
   }
 }
-async function comparisons(t: Tester) {
-  let cursor: string | null = null
-  const mismatches = []
-  for (;;) {
-    const page: FunctionReturnType<typeof internal.resultsBackfill.compareDeckKeyStats> =
-      await t.query(internal.resultsBackfill.compareDeckKeyStats, {
-        cursor,
-        batchSize: 100,
-      })
-    mismatches.push(...page.mismatches)
-    if (page.isDone) return mismatches
-    cursor = page.continueCursor
-  }
-}
-async function assertEqual(t: Tester) {
-  expect(await comparisons(t)).toEqual([])
-}
 async function moveVersion(t: Tester, deckId: Id<"decks">) {
   return t.run(async (ctx) => {
     const current = await ctx.db
@@ -108,6 +89,13 @@ async function moveVersion(t: Tester, deckId: Id<"decks">) {
       .collect()
     const version = current.sort((a, b) => a.versionNumber - b.versionNumber).at(-1)
     return version ? { id: version._id, updatedAt: version.updatedAt ?? version.createdAt } : null
+  })
+}
+async function assertNoLegacyWrites(t: Tester) {
+  await t.run(async (ctx) => {
+    expect(await ctx.db.query("deckStats").collect()).toEqual([])
+    expect(await ctx.db.query("deckGameResults").collect()).toEqual([])
+    expect(await ctx.db.query("deckMatchResults").collect()).toEqual([])
   })
 }
 async function allStats(t: Tester) {
@@ -256,9 +244,9 @@ it.each(["archived", "moved", "missing", "missingDeck", "archivedVersion"] as co
       expect(summary.players[0].deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.deckKey).toBe(deckStillExists ? "deck-key" : undefined)
       expect(result.fingerprint).toBeUndefined()
-      expect(await ctx.db.query("deckGameResults").collect()).toHaveLength(deckStillExists ? 1 : 0)
+      expect(await ctx.db.query("deckGameResults").collect()).toHaveLength(0)
     })
-    await assertEqual(t)
+    await assertNoLegacyWrites(t)
   },
 )
 
@@ -309,6 +297,50 @@ it("counts a deckless result for the deck its seat is later claimed with", async
   expect((await allStats(t)).every((row) => row.games === 0)).toBe(true)
 })
 
+it.each([true, false])(
+  "attaches version counters once on a late claim, with existing key=%s",
+  async (hasKey) => {
+    const t = setup()
+    const { userId, deckId, versionId } = await deck(t)
+    const result = {
+      resultId: "game:late-claim:seat",
+      userId,
+      ...(hasKey ? { deckKey: "deck-key" } : {}),
+      kind: "game" as const,
+      source: "nearby" as const,
+      outcome: "win" as const,
+      finishedAt: 1,
+      deltas: { games: tally },
+    }
+    await t.run(async (ctx) => {
+      await addDeckResult(ctx, result)
+      const claimed = {
+        ...result,
+        deckKey: "deck-key",
+        legacyDeckId: deckId,
+        deckVersionId: versionId,
+        deltas: { games: { total: 2, wins: 0, losses: 2, draws: 0, unknown: 0 } },
+      }
+      await addDeckResult(ctx, claimed)
+      await addDeckResult(ctx, claimed)
+      expect(await ctx.db.query("deckVersionStats").unique()).toMatchObject({
+        deckVersionId: versionId,
+        games: 1,
+        wins: 1,
+        losses: 0,
+      })
+      await removeDeckResult(ctx, userId, result.resultId)
+      await removeDeckResult(ctx, userId, result.resultId)
+      expect(await ctx.db.query("deckVersionStats").unique()).toMatchObject({
+        games: 0,
+        wins: 0,
+        losses: 0,
+      })
+    })
+    await assertNoLegacyWrites(t)
+  },
+)
+
 it("keeps a new client's pinned key and deck name for a moved deck", async () => {
   const t = setup()
   const { actor, deckId, versionId } = await deck(t)
@@ -336,7 +368,7 @@ it("keeps a new client's pinned key and deck name for a moved deck", async () =>
       podSize: 2,
     })
   })
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
 })
 
 it("fingerprints a new client's synced deck from its version when the device had no cards cached", async () => {
@@ -360,7 +392,7 @@ it("leaves the list unknown when a synced deck changed after its uncached game s
   expect(result?.fingerprint).toBeUndefined()
 })
 
-it("comparison reports games a deck played while it was only on a device", async () => {
+it("counts synced and device-only games together", async () => {
   const t = setup()
   const { actor, versionId } = await deck(t)
   const synced = publish("synced-game-000000001")
@@ -372,9 +404,7 @@ it("comparison reports games a deck played while it was only on a device", async
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 2,
   })
-  expect(await comparisons(t)).toEqual([
-    expect.objectContaining({ scope: "deck", reasons: ["device_only_results"] }),
-  ])
+  await assertNoLegacyWrites(t)
 })
 
 it("names a local deck's results from the name its device sends", async () => {
@@ -393,10 +423,23 @@ it("lists a synced deck with totals from games it played while only on a device"
   const args = publish()
   args.players[0] = { ...args.players[0], deckKey: "deck-key", deckName: "Burn" }
   await actor.mutation(api.games.publishFinishedLocalGame, args)
-  await actor.mutation(api.decks.create, { name: "Burn", format: "modern", deckKey: "deck-key" })
+  const deckId = await actor.mutation(api.decks.create, {
+    name: "Burn",
+    format: "modern",
+    deckKey: "deck-key",
+  })
   const [listed] = (await actor.query(api.decks.listMine, {})).decks
-  expect(listed.record.games).toBe(0)
-  expect(listed.keyRecord).toMatchObject({ games: 1, wins: 1 })
+  expect(listed.record).toMatchObject({ games: 1, wins: 1 })
+  expect(listed.keyRecord).toEqual(listed.record)
+  expect(listed.lastPlayedAt).toBe(args.finishedAt)
+  expect(await actor.query(api.decks.detail, { deckId })).toMatchObject({
+    record: listed.record,
+    versions: [{ record: { games: 0 } }],
+  })
+  expect(await actor.query(api.decks.stats, { deckId })).toMatchObject({
+    ...listed.record,
+    byVersion: [{ games: 0 }],
+  })
 })
 
 it("settles a device copy onto the live deck that already has its key", async () => {
@@ -435,7 +478,7 @@ it("rejects another account's version even when archived", async () => {
   )
 })
 
-it("dual-writes local games and manual create/delete, and leaves totals intact when moved", async () => {
+it("records local games and manual create/delete without legacy writes, and keeps totals when moved", async () => {
   const t = setup()
   const { actor, deckId, versionId } = await deck(t)
   const game = publish()
@@ -444,7 +487,7 @@ it("dual-writes local games and manual create/delete, and leaves totals intact w
   const match = manual()
   match.me.deckVersionId = versionId
   const ack = await actor.mutation(api.matches.recordManualMatch, match)
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
   expect(
     (await t.run(async (ctx) => ctx.db.query("deckResults").collect())).map(
       (row) => row.deckVersionId,
@@ -480,7 +523,7 @@ it("dual-writes local games and manual create/delete, and leaves totals intact w
   ).toEqual(moved)
   expect(await allStats(t)).toEqual(before)
   await actor.mutation(api.matches.deleteManualMatch, { matchId: ack.matchId })
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
   expect((await allStats(t))[0]).toMatchObject({
     games: 1,
     manualMatches: { total: 0 },
@@ -547,13 +590,22 @@ it("pins cloud deck keys and lists at start and copies them at finish", async ()
       oracleId: "changed",
     }),
   )
-  const ack = await actor.mutation(api.games.finishGame, { publicId })
+  const completion = { publicId, operationId: "pinned-cloud-completion-001" }
+  const ack = await actor.mutation(api.games.finishGameWithOperation, completion)
+  expect(await actor.mutation(api.games.finishGameWithOperation, completion)).toEqual({
+    ...ack,
+    deduplicated: true,
+  })
+  expect(await t.run(async (ctx) => ctx.db.query("deckVersionStats").unique())).toMatchObject({
+    deckVersionId: versionId,
+    games: 1,
+  })
   const summary = await t.run(async (ctx) => ctx.db.get(ack.summaryId))
   expect(summary?.players[0]).toMatchObject({ deckKey: "deck-key", deckFingerprint: empty })
   const results = await t.run(async (ctx) => ctx.db.query("deckResults").collect())
   expect(results).toHaveLength(2)
   expect(results[0].resultId).toBe(`game:${publicId}:${summary!.players[0].playerId}`)
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 1,
   })
@@ -641,7 +693,7 @@ it("local uploads use the resolved deck's key over the client's key", async () =
     deckKey: "deck-key",
   })
   expect((await actor.query(api.decks.statsForKey, { deckKey: "some-other-key" })).all).toBeNull()
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
 })
 
 it("manual matches use the resolved deck's key over the client's key", async () => {
@@ -657,7 +709,7 @@ it("manual matches use the resolved deck's key over the client's key", async () 
     deckKey: "deck-key",
   })
   expect((await actor.query(api.decks.statsForKey, { deckKey: "some-other-key" })).all).toBeNull()
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
 })
 
 it("generates a valid key when a caller creates a deck without one", async () => {
@@ -773,98 +825,41 @@ it("rejects a move when a card save changed the version since detail was read", 
   }
 })
 
-it("backfills in bounded pages, retries without duplication, and matches legacy totals", async () => {
+it("deleting a manual match reverses stored deltas when its seats lose version and score fields", async () => {
   const t = setup()
   const { actor, versionId } = await deck(t)
   const game = publish()
   game.players[0].deckVersionId = versionId
-  const ack = await actor.mutation(api.games.publishFinishedLocalGame, game)
+  await actor.mutation(api.games.publishFinishedLocalGame, game)
   const match = manual()
   match.me.deckVersionId = versionId
   await actor.mutation(api.matches.recordManualMatch, match)
-  await t.run(async (ctx) => {
-    for (const row of await ctx.db.query("deckResults").collect())
-      await removeDeckResult(ctx, row.userId, row.resultId)
-    const summary = (await ctx.db.get(ack.summaryId))!
-    await ctx.db.patch(summary._id, {
-      clientGameId: undefined,
-      players: summary.players.map(
-        ({ localId: _, resultId: _resultId, deckKey: _key, ...player }) => player,
-      ),
-    })
-    for (const match of await ctx.db.query("matches").collect())
-      await ctx.db.patch(match._id, { seats: match.seats.map(({ deckKey: _, ...seat }) => seat) })
-  })
-  for (let run = 0; run < 2; run++) {
-    for (const fn of [
-      internal.resultsBackfill.backfillDeckKeys,
-      internal.resultsBackfill.backfillGameResults,
-      internal.resultsBackfill.backfillMatchResults,
-    ]) {
-      let cursor: string | null = null
-      for (;;) {
-        const result: { isDone: boolean; continueCursor: string } = await t.mutation(fn, {
-          cursor,
-          batchSize: 1,
-        })
-        if (result.isDone) break
-        cursor = result.continueCursor
-      }
-    }
-    await assertEqual(t)
-  }
-  const rows = await t.run(async (ctx) => ctx.db.query("deckResults").collect())
-  expect(rows).toHaveLength(2)
-  expect(rows.every((row) => row.fingerprint === undefined)).toBe(true)
-  expect(rows.every((row) => row.deckVersionId === versionId)).toBe(true)
-  expect(rows.find((row) => row.kind === "game")?.resultId).toBe(
-    `legacy:${ack.summaryId}:${(await t.run(async (ctx) => ctx.db.get(ack.summaryId)))!.players[0].playerId}`,
+  const storedMatch = (await t.run(async (ctx) => ctx.db.query("matches").unique()))!
+  await t.run(async (ctx) =>
+    ctx.db.patch(storedMatch._id, {
+      seats: storedMatch.seats.map((seat) => ({
+        ...seat,
+        deckVersionId: undefined,
+        gamesWon: undefined,
+      })),
+    }),
   )
+  await actor.mutation(api.matches.deleteManualMatch, { matchId: storedMatch._id })
+  await expect(
+    actor.mutation(api.matches.deleteManualMatch, { matchId: storedMatch._id }),
+  ).rejects.toThrow("Match not found")
+  await t.run(async (ctx) => {
+    expect(await ctx.db.query("deckMatchResults").collect()).toEqual([])
+    expect(await ctx.db.query("deckVersionStats").unique()).toMatchObject({
+      games: 1,
+      wins: 1,
+      manualMatches: { total: 0 },
+      manualGames: { total: 0 },
+    })
+  })
 })
 
-it.each(["deckKeyStats", "deckVersionStats"] as const)(
-  "comparison reports a tampered %s row with its ids",
-  async (table) => {
-    const t = setup()
-    const { actor, deckId, versionId } = await deck(t)
-    const args = publish()
-    args.players[0] = { ...args.players[0], deckVersionId: versionId, deckFingerprint: fingerprint }
-    await actor.mutation(api.games.publishFinishedLocalGame, args)
-    await assertEqual(t)
-    const statsId = await t.run(async (ctx) => {
-      const row =
-        table === "deckKeyStats"
-          ? (await ctx.db.query(table).collect()).find((row) => row.fingerprint === "all")!
-          : (await ctx.db.query(table).unique())!
-      await ctx.db.patch(row._id, { games: 999 })
-      return row._id
-    })
-    expect(await comparisons(t)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining(
-          table === "deckKeyStats"
-            ? {
-                scope: "key",
-                reason: "totals_differ_from_results",
-                statsId,
-                deckKey: "deck-key",
-                expected: expect.objectContaining({ games: 1 }),
-              }
-            : {
-                scope: "version",
-                reason: "unexplained",
-                legacyStatsId: statsId,
-                deckId,
-                deckVersionId: versionId,
-                fingerprints: [{ fingerprint, stats: expect.objectContaining({ games: 1 }) }],
-              },
-        ),
-      ]),
-    )
-  },
-)
-
-it("comparison partitions a shared fingerprint by the legacy version on each result", async () => {
+it("counts games from different versions sharing a fingerprint", async () => {
   const t = setup()
   const { actor, versionId } = await deck(t)
   const secondVersion = await t.run(async (ctx) => {
@@ -876,126 +871,7 @@ it("comparison partitions a shared fingerprint by the legacy version on each res
     args.players[0] = { ...args.players[0], deckVersionId, deckFingerprint: fingerprint }
     await actor.mutation(api.games.publishFinishedLocalGame, args)
   }
-  await assertEqual(t)
   expect((await allStats(t)).find((row) => row.fingerprint === fingerprint)?.games).toBe(2)
-})
-
-it("comparison checks device-only keys and reports missing totals", async () => {
-  const t = setup()
-  const { actor } = await account(t)
-  const args = publish()
-  args.players[0].deckKey = "device-only"
-  await actor.mutation(api.games.publishFinishedLocalGame, args)
-  await assertEqual(t)
-  await t.run(async (ctx) => {
-    const row = (await ctx.db.query("deckKeyStats").unique())!
-    await ctx.db.patch(row._id, { games: 999 })
-  })
-  expect(await comparisons(t)).toEqual([
-    expect.objectContaining({ scope: "key", reason: "totals_differ_from_results" }),
-  ])
-  await t.run(async (ctx) => ctx.db.delete((await ctx.db.query("deckKeyStats").unique())!._id))
-  expect(await comparisons(t)).toEqual([
-    expect.objectContaining({ scope: "result", reason: "missing_totals", deckKey: "device-only" }),
-  ])
-})
-
-it("comparison reports an oversized history instead of accepting a truncated sum", async () => {
-  const t = setup()
-  const { userId } = await account(t)
-  await t.run(async (ctx) => {
-    for (let i = 0; i < 2001; i++)
-      await addDeckResult(ctx, {
-        resultId: `game:large:${i}`,
-        userId,
-        deckKey: "large-history",
-        kind: "game",
-        source: "local",
-        outcome: "win",
-        finishedAt: i,
-        deltas: { games: tally },
-      })
-  })
-  const page = await t.query(internal.resultsBackfill.compareDeckKeyStats, {
-    cursor: "totals:",
-    batchSize: 100,
-  })
-  expect(page.mismatches).toEqual([
-    expect.objectContaining({
-      scope: "key",
-      reason: "comparison_limit",
-      userId,
-      deckKey: "large-history",
-      statsId: expect.any(String),
-    }),
-  ])
-  expect(page.isDone).toBe(false)
-})
-
-it.each(["abandoned", "duplicate", "clamped"] as const)(
-  "comparison reports the reason for %s legacy differences",
-  async (kind) => {
-    const t = setup()
-    const { actor, versionId } = await deck(t)
-    const args = publish()
-    args.players[0].deckVersionId = versionId
-    const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
-    await t.run(async (ctx) => {
-      if (kind === "abandoned") {
-        await ctx.db.patch(ack.summaryId, { terminalStatus: "abandoned" })
-        const row = (await ctx.db.query("deckResults").unique())!
-        await removeDeckResult(ctx, row.userId, row.resultId)
-      } else if (kind === "duplicate") {
-        const {
-          _id: _,
-          _creationTime: __,
-          ...row
-        } = (await ctx.db.query("deckGameResults").unique())!
-        await ctx.db.insert("deckGameResults", row)
-        const old = (await ctx.db.query("deckStats").unique())!
-        await ctx.db.patch(old._id, { games: 2, wins: 2 })
-      } else {
-        const old = (await ctx.db.query("deckStats").unique())!
-        await ctx.db.patch(old._id, { games: 0, wins: 0 })
-      }
-    })
-    expect(await comparisons(t)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          scope: "deck",
-          reason: {
-            abandoned: "abandoned_games_skipped",
-            duplicate: "duplicate_legacy_seats",
-            clamped: "legacy_zero_clamp_possible",
-          }[kind],
-          reasons: expect.arrayContaining([
-            {
-              abandoned: "abandoned_games_skipped",
-              duplicate: "duplicate_legacy_seats",
-              clamped: "legacy_zero_clamp_possible",
-            }[kind],
-          ]),
-        }),
-      ]),
-    )
-  },
-)
-
-it("abandoned cleanup reverses both writers exactly and retries safely", async () => {
-  const t = setup()
-  const { actor, versionId } = await deck(t)
-  const args = publish()
-  args.players[0].deckVersionId = versionId
-  const ack = await actor.mutation(api.games.publishFinishedLocalGame, args)
-  await t.run(async (ctx) => {
-    await ctx.db.patch(ack.summaryId, { terminalStatus: "abandoned" })
-    const row = (await ctx.db.query("deckGameResults").unique())!
-    await removeGameResult(ctx, row, Date.now())
-  })
-  expect((await allStats(t))[0].games).toBe(0)
-  await assertEqual(t)
-  await t.mutation(internal.resultsBackfill.backfillGameResults, { cursor: null, batchSize: 10 })
-  expect(await t.run(async (ctx) => ctx.db.query("deckResults").collect())).toEqual([])
 })
 
 it("limits free manual results to 50 daily, replays free, deletion does not refund, Pro bypasses", async () => {
@@ -1169,12 +1045,11 @@ it("revival replaces deck content without creating a duplicate version and requi
   expect(await t.run(async (ctx) => ctx.db.query("deckVersions").collect())).toHaveLength(1)
 })
 
-it("preserves old guestLocalId as an owner-scoped alias after backfilling keys", async () => {
+it("preserves old guestLocalId as an owner-scoped alias for a migrated deck", async () => {
   const t = setup()
   const { actor, deckId } = await deck(t)
   const alias = "00000000-0000-4000-8000-000000000011"
   await t.run(async (ctx) => ctx.db.patch(deckId, { deckKey: String(deckId), guestLocalId: alias }))
-  await t.mutation(internal.resultsBackfill.backfillDeckKeys, { cursor: null, batchSize: 100 })
   const args = publish()
   args.players[0].deckKey = alias
   await actor.mutation(api.games.publishFinishedLocalGame, args)
@@ -1212,7 +1087,7 @@ it("keeps a connected match's first fingerprint across uploads and dual-writes t
   expect(results).toHaveLength(3)
   expect(results.every((row) => row.fingerprint === fingerprint)).toBe(true)
   expect(results.find((row) => row.kind === "match")?.resultId).toBe(`match:${matchPublicId}:1`)
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
   expect((await actor.query(api.decks.statsForKey, { deckKey: "deck-key" })).all).toMatchObject({
     games: 2,
     connectedMatches: tally,
@@ -1242,7 +1117,7 @@ it("abandoned games leave history without results, and the same user in two seat
     const second = { ...summary.players[1], userId, deckKey: "second-deck" }
     const { recordPlayerResult } =
       jest.requireActual<typeof import("./lib/results")>("./lib/results")
-    await recordPlayerResult(ctx, summary, second, Date.now())
+    await recordPlayerResult(ctx, summary, second)
   })
   const results = await t.run(async (ctx) => ctx.db.query("deckResults").collect())
   expect(results).toHaveLength(2)
@@ -1293,7 +1168,7 @@ it("nearby rewriting preserves canonical ids, and seat claims write results with
   )
 })
 
-it("scrubs a deleted publisher without changing another player's result id during backfill", async () => {
+it("scrubs a deleted publisher without changing another player's result id", async () => {
   jest.useFakeTimers()
   try {
     const t = setup()
@@ -1342,7 +1217,6 @@ it("scrubs a deleted publisher without changing another player's result id durin
     await t.mutation(internal.accountDeletion.processMemberships, { requestId })
     await t.mutation(internal.accountDeletion.processUserLinkedData, { requestId })
     await t.mutation(internal.accountDeletion.processUserLinkedData, { requestId })
-    await t.mutation(internal.resultsBackfill.backfillGameResults, { cursor: null, batchSize: 100 })
     const after = await t.run(async (ctx) => ({
       summary: await ctx.db.get(ack.summaryId),
       results: await ctx.db.query("deckResults").collect(),
@@ -1362,6 +1236,77 @@ it("scrubs a deleted publisher without changing another player's result id durin
       deckKey: (await guest.actor.query(api.decks.detail, { deckId: guestDeck })).deck.deckKey,
     })
     expect(guestStats.all?.games).toBe(1)
+  } finally {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+  }
+})
+
+it("account deletion removes new results and leftover legacy rows", async () => {
+  jest.useFakeTimers()
+  try {
+    const t = setup()
+    const { actor, userId, deckId, versionId } = await deck(t)
+    const game = publish()
+    game.players[0].deckVersionId = versionId
+    const ack = await actor.mutation(api.games.publishFinishedLocalGame, game)
+    const matchArgs = manual()
+    matchArgs.me.deckVersionId = versionId
+    const match = await actor.mutation(api.matches.recordManualMatch, matchArgs)
+    const requestId = await t.run(async (ctx) => {
+      const summary = (await ctx.db.get(ack.summaryId))!
+      await ctx.db.insert("deckGameResults", {
+        deckId,
+        deckVersionId: versionId,
+        gameId: summary.gameId,
+        playerId: summary.players[0].playerId,
+        userId,
+        outcome: "win",
+        finishedAt: summary.finishedAt,
+      })
+      await ctx.db.insert("deckMatchResults", {
+        deckId,
+        deckVersionId: versionId,
+        matchId: match.matchId,
+        userId,
+        source: "manual",
+        outcome: "win",
+        finishedAt: matchArgs.finishedAt,
+      })
+      const {
+        _id,
+        _creationTime,
+        deckVersionId: _,
+        ...counters
+      } = (await ctx.db.query("deckVersionStats").unique())!
+      await ctx.db.insert("deckStats", counters)
+      return await ctx.db.insert("accountDeletionRequests", {
+        clerkUserId: "owner",
+        userId,
+        status: "processing",
+        attempts: 0,
+        requestedAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    })
+    for (let step = 0; step < 8; step++)
+      await t.mutation(internal.accountDeletion.processUserLinkedData, { requestId })
+    for (let step = 0; step < 4; step++)
+      await t.mutation(internal.accountDeletion.processDecks, { requestId })
+    await t.run(async (ctx) => {
+      for (const table of [
+        "decks",
+        "deckVersions",
+        "deckStats",
+        "deckVersionStats",
+        "deckGameResults",
+        "deckMatchResults",
+        "deckResults",
+        "deckKeyStats",
+        "matches",
+      ] as const)
+        expect(await ctx.db.query(table).collect()).toEqual([])
+    })
   } finally {
     jest.clearAllTimers()
     jest.useRealTimers()
@@ -1388,7 +1333,7 @@ it("continues installed-client matches whose first seats have no pinned fields",
       match: { ...args.match, gameNumber: 2 },
     }),
   ).resolves.toHaveProperty("summaryId")
-  await assertEqual(t)
+  await assertNoLegacyWrites(t)
 })
 
 it("reviving by key preserves the sync id installed clients already use", async () => {

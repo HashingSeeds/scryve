@@ -339,7 +339,7 @@ async function activeVersions(ctx: QueryCtx | MutationCtx, deckId: Id<"decks">) 
 }
 
 type StatsCounters = Pick<
-  Doc<"deckStats">,
+  Doc<"deckKeyStats">,
   | "games"
   | "wins"
   | "losses"
@@ -385,16 +385,6 @@ async function versionRecord(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
   )
 }
 
-async function deckRecord(ctx: QueryCtx, deckId: Id<"decks">) {
-  return statsRecord(
-    await ctx.db
-      .query("deckStats")
-      .withIndex("by_deck", (q) => q.eq("deckId", deckId))
-      .unique(),
-  )
-}
-
-// why: new clients read totals that follow the deck key; `record` stays on the legacy totals installed clients read.
 async function keyRecord(ctx: QueryCtx, deck: Doc<"decks">) {
   const stats = await ctx.db
     .query("deckKeyStats")
@@ -402,13 +392,15 @@ async function keyRecord(ctx: QueryCtx, deck: Doc<"decks">) {
       q.eq("userId", deck.ownerUserId).eq("deckKey", deck.deckKey).eq("fingerprint", "all"),
     )
     .unique()
-  return stats ? statsRecord(stats) : undefined
+  return statsRecord(stats)
 }
 
-async function lastPlayedAt(ctx: QueryCtx, deckId: Id<"decks">) {
+async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   const result = await ctx.db
-    .query("deckGameResults")
-    .withIndex("by_deck_and_finished_at", (q) => q.eq("deckId", deckId))
+    .query("deckResults")
+    .withIndex("by_user_and_deck_key_and_finished_at", (q) =>
+      q.eq("userId", deck.ownerUserId).eq("deckKey", deck.deckKey),
+    )
     .order("desc")
     .first()
   return result?.finishedAt
@@ -449,6 +441,7 @@ export const listMine = query({
             deck.game ?? DEFAULT_DECK_GAME,
             "images",
           )
+          const record = await keyRecord(ctx, deck)
           return {
             ...publicDeck(deck),
             latestVersionId: latest?._id,
@@ -470,9 +463,9 @@ export const listMine = query({
               : undefined,
             coverImageUrl:
               latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
-            lastPlayedAt: await lastPlayedAt(ctx, deck._id),
-            record: await deckRecord(ctx, deck._id),
-            keyRecord: await keyRecord(ctx, deck),
+            lastPlayedAt: await lastPlayedAt(ctx, deck),
+            record,
+            keyRecord: record,
           }
         }),
     )
@@ -808,7 +801,7 @@ export const detail = query({
       version: selected ?? null,
       cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
       capacity: await deckVersionCapacity(ctx, user, stored.length),
-      record: await deckRecord(ctx, deck._id),
+      record: await keyRecord(ctx, deck),
       // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Deck stats are free; installed clients still read the retired lock flag.
       analyticsLocked: false,
     }
@@ -1565,7 +1558,7 @@ export const stats = query({
     return {
       locked: false as const,
       deckId: deck._id,
-      ...(await deckRecord(ctx, deck._id)),
+      ...(await keyRecord(ctx, deck)),
       byVersion: await Promise.all(
         versions.map(async (version) => ({
           deckVersionId: version._id,

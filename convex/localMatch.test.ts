@@ -103,8 +103,14 @@ async function rows(t: TestConvex<typeof schema>) {
     games: await ctx.db.query("games").collect(),
     summaries: await ctx.db.query("gameSummaries").collect(),
     history: await ctx.db.query("gameHistoryEntries").collect(),
-    results: await ctx.db.query("deckMatchResults").collect(),
-    stats: await ctx.db.query("deckStats").collect(),
+    results: (await ctx.db.query("deckResults").collect()).filter(
+      (result) => result.kind === "match",
+    ),
+    legacy: await ctx.db.query("deckMatchResults").collect(),
+    stats: (await ctx.db.query("deckKeyStats").collect()).filter(
+      (stats) => stats.fingerprint === "all",
+    ),
+    legacyStats: await ctx.db.query("deckStats").collect(),
     versionStats: await ctx.db.query("deckVersionStats").collect(),
   }))
 }
@@ -226,7 +232,9 @@ describe("finishScryveMatch", () => {
     const retry = await actor.mutation(api.matches.finishScryveMatch, args)
     expect(retry).toEqual(first)
 
-    const { matches, results, stats, versionStats, history } = await rows(t)
+    const { matches, results, stats, versionStats, history, legacy, legacyStats } = await rows(t)
+    expect(legacy).toEqual([])
+    expect(legacyStats).toEqual([])
     expect(matches[0]).toMatchObject({ status: "finished", finishedAt: args.finishedAt })
     expect(matches[0].seats).toEqual([
       expect.objectContaining({ seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" }),
@@ -234,7 +242,7 @@ describe("finishScryveMatch", () => {
     ])
     expect(results).toEqual([
       expect.objectContaining({
-        deckId,
+        legacyDeckId: deckId,
         deckVersionId: versionId,
         matchId: first.matchId,
         source: "connected",

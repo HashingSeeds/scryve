@@ -48,9 +48,16 @@ function twoPlayer(deckVersionId: Id<"deckVersions">, publicId = "manual-match-0
 
 async function statsFor(t: TestConvex<typeof schema>, deckId: Id<"decks">) {
   return await t.run(async (ctx) => {
+    const storedDeck = (await ctx.db.get(deckId))!
+    expect(await ctx.db.query("deckStats").collect()).toEqual([])
     const deck = await ctx.db
-      .query("deckStats")
-      .withIndex("by_deck", (q) => q.eq("deckId", deckId))
+      .query("deckKeyStats")
+      .withIndex("by_user_and_deck_key_and_fingerprint", (q) =>
+        q
+          .eq("userId", storedDeck.ownerUserId)
+          .eq("deckKey", storedDeck.deckKey)
+          .eq("fingerprint", "all"),
+      )
       .unique()
     const version = await ctx.db
       .query("deckVersionStats")
@@ -104,8 +111,14 @@ describe("recordManualMatch", () => {
     expect(rows.history).toEqual([
       expect.objectContaining({ source: "manual", matchId: first.matchId, outcome: "win" }),
     ])
-    expect(rows.results).toEqual([
-      expect.objectContaining({ deckId, deckVersionId, source: "manual", outcome: "win" }),
+    expect(rows.results).toEqual([])
+    expect(rows.deckResults).toEqual([
+      expect.objectContaining({
+        legacyDeckId: deckId,
+        deckVersionId,
+        source: "manual",
+        outcome: "win",
+      }),
     ])
 
     const { deck, version } = await statsFor(t, deckId)
@@ -304,7 +317,7 @@ describe("deleteManualMatch", () => {
     }))
     expect(rows.matches.map((match) => match.publicId)).toEqual(["manual-match-keep01"])
     expect(rows.history).toHaveLength(1)
-    expect(rows.results).toHaveLength(1)
+    expect(rows.results).toHaveLength(0)
     const { deck, version } = await statsFor(t, deckId)
     const expected = {
       manualMatches: { total: 1, wins: 0, losses: 1, draws: 0, unknown: 0 },

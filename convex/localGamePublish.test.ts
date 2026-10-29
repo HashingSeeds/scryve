@@ -107,13 +107,13 @@ describe("publishFinishedLocalGame", () => {
         .withIndex("by_version", (q) => q.eq("deckVersionId", versionId))
         .unique(),
     }))
-    expect(rows.stats).toMatchObject({ games: 1, wins: 1, losses: 0 })
+    expect(rows.stats).toBeNull()
     expect(rows.versionStats).toMatchObject({ games: 1, wins: 1 })
     expect(rows.games).toHaveLength(1)
     expect(rows.games[0]).toMatchObject({ mode: "local", status: "finished" })
     expect(rows.entries).toHaveLength(1)
     expect(rows.entries[0]).toMatchObject({ source: "local", outcome: "win" })
-    expect(rows.results).toHaveLength(1)
+    expect(rows.results).toHaveLength(0)
   })
 
   it("keeps a game with no seat of the user's as a backup with an unknown outcome", async () => {
@@ -284,7 +284,7 @@ it.each(["player_a", "player_b", undefined])(
       const seat = { ...summary.players[1], userId: other._id, deckKey: "elves" }
       const { recordPlayerResult } =
         jest.requireActual<typeof import("./lib/results")>("./lib/results")
-      await recordPlayerResult(ctx, summary, seat, Date.now(), "local")
+      await recordPlayerResult(ctx, summary, seat, "local")
       const results = await ctx.db.query("deckResults").collect()
       expect(results).toHaveLength(2)
       expect(results.find((result) => result.userId === other._id)?.wentFirst).toBe(
