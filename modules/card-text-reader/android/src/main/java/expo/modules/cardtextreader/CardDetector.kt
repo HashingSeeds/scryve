@@ -24,7 +24,9 @@ private val maxSkew = Math.toRadians(8.0).toFloat()
 private const val MIN_EDGE_GRADIENT = 32f
 private const val MIN_SIDE_COVERAGE = 0.6f
 private const val MIN_CORNER_COVERAGE = 0.5f
+private const val MAX_OVERRUN_COVERAGE = 0.5f
 private const val MAX_RECTANGLES = 6
+private const val CLEARLY_CLOSER_ASPECT = 0.02f
 
 data class Point(val x: Float, val y: Float)
 
@@ -141,15 +143,30 @@ object CardDetector {
         }
       }
     }
-    val kept = mutableListOf<List<Point>>()
-    // why: the area inside a card's border overlaps the card itself, and the card should win.
-    for (corners in quads.sortedByDescending(::polygonArea)) {
-      if (kept.size == MAX_RECTANGLES) break
-      if (kept.none { overlap(it, corners) > 0.5f }) kept += corners
+    val kept = mutableListOf<Rectangle>()
+    val candidates = quads
+      .map { corners -> describe(corners.map { luma.toFrame(it.x, it.y) }, guide) }
+      .sortedByDescending { polygonArea(it.corners) }
+    for (candidate in candidates) {
+      val rival = kept.indexOfFirst { overlap(it.corners, candidate.corners) > 0.5f }
+      // why: the area inside a card's border is the same shape but smaller, so the larger wins.
+      // A quad joining the front card to the stack of sleeves around it is larger too, but its
+      // shape is further from a card's, so a clearly closer shape replaces it.
+      if (rival < 0) {
+        if (kept.size < MAX_RECTANGLES) kept += candidate
+      } else if (fitsCardBetter(candidate, kept[rival])) {
+        kept[rival] = candidate
+      }
     }
-    val rectangles = kept.map { corners -> describe(corners.map { luma.toFrame(it.x, it.y) }, guide) }
+    val rectangles = kept.toList()
     val card = rectangles.filter { it.rejected == null }.minByOrNull { abs(it.aspect - CARD_ASPECT) }
     return CardDetection(card, rectangles)
+  }
+
+  private fun fitsCardBetter(candidate: Rectangle, current: Rectangle): Boolean {
+    if (candidate.rejected == Rejection.Shape) return false
+    if (current.rejected == Rejection.Shape) return true
+    return abs(candidate.aspect - CARD_ASPECT) < abs(current.aspect - CARD_ASPECT) - CLEARLY_CLOSER_ASPECT
   }
 
   private fun describe(corners: List<Point>, guide: Box?): Rectangle {
@@ -243,7 +260,17 @@ object CardDetector {
   private fun onEdges(g: Gradients, a: Point, b: Point, line: Line) =
     coverage(g, a, b, line, 0.04f, 0.14f) >= MIN_CORNER_COVERAGE &&
       coverage(g, a, b, line, 0.86f, 0.96f) >= MIN_CORNER_COVERAGE &&
-      coverage(g, a, b, line, 0.04f, 0.96f) >= MIN_SIDE_COVERAGE
+      coverage(g, a, b, line, 0.04f, 0.96f) >= MIN_SIDE_COVERAGE &&
+      endsAtCorners(g, a, b, line)
+
+  /**
+   * why: a card's border stops at its corners, while a quad that borrows a side from the stack
+   * of sleeves behind it, or from the frame inside the card, has a side whose edge runs on past
+   * one of its corners.
+   */
+  private fun endsAtCorners(g: Gradients, a: Point, b: Point, line: Line) =
+    coverage(g, a, b, line, -0.14f, -0.04f) < MAX_OVERRUN_COVERAGE &&
+      coverage(g, a, b, line, 1.04f, 1.14f) < MAX_OVERRUN_COVERAGE
 
   private fun coverage(g: Gradients, a: Point, b: Point, line: Line, from: Float, to: Float): Float {
     val samples = (hypot(b.x - a.x, b.y - a.y) * (to - from)).toInt()

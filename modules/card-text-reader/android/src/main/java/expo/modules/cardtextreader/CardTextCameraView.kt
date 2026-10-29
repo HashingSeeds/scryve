@@ -42,6 +42,7 @@ private fun msBetweenReads(heat: String) = when (heat) {
 }
 private val ANALYSIS_SIZE = Size(1280, 960)
 private const val DETECTION_SHORT_SIDE = 200
+private const val READ_MARGIN = 0.03f
 // why: hiding the outline the first frame the card is missed makes it flicker on a steady card,
 // but reads slow down when the phone is hot, so a count of misses would leave it up too long.
 private const val LOSE_CARD_AFTER_MS = 350L
@@ -156,15 +157,24 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     val width = if (sideways) frame.height else frame.width
     val height = if (sideways) frame.width else frame.height
     val detection = findCard(frame, rotation, width, height)
-    recognizer.process(InputImage.fromMediaImage(image, rotation))
+    // why: reading only the outlined card is most of the work saved on a phone that runs hot.
+    val crop = detection.card?.let { cropAround(it.corners, frame.width, frame.height, rotation, READ_MARGIN) }
+    val input = if (crop == null) {
+      InputImage.fromMediaImage(image, rotation)
+    } else {
+      InputImage.fromByteArray(nv21(image, crop), crop.width, crop.height, rotation, InputImage.IMAGE_FORMAT_NV21)
+    }
+    val shiftX = crop?.uprightX ?: 0
+    val shiftY = crop?.uprightY ?: 0
+    recognizer.process(input)
       .addOnSuccessListener { text ->
         if (!active) return@addOnSuccessListener
         val lines = text.textBlocks.flatMap { block -> block.lines }.mapNotNull { line ->
           val box = line.boundingBox ?: return@mapNotNull null
           mapOf(
             "text" to line.text,
-            "x" to box.left,
-            "y" to box.top,
+            "x" to box.left + shiftX,
+            "y" to box.top + shiftY,
             "width" to box.width(),
             "height" to box.height(),
             // why: ML Kit reports angles against the sensor but boxes against the upright frame.

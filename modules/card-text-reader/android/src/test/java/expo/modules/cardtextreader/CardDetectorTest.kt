@@ -42,6 +42,18 @@ class CardDetectorTest {
   }
 
   @Test
+  fun picksTheFrontCardOverTheStackOfSleevesAroundIt() {
+    val card = card(58f, 64f, 118f)
+    val luma = scene {
+      // why: a pile of clear sleeves reads as one wide, pale rectangle around the front card.
+      paint(box(48f, 56f, 146f, 176f), 120f)
+      paintCard(card)
+    }
+
+    assertCorners(card, CardDetector.detect(luma, guide).card?.corners)
+  }
+
+  @Test
   fun neverPicksTheArtOrTextBoxInsideACard() {
     val card = card(60f, 70f, 120f)
     val luma = scene {
@@ -135,5 +147,31 @@ private fun assertCorners(expected: List<Point>, actual: List<Point>?, tolerance
   expected.zip(actual!!).forEach { (want, got) ->
     assertEquals("x of $got, wanted $want", want.x, got.x, tolerance)
     assertEquals("y of $got, wanted $want", want.y, got.y, tolerance)
+  }
+}
+
+class CardCropTest {
+  private val corners = listOf(Point(240f, 280f), Point(720f, 280f), Point(720f, 950f), Point(240f, 950f))
+
+  @Test
+  fun aCutFromASidewaysSensorMapsBackOntoTheUprightCard() {
+    // why: the back camera's 1280x960 sensor frame stands up as 960x1280 after a 90° turn.
+    val crop = cropAround(corners, sensorWidth = 1280, sensorHeight = 960, rotation = 90, margin = 0f)
+    val uprightRight = crop.uprightX + crop.height
+    val uprightBottom = crop.uprightY + crop.width
+
+    assertEquals(0, crop.left % 2)
+    assertEquals(0, crop.top % 2)
+    assertEquals(240f, crop.uprightX.toFloat(), 2f)
+    assertEquals(280f, crop.uprightY.toFloat(), 2f)
+    assertEquals(720f, uprightRight.toFloat(), 2f)
+    assertEquals(950f, uprightBottom.toFloat(), 2f)
+  }
+
+  @Test
+  fun anUprightSensorIsCutWhereTheCardIs() {
+    val crop = cropAround(corners, sensorWidth = 960, sensorHeight = 1280, rotation = 0, margin = 0f)
+
+    assertEquals(SensorCrop(240, 280, 480, 670, 240, 280), crop)
   }
 }
