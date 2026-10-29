@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.os.Build
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Size
 import android.view.View
@@ -30,7 +32,13 @@ import expo.modules.kotlin.views.ExpoView
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
 
-private const val MIN_FRAME_INTERVAL_MS = 120L
+// why: reading text is most of the phone's work, so reads slow down as it heats up.
+private fun msBetweenReads(heat: String) = when (heat) {
+  "nominal" -> 120L
+  "fair" -> 160L
+  "serious" -> 250L
+  else -> 400L
+}
 private val ANALYSIS_SIZE = Size(1280, 960)
 private const val DETECTION_SHORT_SIDE = 200
 // why: hiding the outline the first frame the card is missed makes it flicker on a steady card.
@@ -116,12 +124,24 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     useCases = group
   }
 
+  private fun heat(): String {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return "nominal"
+    val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return "nominal"
+    return when (power.currentThermalStatus) {
+      PowerManager.THERMAL_STATUS_NONE -> "nominal"
+      PowerManager.THERMAL_STATUS_LIGHT -> "fair"
+      PowerManager.THERMAL_STATUS_MODERATE -> "serious"
+      else -> "critical"
+    }
+  }
+
   @androidx.annotation.OptIn(ExperimentalGetImage::class)
   private fun analyze(frame: ImageProxy) {
     val image = frame.image
     val now = SystemClock.elapsedRealtime()
+    val heat = heat()
     if (!active && showingCard) lose()
-    if (!active || image == null || now - lastFrameAt < MIN_FRAME_INTERVAL_MS) {
+    if (!active || image == null || now - lastFrameAt < msBetweenReads(heat)) {
       frame.close()
       return
     }
@@ -151,7 +171,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
           "width" to width,
           "height" to height,
           "lines" to lines,
-          "detection" to mapOf("tracked" to false, "rectangles" to detection.rectangles.map(::describe)),
+          "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
         )
         detection.card?.let { card -> photo["cardCorners"] = card.corners.map { mapOf("x" to it.x, "y" to it.y) } }
         onText(photo)
