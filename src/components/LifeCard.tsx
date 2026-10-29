@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import type { LifeDelta } from "@/features/game/types"
+import type { LifeDelta, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -37,7 +37,10 @@ import {
   COMPACT_BADGE,
   CommanderDamageCardControls,
   RAM_MS,
+  CommanderChipsHome,
   CommanderTakeoverBackdrop,
+  deepShade,
+  type CommanderChipsHomeFrom,
   PulseRing,
   TAKEOVER_LAYERS,
   useCommanderTakeover,
@@ -49,11 +52,13 @@ import {
   commanderTakeover,
   type CommanderFacing,
   type CommanderReach,
+  type CommanderTakeover,
 } from "./commanderDamageLayout"
 import { CommanderStrip, commanderDamageDealers, commanderStripMovesInward } from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
+import { Icon } from "./Icon"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -374,6 +379,8 @@ export const LifeCard = memo(function LifeCard({
         })
       : undefined
   const floodedBy = useCommanderTakeover(takeover, commanderDamage?.attacker?.color)
+  const [away, setAway] = useState<CommanderChipsHomeFrom | null>(null)
+  const endAway = useCallback(() => setAway(null), [])
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -397,13 +404,56 @@ export const LifeCard = memo(function LifeCard({
             lethal: commanderDamage.lethal,
             facing: commanderDamage.facing ?? {},
             takeover,
+            arriving: !!away,
             acted: !!commanderDamage.acted,
             onChange: (step, index) => commanderDamage.onStage?.(step, index),
           }
         : undefined
+  const [stripPips, setStripPips] = useState<ReadonlyMap<PlayerId, LayoutRectangle>>(
+    () => new Map(),
+  )
+  const homeFrom = useRef<CommanderChipsHomeFrom | null>(null)
+  const [home, setHome] = useState<CommanderChipsHomeFrom | null>(null)
+  const endHome = useCallback(() => setHome(null), [])
+  const [flewOutFor, setFlewOutFor] = useState<PlayerId | null>(null)
   const attackerSide = commanderCardMode?.kind === "source"
   // why: a defender's own controls stay until the attacker's flood has covered them.
   const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
+  const defenderChips = (
+    shown: CommanderTakeover,
+    attackerId: PlayerId,
+  ): CommanderChipsHomeFrom => ({
+    attackerId,
+    color: commanderDamage?.attacker?.color ?? foreground,
+    rotation: contentRotation,
+    chips: shown.cardBadges.map((offset, index) => ({
+      x: cardSize.width / 2 + offset.x,
+      y: cardSize.height / 2 + offset.y,
+      size: shown.badges[index].size,
+      total: armedCommanders[index]?.total ?? 0,
+    })),
+  })
+  // why: a defender's chips fly out of the strip as an attack starts. The chips it shows when the attack ends are handed to a layer that flies them home, since the attack's own controls unmount with it.
+  const targeted = commanderCardMode?.kind === "target"
+  if (targeted && takeover && armedCommanderId && flewOutFor !== armedCommanderId) {
+    setFlewOutFor(armedCommanderId)
+    setAway(defenderChips(takeover, armedCommanderId))
+  }
+  if (!defending && flewOutFor) {
+    setFlewOutFor(null)
+    setAway(null)
+  }
+  useEffect(() => {
+    if (targeted && takeover && armedCommanderId && commanderCovers)
+      homeFrom.current = defenderChips(takeover, armedCommanderId)
+  })
+  useEffect(() => {
+    if (defending || !homeFrom.current) return
+    setHome(homeFrom.current)
+    homeFrom.current = null
+  }, [defending])
+  const chipSpot = (attackerId: PlayerId) =>
+    (commanderDamage?.incoming[attackerId] ?? 0) > 0 ? stripPips.get(attackerId) : undefined
   const lifeMuted = attackerSide || (!localCommander && commanderOverviewOpen)
   const lifeFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
@@ -587,9 +637,15 @@ export const LifeCard = memo(function LifeCard({
           takeover={floodedBy.takeover}
           wave={floodedBy.wave}
           cardSize={cardSize}
-          attackerColor={floodedBy.attackerColor ?? foreground}
+          floodColor={floodedBy.attackerColor ? deepShade(color) : foreground}
           defenderColor={color}
         />
+      ) : null}
+      {home ? (
+        <CommanderChipsHome from={home} target={chipSpot(home.attackerId)} onDone={endHome} />
+      ) : null}
+      {away ? (
+        <CommanderChipsHome from={away} target={chipSpot(away.attackerId)} away onDone={endAway} />
       ) : null}
       <Animated.View
         pointerEvents={
@@ -837,16 +893,21 @@ export const LifeCard = memo(function LifeCard({
                 color={foreground}
               />
             ) : null}
-            <PlayerMark
-              seatNumber={seatNumber}
-              shape={shape}
-              color={foreground}
-              insetSwordColor={color}
-              closeIcon={!commanderCardMode.acted}
-              insetCheck={commanderCardMode.acted}
-              size={identityMetrics.mark}
-              style={markArt.trim}
-            />
+            {/* why: hits already count in a local game, so finishing only closes and stays an X; a connected game's check sends hits that have not landed yet. */}
+            <View
+              testID={`commander-exit-${commanderCardMode.submit === "send" ? "check" : "x"}-seat-${seatNumber}`}
+              style={[
+                $exitGlyph,
+                { width: identityMetrics.mark, height: identityMetrics.mark },
+                markArt.trim,
+              ]}
+            >
+              <Icon
+                icon={commanderCardMode.submit === "send" ? "check" : "x"}
+                color={foreground}
+                size={Math.round(identityMetrics.mark * 0.6)}
+              />
+            </View>
           </BoardPressable>
         </View>
       ) : null}
@@ -880,6 +941,7 @@ export const LifeCard = memo(function LifeCard({
           closeIconStyle={overviewCloseStyle}
           onToggle={commanderDamage.inspection.onToggle}
           onBoundsChange={setStripBounds}
+          onPipsChange={setStripPips}
         />
       ) : null}
       {!commanderCovers &&
@@ -1270,6 +1332,8 @@ const $expandedCommanderBoard: ThemedStyle<ViewStyle> = () => ({
   position: "relative",
   zIndex: 2,
 })
+
+const $exitGlyph: ViewStyle = { alignItems: "center", justifyContent: "center" }
 
 const $overviewClose: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",

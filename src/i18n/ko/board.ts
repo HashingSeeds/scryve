@@ -350,6 +350,7 @@ export default {
     raisePowerOf: "{{name}}의 공격력 올리기",
     lowerPowerOf: "{{name}}의 공격력 내리기",
     partnerAttacks: "{{name}} 공격",
+    unnamed: "커맨더",
     totalFrom: "{{name}}의 커맨더 피해 {{damage}}",
     closeFor: "{{identity}}의 커맨더 피해 닫기",
     showFor: "{{identity}}의 커맨더 피해 보기, {{sources}}",

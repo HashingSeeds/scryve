@@ -20,7 +20,7 @@ import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/
 import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
-import { TAKEOVER_MS } from "./CommanderDamageCardControls"
+import { deepShade, TAKEOVER_MS } from "./CommanderDamageCardControls"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import {
@@ -412,7 +412,7 @@ describe("LifeCard", () => {
     }
   })
 
-  const defendingCard = (onStage = jest.fn(), armed = true) => (
+  const defendingCard = (onStage = jest.fn(), armed = true, attackerColor = "#B85636") => (
     <ThemeProvider initialContext="dark">
       <LifeCard
         playerName="Grace"
@@ -426,28 +426,61 @@ describe("LifeCard", () => {
           incoming: { [commanderIds[0]]: 6 },
           armedPlayerId: armed ? commanderIds[0] : null,
           attackerName: "Ada",
-          attacker: armed ? { color: "#B85636", seatNumber: 1, rotation: 90 } : undefined,
+          attacker: armed ? { color: attackerColor, seatNumber: 1, rotation: 90 } : undefined,
           facing: { x: "left" },
-          reach: { x: -197, y: 0, radius: 900 },
+          reach: {
+            x: -197,
+            y: 0,
+            card: { width: 193, height: 420 },
+            distance: 900,
+          },
           onStage,
         })}
       />
     </ThemeProvider>
   )
 
-  it("floods a defending card in the attacker's color around a disc of its own", () => {
+  it("grows the attacker's card across a defender in a shade of the defender's own color, around a disc of its own", () => {
     const view = render(defendingCard())
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
-    expect(
-      StyleSheet.flatten(view.getByTestId("commander-flood-seat-2").props.style),
-    ).toMatchObject({ backgroundColor: "#B85636", left: 96.5 - 197 - 900, width: 1800 })
+    const flood = view.getByTestId("commander-flood-seat-2")
+    // why: the attacker's card sits just left of this one and has grown 900 on every side.
+    expect(StyleSheet.flatten(flood.props.style)).toMatchObject({
+      backgroundColor: deepShade("#397B61"),
+      left: -1097,
+      top: -900,
+      width: 1993,
+    })
     expect(StyleSheet.flatten(view.getByTestId("commander-disc-seat-2").props.style)).toMatchObject(
       { backgroundColor: "#397B61" },
     )
     expect(view.getByLabelText("6 commander damage from Ada")).toBeTruthy()
     expect(view.getByTestId("life-total-seat-2")).toHaveTextContent("30")
+  })
+
+  it("flies a defender's chip in as the attack starts", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const timing = jest
+      .spyOn(Reanimated, "withTiming")
+      .mockImplementation((value, config, done) => {
+        setTimeout(() => done?.(true), config?.duration ?? 0)
+        return value
+      })
+    try {
+      const view = render(defendingCard())
+      fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+        nativeEvent: { layout: { width: 193, height: 420 } },
+      })
+      expect(view.getAllByTestId("commander-homing-chip")).toHaveLength(1)
+      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      expect(view.queryByTestId("commander-homing-chip")).toBeNull()
+    } finally {
+      timing.mockRestore()
+      motion.mockRestore()
+    }
   })
 
   it("keeps a defender's own controls under the flood until it covers them, and drains it off them after", () => {
@@ -470,11 +503,13 @@ describe("LifeCard", () => {
 
       view.rerender(defendingCard(jest.fn(), false))
       expect(view.getByTestId("life-corner-layer-seat-2")).toBeTruthy()
-      expect(
-        StyleSheet.flatten(view.getByTestId("commander-flood-seat-2").props.style),
-      ).toMatchObject({ backgroundColor: "#B85636" })
+      // why: with no strip spot measured for the attacker, the chip fades where it stood instead of flying.
+      expect(view.getAllByTestId("commander-homing-chip")).toHaveLength(1)
+      expect(view.getByTestId("commander-flood-seat-2")).toBeTruthy()
       act(() => jest.advanceTimersByTime(TAKEOVER_MS))
       expect(view.queryByTestId("commander-takeover-seat-2")).toBeNull()
+      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      expect(view.queryByTestId("commander-homing-chip")).toBeNull()
     } finally {
       timing.mockRestore()
       motion.mockRestore()
@@ -504,6 +539,16 @@ describe("LifeCard", () => {
     const progress = view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" })
     const circumference = 2 * Math.PI * progress.props.r
     expect(progress.props.strokeDashoffset).toBeCloseTo(circumference * (1 - 6 / 21))
+  })
+
+  it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
+    const view = render(defendingCard(jest.fn(), true, "#F2E6A0"))
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 193, height: 420 } },
+    })
+    expect(view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" }).props.stroke).toBe(
+      "#FFFFFF",
+    )
   })
 
   it("fixes the total from the badge without counting a hit", () => {
@@ -987,7 +1032,7 @@ describe("LifeCard", () => {
 
     expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("3")
     expect(view.queryByText("Done")).toBeNull()
-    expect(view.getByTestId("player-mark-close", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
     expect(onPowerStep.mock.calls).toEqual([
@@ -1010,6 +1055,23 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
     expect(view.getByTestId("commander-power-down-seat-1")).toBeDisabled()
+
+    const onSend = jest.fn()
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          commanderDamage={{ ...damage, armBar: { stagedTargets: 1, onSend } }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    // why: a connected game holds hits until the check sends them, so only then does finishing read as a check.
+    fireEvent.press(view.getByTestId("commander-exit-check-seat-1"))
+    expect(onSend).toHaveBeenCalledTimes(1)
   })
 
   describe("pending commander damage claims", () => {

@@ -317,12 +317,13 @@ describe("PlayerGrid", () => {
 
     expect(pulsing()).toHaveLength(2)
     expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
-    expect(view.queryByTestId("player-mark-check", { includeHiddenElements: true })).toBeNull()
+    expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
     expect(pulsing()).toHaveLength(0)
     expect(view.getByTestId("commander-finish-pulse-seat-1")).toBeTruthy()
-    expect(view.getByTestId("player-mark-check", { includeHiddenElements: true })).toBeTruthy()
+    // why: a local hit already counts, so finishing stays an X rather than asking to confirm.
+    expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
 
     view.rerender(grid(null))
     view.rerender(grid(gamePlayers[0].id))

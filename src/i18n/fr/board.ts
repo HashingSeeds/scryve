@@ -376,6 +376,7 @@ export default {
     raisePowerOf: "Augmenter la puissance de {{name}}",
     lowerPowerOf: "Réduire la puissance de {{name}}",
     partnerAttacks: "{{name}} attaque",
+    unnamed: "Commandant",
     totalFrom: "{{damage}} blessures de commandant infligées par {{name}}",
     closeFor: "Fermer les blessures de commandant de {{identity}}",
     showFor: "Afficher les blessures de commandant de {{identity}}, {{sources}}",
