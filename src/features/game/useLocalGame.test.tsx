@@ -8,9 +8,10 @@ import { recordReviewCompletion } from "@/utils/storeReview"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { createLocalGame } from "./domain"
-import { LocalGameRepository, type StringStorage } from "./localPersistence"
+import { LocalGameRepository } from "./localPersistence"
 import type { LocalGame } from "./types"
 import { useLocalGame } from "./useLocalGame"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 jest.mock("@/utils/analytics", () => ({ captureGame: jest.fn() }))
 jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: jest.fn() }))
@@ -18,22 +19,6 @@ jest.mock("@/utils/crashReporting", () => ({
   ErrorType: { HANDLED: "Handled" },
   reportCrash: jest.fn(),
 }))
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-
-  getString(key: string) {
-    return this.values.get(key)
-  }
-
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function game() {
   return createLocalGame({

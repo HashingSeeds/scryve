@@ -5,25 +5,8 @@ import { setTelemetryAdapter } from "@/utils/telemetry"
 import { drainConnectedOutbox } from "./drainOutbox"
 import type { PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
-
-class MemoryStorage {
-  values = new Map<string, string>()
-  getAllKeysCalls = 0
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  getAllKeys() {
-    this.getAllKeysCalls += 1
-    return [...this.values.keys()]
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function action(operationId: string, delta: -5 | -1 | 1 | 5, queuedAt: number): PendingLifeAction {
   return {
@@ -51,7 +34,7 @@ describe("connected outbox drain", () => {
     const second = action("operation-one-load-02", 5, 2)
     repository.enqueue(first, [])
     repository.enqueue(second, [first])
-    storage.getAllKeysCalls = 0
+    const getAllKeys = jest.spyOn(storage, "getAllKeys")
 
     await drainConnectedOutbox({
       repository,
@@ -60,7 +43,7 @@ describe("connected outbox drain", () => {
       send: async (queued) => ({ operationId: queued.event.operationId }),
     })
 
-    expect(storage.getAllKeysCalls).toBe(1)
+    expect(getAllKeys).toHaveBeenCalledTimes(1)
   })
 
   it("reports which kind of write each acknowledgement was for", async () => {

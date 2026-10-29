@@ -10,7 +10,8 @@ import {
   defaultCommandContext,
 } from "./domain"
 import { LocalGameClaimPrompt } from "./LocalGameClaimPrompt"
-import { LocalGameRepository, type StringStorage } from "./localPersistence"
+import { LocalGameRepository } from "./localPersistence"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 let mockAuth: { configured: boolean; isLoaded: boolean; isSignedIn: boolean; userId?: string }
 let mockAuthVisible = false
@@ -19,19 +20,6 @@ jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, authVisible: mockAuthVisible }),
 }))
 jest.mock("expo-router", () => ({ usePathname: () => mockPathname }))
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function finishedGame(now: number, names = ["Ada", "Grace"]) {
   const game = createLocalGame({

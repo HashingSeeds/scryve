@@ -1,21 +1,9 @@
 import { applyLocalTableAction, createLocalGame, localOutReason, localTableRules } from "./domain"
-import { LocalGameRepository, type StringStorage } from "./localPersistence"
+import { LocalGameRepository } from "./localPersistence"
 import { createTableActions } from "./tableRuntime"
 import type { LocalGame } from "./types"
 import { EMPTY_TABLE, pokemonBoardOf } from "../../../convex/lib/table"
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 function localTable(game: LocalGame) {
   let current = game

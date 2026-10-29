@@ -11,6 +11,8 @@ import {
   subscribeResumeIndex,
 } from "./persistence"
 import { sendQueuedAction } from "./useConnectedGame"
+import { projection } from "../../../test/fixtures/connectedProjection"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 import {
   asActorId,
   asDeviceId,
@@ -21,22 +23,6 @@ import {
 } from "../game/domain"
 import { storedPlaySystem } from "../game/playSystems"
 import { setOutboxWriter } from "../sync/durableOutbox"
-
-class MemoryStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  getAllKeys() {
-    return [...this.values.keys()]
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function action(operationId: string, queuedAt = 1, actorId = "user-1"): PendingLifeAction {
   return {
@@ -398,36 +384,7 @@ describe("connected MMKV repository", () => {
 
   it("rejects unknown confirmed-projection schema versions", () => {
     const storage = new MemoryStorage()
-    const validProjection = {
-      schemaVersion: 1,
-      publicId: "game-public",
-      status: "active",
-      playerCount: 2,
-      startingLife: 20,
-      ruleset: "standard",
-      isHost: true,
-      eventSequence: 0,
-      serverUpdatedAt: 1,
-      recentOperationIds: [],
-      players: [
-        {
-          playerId: "player-1",
-          seat: 1,
-          displayName: "Ada",
-          color: "#111111",
-          currentLife: 20,
-          controlledByMe: true,
-        },
-        {
-          playerId: "player-2",
-          seat: 2,
-          displayName: "Grace",
-          color: "#222222",
-          currentLife: 20,
-          controlledByMe: false,
-        },
-      ],
-    }
+    const validProjection = projection(0, 20)
     storage.set(
       CONNECTED_KEYS.projection("game-public"),
       JSON.stringify({ ...validProjection, schemaVersion: 2 }),
@@ -445,36 +402,7 @@ describe("connected MMKV repository", () => {
   it("repairs a projection whose payload belongs to a different scoped game", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-a")
-    const wrongGameProjection: ConnectedProjection = {
-      schemaVersion: 1,
-      publicId: "game-other",
-      status: "active",
-      playerCount: 2,
-      startingLife: 20,
-      ruleset: "standard",
-      isHost: true,
-      eventSequence: 0,
-      serverUpdatedAt: 1,
-      recentOperationIds: [],
-      players: [
-        {
-          playerId: "player-1",
-          seat: 1,
-          displayName: "Ada",
-          color: "#111111",
-          currentLife: 20,
-          controlledByMe: true,
-        },
-        {
-          playerId: "player-2",
-          seat: 2,
-          displayName: "Grace",
-          color: "#222222",
-          currentLife: 20,
-          controlledByMe: false,
-        },
-      ],
-    }
+    const wrongGameProjection = { ...projection(0, 20), publicId: "game-other" }
     const scopedKey = CONNECTED_KEYS.projection("game-public", "user-a")
     storage.set(scopedKey, JSON.stringify(wrongGameProjection))
 
@@ -485,36 +413,7 @@ describe("connected MMKV repository", () => {
   it("cleans a terminal game only after pending and failed actions are resolved", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-a")
-    const terminal: ConnectedProjection = {
-      schemaVersion: 1,
-      publicId: "game-public",
-      status: "finished",
-      playerCount: 2,
-      startingLife: 20,
-      ruleset: "standard",
-      isHost: true,
-      eventSequence: 1,
-      serverUpdatedAt: 2,
-      recentOperationIds: [],
-      players: [
-        {
-          playerId: "player-1",
-          seat: 1,
-          displayName: "Ada",
-          color: "#111111",
-          currentLife: 25,
-          controlledByMe: true,
-        },
-        {
-          playerId: "player-2",
-          seat: 2,
-          displayName: "Grace",
-          color: "#222222",
-          currentLife: 20,
-          controlledByMe: false,
-        },
-      ],
-    }
+    const terminal: ConnectedProjection = { ...projection(1, 25), status: "finished" }
     const pending = action("operation-terminal-pending", 1, "user-a")
     repository.saveProjection(terminal)
     repository.enqueue(pending, [])

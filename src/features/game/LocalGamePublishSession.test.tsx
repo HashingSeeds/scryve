@@ -8,7 +8,8 @@ import { remove } from "@/utils/storage"
 
 import { applyGameCommand, asDeviceId, createLocalGame, defaultCommandContext } from "./domain"
 import { LocalGamePublishSession } from "./LocalGamePublishSession"
-import { LocalGameRepository, type StringStorage } from "./localPersistence"
+import { LocalGameRepository } from "./localPersistence"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 jest.mock("@/utils/crashReporting", () => ({
   ErrorType: { HANDLED: "Handled" },
@@ -65,19 +66,6 @@ jest.mock("../../../convex/_generated/api", () => ({
     matches: { finishScryveMatch: "matches.finishScryveMatch" },
   },
 }))
-
-class MemoryStorage implements StringStorage {
-  values = new Map<string, string>()
-  getString(key: string) {
-    return this.values.get(key)
-  }
-  set(key: string, value: string) {
-    this.values.set(key, value)
-  }
-  delete(key: string) {
-    this.values.delete(key)
-  }
-}
 
 function finishedGame(
   now: number,
