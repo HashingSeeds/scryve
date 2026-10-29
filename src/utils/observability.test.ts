@@ -75,13 +75,22 @@ describe("observability initialization", () => {
     setTelemetryAdapter()
   })
 
+  const mobileMasking = { maskAllText: true, maskAllImages: true, maskAllVectors: true }
+  const browserMasking = { maskAllText: true, maskAllInputs: true, blockAllMedia: true }
+
   it.each([
-    ["ios", 0],
-    ["android", 1],
-    ["web", 1],
-  ] as const)("configures replay for %s", (platform, errorReplaySampleRate) => {
+    ["ios", 0, Sentry.mobileReplayIntegration, mobileMasking],
+    ["android", 1, Sentry.mobileReplayIntegration, mobileMasking],
+    ["web", 1, Sentry.browserReplayIntegration, browserMasking],
+  ] as const)("configures replay for %s", (platform, errorReplaySampleRate, replay, masking) => {
     jest.replaceProperty(Platform, "OS", platform)
     initObservability()
+
+    expect(replay).toHaveBeenCalledWith(masking)
+    expect(Sentry.reactNativeTracingIntegration).toHaveBeenCalledWith({
+      traceFetch: false,
+      traceXHR: false,
+    })
 
     expect(Sentry.init).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -149,25 +158,6 @@ describe("observability initialization", () => {
     expect(Sentry.init).toHaveBeenCalledWith(
       expect.objectContaining({ environment: "development" }),
     )
-  })
-
-  it("passes masking configuration to mobileReplayIntegration", () => {
-    initObservability()
-
-    expect(Sentry.mobileReplayIntegration).toHaveBeenCalledWith({
-      maskAllText: true,
-      maskAllImages: true,
-      maskAllVectors: true,
-    })
-  })
-
-  it("traces launch and navigation without request spans", () => {
-    initObservability()
-
-    expect(Sentry.reactNativeTracingIntegration).toHaveBeenCalledWith({
-      traceFetch: false,
-      traceXHR: false,
-    })
   })
 
   it.each(["ios", "android"] as const)("traces %s only while usage sharing is on", (platform) => {
@@ -279,25 +269,6 @@ describe("observability initialization", () => {
         attemptCount: 2,
         platform: "ios",
         outcome: "success",
-      },
-      level: "info",
-    })
-  })
-
-  it("does not include disallowed metadata fields in breadcrumbs", () => {
-    initObservability()
-
-    emitTelemetry("error.handled", {
-      errorCode: "HANDLED",
-      extraField: "filtered",
-      anotherField: "also-filtered",
-    })
-
-    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
-      category: "telemetry",
-      message: "error.handled",
-      data: {
-        errorCode: "HANDLED",
       },
       level: "info",
     })

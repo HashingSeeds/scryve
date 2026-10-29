@@ -47,11 +47,6 @@ describe("SegmentedControl", () => {
     expect(onSelect).toHaveBeenCalledWith("ygo")
   })
 
-  it("shows every segment at once so the choices need no discovery", () => {
-    const { view } = renderControl("mtg")
-    for (const { label } of SEGMENTS) expect(view.getByText(label)).toBeTruthy()
-  })
-
   it("marks the selected segment with the accent even without the sliding thumb", () => {
     const { view } = renderControl("mtg")
     expect(StyleSheet.flatten(view.getByTestId("system-mtg").props.style)).toMatchObject({

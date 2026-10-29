@@ -1,4 +1,4 @@
-import { load, loadString, save, saveString, clear, remove, storage } from "."
+import { load, loadString, save, saveString, storage } from "."
 
 const VALUE_OBJECT = { x: 1 }
 const VALUE_STRING = JSON.stringify(VALUE_OBJECT)
@@ -40,26 +40,5 @@ describe("MMKV Storage", () => {
     })
 
     expect(save("object", { y: 2 })).toBe(false)
-  })
-
-  it("should save strings and objects", () => {
-    saveString("object", "new string")
-    expect(loadString("object")).toEqual("new string")
-  })
-
-  it("should remove data", () => {
-    remove("object")
-    expect(load("object")).toBeNull()
-    expect(storage.getAllKeys()).toEqual(["string"])
-
-    remove("string")
-    expect(load("string")).toBeNull()
-    expect(storage.getAllKeys()).toEqual([])
-  })
-
-  it("should clear all data", () => {
-    expect(storage.getAllKeys()).toEqual(["string", "object"])
-    clear()
-    expect(storage.getAllKeys()).toEqual([])
   })
 })

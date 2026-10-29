@@ -1,3 +1,6 @@
+// why: analytics imports the SDK lazily, so a cold Jest cache would transform it inside the first test's 5s timeout.
+import "posthog-react-native"
+
 import { storage } from "@/utils/storage"
 
 const fetchMock = jest.fn()

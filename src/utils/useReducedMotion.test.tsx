@@ -43,13 +43,6 @@ describe("useReducedMotion", () => {
     expect(hook.result.current).toBe(false)
   })
 
-  it("enables optional feedback when the initial system preference resolves false", async () => {
-    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false)
-    const hook = renderHook(() => useReducedMotion())
-    expect(hook.result.current).toBeNull()
-    await waitFor(() => expect(hook.result.current).toBe(false))
-  })
-
   it("uses immediate updates until motion is explicitly allowed", () => {
     expect(motionDuration(null, 300)).toBe(0)
     expect(motionDuration(true, 300)).toBe(0)

@@ -7,23 +7,20 @@ const { test } = require("node:test")
 const { measure, parseReport, renderComment } = require("./bundle-size.cjs")
 
 test("measure adds up every chunk per platform", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-bundle-size-test-"))
-  try {
-    const files = {
-      ios: { "entry-a.hbc": 300 },
-      android: { "entry-b.hbc": 200 },
-      web: { "entry-c.js": 100, "index-d.js": 50 },
-    }
-    for (const [platform, bundles] of Object.entries(files)) {
-      const platformDir = path.join(dir, "_expo", "static", "js", platform)
-      fs.mkdirSync(platformDir, { recursive: true })
-      for (const [name, size] of Object.entries(bundles))
-        fs.writeFileSync(path.join(platformDir, name), "x".repeat(size))
-    }
-    assert.deepEqual(measure(dir), { ios: 300, android: 200, web: 150 })
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+  using temp = fs.mkdtempDisposableSync(path.join(os.tmpdir(), "scryve-bundle-size-test-"))
+  const dir = temp.path
+  const files = {
+    ios: { "entry-a.hbc": 300 },
+    android: { "entry-b.hbc": 200 },
+    web: { "entry-c.js": 100, "index-d.js": 50 },
   }
+  for (const [platform, bundles] of Object.entries(files)) {
+    const platformDir = path.join(dir, "_expo", "static", "js", platform)
+    fs.mkdirSync(platformDir, { recursive: true })
+    for (const [name, size] of Object.entries(bundles))
+      fs.writeFileSync(path.join(platformDir, name), "x".repeat(size))
+  }
+  assert.deepEqual(measure(dir), { ios: 300, android: 200, web: 150 })
 })
 
 test("comment shows the change against main and flags bundles that grew too much", () => {

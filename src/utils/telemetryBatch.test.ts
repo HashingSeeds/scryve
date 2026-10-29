@@ -128,7 +128,7 @@ describe("batching telemetry adapter", () => {
 
     adapter.emit(event())
     tick()
-    await adapter.flush()
+    await Promise.resolve()
 
     expect(send).toHaveBeenCalledTimes(1)
   })

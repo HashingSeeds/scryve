@@ -2,6 +2,9 @@ const modulePathIgnorePatterns = ["<rootDir>/\\.delta/", "<rootDir>/\\.agents-wo
 
 const nodeTestDirectories = ["<rootDir>/convex/", "<rootDir>/src/features/sync/"]
 
+// why: test:ygo-worker runs the worker tests by path; the full suite skips them so CI runs them once.
+const workerTestsRequested = process.argv.some((arg) => arg.includes("workers/ygo-image-mirror"))
+
 /**
  * Tests under test/config/ assert repo invariants by reading JSON and shelling out
  * to the Expo CLI. They run without the jest-expo preset, so they must not import
@@ -24,6 +27,7 @@ module.exports = {
         "/node_modules/",
         "<rootDir>/test/config/",
         "<rootDir>/scripts/",
+        ...(workerTestsRequested ? [] : ["<rootDir>/workers/"]),
         ...nodeTestDirectories,
       ],
       transformIgnorePatterns: [

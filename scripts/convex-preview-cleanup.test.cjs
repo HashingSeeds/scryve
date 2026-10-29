@@ -4,26 +4,17 @@ const { test } = require("node:test")
 const { branchForPreview, isStale } = require("./convex-preview-cleanup.cjs")
 const { previewName } = require("./preview.cjs")
 
-test("a preview is stale once its branch is deleted", () => {
-  assert.equal(isStale({ branch: "fix/x", branchExists: false, prStates: ["closed"] }), true)
-  assert.equal(isStale({ branch: "t3-abc", branchExists: false, prStates: [] }), true)
-})
-
-test("a preview is stale when every PR from its still-existing branch is closed", () => {
-  assert.equal(isStale({ branch: "fix/x", branchExists: true, prStates: ["closed"] }), true)
-  assert.equal(
-    isStale({ branch: "fix/x", branchExists: true, prStates: ["closed", "open"] }),
-    false,
-  )
-})
-
-test("a pushed branch without a PR keeps its preview", () => {
-  assert.equal(isStale({ branch: "t3-abc", branchExists: true, prStates: [] }), false)
-})
-
-test("previews named after main or production are always stale", () => {
-  assert.equal(isStale({ branch: "main", branchExists: true, prStates: [] }), true)
-  assert.equal(isStale({ branch: "production", branchExists: true, prStates: [] }), true)
+test("a preview stays only while its branch exists with an open PR or none yet, and never for main or production", () => {
+  for (const [branch, branchExists, prStates, stale] of [
+    ["fix/x", false, ["closed"], true],
+    ["t3-abc", false, [], true],
+    ["fix/x", true, ["closed"], true],
+    ["fix/x", true, ["closed", "open"], false],
+    ["t3-abc", true, [], false],
+    ["main", true, [], true],
+    ["production", true, [], true],
+  ])
+    assert.equal(isStale({ branch, branchExists, prStates }), stale, `${branch} ${prStates}`)
 })
 
 test("a preview from pnpm preview:up maps back to its branch", () => {

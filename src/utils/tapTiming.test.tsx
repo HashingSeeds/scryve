@@ -5,6 +5,8 @@ import { fireEvent, render } from "@testing-library/react-native"
 import { LifeCard } from "@/components/LifeCard"
 import { ThemeProvider } from "@/theme/context"
 
+import { startTapTiming } from "./tapTiming"
+
 jest.mock("@sentry/react-native", () => ({ metrics: { distribution: jest.fn() } }))
 
 const mockAnalytics = { enabled: true }
@@ -56,8 +58,7 @@ describe("startTapTiming", () => {
     ["it runs on web", () => jest.replaceProperty(Platform, "OS", "web")],
   ])("reports nothing when %s", (_, arrange) => {
     arrange()
-    pressPlus()
 
-    expect(Sentry.metrics.distribution).not.toHaveBeenCalled()
+    expect(startTapTiming()).toBeUndefined()
   })
 })

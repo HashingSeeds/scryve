@@ -9,7 +9,6 @@ import {
   CommanderDamageBoard,
   commanderCellTestId,
   commanderChipTestId,
-  commanderStageTestId,
   commanderSwordTestId,
 } from "./CommanderDamageBoard"
 import { COMMANDER_MIN_CELL_SIZE, commanderBoardSeats } from "./commanderDamageLayout"
@@ -68,23 +67,6 @@ describe("CommanderDamageBoard", () => {
     const total = StyleSheet.flatten(view.getByText("11").props.style)
 
     expect(total.fontSize * 2 * 0.62).toBeLessThanOrEqual(cell.width)
-  })
-
-  it("shows no steppers until someone is armed", () => {
-    const view = board({}, 1)
-    expect(view.queryByTestId(commanderStageTestId(2, 1))).toBeNull()
-    expect(view.queryByTestId(commanderStageTestId(2, -1))).toBeNull()
-  })
-
-  it("keeps the compact grid read-only while a commander is armed", () => {
-    const view = board({ armedPlayerId: ids[0] }, 1)
-    expect(view.queryByTestId(commanderStageTestId(2, 1))).toBeNull()
-    expect(view.queryByTestId(commanderStageTestId(2, -1))).toBeNull()
-  })
-
-  it("does not put steppers on the attacker's own board", () => {
-    const view = board({ armedPlayerId: ids[0] }, 0)
-    expect(view.queryByTestId(commanderStageTestId(1, 1))).toBeNull()
   })
 
   it("keeps showing the recorded total while assignment happens on the card", () => {

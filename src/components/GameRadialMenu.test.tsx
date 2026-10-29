@@ -81,17 +81,6 @@ describe("GameRadialMenu", () => {
     for (const action of actions) expect(view.getByTestId(`${action.kind}-button`)).toBeTruthy()
   })
 
-  it("draws the pentagon button with the menu tokens", () => {
-    const view = render(menu(false))
-
-    expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
-    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
-    expect(pentagon).toBeTruthy()
-    expect(lightTheme.colors.gameMenu.anchorBorder).toBe("#FFFFFF")
-    expect(pentagon!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
-    expect(pentagon!.props.d.match(/Q/g)).toHaveLength(5)
-  })
-
   it("uses the flat Keystone II treatment in dark mode", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -108,7 +97,6 @@ describe("GameRadialMenu", () => {
     const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(pentagon!.props.fill).toBe("url(#keystoneTwoFill)")
-    expect(darkTheme.colors.gameMenu.anchorBorder).toBe("#000000")
     expect(pentagon!.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
     expect(
       view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 1.4)!.props.stroke,

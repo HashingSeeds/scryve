@@ -46,8 +46,6 @@ export const commanderCellTestId = (seatNumber: number, playerId: PlayerId) =>
 export const commanderChipTestId = (seatNumber: number, playerId: PlayerId) =>
   `commander-chip-seat-${seatNumber}-${playerId}`
 export const commanderSwordTestId = (seatNumber: number) => `commander-sword-seat-${seatNumber}`
-export const commanderStageTestId = (seatNumber: number, step: number) =>
-  `commander-stage-seat-${seatNumber}-${step}`
 
 export function CommanderDamageBoard({
   ownerPlayerId,
