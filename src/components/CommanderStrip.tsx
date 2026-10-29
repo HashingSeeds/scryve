@@ -44,6 +44,7 @@ export interface CommanderStripProps {
   inspectDisabled?: boolean
   closeIconStyle?: ComponentProps<typeof Animated.View>["style"]
   onBoundsChange?: (bounds: LayoutRectangle) => void
+  onPipsChange?: (pips: ReadonlyMap<PlayerId, LayoutRectangle>) => void
   onToggle: () => void
 }
 
@@ -73,6 +74,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   closeIconStyle,
   onToggle,
   onBoundsChange,
+  onPipsChange,
 }: CommanderStripProps) {
   const {
     themed,
@@ -80,6 +82,24 @@ export const CommanderStrip = memo(function CommanderStrip({
   } = useAppTheme()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
   const [mapBounds, setMapBounds] = useState<LayoutRectangle | null>(null)
+  const [rowBounds, setRowBounds] = useState<ReadonlyMap<number, LayoutRectangle>>(new Map())
+  const [pipBounds, setPipBounds] = useState<
+    ReadonlyMap<PlayerId, { row: number; bounds: LayoutRectangle }>
+  >(new Map())
+  useEffect(() => {
+    if (!onPipsChange || !stripBounds || !mapBounds) return
+    const pips = new Map<PlayerId, LayoutRectangle>()
+    for (const [playerId, { row, bounds }] of pipBounds) {
+      const rowOrigin = rowBounds.get(row)
+      if (!rowOrigin) continue
+      pips.set(playerId, {
+        ...bounds,
+        x: stripBounds.x + mapBounds.x + rowOrigin.x + bounds.x,
+        y: stripBounds.y + mapBounds.y + rowOrigin.y + bounds.y,
+      })
+    }
+    onPipsChange(pips)
+  }, [stripBounds, mapBounds, rowBounds, pipBounds, onPipsChange])
   useEffect(() => {
     if (stripBounds && mapBounds) {
       onBoundsChange?.({
@@ -145,6 +165,9 @@ export const CommanderStrip = memo(function CommanderStrip({
         {boardRows.map((row, rowIndex) => (
           <View
             key={rowIndex}
+            onLayout={({ nativeEvent: { layout } }) =>
+              setRowBounds((current) => new Map(current).set(rowIndex, layout))
+            }
             pointerEvents="none"
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
@@ -177,6 +200,11 @@ export const CommanderStrip = memo(function CommanderStrip({
                 <View
                   key={playerId}
                   testID={`commander-pip-seat-${seatNumber}-${playerId}`}
+                  onLayout={({ nativeEvent: { layout } }) =>
+                    setPipBounds((current) =>
+                      new Map(current).set(playerId, { row: rowIndex, bounds: layout }),
+                    )
+                  }
                   style={[
                     themed($disc),
                     size,

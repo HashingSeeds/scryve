@@ -343,6 +343,8 @@ const board = {
     lowerPowerOf: "Lower {{name}}'s power",
     // Checkbox: whether this partner commander is in the current attack.
     partnerAttacks: "{{name}} attacks",
+    // Shown dimmed in place of the commander's name when the seat has no deck.
+    unnamed: "Commander",
     totalFrom: "{{damage}} commander damage from {{name}}",
     closeFor: "Close commander damage for {{identity}}",
     showFor: "Show commander damage for {{identity}}, {{sources}}",

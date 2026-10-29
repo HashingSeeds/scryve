@@ -93,13 +93,15 @@ export function commanderFacing(
   return sharesColumn ? { y } : { x, y }
 }
 
+// why: the shadow is the attacker's own card growing outward, so it reaches each seat with the card's straight edges, nearest seats first. `x` and `y` place the attacker's center from this seat's center, and `distance` is how far the card must grow to cover every other seat.
 export interface CommanderReach {
   x: number
   y: number
-  radius: number
+  card: { width: number; height: number }
+  distance: number
 }
 
-function seatCenter(
+function seatBox(
   gridRows: readonly (number | null)[][],
   rowFlexes: readonly number[],
   playerIndex: number,
@@ -109,7 +111,13 @@ function seatCenter(
   for (const [row, slots] of gridRows.entries()) {
     const height = rowFlexes[row] / total
     const column = slots.indexOf(playerIndex)
-    if (column >= 0) return { x: (column + 0.5) / slots.length, y: top + height / 2 }
+    if (column >= 0)
+      return {
+        x: (column + 0.5) / slots.length,
+        y: top + height / 2,
+        width: 1 / slots.length,
+        height,
+      }
     top += height
   }
   return undefined
@@ -123,22 +131,26 @@ export function commanderReach(input: {
   defenderIndex: number
 }): CommanderReach | undefined {
   const { gridRows, rowFlexes, board } = input
-  const attacker = seatCenter(gridRows, rowFlexes, input.attackerIndex)
-  const defender = seatCenter(gridRows, rowFlexes, input.defenderIndex)
+  const attacker = seatBox(gridRows, rowFlexes, input.attackerIndex)
+  const defender = seatBox(gridRows, rowFlexes, input.defenderIndex)
   if (!attacker || !defender || !(board.width > 0) || !(board.height > 0)) return undefined
   const ax = attacker.x * board.width
   const ay = attacker.y * board.height
+  const card = { width: attacker.width * board.width, height: attacker.height * board.height }
+  // why: a card grown by d on every side covers a point once d reaches the point's larger gap from the card along either axis.
+  const farthest = gridRows.flat().flatMap((index) => {
+    if (index === null || index === input.attackerIndex) return []
+    const box = seatBox(gridRows, rowFlexes, index)
+    if (!box) return []
+    const gapX = Math.abs(box.x * board.width - ax) + (box.width * board.width - card.width) / 2
+    const gapY = Math.abs(box.y * board.height - ay) + (box.height * board.height - card.height) / 2
+    return [Math.max(gapX, gapY)]
+  })
   return {
     x: ax - defender.x * board.width,
     y: ay - defender.y * board.height,
-    radius: Math.max(
-      ...[
-        [0, 0],
-        [board.width, 0],
-        [0, board.height],
-        [board.width, board.height],
-      ].map(([x, y]) => Math.hypot(x - ax, y - ay)),
-    ),
+    card,
+    distance: Math.max(0, ...farthest),
   }
 }
 
@@ -148,8 +160,10 @@ export interface CommanderTakeover {
   discOffset: { x: number; y: number }
   cardDiscOffset: { x: number; y: number }
   badges: { x: number; y: number; angle: number; size: number; distance: number }[]
+  cardBadges: { x: number; y: number }[]
   knock: { x: number; y: number }
-  flood?: { x: number; y: number; radius: number }
+  // why: the attacker's card in this card's own space, from its top-left corner.
+  flood?: { x: number; y: number } & Pick<CommanderReach, "card" | "distance">
 }
 
 // why: undo and the menu button sit in a card's corners and would cover a badge parked there.
@@ -236,11 +250,19 @@ export function commanderTakeover(input: {
       size: badgeSize,
       distance,
     })),
+    cardBadges: anglesAround(angle).map((badgeAngle) =>
+      rotate(
+        discOffset.x + Math.cos(badgeAngle) * distance,
+        discOffset.y + Math.sin(badgeAngle) * distance,
+        rotation,
+      ),
+    ),
     knock: { x: -outward.x, y: -outward.y },
     flood: reach && {
       x: card.width / 2 + reach.x,
       y: card.height / 2 + reach.y,
-      radius: reach.radius,
+      card: reach.card,
+      distance: reach.distance,
     },
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
   cancelAnimation,
@@ -17,6 +17,7 @@ import Animated, {
 import Svg, { Circle, Path } from "react-native-svg"
 
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import type { PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -25,6 +26,7 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import type { CommanderFacing, CommanderTakeover } from "./commanderDamageLayout"
+import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { overlayTint } from "./LifeControls"
 import type {
   LifeCardContentInsets,
@@ -32,9 +34,8 @@ import type {
   LifeCardEdge,
   LifeCardMenuCorner,
 } from "./playerCardTypes"
-import { MarkArt } from "./PlayerMark"
 import { Text } from "./Text"
-import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
+import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 export type CommanderAttacker = {
   color: string
@@ -53,6 +54,8 @@ type AssignmentTarget = {
   lethal: number
   facing: CommanderFacing
   takeover?: CommanderTakeover
+  // why: while the chips fly out of the strip, the badges they land as stay hidden.
+  arriving?: boolean
   acted: boolean
   onChange: (step: number, index: number) => void
 }
@@ -124,7 +127,7 @@ export function CommanderDamageCardControls({
   return (
     <Animated.View
       testID={`commander-card-mode-seat-${seatNumber}`}
-      exiting={duration ? takeoverExit(duration / 2, source) : undefined}
+      exiting={duration ? takeoverExit(source ? duration / 2 : duration / 6, source) : undefined}
       style={[
         themed($overlay),
         !source && $aboveFlood,
@@ -151,6 +154,129 @@ export function CommanderDamageCardControls({
           mode={mode}
         />
       )}
+    </Animated.View>
+  )
+}
+
+const HOME_MS = 520
+const HOME_FADE_MS = 220
+// why: the strip mounts as the attack ends, so its chip spots take a frame or two to measure before a chip knows where home is.
+const HOME_WAIT_MS = 120
+
+export type CommanderChipsHomeFrom = {
+  attackerId: PlayerId
+  color: string
+  rotation: LifeCardContentRotation
+  chips: { x: number; y: number; size: number; total: number }[]
+}
+
+type HomeFlight = { kind: "fly"; target: LayoutRectangle } | { kind: "fade" }
+
+/** why: when an attack starts, a defender's chips fly out of the attacker's spot in the commander strip to their places on the card, and when it ends they fly back home. With no spot in the strip they fade in or out where they stand. */
+export function CommanderChipsHome({
+  from,
+  target,
+  away,
+  onDone,
+}: {
+  from: CommanderChipsHomeFrom
+  target?: LayoutRectangle
+  away?: boolean
+  onDone: () => void
+}) {
+  const reducedMotion = useReducedMotion()
+  const progress = useSharedValue(0)
+  const [flight, setFlight] = useState<HomeFlight | null>(null)
+
+  useEffect(() => {
+    if (flight) return
+    if (target) {
+      setFlight({ kind: "fly", target })
+      return
+    }
+    const timer = setTimeout(() => setFlight({ kind: "fade" }), HOME_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [flight, target])
+
+  useEffect(() => {
+    if (!flight) return
+    const duration = motionDuration(reducedMotion, flight.kind === "fly" ? HOME_MS : HOME_FADE_MS)
+    if (!duration) {
+      onDone()
+      return
+    }
+    progress.value = withTiming(1, { duration, easing: Easing.inOut(Easing.cubic) }, (finished) => {
+      "worklet"
+      if (finished) runOnJS(onDone)()
+    })
+  }, [flight, onDone, progress, reducedMotion])
+
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, $aboveFlood]}>
+      {from.chips.map((chip, index) => (
+        <HomingChip
+          key={index}
+          chip={chip}
+          color={from.color}
+          ring={SHADOW_CHIP_RING}
+          rotation={from.rotation}
+          flight={flight}
+          away={away}
+          progress={progress}
+        />
+      ))}
+    </View>
+  )
+}
+
+function HomingChip({
+  chip,
+  color,
+  ring,
+  rotation,
+  flight,
+  away,
+  progress,
+}: {
+  chip: CommanderChipsHomeFrom["chips"][number]
+  color: string
+  ring: string
+  rotation: LifeCardContentRotation
+  flight: HomeFlight | null
+  away?: boolean
+  progress: SharedValue<number>
+}) {
+  const target = flight?.kind === "fly" ? flight.target : undefined
+  const fades = flight?.kind === "fade"
+  const style = useAnimatedStyle(() => {
+    // why: flying out plays the trip home backward.
+    const p = away ? 1 - progress.value : progress.value
+    if (!flight && away) return { opacity: 0 }
+    if (target) {
+      const shrink = target.width / chip.size
+      return {
+        transform: [
+          { translateX: (target.x + target.width / 2 - chip.x) * p },
+          { translateY: (target.y + target.height / 2 - chip.y) * p },
+          { scale: 1 + (shrink - 1) * p },
+        ],
+      }
+    }
+    return fades ? { opacity: 1 - p, transform: [{ scale: 1 - 0.2 * p }] } : {}
+  })
+  return (
+    <Animated.View
+      style={[$absolute, { left: chip.x - chip.size / 2, top: chip.y - chip.size / 2 }, style]}
+    >
+      <View style={{ transform: [{ rotate: `${rotation}deg` }] }}>
+        <CommanderChip
+          testID="commander-homing-chip"
+          total={chip.total}
+          color={color}
+          ring={ring}
+          size={chip.size}
+        />
+      </View>
     </Animated.View>
   )
 }
@@ -226,23 +352,74 @@ export function useCommanderTakeover(
   }
 }
 
+// why: a defender floods a deep shade of its own color, so the attacker is the only bright card and no flood can be mistaken for another player's color. The attacker's power box inks its number in the same shade. 0.87 in linear light keeps about 40% of each sRGB channel.
+export function deepShade(color: string) {
+  return mixColorsInLinearLight(color, "#000000", 0.87)
+}
+
+// why: every shadow is dark enough for white ink, so chips on a flooded card share one ring.
+const SHADOW_CHIP_RING = overlayTint("#FFFFFF", 0.5)
+
 export function CommanderTakeoverBackdrop({
   seatNumber,
   takeover,
   wave,
   cardSize,
-  attackerColor,
+  floodColor,
   defenderColor,
 }: {
   seatNumber: number
   takeover: CommanderTakeover
   wave: SharedValue<number>
   cardSize: { width: number; height: number }
-  attackerColor: string
+  floodColor: string
   defenderColor: string
 }) {
-  const waveStyle = useAnimatedStyle(() => ({ transform: [{ scale: wave.value }] }))
+  const {
+    theme: { colors },
+  } = useAppTheme()
   const { flood, disc } = takeover
+  const discX = cardSize.width / 2 + takeover.cardDiscOffset.x
+  const discY = cardSize.height / 2 + takeover.cardDiscOffset.y
+  const ringSize = (disc + DISC_RING) * 2
+  // why: the ring is the board's own gutter around the life disc, so a red-leaning player color still stands off the flood as a cut-out of its card.
+  const ring: ViewStyle = {
+    position: "absolute",
+    width: ringSize,
+    height: ringSize,
+    borderRadius: ringSize / 2,
+    borderWidth: DISC_RING,
+    borderColor: colors.board.background,
+  }
+  // why: how far the attacker's grown card must reach to cover the disc's center.
+  const discGap = flood
+    ? Math.max(
+        Math.abs(discX - flood.x) - flood.card.width / 2,
+        Math.abs(discY - flood.y) - flood.card.height / 2,
+      )
+    : 0
+  // why: the shadow is the attacker's card grown by `grown` on every side, from just inside its own edges until it covers the farthest seat. Its blur fades over twice FLOOD_BLUR past those edges, so it arrives with a soft edge.
+  const grown = (wave: number) => {
+    "worklet"
+    if (!flood) return 0
+    return -FLOOD_BLUR * 2 + wave * (flood.distance + FLOOD_BLUR * 2)
+  }
+  const floodStyle = useAnimatedStyle(() => {
+    if (!flood) return {}
+    const by = grown(wave.value)
+    return {
+      left: flood.x - flood.card.width / 2 - by,
+      top: flood.y - flood.card.height / 2 - by,
+      width: flood.card.width + by * 2,
+      height: flood.card.height + by * 2,
+    }
+  })
+  // why: the ring darkens with the shadow under the disc, so it draws in as the soft edge passes over it.
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: flood
+      ? Math.min(1, Math.max(0, (grown(wave.value) + FLOOD_BLUR * 2 - discGap) / (FLOOD_BLUR * 2)))
+      : 1,
+  }))
 
   return (
     <View
@@ -256,29 +433,30 @@ export function CommanderTakeoverBackdrop({
           style={[
             $absolute,
             {
-              left: flood.x - flood.radius,
-              top: flood.y - flood.radius,
-              width: flood.radius * 2,
-              height: flood.radius * 2,
-              borderRadius: flood.radius,
-              backgroundColor: attackerColor,
+              backgroundColor: floodColor,
+              borderRadius: FLOOD_BLUR,
+              boxShadow: `0 0 ${FLOOD_BLUR}px ${FLOOD_BLUR}px ${floodColor}`,
             },
-            waveStyle,
+            floodStyle,
           ]}
         />
       ) : (
         <View
           testID={`commander-flood-seat-${seatNumber}`}
-          style={[StyleSheet.absoluteFill, { backgroundColor: attackerColor }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: floodColor }]}
         />
       )}
+      <Animated.View
+        testID={`commander-ring-seat-${seatNumber}`}
+        style={[ring, { left: discX - ringSize / 2, top: discY - ringSize / 2 }, ringStyle]}
+      />
       <View
         testID={`commander-disc-seat-${seatNumber}`}
         style={[
           $absolute,
           {
-            left: cardSize.width / 2 + takeover.cardDiscOffset.x - disc,
-            top: cardSize.height / 2 + takeover.cardDiscOffset.y - disc,
+            left: discX - disc,
+            top: discY - disc,
             width: disc * 2,
             height: disc * 2,
             borderRadius: disc,
@@ -324,7 +502,6 @@ function DefenderControls({
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
   const attackerForeground = accessibleForeground(attackerColor)
   const badges = takeover?.badges ?? []
-  const badgeShape = attacker?.shape ?? shapeForSeat(attacker?.seatNumber ?? 1)
   const partners = commanders.length > 1
 
   useEffect(() => {
@@ -380,8 +557,9 @@ function DefenderControls({
   const disc = takeover?.disc ?? 0
   const discX = content.width / 2 + (takeover?.discOffset.x ?? 0)
   const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
-  const ring = disc * 2 + 8
-  const circumference = 2 * Math.PI * disc
+  const ring = (disc + DISC_RING) * 2
+  const progressRadius = disc + DISC_RING / 2
+  const circumference = 2 * Math.PI * progressRadius
   const ringAngle = badges.length ? (badges[0].angle + badges[badges.length - 1].angle) / 2 : 0
   const lead = Math.max(...totals)
   const badgeSize = badges[0]?.size ?? (compact ? COMPACT_BADGE : BADGE)
@@ -424,20 +602,12 @@ function DefenderControls({
             ]}
           >
             <Circle
-              cx={ring / 2}
-              cy={ring / 2}
-              r={takeover.disc}
-              stroke={overlayTint(attackerForeground, 0.25)}
-              strokeWidth={3}
-              fill="none"
-            />
-            <Circle
               testID={`commander-progress-seat-${seatNumber}`}
               cx={ring / 2}
               cy={ring / 2}
-              r={takeover.disc}
+              r={progressRadius}
               stroke={attackerForeground}
-              strokeWidth={3}
+              strokeWidth={DISC_RING}
               strokeLinecap="round"
               strokeDasharray={`${circumference} ${circumference}`}
               strokeDashoffset={circumference * (1 - Math.min(lead, mode.lethal) / mode.lethal)}
@@ -494,12 +664,11 @@ function DefenderControls({
                 disabled={total <= 0}
                 onPress={() => mode.onChange(-1, index)}
               />
-              <CommanderBadge
+              <CommanderChip
                 testID={`commander-total-seat-${suffix}`}
-                shape={badgeShape}
                 total={total}
-                fill={attackerForeground}
-                labelColor={attackerColor}
+                color={attackerColor}
+                ring={SHADOW_CHIP_RING}
                 size={badgeSize}
               />
               <EditStep
@@ -528,9 +697,10 @@ function DefenderControls({
               total={total}
               pips={partners ? index + 1 : 0}
               benched={!!commander.benched}
-              shape={badgeShape}
-              fill={attackerForeground}
-              labelColor={attackerColor}
+              hidden={!!mode.arriving}
+              color={attackerColor}
+              ring={SHADOW_CHIP_RING}
+              pipColor={attackerForeground}
               size={badgeSize}
               impact={takeover ? RAM_MS : 0}
               onPress={() => setEditing(index)}
@@ -572,9 +742,10 @@ function DefenderBadge({
   total,
   pips,
   benched,
-  shape,
-  fill,
-  labelColor,
+  hidden,
+  color,
+  ring,
+  pipColor,
   size,
   impact,
   onPress,
@@ -590,9 +761,10 @@ function DefenderBadge({
   total: number
   pips: number
   benched: boolean
-  shape: PlayerMarkShape
-  fill: string
-  labelColor: string
+  hidden: boolean
+  color: string
+  ring: string
+  pipColor: string
   size: number
   impact: number
   onPress: () => void
@@ -634,19 +806,12 @@ function DefenderBadge({
         benched && $benched,
       ]}
     >
-      <Animated.View style={badgeStyle}>
-        <CommanderBadge
-          testID={totalTestID}
-          shape={shape}
-          total={total}
-          fill={fill}
-          labelColor={labelColor}
-          size={size}
-        />
+      <Animated.View style={[badgeStyle, hidden && $invisible]}>
+        <CommanderChip testID={totalTestID} total={total} color={color} ring={ring} size={size} />
         {pips ? (
           <View pointerEvents="none" style={[$pips, { top: size + 2 }]}>
             {Array.from({ length: pips }, (_, pip) => (
-              <View key={pip} style={[$pip, { backgroundColor: fill }]} />
+              <View key={pip} style={[$pip, { backgroundColor: pipColor }]} />
             ))}
           </View>
         ) : null}
@@ -704,13 +869,26 @@ function AttackerControls({
   mode: AssignmentSource
 }) {
   const { themed } = useAppTheme()
+  const [room, setRoom] = useState<{ width: number; height: number } | null>(null)
   const partners = mode.commanders.length > 1
-  const markSize = partners ? (compact ? 56 : 72) : compact ? 72 : 96
-  const shape = mode.mark?.shape ?? shapeForSeat(mode.mark?.seatNumber ?? seatNumber)
+  const sideways = Math.abs(contentRotation) === 90
+  const space = room && (sideways ? { width: room.height, height: room.width } : room)
+  const layout = attackerLayout({ space, count: mode.commanders.length, compact })
   const testSeats = partnerTestSeats(seatNumber)
+  // why: the box is a pale card of the attacker's own color with its number inked in a deep shade, like the power box printed on a creature card.
+  const cardColor = mode.mark?.color
+  const paper = cardColor
+    ? mixColorsInLinearLight(cardColor, "#FFFFFF", 0.7)
+    : overlayTint(foreground, 0.2)
+  const ink = cardColor ? deepShade(cardColor) : foreground
 
   return (
-    <View style={themed($attackerCenter)}>
+    <View
+      style={themed($attackerCenter)}
+      onLayout={({ nativeEvent: { layout: box } }) =>
+        setRoom({ width: box.width, height: box.height })
+      }
+    >
       <View
         style={[
           themed($partners),
@@ -719,86 +897,47 @@ function AttackerControls({
       >
         {mode.commanders.map(({ name, power, benched }, index) => {
           const suffix = testSeats[index]
-          // why: partners need their names to tell the two marks apart, so a compact card keeps them, smaller; a lone commander's name is left off there for room.
-          const nameText =
-            name && (partners || !compact) ? (
-              <Text
-                testID={`commander-name-seat-${suffix}`}
-                text={name}
-                weight="bold"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.2}
-                style={[
-                  themed($commanderName),
-                  partners && $partnerName,
-                  compact && $compactName,
-                  { color: foreground },
-                ]}
-              />
-            ) : null
-          const mark = (
-            <CommanderBadge
-              testID={`commander-power-seat-${suffix}`}
-              shape={shape}
-              total={power}
-              fill={foreground}
-              labelColor={mode.mark?.color ?? foreground}
-              size={markSize}
+          // why: a seat with no deck still names its attacker, dimmed, so the box never sits unlabeled.
+          const nameText = (
+            <Text
+              testID={`commander-name-seat-${suffix}`}
+              text={name ?? translate("board:commander.unnamed")}
+              weight="bold"
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[
+                themed($commanderName),
+                compact && $compactName,
+                { color: foreground, maxWidth: layout.width },
+                !name && $unnamed,
+              ]}
             />
           )
           return (
             <View key={index} style={[themed($power), benched && $benched]}>
-              {partners && nameText ? (
-                <BoardPressable accessible={false} onPress={() => mode.onToggle(index)}>
-                  {nameText}
-                </BoardPressable>
-              ) : (
-                nameText
-              )}
-              <PowerStep
-                testID={`commander-power-up-seat-${suffix}`}
-                label={
-                  partners
-                    ? translate("board:commander.raisePowerOf", { name })
-                    : translate("board:commander.raisePower")
-                }
-                direction="up"
-                color={foreground}
-                disabled={power >= MAX_COMMANDER_DAMAGE}
-                onPress={() => mode.onPowerStep(1, index)}
-              />
               {partners ? (
                 <BoardPressable
                   testID={`commander-toggle-seat-${suffix}`}
                   accessibilityRole="checkbox"
                   accessibilityLabel={translate("board:commander.partnerAttacks", { name })}
-                  accessibilityValue={{ text: translate("board:commander.power", { power }) }}
                   accessibilityState={{ checked: !benched }}
-                  accessibilityLiveRegion="polite"
                   onPress={() => mode.onToggle(index)}
                 >
-                  {mark}
+                  {nameText}
                 </BoardPressable>
               ) : (
-                <View
-                  accessible
-                  accessibilityLabel={translate("board:commander.power", { power })}
-                  accessibilityLiveRegion="polite"
-                >
-                  {mark}
-                </View>
+                nameText
               )}
-              <PowerStep
-                testID={`commander-power-down-seat-${suffix}`}
-                label={
-                  partners
-                    ? translate("board:commander.lowerPowerOf", { name })
-                    : translate("board:commander.lowerPower")
-                }
-                direction="down"
-                color={foreground}
-                disabled={power <= 1}
-                onPress={() => mode.onPowerStep(-1, index)}
+              <PowerBox
+                suffix={suffix}
+                name={partners ? name : undefined}
+                power={power}
+                color={paper}
+                ink={ink}
+                ring={foreground}
+                width={layout.width}
+                height={layout.height}
+                onStep={(step) => mode.onPowerStep(step, index)}
               />
             </View>
           )
@@ -806,6 +945,29 @@ function AttackerControls({
       </View>
     </View>
   )
+}
+
+const NAME_HEIGHT = 24
+const UNIT_GAP = 16
+// why: a power box is wide enough for its small − and + to sit at its ends, clear of the number.
+const BOX_RATIO = 2
+const MIN_BOX = 44
+
+/** why: an attacker's name sits over its power box, and partners share the card's width side by side, since a card runs out of height before width. Each box shrinks to its lane, down to a tappable minimum. */
+function attackerLayout({
+  space,
+  count,
+  compact,
+}: {
+  space: { width: number; height: number } | null
+  count: number
+  compact?: boolean
+}) {
+  const largest = count > 1 ? (compact ? 52 : 64) : compact ? 72 : 88
+  const lane = space ? (space.width - UNIT_GAP * (count + 1)) / count : Infinity
+  const room = space ? space.height - NAME_HEIGHT - UNIT_GAP * 2 : Infinity
+  const height = Math.floor(Math.max(MIN_BOX, Math.min(largest, lane / BOX_RATIO, room)))
+  return { height, width: Math.round(height * BOX_RATIO) }
 }
 
 const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber}-partner`]
@@ -850,97 +1012,136 @@ export function PulseRing({
   )
 }
 
-function PowerStep({
-  testID,
-  label,
-  direction,
+/** why: the attacker's power reads as a creature's power box, and its left and right halves lower and raise it, as a card's halves do for life. */
+function PowerBox({
+  suffix,
+  name,
+  power,
   color,
-  disabled,
-  onPress,
+  ink,
+  ring,
+  width,
+  height,
+  onStep,
 }: {
-  testID: string
-  label: string
-  direction: "up" | "down"
+  suffix: string
+  name?: string
+  power: number
   color: string
-  disabled: boolean
-  onPress: () => void
+  ink: string
+  ring: string
+  width: number
+  height: number
+  onStep: (step: 1 | -1) => void
 }) {
   const { themed } = useAppTheme()
+  const half = (step: 1 | -1) => {
+    const disabled = step < 0 ? power <= 1 : power >= MAX_COMMANDER_DAMAGE
+    const label =
+      step < 0
+        ? name
+          ? translate("board:commander.lowerPowerOf", { name })
+          : translate("board:commander.lowerPower")
+        : name
+          ? translate("board:commander.raisePowerOf", { name })
+          : translate("board:commander.raisePower")
+    return (
+      <BoardPressable
+        testID={`commander-power-${step < 0 ? "down" : "up"}-seat-${suffix}`}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={() => onStep(step)}
+        style={({ pressed }) => [
+          $boxHalf,
+          { alignItems: step < 0 ? "flex-start" : "flex-end", paddingHorizontal: height * 0.16 },
+          pressed && { backgroundColor: overlayTint(ink, 0.14) },
+        ]}
+      >
+        <Text
+          text={step < 0 ? "−" : "+"}
+          maxFontSizeMultiplier={1}
+          style={[
+            { color: ink, fontSize: height * 0.3, lineHeight: height * 0.4 },
+            disabled ? $boxGlyphDisabled : $boxGlyph,
+          ]}
+        />
+      </BoardPressable>
+    )
+  }
   return (
-    <BoardPressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        themed($step),
-        pressed && { backgroundColor: overlayTint(color, 0.14) },
-        disabled && themed($disabledStep),
+    <View
+      style={[
+        $box,
+        {
+          width,
+          height,
+          borderRadius: height * 0.22,
+          borderWidth: Math.max(2, height * 0.04),
+          borderColor: ring,
+          backgroundColor: color,
+        },
       ]}
     >
-      <Svg width={34} height={20} viewBox="0 0 34 20">
-        <Path
-          d={direction === "up" ? "M5 15 17 4l12 11" : "M5 5l12 11L29 5"}
-          stroke={color}
-          strokeWidth={3.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
+      {half(-1)}
+      {half(1)}
+      <View
+        testID={`commander-power-seat-${suffix}`}
+        accessible
+        accessibilityLabel={translate("board:commander.power", { power })}
+        accessibilityLiveRegion="polite"
+        pointerEvents="none"
+        style={themed($boxValue)}
+      >
+        <Text
+          text={`${power}`}
+          weight="bold"
+          maxFontSizeMultiplier={1}
+          style={{ color: ink, fontSize: height * 0.62, lineHeight: height * 0.8 }}
         />
-      </Svg>
-    </BoardPressable>
+      </View>
+    </View>
   )
 }
 
-/** why: a number centred in a mark's box sits off lopsided shapes, so the label follows each shape's visual middle: halfway between its area centroid and the centre of its largest inscribed circle, measured from the MarkArt paths and rounded to 0.5. Shapes left out sit at 22. */
-const LABEL_CENTER_Y: Partial<Record<PlayerMarkShape, number>> = {
-  triangle: 25,
-  heart: 20.5,
-  star: 23,
-  crown: 23,
-  flame: 26,
-  bolt: 21.5,
-  skull: 21,
-  spade: 21,
-  gem: 20,
-  tower: 22.5,
-}
-
-function CommanderBadge({
+// why: the takeover's markers match the commander strip's chips, so a hit reads as the same chip that lands in the strip after.
+function CommanderChip({
   testID,
-  shape,
   total,
-  fill,
-  labelColor,
+  color,
+  ring,
   size,
 }: {
   testID: string
-  shape: PlayerMarkShape
   total: number
-  fill: string
-  labelColor: string
+  color: string
+  ring: string
   size: number
 }) {
-  const fontSize = size * (total >= 10 ? 0.27 : 0.34)
-  const centerY = ((LABEL_CENTER_Y[shape] ?? 22) / 44) * size
+  const fontSize = size * (total >= 10 ? 0.42 : 0.5)
   return (
-    <View style={{ width: size, height: size }}>
-      <MarkArt shape={shape} color={fill} size={size} />
+    <View
+      style={[
+        $chip,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderWidth: Math.max(1.5, size * 0.04),
+          backgroundColor: color,
+          borderColor: ring,
+        },
+      ]}
+    >
       <Text
         testID={testID}
         text={String(total)}
         weight="bold"
         maxFontSizeMultiplier={1}
         style={[
-          $badgeLabel,
-          {
-            top: centerY - fontSize * 0.6,
-            fontSize,
-            lineHeight: fontSize * 1.2,
-            color: labelColor,
-          },
+          $chipLabel,
+          { fontSize, lineHeight: fontSize * 1.2, color: accessibleForeground(color) },
         ]}
       />
     </View>
@@ -986,12 +1187,17 @@ const $centered: ViewStyle = { justifyContent: "center", alignItems: "center" }
 
 const $absolute: ViewStyle = { position: "absolute" }
 
+// why: the disc's ring matches the board's gutter between cards, and the damage arc runs along it.
+const DISC_RING = 4
+// why: the shadow's blur and spread. Spreading by the blur puts the blur's solid core at the card's grown edge, so the shadow fades smoothly from there over twice this distance.
+const FLOOD_BLUR = 24
 /** why: while an attack holds a defending card, the flood covers its own controls (z 10), the life total rides above the flood, and the ring, badges, and hit target above that. */
 export const TAKEOVER_LAYERS = { flood: 11, life: 12, controls: 13 } as const
 const $flood: ViewStyle = { zIndex: TAKEOVER_LAYERS.flood }
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }
 
 const $benched: ViewStyle = { opacity: 0.4 }
+const $invisible: ViewStyle = { opacity: 0 }
 
 const $pips: ViewStyle = {
   position: "absolute",
@@ -1004,7 +1210,12 @@ const $pips: ViewStyle = {
 
 const $pip: ViewStyle = { width: 5, height: 5, borderRadius: 2.5 }
 
-const $badgeLabel: TextStyle = { position: "absolute", left: 0, right: 0, textAlign: "center" }
+const $chip: ViewStyle = { alignItems: "center", justifyContent: "center" }
+const $chipLabel: TextStyle = { textAlign: "center", fontVariant: ["tabular-nums"] }
+const $box: ViewStyle = { flexDirection: "row", overflow: "hidden" }
+const $boxHalf: ViewStyle = { flex: 1, justifyContent: "center" }
+const $boxGlyph: TextStyle = { opacity: 0.6 }
+const $boxGlyphDisabled: TextStyle = { opacity: 0.2 }
 
 export const BADGE = 46
 export const COMPACT_BADGE = 36
@@ -1051,8 +1262,6 @@ const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
 })
 
-const $partnerName: TextStyle = { maxWidth: 100 }
-
 const $compactName: TextStyle = { fontSize: 13, lineHeight: 16, maxWidth: 88 }
 
 const $edit: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -1065,12 +1274,10 @@ const $edit: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   backgroundColor: "rgba(0,0,0,0.45)",
 })
 
-const $step: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: 64,
-  height: 40,
+const $boxValue: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFill,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: spacing.xs,
 })
 
 const $commanderName: ThemedStyle<TextStyle> = () => ({
@@ -1079,4 +1286,4 @@ const $commanderName: ThemedStyle<TextStyle> = () => ({
   maxWidth: 140,
 })
 
-const $disabledStep: ThemedStyle<ViewStyle> = () => ({ opacity: 0.25 })
+const $unnamed: TextStyle = { opacity: 0.6 }

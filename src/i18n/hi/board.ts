@@ -362,6 +362,7 @@ export default {
     raisePowerOf: "{{name}} की पावर बढ़ाएँ",
     lowerPowerOf: "{{name}} की पावर घटाएँ",
     partnerAttacks: "{{name}} अटैक करता है",
+    unnamed: "कमांडर",
     totalFrom: "{{name}} से {{damage}} कमांडर डैमेज",
     closeFor: "{{identity}} के लिए कमांडर डैमेज बंद करें",
     showFor: "{{identity}} के लिए कमांडर डैमेज दिखाएँ, {{sources}}",

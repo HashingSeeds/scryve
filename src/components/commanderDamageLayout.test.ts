@@ -61,15 +61,23 @@ describe("commander damage board layout", () => {
     expect(commanderFacing(GRIDS[6], 0, 5)).toEqual({ x: "left", y: "top" })
   })
 
-  it("measures the attacker from each seat so one wave can cross the whole board", () => {
-    const reach = commanderReach({
-      gridRows: GRIDS[5],
-      rowFlexes: [1, 1, 0.8],
-      board: { width: 400, height: 840 },
-      attackerIndex: 0,
-      defenderIndex: 4,
-    })
-    expect(reach).toEqual({ x: -100, y: -570, radius: Math.hypot(300, 690) })
+  it("grows the attacker's card until it covers the farthest seat", () => {
+    const reach = (defenderIndex: number) =>
+      commanderReach({
+        gridRows: GRIDS[5],
+        rowFlexes: [1, 1, 0.8],
+        board: { width: 400, height: 840 },
+        attackerIndex: 0,
+        defenderIndex,
+      })
+    // why: the attacker's card spans 0 to 200 across and 0 to 300 down; the bottom seat spans the board's width from 600 to 840, so the card must grow 540 to reach its bottom edge.
+    const bottom = reach(4)
+    expect(bottom?.x).toBeCloseTo(-100)
+    expect(bottom?.y).toBeCloseTo(-570)
+    expect(bottom?.card.width).toBeCloseTo(200)
+    expect(bottom?.card.height).toBeCloseTo(300)
+    expect(bottom?.distance).toBeCloseTo(540)
+    expect(reach(1)?.distance).toBeCloseTo(540)
   })
 
   it("parks the badge just outside the life disc, toward the attacker, and knocks the card away", () => {
@@ -79,13 +87,18 @@ describe("commander damage board layout", () => {
       lifeFontSize: 148,
       lifeDigits: 2,
       badgeSize: 46,
-      reach: { x: 0, y: -424, radius: 900 },
+      reach: { x: 0, y: -424, card: { width: 390, height: 420 }, distance: 900 },
     })
     expect(takeover.badges[0].x).toBeCloseTo(0)
     expect(takeover.badges[0].y).toBeCloseTo(takeover.discOffset.y - (takeover.disc + 23 + 6))
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
-    expect(takeover.flood).toEqual({ x: 195, y: -214, radius: 900 })
+    expect(takeover.flood).toEqual({
+      x: 195,
+      y: -214,
+      card: { width: 390, height: 420 },
+      distance: 900,
+    })
   })
 
   it("reads the attacker's direction in a sideways seat's own orientation", () => {
@@ -95,9 +108,11 @@ describe("commander damage board layout", () => {
       lifeFontSize: 104,
       lifeDigits: 2,
       badgeSize: 46,
-      reach: { x: 0, y: -424, radius: 900 },
+      reach: { x: 0, y: -424, card: { width: 390, height: 420 }, distance: 900 },
     })
     expect(takeover.badges[0].x).toBeCloseTo(-takeover.badges[0].distance)
+    expect(takeover.cardBadges[0].x).toBeCloseTo(-takeover.badges[0].y)
+    expect(takeover.cardBadges[0].y).toBeCloseTo(takeover.badges[0].x)
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
   })
@@ -113,7 +128,7 @@ describe("commander damage board layout", () => {
       lifeFontSize: 104,
       lifeDigits: 2,
       badgeSize: 46,
-      reach: { x: -197, y: 0, radius: 900 },
+      reach: { x: -197, y: 0, card: { width: 390, height: 420 }, distance: 900 },
     })
     expect(Math.abs(badge.x) + badge.size / 2).toBeLessThanOrEqual(210)
     expect(Math.abs(badge.y) + badge.size / 2).toBeLessThanOrEqual(96.5)
@@ -147,7 +162,7 @@ describe("commander damage board layout", () => {
       lifeDigits: 2,
       badgeSize: 46,
       badgeCount: 2,
-      reach: { x: 0, y: -424, radius: 900 },
+      reach: { x: 0, y: -424, card: { width: 390, height: 420 }, distance: 900 },
     })
     expect(badges).toHaveLength(2)
     const [first, partner] = badges

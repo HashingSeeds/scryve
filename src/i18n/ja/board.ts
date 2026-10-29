@@ -351,6 +351,7 @@ export default {
     raisePowerOf: "{{name}}のパワーを上げる",
     lowerPowerOf: "{{name}}のパワーを下げる",
     partnerAttacks: "{{name}}が攻撃",
+    unnamed: "統率者",
     totalFrom: "{{name}}からの統率者ダメージ{{damage}}",
     closeFor: "{{identity}}の統率者ダメージを閉じる",
     showFor: "{{identity}}の統率者ダメージを表示、{{sources}}",
