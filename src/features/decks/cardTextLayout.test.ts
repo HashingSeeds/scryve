@@ -49,6 +49,23 @@ describe("framedLinesFromCardTop", () => {
     expect(framedLinesFromCardTop(photo, framing)).toEqual(["Martial Coup", "Sorcery"])
   })
 
+  it("never reads the end of a split name on its own", () => {
+    const photo = {
+      width: 800,
+      height: 1200,
+      lines: [
+        line("Balance", 460, 300),
+        line("Leonardo, the", 340, 302),
+        line("Legendary Creature", 400, 700),
+      ],
+    }
+    expect(framedLinesFromCardTop(photo, framing)).toEqual([
+      "Leonardo, the Balance",
+      "Leonardo, the",
+      "Legendary Creature",
+    ])
+  })
+
   it("reads only the outlined card when the camera found one", () => {
     const photo = {
       width: 800,

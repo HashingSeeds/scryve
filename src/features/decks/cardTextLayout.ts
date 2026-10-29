@@ -60,5 +60,26 @@ export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFramin
   const cardRotation = circularMeanRadians(framed.map(({ line }) => line))
   const downTheCard = ({ x, y }: { x: number; y: number }) =>
     -x * Math.sin(cardRotation) + y * Math.cos(cardRotation)
-  return framed.sort((a, b) => downTheCard(a) - downTheCard(b)).map(({ line }) => line.text)
+  const acrossTheCard = ({ x, y }: { x: number; y: number }) =>
+    x * Math.cos(cardRotation) + y * Math.sin(cardRotation)
+  // why: a split name's last piece can be another card's name ("Leonardo, the" + "Balance").
+  const rows: (typeof framed)[] = []
+  for (const piece of framed.sort((a, b) => downTheCard(a) - downTheCard(b))) {
+    const row = rows.at(-1)
+    const first = row?.[0]
+    if (
+      row &&
+      first &&
+      Math.abs(downTheCard(piece) - downTheCard(first)) <
+        Math.min(piece.line.height, first.line.height) / 2
+    )
+      row.push(piece)
+    else rows.push([piece])
+  }
+  return rows.flatMap((row) => {
+    const texts = row
+      .sort((a, b) => acrossTheCard(a) - acrossTheCard(b))
+      .map(({ line }) => line.text)
+    return texts.length > 1 ? [texts.join(" "), texts[0]] : texts
+  })
 }

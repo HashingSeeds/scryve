@@ -147,8 +147,10 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       followed.confidence > 0.3,
       rejection(followed) == nil
     else {
+      // why: the tracker often slips on the frame right after a detection; looking again on
+      // the same frame keeps the outline on a card that never left the guide.
       self.tracking = nil
-      return miss()
+      return detect(buffer)
     }
     tracking.inputObservation = followed
     show(followed)
