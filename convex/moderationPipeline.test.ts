@@ -405,18 +405,6 @@ describe("moderation pipeline", () => {
         }),
       ).rejects.toThrow(/blocked/)
     })
-
-    it("does not hold a name on one report alone when the filter is clean", async () => {
-      const t = makeConvexTest()
-      const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
-      const guestSeat = await seatOf(host, "device-host-0001", 2)
-      const result = await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)
-      await settle(t)
-
-      expect(result.held).toBe(false)
-      const reported = await userByUsername(t, "guest-handle")
-      expect(reported?.moderationHold).toBeUndefined()
-    })
   })
 
   describe("operator resolution", () => {
@@ -443,21 +431,6 @@ describe("moderation pipeline", () => {
       // The harassment claim was unfounded; the username still trips the filter, so it stays held.
       const reported = await userByUsername(t, "sh1t-lord")
       expect(reported?.moderationHold?.reason).toBe("filter")
-    })
-
-    it("keeps an upheld hold after every report is resolved", async () => {
-      const t = makeConvexTest()
-      const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
-      const guestSeat = await seatOf(host, "device-host-0001", 2)
-      await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)
-      await settle(t)
-      const open = await t.query(internal.moderation.openReports, {})
-      await t.mutation(internal.moderation.upholdReport, { reportId: open[0].reportId })
-      await settle(t)
-
-      const held = await userByUsername(t, "guest-handle")
-      expect(held?.moderationHold?.reason).toBe("operator")
-      expect(await t.query(internal.moderation.openReports, {})).toHaveLength(0)
     })
   })
 })

@@ -1,4 +1,5 @@
 import { makeConvexTest } from "../test/convexTest"
+import { stepClock } from "../test/steppingClock"
 import { api, internal } from "./_generated/api"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { normalizePokemonCards } from "./lib/games/pokemon"
@@ -41,26 +42,6 @@ describe("card provider caching and health", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it("loads card descriptions without signing in", async () => {
-    const id = "11111111-1111-1111-1111-111111111111"
-    jest.spyOn(global, "fetch").mockImplementation(() =>
-      response({
-        id,
-        oracle_id: id,
-        name: "Avenge",
-        type_line: "Sorcery",
-        oracle_text: "Destroy all creatures.",
-        mana_cost: "{4}{W}{W}",
-        image_uris: { normal: "https://cards.scryfall.io/normal/test.jpg" },
-      }),
-    )
-    const t = makeConvexTest()
-    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
-      name: "Avenge",
-      oracleText: "Destroy all creatures.",
-    })
-  })
-
   it("enriches legacy Magic references once and serves Commander metadata in batches", async () => {
     const id = "11111111-1111-1111-1111-111111111111"
     const t = makeConvexTest()
@@ -83,6 +64,8 @@ describe("card provider caching and health", () => {
         color_identity: ["U"],
         legalities: { commander: "legal" },
         keywords: ["Flying", "Ward"],
+        power: "1",
+        toughness: "4",
       }),
     )
     const metadata = {
@@ -90,6 +73,7 @@ describe("card provider caching and health", () => {
       commanderLegality: "legal",
       colorIdentity: "U",
       keywords: "Flying\nWard",
+      power: "1",
     }
     await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject(metadata)
     await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject(metadata)
@@ -97,31 +81,6 @@ describe("card provider caching and health", () => {
     expect(
       await t.query(api.cards.detailsBatch, { game: "mtg", items: [{ key: id, scryfallId: id }] }),
     ).toEqual([{ key: id, details: expect.objectContaining(metadata) }])
-  })
-
-  it("stores a fetched card's printed power and serves it with card details", async () => {
-    const id = "77777777-7777-7777-7777-777777777777"
-    const t = makeConvexTest()
-    jest.spyOn(global, "fetch").mockImplementation(() =>
-      response({
-        id,
-        oracle_id: id,
-        name: "Krenko, Mob Boss",
-        set_name: "Magic 2013",
-        type_line: "Legendary Creature — Goblin Warrior",
-        color_identity: ["R"],
-        legalities: { commander: "legal" },
-        keywords: [],
-        power: "3",
-        toughness: "3",
-      }),
-    )
-    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
-      power: "3",
-    })
-    expect(
-      await t.query(api.cards.detailsBatch, { game: "mtg", items: [{ key: id, scryfallId: id }] }),
-    ).toEqual([{ key: id, details: expect.objectContaining({ power: "3" }) }])
   })
 
   it("refreshes Commander metadata older than a day and reports its cache timestamp", async () => {
@@ -251,22 +210,49 @@ describe("card provider caching and health", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 
-  it("records successful empty Pokemon lookups as healthy card-not-found responses", async () => {
-    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 404))
-    const t = makeConvexTest()
-    const actor = t.withIdentity({ subject: "pokemon-lookup" })
+  it.each([
+    {
+      game: "pokemon",
+      provider: "tcgdex",
+      cardId: "missing-card",
+      body: {},
+      httpStatus: 404,
+      code: "card_not_found",
+      status: "healthy",
+    },
+    {
+      game: "ygo",
+      provider: "ygoprodeck",
+      cardId: "12345678",
+      body: { data: [] },
+      httpStatus: 200,
+      code: "card_not_found",
+      status: "healthy",
+    },
+    {
+      game: "pokemon",
+      provider: "tcgdex",
+      cardId: "base1-4",
+      body: {},
+      httpStatus: 503,
+      code: "card_provider_unavailable",
+      status: "unavailable",
+    },
+  ])(
+    "records a $game $httpStatus lookup as $code with $status provider health",
+    async ({ game, provider, cardId, body, httpStatus, code, status }) => {
+      jest.spyOn(global, "fetch").mockImplementation(() => response(body, httpStatus))
+      const t = makeConvexTest()
+      const actor = t.withIdentity({ subject: `${game}-lookup` })
 
-    await expect(
-      actor.action(api.cards.byCatalogId, { game: "pokemon", cardId: "missing-card" }),
-    ).rejects.toMatchObject({ data: { code: "card_not_found" } })
-    await expect(
-      actor.query(api.providerHealth.current, {
-        game: "pokemon",
-        provider: "tcgdex",
-        operation: "card-lookup",
-      }),
-    ).resolves.toMatchObject({ status: "healthy", httpStatus: 404 })
-  })
+      await expect(actor.action(api.cards.byCatalogId, { game, cardId })).rejects.toMatchObject({
+        data: { code },
+      })
+      await expect(
+        actor.query(api.providerHealth.current, { game, provider, operation: "card-lookup" }),
+      ).resolves.toMatchObject({ status, httpStatus })
+    },
+  )
 
   it("records unmatched Pokemon references as healthy card-not-found responses", async () => {
     const fetchSpy = jest.spyOn(global, "fetch")
@@ -299,40 +285,6 @@ describe("card provider caching and health", () => {
         originalReference: "MEG 76",
       }),
     ).rejects.toMatchObject({ data: { code: "card_not_found" } })
-  })
-
-  it("records successful empty Yu-Gi-Oh lookups as healthy card-not-found responses", async () => {
-    jest.spyOn(global, "fetch").mockImplementation(() => response({ data: [] }))
-    const t = makeConvexTest()
-    const actor = t.withIdentity({ subject: "ygo-lookup" })
-
-    await expect(
-      actor.action(api.cards.byCatalogId, { game: "ygo", cardId: "12345678" }),
-    ).rejects.toMatchObject({ data: { code: "card_not_found" } })
-    await expect(
-      actor.query(api.providerHealth.current, {
-        game: "ygo",
-        provider: "ygoprodeck",
-        operation: "card-lookup",
-      }),
-    ).resolves.toMatchObject({ status: "healthy", httpStatus: 200 })
-  })
-
-  it("still records genuine provider failures as unavailable", async () => {
-    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 503))
-    const t = makeConvexTest()
-    const actor = t.withIdentity({ subject: "failed-pokemon-lookup" })
-
-    await expect(
-      actor.action(api.cards.byCatalogId, { game: "pokemon", cardId: "base1-4" }),
-    ).rejects.toMatchObject({ data: { code: "card_provider_unavailable" } })
-    await expect(
-      actor.query(api.providerHealth.current, {
-        game: "pokemon",
-        provider: "tcgdex",
-        operation: "card-lookup",
-      }),
-    ).resolves.toMatchObject({ status: "unavailable", httpStatus: 503 })
   })
 
   it("reports Scryfall 404 lookups as card-not-found", async () => {
@@ -510,6 +462,7 @@ describe("image fallback candidates", () => {
         url.endsWith(original.id) ? original : candidates.find((card) => url.endsWith(card.id)),
       )
     })
+    stepClock()
     const t = makeConvexTest()
     expect(
       await t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: original.id }),
@@ -608,6 +561,7 @@ it("caps Pokemon fallback detail requests and prioritizes the original set", asy
       })
     return response({ ...original, hp: 90 })
   })
+  const nowSpy = stepClock()
   try {
     const t = makeConvexTest()
     expect(
@@ -617,6 +571,7 @@ it("caps Pokemon fallback detail requests and prioritizes the original set", asy
     expect(calls[2]).toContain("me05-091")
   } finally {
     fetchSpy.mockRestore()
+    nowSpy.mockRestore()
   }
 })
 
@@ -975,6 +930,7 @@ describe("card name catalog", () => {
 
   it("follows Scryfall's next pages for printed names", async () => {
     const t = makeConvexTest()
+    stepClock()
     alternateNamePages([
       {
         flavor: "Marauding Mutagen",
@@ -990,17 +946,14 @@ describe("card name catalog", () => {
   it.each([
     ["a next page on another host", "https://api.scryfall.com.example.net/cards/search?page=2"],
     ["more pages than it will follow", "https://api.scryfall.com/cards/search?q=x&page=2"],
-  ])(
-    "refuses to cache a partial printed-name list from %s",
-    async (_, next) => {
-      const t = makeConvexTest()
-      alternateNamePages(Array.from({ length: 11 }, () => ({ flavor: "Marauding Mutagen", next })))
-      await expect(t.action(api.cards.cardNameCatalog, {})).rejects.toMatchObject({
-        data: { code: "scryfall_invalid_response" },
-      })
-    },
-    30_000,
-  )
+  ])("refuses to cache a partial printed-name list from %s", async (_, next) => {
+    const t = makeConvexTest()
+    stepClock()
+    alternateNamePages(Array.from({ length: 11 }, () => ({ flavor: "Marauding Mutagen", next })))
+    await expect(t.action(api.cards.cardNameCatalog, {})).rejects.toMatchObject({
+      data: { code: "scryfall_invalid_response" },
+    })
+  })
 
   it("reports an outage when there is no cached copy to fall back on", async () => {
     const t = makeConvexTest()

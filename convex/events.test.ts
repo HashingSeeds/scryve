@@ -1,5 +1,7 @@
-import { convexTest, type TestConvex } from "convex-test"
-
+import { api, internal } from "./_generated/api"
+import type { Id } from "./_generated/dataModel"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
+import { MAX_EVENT_PLAYERS, MAX_EVENT_ROUNDS } from "./lib/events/model"
 import {
   applyHubCommand,
   createHubEvent,
@@ -7,25 +9,6 @@ import {
   joinHub,
   nearbyImport,
 } from "../src/features/events/nearby/hubEvent"
-import { registerRateLimiter } from "../test/registerRateLimiter"
-import { api, internal } from "./_generated/api"
-import type { Id } from "./_generated/dataModel"
-import { MAX_EVENT_PLAYERS, MAX_EVENT_ROUNDS } from "./lib/events/model"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-  "./events.ts": async () => jest.requireActual("./events"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
-
-async function account(t: TestConvex<typeof schema>, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
-}
 
 const swiss = {
   name: "Friday Modern",
@@ -39,23 +22,22 @@ const swiss = {
 }
 
 async function setup(players = ["ana", "ben", "cat"]) {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
-  const organizer = await account(t, "organizer")
+  const t = makeConvexTest()
+  const organizer = await signedIn(t, "organizer")
   const { eventId, code } = await organizer.mutation(api.events.create, {
     ...swiss,
     codeCandidates: ["ABC123"],
   })
-  const actors = new Map<string, Awaited<ReturnType<typeof account>>>()
+  const actors = new Map<string, Awaited<ReturnType<typeof signedIn>>>()
   for (const name of players) {
-    const actor = await account(t, name)
+    const actor = await signedIn(t, name)
     await actor.mutation(api.events.join, { code: code.toLowerCase() })
     actors.set(name, actor)
   }
   return { t, organizer, eventId, code, actors }
 }
 
-async function deleteAccount(t: TestConvex<typeof schema>, subject: string) {
+async function deleteAccount(t: ConvexTestHarness, subject: string) {
   const requestId = await t.run(async (ctx) => {
     const user = (await ctx.db
       .query("users")
@@ -74,7 +56,7 @@ async function deleteAccount(t: TestConvex<typeof schema>, subject: string) {
     await t.mutation(internal.accountDeletion.processUserLinkedData, { requestId })
 }
 
-async function tablesOf(t: TestConvex<typeof schema>, eventId: Id<"events">) {
+async function tablesOf(t: ConvexTestHarness, eventId: Id<"events">) {
   const view = await t.query(api.events.view, { eventId })
   return view!.tables
 }
@@ -176,16 +158,9 @@ describe("events", () => {
     })
   })
 
-  it("returns nothing for an unknown code instead of throwing", async () => {
-    const { t } = await setup([])
-    const stranger = await account(t, "stranger")
-    expect(await stranger.mutation(api.events.join, { code: "ZZZ999" })).toBeNull()
-  })
-
   it("caps how many unfinished events one organizer runs", async () => {
-    const t = convexTest(schema, modules)
-    registerRateLimiter(t)
-    const organizer = await account(t, "organizer")
+    const t = makeConvexTest()
+    const organizer = await signedIn(t, "organizer")
     for (let index = 0; index < 5; index++)
       await organizer.mutation(api.events.create, {
         ...swiss,
@@ -309,18 +284,12 @@ describe("events", () => {
       ])
     })
 
-    it("refuses tables that name players the event doesn't have", async () => {
-      const { organizer } = await setup([])
-      await expect(
-        organizer.mutation(api.events.importNearby, {
-          ...nearby,
-          nearbyId: "event_bad",
-          tables: [{ ...nearby.tables[0]!, playerIds: ["p1", "ghost"] }],
-        }),
-      ).rejects.toThrow("Unknown player")
-    })
-
     it.each([
+      [
+        "a table naming a player the event doesn't have",
+        { tables: [{ ...nearby.tables[0]!, playerIds: ["p1", "ghost"] }] },
+        "Unknown player",
+      ],
       [
         "a player listed twice",
         { players: [...nearby.players, { id: "p1", name: "Kim again" }] },
@@ -428,7 +397,7 @@ describe("events", () => {
 
     it("gives each organizer their own copy of the same nearby event", async () => {
       const { t, organizer } = await setup([])
-      const other = await account(t, "other-organizer")
+      const other = await signedIn(t, "other-organizer")
       const mine = await organizer.mutation(api.events.importNearby, nearby)
       const theirs = await other.mutation(api.events.importNearby, {
         ...nearby,

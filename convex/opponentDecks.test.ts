@@ -1,6 +1,6 @@
 import type { FunctionArgs } from "convex/server"
 
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import { deckFingerprint } from "./lib/deckFingerprint"
@@ -9,22 +9,9 @@ import { hashSeatPassToken } from "./lib/seatPass"
 const FINISHED_AT = 1_700_000_900_000
 const fingerprint = `v1:${"b".repeat(64)}`
 
-async function account(t: ConvexTestHarness, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  const userId = await t.run(
-    async (ctx) =>
-      (await ctx.db
-        .query("users")
-        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", subject))
-        .unique())!._id,
-  )
-  return { actor, userId }
-}
-
 async function commanderDeck(
   t: ConvexTestHarness,
-  actor: Awaited<ReturnType<typeof account>>["actor"],
+  actor: Awaited<ReturnType<typeof signedIn>>,
   name: string,
   commanders: { cardId: string; name: string }[],
 ) {
@@ -87,7 +74,8 @@ function resultsOf(t: ConvexTestHarness, userId: Id<"users">) {
 describe("local games", () => {
   it("remember each opponent's label, and old payloads still name the opponent", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "host")
+    const actor = await signedIn(t, "host")
+    const { userId } = actor
     const label = {
       name: "  Bob's Atraxa  ",
       identity: [
@@ -125,7 +113,7 @@ describe("local games", () => {
 
   it("rejects a label whose fingerprint has no deck key, or with three identity cards", async () => {
     const t = makeConvexTest()
-    const { actor } = await account(t, "host")
+    const actor = await signedIn(t, "host")
     await expect(
       actor.mutation(
         api.games.publishFinishedLocalGame,
@@ -145,13 +133,13 @@ describe("local games", () => {
 describe("nearby games", () => {
   it("fills in a guest's real deck on every seat's result once the guest claims", async () => {
     const t = makeConvexTest()
-    const host = await account(t, "host")
-    const guest = await account(t, "guest")
-    const { versionId } = await commanderDeck(t, guest.actor, "Kenrith", [
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
+    const { versionId } = await commanderDeck(t, guest, "Kenrith", [
       { cardId: "kenrith", name: "Kenrith, the Returned King" },
     ])
     const token = "guest-seat-token"
-    await host.actor.mutation(
+    await host.mutation(
       api.games.publishFinishedLocalGame,
       localGame(
         [
@@ -169,7 +157,7 @@ describe("nearby games", () => {
       { displayName: "Bob", outcome: "win", deck: { name: "Typed by host" } },
     ])
 
-    await guest.actor.mutation(api.games.claimNearbySeat, {
+    await guest.mutation(api.games.claimNearbySeat, {
       publicId: "lan_0123456789abcdef0123456789abcdef-1",
       token,
       deckVersionId: versionId,
@@ -193,14 +181,14 @@ describe("nearby games", () => {
 describe("cloud games", () => {
   it("derive each seat's deck and commanders, and the host can label a guest seat", async () => {
     const t = makeConvexTest()
-    const host = await account(t, "host")
-    const second = await account(t, "second")
-    const { versionId } = await commanderDeck(t, host.actor, "Partners", [
+    const host = await signedIn(t, "host")
+    const second = await signedIn(t, "second")
+    const { versionId } = await commanderDeck(t, host, "Partners", [
       { cardId: "tymna", name: "Tymna the Weaver" },
       { cardId: "thrasios", name: "Thrasios, Triton Hero" },
     ])
     const publicId = "cloud-opponents-game-01"
-    await host.actor.mutation(api.games.createLobby, {
+    await host.mutation(api.games.createLobby, {
       publicId,
       playerCount: 3,
       startingLife: 40,
@@ -212,12 +200,12 @@ describe("cloud games", () => {
       hostDisplayName: "Host",
       hostColor: "#123456",
     })
-    await second.actor.mutation(api.games.claimSeat, {
+    await second.mutation(api.games.claimSeat, {
       token: "t".repeat(43),
       displayName: "Second",
       color: "#654321",
     })
-    await host.actor.mutation(api.decks.selectForSeat, {
+    await host.mutation(api.decks.selectForSeat, {
       publicId,
       seat: 1,
       deckVersionId: versionId,
@@ -237,30 +225,30 @@ describe("cloud games", () => {
       })
     })
     await expect(
-      second.actor.mutation(api.games.labelGuestSeatDeck, {
+      second.mutation(api.games.labelGuestSeatDeck, {
         publicId,
         seat: 3,
         deckLabel: { name: "Mono red" },
       }),
     ).rejects.toThrow("Host permission required")
     await expect(
-      host.actor.mutation(api.games.labelGuestSeatDeck, {
+      host.mutation(api.games.labelGuestSeatDeck, {
         publicId,
         seat: 2,
         deckLabel: { name: "Not theirs to name" },
       }),
     ).rejects.toThrow("Only a guest seat can be labeled")
-    await host.actor.mutation(api.games.labelGuestSeatDeck, {
+    await host.mutation(api.games.labelGuestSeatDeck, {
       publicId,
       seat: 3,
       deckLabel: { name: "Mono red" },
     })
-    const projection = await host.actor.query(api.games.lobbyProjection, { publicId })
+    const projection = await host.query(api.games.lobbyProjection, { publicId })
     expect(projection.players.find((player) => player.seat === 3)?.deckLabel).toEqual({
       name: "Mono red",
     })
-    await host.actor.mutation(api.games.startGame, { publicId })
-    await host.actor.mutation(api.games.finishGame, {
+    await host.mutation(api.games.startGame, { publicId })
+    await host.mutation(api.games.finishGame, {
       publicId,
       result: { kind: "win", winnerPlayerIds: [guestSeat] },
     })
@@ -288,7 +276,8 @@ describe("cloud games", () => {
 describe("manual matches", () => {
   it("keep opponent labels and a synced deck's fingerprint, and accept old payloads", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "owner")
+    const actor = await signedIn(t, "owner")
+    const { userId } = actor
     const deckId = await actor.mutation(api.decks.create, { name: "Burn", format: "modern" })
     const deckVersionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
     const listFingerprint = await deckFingerprint([])
@@ -346,15 +335,15 @@ describe("account deletion", () => {
 
   it("drops the deleted account from other players' results", async () => {
     const t = makeConvexTest()
-    const host = await account(t, "host")
-    const guest = await account(t, "guest")
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
     const token = "guest-seat-token"
     const publicId = "lan_0123456789abcdef0123456789abcdef-2"
-    await host.actor.mutation(
+    await host.mutation(
       api.games.publishFinishedLocalGame,
       localGame([me, { ...them, seatPassHash: await hashSeatPassToken(token) }], publicId),
     )
-    await guest.actor.mutation(api.games.claimNearbySeat, { publicId, token })
+    await guest.mutation(api.games.claimNearbySeat, { publicId, token })
     expect((await resultsOf(t, host.userId))[0].opponents?.[0].userId).toBe(guest.userId)
 
     const requestId = await t.run(async (ctx) =>
@@ -376,7 +365,8 @@ describe("account deletion", () => {
 describe("backfillResultOpponents", () => {
   it("names opponents on older results once, and leaves newer ones alone", async () => {
     const t = makeConvexTest()
-    const { actor, userId } = await account(t, "host")
+    const actor = await signedIn(t, "host")
+    const { userId } = actor
     await actor.mutation(
       api.games.publishFinishedLocalGame,
       localGame([me, { ...them, deckLabel: { name: "Labeled" } }]),

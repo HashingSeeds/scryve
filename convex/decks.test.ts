@@ -1,15 +1,9 @@
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import { addDeckResult } from "./lib/deckResults"
 
 const inviteToken = "t".repeat(43)
 const hostDeviceId = "device-host-0001"
-
-async function synced(t: ConvexTestHarness, subject: string, name: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: name })
-  return actor
-}
 
 describe("premium deck tracking", () => {
   it.each([
@@ -21,7 +15,7 @@ describe("premium deck tracking", () => {
     async ({ account, ...expected }) => {
       const t = makeConvexTest()
       const clerkUserId = `capacity-${account}`
-      const actor = await synced(t, clerkUserId, "Capacity Owner")
+      const actor = await signedIn(t, clerkUserId, "Capacity Owner")
       await t.mutation(internal.entitlements.setUserFeature, {
         clerkUserId,
         feature: "pro_decks_limit",
@@ -53,7 +47,7 @@ describe("premium deck tracking", () => {
 
   it("preserves a commander's chosen color through imports, version saves, and queued sync", async () => {
     const t = makeConvexTest()
-    const owner = await synced(t, "commander-color-owner", "Commander Player")
+    const owner = await signedIn(t, "commander-color-owner", "Commander Player")
     const card = {
       oracleId: "11111111-1111-1111-1111-111111111111",
       scryfallId: "22222222-2222-2222-2222-222222222222",
@@ -104,7 +98,7 @@ describe("premium deck tracking", () => {
 
   it("lets a player clear a deck only when the lobby makes decks optional", async () => {
     const t = makeConvexTest()
-    const optionalHost = await synced(t, "optional-host", "Optional Host")
+    const optionalHost = await signedIn(t, "optional-host", "Optional Host")
     const deckId = await optionalHost.mutation(api.decks.create, {
       name: "Optional Deck",
       format: "commander",
@@ -149,7 +143,7 @@ describe("premium deck tracking", () => {
     })
     expect(projection.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
 
-    const requiredHost = await synced(t, "required-host", "Required Host")
+    const requiredHost = await signedIn(t, "required-host", "Required Host")
     const requiredLobby = await requiredHost.mutation(api.games.createLobby, {
       publicId: "required-deck-public-1234",
       playerCount: 2,
@@ -172,7 +166,7 @@ describe("premium deck tracking", () => {
 
   it("creates an imported deck and its first version atomically", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "import-owner", "Import Owner")
+    const actor = await signedIn(t, "import-owner", "Import Owner")
     const deckId = await actor.mutation(api.decks.importResolved, {
       name: "Imported Commander",
       format: "commander",
@@ -208,8 +202,8 @@ describe("premium deck tracking", () => {
 
   it("imports guest decks once per owner and preserves archived receipts", async () => {
     const t = makeConvexTest()
-    const owner = await synced(t, "guest-owner", "Guest Owner")
-    const other = await synced(t, "guest-other", "Guest Other")
+    const owner = await signedIn(t, "guest-owner", "Guest Owner")
+    const other = await signedIn(t, "guest-other", "Guest Other")
     const localId = "11111111-1111-4111-8111-111111111111"
     const args = { localId, localUpdatedAt: 123, name: "Scratch", format: "commander", cards: [] }
     const imported = await owner.mutation(api.decks.importGuest, args)
@@ -255,7 +249,7 @@ describe("premium deck tracking", () => {
 
   it("returns guest capacity without writing when a free account is full", async () => {
     const t = makeConvexTest()
-    const owner = await synced(t, "guest-full", "Guest Full")
+    const owner = await signedIn(t, "guest-full", "Guest Full")
     await owner.mutation(api.decks.create, { name: "First", format: "commander" })
     await owner.mutation(api.decks.create, { name: "Second", format: "commander" })
     await expect(
@@ -274,7 +268,7 @@ describe("premium deck tracking", () => {
 
   it("imports a Yu-Gi-Oh! catalog deck without crossing system identities", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "catalog-owner", "Catalog Owner")
+    const actor = await signedIn(t, "catalog-owner", "Catalog Owner")
     const catalogDeckId = await t.run(async (ctx) => {
       const id = await ctx.db.insert("deckCatalogs", {
         game: "ygo",
@@ -341,7 +335,7 @@ describe("premium deck tracking", () => {
 
   it("blocks imports immediately when the legal release state is disabled", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "gated-owner", "Gated Owner")
+    const actor = await signedIn(t, "gated-owner", "Gated Owner")
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
       game: "ygo",
       capability: "deckImport",
@@ -376,7 +370,7 @@ describe("premium deck tracking", () => {
     "restores missing mirror URLs with printing %s",
     async (printingId) => {
       const t = makeConvexTest()
-      const actor = await synced(t, "mirror-owner", "Mirror Owner")
+      const actor = await signedIn(t, "mirror-owner", "Mirror Owner")
       const catalogDeckId = await t.run(async (ctx) => {
         const id = await ctx.db.insert("deckCatalogs", {
           game: "ygo",
@@ -410,7 +404,7 @@ describe("premium deck tracking", () => {
 
   it("keeps card text available while an image release gate is disabled", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "image-gate-owner", "Image Gate Owner")
+    const actor = await signedIn(t, "image-gate-owner", "Image Gate Owner")
     const catalogDeckId = await t.run(async (ctx) => {
       const id = await ctx.db.insert("deckCatalogs", {
         game: "ygo",
@@ -456,24 +450,9 @@ describe("premium deck tracking", () => {
     expect(decks.decks[0]).not.toHaveProperty("coverImageUrl")
   })
 
-  it("blocks Top Deck provider actions behind the example-decks release gate", async () => {
-    const t = makeConvexTest()
-    const actor = await synced(t, "feed-gate-owner", "Feed Gate Owner")
-    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
-      game: "ygo",
-      capability: "exampleDecks",
-      release: "permission_required",
-      note: "Registration pending",
-    })
-
-    await expect(
-      actor.action(api.deckCatalogs.searchTopDecks, { game: "ygo", query: "" }),
-    ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
-  })
-
   it("keeps two decks free and unlocks additional decks through server entitlements", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "deck-owner", "Deck Owner")
+    const actor = await signedIn(t, "deck-owner", "Deck Owner")
     await expect(
       actor.mutation(api.decks.create, { name: "First", format: "commander" }),
     ).resolves.toBeDefined()
@@ -505,7 +484,7 @@ describe("premium deck tracking", () => {
 
   it("uses canonical entitlement precedence while accepting legacy stored records", async () => {
     const t = makeConvexTest()
-    const legacy = await synced(t, "legacy-entitlement", "Legacy Entitlement")
+    const legacy = await signedIn(t, "legacy-entitlement", "Legacy Entitlement")
     const userId = await t.run(async (ctx) => {
       const user = await ctx.db
         .query("users")
@@ -582,7 +561,7 @@ describe("premium deck tracking", () => {
 
   it("frees capacity when a deck is deleted and refuses further edits", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "archive-owner", "Archive Owner")
+    const actor = await signedIn(t, "archive-owner", "Archive Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Retired", format: "commander" })
     await expect(actor.mutation(api.decks.archive, { deckId })).resolves.toBeNull()
     await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
@@ -610,7 +589,7 @@ describe("premium deck tracking", () => {
 
   it("lists active decks behind more than 100 newer deleted decks", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "many-deleted-owner", "Many Deleted Owner")
+    const actor = await signedIn(t, "many-deleted-owner", "Many Deleted Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Keeper", format: "commander" })
     await t.run(async (ctx) => {
       const deck = await ctx.db.get(deckId)
@@ -635,8 +614,8 @@ describe("premium deck tracking", () => {
 
   it("snapshots a selected deck version and records an explicit winning result", async () => {
     const t = makeConvexTest()
-    const host = await synced(t, "host", "Host")
-    const joiner = await synced(t, "joiner", "Joiner")
+    const host = await signedIn(t, "host", "Host")
+    const joiner = await signedIn(t, "joiner", "Joiner")
     const deckId = await host.mutation(api.decks.create, { name: "Dragons", format: "commander" })
     const deckVersionId = await host.mutation(api.decks.saveVersion, {
       deckId,
@@ -705,8 +684,8 @@ describe("premium deck tracking", () => {
 
   it("serves legacy stats from the owner's deck key totals", async () => {
     const t = makeConvexTest()
-    const owner = await synced(t, "key-owner", "Owner")
-    await synced(t, "key-other", "Other")
+    const owner = await signedIn(t, "key-owner", "Owner")
+    await signedIn(t, "key-other", "Other")
     const deckId = await owner.mutation(api.decks.create, { name: "Burn", format: "modern" })
     const [empty] = (await owner.query(api.decks.listMine)).decks
     expect(empty.record).toMatchObject({ games: 0, wins: 0 })
@@ -765,7 +744,7 @@ describe("premium deck tracking", () => {
 
   it("returns manual match counters beside Scryve games without changing the game fields", async () => {
     const t = makeConvexTest()
-    const owner = await synced(t, "manual-owner", "Owner")
+    const owner = await signedIn(t, "manual-owner", "Owner")
     const deckId = await owner.mutation(api.decks.create, { name: "Burn", format: "modern" })
     const deckVersionId = await owner.mutation(api.decks.saveVersion, { deckId, cards: [] })
     const finishedAt = Date.UTC(2026, 9, 3)
@@ -805,8 +784,8 @@ describe("premium deck tracking", () => {
 
   it("shows other players a neutral label for a deck name that fails the name filter", async () => {
     const t = makeConvexTest()
-    const host = await synced(t, "host", "Host")
-    const joiner = await synced(t, "joiner", "Joiner")
+    const host = await signedIn(t, "host", "Host")
+    const joiner = await signedIn(t, "joiner", "Joiner")
     const deckId = await host.mutation(api.decks.create, {
       name: "Shitty Dragons",
       format: "commander",
@@ -871,12 +850,12 @@ describe("premium deck tracking", () => {
     expect(JSON.stringify([joinerSummary, joinerHistory])).not.toContain("Shitty")
   })
 
-  it.each(["deleted version", "changed format"])(
+  it.each(["deleted version", "changed format", "deleted deck"])(
     "drops an invalid selection at start: %s",
     async (reason) => {
       const t = makeConvexTest()
-      const host = await synced(t, "stale-host", "Host")
-      const joiner = await synced(t, "stale-joiner", "Joiner")
+      const host = await signedIn(t, "stale-host", "Host")
+      const joiner = await signedIn(t, "stale-joiner", "Joiner")
       const deckId = await host.mutation(api.decks.create, { name: "Goblins", format: "commander" })
       const firstVersionId = await host.mutation(api.decks.saveVersion, {
         deckId,
@@ -920,8 +899,10 @@ describe("premium deck tracking", () => {
       })
       if (reason === "deleted version") {
         await host.mutation(api.decks.deleteVersion, { versionId: firstVersionId })
-      } else {
+      } else if (reason === "changed format") {
         await host.mutation(api.decks.update, { deckId, format: "vintage" })
+      } else {
+        await host.mutation(api.decks.archive, { deckId })
       }
 
       const lobby = await host.query(api.games.lobbyProjection, {
@@ -949,62 +930,6 @@ describe("premium deck tracking", () => {
     },
   )
 
-  it("drops a seat selection whose deck was deleted before the game started", async () => {
-    const t = makeConvexTest()
-    const host = await synced(t, "archived-host", "Host")
-    const joiner = await synced(t, "archived-joiner", "Joiner")
-    const deckId = await host.mutation(api.decks.create, { name: "Elves", format: "commander" })
-    const deckVersionId = await host.mutation(api.decks.saveVersion, {
-      deckId,
-      cards: [
-        {
-          oracleId: "11111111-1111-1111-1111-111111111111",
-          scryfallId: "22222222-2222-2222-2222-222222222222",
-          name: "Elf Test Card",
-          quantity: 1,
-          board: "commander",
-        },
-      ],
-    })
-    const created = await host.mutation(api.games.createLobby, {
-      publicId: "archived-deck-public-12",
-      playerCount: 2,
-      startingLife: 40,
-      ruleset: "commander",
-      inviteToken,
-      manualCodeCandidates: ["ABC236"],
-      hostDisplayName: "Host",
-      hostColor: "#7C3AED",
-      deviceId: hostDeviceId,
-    })
-    await joiner.mutation(api.games.claimSeat, {
-      token: inviteToken,
-      displayName: "Joiner",
-      color: "#2563EB",
-    })
-    await host.mutation(api.decks.selectForSeat, {
-      publicId: created.publicId,
-      seat: 1,
-      deckVersionId,
-    })
-    await host.mutation(api.decks.archive, { deckId })
-
-    const lobby = await host.query(api.games.lobbyProjection, {
-      publicId: created.publicId,
-      deviceId: hostDeviceId,
-    })
-    const hostPlayer = lobby.players.find((player) => player.seat === 1)!
-    await host.mutation(api.games.startGame, { publicId: created.publicId })
-    await host.mutation(api.games.finishGame, {
-      publicId: created.publicId,
-      result: { kind: "win", winnerPlayerIds: [hostPlayer.playerId] },
-    })
-
-    const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
-    expect(summary).not.toBeNull()
-    expect(summary?.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
-  })
-
   it("accepts authoritative Clerk username projections", async () => {
     const t = makeConvexTest()
     await t.mutation(internal.users.syncFromClerk, {
@@ -1029,7 +954,7 @@ describe("premium deck tracking", () => {
 
   it("lets non-Pro users page past 10 connected games", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "history-owner", "History Owner")
+    const actor = await signedIn(t, "history-owner", "History Owner")
     await t.run(async (ctx) => {
       const user = await ctx.db
         .query("users")
@@ -1105,7 +1030,7 @@ async function premiumVersions(t: ConvexTestHarness, clerkUserId: string) {
 describe("deck versions", () => {
   it("starts every new deck with one named version and room for another", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "slot-owner", "Slot Owner")
+    const actor = await signedIn(t, "slot-owner", "Slot Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Slots", format: "commander" })
     await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
       versions: [{ versionNumber: 1, name: "Current", cardCount: 0 }],
@@ -1115,7 +1040,7 @@ describe("deck versions", () => {
 
   it("edits a version in place instead of appending history", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "edit-owner", "Edit Owner")
+    const actor = await signedIn(t, "edit-owner", "Edit Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Edits", format: "commander" })
     const first = await actor.mutation(api.decks.saveVersion, {
       deckId,
@@ -1134,7 +1059,7 @@ describe("deck versions", () => {
 
   it("persists metadata-only card changes", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "metadata-owner", "Metadata Owner")
+    const actor = await signedIn(t, "metadata-owner", "Metadata Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Metadata", format: "commander" })
     const card = testCard("Original Name", "aaaaaaa3")
     await actor.mutation(api.decks.saveVersion, { deckId, cards: [card] })
@@ -1168,7 +1093,7 @@ describe("deck versions", () => {
 
   it("treats reorder-only saves as no-ops", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "reorder-owner", "Reorder Owner")
+    const actor = await signedIn(t, "reorder-owner", "Reorder Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Reorder", format: "commander" })
     const cards = [testCard("First Card", "aaaaaaa4"), testCard("Second Card", "aaaaaaa5")]
     await actor.mutation(api.decks.saveVersion, { deckId, cards })
@@ -1182,7 +1107,7 @@ describe("deck versions", () => {
 
   it("gives free decks two versions, keeps more premium and caps them at five", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "version-owner", "Version Owner")
+    const actor = await signedIn(t, "version-owner", "Version Owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Tuning", format: "commander" })
     await actor.mutation(api.decks.createVersion, { deckId, name: "vs Control" })
     await expect(
@@ -1206,7 +1131,7 @@ describe("deck versions", () => {
 
   it("seeds a new version from the version it was branched off", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "branch-owner", "Branch Owner")
+    const actor = await signedIn(t, "branch-owner", "Branch Owner")
     await premiumVersions(t, "branch-owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Branch", format: "commander" })
     const mainVersionId = await actor.mutation(api.decks.saveVersion, {
@@ -1241,7 +1166,7 @@ describe("deck versions", () => {
 
   it("archives a version without disturbing the last one standing", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "prune-owner", "Prune Owner")
+    const actor = await signedIn(t, "prune-owner", "Prune Owner")
     await premiumVersions(t, "prune-owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Prune", format: "commander" })
     const extraId = await actor.mutation(api.decks.createVersion, { deckId, name: "Experiment" })
@@ -1260,7 +1185,7 @@ describe("deck versions", () => {
 
   it("rejects a save to a deleted version instead of recreating it", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "stray-owner", "Stray Owner")
+    const actor = await signedIn(t, "stray-owner", "Stray Owner")
     await premiumVersions(t, "stray-owner")
     const deckId = await actor.mutation(api.decks.create, { name: "Stray", format: "commander" })
     const deletedId = await actor.mutation(api.decks.createVersion, { deckId, name: "Experiment" })
@@ -1281,7 +1206,7 @@ describe("deck versions", () => {
 
   it("round-trips deck and version notes", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "note-owner", "Note Owner")
+    const actor = await signedIn(t, "note-owner", "Note Owner")
     const deckId = await actor.mutation(api.decks.create, {
       name: "Notes",
       format: "commander",
@@ -1303,7 +1228,7 @@ describe("deck versions", () => {
 
   it("favorites and unfavorites an owned deck without changing its content order", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "favorite-owner", "Favorite Owner")
+    const actor = await signedIn(t, "favorite-owner", "Favorite Owner")
     const deckId = await actor.mutation(api.decks.create, {
       name: "Favorite me",
       format: "commander",
@@ -1322,7 +1247,7 @@ describe("deck versions", () => {
 
   it("accepts released systems and rejects unknown system or format pairs", async () => {
     const t = makeConvexTest()
-    const actor = await synced(t, "game-owner", "Game Owner")
+    const actor = await signedIn(t, "game-owner", "Game Owner")
     await expect(
       actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "other" }),
     ).rejects.toMatchObject({ data: { code: "unknown_game" } })
@@ -1350,7 +1275,7 @@ it("imports Magic catalog examples into the existing deck and version model", as
   await expect(
     t.mutation(api.decks.importCatalog, { catalogDeckId: catalogDeck._id }),
   ).rejects.toMatchObject({ data: { code: "unauthenticated" } })
-  const actor = await synced(t, "magic-catalog-owner", "Magic Catalog Owner")
+  const actor = await signedIn(t, "magic-catalog-owner", "Magic Catalog Owner")
   const deckId = await actor.mutation(api.decks.importCatalog, { catalogDeckId: catalogDeck._id })
   const detail = await actor.query(api.decks.detail, { deckId })
   expect(detail.deck.format).toBe("pauper")

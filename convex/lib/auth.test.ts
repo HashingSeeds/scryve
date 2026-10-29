@@ -1,17 +1,11 @@
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./auth"
-import { makeConvexTest, type ConvexTestHarness } from "../../test/convexTest"
+import { makeConvexTest, signedIn } from "../../test/convexTest"
 import { api } from "../_generated/api"
-
-async function synced(t: ConvexTestHarness, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
-}
 
 describe("auth helpers", () => {
   it("reject with codes that survive production, keeping the messages installed clients match", async () => {
     const t = makeConvexTest()
-    const host = await synced(t, "auth-host")
+    const host = await signedIn(t, "auth-host")
     await host.mutation(api.games.createLobby, {
       publicId: "auth-game-id-12345678",
       playerCount: 2,
@@ -23,7 +17,7 @@ describe("auth helpers", () => {
       hostColor: "#7C3AED",
       deviceId: "device-host-0001",
     })
-    const stranger = await synced(t, "auth-stranger")
+    const stranger = await signedIn(t, "auth-stranger")
     const game = await t.run(async (ctx) => await ctx.db.query("games").first())
     if (!game) throw new Error("lobby was not created")
 

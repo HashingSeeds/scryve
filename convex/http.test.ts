@@ -1,18 +1,10 @@
-import { convexTest } from "convex-test"
 import { Webhook } from "svix"
 
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./http.ts": async () => jest.requireActual("./http"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 
 const secret = "whsec_dGVzdC13ZWJob29rLXNlY3JldA=="
 const otherSecret = "whsec_b3RoZXItd2ViaG9vay1zZWNyZXQ="
-type Harness = ReturnType<typeof convexTest>
+type Harness = ConvexTestHarness
 
 async function fetchSigned(t: Harness, event: unknown, signingSecret = secret) {
   const body = JSON.stringify(event)
@@ -49,7 +41,7 @@ describe("Clerk webhook user sync", () => {
 
   it("returns 503 without a configured signing secret and leaves users untouched", async () => {
     delete process.env.CLERK_WEBHOOK_SIGNING_SECRET
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
 
     const response = await t.fetch("/clerk/webhooks", { method: "POST", body: "{}" })
 
@@ -59,7 +51,7 @@ describe("Clerk webhook user sync", () => {
 
   it("returns 400 when the payload signature does not verify and leaves users untouched", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const response = await fetchSigned(
       t,
       {
@@ -73,15 +65,16 @@ describe("Clerk webhook user sync", () => {
     expect(await users(t)).toEqual([])
   })
 
-  it("returns 400 for a signed user event whose data is missing or not an object", async () => {
+  it("returns 400 for a signed user event whose data is missing, not an object, or has no username", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
 
     const malformedEvents = [
       { type: "user.created" },
       { type: "user.created", data: null },
       { type: "user.updated", data: "not-an-object" },
       { type: "user.updated", data: ["not", "a", "record"] },
+      { type: "user.created", data: { id: "clerk_missing_username", first_name: "Missing" } },
     ]
     for (const event of malformedEvents) {
       const response = await fetchSigned(t, event)
@@ -90,22 +83,9 @@ describe("Clerk webhook user sync", () => {
     expect(await users(t)).toEqual([])
   })
 
-  it("returns 400 for a signed user.created event without a username", async () => {
-    process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
-    const t = convexTest(schema, modules)
-
-    const response = await fetchSigned(t, {
-      type: "user.created",
-      data: { id: "clerk_missing_username", first_name: "Missing" },
-    })
-
-    expect(response.status).toBe(400)
-    expect(await users(t)).toEqual([])
-  })
-
   it("returns 200 for a signed user.created event and writes its Clerk profile", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
 
     const response = await fetchSigned(t, {
       type: "user.created",
@@ -131,7 +111,7 @@ describe("Clerk webhook user sync", () => {
 
   it("updates the existing user for a second signed user.updated event", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const createdResponse = await fetchSigned(t, {
       type: "user.created",
       data: { id: "clerk_updated", username: "before", first_name: "Before" },
@@ -164,7 +144,7 @@ describe("Clerk webhook user sync", () => {
 
   it("returns 200 for a signed unrelated event and leaves users untouched", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
 
     const response = await fetchSigned(t, {
       type: "session.created",

@@ -1,19 +1,8 @@
-import { convexTest } from "convex-test"
-
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { makeConvexTest } from "../test/convexTest"
 import { api } from "./_generated/api"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { archidektDeckLink, parseArchidektDeck } from "./lib/games/archidekt"
-import schema from "./schema"
 
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./archidektImports.ts": async () => jest.requireActual("./archidektImports"),
-  "./externalApiRateLimits.ts": async () => jest.requireActual("./externalApiRateLimits"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 const importDeck = api.archidektImports.resolvePublic
 
 function card(
@@ -155,8 +144,7 @@ it.each([
 })
 
 it("normalizes deck links and uses a fixed fetch path for guests", async () => {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
+  const t = makeConvexTest()
   const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (url) => {
     if (String(url).includes("archidekt.com")) return providerResponse()
     return new Response(
@@ -202,8 +190,7 @@ it("normalizes deck links and uses a fixed fetch path for guests", async () => {
 })
 
 it("does not substitute another printing or trust mismatched oracle identity", async () => {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
+  const t = makeConvexTest()
   const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (url) =>
     String(url).includes("archidekt.com")
       ? providerResponse()
@@ -229,14 +216,16 @@ it("does not substitute another printing or trust mismatched oracle identity", a
   }
 })
 
-it.each([403, 404, 429, 500])("returns a useful provider failure for HTTP %s", async (status) => {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
+it.each([
+  [404, "This deck is unavailable. Use a public Archidekt deck or paste its text export."],
+  [500, "Archidekt is temporarily unavailable. Try again or paste its text export."],
+])("returns a useful provider failure for HTTP %s", async (status, message) => {
+  const t = makeConvexTest()
   const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(new Response("", { status }))
   try {
     await expect(
       t.action(importDeck, { url: "https://archidekt.com/decks/200" }),
-    ).rejects.toMatchObject({ data: { code: "archidekt_unavailable" } })
+    ).rejects.toMatchObject({ data: { code: "archidekt_unavailable", message } })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   } finally {
     fetchSpy.mockRestore()
@@ -244,8 +233,7 @@ it.each([403, 404, 429, 500])("returns a useful provider failure for HTTP %s", a
 })
 
 it("bounds responses even without a content-length header", async () => {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
+  const t = makeConvexTest()
   const fetchSpy = jest
     .spyOn(global, "fetch")
     .mockResolvedValue(new Response("x".repeat(4 * 1024 * 1024 + 1)))
@@ -260,8 +248,7 @@ it("bounds responses even without a content-length header", async () => {
 
 it("aborts slow Archidekt requests and returns the paste fallback", async () => {
   jest.useFakeTimers()
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
+  const t = makeConvexTest()
   let notifyStarted: () => void = () => {}
   const started = new Promise<void>((resolve) => {
     notifyStarted = resolve

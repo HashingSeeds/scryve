@@ -1,4 +1,4 @@
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import { forgetAccountDevices, RENEWAL_REMINDER_LEAD_MS } from "./lib/notifications"
 
@@ -21,12 +21,6 @@ function device(
     feedbackReplies: prefs.feedbackReplies ?? false,
     renewalReminders: prefs.renewalReminders ?? false,
   })
-}
-
-async function signedIn(t: ConvexTestHarness, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
 }
 
 function expo() {

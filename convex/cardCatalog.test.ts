@@ -1,15 +1,7 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest } from "../test/convexTest"
 import { internal } from "./_generated/api"
 import { normalizePokemonCards } from "./lib/games/pokemon"
 import { pokemonCardFromCatalog } from "./lib/table"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
-}
 
 function printing(index: number) {
   return {
@@ -35,7 +27,7 @@ function card(printings: ReturnType<typeof printing>[]) {
 
 describe("normalized card catalog", () => {
   it("projects the printing used for a printing-id lookup", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await t.mutation(internal.cardCatalog.cacheMany, {
       cards: [card([printing(1), printing(2)])],
     })
@@ -55,7 +47,7 @@ describe("normalized card catalog", () => {
   })
 
   it("accepts cards above the cache batch size and caps stored printings", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await t.mutation(internal.cardCatalog.cacheMany, {
       cards: [card(Array.from({ length: 101 }, (_, index) => printing(index)))],
     })
@@ -66,7 +58,7 @@ describe("normalized card catalog", () => {
   })
 
   it("keeps a full TCGdex card's HP when a brief search result for it is cached", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const [full] = normalizePokemonCards({
       id: "sv03.5-006",
       localId: "006",
@@ -97,7 +89,7 @@ describe("normalized card catalog", () => {
   })
 
   it("rejects cards without a printing", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await expect(
       t.mutation(internal.cardCatalog.cacheMany, { cards: [card([])] }),
     ).rejects.toMatchObject({ data: { code: "invalid_card" } })

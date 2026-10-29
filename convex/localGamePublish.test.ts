@@ -1,29 +1,9 @@
 import type { FunctionArgs } from "convex/server"
-import { convexTest } from "convex-test"
 
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./history.ts": async () => jest.requireActual("./history"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const FINISHED_AT = 1_700_000_900_000
-
-async function synced(t: ReturnType<typeof convexTest>, subject: string, name: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: name })
-  return actor
-}
 
 type PublishArgs = FunctionArgs<typeof api.games.publishFinishedLocalGame>
 
@@ -46,7 +26,7 @@ function finishedGame(overrides: Partial<PublishArgs> = {}): PublishArgs {
   }
 }
 
-async function ownedDeck(actor: ReturnType<ReturnType<typeof convexTest>["withIdentity"]>) {
+async function ownedDeck(actor: ReturnType<ConvexTestHarness["withIdentity"]>) {
   const deckId = await actor.mutation(api.decks.create, { name: "Atraxa", format: "commander" })
   const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
   return { deckId, versionId }
@@ -54,8 +34,8 @@ async function ownedDeck(actor: ReturnType<ReturnType<typeof convexTest>["withId
 
 describe("publishFinishedLocalGame", () => {
   it("records the account's seat and deck once, and returns the same result on retry", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
     const { deckId, versionId } = await ownedDeck(owner)
     const args = finishedGame()
     args.players[0] = { ...args.players[0], me: true, deckVersionId: versionId }
@@ -117,8 +97,8 @@ describe("publishFinishedLocalGame", () => {
   })
 
   it("keeps a game with no seat of the user's as a backup with an unknown outcome", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
     await owner.mutation(api.games.publishFinishedLocalGame, finishedGame())
     const history = await owner.query(api.games.connectedHistory, {
       paginationOpts: { numItems: 10, cursor: null },
@@ -140,16 +120,16 @@ describe("publishFinishedLocalGame", () => {
       viewerPlayerIds: [],
       players: [{ displayName: "Ada" }, { displayName: "Grace" }],
     })
-    const other = await synced(t, "other", "Other")
+    const other = await signedIn(t, "other", "Other")
     await expect(
       other.query(api.games.connectedSummary, { publicId: finishedGame().publicId }),
     ).rejects.toThrow("Game membership required")
   })
 
   it("rejects decks the user does not own, decks on other seats, and other accounts' ids", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
-    const other = await synced(t, "other", "Other")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
+    const other = await signedIn(t, "other", "Other")
     const { versionId } = await ownedDeck(other)
     const base = finishedGame()
     await expect(
@@ -184,8 +164,8 @@ describe("publishFinishedLocalGame", () => {
   })
 
   it("stores a game without a system as none, not as Magic", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
     await owner.mutation(api.games.publishFinishedLocalGame, {
       ...finishedGame({ system: undefined, format: undefined, ruleset: "none", startingLife: 20 }),
       players: [
@@ -214,8 +194,8 @@ describe("publishFinishedLocalGame", () => {
   })
 
   it("stays finished through stale-game cleanup", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
     await owner.mutation(api.games.publishFinishedLocalGame, finishedGame())
     await expect(t.mutation(internal.games.cleanupStaleGames, {})).resolves.toMatchObject({
       examined: 0,
@@ -230,38 +210,41 @@ describe("publishFinishedLocalGame", () => {
     jest.useFakeTimers()
     const previousClerkSecret = process.env.CLERK_SECRET_KEY
     process.env.CLERK_SECRET_KEY = "sk_test_local_publish"
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
-    await owner.mutation(api.games.publishFinishedLocalGame, finishedGame())
-    const request = await owner.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
-      confirmation: "DELETE",
-    })
-    for (let pass = 0; pass < 8; pass += 1)
-      await t.mutation(internal.accountDeletion.processUserLinkedData, {
-        requestId: request.requestId,
+    try {
+      const t = makeConvexTest()
+      const owner = await signedIn(t, "owner", "Owner")
+      await owner.mutation(api.games.publishFinishedLocalGame, finishedGame())
+      const request = await owner.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+        confirmation: "DELETE",
       })
-    const rows = await t.run(async (ctx) => ({
-      game: await ctx.db.query("games").unique(),
-      summary: await ctx.db.query("gameSummaries").unique(),
-      entries: await ctx.db.query("gameHistoryEntries").collect(),
-    }))
-    expect(rows.game?.hostUserId).toBeUndefined()
-    expect(rows.summary?.finishedByUserId).toBeUndefined()
-    expect(rows.summary?.players.map((player) => player.displayName)).toEqual(["Ada", "Grace"])
-    expect(rows.entries).toHaveLength(0)
-    jest.clearAllTimers()
-    jest.useRealTimers()
-    if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY
-    else process.env.CLERK_SECRET_KEY = previousClerkSecret
+      for (let pass = 0; pass < 8; pass += 1)
+        await t.mutation(internal.accountDeletion.processUserLinkedData, {
+          requestId: request.requestId,
+        })
+      const rows = await t.run(async (ctx) => ({
+        game: await ctx.db.query("games").unique(),
+        summary: await ctx.db.query("gameSummaries").unique(),
+        entries: await ctx.db.query("gameHistoryEntries").collect(),
+      }))
+      expect(rows.game?.hostUserId).toBeUndefined()
+      expect(rows.summary?.finishedByUserId).toBeUndefined()
+      expect(rows.summary?.players.map((player) => player.displayName)).toEqual(["Ada", "Grace"])
+      expect(rows.entries).toHaveLength(0)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+      if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY
+      else process.env.CLERK_SECRET_KEY = previousClerkSecret
+    }
   })
 })
 
 it.each(["player_a", "player_b", undefined])(
   "records first player %s per seat and replays without duplicate results",
   async (firstPlayerLocalId) => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "owner", "Owner")
-    await synced(t, "other", "Other")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
+    await signedIn(t, "other", "Other")
     const args = finishedGame({ firstPlayerLocalId })
     args.players[0] = { ...args.players[0], me: true, deckKey: "burn" }
     const ack = await owner.mutation(api.games.publishFinishedLocalGame, args)
@@ -298,8 +281,8 @@ it.each(["player_a", "player_b", undefined])(
 )
 
 it("keeps a game whose first player is outside it, without a first player", async () => {
-  const t = convexTest(schema, modules)
-  const owner = await synced(t, "owner", "Owner")
+  const t = makeConvexTest()
+  const owner = await signedIn(t, "owner", "Owner")
   const ack = await owner.mutation(
     api.games.publishFinishedLocalGame,
     finishedGame({ firstPlayerLocalId: "absent" }),

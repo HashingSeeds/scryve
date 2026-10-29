@@ -1,21 +1,7 @@
-import { convexTest } from "convex-test"
-
-import { registerRateLimiter } from "../test/registerRateLimiter"
+import { makeConvexTest } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import { limitlessDeckLink, limitlessPlayerDecklist } from "./lib/games/limitless"
 import { parseYgoprodeckDeckPage, ygoprodeckDeckLink } from "./lib/games/yugiohDecks"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
-  "./deckImports.ts": async () => jest.requireActual("./deckImports"),
-  "./externalApiRateLimits.ts": async () => jest.requireActual("./externalApiRateLimits"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Documents the origin of the provider fixture rather than behavior.
 // Reduced from https://ygoprodeck.com/deck/blue-eyes-for-duelingbook-312866 on October 7, 2026.
@@ -141,8 +127,7 @@ describe("resolveLink", () => {
       )
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const result = await t
         .withIdentity({ subject: "ygoprodeck-importer" })
         .action(api.deckImports.resolveLink, {
@@ -185,8 +170,7 @@ describe("resolveLink", () => {
       return new Response(JSON.stringify(url.pathname.endsWith("/me01-76") ? riolu : [riolu]))
     })
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       const result = await t
         .withIdentity({ subject: "limitless-importer" })
         .action(api.deckImports.resolveLink, {
@@ -212,8 +196,7 @@ describe("resolveLink", () => {
   it("rejects Limitless imports with a retry delay instead of queueing behind a backlog", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       for (let index = 0; index < 10; index++)
         await t.mutation(internal.externalApiRateLimits.reserve, {
           bucket: "limitless:imports",
@@ -244,8 +227,7 @@ describe("resolveLink", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(new Response("", { status: 503 }))
       try {
-        const t = convexTest(schema, modules)
-        registerRateLimiter(t)
+        const t = makeConvexTest()
         await expect(
           t.withIdentity({ subject: "outage-importer" }).action(api.deckImports.resolveLink, {
             game,
@@ -266,8 +248,7 @@ describe("resolveLink", () => {
   it("rejects another game's deck link before fetching", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
+      const t = makeConvexTest()
       await expect(
         t.action(api.deckImports.resolveLink, {
           game: "ygo",

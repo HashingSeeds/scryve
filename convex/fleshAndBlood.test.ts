@@ -1,20 +1,13 @@
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import fabPrecons from "./lib/games/fabPrecons.json"
 import fabCube from "./lib/games/fixtures/fabCube.json"
-import fabPreconCards from "./lib/games/fixtures/fabPreconCards.json"
 
 async function syncedFab(dataset: unknown[] = fabCube) {
   jest.spyOn(global, "fetch").mockImplementation(async () => new Response(JSON.stringify(dataset)))
   const t = makeConvexTest()
   await t.action(internal.cardDatasetSync.sync, { game: "fab" })
   return t
-}
-
-async function player(t: ConvexTestHarness, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
 }
 
 const FABRARY_LIST = [
@@ -43,9 +36,9 @@ function printing(id: string) {
   return [{ unique_id: `${id}-p`, image_url: `https://img.test/${id}.png` }]
 }
 
-function blitzPrecon() {
-  const deck = fabPrecons.find(({ format }) => format === "blitz")
-  if (!deck) throw new Error("No Blitz precon")
+function preconDataset(format: string) {
+  const deck = fabPrecons.find((precon) => precon.format === format)
+  if (!deck) throw new Error(`No ${format} precon`)
   const dataset = [
     { unique_id: deck.heroId, name: deck.hero, printings: printing("hero") },
     ...deck.cards.map((card, index) => ({
@@ -58,25 +51,16 @@ function blitzPrecon() {
   return { deck, dataset }
 }
 
-function everyPreconCard() {
-  return [
-    ...Object.entries(fabPreconCards.heroes).map(([id, name]) => ({
-      unique_id: id,
-      name,
-      printings: printing(id),
-    })),
-    ...Object.entries(fabPreconCards.cards).map(([id, listed]) => {
-      const [, name = listed, pitch = ""] = /^(.*) \((red|yellow|blue)\)$/.exec(listed) ?? []
-      return { unique_id: id, name, pitch: pitches.get(pitch) ?? "", printings: printing(id) }
-    }),
-  ]
-}
-
 describe("Flesh and Blood", () => {
-  afterEach(() => jest.restoreAllMocks())
+  // why: each sync schedules a precon refresh per format. On real timers they run after the test ends and slow the next one.
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
 
   it("imports a Fabrary card list with its hero in the hero section and each pitch as its own card", async () => {
-    const actor = await player(await syncedFab(), "fab-importer")
+    const actor = await signedIn(await syncedFab(), "fab-importer")
 
     const result = await actor.action(api.deckImports.resolvePasted, {
       game: "fab",
@@ -111,7 +95,7 @@ describe("Flesh and Blood", () => {
       pitch: "1",
       printings: printing("snatch"),
     }
-    const actor = await player(await syncedFab([...decoys, snatch]), "fab-exact-name")
+    const actor = await signedIn(await syncedFab([...decoys, snatch]), "fab-exact-name")
 
     const result = await actor.action(api.deckImports.resolvePasted, {
       game: "fab",
@@ -123,112 +107,107 @@ describe("Flesh and Blood", () => {
   })
 
   it("starts a connected seat at its hero's life, in the rematch, and in the summary", async () => {
-    jest.useFakeTimers()
-    try {
-      const t = await syncedFab()
-      const host = await player(t, "fab-host")
-      const joiner = await player(t, "fab-joiner")
-      const imported = await host.action(api.deckImports.resolvePasted, {
-        game: "fab",
-        list: "Hero: Aurora, Shooting Star\n3x Snatch (red)",
-      })
-      const deckId = await host.mutation(api.decks.importResolved, {
-        name: "Aurora",
-        game: "fab",
-        format: "cc",
-        cards: imported.cards,
-      })
-      const deckVersionId = (await host.query(api.decks.detail, { deckId })).versions[0]._id
-      expect((await host.query(api.decks.listMine, {})).decks[0].startingValue).toBe(40)
+    const t = await syncedFab()
+    const host = await signedIn(t, "fab-host")
+    const joiner = await signedIn(t, "fab-joiner")
+    const imported = await host.action(api.deckImports.resolvePasted, {
+      game: "fab",
+      list: "Hero: Aurora, Shooting Star\n3x Snatch (red)",
+    })
+    const deckId = await host.mutation(api.decks.importResolved, {
+      name: "Aurora",
+      game: "fab",
+      format: "cc",
+      cards: imported.cards,
+    })
+    const deckVersionId = (await host.query(api.decks.detail, { deckId })).versions[0]._id
+    expect((await host.query(api.decks.listMine, {})).decks[0].startingValue).toBe(40)
 
-      const created = await host.mutation(api.games.createLobby, {
-        publicId: "fab-hero-life-public-12",
-        playerCount: 2,
-        startingLife: 20,
-        ruleset: "cc",
-        system: "fab",
-        format: "cc",
-        inviteToken: "f".repeat(43),
-        manualCodeCandidates: ["FAB234"],
-        hostDisplayName: "Host",
-        hostColor: "#7C3AED",
-      })
-      await joiner.mutation(api.games.claimSeat, {
-        token: "f".repeat(43),
-        displayName: "Joiner",
-        color: "#2563EB",
-        systems: ["fab"],
-      })
-      await host.mutation(api.decks.selectForSeat, {
-        publicId: created.publicId,
-        seat: 1,
-        deckVersionId,
-      })
-      await host.mutation(api.games.startGame, { publicId: created.publicId })
-      const lives = async (publicId: string) =>
-        (await host.query(api.games.lobbyProjection, { publicId })).players.map(
-          ({ seat, currentLife }) => [seat, currentLife],
-        )
-      expect(await lives(created.publicId)).toEqual([
-        [1, 40],
-        [2, 20],
-      ])
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "fab-hero-life-public-12",
+      playerCount: 2,
+      startingLife: 20,
+      ruleset: "cc",
+      system: "fab",
+      format: "cc",
+      inviteToken: "f".repeat(43),
+      manualCodeCandidates: ["FAB234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+    })
+    await joiner.mutation(api.games.claimSeat, {
+      token: "f".repeat(43),
+      displayName: "Joiner",
+      color: "#2563EB",
+      systems: ["fab"],
+    })
+    await host.mutation(api.decks.selectForSeat, {
+      publicId: created.publicId,
+      seat: 1,
+      deckVersionId,
+    })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    const lives = async (publicId: string) =>
+      (await host.query(api.games.lobbyProjection, { publicId })).players.map(
+        ({ seat, currentLife }) => [seat, currentLife],
+      )
+    expect(await lives(created.publicId)).toEqual([
+      [1, 40],
+      [2, 20],
+    ])
 
-      const rematch = {
-        publicId: "fab-hero-life-rematch-1",
-        inviteToken: "g".repeat(43),
-        manualCodeCandidates: ["FAB345"],
-      }
-      await host.mutation(api.games.finishGame, { publicId: created.publicId, rematch })
-      const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
-      expect(summary?.players.map(({ seat, startingLife }) => [seat, startingLife])).toEqual([
-        [1, 40],
-        [2, undefined],
-      ])
-      expect(await lives(rematch.publicId)).toEqual([
-        [1, 40],
-        [2, 20],
-      ])
-
-      await t.run(async (ctx) => {
-        const hero = await ctx.db
-          .query("gameCards")
-          .filter((q) => q.eq(q.field("name"), "Aurora, Shooting Star"))
-          .first()
-        if (!hero?.facets) throw new Error("No hero card")
-        await ctx.db.patch(hero._id, {
-          facets: hero.facets.map((facet) =>
-            facet.key === "health" ? { ...facet, value: "30" } : facet,
-          ),
-        })
-      })
-      expect((await host.query(api.decks.listMine, {})).decks[0].startingValue).toBe(30)
-      const corrected = await host.query(api.games.connectedSummary, {
-        publicId: created.publicId,
-      })
-      expect(corrected?.players[0]).toMatchObject({ startingLife: 40, finalLife: 40 })
-
-      await t.run(async (ctx) => {
-        await ctx.db.patch(deckVersionId, { archivedAt: Date.now() })
-      })
-      const second = {
-        publicId: "fab-hero-life-rematch-2",
-        inviteToken: "h".repeat(43),
-        manualCodeCandidates: ["FAB456"],
-      }
-      await host.mutation(api.games.finishGame, { publicId: rematch.publicId, rematch: second })
-      expect(await lives(second.publicId)).toEqual([
-        [1, 40],
-        [2, 20],
-      ])
-    } finally {
-      jest.useRealTimers()
+    const rematch = {
+      publicId: "fab-hero-life-rematch-1",
+      inviteToken: "g".repeat(43),
+      manualCodeCandidates: ["FAB345"],
     }
+    await host.mutation(api.games.finishGame, { publicId: created.publicId, rematch })
+    const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
+    expect(summary?.players.map(({ seat, startingLife }) => [seat, startingLife])).toEqual([
+      [1, 40],
+      [2, undefined],
+    ])
+    expect(await lives(rematch.publicId)).toEqual([
+      [1, 40],
+      [2, 20],
+    ])
+
+    await t.run(async (ctx) => {
+      const hero = await ctx.db
+        .query("gameCards")
+        .filter((q) => q.eq(q.field("name"), "Aurora, Shooting Star"))
+        .first()
+      if (!hero?.facets) throw new Error("No hero card")
+      await ctx.db.patch(hero._id, {
+        facets: hero.facets.map((facet) =>
+          facet.key === "health" ? { ...facet, value: "30" } : facet,
+        ),
+      })
+    })
+    expect((await host.query(api.decks.listMine, {})).decks[0].startingValue).toBe(30)
+    const corrected = await host.query(api.games.connectedSummary, {
+      publicId: created.publicId,
+    })
+    expect(corrected?.players[0]).toMatchObject({ startingLife: 40, finalLife: 40 })
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(deckVersionId, { archivedAt: Date.now() })
+    })
+    const second = {
+      publicId: "fab-hero-life-rematch-2",
+      inviteToken: "h".repeat(43),
+      manualCodeCandidates: ["FAB456"],
+    }
+    await host.mutation(api.games.finishGame, { publicId: rematch.publicId, rematch: second })
+    expect(await lives(second.publicId)).toEqual([
+      [1, 40],
+      [2, 20],
+    ])
   })
 
   it("browses official precons by format, hero first, with their sourced counts", async () => {
-    const { deck, dataset } = blitzPrecon()
-    const actor = await player(await syncedFab(dataset), "fab-precons")
+    const { deck, dataset } = preconDataset("blitz")
+    const actor = await signedIn(await syncedFab(dataset), "fab-precons")
 
     const browsed = await actor.action(api.deckCatalogs.browse, {
       game: "fab",
@@ -256,7 +235,7 @@ describe("Flesh and Blood", () => {
   })
 
   it("keeps a listed precon while its cards are missing from a partial sync, and drops unlisted ones", async () => {
-    const { deck, dataset } = blitzPrecon()
+    const { deck, dataset } = preconDataset("blitz")
     const t = await syncedFab(dataset)
     await t.action(internal.deckCatalogs.refresh, { game: "fab", format: "blitz" })
     await t.mutation(internal.deckCatalogs.upsert, {
@@ -296,9 +275,8 @@ describe("Flesh and Blood", () => {
   })
 
   it("retries a partly synced precon refresh until every listed deck resolves", async () => {
-    const t = await syncedFab(everyPreconCard())
-    const deck = fabPrecons.find(({ format }) => format === "silverAge")
-    if (!deck) throw new Error("No Silver Age precon")
+    const { deck, dataset } = preconDataset("silverAge")
+    const t = await syncedFab(dataset)
     const hero = await t.run(async (ctx) => {
       const card = await ctx.db
         .query("gameCards")
@@ -335,7 +313,7 @@ describe("Flesh and Blood", () => {
   })
 
   it("serves image fallbacks from the catalog and has no deck links", async () => {
-    const actor = await player(await syncedFab(), "fab-browser")
+    const actor = await signedIn(await syncedFab(), "fab-browser")
     await expect(
       actor.action(api.deckImports.resolveLink, {
         game: "fab",

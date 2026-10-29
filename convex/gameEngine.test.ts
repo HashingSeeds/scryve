@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values"
 
-import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import { engineGameOf, type EngineError } from "./lib/gameEngine"
@@ -24,8 +24,7 @@ async function parityGame(
   t: ConvexTestHarness,
   setup: { system: string; format: string; startingLife: number },
 ) {
-  const host = t.withIdentity({ subject: "parity-host" })
-  await host.mutation(api.users.syncCurrent, { displayName: "Host" })
+  const host = await signedIn(t, "parity-host", "Host")
   const created = await host.mutation(api.games.createLobby, {
     publicId: "parity-game-public-01",
     playerCount: 2,
@@ -39,8 +38,7 @@ async function parityGame(
     hostColor: "#7C3AED",
     deviceId: HOST_DEVICE,
   })
-  const joiner = t.withIdentity({ subject: "parity-joiner" })
-  await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner" })
+  const joiner = await signedIn(t, "parity-joiner", "Joiner")
   await joiner.mutation(api.games.claimSeat, {
     token,
     displayName: "Joiner",

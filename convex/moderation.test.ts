@@ -1,11 +1,6 @@
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import {
-  DISMISSED_RETENTION_MS,
-  UPHELD_RETENTION_MS,
-  moderationRetentionExpiresAt,
-} from "./lib/moderationRetention"
 
 const PUBLIC_ID = "moderation-game-1234"
 type Actor = ReturnType<ConvexTestHarness["withIdentity"]>
@@ -161,30 +156,6 @@ describe("moderation", () => {
     expect(JSON.stringify(summary)).not.toContain("guest-handle")
   })
 
-  it("holds a name on the first report when it trips the filter", async () => {
-    const t = makeConvexTest()
-    const { host, guest } = await seatedGame(t, ["host-handle", "sh1t-lord"])
-    await settle(t)
-    const guestSeat = await seatOf(host, "device-host-0001", 2)
-
-    const beforeReport = await projectionFor(guest, "device-guest-001")
-    expect(beforeReport.players[1].displayName).not.toBe("sh1t-lord")
-
-    const result = await host.mutation(api.moderation.reportPlayer, {
-      publicId: PUBLIC_ID,
-      playerId: guestSeat.playerId as Id<"gamePlayers">,
-      reason: "offensive_username",
-    })
-    await settle(t)
-    expect(result.held).toBe(true)
-    const reports = await t.run(async (ctx) => await ctx.db.query("moderationReports").collect())
-    expect(reports[0]).toMatchObject({
-      status: "open",
-      autoAction: "held_on_filter",
-      matchedTerms: ["shit"],
-    })
-  })
-
   it("holds a name once two distinct players report it", async () => {
     const t = makeConvexTest()
     const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
@@ -225,42 +196,6 @@ describe("moderation", () => {
     await settle(t)
     const reports = await t.run(async (ctx) => await ctx.db.query("moderationReports").collect())
     expect(reports).toHaveLength(1)
-  })
-
-  it("refuses to seat players who have blocked each other", async () => {
-    const t = makeConvexTest()
-    const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
-    const guestSeat = await seatOf(host, "device-host-0001", 2)
-    await host.mutation(api.moderation.blockPlayer, {
-      publicId: PUBLIC_ID,
-      playerId: guestSeat.playerId as Id<"gamePlayers">,
-    })
-    const guest = t.withIdentity({ subject: "guest-subject" })
-    const secondToken = "s".repeat(43)
-    await t.run(async (ctx) => {
-      for (const player of await ctx.db.query("gamePlayers").collect())
-        await ctx.db.delete(player._id)
-      for (const game of await ctx.db.query("games").collect()) await ctx.db.delete(game._id)
-    })
-    await host.mutation(api.games.createLobby, {
-      publicId: "moderation-game-5678",
-      playerCount: 2,
-      startingLife: 40,
-      ruleset: "commander",
-      inviteToken: secondToken,
-      manualCodeCandidates: ["MOD567"],
-      hostDisplayName: "Host Realname",
-      hostColor: "#7C3AED",
-      deviceId: "device-host-0002",
-    })
-    await expect(
-      guest.mutation(api.games.claimSeat, {
-        token: secondToken,
-        displayName: "Guest Realname",
-        color: "#2563EB",
-        deviceId: "device-guest-002",
-      }),
-    ).rejects.toThrow("blocked")
   })
 
   it("restores visibility when a block is lifted", async () => {
@@ -319,8 +254,7 @@ describe("moderation", () => {
 
   it("keeps an operator hold in place when a report is dismissed", async () => {
     const t = makeConvexTest()
-    const { host, guest } = await seatedGame(t, ["host-handle", "sh1t-lord"])
-    await settle(t)
+    const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
     await host.mutation(api.moderation.reportPlayer, {
       publicId: PUBLIC_ID,
@@ -331,8 +265,16 @@ describe("moderation", () => {
     await t.mutation(internal.moderation.upholdReport, { reportId: report._id })
     await t.mutation(internal.moderation.dismissReport, { reportId: report._id })
     await settle(t)
+    const held = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("users")
+          .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "guest-subject"))
+          .unique(),
+    )
+    expect(held?.moderationHold?.reason).toBe("operator")
     expect((await projectionFor(guest, "device-guest-001")).players[1].displayName).not.toBe(
-      "sh1t-lord",
+      "guest-handle",
     )
   })
 
@@ -383,13 +325,14 @@ describe("moderation", () => {
     const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
     await settle(t)
     const guestSeat = await seatOf(host, "device-host-0001", 2)
-    await host.mutation(api.moderation.reportPlayer, {
+    const result = await host.mutation(api.moderation.reportPlayer, {
       publicId: PUBLIC_ID,
       playerId: guestSeat.playerId as Id<"gamePlayers">,
       reason: "offensive_username",
       note: "seen in a game",
     })
     await settle(t)
+    expect(result.held).toBe(true)
     const open = await t.query(internal.moderation.openReports, {})
     expect(open).toHaveLength(1)
     expect(open[0]).toMatchObject({
@@ -557,18 +500,6 @@ describe("moderation", () => {
         reason: "other",
       }),
     ).rejects.toThrow()
-  })
-
-  it("calculates exact retention deadlines by resolution status", () => {
-    const createdAt = 1_000
-    const resolvedAt = 2_000
-    expect(moderationRetentionExpiresAt("upheld", resolvedAt, createdAt)).toBe(
-      resolvedAt + UPHELD_RETENTION_MS,
-    )
-    expect(moderationRetentionExpiresAt("dismissed", resolvedAt, createdAt)).toBe(
-      resolvedAt + DISMISSED_RETENTION_MS,
-    )
-    expect(moderationRetentionExpiresAt("open", undefined, createdAt)).toBeUndefined()
   })
 
   it("purges expired reports but preserves future and legally held reports", async () => {

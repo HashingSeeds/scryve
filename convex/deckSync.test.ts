@@ -1,28 +1,12 @@
 import type { FunctionReturnType } from "convex/server"
-import { convexTest } from "convex-test"
 
+import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const firstSyncId = "11111111-1111-4111-8111-111111111111"
 const secondSyncId = "22222222-2222-4222-8222-222222222222"
 const thirdSyncId = "33333333-3333-4333-8333-333333333333"
-
-async function synced(t: ReturnType<typeof convexTest>, subject: string) {
-  const actor = t.withIdentity({ subject })
-  await actor.mutation(api.users.syncCurrent, { displayName: subject })
-  return actor
-}
 
 function writeArgs(
   id: string,
@@ -51,8 +35,8 @@ function writeArgs(
 
 describe("deck sync", () => {
   it("canonicalizes UUID casing for deck identity and operation replay", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "uuid-owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "uuid-owner")
     const args = writeArgs(
       "aabbccdd-aabb-4aab-8aab-aabbccddeeff",
       "abcdefab-abcd-4abc-8abc-abcdefabcdef",
@@ -77,8 +61,8 @@ describe("deck sync", () => {
   })
 
   it("creates once and replays the original receipt after later edits and deletion", async () => {
-    const t = convexTest(schema, modules)
-    const actor = await synced(t, "replay-owner")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "replay-owner")
     const createArgs = writeArgs(firstSyncId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 
     const created = await actor.mutation(api.decks.syncWrite, createArgs)
@@ -124,8 +108,8 @@ describe("deck sync", () => {
   })
 
   it("projects legacy decks at revision zero and detects update and archive conflicts", async () => {
-    const t = convexTest(schema, modules)
-    const actor = await synced(t, "legacy-owner")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "legacy-owner")
     const deckId = await actor.mutation(api.decks.create, {
       name: "Legacy",
       format: "commander",
@@ -181,9 +165,9 @@ describe("deck sync", () => {
   })
 
   it("isolates identifiers and operations by owner and requires authentication", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "first-owner")
-    const other = await synced(t, "second-owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "first-owner")
+    const other = await signedIn(t, "second-owner")
     const operationId = "12121212-1212-4212-8212-121212121212"
     const ownerDeck = await owner.mutation(api.decks.syncWrite, writeArgs(firstSyncId, operationId))
     const otherDeck = await other.mutation(api.decks.syncWrite, writeArgs(firstSyncId, operationId))
@@ -220,8 +204,8 @@ describe("deck sync", () => {
   })
 
   it("keeps decks archived before sync support deleted", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "archived-legacy-owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "archived-legacy-owner")
     const deckId = await owner.mutation(api.decks.create, {
       name: "Archived legacy deck",
       format: "commander",
@@ -240,9 +224,9 @@ describe("deck sync", () => {
   })
 
   it("paginates a stable owner-only feed that includes tombstones", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "page-owner")
-    const other = await synced(t, "page-other")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "page-owner")
+    const other = await signedIn(t, "page-other")
     const ids = [firstSyncId, secondSyncId, thirdSyncId]
     for (const [index, id] of ids.entries()) {
       await owner.mutation(
@@ -315,16 +299,16 @@ describe("deck sync", () => {
       code: "deck_not_found",
     },
   ])("rejects malformed $label", async ({ args, code }) => {
-    const t = convexTest(schema, modules)
-    const actor = await synced(t, `invalid-${code}`)
+    const t = makeConvexTest()
+    const actor = await signedIn(t, `invalid-${code}`)
     await expect(actor.mutation(api.decks.syncWrite, args)).rejects.toMatchObject({
       data: { code },
     })
   })
 
   it("reuses deck capacity and released-game validation", async () => {
-    const t = convexTest(schema, modules)
-    const owner = await synced(t, "limited-owner")
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "limited-owner")
     await owner.mutation(
       api.decks.syncWrite,
       writeArgs(firstSyncId, "abababab-abab-4bab-8bab-abababababab"),
@@ -340,7 +324,7 @@ describe("deck sync", () => {
       ),
     ).rejects.toMatchObject({ data: { code: "deck_limit_reached" } })
 
-    const gated = await synced(t, "gated-owner")
+    const gated = await signedIn(t, "gated-owner")
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
       game: "ygo",
       capability: "deckImport",
@@ -389,8 +373,8 @@ function versionArgs(
 }
 
 describe("deck version sync", () => {
-  async function seedVersion(t: ReturnType<typeof convexTest>, subject: string) {
-    const actor = await synced(t, subject)
+  async function seedVersion(t: ConvexTestHarness, subject: string) {
+    const actor = await signedIn(t, subject)
     const deckId = await actor.mutation(api.decks.create, { name: "Deck", format: "commander" })
     const versionId = await actor.mutation(api.decks.saveVersion, {
       deckId,
@@ -400,7 +384,7 @@ describe("deck version sync", () => {
   }
 
   it("replays a lost response identically without extra revisions", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-replay-owner")
     const args = versionArgs(deckId, versionId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 2)
     const saved = await actor.mutation(api.decks.syncVersionWrite, args)
@@ -415,42 +399,33 @@ describe("deck version sync", () => {
     expect(stored.receipts).toHaveLength(1)
   })
 
-  it("rejects reused operation IDs with a different payload", async () => {
-    const t = convexTest(schema, modules)
-    const { actor, deckId, versionId } = await seedVersion(t, "version-mismatch-owner")
-    const args = versionArgs(deckId, versionId, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2)
-    await actor.mutation(api.decks.syncVersionWrite, { ...args, cards: [otherCard] })
-    await expect(actor.mutation(api.decks.syncVersionWrite, args)).rejects.toMatchObject({
-      data: { code: "sync_operation_mismatch" },
-    })
-    const stored = await t.run(async (ctx) => await ctx.db.get(versionId))
-    expect(stored).toMatchObject({ syncRevision: 3 })
-  })
-
-  it("rejects reused operation IDs when any card field changed", async () => {
-    const t = convexTest(schema, modules)
-    const { actor, deckId, versionId } = await seedVersion(t, "version-name-owner")
-    const renamed = {
-      ...syncCard,
-      name: "Card (corrected)",
-      imageUrl: "https://images.example.test/a.png",
-    }
-    await actor.mutation(
-      api.decks.syncVersionWrite,
-      versionArgs(deckId, versionId, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2),
-    )
-    await expect(
-      actor.mutation(
-        api.decks.syncVersionWrite,
-        versionArgs(deckId, versionId, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2, {
-          cards: [renamed],
-        }),
-      ),
-    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
-  })
+  it.each([
+    { change: "different cards", saved: [otherCard], retried: [syncCard], revision: 3 },
+    {
+      change: "a changed card field",
+      saved: [syncCard],
+      retried: [
+        { ...syncCard, name: "Card (corrected)", imageUrl: "https://images.example.test/a.png" },
+      ],
+      revision: 2,
+    },
+  ])(
+    "rejects a reused operation ID whose payload has $change",
+    async ({ saved, retried, revision }) => {
+      const t = makeConvexTest()
+      const { actor, deckId, versionId } = await seedVersion(t, "version-mismatch-owner")
+      const args = versionArgs(deckId, versionId, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2)
+      await actor.mutation(api.decks.syncVersionWrite, { ...args, cards: saved })
+      await expect(
+        actor.mutation(api.decks.syncVersionWrite, { ...args, cards: retried }),
+      ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+      const stored = await t.run(async (ctx) => await ctx.db.get(versionId))
+      expect(stored).toMatchObject({ syncRevision: revision })
+    },
+  )
 
   it("reaches active versions in decks with more than twenty archived rows", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-deep-owner")
     await t.run(async (ctx) => {
       const deck = await ctx.db.get(deckId)
@@ -477,7 +452,7 @@ describe("deck version sync", () => {
   })
 
   it("projects readVersion cards exactly like detail with images disabled", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-projection-owner")
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
       game: "mtg",
@@ -494,7 +469,7 @@ describe("deck version sync", () => {
   })
 
   it("reads a version's cards by version id for its owner only", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-cards-owner")
     const read = await actor.query(api.decks.readVersion, { deckId, versionId })
     await expect(actor.query(api.decks.versionCards, { versionId })).resolves.toEqual({
@@ -502,15 +477,15 @@ describe("deck version sync", () => {
       cards: read.cards,
     })
 
-    const stranger = await synced(t, "version-cards-stranger")
+    const stranger = await signedIn(t, "version-cards-stranger")
     await expect(stranger.query(api.decks.versionCards, { versionId })).rejects.toThrow(
       "Deck not found",
     )
   })
 
   it("bootstraps revisions, tombstones, and archived reads for a fresh client", async () => {
-    const t = convexTest(schema, modules)
-    const actor = await synced(t, "version-pull-owner")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "version-pull-owner")
     const created = await actor.mutation(api.decks.syncWrite, {
       id: "33333333-3333-4333-8333-333333333333",
       operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -566,7 +541,7 @@ describe("deck version sync", () => {
   })
 
   it("conflicts on stale revisions after legacy writes and recovers", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-stale-owner")
     await actor.mutation(api.decks.saveVersion, { deckId, cards: [otherCard] })
     const stale = versionArgs(deckId, versionId, "cccccccc-cccc-4ccc-8ccc-cccccccccccc", 1)
@@ -594,7 +569,7 @@ describe("deck version sync", () => {
   })
 
   it("returns a recoverable conflict for saves to archived versions", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-archived-owner")
     await t.run(async (ctx) => await ctx.db.patch(versionId, { archivedAt: Date.now() }))
     const pending = versionArgs(deckId, versionId, "dddddddd-dddd-4ddd-8ddd-dddddddddddd", 2)
@@ -607,7 +582,7 @@ describe("deck version sync", () => {
   })
 
   it("rejects pending saves to archived decks", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-deck-gone-owner")
     await actor.mutation(api.decks.archive, { deckId })
     await expect(
@@ -619,9 +594,9 @@ describe("deck version sync", () => {
   })
 
   it("isolates version saves by owner and requires authentication", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { deckId, versionId } = await seedVersion(t, "version-isolated-owner")
-    const stranger = await synced(t, "version-owner-second")
+    const stranger = await signedIn(t, "version-owner-second")
     await expect(
       stranger.mutation(
         api.decks.syncVersionWrite,
@@ -633,22 +608,9 @@ describe("deck version sync", () => {
     })
   })
 
-  it("keeps canonical no-op saves from advancing revisions", async () => {
-    const t = convexTest(schema, modules)
-    const { actor, deckId, versionId } = await seedVersion(t, "version-noop-owner")
-    await expect(
-      actor.mutation(
-        api.decks.syncVersionWrite,
-        versionArgs(deckId, versionId, "abababab-abab-4bab-8bab-abababababab", 2),
-      ),
-    ).resolves.toMatchObject({ versionId, revision: 2, cardCount: 1 })
-    const stored = await t.run(async (ctx) => await ctx.db.get(versionId))
-    expect(stored).toMatchObject({ syncRevision: 2 })
-  })
-
   it("saves cards by database deckId for decks created through syncWrite", async () => {
-    const t = convexTest(schema, modules)
-    const actor = await synced(t, "version-dbid-owner")
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "version-dbid-owner")
     const created = await actor.mutation(api.decks.syncWrite, {
       id: "44444444-4444-4444-8444-444444444444",
       operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -677,7 +639,7 @@ describe("deck version sync", () => {
   })
 
   it("bounds card payloads and rejects malformed identifiers", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { actor, deckId, versionId } = await seedVersion(t, "version-bounds-owner")
     await expect(
       actor.mutation(

@@ -7,19 +7,6 @@ describe("legal acceptances", () => {
     await expect(t.query(api.legal.currentAcceptances, {})).resolves.toBeNull()
   })
 
-  it("records an acceptance and reads it back", async () => {
-    const t = makeConvexTest()
-    const actor = t.withIdentity({ subject: "consent-user" })
-    await actor.mutation(api.legal.recordAcceptance, {
-      document: "terms",
-      version: "2026-08-18",
-      platform: "ios",
-    })
-    await expect(actor.query(api.legal.currentAcceptances, {})).resolves.toEqual([
-      { document: "terms", version: "2026-08-18", acceptedAt: expect.any(Number) },
-    ])
-  })
-
   it("keeps one row per document and updates it on a new version", async () => {
     const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "consent-user" })
@@ -39,7 +26,7 @@ describe("legal acceptances", () => {
     ])
   })
 
-  it("does not separate acceptances between users", async () => {
+  it("keeps each user's acceptances separate", async () => {
     const t = makeConvexTest()
     await t.withIdentity({ subject: "first" }).mutation(api.legal.recordAcceptance, {
       document: "terms",
