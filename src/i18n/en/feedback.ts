@@ -19,7 +19,6 @@ const feedback = {
     kind: "What is it?",
     feature: "Feature",
     bug: "Bug",
-    bodyLabel: "Message",
     bodyPlaceholder: {
       feature: "What would you like, and when would you use it?",
       bug: "What happened? What did you expect?",
@@ -28,7 +27,7 @@ const feedback = {
     removeScreenshot: "Remove screenshot",
     selectedScreenshot: "Selected screenshot",
     screenshotFailed: "Couldn't add that screenshot. Try another image.",
-    bugDisclosure: "Bug reports also send your device details and any screenshot to Sentry.",
+    sentryDisclosure: "Bug reports and screenshots also send your device details to Sentry.",
     translationNotice:
       "Write in any language. We may use AI tools to translate it. See our <privacy>Privacy Policy</privacy>.",
     includeAccount: "Include my account",
@@ -37,7 +36,6 @@ const feedback = {
     anonymous:
       "Sent without your account. Replies show on this device, and reinstalling may lose them.",
     signInToKeep: "Sign in to keep it",
-    send: "Send",
     sendFailed: "Couldn't send. Try again.",
     // Shown when a player sent too much feedback in a short time.
     rateLimited_one: "Too many sends. Try again in {{count}} minute.",
@@ -61,16 +59,26 @@ const feedback = {
     missing: "This feedback is gone.",
     you: "You",
     team: "Scryve",
-    replyLabel: "Reply",
     replyPlaceholder: "Add a detail or answer a question",
     send: "Send",
+    // Under the player's latest message while it is on its way, then once the server has it.
+    sending: "Sending…",
+    sent: "Sent",
     sendFailed: "Couldn't send. Try again.",
-    includeAccount: "Include my account",
-    includeAccountHelper: "Lets us see your username and keeps this thread on every device.",
     linked: "Sent with your account",
     linkedElsewhere: "Sent with a different account",
-    signInToKeep: "Sign in to keep this thread if you reinstall",
-    notifyReplies: "Notify me about replies to all my feedback",
+    notLinked: "Sent without your account.",
+    // Links the thread to the signed-in account. Follows "Sent without your account."
+    includeAccount: "Include it",
+    // Follows "Sent without your account." when signed out.
+    signInToKeep: "Sign in to keep it",
+  },
+  // Asked once, after the player's first feedback send.
+  notifyPrompt: {
+    title: "Get a notification for replies?",
+    body: "Replies always show up here in Scryve either way.",
+    notNow: "Not now",
+    notify: "Notify me",
   },
   unavailable: "Feedback needs Scryve's cloud, which isn't set up in this build.",
 }

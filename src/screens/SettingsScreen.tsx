@@ -215,6 +215,7 @@ export function SettingsScreen({
           <Switch
             testID="notify-feedback-switch"
             labelTx="account:settings.notifications.feedbackReplies"
+            helperTx="account:settings.notifications.feedbackRepliesHelper"
             value={notifications.feedbackReplies}
             onValueChange={(on) => notifications.onChange("feedbackReplies", on)}
           />

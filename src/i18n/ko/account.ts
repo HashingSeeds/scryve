@@ -79,6 +79,7 @@ export default {
     notifications: {
       heading: "알림",
       feedbackReplies: "피드백 답변",
+      feedbackRepliesHelper: "답글은 항상 내 피드백에 표시됩니다",
       renewalReminders: "갱신 알림",
       renewalRemindersHelper: "구독 갱신 3일 전",
       channel: "답변 및 알림",

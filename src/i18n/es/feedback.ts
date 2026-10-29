@@ -20,7 +20,6 @@ export default {
     kind: "¿De qué se trata?",
     feature: "Función",
     bug: "Error",
-    bodyLabel: "Mensaje",
     bodyPlaceholder: {
       feature: "¿Qué te gustaría y cuándo lo usarías?",
       bug: "¿Qué pasó? ¿Qué esperabas que pasara?",
@@ -29,8 +28,8 @@ export default {
     removeScreenshot: "Quitar captura de pantalla",
     selectedScreenshot: "Captura de pantalla seleccionada",
     screenshotFailed: "No se pudo añadir esa captura. Prueba con otra imagen.",
-    bugDisclosure:
-      "Los informes de errores también envían los datos de tu dispositivo y cualquier captura de pantalla a Sentry.",
+    sentryDisclosure:
+      "Los informes de errores y las capturas de pantalla también envían a Sentry los datos de tu dispositivo.",
     translationNotice:
       "Escribe en el idioma que quieras. Podemos usar herramientas de IA para traducirlo. Consulta nuestra <privacy>Política de privacidad</privacy>.",
     includeAccount: "Incluir mi cuenta",
@@ -39,7 +38,6 @@ export default {
     anonymous:
       "Enviado sin tu cuenta. Las respuestas se muestran en este dispositivo y, si reinstalas la app, podrías perderlas.",
     signInToKeep: "Inicia sesión para conservarlo",
-    send: "Enviar",
     sendFailed: "No se pudo enviar. Inténtalo de nuevo.",
     rateLimited_one: "Demasiados envíos. Inténtalo de nuevo en {{count}} minuto.",
     rateLimited_many: "Demasiados envíos. Inténtalo de nuevo en {{count}} minutos.",
@@ -63,17 +61,22 @@ export default {
     missing: "Estos comentarios ya no existen.",
     you: "Tú",
     team: "Scryve",
-    replyLabel: "Respuesta",
     replyPlaceholder: "Añade un detalle o responde una pregunta",
     send: "Enviar",
+    sending: "Enviando…",
+    sent: "Enviado",
     sendFailed: "No se pudo enviar. Inténtalo de nuevo.",
-    includeAccount: "Incluir mi cuenta",
-    includeAccountHelper:
-      "Nos permite ver tu nombre de usuario y mantiene este hilo en todos tus dispositivos.",
     linked: "Enviado con tu cuenta",
     linkedElsewhere: "Enviado con otra cuenta",
-    signInToKeep: "Inicia sesión para conservar este hilo si reinstalas",
-    notifyReplies: "Avisarme de las respuestas a todos mis comentarios",
+    notLinked: "Enviado sin tu cuenta.",
+    includeAccount: "Incluirla",
+    signInToKeep: "Inicia sesión para conservarlo",
+  },
+  notifyPrompt: {
+    title: "¿Quieres recibir una notificación cuando haya respuestas?",
+    body: "Las respuestas siempre aparecen aquí en Scryve, de todos modos.",
+    notNow: "Ahora no",
+    notify: "Notificarme",
   },
   unavailable:
     "Los comentarios necesitan la nube de Scryve, que no está configurada en esta versión.",

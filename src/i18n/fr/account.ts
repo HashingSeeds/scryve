@@ -79,6 +79,7 @@ export default {
     notifications: {
       heading: "Notifications",
       feedbackReplies: "Réponses aux commentaires",
+      feedbackRepliesHelper: "Les réponses s'affichent toujours dans Vos commentaires",
       renewalReminders: "Rappels de renouvellement",
       renewalRemindersHelper: "3 jours avant le renouvellement de votre abonnement",
       channel: "Réponses et rappels",

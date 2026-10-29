@@ -32,6 +32,26 @@ export async function setPushPref(kind: PushKind, on: boolean) {
   storage.set(prefKey(kind), on)
 }
 
+const FEEDBACK_REPLIES_OFFERED = "notifications.feedbackRepliesOffered"
+
+// why: asked once, so "Not now" sticks; Settings is the way back. The OS prompt comes only after a yes, since iOS allows it once.
+export function offerFeedbackReplies() {
+  if (
+    !pushSupported ||
+    storage.getBoolean(FEEDBACK_REPLIES_OFFERED) ||
+    storage.getBoolean(prefKey("feedbackReplies"))
+  )
+    return
+  storage.set(FEEDBACK_REPLIES_OFFERED, true)
+  Alert.alert(translate("feedback:notifyPrompt.title"), translate("feedback:notifyPrompt.body"), [
+    { text: translate("feedback:notifyPrompt.notNow"), style: "cancel" },
+    {
+      text: translate("feedback:notifyPrompt.notify"),
+      onPress: () => void setPushPref("feedbackReplies", true),
+    },
+  ])
+}
+
 export function offerRenewalReminder() {
   if (!pushSupported || storage.getBoolean(prefKey("renewalReminders"))) return
   Alert.alert(
