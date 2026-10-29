@@ -27,7 +27,6 @@ import {
   fixedReply,
   isStorePlatform,
   senderHash,
-  type StorePlatform,
 } from "./lib/feedback"
 import { notifyFeedbackReply } from "./lib/notifications"
 
@@ -454,13 +453,25 @@ export const shipFixes = internalMutation({
   },
 })
 
-export async function tellStoreFixes(ctx: MutationCtx, platform: StorePlatform) {
-  const requests = await ctx.db
-    .query("feedbackRequests")
-    .withIndex("by_awaiting_store", (q) => q.eq("awaitingStore", platform))
-    .take(APOLLO_BATCH)
-  for (const request of requests) await tellFix(ctx, request)
-}
+export const tellStoreFixes = internalMutation({
+  args: {
+    platform: v.union(v.literal("ios"), v.literal("android")),
+    cursor: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { platform, cursor }) => {
+    const page = await ctx.db
+      .query("feedbackRequests")
+      .withIndex("by_awaiting_store", (q) => q.eq("awaitingStore", platform))
+      .paginate({ cursor, numItems: APOLLO_BATCH })
+    for (const request of page.page) await tellFix(ctx, request)
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.feedback.tellStoreFixes, {
+        platform,
+        cursor: page.continueCursor,
+      })
+    return null
+  },
+})
 
 async function tellFix(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
   const fix = request.fixedIn

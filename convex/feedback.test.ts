@@ -422,13 +422,15 @@ describe("feedback", () => {
         const request = await ctx.db.get(requestId)
         return { messages: messages.map(({ body }) => body), awaiting: request?.awaitingStore }
       })
-    const live = (t: ConvexTestHarness, runtimeVersion: string, commitAt?: number) =>
-      t.mutation(internal.storeReleases.setLive, {
+    const live = async (t: ConvexTestHarness, runtimeVersion: string, commitAt?: number) => {
+      await t.mutation(internal.storeReleases.setLive, {
         platform: "ios",
         version: "0.3.0",
         runtimeVersion,
         ...(commitAt === undefined ? {} : { commitAt }),
       })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    }
 
     it("tells the player at promote when their build loads the update", async () => {
       const t = makeConvexTest()
@@ -461,6 +463,7 @@ describe("feedback", () => {
         version: "0.3.0",
         runtimeVersion: "rt-a1",
       })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
       await t.mutation(internal.feedback.shipFixes, {
         commit: "abcdef1234",
         issues: [8],
@@ -480,6 +483,33 @@ describe("feedback", () => {
       expect((await told(t, requestId)).awaiting).toBe("ios")
       await live(t, "rt-2", at)
       expect((await told(t, requestId)).messages).toHaveLength(1)
+    })
+
+    it("tells every waiting player, past one page", async () => {
+      const t = makeConvexTest()
+      const fixedIn = { commit: "abcdef1234", at: 1, runtimes: { ios: "rt-1" } }
+      await t.run(async (ctx) => {
+        for (let n = 0; n < 101; n++)
+          await ctx.db.insert("feedbackRequests", {
+            kind: "bug",
+            body: "Crash",
+            senderHash: "h",
+            platform: "ios",
+            runtimeVersion: "rt-0",
+            fixedIn,
+            awaitingStore: "ios",
+            unread: false,
+            updatedAt: 0,
+          })
+      })
+      await live(t, "rt-1")
+      const waiting = await t.run((ctx) =>
+        ctx.db
+          .query("feedbackRequests")
+          .withIndex("by_awaiting_store", (q) => q.eq("awaitingStore", "ios"))
+          .collect(),
+      )
+      expect(waiting).toEqual([])
     })
 
     it("covers both ways when the player's runtime is unknown", async () => {

@@ -206,7 +206,6 @@ function recordLive(args) {
   const write = args.includes("--yes")
   let previewed = false
   const runtimes = tagRuntimes(version, platforms.length ? platforms : ["android", "ios"])
-  // why: Convex tells players a fix is in the store when it shipped before this build's commit.
   const commitAt = Number(git("log", "-1", "--format=%ct", `v${version}^{commit}`)) * 1000
   for (const { platform, runtimeVersion } of runtimes) {
     const record = JSON.stringify({ platform, version, runtimeVersion, commitAt })

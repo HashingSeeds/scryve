@@ -2,6 +2,9 @@ import { makeConvexTest } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 
 describe("store releases", () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
   it("keeps one live release per platform", async () => {
     const t = makeConvexTest()
     await t.mutation(internal.storeReleases.setLive, {
@@ -14,6 +17,7 @@ describe("store releases", () => {
       version: "0.3.0",
       runtimeVersion: "runtime-b",
     })
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
 
     await expect(t.query(api.storeReleases.live, { platform: "ios" })).resolves.toEqual({
       version: "0.3.0",

@@ -71,9 +71,8 @@ export function deletedFeedbackCard(requestId: Id<"feedbackRequests">) {
 }
 
 const STORES = { ios: "App Store", android: "Google Play" } as const
-export type StorePlatform = keyof typeof STORES
 
-export function isStorePlatform(platform: string | undefined): platform is StorePlatform {
+export function isStorePlatform(platform: string | undefined): platform is keyof typeof STORES {
   return platform === "ios" || platform === "android"
 }
 
@@ -88,7 +87,6 @@ export function fixReach(
   if (!isStorePlatform(request.platform)) return "unknown"
   const shipped = fix.runtimes[request.platform]
   if (shipped && shipped === request.runtimeVersion) return "update"
-  // why: a live build loads the fix's update when it shares its runtime, and holds the fix itself when it was tagged on main after the promote.
   const live = !!store && (store.runtimeVersion === shipped || (store.commitAt ?? 0) >= fix.at)
   if (!live) return "waiting"
   return request.runtimeVersion ? "store" : "unknown"
