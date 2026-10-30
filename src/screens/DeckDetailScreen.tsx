@@ -643,7 +643,6 @@ function DeckDetailContent({
   }
 
   function chooseVersion(versionId: string) {
-    if (latestDraft.current.editing) discardEdits()
     setNewListNotice(false)
     setSelectedVersionId(versionId as Id<"deckVersions">)
   }
@@ -870,7 +869,11 @@ function DeckDetailContent({
                 }
               : { label: translate("decks:detail.versions"), latest: true }
         }
-        onVersions={() => setDialog("versions")}
+        onVersions={() => {
+          // why: a clean draft keeps the version it opened on pinned, so a version created, chosen, or deleted next would send the following save to the old one.
+          if (latestDraft.current.editing) discardEdits()
+          setDialog("versions")
+        }}
         onBack={onBack}
         onSave={save}
         onDiscard={discardEdits}

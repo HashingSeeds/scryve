@@ -239,6 +239,7 @@ export function GuestDeckDetailScreen({
       )
     : 0
   const savedDeck = stored?.deck ?? current
+  const shown = building ? current : savedDeck
 
   return (
     <Screen
@@ -251,9 +252,9 @@ export function GuestDeckDetailScreen({
         mode={mode}
         onModeChange={setMode}
         guest
-        name={current.name}
+        name={shown.name}
         game={game}
-        format={current.format}
+        format={shown.format}
         cards={current.cards}
         savedCards={savedDeck.cards}
         note={current.note ?? ""}
@@ -267,9 +268,9 @@ export function GuestDeckDetailScreen({
                   pathname: "/connected/decks/stats",
                   params: {
                     deckKey: stored.deckKey ?? stored.localId,
-                    deckName: current.name,
+                    deckName: savedDeck.name,
                     game,
-                    format: current.format,
+                    format: savedDeck.format,
                   },
                 })
             : undefined

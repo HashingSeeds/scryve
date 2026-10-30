@@ -1690,6 +1690,57 @@ describe("DeckDetailScreen", () => {
     })
   })
 
+  it("saves to a version created after an undone edit, not the one the edit started on", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockConnectionState.isWebSocketConnected = false
+    const main = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.version = main
+    mockVersionCacheState.versions = [main]
+    mockVersionCacheState.cards = [solRing]
+    mockVersionCacheState.capacity = { limit: 5, premium: true }
+    mockVersionCreate.mockReturnValueOnce("version-new")
+    const view = renderDetail(offlineAccess)
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.press(view.getByLabelText("Increase Sol Ring"))
+    fireEvent.press(view.getByLabelText("Decrease Sol Ring"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
+    fireEvent.press(view.getByTestId("version-picker-__new__"))
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Budget swap")
+    fireEvent.press(view.getByTestId("version-submit"))
+    expect(mockVersionCreate).toHaveBeenCalledTimes(1)
+
+    const created = { ...main, versionId: "version-new", revision: 0, versionNumber: 2 }
+    mockVersionCacheState.version = created
+    mockVersionCacheState.versions = [main, created]
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={offlineAccess} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByLabelText("Increase Sol Ring"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockVersionCardUpdate).toHaveBeenCalledWith(
+      "deck-1",
+      "version-new",
+      [expect.objectContaining({ name: "Sol Ring", quantity: 2 })],
+      0,
+    )
+  })
+
   it("points free accounts at premium instead of opening the version editor", () => {
     mockDetail.value = {
       ...(mockDetail.value as Record<string, unknown>),

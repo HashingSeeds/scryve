@@ -196,6 +196,17 @@ test("deck details edits the name without a duplicate notes field", () => {
   )
 })
 
+test("Play keeps the saved name until a settings rename is saved", () => {
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.changeText(view.getByTestId("deck-name-input"), "Renamed")
+  fireEvent.press(view.getByTestId("deck-settings-save"))
+  expect(view.getByText("Renamed")).toBeTruthy()
+  fireEvent.press(view.getByTestId("deck-mode-play"))
+  expect(view.getByText("Offline Commander")).toBeTruthy()
+  expect(view.queryByText("Renamed")).toBeNull()
+})
+
 test("cancel keeps a guest deck and confirm deletes it", () => {
   const view = renderScreen()
   fireEvent.press(view.getByTestId("deck-settings-button"))
