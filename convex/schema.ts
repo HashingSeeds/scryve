@@ -376,7 +376,6 @@ export default defineSchema({
     game: v.optional(v.string()),
     note: v.optional(v.string()),
     favoritedAt: v.optional(v.number()),
-    // why: unset or pointing at a deleted version means the player brings the latest version.
     bringingVersionId: v.optional(v.id("deckVersions")),
     // why: archivedAt means deleted. The name predates unsynced decks and stays for installed clients.
     archivedAt: v.optional(v.number()),

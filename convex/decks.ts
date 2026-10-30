@@ -406,7 +406,6 @@ async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   return result?.finishedAt
 }
 
-// why: a pick whose version was deleted reads as unset, so every deletion path falls back to latest.
 function publicDeck(deck: Doc<"decks">, versions: readonly Doc<"deckVersions">[]) {
   const { bringingVersionId, ...rest } = deck
   return {

@@ -124,7 +124,6 @@ export const summary = query({
   },
 })
 
-// why: a blocked player or a gated deck name hides the commanders too, as matchups does.
 function shownIdentity(
   seat: { userId?: Id<"users">; deckName?: string; deckLabel?: DeckLabel },
   blocked: Set<Id<"users">>,
