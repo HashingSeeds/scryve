@@ -48,6 +48,7 @@ export default {
     noChanges: "Sin cambios de cartas.",
     comparePro: "Compara listas con Scryve Pro.",
     unavailable: "Estadísticas no disponibles.",
+    signIn: "Inicia sesión para ver las estadísticas del mazo",
     viewStats: "Ver estadísticas del mazo",
     onDeviceLabel: "{{name}}, en este dispositivo",
     limited: "Los desgloses abarcan los últimos 200 resultados.",

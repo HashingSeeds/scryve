@@ -45,6 +45,7 @@ export default {
     noChanges: "कार्ड में कोई बदलाव नहीं।",
     comparePro: "Scryve Pro से सूचियों की तुलना करें।",
     unavailable: "आँकड़े उपलब्ध नहीं हैं।",
+    signIn: "डेक स्टैट्स देखने के लिए साइन इन करें",
     viewStats: "डेक के आँकड़े देखें",
     onDeviceLabel: "{{name}}, इस डिवाइस पर",
     limited: "ब्रेकडाउन में नवीनतम 200 नतीजे शामिल हैं।",

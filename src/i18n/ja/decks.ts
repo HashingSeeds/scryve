@@ -42,6 +42,7 @@ export default {
     noChanges: "カードの変更なし。",
     comparePro: "Scryve Proでリストを比較。",
     unavailable: "統計を利用できません。",
+    signIn: "サインインしてデッキの統計を見る",
     viewStats: "デッキ統計を見る",
     onDeviceLabel: "{{name}}、この端末のみ",
     limited: "内訳は直近200件の結果が対象です。",
