@@ -359,6 +359,9 @@ export default {
     saving: "Guardando…",
     saveResult: "Guardar resultado",
     saveFailed: "No se pudo guardar este encuentro. Inténtalo de nuevo.",
+    savedOffline: "Guardado en este dispositivo. Se sincronizará cuando vuelvas a tener conexión.",
+    queueFull:
+      "Hay demasiados encuentros esperando para sincronizarse. Vuelve a conectarte antes de añadir más.",
     error: {
       opponentName: "El oponente {{number}} necesita un nombre",
       nameLength: "Los nombres pueden tener como máximo {{max}} caracteres",

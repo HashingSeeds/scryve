@@ -339,6 +339,8 @@ export default {
     saving: "保存中…",
     saveResult: "結果を保存",
     saveFailed: "このマッチを保存できませんでした。もう一度お試しください。",
+    savedOffline: "このデバイスに保存しました。オンラインに戻ると同期されます。",
+    queueFull: "同期待ちのマッチが多すぎます。再接続してから追加してください。",
     error: {
       opponentName: "対戦相手{{number}}の名前が必要です",
       nameLength: "名前は{{max}}文字以内にしてください",
