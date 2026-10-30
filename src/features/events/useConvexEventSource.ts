@@ -3,11 +3,11 @@ import { useMutation, useQuery } from "convex/react"
 
 import { SyncLatency } from "@/features/connected/syncLatency"
 
-import { standingsThroughRound } from "./eventLogic"
 import type { EventSource, EventView } from "./eventSource"
 import { useLatencyReports } from "./useLatencyReports"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+import { standingsThroughRound } from "../../../convex/lib/events/commands"
 
 export function useConvexEventSource(eventId: string): EventSource {
   const id = eventId as Id<"events">
