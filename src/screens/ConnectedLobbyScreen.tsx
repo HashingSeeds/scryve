@@ -8,7 +8,7 @@ import { readPublicCloudConfig } from "@/features/auth/config"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { onlineOnlyNotice, type LobbyExitAction } from "@/features/connected/connectedCopy"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
-import type { LobbyDeckState } from "@/features/connected/LobbySeatList"
+import type { LobbyDeckState, LobbyDeviceDecks } from "@/features/connected/LobbySeatList"
 import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
@@ -16,6 +16,7 @@ import {
 } from "@/features/connected/PlayerActionsDialog"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { LobbyDeviceDeckSource } from "@/features/lobby/LobbyDeviceDeckSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 import { captureAnalytics, captureGame } from "@/utils/analytics"
@@ -313,7 +314,11 @@ function ConnectedLobbyContent({
         onShare: inviteUrl || manualCode ? shareInvite : undefined,
       }}
       decks={{
-        source: (render) => <LobbyDeckSource>{render}</LobbyDeckSource>,
+        source: (render) => (
+          <LobbyDeckSource online={isWebSocketConnected} onUse={chooseVersion}>
+            {render}
+          </LobbyDeckSource>
+        ),
         selectingSeats: selectingDeckSeats,
         onSelect: (seat, deckVersionId) => void chooseVersion(seat, deckVersionId),
         onManage: onManageDecks ? () => onManageDecks(lobby.system) : undefined,
@@ -351,15 +356,39 @@ function ConnectedLobbyContent({
   )
 }
 
-function LobbyDeckSource({ children }: { children: (state: LobbyDeckState) => ReactNode }) {
+type DeckRender = (state: LobbyDeckState, device?: LobbyDeviceDecks) => ReactNode
+
+function LobbyDeckSource({
+  online,
+  onUse,
+  children,
+}: {
+  online: boolean
+  onUse: (seat: number, deckVersionId: string) => Promise<void>
+  children: DeckRender
+}) {
   return (
     <ConvexQueryBoundary fallback={({ retry }) => children({ status: "error", retry })}>
-      <LobbyDeckQuery>{children}</LobbyDeckQuery>
+      <LobbyDeckQuery online={online} onUse={onUse}>
+        {children}
+      </LobbyDeckQuery>
     </ConvexQueryBoundary>
   )
 }
 
-function LobbyDeckQuery({ children }: { children: (state: LobbyDeckState) => ReactNode }) {
+function LobbyDeckQuery({
+  online,
+  onUse,
+  children,
+}: {
+  online: boolean
+  onUse: (seat: number, deckVersionId: string) => Promise<void>
+  children: DeckRender
+}) {
   const result = useQuery(api.decks.listMine)
-  return children(remoteValue(result?.decks))
+  return (
+    <LobbyDeviceDeckSource online={online} capacity={result?.capacity} onUse={onUse}>
+      {(device) => children(remoteValue(result?.decks), device)}
+    </LobbyDeviceDeckSource>
+  )
 }
