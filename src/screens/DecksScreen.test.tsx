@@ -672,6 +672,51 @@ describe("DecksScreen", () => {
     expect(view.queryByText("Mono Red")).toBeNull()
   })
 
+  it("gives each collection its own empty state when device decks sit outside it", () => {
+    const local = saveGuestDeck({ name: "Local", format: "commander", game: "mtg", cards: [] })
+    mockListMine.value = {
+      decks: [standardDeck],
+      capacity: { used: 1, limit: 100, premium: true, canCreate: true },
+      analyticsLocked: false,
+    }
+    const view = renderShelf()
+
+    fireEvent.press(view.getByTestId("collection-filter-favorites"))
+    expect(view.getByText("No favorite decks yet")).toBeTruthy()
+    expect(view.queryByText("Nothing matches")).toBeNull()
+    expect(view.queryByText("Clear search and filters")).toBeNull()
+
+    fireEvent.press(view.getByTestId("collection-filter-recent"))
+    expect(view.getByText("No recent decks yet")).toBeTruthy()
+    expect(view.queryByText("Clear search and filters")).toBeNull()
+
+    act(() => recordRecentDeck(guestDeckRouteId(local.localId)))
+    expect(view.getByText("Local")).toBeTruthy()
+    expect(view.queryByText("No recent decks yet")).toBeNull()
+
+    fireEvent.changeText(view.getByTestId("deck-search-input"), "nothing here")
+    expect(view.getByText("Nothing matches")).toBeTruthy()
+    fireEvent.press(view.getByText("Clear search and filters"))
+    expect(view.getByText("Local")).toBeTruthy()
+  })
+
+  it("gives each collection its own empty state for signed-out device decks", () => {
+    saveGuestDeck({ name: "Local", format: "commander", game: "mtg", cards: [] })
+    const view = renderShelf({
+      access: { ready: false, loading: false, signedIn: false, request: jest.fn() },
+    })
+
+    fireEvent.press(view.getByTestId("collection-filter-favorites"))
+    expect(view.getByText("No favorite decks yet")).toBeTruthy()
+    expect(view.queryByText("Clear search and filters")).toBeNull()
+
+    fireEvent.press(view.getByTestId("collection-filter-all"))
+    fireEvent.changeText(view.getByTestId("deck-search-input"), "nothing here")
+    expect(view.getByText("Nothing matches")).toBeTruthy()
+    fireEvent.press(view.getByText("Clear search and filters"))
+    expect(view.getByText("Local")).toBeTruthy()
+  })
+
   it("keeps Add deck enabled on a full free shelf", () => {
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],

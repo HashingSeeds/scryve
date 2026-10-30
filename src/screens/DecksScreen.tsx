@@ -74,6 +74,11 @@ const COLLECTIONS = [
   { id: "favorites", labelTx: "decks:shelf.collectionFavorites" },
   { id: "recent", labelTx: "decks:shelf.collectionRecent" },
 ] as const
+const EMPTY_COLLECTION = {
+  all: { titleTx: "decks:shelf.noDecks", detailTx: "decks:shelf.noDecksDetail" },
+  favorites: { titleTx: "decks:shelf.noFavorites", detailTx: "decks:shelf.noFavoritesDetail" },
+  recent: { titleTx: "decks:shelf.noRecent", detailTx: "decks:shelf.noRecentDetail" },
+} as const satisfies Record<DeckCollection, unknown>
 
 function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
   const cards = deck.cardQuantity
@@ -391,18 +396,7 @@ function DeckShelf({
   const filtered =
     (collectionDecks.length > 0 || (hasLocalDecks && !localRows.length)) &&
     visibleDecks.length === 0
-  const emptyTitle =
-    collection === "favorites"
-      ? "decks:shelf.noFavorites"
-      : collection === "recent"
-        ? "decks:shelf.noRecent"
-        : "decks:shelf.noDecks"
-  const emptyDetail =
-    collection === "favorites"
-      ? "decks:shelf.noFavoritesDetail"
-      : collection === "recent"
-        ? "decks:shelf.noRecentDetail"
-        : "decks:shelf.noDecksDetail"
+  const { titleTx, detailTx } = EMPTY_COLLECTION[collection]
 
   async function toggleFavorite(deck: ShelfDeck) {
     try {
@@ -422,13 +416,13 @@ function DeckShelf({
         <Text tx="decks:shelf.reconnect" />
         <Button tx="common:tryAgain" onPress={() => void synced.retry()} />
       </View>
-    ) : mine && localRows.length && !filtered && collection === "all" ? null : mine ? (
+    ) : mine && localRows.length && !filtered ? null : mine ? (
       <View style={themed($empty)}>
-        <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : emptyTitle} />
+        <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : titleTx} />
         <Text
           size="sm"
           style={themed($dimmedText)}
-          tx={filtered ? "decks:shelf.tryAnotherSearch" : emptyDetail}
+          tx={filtered ? "decks:shelf.tryAnotherSearch" : detailTx}
         />
         {filtered ? <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} /> : null}
       </View>
@@ -592,10 +586,13 @@ export function DecksScreen({
     cardQuantity: guest.deck.cards.reduce((total, card) => total + card.quantity, 0),
     keyRecord: keyTotals.get(guest.deckKey ?? guest.localId),
   }))
-  const visibleGuestRows = guestRows.filter(
+  const collectionGuestRows = guestRows.filter(
     (guestRow) =>
       collection !== "favorites" &&
-      (collection !== "recent" || recentDeckIds.includes(guestRow._id)) &&
+      (collection !== "recent" || recentDeckIds.includes(guestRow._id)),
+  )
+  const visibleGuestRows = collectionGuestRows.filter(
+    (guestRow) =>
       (system === ALL_SYSTEMS || guestRow.game === system) &&
       (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
       matchesSearch(guestRow, search),
@@ -709,22 +706,24 @@ export function DecksScreen({
                 <View style={themed($empty)}>
                   <Text
                     preset="subheading"
-                    tx={guestDecks.length ? "decks:shelf.nothingMatches" : "decks:shelf.noDecks"}
+                    tx={
+                      collectionGuestRows.length
+                        ? "decks:shelf.nothingMatches"
+                        : EMPTY_COLLECTION[collection].titleTx
+                    }
                   />
                   <Text
                     size="sm"
                     tx={
-                      guestDecks.length ? "decks:shelf.tryAnotherSearch" : "decks:shelf.guestEmpty"
+                      collectionGuestRows.length
+                        ? "decks:shelf.tryAnotherSearch"
+                        : collection === "all"
+                          ? "decks:shelf.guestEmpty"
+                          : EMPTY_COLLECTION[collection].detailTx
                     }
                   />
-                  {guestDecks.length ? (
-                    <Button
-                      tx="decks:shelf.clearSearch"
-                      onPress={() => {
-                        clearVisibleFilters()
-                        setCollection("all")
-                      }}
-                    />
+                  {collectionGuestRows.length ? (
+                    <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} />
                   ) : null}
                 </View>
               )
@@ -783,7 +782,7 @@ export function DecksScreen({
               onSelect={onSelect}
               access={access}
               localRows={visibleGuestRows}
-              hasLocalDecks={guestDecks.length > 0}
+              hasLocalDecks={collectionGuestRows.length > 0}
             />
           </ConvexQueryBoundary>
         )}
