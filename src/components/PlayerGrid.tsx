@@ -435,6 +435,7 @@ export function PlayerGrid({
                       playerName={player.name}
                       seatNumber={seatNumber}
                       shape={player.shape}
+                      foil={isPlayerFoil?.(player)}
                       prizes={player.life}
                       color={player.color}
                       compact={layout.compact}
