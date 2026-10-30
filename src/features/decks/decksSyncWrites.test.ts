@@ -19,6 +19,8 @@ import { makeConvexTest } from "../../../test/convexTest"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 import { setOutboxWriter } from "../sync/durableOutbox"
 
+type SyncWriteArgs = FunctionArgs<typeof api.decks.syncWrite>
+
 const deckId = "deck-1" as Id<"decks">
 const metadata = (revision = 0): SyncedDeck => ({
   id: deckId,
@@ -482,6 +484,70 @@ describe("deck metadata writes", () => {
     expect(stored).toMatchObject({ name: "Renamed once", syncRevision: 1 })
     expect(restarted.getSnapshot().pending).toEqual([])
     stopRestarted()
+  })
+
+  async function backendDeck() {
+    const t = makeConvexTest()
+    const actor = t.withIdentity({ subject: "owner" })
+    await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
+    const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
+    const page = await actor.query(api.decks.syncPage, {
+      paginationOpts: { numItems: 100, cursor: null },
+    })
+    const local = new MemoryStorage()
+    new DeckSyncRepository("owner", local).mergeMetadata(page.page)
+    const client = {
+      mutation: (reference: typeof api.decks.syncWrite, args: SyncWriteArgs) =>
+        actor.mutation(reference, args),
+    } as unknown as ConvexReactClient
+    const controller = new DeckMetadataWriteController(
+      client,
+      new DeckSyncWriteRepository("owner", local),
+    )
+    return { t, actor, id, controller }
+  }
+
+  it("queues a delete offline and archives the deck once online", async () => {
+    const { t, id, controller } = await backendDeck()
+
+    controller.remove(id)
+    expect(controller.getSnapshot()).toMatchObject({
+      metadata: [{ deckId: id, deleted: true }],
+      pending: [{ deckId: id, deleted: true }],
+    })
+
+    const stop = controller.start()
+    await flush()
+    stop()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      metadata: [{ deckId: id, deleted: true }],
+      pending: [],
+      failures: [],
+    })
+    expect(await t.run(async (ctx) => ctx.db.get(id))).toHaveProperty("archivedAt")
+  })
+
+  it("deletes a deck that another device renamed after an offline rename and delete", async () => {
+    const { t, actor, id, controller } = await backendDeck()
+    controller.update(id, { name: "Offline rename" })
+    controller.remove(id)
+    await actor.mutation(api.decks.update, {
+      deckId: id,
+      name: "Other device",
+      format: "commander",
+    })
+
+    const stop = controller.start()
+    await flush()
+    stop()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      metadata: [{ deckId: id, deleted: true }],
+      pending: [],
+      failures: [],
+    })
+    expect(await t.run(async (ctx) => ctx.db.get(id))).toHaveProperty("archivedAt")
   })
 
   it("keeps the stored writer provenance out of the real backend's strict args", async () => {

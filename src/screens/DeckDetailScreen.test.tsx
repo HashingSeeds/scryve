@@ -22,6 +22,7 @@ const mockDeckSyncState = {
 const mockUpdateMetadata = jest.fn()
 const mockDiscardMetadataFailure = jest.fn()
 const mockReapplyMetadataFailure = jest.fn()
+const mockRemoveDeck = jest.fn()
 const mockMetadataWriteState = {
   metadata: [] as Array<Record<string, unknown>>,
   pending: [] as Array<Record<string, unknown>>,
@@ -60,6 +61,7 @@ jest.mock("@/features/decks/decksSyncWrites", () => ({
     update: mockUpdateMetadata,
     discardFailure: mockDiscardMetadataFailure,
     reapplyFailure: mockReapplyMetadataFailure,
+    remove: mockRemoveDeck,
   }),
 }))
 const mockVersionCardUpdate = jest.fn()
@@ -1954,6 +1956,66 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("delete-deck-button"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
+  })
+
+  describe("offline deck actions", () => {
+    const offline = { ready: false, loading: false, signedIn: true, ownerId: "owner-a" }
+    const reconnect = "Reconnect to continue."
+
+    beforeEach(() => {
+      mockDeckSyncState.enabled = true
+      mockDeckSyncState.metadata = [cachedMetadata]
+      mockConnectionState.isWebSocketConnected = false
+    })
+
+    function renderOffline(onBack = jest.fn(), onMovedToDevice?: (localId: string) => void) {
+      return render(
+        <ThemeProvider initialContext="light">
+          <DeckDetailScreen
+            deckId="deck-1"
+            onBack={onBack}
+            onMovedToDevice={onMovedToDevice}
+            access={{ ...offline, message: reconnect, request: jest.fn() }}
+          />
+        </ThemeProvider>,
+      )
+    }
+
+    it("queues the delete and leaves the deck", () => {
+      mockMetadataWriteState.metadata = [cachedMetadata]
+      const onBack = jest.fn()
+      const view = renderOffline(onBack)
+      fireEvent.press(view.getByTestId("deck-settings-button"))
+      fireEvent.press(view.getByTestId("delete-deck-button"))
+      fireEvent.press(view.getByTestId("delete-deck-confirm"))
+
+      expect(mockRemoveDeck).toHaveBeenCalledWith("deck-1")
+      expect(mockArchiveDeck).not.toHaveBeenCalled()
+      expect(onBack).toHaveBeenCalledTimes(1)
+    })
+
+    it("says why the delete can't run when the deck isn't cached for offline writes", async () => {
+      const view = renderOffline()
+      fireEvent.press(view.getByTestId("deck-settings-button"))
+      fireEvent.press(view.getByTestId("delete-deck-button"))
+      fireEvent.press(view.getByTestId("delete-deck-confirm"))
+
+      expect(
+        await within(view.getByTestId("delete-deck-dialog")).findByText(reconnect),
+      ).toBeTruthy()
+      expect(mockArchiveDeck).not.toHaveBeenCalled()
+    })
+
+    it("says why keep on device needs a connection", async () => {
+      const onMovedToDevice = jest.fn()
+      const view = renderOffline(jest.fn(), onMovedToDevice)
+      fireEvent.press(view.getByTestId("deck-settings-button"))
+      fireEvent.press(view.getByTestId("move-deck-button"))
+      fireEvent.press(view.getByTestId("move-deck-confirm"))
+
+      expect(await within(view.getByTestId("move-deck-dialog")).findByText(reconnect)).toBeTruthy()
+      expect(onMovedToDevice).not.toHaveBeenCalled()
+    })
   })
 
   it("keeps detail geometry visible and retries an unavailable query", () => {

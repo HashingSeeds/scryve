@@ -355,6 +355,7 @@ function DeckShelf({
   const localDecks = useMemo(() => {
     const metadata = new Map(writes.metadata.map((deck) => [String(deck.deckId), deck]))
     return synced.decks
+      .filter((deck) => !metadata.get(deck._id)?.deleted)
       .map((deck) => {
         const local = metadata.get(deck._id)
         return local

@@ -194,6 +194,7 @@ describe("DecksScreen", () => {
       update: jest.fn(),
       discardFailure: jest.fn(),
       reapplyFailure: jest.fn(),
+      remove: jest.fn(),
     })
     const onSelect = jest.fn()
     const view = renderShelf({ onSelect })
@@ -208,6 +209,42 @@ describe("DecksScreen", () => {
     expect(onSelect).toHaveBeenLastCalledWith(
       expect.objectContaining({ deckId: standardDeck._id, reviewChanges: true }),
     )
+  })
+
+  it("hides a deck deleted offline before the delete syncs", () => {
+    jest.spyOn(deckSync, "isDeckSyncEnabled").mockReturnValue(true)
+    jest.spyOn(deckSync, "useDeckSync").mockReturnValue({
+      decks: [commanderDeck, standardDeck],
+      metadata: [],
+      loading: false,
+      retry: jest.fn(),
+    })
+    jest.spyOn(deckWrites, "useDeckMetadataWrites").mockReturnValue({
+      metadata: [
+        {
+          id: standardDeck._id,
+          deckId: standardDeck._id as Id<"decks">,
+          name: standardDeck.name,
+          format: standardDeck.format,
+          game: "mtg",
+          note: "",
+          revision: 2,
+          deleted: true,
+          createdAt: 1,
+          updatedAt: 200,
+        },
+      ],
+      pending: [],
+      capacityBlocked: false,
+      failures: [],
+      update: jest.fn(),
+      discardFailure: jest.fn(),
+      reapplyFailure: jest.fn(),
+      remove: jest.fn(),
+    })
+    const view = renderShelf()
+    expect(view.getByText(commanderDeck.name)).toBeTruthy()
+    expect(view.queryByText(standardDeck.name)).toBeNull()
   })
 
   it("offers retry instead of an empty shelf when sync has no cached data", () => {
@@ -399,6 +436,7 @@ describe("DecksScreen", () => {
       update: jest.fn(),
       discardFailure: jest.fn(),
       reapplyFailure: jest.fn(),
+      remove: jest.fn(),
     })
     clear()
     clearGuestDecks()
@@ -493,6 +531,7 @@ describe("DecksScreen", () => {
       update: jest.fn(),
       discardFailure: jest.fn(),
       reapplyFailure: jest.fn(),
+      remove: jest.fn(),
     }
     jest.spyOn(deckWrites, "useDeckMetadataWrites").mockImplementation(() => writes)
     const onSelect = jest.fn()
