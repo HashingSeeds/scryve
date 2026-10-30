@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
@@ -8,6 +9,16 @@ import { CurrentGameScreen } from "./CurrentGameScreen"
 import { MemoryStorage } from "../../test/support/memoryStorage"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
+
+jest.mock("@/features/decks/useSeatDeckCards", () => ({
+  useSeatDeckCards: (deck: unknown) =>
+    deck
+      ? [
+          { name: "Searing Blaze", quantity: 2, section: "main" },
+          { name: "Rest in Peace", quantity: 2, section: "sideboard" },
+        ]
+      : [],
+}))
 
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
@@ -54,6 +65,40 @@ function endGame(view: ReturnType<typeof render>, winner: number | "draw") {
 }
 
 describe("CurrentGameScreen match mode", () => {
+  it("sideboards for the rest of the match from the Next game step", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 2,
+      system: "mtg",
+      format: "modern",
+      account: { ownerId: "owner", meSeat: 0, deckVersionId: "version-1", deckName: "Boros Burn" },
+      match: { bestOf: 3 },
+    })
+    repository.saveActiveGame(game)
+    const { view } = mount(repository)
+    endGame(view, 0)
+
+    expect(view.getByText("Boros Burn · 2 in sideboard")).toBeTruthy()
+    fireEvent.press(view.getByTestId("sideboard-first"))
+    fireEvent.press(view.getByLabelText("Swap one more Searing Blaze"))
+    expect(view.getByTestId("sideboard-short")).toHaveTextContent(
+      "Main would have 1. Take fewer out or bring more in.",
+    )
+    fireEvent.press(view.getByLabelText("Swap one more Rest in Peace"))
+    fireEvent.press(view.getByTestId("sideboard-apply"))
+
+    expect(view.getByTestId("match-prompt-dialog")).toBeTruthy()
+    expect(loadMatchSwaps(game.match?.id)).toEqual({
+      in: [{ key: "sideboard:Rest in Peace", name: "Rest in Peace", quantity: 1 }],
+      out: [{ key: "main:Searing Blaze", name: "Searing Blaze", quantity: 1 }],
+    })
+    expect(repository.loadActiveGame()?.account?.deckVersionId).toBe("version-1")
+  })
+
   it("keeps the loser's first choice when a match game is restarted", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.saveActiveGame(matchGame(3))

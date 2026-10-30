@@ -498,6 +498,43 @@ const decks = {
       nearby: "Nearby",
       online: "Online",
     },
+    // Heading over the cards swapped in and out for the match in progress.
+    thisMatch: "This match",
+    asBuilt: "Main deck as built",
+    // Under "Main deck as built", e.g. "60 cards · 15 in sideboard". {{cards}} is already counted, like "60 cards".
+    asBuiltDetail: "{{cards}} · {{side}} in sideboard",
+    // A card brought in from the sideboard for this match, e.g. "+2 Rest in Peace".
+    swappedIn: "+{{count}} {{card}}",
+    // A card taken out of the main deck for this match, e.g. "−2 Searing Blaze".
+    swappedOut: "−{{count}} {{card}}",
+    resetsNote: "Resets when the match ends. Your list doesn't change.",
+    // Button: undo every swap for this match and play the deck as built.
+    reset: "Reset",
+  },
+  // Swapping cards between main deck and sideboard between games of a match. It never edits the saved deck.
+  sideboard: {
+    // Opens the swap sheet. Also the name of the deck action.
+    open: "Sideboard",
+    title: "Sideboard for this match",
+    close: "Close sideboard",
+    // Running totals, e.g. "In 2 · Out 2 · Main 60".
+    counts: "In {{in}} · Out {{out}} · Main {{main}}",
+    inFromSide: "In from sideboard",
+    outOfMain: "Out of main",
+    // Under a sideboard card, e.g. "1 of 2 in side".
+    leftInSide: "{{left}} of {{total}} in side",
+    // Under a main deck card, e.g. "3 of 4 left".
+    leftInMain: "{{left}} of {{total}} left",
+    short: "Main would have {{count}}. Take fewer out or bring more in.",
+    apply: "Apply",
+    more: "Swap one more {{card}}",
+    fewer: "Swap one fewer {{card}}",
+    // Offered between games of a match, before the next game starts.
+    first: "Sideboard first",
+    // Under "Sideboard first", e.g. "Boros Burn · 15 in sideboard".
+    firstDetail: "{{deck}} · {{side}} in sideboard",
+    // Opens the swap sheet from "Sideboard first".
+    openAction: "Open",
   },
   build: {
     // Opens card search to find a card in this deck or add a new one.

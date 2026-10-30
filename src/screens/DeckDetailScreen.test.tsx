@@ -3,13 +3,25 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
+import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
+import { createLocalGame, createNextMatchGame } from "@/features/game/domain"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
 
 import { DeckDetailScreen } from "./DeckDetailScreen"
 
 let mockFocused = true
+jest.mock("@/features/decks/useSeatDeckCards", () => ({
+  useSeatDeckCards: (deck: unknown) =>
+    deck
+      ? [
+          { name: "Sol Ring", quantity: 1, section: "main" },
+          { name: "Swords to Plowshares", quantity: 1, section: "sideboard" },
+        ]
+      : [],
+}))
 const mockCaptureAnalytics = jest.fn()
 jest.mock("@/utils/analytics", () => ({
   captureAnalytics: (...args: unknown[]) => mockCaptureAnalytics(...args),
@@ -2122,6 +2134,91 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("deck-action-delete"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
+  })
+
+  it("sideboards between games of a local match without touching the deck", () => {
+    const first = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "version-main" },
+      match: { bestOf: 3 },
+    })
+    const repository = new LocalGameRepository()
+    repository.saveActiveGame(
+      createNextMatchGame({
+        ...first,
+        status: "finished",
+        result: { kind: "win", winnerPlayerIds: [first.players[1].id] },
+      }),
+    )
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          onMovedToDevice={jest.fn()}
+          access={offlineAccess}
+        />
+      </ThemeProvider>,
+    )
+    expect(
+      within(view.getByTestId("deck-play-match")).getByText("1 card · 1 in sideboard"),
+    ).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    const sheet = within(view.getByTestId("deck-actions-sheet"))
+    expect(sheet.getAllByRole("button").map((row) => row.props.testID)).toEqual([
+      "deck-action-details",
+      "deck-action-move",
+      "deck-action-sideboard",
+      "deck-action-delete",
+    ])
+    fireEvent.press(view.getByTestId("deck-action-sideboard"))
+    fireEvent.press(view.getByLabelText("Swap one more Swords to Plowshares"))
+    fireEvent.press(view.getByLabelText("Swap one more Sol Ring"))
+    fireEvent.press(view.getByTestId("sideboard-apply"))
+
+    const match = within(view.getByTestId("deck-play-match"))
+    expect(match.getByText("+1 Swords to Plowshares")).toBeTruthy()
+    expect(match.getByText("−1 Sol Ring")).toBeTruthy()
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(loadAccountDraft("owner-a", "deck-1")).toBeUndefined()
+
+    fireEvent.press(view.getByTestId("sideboard-reset"))
+    expect(loadMatchSwaps(first.match?.id)).toEqual({ in: [], out: [] })
+    expect(view.getByText("Main deck as built")).toBeTruthy()
+  })
+
+  it("leaves Sideboard out of deck actions once the next game has started", () => {
+    const first = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "version-main" },
+      match: { bestOf: 3 },
+    })
+    const second = createNextMatchGame({
+      ...first,
+      status: "finished",
+      result: { kind: "win", winnerPlayerIds: [first.players[1].id] },
+    })
+    new LocalGameRepository().saveActiveGame({
+      ...second,
+      players: second.players.map((player) => ({ ...player, life: player.life - 1 })),
+    })
+    const view = renderDetail(offlineAccess)
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    expect(view.queryByTestId("deck-action-sideboard")).toBeNull()
+    expect(view.queryByTestId("play-sideboard")).toBeNull()
   })
 
   describe("offline deck actions", () => {
