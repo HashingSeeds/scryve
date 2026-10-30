@@ -2,15 +2,19 @@ import { DEFAULT_DECK_GAME } from "./deckGames"
 import {
   applyLifeChange,
   commanderClaimOutcome,
+  commanderField,
   confirmCommanderClaim,
   controlsSeat,
   isCommanderDamageDelta,
   isCommanderFormat,
+  isCommanderSlot,
   isLifeDelta,
   isSameCommanderClaim,
   isSameCommanderResolution,
   isSameLifeChange,
+  PARTNER_COMMANDER,
   type CommanderClaimRequest,
+  type CommanderSlot,
   type LifeChangeRequest,
   type SeatActor,
   type SeatOwner,
@@ -20,7 +24,10 @@ import { nameFailsGate } from "./nameFilter"
 import { tableRules } from "./systems"
 import {
   applyTableAction,
+  seatTable,
   tableActionDelta,
+  tableActionIdentity,
+  tableRelatedSeatId,
   type PlayerTable,
   type PokemonCard,
   type TableAction,
@@ -72,6 +79,12 @@ export interface EngineSeat extends SeatOwner, PlayerTable {
   eventCount?: number
 }
 
+export interface CommanderPair {
+  fromPlayerId: string
+  toPlayerId: string
+  commander?: CommanderSlot
+}
+
 export interface GameEventRecord {
   playerId: string
   operationId: string
@@ -79,6 +92,7 @@ export interface GameEventRecord {
   delta?: number
   fromPlayerId?: string
   toPlayerId?: string
+  commander?: CommanderSlot
   claimOperationId?: string
   actorUserId?: string
   deviceId?: string
@@ -90,11 +104,9 @@ export interface GameEventRecord {
 
 export type ClaimStatus = "pending" | "confirmed" | "declined"
 
-export interface CommanderClaimRecord {
+export interface CommanderClaimRecord extends CommanderPair {
   operationId: string
   resolutionOperationId?: string
-  fromPlayerId: string
-  toPlayerId: string
   delta: number
   status: ClaimStatus
   actorUserId?: string
@@ -128,10 +140,8 @@ export type GameChange =
         >
       >
     }
-  | { kind: "pair.put"; fromPlayerId: string; toPlayerId: string; total: number; updatedAt: number }
+  | (CommanderPair & { kind: "pair.put"; total: number; updatedAt: number })
   | { kind: "designations.set"; designations: TableState["designations"] }
-
-export type RetryMatch = "new" | "duplicate" | EngineError
 
 export interface WriteRequest {
   operationId: string
@@ -139,10 +149,82 @@ export interface WriteRequest {
   clientCreatedAt: number
 }
 
-const isValidOperationId = (operationId: string) => /^[A-Za-z0-9_-]{16,128}$/.test(operationId)
+export type ClaimDecision = "confirmed" | "declined"
+
+export type GameWrite =
+  | (WriteRequest & { kind: "life"; playerId: string; delta: number })
+  | (WriteRequest & { kind: "table"; action: TableAction })
+  | (WriteRequest & {
+      kind: "commander.claim"
+      fromPlayerId: string
+      toPlayerId: string
+      commander?: number
+      delta: number
+    })
+  | (WriteRequest & {
+      kind: "commander.resolve"
+      decision: ClaimDecision
+      resolutionOperationId?: string
+    })
+
+type WriteOf<Kind extends GameWrite["kind"]> = Extract<GameWrite, { kind: Kind }>
+
+export interface GameAck {
+  operationId: string
+  deduplicated: boolean
+  status?: ClaimStatus
+  currentLife?: number
+  total?: number
+}
+
+export type GameWriteResult = { ok: true; ack: GameAck } | { ok: false; error: EngineError }
+
+export type Read<T> = T | Promise<T>
+
+/**
+ * why: reads only see this game, and `pendingClaims` may stop after
+ * MAX_PENDING_COMMANDER_CLAIMS + 1. `beforeNewWrite` runs once a write is known not to be a
+ * retry, so a retry never spends the rate limit.
+ */
+export interface GameStore {
+  readonly game: EngineGame
+  seat(id: string): Read<EngineSeat | undefined>
+  event(operationId: string): Read<GameEventRecord | undefined>
+  claim(operationId: string): Read<CommanderClaimRecord | undefined>
+  pendingClaims(): Read<readonly CommanderPair[]>
+  pairTotal(pair: CommanderPair): Read<number>
+  beforeNewWrite?(): Read<void>
+  apply(changes: readonly GameChange[]): Read<void>
+}
+
+/** why: the nearby host writes synchronously while Convex awaits, so the engine yields each store read and a driver answers it. */
+export type GameSteps<Result> = Generator<Read<unknown>, Result, never>
+
+function* read<T>(answer: Read<T>): Generator<Read<T>, T, T> {
+  return yield answer
+}
+
+export function runSync<Result>(steps: GameSteps<Result>): Result {
+  let step = steps.next()
+  // why: each answer goes back to the read that yielded it, a pairing TypeScript can't follow.
+  while (!step.done) {
+    if (step.value instanceof Promise)
+      throw new Error("A synchronous game store returned a promise")
+    step = steps.next(step.value as never)
+  }
+  return step.value
+}
+
+export async function runAsync<Result>(steps: GameSteps<Result>): Promise<Result> {
+  let step = steps.next()
+  while (!step.done) step = steps.next((await step.value) as never)
+  return step.value
+}
+
+export type RetryMatch = "new" | "duplicate" | EngineError
 
 export const checkOperationId = (operationId: string) =>
-  isValidOperationId(operationId)
+  /^[A-Za-z0-9_-]{16,128}$/.test(operationId)
     ? null
     : writeError("invalid_operation_id", "Invalid operation identifier")
 
@@ -159,28 +241,89 @@ export const checkClientCreatedAt = (clientCreatedAt: number) =>
 const checkWrite = ({ operationId, deviceId, clientCreatedAt }: WriteRequest) =>
   checkOperationId(operationId) ?? checkDeviceId(deviceId) ?? checkClientCreatedAt(clientCreatedAt)
 
-export const checkActive = (game: Pick<EngineGame, "status">) =>
+const checkActive = (game: Pick<EngineGame, "status">) =>
   game.status === "active" ? null : writeError("game_not_active", "Game is not active")
 
-export const authorizeSeat = (
-  seat: EngineSeat | undefined,
+/** why: Convex runs this before it loads the game, so a malformed write fails the same way whether or not its game exists. */
+export function rejectRequest(write: GameWrite): EngineError | null {
+  if (write.kind === "life")
+    return (
+      (isLifeDelta(write.delta)
+        ? null
+        : writeError(
+            "invalid_life_delta",
+            "Life delta must be a non-zero whole number from -999999 to 999999",
+          )) ?? checkWrite(write)
+    )
+  if (write.kind === "table") return checkWrite(write)
+  if (write.kind === "commander.claim")
+    return (
+      (isCommanderDamageDelta(write.delta)
+        ? null
+        : rejected("Commander damage delta must be a non-zero whole number from -99 to 99")) ??
+      (isCommanderSlot(write.commander)
+        ? null
+        : rejected("Commander must be omitted for the first commander or 1 for the partner")) ??
+      checkWrite(write) ??
+      (write.fromPlayerId === write.toPlayerId
+        ? rejected("A commander cannot damage itself")
+        : null)
+    )
+  return (
+    checkOperationId(write.operationId) ??
+    (write.resolutionOperationId === undefined
+      ? null
+      : checkOperationId(write.resolutionOperationId)) ??
+    checkDeviceId(write.deviceId) ??
+    checkClientCreatedAt(write.clientCreatedAt)
+  )
+}
+
+export const rejectForGame = (game: Pick<EngineGame, "system" | "format">, write: GameWrite) =>
+  (write.kind === "commander.claim" || write.kind === "commander.resolve") &&
+  !isCommanderFormat(game.system, game.format)
+    ? rejected("Commander damage is only available in Commander games")
+    : null
+
+const failed = (error: EngineError): GameWriteResult => ({ ok: false, error })
+
+const acknowledged = (ack: GameAck): GameWriteResult => ({ ok: true, ack })
+
+function* ownedSeat(
+  store: GameStore,
+  id: string,
   actor: SeatActor,
   message = "Seat-owner permission required",
-) => (seat && controlsSeat(seat, actor) ? null : writeError("seat_owner_required", message))
+) {
+  const seat = yield* read(store.seat(id))
+  return seat && controlsSeat(seat, actor) ? seat : writeError("seat_owner_required", message)
+}
 
-export const validateLifeChange = (request: WriteRequest & { delta: number }) =>
-  (isLifeDelta(request.delta)
-    ? null
-    : writeError(
-        "invalid_life_delta",
-        "Life delta must be a non-zero whole number from -999999 to 999999",
-      )) ?? checkWrite(request)
+function* admitNewWrite(store: GameStore) {
+  yield* read(store.beforeNewWrite?.())
+}
+
+export function* writeGame(
+  store: GameStore,
+  identity: Omit<SeatActor, "deviceId">,
+  write: GameWrite,
+  now: number,
+): GameSteps<GameWriteResult> {
+  const invalid = rejectRequest(write) ?? rejectForGame(store.game, write)
+  if (invalid) return failed(invalid)
+  const actor = { ...identity, deviceId: write.deviceId }
+  if (write.kind === "life") return yield* writeLife(store, actor, write, now)
+  if (write.kind === "table") return yield* writeTable(store, actor, write, now)
+  if (write.kind === "commander.claim") return yield* writeClaim(store, actor, write, now)
+  return yield* writeResolution(store, actor, write, now)
+}
 
 export function matchLifeRetry(
   previous: GameEventRecord | undefined,
   request: LifeChangeRequest,
 ): RetryMatch {
   if (!previous) return "new"
+  // why: a floored change stores the delta the client sent in `actionIdentity`; matching on the stored delta would turn its retries and status checks into conflicts.
   const delta =
     previous.actionIdentity === undefined ? previous.delta : Number(previous.actionIdentity)
   return previous.kind === "life.changed" && isSameLifeChange({ ...previous, delta }, request)
@@ -219,7 +362,27 @@ export function changeLife(
   return { currentLife, changes }
 }
 
-export const validateTableAction = checkWrite
+function* writeLife(
+  store: GameStore,
+  actor: SeatActor,
+  write: WriteOf<"life">,
+  now: number,
+): GameSteps<GameWriteResult> {
+  const seat = yield* ownedSeat(store, write.playerId, actor)
+  if (isEngineError(seat)) return failed(seat)
+  const { operationId } = write
+  const request = { ...write, playerId: seat.id, actorUserId: actor.userId }
+  const retry = matchLifeRetry(yield* read(store.event(operationId)), request)
+  if (retry === "duplicate")
+    return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
+  if (retry !== "new") return failed(retry)
+  yield* admitNewWrite(store)
+  const inactive = checkActive(store.game)
+  if (inactive) return failed(inactive)
+  const { currentLife, changes } = changeLife(store.game, seat, request, now)
+  yield* read(store.apply(changes))
+  return acknowledged({ operationId, deduplicated: false, currentLife })
+}
 
 function gatedCard<Card extends PokemonCard>(card: Card): Card {
   return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card
@@ -256,17 +419,6 @@ export function gatedTableState(table: TableState): TableState {
   }
 }
 
-export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
-  if (
-    action.kind === "pokemon.knockedOut" ||
-    action.kind === "pokemon.damaged" ||
-    action.kind === "pokemon.checkedUp"
-  )
-    return action.takerPlayerId
-  if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
-  return undefined
-}
-
 export interface TableActionRequest extends WriteRequest {
   actorUserId: string
   action: TableAction
@@ -275,12 +427,12 @@ export interface TableActionRequest extends WriteRequest {
 
 export function matchTableRetry(
   previous: GameEventRecord | undefined,
-  seat: EngineSeat,
+  playerId: string,
   request: TableActionRequest,
 ): RetryMatch {
   if (!previous) return "new"
   return previous.kind === request.action.kind &&
-    previous.playerId === seat.id &&
+    previous.playerId === playerId &&
     previous.actionIdentity === request.actionIdentity &&
     previous.actorUserId === request.actorUserId &&
     previous.deviceId === request.deviceId &&
@@ -288,11 +440,6 @@ export function matchTableRetry(
     ? "duplicate"
     : MISMATCH
 }
-
-const playerTableOfSeat = (seat: EngineSeat): PlayerTable => ({
-  ...(seat.counters ? { counters: seat.counters } : {}),
-  ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
-})
 
 export function changeTable(
   game: EngineGame,
@@ -306,7 +453,7 @@ export function changeTable(
   if (related) rows.set(related.id, related)
   const table: TableState = {
     designations: game.designations,
-    players: Object.fromEntries([...rows.values()].map((row) => [row.id, playerTableOfSeat(row)])),
+    players: Object.fromEntries([...rows.values()].map((row) => [row.id, seatTable(row)])),
   }
   const result = applyTableAction(table, action, {
     rules: tableRules(game.system, game.format),
@@ -364,62 +511,58 @@ export function changeTable(
   return { changes }
 }
 
-export const checkCommanderGame = (game: Pick<EngineGame, "system" | "format">) =>
-  isCommanderFormat(game.system, game.format)
-    ? null
-    : rejected("Commander damage is only available in Commander games")
-
-export const validateCommanderClaim = (
-  request: WriteRequest & { delta: number; fromPlayerId: string; toPlayerId: string },
-) =>
-  (isCommanderDamageDelta(request.delta)
-    ? null
-    : rejected("Commander damage delta must be a non-zero whole number from -99 to 99")) ??
-  checkWrite(request) ??
-  (request.fromPlayerId === request.toPlayerId
-    ? rejected("A commander cannot damage itself")
-    : null)
-
-export const checkClaimTarget = (target: EngineSeat | undefined) =>
-  target ? null : rejected("Commander damage target must belong to this game")
-
-export function matchClaimRetry(
-  existing: CommanderClaimRecord | undefined,
-  eventWithOperation: GameEventRecord | undefined,
-  request: CommanderClaimRequest,
-): RetryMatch {
-  if (existing) return isSameCommanderClaim(existing, request) ? "duplicate" : MISMATCH
-  return eventWithOperation ? MISMATCH : "new"
+function* writeTable(
+  store: GameStore,
+  actor: SeatActor,
+  write: WriteOf<"table">,
+  now: number,
+): GameSteps<GameWriteResult> {
+  const action = gatedTableAction(write.action)
+  const seat = yield* ownedSeat(store, action.playerId, actor)
+  if (isEngineError(seat)) return failed(seat)
+  const { operationId } = write
+  const request = {
+    ...write,
+    action,
+    actorUserId: actor.userId,
+    // why: identity comes from the action as sent, so a retry matches even when the name gate trimmed what was stored.
+    actionIdentity: tableActionIdentity(write.action),
+  }
+  const retry = matchTableRetry(yield* read(store.event(operationId)), seat.id, request)
+  if (retry === "duplicate") return acknowledged({ operationId, deduplicated: true })
+  if (retry !== "new") return failed(retry)
+  yield* admitNewWrite(store)
+  const inactive = checkActive(store.game)
+  if (inactive) return failed(inactive)
+  const relatedId = tableRelatedSeatId(action, seat)
+  const related = relatedId === undefined ? undefined : yield* read(store.seat(relatedId))
+  const outcome = changeTable(store.game, seat, related, request, now)
+  if (isEngineError(outcome)) return failed(outcome)
+  yield* read(store.apply(outcome.changes))
+  return acknowledged({ operationId, deduplicated: false })
 }
 
 export const declinedClaimOperationId = (operationId: string) => `${operationId}_declined`
 
+const isSamePair = (left: CommanderPair, right: CommanderPair) =>
+  left.fromPlayerId === right.fromPlayerId &&
+  left.toPlayerId === right.toPlayerId &&
+  left.commander === right.commander
+
 export function submitClaim(
-  state: {
-    total: number
-    pending: readonly Pick<CommanderClaimRecord, "fromPlayerId" | "toPlayerId">[]
-    declinedEventExists: boolean
-  },
+  pair: CommanderPair,
+  status: "pending" | "declined",
   target: EngineSeat,
   request: CommanderClaimRequest,
   now: number,
-): { status: ClaimStatus; changes: GameChange[] } | EngineError {
-  const declined =
-    commanderClaimOutcome({
-      total: state.total,
-      delta: request.delta,
-      pendingClaims: state.pending.length,
-      pairHasPendingClaim: state.pending.some(
-        (claim) => claim.fromPlayerId === request.fromPlayerId && claim.toPlayerId === target.id,
-      ),
-    }) === "declined"
-  if (declined && state.declinedEventExists) return MISMATCH
-  const status: ClaimStatus = declined ? "declined" : "pending"
+): GameChange[] {
+  const declined = status === "declined"
   const event = {
     playerId: target.id,
     delta: request.delta,
-    fromPlayerId: request.fromPlayerId,
+    fromPlayerId: pair.fromPlayerId,
     toPlayerId: target.id,
+    ...commanderField(pair.commander),
     claimOperationId: request.operationId,
     clientCreatedAt: request.clientCreatedAt,
     serverCreatedAt: now,
@@ -429,8 +572,9 @@ export function submitClaim(
       kind: "claim.insert",
       claim: {
         operationId: request.operationId,
-        fromPlayerId: request.fromPlayerId,
+        fromPlayerId: pair.fromPlayerId,
         toPlayerId: target.id,
+        ...commanderField(pair.commander),
         delta: request.delta,
         status,
         actorUserId: request.actorUserId,
@@ -465,34 +609,54 @@ export function submitClaim(
     seatId: target.id,
     patch: { eventCount: (target.eventCount ?? 0) + (declined ? 2 : 1), lastEventAt: now },
   })
-  return { status, changes }
+  return changes
 }
 
-export type ClaimDecision = "confirmed" | "declined"
+function* writeClaim(
+  store: GameStore,
+  actor: SeatActor,
+  write: WriteOf<"commander.claim">,
+  now: number,
+): GameSteps<GameWriteResult> {
+  const inactive = checkActive(store.game)
+  if (inactive) return failed(inactive)
+  const source = yield* ownedSeat(
+    store,
+    write.fromPlayerId,
+    actor,
+    "Seat-owner permission required for the attacking seat",
+  )
+  if (isEngineError(source)) return failed(source)
+  const target = yield* read(store.seat(write.toPlayerId))
+  if (!target) return failed(rejected("Commander damage target must belong to this game"))
+  const { operationId } = write
+  const commander = write.commander === PARTNER_COMMANDER ? PARTNER_COMMANDER : undefined
+  const request = { ...write, commander, actorUserId: actor.userId }
+  const existing = yield* read(store.claim(operationId))
+  if (existing)
+    return isSameCommanderClaim(existing, request)
+      ? acknowledged({ operationId, deduplicated: true, status: existing.status })
+      : failed(MISMATCH)
+  if (yield* read(store.event(operationId))) return failed(MISMATCH)
+  yield* admitNewWrite(store)
+  const pair: CommanderPair = { fromPlayerId: source.id, toPlayerId: target.id, commander }
+  const total = yield* read(store.pairTotal(pair))
+  const pending = yield* read(store.pendingClaims())
+  const status = commanderClaimOutcome({
+    total,
+    delta: write.delta,
+    pendingClaims: pending.length,
+    pairHasPendingClaim: pending.some((claim) => isSamePair(claim, pair)),
+  })
+  if (status === "declined" && (yield* read(store.event(declinedClaimOperationId(operationId)))))
+    return failed(MISMATCH)
+  yield* read(store.apply(submitClaim(pair, status, target, request, now)))
+  return acknowledged({ operationId, deduplicated: false, status })
+}
 
 export interface ResolutionRequest extends WriteRequest {
   actorUserId: string
   resolutionOperationId?: string
-}
-
-export const validateResolution = (request: ResolutionRequest) =>
-  checkOperationId(request.operationId) ??
-  (request.resolutionOperationId === undefined
-    ? null
-    : checkOperationId(request.resolutionOperationId)) ??
-  checkDeviceId(request.deviceId) ??
-  checkClientCreatedAt(request.clientCreatedAt)
-
-export function checkResolutionBinding(
-  claim: CommanderClaimRecord | undefined,
-  request: ResolutionRequest,
-): EngineError | null {
-  if (!claim) return rejected("Commander damage claim not found")
-  return request.resolutionOperationId &&
-    claim.resolutionOperationId &&
-    claim.resolutionOperationId !== request.resolutionOperationId
-    ? MISMATCH
-    : null
 }
 
 export const resolutionEventIds = (claim: CommanderClaimRecord) => [
@@ -500,30 +664,23 @@ export const resolutionEventIds = (claim: CommanderClaimRecord) => [
   `${claim.operationId}_${claim.status}`,
 ]
 
-export function matchResolutionRetry(
+function* recordedResolution(store: GameStore, claim: CommanderClaimRecord) {
+  for (const operationId of resolutionEventIds(claim)) {
+    const event = yield* read(store.event(operationId))
+    if (event) return event
+  }
+  return undefined
+}
+
+export function rebindResolution(
   claim: CommanderClaimRecord,
-  decision: ClaimDecision,
-  events: {
-    withResolutionId: GameEventRecord | undefined
-    recorded: GameEventRecord | undefined
-  },
-  request: ResolutionRequest,
-): "new" | { changes: GameChange[] } | EngineError {
+  recorded: GameEventRecord | undefined,
+  request: ResolutionRequest & { resolutionOperationId: string },
+): GameChange[] | EngineError {
   const { resolutionOperationId } = request
   if (
-    resolutionOperationId &&
-    events.withResolutionId &&
-    (events.withResolutionId.claimOperationId !== claim.operationId ||
-      events.withResolutionId.kind !== `commanderDamage.${decision}`)
-  )
-    return MISMATCH
-  if (claim.status === "pending") return "new"
-  if (!resolutionOperationId) return { changes: [] }
-  if (claim.status !== decision) return MISMATCH
-  const event = events.recorded
-  if (
-    !event ||
-    !isSameCommanderResolution(event, {
+    !recorded ||
+    !isSameCommanderResolution(recorded, {
       kind: `commanderDamage.${claim.status}`,
       claimOperationId: claim.operationId,
       defenderPlayerId: claim.toPlayerId,
@@ -540,9 +697,13 @@ export function matchResolutionRetry(
       operationId: claim.operationId,
       patch: { resolutionOperationId },
     })
-  if (event.operationId !== resolutionOperationId)
-    changes.push({ kind: "event.rekey", operationId: event.operationId, to: resolutionOperationId })
-  return { changes }
+  if (recorded.operationId !== resolutionOperationId)
+    changes.push({
+      kind: "event.rekey",
+      operationId: recorded.operationId,
+      to: resolutionOperationId,
+    })
+  return changes
 }
 
 export function resolveClaim(
@@ -560,6 +721,7 @@ export function resolveClaim(
     delta: claim.delta,
     fromPlayerId: claim.fromPlayerId,
     toPlayerId: claim.toPlayerId,
+    ...commanderField(claim.commander),
     claimOperationId: claim.operationId,
     actorUserId: request.actorUserId,
     deviceId: request.deviceId,
@@ -603,6 +765,7 @@ export function resolveClaim(
         kind: "pair.put",
         fromPlayerId: claim.fromPlayerId,
         toPlayerId: claim.toPlayerId,
+        ...commanderField(claim.commander),
         total,
         updatedAt: now,
       },
@@ -614,4 +777,67 @@ export function resolveClaim(
       settled,
     ],
   }
+}
+
+function* writeResolution(
+  store: GameStore,
+  actor: SeatActor,
+  write: WriteOf<"commander.resolve">,
+  now: number,
+): GameSteps<GameWriteResult> {
+  const claim = yield* read(store.claim(write.operationId))
+  if (!claim) return failed(rejected("Commander damage claim not found"))
+  const { decision, resolutionOperationId } = write
+  if (
+    resolutionOperationId &&
+    claim.resolutionOperationId &&
+    claim.resolutionOperationId !== resolutionOperationId
+  )
+    return failed(MISMATCH)
+  const target = yield* ownedSeat(
+    store,
+    claim.toPlayerId,
+    actor,
+    "Seat-owner permission required for the defending seat",
+  )
+  if (isEngineError(target)) return failed(target)
+  const request = { ...write, actorUserId: actor.userId }
+  if (resolutionOperationId) {
+    const bound = yield* read(store.event(resolutionOperationId))
+    if (
+      bound &&
+      (bound.claimOperationId !== claim.operationId || bound.kind !== `commanderDamage.${decision}`)
+    )
+      return failed(MISMATCH)
+  }
+  const operationId = resolutionOperationId ?? claim.operationId
+  if (claim.status !== "pending") {
+    if (resolutionOperationId) {
+      if (claim.status !== decision) return failed(MISMATCH)
+      const rebound = rebindResolution(claim, yield* recordedResolution(store, claim), {
+        ...request,
+        resolutionOperationId,
+      })
+      if (isEngineError(rebound)) return failed(rebound)
+      yield* read(store.apply(rebound))
+    }
+    const replayed = { operationId, deduplicated: true, status: claim.status }
+    if (decision !== "confirmed" || claim.status !== "confirmed") return acknowledged(replayed)
+    const total = yield* read(store.pairTotal(claim))
+    return acknowledged({ ...replayed, total, currentLife: target.currentLife })
+  }
+  yield* admitNewWrite(store)
+  const inactive = checkActive(store.game)
+  if (inactive) return failed(inactive)
+  const pairTotal = decision === "confirmed" ? yield* read(store.pairTotal(claim)) : 0
+  const outcome = resolveClaim(claim, decision, pairTotal, target, request, now)
+  if (isEngineError(outcome)) return failed(outcome)
+  yield* read(store.apply(outcome.changes))
+  const { total, currentLife } = outcome
+  return acknowledged({
+    operationId,
+    deduplicated: false,
+    status: decision,
+    ...(total === undefined ? {} : { total, currentLife }),
+  })
 }

@@ -53,6 +53,7 @@ import type * as lib_events_standings from "../lib/events/standings.js";
 import type * as lib_events_validators from "../lib/events/validators.js";
 import type * as lib_feedback from "../lib/feedback.js";
 import type * as lib_gameEngine from "../lib/gameEngine.js";
+import type * as lib_gameEngineConvex from "../lib/gameEngineConvex.js";
 import type * as lib_gameEngineMemory from "../lib/gameEngineMemory.js";
 import type * as lib_gameRateLimits from "../lib/gameRateLimits.js";
 import type * as lib_gameRules from "../lib/gameRules.js";
@@ -150,6 +151,7 @@ declare const fullApi: ApiFromModules<{
   "lib/events/validators": typeof lib_events_validators;
   "lib/feedback": typeof lib_feedback;
   "lib/gameEngine": typeof lib_gameEngine;
+  "lib/gameEngineConvex": typeof lib_gameEngineConvex;
   "lib/gameEngineMemory": typeof lib_gameEngineMemory;
   "lib/gameRateLimits": typeof lib_gameRateLimits;
   "lib/gameRules": typeof lib_gameRules;

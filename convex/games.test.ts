@@ -2666,6 +2666,23 @@ describe("Convex game write rate limits", () => {
     ).resolves.toBeDefined()
   })
 
+  it("rate-limits a new change before checking that the game is still active", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    for (let index = 0; index < 60; index += 1)
+      await game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, `ended-burst-operation-${index}`, -1),
+      )
+    await game.host.mutation(api.games.finishGame, { publicId: game.publicId })
+    await expect(
+      game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, "ended-burst-over", -1),
+      ),
+    ).rejects.toMatchObject({ data: { code: "rate_limited" } })
+  })
+
   it("rate-limits table actions the same way and still acknowledges a replay", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

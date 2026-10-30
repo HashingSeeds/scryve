@@ -24,25 +24,34 @@ import { limitResultRate } from "./lib/deckRateLimits"
 import { canonicalResultId } from "./lib/deckResults"
 import { deckStartingValue } from "./lib/deckStartingValue"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
-import { gatedTableAction, gatedTableState, tableRelatedSeatId } from "./lib/gameEngine"
+import {
+  checkClientCreatedAt,
+  checkDeviceId,
+  checkOperationId,
+  engineGameOf,
+  gatedTableState,
+  matchLifeRetry,
+  matchTableRetry,
+  rejectForGame,
+  rejectRequest,
+  resolutionEventIds,
+  type ClaimDecision,
+  type GameWrite,
+} from "./lib/gameEngine"
+import { storedDesignations, throwIfRejected, writeCloudGame } from "./lib/gameEngineConvex"
 import { limitGameRate } from "./lib/gameRateLimits"
 import {
-  applyLifeChange,
-  commanderClaimOutcome,
-  confirmCommanderClaim,
-  controlsSeat,
-  isCommanderDamageDelta,
-  isCommanderSlot,
+  commanderField,
   commanderLethalDamage,
   isCommanderFormat,
+  isCommanderSlot,
   isLifeDelta,
   isSameCommanderClaim,
   isSameCommanderResolution,
-  isSameLifeChange,
   MAX_COMMANDER_DAMAGE,
   MAX_PENDING_COMMANDER_CLAIMS,
   MAX_SNAPSHOT_LIFE,
-  type PARTNER_COMMANDER,
+  type CommanderSlot,
 } from "./lib/gameRules"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
@@ -83,16 +92,14 @@ import { recordGameResults, recordPlayerResult, refreshGameOpponents } from "./l
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
 import { startingValueRange, systemDefinition, tableRules } from "./lib/systems"
 import {
-  applyTableAction as reduceTableAction,
   canonicalJson,
   isValidTableSnapshot,
   remapTableState,
-  tableActionDelta,
+  seatTable,
   tableActionIdentity,
   tableForVersion,
   tableStateValidator,
   tableActionValidator,
-  type PlayerTable,
   type TableState,
 } from "./lib/table"
 import {
@@ -141,44 +148,9 @@ function assertLifeDelta(delta: number) {
     throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
 }
 
-function assertGameWriteLifeDelta(delta: number) {
-  if (!isLifeDelta(delta))
-    throw gameWriteError(
-      "invalid_life_delta",
-      "Life delta must be a non-zero whole number from -999999 to 999999",
-    )
-}
-
-function assertCommanderDelta(delta: number) {
-  if (!isCommanderDamageDelta(delta))
-    throw new Error("Commander damage delta must be a non-zero whole number from -99 to 99")
-}
-
-type CommanderSlot = typeof PARTNER_COMMANDER | undefined
-
 function assertCommanderSlot(commander: number | undefined): asserts commander is CommanderSlot {
   if (!isCommanderSlot(commander))
     throw new Error("Commander must be omitted for the first commander or 1 for the partner")
-}
-
-function commanderField(commander: CommanderSlot) {
-  return commander === undefined ? {} : { commander }
-}
-
-async function commanderDamageRow(
-  ctx: QueryCtx,
-  pair: Pick<Doc<"gameCommanderClaims">, "gameId" | "fromPlayerId" | "toPlayerId" | "commander">,
-) {
-  return await ctx.db
-    .query("gameCommanderDamage")
-    .withIndex("by_game_pair_and_commander", (q) =>
-      q
-        .eq("gameId", pair.gameId)
-        .eq("fromPlayerId", pair.fromPlayerId)
-        .eq("toPlayerId", pair.toPlayerId)
-        .eq("commander", pair.commander),
-    )
-    .unique()
 }
 
 function gameCommanderLethal(game: Doc<"games">) {
@@ -188,39 +160,12 @@ function gameCommanderLethal(game: Doc<"games">) {
   )
 }
 
-function isCommanderGame(game: Doc<"games">) {
-  return gameCommanderLethal(game) !== undefined
-}
-
-function assertCommanderGame(game: Doc<"games">) {
-  if (!isCommanderGame(game))
-    throw new Error("Commander damage is only available in Commander games")
-}
-
-function isValidOperationId(operationId: string) {
-  return /^[A-Za-z0-9_-]{16,128}$/.test(operationId)
-}
-
 function assertOperationId(operationId: string) {
-  if (!isValidOperationId(operationId)) throw new Error("Invalid operation identifier")
-}
-
-function assertGameWriteOperationId(operationId: string) {
-  if (!isValidOperationId(operationId))
-    throw gameWriteError("invalid_operation_id", "Invalid operation identifier")
-}
-
-function isValidDeviceId(deviceId: string) {
-  return /^[A-Za-z0-9_-]{8,128}$/.test(deviceId)
+  if (checkOperationId(operationId)) throw new Error("Invalid operation identifier")
 }
 
 function assertDeviceId(deviceId: string) {
-  if (!isValidDeviceId(deviceId)) throw new Error("Invalid device identifier")
-}
-
-function assertGameWriteDeviceId(deviceId: string) {
-  if (!isValidDeviceId(deviceId))
-    throw gameWriteError("invalid_device_id", "Invalid device identifier")
+  if (checkDeviceId(deviceId)) throw new Error("Invalid device identifier")
 }
 
 function gameUnavailable() {
@@ -232,13 +177,6 @@ function appearanceTaken() {
     code: "appearance_taken",
     message: "Another player already claimed that color or shape",
   })
-}
-
-function syncOperationMismatch() {
-  return gameWriteError(
-    "sync_operation_mismatch",
-    "Operation identifier was reused with different data",
-  )
 }
 
 function assertLocalId(localId: string) {
@@ -1341,7 +1279,7 @@ export const publishLocalGame = mutation({
       )
       for (const [playerId, player] of Object.entries(table.players)) {
         const id = ctx.db.normalizeId("gamePlayers", playerId)
-        if (id) await ctx.db.patch(id, playerTableFromRow(player))
+        if (id) await ctx.db.patch(id, seatTable(player))
       }
       if (Object.keys(table.designations).length > 0)
         await ctx.db.patch(gameId, { designations: storedDesignations(ctx, table.designations) })
@@ -2011,7 +1949,7 @@ function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
 function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): TableState {
   return {
     designations: game.designations ?? {},
-    players: Object.fromEntries(players.map((player) => [player._id, playerTableFromRow(player)])),
+    players: Object.fromEntries(players.map((player) => [player._id, seatTable(player)])),
   }
 }
 
@@ -2036,18 +1974,19 @@ async function statusForOperation(
   projectionEventSequence: number,
   operation: Infer<typeof connectedOperation>,
 ) {
-  assertOperationId(operation.operationId)
-  if (operation.kind === "commanderDamage.resolved") assertOperationId(operation.claimOperationId)
-  assertDeviceId(operation.deviceId)
-  if (!Number.isSafeInteger(operation.clientCreatedAt) || operation.clientCreatedAt < 0)
-    throw new Error("Invalid client timestamp")
-  if (operation.kind === "life.changed") assertLifeDelta(operation.delta)
-  if (operation.kind === "commanderDamage.submitted") {
-    assertCommanderDelta(operation.delta)
-    assertCommanderSlot(operation.commander)
-    if (operation.fromPlayerId === operation.toPlayerId)
-      throw new Error("A commander cannot damage itself")
-  }
+  const invalid =
+    checkOperationId(operation.operationId) ??
+    (operation.kind === "commanderDamage.resolved"
+      ? checkOperationId(operation.claimOperationId)
+      : null) ??
+    checkDeviceId(operation.deviceId) ??
+    checkClientCreatedAt(operation.clientCreatedAt) ??
+    (operation.kind === "life.changed"
+      ? rejectRequest({ ...operation, kind: "life" })
+      : operation.kind === "commanderDamage.submitted"
+        ? rejectRequest({ ...operation, kind: "commander.claim" })
+        : null)
+  if (invalid) throw new Error(invalid.message)
   const conflict = (reason: string) => ({
     status: "conflict" as const,
     operationId: operation.operationId,
@@ -2062,6 +2001,7 @@ async function statusForOperation(
     operationId: operation.operationId,
     projectionEventSequence,
   })
+  const reused = "Operation identifier was reused with different data"
 
   if (operation.kind === "commanderDamage.resolved") {
     const claim = await ctx.db
@@ -2071,29 +2011,24 @@ async function statusForOperation(
       )
       .unique()
     if (!claim) return notFound()
-    const expectedStatus = operation.accepted ? "confirmed" : "declined"
-    if (claim.status === "pending") return notFound()
-    if (claim.status !== expectedStatus)
-      return conflict(
-        "Operation identifier was reused with different data: Commander damage claim was resolved differently",
-      )
-    if (!claim.resolutionOperationId) return notFound()
-    if (claim.resolutionOperationId !== operation.operationId)
-      return conflict("Operation identifier was reused with different data")
     const decision = operation.accepted ? "confirmed" : "declined"
+    if (claim.status === "pending") return notFound()
+    if (claim.status !== decision)
+      return conflict(`${reused}: Commander damage claim was resolved differently`)
+    if (!claim.resolutionOperationId) return notFound()
+    if (claim.resolutionOperationId !== operation.operationId) return conflict(reused)
     const event = await commanderResolutionEvent(ctx, claim)
     if (!event) return notFound()
-    if (
-      event.kind !== `commanderDamage.${decision}` ||
-      event.claimOperationId !== operation.claimOperationId ||
-      event.playerId !== operation.toPlayerId ||
-      event.toPlayerId !== operation.toPlayerId ||
-      event.actorUserId !== user._id ||
-      event.deviceId !== operation.deviceId ||
-      event.clientCreatedAt !== operation.clientCreatedAt
-    )
-      return conflict("Operation identifier was reused with different data")
-    return acknowledged()
+    return isSameCommanderResolution(event, {
+      kind: `commanderDamage.${decision}`,
+      claimOperationId: operation.claimOperationId,
+      defenderPlayerId: operation.toPlayerId,
+      actorUserId: user._id,
+      deviceId: operation.deviceId,
+      clientCreatedAt: operation.clientCreatedAt,
+    })
+      ? acknowledged()
+      : conflict(reused)
   }
 
   const event = await ctx.db
@@ -2103,24 +2038,17 @@ async function statusForOperation(
     )
     .unique()
   if (!event) return notFound()
+  const request = { ...operation, actorUserId: user._id }
   const matches =
-    event.actorUserId === user._id &&
-    event.deviceId === operation.deviceId &&
-    event.clientCreatedAt === operation.clientCreatedAt &&
-    (operation.kind === "life.changed"
-      ? event.kind === "life.changed" &&
-        event.playerId === operation.playerId &&
-        requestedLifeDelta(event) === operation.delta
-      : operation.kind === "table.action"
-        ? event.kind === operation.action.kind &&
-          event.playerId === operation.action.playerId &&
-          event.actionIdentity === tableActionIdentity(operation.action)
-        : event.kind === "commanderDamage.claimed" &&
-          event.fromPlayerId === operation.fromPlayerId &&
-          event.toPlayerId === operation.toPlayerId &&
-          event.commander === operation.commander &&
-          event.delta === operation.delta)
-  return matches ? acknowledged() : conflict("Operation identifier was reused with different data")
+    request.kind === "life.changed"
+      ? matchLifeRetry(event, request) === "duplicate"
+      : request.kind === "table.action"
+        ? matchTableRetry(event, request.action.playerId, {
+            ...request,
+            actionIdentity: tableActionIdentity(request.action),
+          }) === "duplicate"
+        : event.kind === "commanderDamage.claimed" && isSameCommanderClaim(event, request)
+  return matches ? acknowledged() : conflict(reused)
 }
 
 export const setMyAppearance = mutation({
@@ -2396,9 +2324,11 @@ export const rotateInvite = mutation({
   },
 })
 
-/** why: a floored change stores the delta the client sent in `actionIdentity`; matching on the stored delta would turn its retries and status checks into conflicts. */
-function requestedLifeDelta(event: Doc<"gameEvents">) {
-  return event.actionIdentity === undefined ? event.delta : Number(event.actionIdentity)
+async function gameForWrite(ctx: MutationCtx, publicId: string, write: GameWrite) {
+  throwIfRejected(rejectRequest(write))
+  const game = await gameByPublicId(ctx, publicId)
+  throwIfRejected(rejectForGame(engineGameOf(game), write))
+  return game
 }
 
 export const changeLife = mutation({
@@ -2410,111 +2340,24 @@ export const changeLife = mutation({
     deviceId: v.string(),
     clientCreatedAt: v.number(),
   },
-  handler: async (ctx, args) => {
-    assertGameWriteLifeDelta(args.delta)
-    assertGameWriteOperationId(args.operationId)
-    assertGameWriteDeviceId(args.deviceId)
-    if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
-
-    const game = await gameByPublicId(ctx, args.publicId)
-    const user = await requireUser(ctx)
-    const membership = await ctx.db
-      .query("gamePlayers")
-      .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
-      .first()
-    if (!membership) throw gameWriteError("game_membership_required", "Game membership required")
-    const target = membership._id === args.playerId ? membership : await ctx.db.get(args.playerId)
-    if (
-      !target ||
-      target.gameId !== game._id ||
-      !controlsSeat(target, {
-        userId: user._id,
-        deviceId: args.deviceId,
-        isHost: game.hostUserId === user._id,
-      })
-    )
-      throw gameWriteError("seat_owner_required", "Seat-owner permission required")
-
-    const duplicate = await ctx.db
-      .query("gameEvents")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", args.operationId),
-      )
-      .unique()
-    if (duplicate) {
-      const request = {
-        playerId: target._id,
-        actorUserId: user._id,
-        delta: args.delta,
-        deviceId: args.deviceId,
-        clientCreatedAt: args.clientCreatedAt,
-      }
-      const recorded = { ...duplicate, delta: requestedLifeDelta(duplicate) }
-      if (duplicate.kind !== "life.changed" || !isSameLifeChange(recorded, request))
-        throw syncOperationMismatch()
-      return {
-        operationId: duplicate.operationId,
-        eventId: duplicate._id,
-        sequence: duplicate.sequence ?? null,
-        currentLife: target.currentLife,
-        deduplicated: true,
-      }
-    }
-    await limitGameRate(ctx, "gameWrite", user._id)
-    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
-
-    const now = Date.now()
-    const { delta, currentLife } = applyLifeChange(
-      game.system ?? game.game ?? DEFAULT_DECK_GAME,
-      target.currentLife,
-      args.delta,
-    )
-    const eventId = await ctx.db.insert("gameEvents", {
-      gameId: game._id,
-      playerId: target._id,
-      operationId: args.operationId,
-      kind: "life.changed",
-      ...(delta === 0 ? {} : { delta }),
-      ...(delta === args.delta ? {} : { actionIdentity: String(args.delta) }),
-      actorUserId: user._id,
-      deviceId: args.deviceId,
-      clientCreatedAt: args.clientCreatedAt,
-      serverCreatedAt: now,
-    })
-    await ctx.db.patch(target._id, {
-      currentLife,
-      eventCount: (target.eventCount ?? 0) + 1,
-      lastEventAt: now,
-    })
+  handler: async (ctx, { publicId, ...sent }) => {
+    const write: GameWrite = { kind: "life", ...sent }
+    const game = await gameForWrite(ctx, publicId, write)
+    const { user, player } = await requireMembership(ctx, game._id)
+    const { ack, eventOf } = await writeCloudGame(ctx, game, user, write, [player])
+    const event = await eventOf(ack.operationId)
     return {
-      operationId: args.operationId,
-      eventId,
-      sequence: null,
-      currentLife,
-      deduplicated: false,
+      operationId: ack.operationId,
+      eventId: event._id,
+      sequence: event.sequence ?? null,
+      currentLife: ack.currentLife,
+      deduplicated: ack.deduplicated,
     }
   },
 })
 
 function gameTableRules(game: Doc<"games">) {
   return tableRules(game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset)
-}
-
-function storedDesignations(ctx: QueryCtx, designations: TableState["designations"]) {
-  const stored: Record<string, Id<"gamePlayers">> = {}
-  for (const [designationId, holder] of Object.entries(designations)) {
-    const holderId = ctx.db.normalizeId("gamePlayers", holder)
-    if (holderId) stored[designationId] = holderId
-  }
-  return stored
-}
-
-function playerTableFromRow(player: PlayerTable): PlayerTable {
-  return {
-    ...(player.counters ? { counters: player.counters } : {}),
-    ...(player.pokemon ? { pokemon: player.pokemon } : {}),
-  }
 }
 
 export const tableAction = mutation({
@@ -2525,135 +2368,18 @@ export const tableAction = mutation({
     clientCreatedAt: v.number(),
     action: tableActionValidator,
   },
-  handler: async (ctx, args) => {
-    assertGameWriteOperationId(args.operationId)
-    assertGameWriteDeviceId(args.deviceId)
-    if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
-    const action = gatedTableAction(args.action)
-
-    const game = await gameByPublicId(ctx, args.publicId)
+  handler: async (ctx, { publicId, ...sent }) => {
+    const write: GameWrite = { kind: "table", ...sent }
+    const game = await gameForWrite(ctx, publicId, write)
     const user = await requireUser(ctx)
-    const actorId = ctx.db.normalizeId("gamePlayers", action.playerId)
-    const actor = actorId ? await ctx.db.get(actorId) : null
-    if (
-      !actor ||
-      actor.gameId !== game._id ||
-      !controlsSeat(actor, {
-        userId: user._id,
-        deviceId: args.deviceId,
-        isHost: game.hostUserId === user._id,
-      })
-    )
-      throw gameWriteError("seat_owner_required", "Seat-owner permission required")
-
-    // why: identity comes from the action as sent, so a retry matches even when the name gate trimmed what was stored.
-    const actionIdentity = tableActionIdentity(args.action)
-    const actionDelta = tableActionDelta(action)
-    const duplicate = await ctx.db
-      .query("gameEvents")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", args.operationId),
-      )
-      .unique()
-    if (duplicate) {
-      if (
-        duplicate.kind !== action.kind ||
-        duplicate.playerId !== actor._id ||
-        duplicate.actionIdentity !== actionIdentity ||
-        duplicate.actorUserId !== user._id ||
-        duplicate.deviceId !== args.deviceId ||
-        duplicate.clientCreatedAt !== args.clientCreatedAt
-      )
-        throw syncOperationMismatch()
-      return { operationId: duplicate.operationId, eventId: duplicate._id, deduplicated: true }
+    const { ack, eventOf } = await writeCloudGame(ctx, game, user, write)
+    return {
+      operationId: ack.operationId,
+      eventId: (await eventOf(ack.operationId))._id,
+      deduplicated: ack.deduplicated,
     }
-    await limitGameRate(ctx, "gameWrite", user._id)
-    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
-
-    const rows = new Map<string, Doc<"gamePlayers">>([[actor._id, actor]])
-    const relatedId = ctx.db.normalizeId("gamePlayers", tableRelatedSeatId(action, actor) ?? "")
-    const related = relatedId ? await ctx.db.get(relatedId) : null
-    if (related?.gameId === game._id) rows.set(related._id, related)
-    const table: TableState = {
-      designations: game.designations ?? {},
-      players: Object.fromEntries(
-        [...rows.values()].map((row) => [row._id, playerTableFromRow(row)]),
-      ),
-    }
-    const result = reduceTableAction(table, action, {
-      rules: gameTableRules(game),
-      operationId: args.operationId,
-      lifeOf: (playerId) => rows.get(playerId)?.currentLife,
-    })
-    if (!result) throw gameWriteError("invalid_table_action", "This table change no longer applies")
-
-    const now = Date.now()
-    for (const row of rows.values()) {
-      const before = table.players[row._id]
-      const after = result.table.players[row._id]
-      const lifeDelta = result.life
-        .filter((change) => change.playerId === row._id)
-        .reduce((total, change) => total + change.delta, 0)
-      const isActor = row._id === actor._id
-      if (!isActor && after === before && lifeDelta === 0) continue
-      await ctx.db.patch(row._id, {
-        ...(after === before ? {} : { counters: after?.counters, pokemon: after?.pokemon }),
-        ...(lifeDelta === 0 ? {} : { currentLife: row.currentLife + lifeDelta }),
-        ...(isActor ? { eventCount: (row.eventCount ?? 0) + 1 } : {}),
-        lastEventAt: now,
-      })
-    }
-    if (result.table.designations !== table.designations)
-      await ctx.db.patch(game._id, {
-        designations: storedDesignations(ctx, result.table.designations),
-      })
-
-    const lifeChange = result.life[0]
-    const lifeChangeTarget = lifeChange && ctx.db.normalizeId("gamePlayers", lifeChange.playerId)
-    const eventId = await ctx.db.insert("gameEvents", {
-      gameId: game._id,
-      playerId: actor._id,
-      operationId: args.operationId,
-      kind: action.kind,
-      actionIdentity,
-      ...(lifeChange && lifeChangeTarget
-        ? { toPlayerId: lifeChangeTarget, delta: lifeChange.delta }
-        : actionDelta === undefined
-          ? {}
-          : { delta: actionDelta }),
-      ...(action.kind === "pokemon.knockoutUndone"
-        ? { undoOfOperationId: action.knockoutOperationId }
-        : {}),
-      actorUserId: user._id,
-      deviceId: args.deviceId,
-      clientCreatedAt: args.clientCreatedAt,
-      serverCreatedAt: now,
-    })
-    return { operationId: args.operationId, eventId, deduplicated: false }
   },
 })
-
-async function commanderPlayerForWrite(
-  ctx: MutationCtx,
-  game: Doc<"games">,
-  playerId: Id<"gamePlayers">,
-  user: Doc<"users">,
-  deviceId: string,
-  label: "source" | "target",
-) {
-  const player = await ctx.db.get(playerId)
-  if (
-    !player ||
-    player.gameId !== game._id ||
-    !controlsSeat(player, { userId: user._id, deviceId, isHost: game.hostUserId === user._id })
-  )
-    throw gameWriteError(
-      "seat_owner_required",
-      `Seat-owner permission required for the ${label === "source" ? "attacking" : "defending"} seat`,
-    )
-  return player
-}
 
 export const submitCommanderDamage = mutation({
   args: {
@@ -2666,146 +2392,22 @@ export const submitCommanderDamage = mutation({
     deviceId: v.string(),
     clientCreatedAt: v.number(),
   },
-  handler: async (ctx, args) => {
-    assertCommanderDelta(args.delta)
-    assertCommanderSlot(args.commander)
-    assertGameWriteOperationId(args.operationId)
-    assertGameWriteDeviceId(args.deviceId)
-    if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
-    if (args.fromPlayerId === args.toPlayerId) throw new Error("A commander cannot damage itself")
-
-    const game = await gameByPublicId(ctx, args.publicId)
-    assertCommanderGame(game)
+  handler: async (ctx, { publicId, ...sent }) => {
+    const write: GameWrite = { kind: "commander.claim", ...sent }
+    const game = await gameForWrite(ctx, publicId, write)
     const user = await requireUser(ctx)
-    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
-    const source = await commanderPlayerForWrite(
-      ctx,
-      game,
-      args.fromPlayerId,
-      user,
-      args.deviceId,
-      "source",
-    )
-    const target = await ctx.db.get(args.toPlayerId)
-    if (!target || target.gameId !== game._id)
-      throw new Error("Commander damage target must belong to this game")
-
-    const existing = await ctx.db
-      .query("gameCommanderClaims")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", args.operationId),
-      )
-      .unique()
-    if (existing) {
-      if (!isSameCommanderClaim(existing, { ...args, actorUserId: user._id }))
-        throw syncOperationMismatch()
-      return {
-        operationId: existing.operationId,
-        claimId: existing._id,
-        status: existing.status,
-        deduplicated: true,
-      }
+    const { ack, claimIdOf } = await writeCloudGame(ctx, game, user, write)
+    return {
+      operationId: ack.operationId,
+      claimId: await claimIdOf(ack.operationId),
+      status: ack.status,
+      deduplicated: ack.deduplicated,
     }
-    const eventWithOperation = await ctx.db
-      .query("gameEvents")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", args.operationId),
-      )
-      .unique()
-    if (eventWithOperation) throw syncOperationMismatch()
-    await limitGameRate(ctx, "gameWrite", user._id)
-
-    const pair = await commanderDamageRow(ctx, {
-      gameId: game._id,
-      fromPlayerId: source._id,
-      toPlayerId: target._id,
-      commander: args.commander,
-    })
-    const pending = await ctx.db
-      .query("gameCommanderClaims")
-      .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
-      .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
-    const declined =
-      commanderClaimOutcome({
-        total: pair?.total ?? 0,
-        delta: args.delta,
-        pendingClaims: pending.length,
-        pairHasPendingClaim: pending.some(
-          (claim) =>
-            claim.fromPlayerId === source._id &&
-            claim.toPlayerId === target._id &&
-            claim.commander === args.commander,
-        ),
-      }) === "declined"
-    const declineOperationId = `${args.operationId}_declined`
-    if (
-      declined &&
-      (await ctx.db
-        .query("gameEvents")
-        .withIndex("by_game_operation", (q) =>
-          q.eq("gameId", game._id).eq("operationId", declineOperationId),
-        )
-        .first())
-    )
-      throw syncOperationMismatch()
-
-    const now = Date.now()
-    const status = declined ? ("declined" as const) : ("pending" as const)
-    const claimId = await ctx.db.insert("gameCommanderClaims", {
-      gameId: game._id,
-      operationId: args.operationId,
-      fromPlayerId: source._id,
-      toPlayerId: target._id,
-      ...commanderField(args.commander),
-      delta: args.delta,
-      status,
-      actorUserId: user._id,
-      deviceId: args.deviceId,
-      clientCreatedAt: args.clientCreatedAt,
-      createdAt: now,
-      ...(declined ? { resolvedAt: now } : {}),
-    })
-    await ctx.db.insert("gameEvents", {
-      gameId: game._id,
-      playerId: target._id,
-      operationId: args.operationId,
-      kind: "commanderDamage.claimed",
-      delta: args.delta,
-      fromPlayerId: source._id,
-      toPlayerId: target._id,
-      ...commanderField(args.commander),
-      claimOperationId: args.operationId,
-      actorUserId: user._id,
-      deviceId: args.deviceId,
-      clientCreatedAt: args.clientCreatedAt,
-      serverCreatedAt: now,
-    })
-    if (declined)
-      await ctx.db.insert("gameEvents", {
-        gameId: game._id,
-        playerId: target._id,
-        operationId: declineOperationId,
-        kind: "commanderDamage.declined",
-        delta: args.delta,
-        fromPlayerId: source._id,
-        toPlayerId: target._id,
-        ...commanderField(args.commander),
-        claimOperationId: args.operationId,
-        clientCreatedAt: args.clientCreatedAt,
-        serverCreatedAt: now,
-      })
-    await ctx.db.patch(target._id, {
-      eventCount: (target.eventCount ?? 0) + (declined ? 2 : 1),
-      lastEventAt: now,
-    })
-    return { operationId: args.operationId, claimId, status, deduplicated: false }
   },
 })
 
 async function commanderResolutionEvent(ctx: QueryCtx, claim: Doc<"gameCommanderClaims">) {
-  const operationId = claim.resolutionOperationId
-  if (operationId) {
+  for (const operationId of resolutionEventIds(claim)) {
     const event = await ctx.db
       .query("gameEvents")
       .withIndex("by_game_operation", (q) =>
@@ -2814,194 +2416,34 @@ async function commanderResolutionEvent(ctx: QueryCtx, claim: Doc<"gameCommander
       .unique()
     if (event) return event
   }
-  return await ctx.db
-    .query("gameEvents")
-    .withIndex("by_game_operation", (q) =>
-      q.eq("gameId", claim.gameId).eq("operationId", `${claim.operationId}_${claim.status}`),
-    )
-    .unique()
+  return null
 }
 
 async function resolveCommanderClaim(
   ctx: MutationCtx,
-  args: {
+  {
+    publicId,
+    ...sent
+  }: {
     publicId: string
     operationId: string
     deviceId: string
     clientCreatedAt: number
     resolutionOperationId?: string
   },
-  decision: "confirmed" | "declined",
+  decision: ClaimDecision,
 ) {
-  assertGameWriteOperationId(args.operationId)
-  if (args.resolutionOperationId !== undefined)
-    assertGameWriteOperationId(args.resolutionOperationId)
-  assertGameWriteDeviceId(args.deviceId)
-  if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-    throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
-  const game = await gameByPublicId(ctx, args.publicId)
-  assertCommanderGame(game)
+  const write: GameWrite = { kind: "commander.resolve", decision, ...sent }
+  const game = await gameForWrite(ctx, publicId, write)
   const user = await requireUser(ctx)
-  const claim = await ctx.db
-    .query("gameCommanderClaims")
-    .withIndex("by_game_operation", (q) =>
-      q.eq("gameId", game._id).eq("operationId", args.operationId),
-    )
-    .unique()
-  if (!claim) throw new Error("Commander damage claim not found")
-  if (
-    args.resolutionOperationId &&
-    claim.resolutionOperationId &&
-    claim.resolutionOperationId !== args.resolutionOperationId
-  )
-    throw syncOperationMismatch()
-  const target = await commanderPlayerForWrite(
-    ctx,
-    game,
-    claim.toPlayerId,
-    user,
-    args.deviceId,
-    "target",
-  )
-  if (args.resolutionOperationId) {
-    const operationId = args.resolutionOperationId
-    const existing = await ctx.db
-      .query("gameEvents")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", operationId),
-      )
-      .unique()
-    if (
-      existing &&
-      (existing.claimOperationId !== claim.operationId ||
-        existing.kind !== `commanderDamage.${decision}`)
-    )
-      throw syncOperationMismatch()
-  }
-  if (claim.status !== "pending") {
-    if (args.resolutionOperationId) {
-      if (claim.status !== decision) throw syncOperationMismatch()
-      const event = await commanderResolutionEvent(ctx, claim)
-      if (
-        !event ||
-        !isSameCommanderResolution(event, {
-          kind: `commanderDamage.${claim.status}`,
-          claimOperationId: claim.operationId,
-          defenderPlayerId: claim.toPlayerId,
-          actorUserId: user._id,
-          deviceId: args.deviceId,
-          clientCreatedAt: args.clientCreatedAt,
-        })
-      )
-        throw syncOperationMismatch()
-      if (!claim.resolutionOperationId)
-        await ctx.db.patch(claim._id, { resolutionOperationId: args.resolutionOperationId })
-      if (event.operationId !== args.resolutionOperationId)
-        await ctx.db.patch(event._id, { operationId: args.resolutionOperationId })
-    }
-    return {
-      operationId: args.resolutionOperationId ?? claim.operationId,
-      claimId: claim._id,
-      status: claim.status,
-      deduplicated: true,
-      ...(decision === "confirmed" && claim.status === "confirmed"
-        ? {
-            total: (await commanderDamageRow(ctx, claim))?.total ?? 0,
-            currentLife: target.currentLife,
-          }
-        : {}),
-    }
-  }
-  await limitGameRate(ctx, "gameWrite", user._id)
-  if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
-
-  const now = Date.now()
-  const eventOperationId = args.resolutionOperationId ?? `${claim.operationId}_${decision}`
-  if (decision === "confirmed") {
-    const pair = await commanderDamageRow(ctx, claim)
-    const confirmed = confirmCommanderClaim({
-      total: pair?.total ?? 0,
-      life: target.currentLife,
-      delta: claim.delta,
-    })
-    if (!confirmed) throw new Error("Commander damage total must remain between 0 and 99")
-    const { total, currentLife } = confirmed
-    await ctx.db.insert("gameEvents", {
-      gameId: game._id,
-      playerId: target._id,
-      operationId: eventOperationId,
-      kind: "commanderDamage.confirmed",
-      delta: claim.delta,
-      fromPlayerId: claim.fromPlayerId,
-      toPlayerId: claim.toPlayerId,
-      ...commanderField(claim.commander),
-      claimOperationId: claim.operationId,
-      actorUserId: user._id,
-      deviceId: args.deviceId,
-      clientCreatedAt: args.clientCreatedAt,
-      serverCreatedAt: now,
-    })
-    if (pair) await ctx.db.patch(pair._id, { total, updatedAt: now })
-    else
-      await ctx.db.insert("gameCommanderDamage", {
-        gameId: game._id,
-        fromPlayerId: claim.fromPlayerId,
-        toPlayerId: claim.toPlayerId,
-        ...commanderField(claim.commander),
-        total,
-        updatedAt: now,
-      })
-    await ctx.db.patch(target._id, {
-      currentLife,
-      eventCount: (target.eventCount ?? 0) + 1,
-      lastEventAt: now,
-    })
-    await ctx.db.patch(claim._id, {
-      status: "confirmed",
-      ...(args.resolutionOperationId ? { resolutionOperationId: args.resolutionOperationId } : {}),
-      resolvedAt: now,
-      resolvedByUserId: user._id,
-    })
-    return {
-      operationId: args.resolutionOperationId ?? claim.operationId,
-      claimId: claim._id,
-      status: "confirmed" as const,
-      total,
-      currentLife,
-      deduplicated: false,
-    }
-  }
-
-  await ctx.db.insert("gameEvents", {
-    gameId: game._id,
-    playerId: target._id,
-    operationId: eventOperationId,
-    kind: "commanderDamage.declined",
-    delta: claim.delta,
-    fromPlayerId: claim.fromPlayerId,
-    toPlayerId: claim.toPlayerId,
-    ...commanderField(claim.commander),
-    claimOperationId: claim.operationId,
-    actorUserId: user._id,
-    deviceId: args.deviceId,
-    clientCreatedAt: args.clientCreatedAt,
-    serverCreatedAt: now,
-  })
-  await ctx.db.patch(claim._id, {
-    status: "declined",
-    ...(args.resolutionOperationId ? { resolutionOperationId: args.resolutionOperationId } : {}),
-    resolvedAt: now,
-    resolvedByUserId: user._id,
-  })
-  await ctx.db.patch(target._id, {
-    eventCount: (target.eventCount ?? 0) + 1,
-    lastEventAt: now,
-  })
+  const { ack, claimIdOf } = await writeCloudGame(ctx, game, user, write)
+  const { total, currentLife } = ack
   return {
-    operationId: args.resolutionOperationId ?? claim.operationId,
-    claimId: claim._id,
-    status: "declined" as const,
-    deduplicated: false,
+    operationId: ack.operationId,
+    claimId: await claimIdOf(sent.operationId),
+    status: ack.status,
+    deduplicated: ack.deduplicated,
+    ...(total === undefined ? {} : { total, currentLife }),
   }
 }
 

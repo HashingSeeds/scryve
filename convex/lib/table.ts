@@ -204,6 +204,13 @@ export function playerTableOf(table: TableState, playerId: string): PlayerTable 
   return table.players[playerId] ?? {}
 }
 
+export function seatTable(seat: PlayerTable): PlayerTable {
+  return {
+    ...(seat.counters ? { counters: seat.counters } : {}),
+    ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
+  }
+}
+
 export function counterValue(table: TableState, playerId: string, counterId: string): number {
   return playerTableOf(table, playerId).counters?.[counterId] ?? 0
 }
@@ -332,6 +339,17 @@ function replacePokemon(board: PokemonBoard, next: PokemonInPlay): PokemonBoard 
   return board.active?.id === next.id
     ? { ...board, active: next }
     : { ...board, bench: board.bench.map((pokemon) => (pokemon.id === next.id ? next : pokemon)) }
+}
+
+export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
+  if (
+    action.kind === "pokemon.knockedOut" ||
+    action.kind === "pokemon.damaged" ||
+    action.kind === "pokemon.checkedUp"
+  )
+    return action.takerPlayerId
+  if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
+  return undefined
 }
 
 /**
