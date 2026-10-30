@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
@@ -22,9 +22,17 @@ const mockConvex = { action: mockSearchCards }
 const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvex,
-  useQuery: (...args: unknown[]) => mockStatsQuery(...args),
+  // why: the deck capacity query is the only one called with empty args.
+  useQuery: (...args: unknown[]) =>
+    JSON.stringify(args[1]) === "{}" ? { used: 1, limit: 2 } : mockStatsQuery(...args),
   useConvexConnectionState: () => mockConnectionState,
   useAction: () => mockSearchCards,
+}))
+
+const mockSync = jest.fn()
+jest.mock("@/features/decks/localDeckSync", () => ({
+  ...jest.requireActual("@/features/decks/localDeckSync"),
+  useLocalDeckSync: () => ({ sync: mockSync, keepOnDevice: jest.fn() }),
 }))
 
 const mockStatsPush = jest.fn()
@@ -76,6 +84,31 @@ function renderScreen(onBack = jest.fn(), localId = mockStored.localId) {
   }
 }
 
+const signedIn = {
+  ready: true,
+  loading: false,
+  signedIn: true,
+  ownerId: "owner-a",
+  request: jest.fn(),
+}
+
+function renderSignedIn(access: typeof signedIn & { message?: string } = signedIn) {
+  const onSynced = jest.fn()
+  return {
+    onSynced,
+    ...render(
+      <ThemeProvider initialContext="dark">
+        <GuestDeckDetailScreen
+          localId={mockStored.localId}
+          access={access}
+          onBack={jest.fn()}
+          onSynced={onSynced}
+        />
+      </ThemeProvider>,
+    ),
+  }
+}
+
 beforeEach(() => {
   clearStorage()
   clearCardDetails()
@@ -86,6 +119,7 @@ beforeEach(() => {
   mockSaveFailure = false
   mockSaveGuestDeck.mockClear()
   mockDeleteGuestDeck.mockClear()
+  mockSync.mockReset()
 })
 
 test("changes a cached commander offline and saves both sections without changing the card count", async () => {
@@ -186,6 +220,7 @@ test("opens in Play, edits notes in Build, and saves locally", () => {
 test("deck details edits the name without a duplicate notes field", () => {
   const view = renderScreen()
   fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.press(view.getByTestId("deck-action-details"))
   expect(view.queryByTestId("deck-note-input")).toBeNull()
   fireEvent.changeText(view.getByTestId("deck-name-input"), "Renamed")
   fireEvent.press(view.getByTestId("deck-settings-save"))
@@ -199,6 +234,7 @@ test("deck details edits the name without a duplicate notes field", () => {
 test("Play keeps the saved name until a settings rename is saved", () => {
   const view = renderScreen()
   fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.press(view.getByTestId("deck-action-details"))
   fireEvent.changeText(view.getByTestId("deck-name-input"), "Renamed")
   fireEvent.press(view.getByTestId("deck-settings-save"))
   expect(view.getByText("Renamed")).toBeTruthy()
@@ -210,14 +246,53 @@ test("Play keeps the saved name until a settings rename is saved", () => {
 test("cancel keeps a guest deck and confirm deletes it", () => {
   const view = renderScreen()
   fireEvent.press(view.getByTestId("deck-settings-button"))
-  fireEvent.press(view.getByTestId("delete-deck-button"))
+  fireEvent.press(view.getByTestId("deck-action-delete"))
   fireEvent.press(view.getByTestId("confirm-dialog-cancel"))
   expect(mockDeleteGuestDeck).not.toHaveBeenCalled()
   fireEvent.press(view.getByTestId("deck-settings-button"))
-  fireEvent.press(view.getByTestId("delete-deck-button"))
+  fireEvent.press(view.getByTestId("deck-action-delete"))
   fireEvent.press(view.getByTestId("guest-deck-confirm-delete"))
   expect(mockDeleteGuestDeck).toHaveBeenCalledTimes(1)
   expect(mockDeleteGuestDeck).toHaveBeenCalledWith(mockStored.localId)
+})
+
+test("syncs a device deck from the actions sheet", async () => {
+  mockSync.mockResolvedValue({ status: "synced", deckId: "deck-9" })
+  const view = renderSignedIn()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  const sheet = within(view.getByTestId("deck-actions-sheet"))
+  expect(sheet.getAllByRole("button").map((row) => row.props.testID)).toEqual([
+    "deck-action-details",
+    "deck-action-sync",
+    "deck-action-delete",
+  ])
+  expect(sheet.getByText("1 of 2 synced decks")).toBeTruthy()
+  fireEvent.press(view.getByTestId("deck-action-sync"))
+  await waitFor(() => expect(view.onSynced).toHaveBeenCalledWith("deck-9"))
+  expect(mockSync).toHaveBeenCalledWith(mockStored.localId)
+})
+
+test("offline, sync stays listed but blocked while rename and delete still work", () => {
+  mockConnectionState.isWebSocketConnected = false
+  const view = renderSignedIn({ ...signedIn, ready: false, message: "Reconnect to continue." })
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  const sync = view.getByTestId("deck-action-sync")
+  expect(sync).toBeDisabled()
+  expect(within(sync).getByText("Reconnect to continue.")).toBeTruthy()
+  expect(view.getByTestId("deck-action-details")).toBeEnabled()
+  expect(view.getByTestId("deck-action-delete")).toBeEnabled()
+})
+
+test("sync waits for unsaved edits to be saved or discarded", () => {
+  const view = renderSignedIn()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.press(view.getByTestId("deck-action-details"))
+  fireEvent.changeText(view.getByTestId("deck-name-input"), "Renamed")
+  fireEvent.press(view.getByTestId("deck-settings-save"))
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  const sync = view.getByTestId("deck-action-sync")
+  expect(sync).toBeDisabled()
+  expect(within(sync).getByText("Save or discard your changes first.")).toBeTruthy()
 })
 
 test("shows only the deck it was opened for", () => {
@@ -376,7 +451,7 @@ test("renders signed-in local deck stats by key as one record", () => {
 
 test("does not query account stats while signed out", () => {
   renderScreen()
-  expect(mockStatsQuery).not.toHaveBeenCalled()
+  expect(mockStatsQuery.mock.calls.every(([, args]) => args === "skip")).toBe(true)
 })
 
 test("moving a card to the sideboard and back leaves nothing to save", () => {

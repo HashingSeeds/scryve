@@ -180,7 +180,6 @@ const decks = {
     pickTitle_other: "Choose up to {{count}} decks to sync",
     pro: "Pro syncs up to {{premiumLimit}} decks and adds deck versions.",
     seePro: "See Pro",
-    onDeviceCount: "On this device · Synced decks {{used}}/{{limit}}",
     sync: "Sync",
     syncing: "Syncing…",
     addAsNew: "Add to your account as a new deck",
@@ -200,14 +199,23 @@ const decks = {
     none: "No additional card details are available.",
     loadFailed: "Could not load card details",
   },
+  actions: {
+    close: "Close deck actions",
+    nameAndFormat: "Name and format",
+    moveToDevice: "Move to this device",
+    sync: "Sync to account",
+    delete: "Delete deck",
+    // Shown under a blocked action while unsaved deck edits are open.
+    saveFirst: "Save or discard your changes first.",
+    // Shown under Move while edits made on this device are still uploading.
+    editsSyncing: "Waiting for your changes to sync.",
+  },
   settings: {
-    close: "Close deck settings",
-    title: "Deck details",
+    close: "Close name and format",
+    title: "Name and format",
     name: "Deck name",
     format: "Format",
     save: "Save changes",
-    unsync: "Keep on this device only",
-    delete: "Delete deck",
   },
   versionDialog: {
     close: "Close version editor",
