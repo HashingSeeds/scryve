@@ -359,6 +359,9 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
 
 export const COMMANDER_SLOTS: readonly CommanderSlot[] = [undefined, PARTNER_COMMANDER]
 
+export const clampedCommanderDelta = (total: number, delta: number) =>
+  Math.max(0, Math.min(MAX_COMMANDER_DAMAGE, total + delta)) - total
+
 /** why: the partner's key keeps its marker before the `>`, so builds that split a key on `>` find no seat named `id#1` and skip it instead of misreading it. */
 export const commanderDamageKey = (
   fromPlayerId: PlayerId,
@@ -600,9 +603,10 @@ export function commandToEvent(
       !game.players.some(({ id }) => id === toPlayerId)
     )
       return null
-    const current = commanderDamageBetween(game, fromPlayerId, toPlayerId, commander)
-    const clamped = Math.max(0, Math.min(MAX_COMMANDER_DAMAGE, current + command.delta))
-    const delta = clamped - current
+    const delta = clampedCommanderDelta(
+      commanderDamageBetween(game, fromPlayerId, toPlayerId, commander),
+      command.delta,
+    )
     if (delta === 0) return null
     return {
       ...base,

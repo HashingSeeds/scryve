@@ -110,7 +110,11 @@ export type LifeCardCommanderDamage = Omit<
   onToggleCommander?: (index: number) => void
   facing?: CommanderFacing
   reach?: CommanderReach
-  onStage?: (step: number, index: number) => void
+  dealt?: number
+  takeBack?: number
+  onHit?: () => void
+  onUndo?: () => void
+  onAdjust?: (step: number, index: number) => void
   acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
   pendingClaims?: readonly CommanderClaim[]
@@ -406,7 +410,11 @@ export const LifeCard = memo(function LifeCard({
             takeover,
             arriving: !!away,
             acted: !!commanderDamage.acted,
-            onChange: (step, index) => commanderDamage.onStage?.(step, index),
+            dealt: commanderDamage.dealt ?? 0,
+            takeBack: commanderDamage.takeBack ?? 0,
+            onHit: commanderDamage.onHit ?? (() => {}),
+            onUndo: commanderDamage.onUndo ?? (() => {}),
+            onAdjust: commanderDamage.onAdjust ?? (() => {}),
           }
         : undefined
   const [stripPips, setStripPips] = useState<ReadonlyMap<PlayerId, LayoutRectangle>>(

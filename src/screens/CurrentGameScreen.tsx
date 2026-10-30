@@ -24,6 +24,7 @@ import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
+import type { AttackChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, systemDice, type DiceSeatChip } from "@/features/game/dice"
 import {
   canContinueMatch,
@@ -51,6 +52,7 @@ import type {
   MatchSeatOutcome,
   PlayerId,
 } from "@/features/game/types"
+import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { closingMenu, useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { gameRules, openRules } from "@/features/rules/gameRules"
@@ -207,26 +209,36 @@ export function CurrentGameScreen({
     [dice.tools, markFirstPlayerUsed],
   )
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
-  const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
-  const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderLethal = playCommanderLethal(system, runtime.game.format)
   const commanderDamageEnabled = commanderLethal !== undefined
   const outState = useMemo(() => localOutState(runtime.game), [runtime.game])
+  const seatDeck = (playerId: PlayerId) => {
+    const account = runtime.game.account
+    if (!account || playerId !== account.mePlayerId) return undefined
+    if (account.deckVersionId) return { ownerId: account.ownerId, versionId: account.deckVersionId }
+    return account.deckKey && account.deckFingerprint
+      ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
+      : undefined
+  }
+  const commanderPort = {
+    incoming: (to: PlayerId, commander?: CommanderSlot) =>
+      incomingCommanderDamage(runtime.game, to, commander),
+    commit: (from: PlayerId, changes: readonly AttackChange[]) =>
+      changes.forEach(({ toPlayerId, commander, delta }) =>
+        runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
+      ),
+  }
+  const attack = useCommanderAttack(commanderPort, { seatDeck })
+  const attackDispatch = attack.dispatch
 
   function toggleSword(player: GamePlayer) {
     markFirstPlayerUsed()
-    setInspectedPlayerId(null)
-    setArmedPlayerId((current) => (current === player.id ? null : player.id))
+    attackDispatch({ type: "press", playerId: player.id })
   }
 
   function inspectCommanderDamage(playerId: PlayerId | null) {
     if (playerId) markFirstPlayerUsed()
-    setInspectedPlayerId(playerId)
-  }
-
-  function assignCommanderDamage(target: GamePlayer, step: number, commander?: CommanderSlot) {
-    if (!armedPlayerId || armedPlayerId === target.id) return
-    runtime.assignCommanderDamage(armedPlayerId, target.id, step, commander)
+    attackDispatch({ type: "inspect", playerId })
   }
 
   const captureMenuDialogOrigin = useCallback((event?: GestureResponderEvent) => {
@@ -309,14 +321,11 @@ export function CurrentGameScreen({
   }, [])
 
   const toggleMenu = useCallback(() => {
-    setArmedPlayerId(null)
+    attackDispatch({ type: "send" })
     setMenuOpen((current) => !current)
-  }, [])
+  }, [attackDispatch])
 
-  const exitCommanderMode = useCallback(() => {
-    setArmedPlayerId(null)
-    setInspectedPlayerId(null)
-  }, [])
+  const exitCommanderMode = useCallback(() => attackDispatch({ type: "send" }), [attackDispatch])
 
   function closePanel() {
     setLayoutPickerOpen(false)
@@ -399,6 +408,7 @@ export function CurrentGameScreen({
   const diceOpen = dice.open
   const closeDice = dice.close
   const diceArmed = dice.grid.armed
+  const inspectedPlayerId = attack.inspectedPlayerId
   const exitAction = useMemo(
     () =>
       diceOpen
@@ -443,25 +453,18 @@ export function CurrentGameScreen({
               commanderDamage={
                 commanderDamageEnabled
                   ? {
-                      incomingFor: (player, commander) =>
-                        incomingCommanderDamage(runtime.game, player.id, commander),
+                      incomingFor: commanderPort.incoming,
                       lethal: commanderLethal,
-                      armedPlayerId,
-                      inspection: { playerId: inspectedPlayerId, onChange: inspectCommanderDamage },
+                      attack,
+                      inspection: {
+                        playerId: attack.inspectedPlayerId,
+                        onChange: inspectCommanderDamage,
+                      },
                       onPressSword: toggleSword,
-                      onStage: assignCommanderDamage,
                     }
                   : undefined
               }
-              getSeatDeck={(player) => {
-                const account = runtime.game.account
-                if (!account || player.id !== account.mePlayerId) return undefined
-                if (account.deckVersionId)
-                  return { ownerId: account.ownerId, versionId: account.deckVersionId }
-                return account.deckKey && account.deckFingerprint
-                  ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
-                  : undefined
-              }}
+              getSeatDeck={(player) => seatDeck(player.id)}
               table={runtime.tableRuntime}
               dice={claimingGrid}
               onChange={runtime.changeLife}

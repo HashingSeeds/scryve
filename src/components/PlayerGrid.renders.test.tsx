@@ -32,9 +32,15 @@ const players = Array.from({ length: 4 }, (_, seat) => ({
 const commanderDamage = {
   incomingFor: () => ({}),
   lethal: 21,
-  armedPlayerId: null,
+  attack: {
+    armedPlayerId: null,
+    inspectedPlayerId: null,
+    acted: false,
+    stagedTargets: undefined,
+    against: jest.fn(),
+    dispatch: jest.fn(),
+  },
   onPressSword: jest.fn(),
-  onStage: jest.fn(),
 }
 
 describe("PlayerGrid renders", () => {

@@ -412,7 +412,11 @@ describe("LifeCard", () => {
     }
   })
 
-  const defendingCard = (onStage = jest.fn(), armed = true, attackerColor = "#B85636") => (
+  const defendingCard = (
+    strike: Partial<LifeCardCommanderDamage> = {},
+    armed = true,
+    attackerColor = "#B85636",
+  ) => (
     <ThemeProvider initialContext="dark">
       <LifeCard
         playerName="Grace"
@@ -434,7 +438,9 @@ describe("LifeCard", () => {
             card: { width: 193, height: 420 },
             distance: 900,
           },
-          onStage,
+          dealt: 1,
+          takeBack: 1,
+          ...strike,
         })}
       />
     </ThemeProvider>
@@ -501,7 +507,7 @@ describe("LifeCard", () => {
       act(() => jest.advanceTimersByTime(TAKEOVER_MS))
       expect(view.queryByTestId("life-corner-layer-seat-2")).toBeNull()
 
-      view.rerender(defendingCard(jest.fn(), false))
+      view.rerender(defendingCard({}, false))
       expect(view.getByTestId("life-corner-layer-seat-2")).toBeTruthy()
       // why: with no strip spot measured for the attacker, the chip fades where it stood instead of flying.
       expect(view.getAllByTestId("commander-homing-chip")).toHaveLength(1)
@@ -519,13 +525,13 @@ describe("LifeCard", () => {
   it("lands a hit on the tap even while the badge is still ramming", () => {
     const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     try {
-      const onStage = jest.fn()
-      const view = render(defendingCard(onStage))
+      const onHit = jest.fn()
+      const view = render(defendingCard({ onHit }))
       fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
         nativeEvent: { layout: { width: 193, height: 420 } },
       })
       fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-      expect(onStage).toHaveBeenCalledWith(1, 0)
+      expect(onHit).toHaveBeenCalled()
     } finally {
       motion.mockRestore()
     }
@@ -542,7 +548,7 @@ describe("LifeCard", () => {
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
-    const view = render(defendingCard(jest.fn(), true, "#F2E6A0"))
+    const view = render(defendingCard({}, true, "#F2E6A0"))
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
@@ -552,16 +558,18 @@ describe("LifeCard", () => {
   })
 
   it("fixes the total from the badge without counting a hit", () => {
-    const onStage = jest.fn()
-    const view = render(defendingCard(onStage))
+    const onAdjust = jest.fn()
+    const onHit = jest.fn()
+    const view = render(defendingCard({ onAdjust, onHit }))
     fireEvent.press(view.getByTestId("commander-badge-seat-2"))
     fireEvent.press(view.getByTestId("commander-edit-up-seat-2"))
     fireEvent.press(view.getByTestId("commander-edit-down-seat-2"))
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-    expect(onStage.mock.calls).toEqual([
+    expect(onAdjust.mock.calls).toEqual([
       [1, 0],
       [-1, 0],
     ])
+    expect(onHit).not.toHaveBeenCalled()
     expect(view.queryByTestId("commander-edit-seat-2")).toBeNull()
   })
 
@@ -899,7 +907,7 @@ describe("LifeCard", () => {
             armedPlayerId: commanderIds[0],
             attackerName: "Ada",
             facing: { y: "top" },
-            onStage: jest.fn(),
+            takeBack: 1,
           })}
         />
       </ThemeProvider>,
@@ -909,17 +917,9 @@ describe("LifeCard", () => {
     expect(undo).toHaveProperty("right")
   })
 
-  it("deals the attacker's power with each tap anywhere on a defending card", () => {
-    const onStage = jest.fn()
-    const damage = commanderDamage({
-      ownerPlayerId: commanderIds[1],
-      incoming: { [commanderIds[0]]: 7 },
-      armedPlayerId: commanderIds[0],
-      attackerName: "Ada",
-      commanders: [{ power: 3, total: 11 }],
-      facing: { y: "top" },
-      onStage,
-    })
+  it("deals a hit with each tap anywhere on a defending card, and takes back the last one", () => {
+    const onHit = jest.fn()
+    const onUndo = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -927,7 +927,18 @@ describe("LifeCard", () => {
           seatNumber={2}
           life={20}
           color="#397B61"
-          commanderDamage={damage}
+          commanderDamage={commanderDamage({
+            ownerPlayerId: commanderIds[1],
+            incoming: { [commanderIds[0]]: 7 },
+            armedPlayerId: commanderIds[0],
+            attackerName: "Ada",
+            commanders: [{ power: 3, total: 11 }],
+            dealt: 3,
+            takeBack: 3,
+            facing: { y: "top" },
+            onHit,
+            onUndo,
+          })}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -935,32 +946,15 @@ describe("LifeCard", () => {
 
     expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("11")
     expect(view.queryByTestId(lifeControlTestId(2, 1))).toBeNull()
+    expect(view.getByTestId("commander-hit-seat-2")).toHaveProp(
+      "accessibilityLabel",
+      "Deal 3 commander damage to Grace",
+    )
 
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
     fireEvent.press(view.getByTestId("commander-undo-seat-2"))
-    expect(onStage.mock.calls).toEqual([
-      [3, 0],
-      [-3, 0],
-    ])
-
-    view.rerender(
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Grace"
-          seatNumber={2}
-          life={20}
-          color="#397B61"
-          commanderDamage={{
-            ...damage,
-            incoming: { [commanderIds[0]]: 97 },
-            commanders: [{ power: 5, total: 97 }],
-          }}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-    expect(onStage).toHaveBeenLastCalledWith(2, 0)
+    expect(onHit).toHaveBeenCalledTimes(1)
+    expect(onUndo).toHaveBeenCalledTimes(1)
   })
 
   it("names the attacker's commander above its power", () => {
