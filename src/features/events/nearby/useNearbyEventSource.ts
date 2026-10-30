@@ -4,7 +4,7 @@ import type { HubCommand } from "./hubEvent"
 import { hubStandings, hubView } from "./hubEvent"
 import { nearbyEventClient, useNearbyEventClient } from "./nearbyEventClient"
 import { nearbyEventHost, useNearbyEventHost } from "./nearbyEventHost"
-import { standingsThroughRound } from "../eventLogic"
+import { standingsThroughRound } from "../../../../convex/lib/events/commands"
 import type { EventSource } from "../eventSource"
 import { useLatencyReports } from "../useLatencyReports"
 

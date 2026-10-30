@@ -1,7 +1,7 @@
 import { hubStandings, hubView, type HubEvent, type HubTable } from "./hubEvent"
 import type { NearbyPatchMessage, NearbyViewMessage } from "./nearbyEventProtocol"
+import { standingsThroughRound } from "../../../../convex/lib/events/commands"
 import type { PlayerStanding } from "../../../../convex/lib/events/model"
-import { standingsThroughRound } from "../eventLogic"
 import type { EventView } from "../eventSource"
 
 interface Feed {

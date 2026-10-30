@@ -31,17 +31,20 @@ import {
   isFinalRound,
   myResultText,
   myTable,
-  nextRoundBlocker,
   percent,
   playerName,
   resultText,
-  type RoundBlocker,
-  standingsThroughRound,
   tablePlayers,
 } from "./eventLogic"
 import type { EventSource, EventTableView, EventView } from "./eventSource"
 import { ResultDialog } from "./ResultDialog"
-import { MAX_ROUND_MINUTES, MIN_ROUND_MINUTES } from "../../../convex/lib/events/commands"
+import {
+  MAX_ROUND_MINUTES,
+  MIN_ROUND_MINUTES,
+  standingsThroughRound,
+  startRoundBlocker,
+  type RoundBlocker,
+} from "../../../convex/lib/events/commands"
 import { MAX_EVENT_ROUNDS } from "../../../convex/lib/events/model"
 import { suggestedSwissRounds } from "../../../convex/lib/events/pairing"
 
@@ -122,7 +125,7 @@ export function EventScreen({
     )
 
   const finalRound = view ? isFinalRound(view) : false
-  const nextRound = view ? nextRoundBlocker(view) : undefined
+  const nextRound = view ? startRoundBlocker(view) : undefined
   // why: finishing only needs every result in; a capped round count or a dropped field must not trap the organizer.
   const blocker = finalRound && nextRound?.kind !== "results" ? undefined : nextRound
   const editingTable = view?.tables.find((table) => table.id === editing)

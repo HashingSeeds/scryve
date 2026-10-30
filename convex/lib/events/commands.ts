@@ -8,6 +8,7 @@ import {
   MIN_POD_SIZE,
   type EventPlayerState,
   type EventSettings,
+  type EventStructure,
   type EventTableState,
   type TableResult,
 } from "./model"
@@ -84,8 +85,55 @@ export function assertCanAddPlayer(status: EventStatus, playerCount: number) {
     throw eventError("event_full", `An event can have at most ${MAX_EVENT_PLAYERS} players`)
 }
 
-export const roundComplete = (tables: readonly EventTable[]) =>
-  tables.every((table) => table.result !== undefined)
+export const roundComplete = (tables: readonly { readonly result?: TableResult | null }[]) =>
+  tables.every((table) => table.result != null)
+
+export function standingsThroughRound(event: {
+  status: EventStatus
+  round: number
+  tables: readonly { readonly result?: TableResult | null }[]
+}) {
+  if (event.round === 0 || event.status === "finished") return event.round
+  return roundComplete(event.tables) ? event.round : event.round - 1
+}
+
+export type RoundBlocker =
+  | { readonly kind: "finished" }
+  | { readonly kind: "results" }
+  | { readonly kind: "players"; readonly count: number }
+  | { readonly kind: "maxRounds" }
+
+export function startRoundBlocker(state: {
+  status: EventStatus
+  round: number
+  structure: EventStructure
+  players: readonly EventPlayerState[]
+  tables: readonly { readonly result?: TableResult | null }[]
+}): RoundBlocker | undefined {
+  if (state.status === "finished") return { kind: "finished" }
+  if (!roundComplete(state.tables)) return { kind: "results" }
+  const minimum = state.structure === "pods" ? MIN_POD_SIZE : 2
+  if (state.players.filter((player) => !player.dropped).length < minimum)
+    return { kind: "players", count: minimum }
+  if (state.round >= MAX_EVENT_ROUNDS) return { kind: "maxRounds" }
+  return undefined
+}
+
+function roundBlockerError(blocker: RoundBlocker) {
+  switch (blocker.kind) {
+    case "finished":
+      return eventError("event_finished", "This event has finished")
+    case "results":
+      return eventError("results_missing", "Enter every result before the next round")
+    case "players":
+      return eventError(
+        "not_enough_players",
+        `At least ${blocker.count} players are needed to start a round`,
+      )
+    case "maxRounds":
+      return new Error(`An event can have at most ${MAX_EVENT_ROUNDS} rounds`)
+  }
+}
 
 export function startRound(state: {
   status: EventStatus
@@ -95,19 +143,12 @@ export function startRound(state: {
   settings: EventSettings
   random: () => number
 }): { round: number; tables: EventTable[] } {
-  if (state.status === "finished") throw eventError("event_finished", "This event has finished")
-  if (state.round >= MAX_EVENT_ROUNDS)
-    throw new Error(`An event can have at most ${MAX_EVENT_ROUNDS} rounds`)
-  const current = state.tables.filter((table) => table.round === state.round)
-  if (!roundComplete(current))
-    throw eventError("results_missing", "Enter every result before the next round")
-  const active = state.players.filter((player) => !player.dropped)
-  const minimum = state.settings.structure === "pods" ? MIN_POD_SIZE : 2
-  if (active.length < minimum)
-    throw eventError(
-      "not_enough_players",
-      `At least ${minimum} players are needed to start a round`,
-    )
+  const blocker = startRoundBlocker({
+    ...state,
+    structure: state.settings.structure,
+    tables: state.tables.filter((table) => table.round === state.round),
+  })
+  if (blocker) throw roundBlockerError(blocker)
   const pair = state.settings.structure === "pods" ? pairPodRound : pairSwissRound
   const pairings = pair({
     players: state.players,
@@ -173,9 +214,60 @@ export function assertResult(
   }
 }
 
-function seatOf(table: EventTable, actor: EventActor) {
-  if (actor.kind !== "player") return -1
-  return table.playerIds.indexOf(actor.playerId)
+const REFUSALS = {
+  notStarted: { message: "This event hasn't started" },
+  finished: { code: "event_finished", message: "This event has finished" },
+  notRunning: { message: "This event isn't running a round" },
+  bye: { message: "A bye's result can't change" },
+  notYourReport: { message: "You can only report your own table" },
+  earlierRound: { message: "Only the organizer can change an earlier round" },
+  confirmed: {
+    code: "result_confirmed",
+    message: "Ask the organizer to change a confirmed result",
+  },
+  nothingToConfirm: { code: "nothing_to_confirm", message: "There's no result to confirm" },
+  notYourConfirm: { message: "You can only confirm your own table" },
+  ownReport: { message: "Another player at your table confirms your report" },
+} as const satisfies Record<string, { code?: EventErrorCode; message: string }>
+
+export type EventRefusal = keyof typeof REFUSALS
+
+function refusalError(refusal: EventRefusal) {
+  const { code, message }: { code?: EventErrorCode; message: string } = REFUSALS[refusal]
+  return code ? eventError(code, message) : new Error(message)
+}
+
+type ResultState = {
+  status: EventStatus
+  round: number
+  table: Pick<EventTable, "round" | "playerIds" | "status"> & {
+    readonly result?: TableResult | null
+    readonly reportedBy?: string | null
+  }
+}
+
+const seated = (table: ResultState["table"], playerId: string) => table.playerIds.includes(playerId)
+
+export function reportRefusal(state: ResultState, actor: EventActor): EventRefusal | undefined {
+  const { table } = state
+  if (state.status === "registration") return "notStarted"
+  if (table.result?.kind === "bye") return "bye"
+  if (state.status !== "active") return "finished"
+  if (actor.kind === "organizer") return undefined
+  if (!seated(table, actor.playerId)) return "notYourReport"
+  if (table.round !== state.round) return "earlierRound"
+  if (table.status === "confirmed") return "confirmed"
+  return undefined
+}
+
+export function confirmRefusal(state: ResultState, actor: EventActor): EventRefusal | undefined {
+  const { table } = state
+  if (state.status !== "active") return "notRunning"
+  if (table.status !== "reported" || !table.result) return "nothingToConfirm"
+  if (actor.kind === "organizer") return undefined
+  if (!seated(table, actor.playerId)) return "notYourConfirm"
+  if (table.reportedBy === actor.playerId) return "ownReport"
+  return undefined
 }
 
 type TablePatch = Pick<EventTable, "result" | "status" | "reportedBy">
@@ -185,18 +277,12 @@ export function reportResult(
   actor: EventActor,
   result: TableResult | null,
 ): TablePatch {
-  const { table } = state
-  if (state.status === "registration") throw new Error("This event hasn't started")
-  if (table.result?.kind === "bye") throw new Error("A bye's result can't change")
+  const refusal = reportRefusal(state, actor)
+  if (refusal) throw refusalError(refusal)
   if (actor.kind === "organizer")
     return result === null
       ? { result: undefined, status: "open", reportedBy: undefined }
       : { result, status: "confirmed", reportedBy: undefined }
-  if (state.status !== "active") throw eventError("event_finished", "This event has finished")
-  if (seatOf(table, actor) < 0) throw new Error("You can only report your own table")
-  if (table.round !== state.round) throw new Error("Only the organizer can change an earlier round")
-  if (table.status === "confirmed")
-    throw eventError("result_confirmed", "Ask the organizer to change a confirmed result")
   if (result === null) throw new Error("Only the organizer can clear a result")
   return { result, status: "reported", reportedBy: actor.playerId }
 }
@@ -205,15 +291,9 @@ export function confirmResult(
   state: { status: EventStatus; round: number; table: EventTable },
   actor: EventActor,
 ): TablePatch {
+  const refusal = confirmRefusal(state, actor)
+  if (refusal) throw refusalError(refusal)
   const { table } = state
-  if (state.status !== "active") throw new Error("This event isn't running a round")
-  if (table.status !== "reported" || !table.result)
-    throw eventError("nothing_to_confirm", "There's no result to confirm")
-  if (actor.kind === "player") {
-    if (seatOf(table, actor) < 0) throw new Error("You can only confirm your own table")
-    if (table.reportedBy === actor.playerId)
-      throw new Error("Another player at your table confirms your report")
-  }
   return { result: table.result, status: "confirmed", reportedBy: table.reportedBy }
 }
 

@@ -19,10 +19,14 @@ import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
-import { chunk, clockPhase, fitGrid, formatClock, standingsThroughRound } from "./display"
+import { chunk, clockPhase, fitGrid, formatClock } from "./display"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import { clockRemainingMs, type EventClock } from "../../../convex/lib/events/commands"
+import {
+  clockRemainingMs,
+  standingsThroughRound,
+  type EventClock,
+} from "../../../convex/lib/events/commands"
 import { formatDefinition } from "../../../convex/lib/systems"
 
 type EventView = NonNullable<FunctionReturnType<typeof api.events.view>>
@@ -114,7 +118,7 @@ function useSize() {
 
 function EventBoard({ eventId, s }: { eventId: Id<"events">; s: Styles }) {
   const event = useQuery(api.events.view, { eventId })
-  const through = event ? standingsThroughRound(event) : null
+  const through = event ? standingsThroughRound(event) : 0
   const standings = useQuery(
     api.events.standings,
     through ? { eventId, throughRound: through } : "skip",

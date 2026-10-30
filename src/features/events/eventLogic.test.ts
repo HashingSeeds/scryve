@@ -1,13 +1,17 @@
 import {
+  canConfirm,
+  canReport,
   eventErrorText,
   localClockFor,
   matchSetupFor,
-  nextRoundBlocker,
   resultIsValid,
-  standingsThroughRound,
 } from "./eventLogic"
 import type { EventTableView, EventView } from "./eventSource"
-import { eventError } from "../../../convex/lib/events/commands"
+import {
+  eventError,
+  standingsThroughRound,
+  startRoundBlocker,
+} from "../../../convex/lib/events/commands"
 
 const table = (overrides: Partial<EventTableView> = {}): EventTableView => ({
   id: "t1",
@@ -57,14 +61,30 @@ describe("standingsThroughRound", () => {
   })
 })
 
-describe("nextRoundBlocker", () => {
+describe("startRoundBlocker", () => {
   it("names what stops the next round", () => {
-    expect(nextRoundBlocker(event())).toEqual({ kind: "results" })
-    expect(nextRoundBlocker(event({ tables: [reported] }))).toBeUndefined()
-    expect(nextRoundBlocker(event({ structure: "pods", round: 0, tables: [] }))).toEqual({
+    expect(startRoundBlocker(event())).toEqual({ kind: "results" })
+    expect(startRoundBlocker(event({ tables: [reported] }))).toBeUndefined()
+    expect(startRoundBlocker(event({ structure: "pods", round: 0, tables: [] }))).toEqual({
       kind: "players",
       count: 3,
     })
+  })
+})
+
+describe("canReport and canConfirm", () => {
+  it("offer no result change on a finished event, not even to the organizer", () => {
+    const finished = event({ status: "finished", isOrganizer: true })
+    expect(canReport(event({ isOrganizer: true }), reported)).toBe(true)
+    expect(canReport(finished, reported)).toBe(false)
+    expect(canConfirm(finished, { ...reported, status: "reported", reportedBy: "b" })).toBe(false)
+  })
+
+  it("let a player confirm only an opponent's report at their own table", () => {
+    const theirs = { ...reported, status: "reported", reportedBy: "b" } as const
+    expect(canConfirm(event(), theirs)).toBe(true)
+    expect(canConfirm(event(), { ...theirs, reportedBy: "a" })).toBe(false)
+    expect(canConfirm(event({ myPlayerId: "c" }), theirs)).toBe(false)
   })
 })
 

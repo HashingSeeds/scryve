@@ -9,14 +9,14 @@ import type { EventTableView, EventView } from "./eventSource"
 import {
   assertResult,
   clockRemainingMs,
-  roundComplete,
+  confirmRefusal,
+  reportRefusal,
+  type EventActor,
   type EventClock,
   type EventErrorCode,
 } from "../../../convex/lib/events/commands"
-import { MAX_EVENT_ROUNDS, MIN_POD_SIZE, type TableResult } from "../../../convex/lib/events/model"
+import type { TableResult } from "../../../convex/lib/events/model"
 import { eventRules, type Tiebreaker } from "../../../convex/lib/events/rules"
-
-type RoundState = Pick<EventView, "round" | "tables">
 
 type EventSummary = Pick<EventView, "system" | "format" | "structure" | "status" | "round"> & {
   bestOf?: EventView["bestOf"]
@@ -35,40 +35,6 @@ export function eventMeta(event: EventSummary) {
 export const eventStatusText = (event: EventSummary) =>
   translate(`events:status.${event.status}`, { round: event.round })
 
-export function roundHasEveryResult({ round, tables }: RoundState) {
-  return roundComplete(
-    tables.map((table) => ({
-      round,
-      table: table.table,
-      playerIds: table.playerIds,
-      status: table.status,
-      result: table.result ?? undefined,
-    })),
-  )
-}
-
-export function standingsThroughRound(view: RoundState & Pick<EventView, "status">) {
-  if (view.round === 0) return 0
-  if (view.status === "finished") return view.round
-  return roundHasEveryResult(view) ? view.round : view.round - 1
-}
-
-export type RoundBlocker =
-  | { kind: "finished" }
-  | { kind: "results" }
-  | { kind: "players"; count: number }
-  | { kind: "maxRounds" }
-
-export function nextRoundBlocker(view: EventView): RoundBlocker | undefined {
-  if (view.status === "finished") return { kind: "finished" }
-  if (!roundHasEveryResult(view)) return { kind: "results" }
-  const minimum = view.structure === "pods" ? MIN_POD_SIZE : 2
-  if (view.players.filter((player) => !player.dropped).length < minimum)
-    return { kind: "players", count: minimum }
-  if (view.round >= MAX_EVENT_ROUNDS) return { kind: "maxRounds" }
-  return undefined
-}
-
 export function myTable(view: EventView) {
   const me = view.myPlayerId
   return me ? view.tables.find((table) => table.playerIds.includes(me)) : undefined
@@ -78,28 +44,29 @@ export function playerName(view: EventView, playerId: string) {
   return view.players.find((player) => player.id === playerId)?.name ?? "?"
 }
 
-const isBye = (table: EventTableView) => table.result?.kind === "bye"
+const actorOf = (view: EventView): EventActor | undefined =>
+  view.isOrganizer
+    ? { kind: "organizer" }
+    : view.myPlayerId
+      ? { kind: "player", playerId: view.myPlayerId }
+      : undefined
 
-export function canReport(view: EventView, table: EventTableView) {
-  if (view.status !== "active" || isBye(table)) return false
-  if (view.isOrganizer) return true
+function canChange(refusal: typeof reportRefusal, view: EventView, table: EventTableView) {
+  const actor = actorOf(view)
   return (
-    view.status === "active" &&
-    table.status !== "confirmed" &&
-    view.myPlayerId !== null &&
-    table.playerIds.includes(view.myPlayerId)
+    actor !== undefined &&
+    refusal(
+      { status: view.status, round: view.round, table: { ...table, round: view.round } },
+      actor,
+    ) === undefined
   )
 }
 
-export function canConfirm(view: EventView, table: EventTableView) {
-  if (view.status !== "active" || table.status !== "reported") return false
-  if (view.isOrganizer) return true
-  return (
-    view.myPlayerId !== null &&
-    table.playerIds.includes(view.myPlayerId) &&
-    table.reportedBy !== view.myPlayerId
-  )
-}
+export const canReport = (view: EventView, table: EventTableView) =>
+  canChange(reportRefusal, view, table)
+
+export const canConfirm = (view: EventView, table: EventTableView) =>
+  canChange(confirmRefusal, view, table)
 
 export function resultIsValid(view: EventView, table: EventTableView, result: TableResult) {
   if (!isPlaySystemId(view.system)) return false

@@ -1,7 +1,7 @@
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
 import { normalizeHttpsOrigin } from "@/utils/httpsOrigin"
 
-import type { EventClock, EventStatus } from "../../../convex/lib/events/commands"
+import type { EventClock } from "../../../convex/lib/events/commands"
 
 export function eventDisplayUrl(origin: string, code: string) {
   const site = normalizeHttpsOrigin(origin)
@@ -47,14 +47,4 @@ export function fitGrid(area: {
   const columns = Math.min(maxColumns, Math.max(1, Math.ceil(area.count / maxRows)))
   const rows = Math.min(maxRows, Math.max(1, Math.ceil(area.count / columns)))
   return { rows, columns, pages: Math.max(1, Math.ceil(area.count / (rows * columns))) }
-}
-
-export function standingsThroughRound(event: {
-  status: EventStatus
-  round: number
-  tables: readonly { result: unknown }[]
-}) {
-  if (event.status === "registration") return null
-  if (event.status === "finished") return event.round
-  return event.tables.every((table) => table.result !== null) ? event.round : event.round - 1
 }

@@ -4,7 +4,7 @@ import { createHubEvent, hubStandings, hubView, joinHub, type HubEvent } from ".
 import { applyHostMessage } from "./nearbyEventFeed"
 import { nearbyEventHost } from "./nearbyEventHost"
 import type { NearbyGuestMessage, NearbyHostMessage } from "./nearbyEventProtocol"
-import { standingsThroughRound } from "../eventLogic"
+import { standingsThroughRound } from "../../../../convex/lib/events/commands"
 
 jest.mock("@/features/lan/lanTransport", () => ({ hostLan: jest.fn() }))
 

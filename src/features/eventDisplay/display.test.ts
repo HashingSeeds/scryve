@@ -1,11 +1,4 @@
-import {
-  chunk,
-  clockPhase,
-  eventDisplayUrl,
-  fitGrid,
-  formatClock,
-  standingsThroughRound,
-} from "./display"
+import { chunk, clockPhase, eventDisplayUrl, fitGrid, formatClock } from "./display"
 
 describe("eventDisplayUrl", () => {
   it("builds the display link from the site origin and a normalized code", () => {
@@ -74,23 +67,5 @@ describe("fitGrid", () => {
     expect(
       fitGrid({ count: 0, width: 10, height: 10, rowHeight: 50, minColumnWidth: 800 }),
     ).toEqual({ rows: 1, columns: 1, pages: 1 })
-  })
-})
-
-describe("standingsThroughRound", () => {
-  const done = { result: { kind: "bye" } }
-  const open = { result: null }
-
-  it("has no standings during registration", () => {
-    expect(standingsThroughRound({ status: "registration", round: 0, tables: [] })).toBeNull()
-  })
-
-  it("counts the current round only once every table has a result", () => {
-    expect(standingsThroughRound({ status: "active", round: 3, tables: [done, open] })).toBe(2)
-    expect(standingsThroughRound({ status: "active", round: 3, tables: [done, done] })).toBe(3)
-  })
-
-  it("counts every round once the event finishes", () => {
-    expect(standingsThroughRound({ status: "finished", round: 4, tables: [open] })).toBe(4)
   })
 })
