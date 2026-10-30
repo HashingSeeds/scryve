@@ -561,9 +561,6 @@ export function PlayerGrid({
                             onUndo: stable(`undo:${player.id}`, () =>
                               attack.dispatch({ type: "undo", to: player.id }),
                             ),
-                            onAdjust: stable(`adjust:${player.id}`, (step: number, slot: number) =>
-                              attack.dispatch({ type: "adjust", to: player.id, slot, step }),
-                            ),
                             ...(attack.stagedTargets !== undefined &&
                             attack.armedPlayerId === player.id
                               ? {

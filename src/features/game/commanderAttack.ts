@@ -23,7 +23,6 @@ export type AttackAction =
   | { type: "bench"; slot: number }
   | { type: "hit"; to: PlayerId }
   | { type: "undo"; to: PlayerId }
-  | { type: "adjust"; to: PlayerId; slot: number; step: number }
 
 export type AttackBoard = {
   recorded: (from: PlayerId, to: PlayerId, commander: CommanderSlot) => number
@@ -137,11 +136,6 @@ export function reduceAttack(
         to: action.to,
         deltas: view.takeBacks.map((amount) => -amount),
       })
-    }
-    case "adjust": {
-      if (!armed || armed === action.to) return { state }
-      const deltas = COMMANDER_SLOTS.map((_, slot) => (slot === action.slot ? action.step : 0))
-      return land(state, board, armed, { to: action.to, deltas })
     }
   }
 }

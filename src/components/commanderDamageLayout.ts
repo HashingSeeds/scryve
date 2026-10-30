@@ -2,6 +2,8 @@ import { Platform } from "react-native"
 
 import type { PlayerId } from "@/features/game/types"
 
+import { getLifeLineHeight } from "./playerCardTypes"
+
 export interface CommanderBoardSeat {
   playerId: PlayerId
   row: number
@@ -157,25 +159,72 @@ export function commanderReach(input: {
 export interface CommanderTakeover {
   content: { width: number; height: number }
   disc: number
+  // why: a readout too big for the disc its card has room for shrinks into it while the attack holds the card.
+  fit: number
   discOffset: { x: number; y: number }
   cardDiscOffset: { x: number; y: number }
-  badges: { x: number; y: number; angle: number; size: number; distance: number }[]
-  cardBadges: { x: number; y: number }[]
+  // why: toward the attacker in the card's upright content space, where the damage arc starts.
+  angle: number
+  // why: a hit knocks the card away from the attacker, in the card's own space.
   knock: { x: number; y: number }
-  // why: the attacker's card in this card's own space, from its top-left corner.
-  flood?: { x: number; y: number } & Pick<CommanderReach, "card" | "distance">
+  // why: the attacker's card in this card's own space, from its top-left corner. `discGap` is how far that card must grow to cover the disc's center.
+  flood?: { x: number; y: number; discGap: number } & Pick<CommanderReach, "card" | "distance">
 }
 
-// why: undo and the menu button sit in a card's corners and would cover a badge parked there.
-const CORNER_CLEARANCE = 52
-const BADGE_GAP = 6
-const ANGLE_STEP = Math.PI / 90
+/** why: the box a seat's readout inks, in its own upright space. `y` places the box's center below the card's center. */
+export interface ReadoutInk {
+  width: number
+  height: number
+  y: number
+}
+
+// why: the disc keeps this gap from the card's edges.
+const DISC_GAP = 6
+// why: a readout never shrinks past legibility, even if it then runs past a tiny card's disc.
+const MIN_FIT = 0.6
 // why: Rubik Bold digits ink about 0.64em wide and 0.72em tall, and the disc keeps clear of the ink box's corners by DISC_CLEARANCE.
 const DIGIT_INK_WIDTH = 0.64
 const DIGIT_INK_HEIGHT = 0.72
 const DISC_CLEARANCE = 0.08
 // why: a total's line box is centred on the card, but its digits sit high in it (measured on iOS; Android and web from Rubik's metrics and each line-height model), so the disc rises to meet them.
 const DIGIT_RISE = Platform.select({ ios: 0.043, android: 0.037, default: 0.0125 })
+
+// why: an out seat's second line under its big number. LifeCard styles it from these, so the disc that rings it stays in step.
+export const STRUCK_LIFE = { fontSize: 22, lineHeight: 28 } as const
+export const OUT_LABEL = { fontSize: 14, lineHeight: 24, marginTop: -8 } as const
+export const OUT_CAUSE_GAP = 6
+
+export function lifeInk(fontSize: number, digits: number): ReadoutInk {
+  return {
+    width: Math.max(digits, 2) * DIGIT_INK_WIDTH * fontSize,
+    height: DIGIT_INK_HEIGHT * fontSize,
+    y: -DIGIT_RISE * fontSize,
+  }
+}
+
+/** why: an out seat stacks a smaller line (its struck total, or OUT) under its big number, and a cause glyph `lead`s wide may sit before that number. */
+export function outInk(input: {
+  fontSize: number
+  digits: number
+  lead?: number
+  below: { fontSize: number; lineHeight: number; marginTop?: number; chars: number }
+}): ReadoutInk {
+  const { fontSize, below } = input
+  const top = getLifeLineHeight(fontSize)
+  const column = top + (below.marginTop ?? 0) + below.lineHeight
+  const number = lifeInk(fontSize, input.digits)
+  const inkTop = -column / 2 + top / 2 + number.y - number.height / 2
+  const inkBottom =
+    column / 2 - below.lineHeight / 2 + (DIGIT_INK_HEIGHT / 2 - DIGIT_RISE) * below.fontSize
+  return {
+    width: Math.max(
+      (input.lead ?? 0) + number.width,
+      below.chars * DIGIT_INK_WIDTH * below.fontSize,
+    ),
+    height: inkBottom - inkTop,
+    y: (inkTop + inkBottom) / 2,
+  }
+}
 
 function rotate(x: number, y: number, degrees: number) {
   const radians = (degrees * Math.PI) / 180
@@ -189,80 +238,44 @@ export function commanderTakeover(input: {
   card: { width: number; height: number }
   rotation: number
   lifeFontSize: number
-  lifeDigits: number
-  badgeSize: number
-  badgeCount?: number
+  ink: ReadoutInk
   reach?: CommanderReach
 }): CommanderTakeover {
-  const { card, rotation, lifeFontSize, badgeSize, badgeCount = 1, reach } = input
+  const { card, rotation, lifeFontSize, ink, reach } = input
   const sideways = Math.abs(rotation) === 90
   const content = sideways
     ? { width: card.height, height: card.width }
     : { width: card.width, height: card.height }
-  const textWidth = Math.max(input.lifeDigits, 2) * DIGIT_INK_WIDTH * lifeFontSize
-  const textHeight = lifeFontSize * DIGIT_INK_HEIGHT
-  const discOffset = { x: 0, y: -DIGIT_RISE * lifeFontSize }
+  const needed = Math.hypot(ink.width, ink.height) / 2 + lifeFontSize * DISC_CLEARANCE
   const disc = Math.max(
     0,
-    Math.min(
-      Math.hypot(textWidth, textHeight) / 2 + lifeFontSize * DISC_CLEARANCE,
-      Math.min(content.width, content.height) / 2 - BADGE_GAP - Math.abs(discOffset.y),
-    ),
+    Math.min(needed, Math.min(content.width, content.height) / 2 - DISC_GAP - Math.abs(ink.y)),
   )
-  const distance = disc + badgeSize / 2 + BADGE_GAP
+  const fit = needed > 0 ? Math.max(MIN_FIT, disc / needed) : 1
+  // why: the readout shrinks about the card's center, so its ink center moves in with it.
+  const discOffset = { x: 0, y: ink.y * fit }
   const toward = reach ? rotate(reach.x, reach.y, -rotation) : { x: 0, y: -1 }
-  const wanted = Math.atan2(toward.y, toward.x)
-  const half = badgeSize / 2 + 4
-  const spread = 2 * Math.asin(Math.min(1, (badgeSize + BADGE_GAP) / (2 * distance)))
-  const anglesAround = (center: number) =>
-    Array.from(
-      { length: badgeCount },
-      (_, index) => center + (index - (badgeCount - 1) / 2) * spread,
-    )
-  const fitsOne = (angle: number) => {
-    const x = discOffset.x + Math.cos(angle) * distance
-    const y = discOffset.y + Math.sin(angle) * distance
-    const inside =
-      Math.abs(x) + half <= content.width / 2 && Math.abs(y) + half <= content.height / 2
-    const inCorner =
-      Math.abs(x) + half > content.width / 2 - CORNER_CLEARANCE &&
-      Math.abs(y) + half > content.height / 2 - CORNER_CLEARANCE
-    return inside && !inCorner
-  }
-  const fits = (center: number) => anglesAround(center).every(fitsOne)
-  let angle = wanted
-  search: for (let offset = 0; offset <= Math.PI; offset += ANGLE_STEP)
-    for (const candidate of [wanted + offset, wanted - offset])
-      if (fits(candidate)) {
-        angle = candidate
-        break search
-      }
+  const angle = Math.atan2(toward.y, toward.x)
   const outward = rotate(Math.cos(angle), Math.sin(angle), rotation)
+  const cardDiscOffset = rotate(discOffset.x, discOffset.y, rotation)
+  const floodAt = reach && { x: card.width / 2 + reach.x, y: card.height / 2 + reach.y }
   return {
     content,
     disc,
+    fit,
     discOffset,
-    cardDiscOffset: rotate(discOffset.x, discOffset.y, rotation),
-    badges: anglesAround(angle).map((badgeAngle) => ({
-      x: discOffset.x + Math.cos(badgeAngle) * distance,
-      y: discOffset.y + Math.sin(badgeAngle) * distance,
-      angle: badgeAngle,
-      size: badgeSize,
-      distance,
-    })),
-    cardBadges: anglesAround(angle).map((badgeAngle) =>
-      rotate(
-        discOffset.x + Math.cos(badgeAngle) * distance,
-        discOffset.y + Math.sin(badgeAngle) * distance,
-        rotation,
-      ),
-    ),
+    cardDiscOffset,
+    angle,
     knock: { x: -outward.x, y: -outward.y },
-    flood: reach && {
-      x: card.width / 2 + reach.x,
-      y: card.height / 2 + reach.y,
-      card: reach.card,
-      distance: reach.distance,
-    },
+    flood: reach &&
+      floodAt && {
+        ...floodAt,
+        card: reach.card,
+        distance: reach.distance,
+        discGap: Math.max(
+          Math.abs(card.width / 2 + cardDiscOffset.x - floodAt.x) - reach.card.width / 2,
+          Math.abs(card.height / 2 + cardDiscOffset.y - floodAt.y) - reach.card.height / 2,
+        ),
+      },
   }
 }
