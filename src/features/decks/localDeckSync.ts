@@ -15,12 +15,18 @@ import { useDeckVersionWrites } from "./decksVersionWrites"
 import {
   acknowledgeGuestDeckImport,
   deleteGuestDeck,
+  guestDeckRouteId,
   loadGuestDeck,
   saveGuestDeck,
   useGuestDecks,
+  type GuestDeckPayload,
 } from "./guestDeck"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+
+export type DeckHome = "account" | "device"
+
+const SAVE_TO_ACCOUNT_WAIT_MS = 5000
 
 export type LocalDeckSyncResult =
   | { status: "synced"; deckId: Id<"decks"> }
@@ -250,6 +256,26 @@ export function useLocalDeckSync(ownerId: string | undefined) {
   )
 
   return { sync, keepOnDevice }
+}
+
+// why: the deck lands on this device first, so a failed account save (full, offline, conflict) still keeps it.
+export function useSaveNewDeck(ownerId: string | undefined) {
+  const { sync } = useLocalDeckSync(ownerId)
+  return useCallback(
+    async (payload: GuestDeckPayload, home: DeckHome) => {
+      const { localId } = saveGuestDeck(payload)
+      if (home === "account" && ownerId) {
+        // why: Convex holds a mutation through a dropped connection, so an unbounded wait would freeze the save; the sync keeps running and the device deck screen waits on it.
+        const result = await Promise.race([
+          sync(localId).catch(() => undefined),
+          new Promise<undefined>((resolve) => setTimeout(resolve, SAVE_TO_ACCOUNT_WAIT_MS)),
+        ])
+        if (result?.status === "synced") return result.deckId
+      }
+      return guestDeckRouteId(localId)
+    },
+    [ownerId, sync],
+  )
 }
 
 // why: moving snapshots the server copy, so a deck with edits still queued on this device would lose them.

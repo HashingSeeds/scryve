@@ -273,21 +273,22 @@ describe("DecksScreen", () => {
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
-  it("scrolls local decks in the same list as synced decks, each under its own label", () => {
-    for (let index = 0; index < 30; index++)
-      saveGuestDeck({ name: `Local ${index}`, format: "commander", game: "mtg", cards: [] })
+  it("lists account and device decks together, newest first, each marked with where it lives", () => {
+    const local = saveGuestDeck({ name: "Local deck", format: "commander", game: "mtg", cards: [] })
     const view = renderShelf()
-    const sectionList = view.UNSAFE_getByType(require("react-native").SectionList)
-    expect(sectionList.props.sections[0].key).toBe("synced")
     const list = within(view.getByTestId("decks-list"))
-    expect(list.getByText("On this device")).toBeTruthy()
-    expect(list.getByText("Local 0")).toBeTruthy()
-    expect(list.getByLabelText("Local 0, on this device")).toBeTruthy()
-    expect(list.getAllByTestId("device-glyph").length).toBeGreaterThan(0)
-    expect(
-      within(view.getByTestId("deck-card-existing-deck")).queryByTestId("device-glyph"),
-    ).toBeNull()
-    expect(list.getByText("Synced")).toBeTruthy()
+    expect(list.queryByText("Synced")).toBeNull()
+    expect(list.queryByText("On this device")).toBeNull()
+    const localCard = within(view.getByTestId(`deck-card-${guestDeckRouteId(local.localId)}`))
+    expect(localCard.getByTestId("deck-home-device")).toBeTruthy()
+    expect(localCard.queryByTestId("deck-home-account")).toBeNull()
+    const accountCard = within(view.getByTestId("deck-card-existing-deck"))
+    expect(accountCard.getByTestId("deck-home-account")).toBeTruthy()
+    expect(accountCard.queryByTestId("deck-home-device")).toBeNull()
+    const names = list.getAllByRole("button").map((button) => button.props.accessibilityLabel)
+    expect(names.indexOf("Local deck, on this device")).toBeLessThan(
+      names.indexOf("Existing Deck, in your account"),
+    )
   })
 
   it("shows a local deck's record from its key totals only while its account is signed in", () => {
@@ -382,7 +383,7 @@ describe("DecksScreen", () => {
     mockTotals = []
   })
 
-  it("leaves out the Synced label and the empty hint when only local decks exist", () => {
+  it("leaves out the empty hint when only local decks exist", () => {
     saveGuestDeck({ name: "Local only", format: "commander", game: "mtg", cards: [] })
     mockListMine.value = {
       decks: [],
@@ -482,7 +483,7 @@ describe("DecksScreen", () => {
     expect(view.getByText("3-2")).toBeTruthy()
     expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
     expect(view.getAllByText("Recent")).toHaveLength(1)
-    fireEvent.press(view.getByLabelText("Existing Deck"))
+    fireEvent.press(view.getByLabelText("Existing Deck, in your account"))
     expect(onSelect).toHaveBeenCalledWith({
       deckId: "existing-deck",
       name: "Existing Deck",
@@ -562,7 +563,7 @@ describe("DecksScreen", () => {
     expect(
       view.queryByTestId("deck-needs-review-standard-deck", { includeHiddenElements: true }),
     ).toBeNull()
-    expect(view.getByLabelText("Mono Red")).toBeTruthy()
+    expect(view.getByLabelText("Mono Red, in your account")).toBeTruthy()
   })
 
   it.each([
@@ -829,17 +830,14 @@ describe("DecksScreen", () => {
     fireEvent.press(view.getAllByText("Back to lobby")[0])
     expect(onBack).toHaveBeenCalledTimes(1)
   })
-  test("offers Sync on the on-device section, below synced decks", () => {
-    for (let index = 0; index < 30; index++)
+  test("offers Sync for decks only on this device above the one list", () => {
+    for (let index = 0; index < 3; index++)
       saveGuestDeck({ name: `Local ${index}`, format: "commander", game: "mtg", cards: [] })
     const view = renderShelf({
       access: { ready: true, loading: false, signedIn: true, ownerId: "owner", request: jest.fn() },
     })
-    const sectionList = view.UNSAFE_getByType(require("react-native").SectionList)
-    expect(sectionList.props.sections[0].key).toBe("synced")
-    expect(sectionList.props.sections[1].key).toBe("local")
-    expect(
-      within(view.getByTestId("local-deck-sync-header")).getByTestId("local-deck-sync-choose"),
-    ).toBeTruthy()
+    const header = within(view.getByTestId("local-deck-sync-header"))
+    expect(header.getByText("On this device")).toBeTruthy()
+    expect(header.getByTestId("local-deck-sync-choose")).toBeTruthy()
   })
 })
