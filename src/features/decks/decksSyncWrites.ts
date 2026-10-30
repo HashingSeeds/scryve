@@ -391,7 +391,12 @@ export class DeckMetadataWriteController {
       },
       send: async (action) => {
         for (const id of action.supersedes ?? []) this.repository.dismissFailed(id)
-        if (this.repository.loadFailed().some((failure) => failure.action.deckId === action.deckId))
+        const failed = this.repository
+          .loadFailed()
+          .filter((failure) => failure.action.deckId === action.deckId)
+        if (action.deleted)
+          for (const failure of failed) this.repository.dismissFailed(failure.action.operationId)
+        else if (failed.length)
           throw new ConvexError({
             code: "sync_conflict",
             message: DECK_CONFLICT_REASON,

@@ -528,8 +528,9 @@ describe("deck metadata writes", () => {
     expect(await t.run(async (ctx) => ctx.db.get(id))).toHaveProperty("archivedAt")
   })
 
-  it("deletes a deck that another device renamed after the delete was queued", async () => {
+  it("deletes a deck that another device renamed after an offline rename and delete", async () => {
     const { t, actor, id, controller } = await backendDeck()
+    controller.update(id, { name: "Offline rename" })
     controller.remove(id)
     await actor.mutation(api.decks.update, {
       deckId: id,
