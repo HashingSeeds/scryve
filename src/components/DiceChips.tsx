@@ -192,7 +192,7 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 0,
   gap: spacing.xxxs,
 })
-const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
@@ -200,10 +200,10 @@ const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: DICE_CHIP_HEIGHT,
   minWidth: DICE_CHIP_HEIGHT,
   paddingHorizontal: spacing.xs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1.5,
 })
-const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
@@ -211,7 +211,7 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: COMPACT_DICE_CHIP_HEIGHT,
   minWidth: 28,
   paddingHorizontal: spacing.xxs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1.5,
 })
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 18 })

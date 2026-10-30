@@ -199,7 +199,7 @@ function HistoryRow({
       </View>
       <View style={$styles.flex1}>
         <Text size="sm" weight="medium" numberOfLines={2} text={title} />
-        <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={subtitle} />
+        <Text size="xxs" numberOfLines={1} tone="dim" text={subtitle} />
       </View>
       {entry.match && !group ? null : (
         <View style={themed($dots)}>
@@ -209,17 +209,11 @@ function HistoryRow({
               style={[themed($dot), player.color ? { backgroundColor: player.color } : undefined]}
             />
           ))}
-          {extraPlayers > 0 ? (
-            <Text size="xxs" style={themed($dimmedText)} text={`+${extraPlayers}`} />
-          ) : null}
+          {extraPlayers > 0 ? <Text size="xxs" tone="dim" text={`+${extraPlayers}`} /> : null}
         </View>
       )}
       {group ? (
-        <Text
-          size="xs"
-          style={themed($dimmedText)}
-          text={expanded ? EXPANDED_CARET : COLLAPSED_CARET}
-        />
+        <Text size="xs" tone="dim" text={expanded ? EXPANDED_CARET : COLLAPSED_CARET} />
       ) : null}
     </TouchableOpacity>
   )
@@ -269,7 +263,7 @@ function ConnectedHistoryStatus({
         style={themed($row)}
       >
         <View style={themed($skeletonBadge)} />
-        <Text size="xs" style={themed($dimmedText)} tx="play:history.loadingConnected" />
+        <Text size="xs" tone="dim" tx="play:history.loadingConnected" />
       </View>
     )
 
@@ -443,7 +437,7 @@ export function HistoryScreen({
         ListHeaderComponent={
           <View style={themed($headerBlock)}>
             <Text preset="heading" tx="play:history.title" />
-            <Text size="xs" style={themed($dimmedText)} text={countLabel} />
+            <Text size="xs" tone="dim" text={countLabel} />
             {onAddPastGames ? (
               <TouchableOpacity
                 testID="history-add-past-games"
@@ -451,7 +445,7 @@ export function HistoryScreen({
                 style={$pastGames}
                 onPress={addPastGames}
               >
-                <Text size="xs" style={themed($dimmedText)} tx="play:history.addPastGames" />
+                <Text size="xs" tone="dim" tx="play:history.addPastGames" />
               </TouchableOpacity>
             ) : null}
             {pastGamesFailed ? <AlertNote text={translate("board:claim.saveFailed")} /> : null}
@@ -575,11 +569,7 @@ export function HistoryScreen({
                   }
                 />
                 {anyFilters ? (
-                  <Text
-                    size="xxs"
-                    style={themed($dimmedText)}
-                    tx="play:history.filtersLoadedNote"
-                  />
+                  <Text size="xxs" tone="dim" tx="play:history.filtersLoadedNote" />
                 ) : null}
               </>
             ) : null}
@@ -782,16 +772,16 @@ const $skeletonCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   gap: spacing.xs,
 })
-const $skeletonTitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonTitle: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "56%",
   height: 14,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonSubtitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonSubtitle: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "82%",
   height: 10,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
 const $skeletonDots: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -820,4 +810,3 @@ const $dot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.separator,
 })
 const $pastGames: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
-const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

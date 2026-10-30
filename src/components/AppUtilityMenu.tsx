@@ -333,10 +333,10 @@ const $dotsRow: ViewStyle = {
   justifyContent: "center",
   gap: 4,
 }
-const $dot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $dot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 5,
   height: 5,
-  borderRadius: 2.5,
+  borderRadius: radius.full,
   backgroundColor: colors.text,
 })
 const $items: ThemedStyle<ViewStyle> = () => ({ justifyContent: "center" })
@@ -354,18 +354,18 @@ const $settingsItem: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "flex-start",
   gap: spacing.xs,
 })
-const $inlineUpdateDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $inlineUpdateDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 7,
   height: 7,
-  borderRadius: 3.5,
+  borderRadius: radius.full,
   backgroundColor: colors.tint,
 })
-const $updateDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $updateDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   position: "absolute",
   top: 7,
   right: 7,
   width: 8,
   height: 8,
-  borderRadius: 4,
+  borderRadius: radius.full,
   backgroundColor: colors.tint,
 })

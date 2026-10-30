@@ -8,6 +8,7 @@ import { TextAction } from "@/components/TextAction"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import { fetchCardDetails, loadCardDetails } from "./cardDetailsCache"
@@ -68,7 +69,7 @@ export function DeckAnalysisTab({
           {analysis.incomplete ? (
             <Text
               size="xs"
-              style={themed($dim)}
+              tone="dim"
               tx="decks:analysis.incomplete"
               txOptions={analysis.incomplete}
               testID="deck-analysis-incomplete"
@@ -78,7 +79,7 @@ export function DeckAnalysisTab({
             <View style={$row}>
               <Text
                 size="xs"
-                style={themed($dim)}
+                tone="dim"
                 tx="decks:analysis.noCommander"
                 testID="deck-analysis-no-commander"
               />
@@ -102,7 +103,8 @@ export function DeckAnalysisTab({
           <Text size="sm" weight="medium" tx="decks:analysis.curve" />
           <Text
             size="xs"
-            style={[themed($dim), $tabular]}
+            tone="dim"
+            style={$tabular}
             tx="decks:analysis.average"
             txOptions={{ value: analysis.averageManaValue.toFixed(2) }}
           />
@@ -110,11 +112,7 @@ export function DeckAnalysisTab({
         <View style={themed($curve)} testID="deck-analysis-curve">
           {analysis.curve.map((count, value) => (
             <View key={value} style={themed($column)}>
-              <Text
-                size="xxs"
-                style={[themed($dim), $tabular]}
-                text={count > 0 ? String(count) : ""}
-              />
+              <Text size="xxs" tone="dim" style={$tabular} text={count > 0 ? String(count) : ""} />
               <View
                 style={[
                   themed($bar),
@@ -123,7 +121,8 @@ export function DeckAnalysisTab({
               />
               <Text
                 size="xxs"
-                style={[themed($dim), $tabular]}
+                tone="dim"
+                style={$tabular}
                 text={value === CURVE_BUCKETS - 1 ? `${value}+` : String(value)}
               />
             </View>
@@ -167,8 +166,8 @@ export function DeckAnalysisTab({
         <View style={themed($group)} testID="deck-analysis-colors">
           <View style={$colorRow}>
             <Text size="sm" weight="medium" tx="decks:analysis.colors" style={$flex} />
-            <Text size="xs" style={[themed($dim), $cell]} tx="decks:analysis.pips" />
-            <Text size="xs" style={[themed($dim), $cell]} tx="decks:analysis.sources" />
+            <Text size="xs" tone="dim" style={$cell} tx="decks:analysis.pips" />
+            <Text size="xs" tone="dim" style={$cell} tx="decks:analysis.sources" />
           </View>
           {analysis.colors.map(({ color, pips, sources }) => (
             <View key={color} style={$colorRow} testID={`deck-analysis-color-${color}`}>
@@ -213,7 +212,7 @@ export function DeckAnalysisTab({
             ]}
           />
           {analysis.freeMulligan ? (
-            <Text size="xs" style={themed($dim)} tx="decks:analysis.freeMulligan" />
+            <Text size="xs" tone="dim" tx="decks:analysis.freeMulligan" />
           ) : null}
         </View>
       ) : null}
@@ -221,26 +220,23 @@ export function DeckAnalysisTab({
       {analysis.missing > 0 ? (
         <Text
           size="xs"
-          style={themed($dim)}
+          tone="dim"
           tx="decks:analysis.missing"
           txOptions={{ count: analysis.missing }}
           testID="deck-analysis-missing"
         />
       ) : null}
-      {analysis.suggestedLands ? (
-        <Text size="xxs" style={themed($dim)} tx="decks:analysis.credit" />
-      ) : null}
+      {analysis.suggestedLands ? <Text size="xxs" tone="dim" tx="decks:analysis.credit" /> : null}
     </View>
   )
 }
 
 function Odds({ cells }: { cells: { label: string; chance: number }[] }) {
-  const { themed } = useAppTheme()
   return (
     <View style={$row}>
       {cells.map(({ label, chance }) => (
         <View key={label} style={$flex}>
-          <Text size="xxs" style={themed($dim)} text={label} />
+          <Text size="xxs" tone="dim" text={label} />
           <Text size="sm" weight="medium" style={$tabular} text={`${Math.round(chance * 100)}%`} />
         </View>
       ))}
@@ -249,10 +245,9 @@ function Odds({ cells }: { cells: { label: string; chance: number }[] }) {
 }
 
 function Line({ label, value, testID }: { label: string; value: string; testID: string }) {
-  const { themed } = useAppTheme()
   return (
     <View style={$between} testID={testID}>
-      <Text size="sm" style={themed($dim)} text={label} />
+      <Text size="sm" tone="dim" text={label} />
       <Text size="sm" weight="medium" style={$tabular} text={value} />
     </View>
   )
@@ -266,13 +261,12 @@ const $between: ViewStyle = {
   alignItems: "baseline",
 }
 const $tabular: TextStyle = { fontVariant: ["tabular-nums"] }
-const $dot: ViewStyle = { width: 10, height: 10, borderRadius: 5 }
+const $dot: ViewStyle = { width: 10, height: 10, borderRadius: radius.full }
 const $panel: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.md,
   gap: spacing.lg,
 })
 const $group: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $choose: ViewStyle = {
   minWidth: 44,
   minHeight: 44,
@@ -291,10 +285,10 @@ const $column: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
   minHeight: CURVE_HEIGHT + 32,
 })
-const $bar: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $bar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   alignSelf: "stretch",
   backgroundColor: colors.tint,
-  borderRadius: 2,
+  borderRadius: radius.xxs,
 })
 const $colorRow: ViewStyle = { flexDirection: "row", alignItems: "center" }
 const $cell: TextStyle = { width: 64, textAlign: "right" }

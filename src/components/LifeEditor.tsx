@@ -15,6 +15,7 @@ import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import { appLocale } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -459,7 +460,7 @@ export function LifeEditor({
 const styles = StyleSheet.create({
   action: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.md,
     flex: 1,
     justifyContent: "center",
     minHeight: 42,
@@ -473,7 +474,7 @@ const styles = StyleSheet.create({
   },
   balloonBody: {
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: radius.xxl,
     minWidth: 56,
     paddingHorizontal: 6,
     paddingVertical: 7,
@@ -487,14 +488,19 @@ const styles = StyleSheet.create({
   },
   center: { alignSelf: "center", height: 14, position: "absolute", width: 2 },
   closeButton: { alignItems: "center", height: 32, justifyContent: "center", width: 32 },
-  closeStroke: { borderRadius: 1, height: 2, position: "absolute", width: 20 },
+  closeStroke: { borderRadius: radius.full, height: 2, position: "absolute", width: 20 },
   compactAction: { minHeight: 36 },
   compactActions: { marginHorizontal: 6 },
   compactBalloon: { bottom: 42 },
   compactBalloonBody: { paddingVertical: 4 },
   compactOverlay: { gap: 4, padding: 6 },
   compactScrubArea: { height: 72 },
-  compactThumb: { borderRadius: 15, height: 30, transform: [{ translateX: -15 }], width: 30 },
+  compactThumb: {
+    borderRadius: radius.full,
+    height: 30,
+    transform: [{ translateX: -15 }],
+    width: 30,
+  },
   compactTrackTouch: { height: 52 },
   compactValue: { fontSize: 36, lineHeight: 42 },
   header: {
@@ -513,14 +519,14 @@ const styles = StyleSheet.create({
   },
   scrubArea: { height: 112, justifyContent: "flex-end", width: "90%" },
   thumb: {
-    borderRadius: 18,
+    borderRadius: radius.full,
     height: 36,
     position: "absolute",
     transform: [{ translateX: -18 }],
     width: 36,
   },
   title: { flex: 1 },
-  track: { borderRadius: 3, height: 6 },
+  track: { borderRadius: radius.full, height: 6 },
   trackTouch: { height: 68, justifyContent: "center", width: "100%" },
   value: { fontSize: 48, fontVariant: ["tabular-nums"], lineHeight: 56 },
 })

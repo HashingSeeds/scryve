@@ -2,6 +2,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 
 import { translate } from "@/i18n/translate"
+import { radius } from "@/theme/radius"
 
 interface RootErrorFallbackProps {
   error: Error
@@ -68,7 +69,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "flex-start",
     backgroundColor: fallbackColors.buttonBackground,
-    borderRadius: 8,
+    borderRadius: radius.md,
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
   },
   details: {
     backgroundColor: fallbackColors.detailsBackground,
-    borderRadius: 8,
+    borderRadius: radius.md,
     maxHeight: 240,
   },
   detailsContent: {

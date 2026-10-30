@@ -65,7 +65,7 @@ export function WhatYouPlayScreen({ defaultPlayerCount, onChoose }: WhatYouPlayS
             }
             onChoose={setChosen}
           />
-          <Text tx="play:whatYouPlay.changeLater" size="xs" style={themed($muted)} />
+          <Text tx="play:whatYouPlay.changeLater" size="xs" tone="dim" />
         </ScrollView>
       </View>
       <BottomActionBar style={$bar}>
@@ -84,7 +84,7 @@ export function WhatYouPlayScreen({ defaultPlayerCount, onChoose }: WhatYouPlayS
           {saveFailed ? (
             <Text accessibilityRole="alert" size="xs" tx="play:whatYouPlay.sharingSaveFailed" />
           ) : null}
-          <Text size="xs" style={themed($muted)}>
+          <Text size="xs" tone="dim">
             <Trans
               i18nKey="play:whatYouPlay.acceptance"
               components={{
@@ -142,7 +142,7 @@ const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $list: ViewStyle = { flex: 1 }
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $footer: ThemedStyle<ViewStyle> = (theme) => ({ ...$column(theme), gap: theme.spacing.sm })
-const $primaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({ borderRadius: radius.lg })
+const $primaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({ borderRadius: radius.xl })
 const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 

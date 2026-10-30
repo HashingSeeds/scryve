@@ -1226,12 +1226,7 @@ function NewGameForm({
       >
         <ScrollView contentContainerStyle={themed($statusDetails)}>
           {connectedMode && connected?.blockedReason ? (
-            <Text
-              accessibilityRole="alert"
-              size="xs"
-              text={connected.blockedReason}
-              style={themed($footerStatus)}
-            />
+            <Text accessibilityRole="alert" size="xs" text={connected.blockedReason} tone="dim" />
           ) : null}
           {connectedMode && connected?.error ? (
             <View style={themed($connectedError)}>
@@ -1292,7 +1287,7 @@ function NewGameForm({
                           ? "play:newGame.endGameEllipsis"
                           : "play:newGame.leaveGameEllipsis"
                       }
-                      style={themed($footerStatus)}
+                      tone="dim"
                     />
                   </TouchableOpacity>
                 </View>
@@ -1307,7 +1302,7 @@ function NewGameForm({
               {connected?.activeGamesNextPage?.status === "available" ? (
                 <Button tx="play:newGame.loadMore" onPress={connected.activeGamesNextPage.load} />
               ) : connected?.activeGamesNextPage?.status === "loading" ? (
-                <Text size="xs" style={themed($footerStatus)} tx="play:newGame.loadingMoreGames" />
+                <Text size="xs" tone="dim" tx="play:newGame.loadingMoreGames" />
               ) : null}
             </View>
           ) : null}
@@ -1391,7 +1386,7 @@ function NewGameForm({
           accessibilityViewIsModal
         >
           <Text preset="subheading" tx="play:newGame.hostSeatTitle" />
-          <Text size="xs" tx="play:newGame.hostSeatMessage" style={themed($footerStatus)} />
+          <Text size="xs" tx="play:newGame.hostSeatMessage" tone="dim" />
           {localGame.players.map((player) => (
             <Button
               key={player.id}
@@ -1513,7 +1508,6 @@ const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $footerAction: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $footerStack: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
 const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,

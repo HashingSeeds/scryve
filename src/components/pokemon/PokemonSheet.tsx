@@ -13,6 +13,7 @@ import {
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import { spacing } from "@/theme/spacing"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -779,10 +780,10 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxs + 2,
 })
-const $fieldWrapper: ThemedStyle<ViewStyle> = () => ({ borderRadius: 10 })
-const $ghost: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $fieldWrapper: ThemedStyle<ViewStyle> = () => ({ borderRadius: radius.lg })
+const $ghost: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 40,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   borderWidth: 1.5,
   paddingHorizontal: spacing.xs,
   justifyContent: "center",
@@ -790,24 +791,24 @@ const $ghost: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $bodyContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $compactBodyContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $resultsContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $result: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $result: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
   minHeight: 40,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   paddingHorizontal: spacing.sm,
 })
 const $prizeChoice: ThemedStyle<ViewStyle> = () => ({
   width: 36,
   height: 36,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   alignItems: "center",
   justifyContent: "center",
 })
 const $primary: ThemedStyle<ViewStyle> = () => ({
   minHeight: 36,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   alignItems: "center",
   justifyContent: "center",
 })
@@ -827,14 +828,14 @@ const $compactBig: ThemedStyle<TextStyle> = () => ({
 const $step: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   minHeight: 44,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   alignItems: "center",
   justifyContent: "center",
 })
 const $action: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   minHeight: 40,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   alignItems: "center",
   justifyContent: "center",
 })

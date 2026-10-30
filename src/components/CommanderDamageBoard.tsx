@@ -232,11 +232,11 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
 })
 
-const $cell: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $cell: ThemedStyle<ViewStyle> = ({ radius }) => ({
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 
 const $cellIdle: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { AppState, Linking, Platform, ScrollView, View } from "react-native"
 import { CameraView, ScanningResult, useCameraPermissions } from "expo-camera"
 import * as Haptics from "expo-haptics"
@@ -228,7 +228,7 @@ function ScannerLayout({
             accessibilityRole="header"
             tx={titleTx}
           />
-          {bodyTx ? <Text size="sm" style={themed($dimmed)} tx={bodyTx} /> : null}
+          {bodyTx ? <Text size="sm" tone="dim" tx={bodyTx} /> : null}
         </View>
         {notice}
       </ScrollView>
@@ -243,4 +243,3 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.lg,
 })
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

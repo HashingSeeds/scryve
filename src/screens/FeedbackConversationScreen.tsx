@@ -141,7 +141,7 @@ export function FeedbackConversationScreen({
         )
       }
     >
-      {thread === null ? <Text tx="feedback:thread.missing" style={themed($muted)} /> : null}
+      {thread === null ? <Text tx="feedback:thread.missing" tone="dim" /> : null}
       {opened ? null : (
         <>
           <SegmentedControl
@@ -165,7 +165,7 @@ export function FeedbackConversationScreen({
               onValueChange={onIncludeAccount}
             />
           ) : (
-            <Text size="xs" style={themed($muted)}>
+            <Text size="xs" tone="dim">
               {translate("feedback:suggest.anonymous")}{" "}
               <Text
                 size="xs"
@@ -176,7 +176,7 @@ export function FeedbackConversationScreen({
               />
             </Text>
           )}
-          <Text size="xs" style={themed($muted)}>
+          <Text size="xs" tone="dim">
             <Trans
               i18nKey="feedback:suggest.translationNotice"
               components={{
@@ -191,7 +191,7 @@ export function FeedbackConversationScreen({
               }}
             />
           </Text>
-          <Text tx="feedback:suggest.sentryDisclosure" size="xs" style={themed($muted)} />
+          <Text tx="feedback:suggest.sentryDisclosure" size="xs" tone="dim" />
         </>
       )}
       {request || outgoing !== undefined ? (
@@ -199,7 +199,7 @@ export function FeedbackConversationScreen({
           tx={`feedback:suggest.${request?.kind ?? kind}`}
           size="xxs"
           weight="bold"
-          style={themed($muted)}
+          tone="dim"
         />
       ) : null}
       {request ? (
@@ -285,10 +285,10 @@ function AccountStatus({
 }) {
   const { themed } = useAppTheme()
   if (request.linkedElsewhere)
-    return <Text tx="feedback:thread.linkedElsewhere" size="xs" style={themed($muted)} />
-  if (request.linked) return <Text tx="feedback:thread.linked" size="xs" style={themed($muted)} />
+    return <Text tx="feedback:thread.linkedElsewhere" size="xs" tone="dim" />
+  if (request.linked) return <Text tx="feedback:thread.linked" size="xs" tone="dim" />
   return (
-    <Text size="xs" style={themed($muted)}>
+    <Text size="xs" tone="dim">
       {translate("feedback:thread.notLinked")}{" "}
       <Text
         size="xs"
@@ -406,25 +406,25 @@ const $attachment: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-start",
   gap: spacing.xs,
 })
-const $thumbnail: ThemedStyle<ImageStyle> = ({ colors }) => ({
+const $thumbnail: ThemedStyle<ImageStyle> = ({ colors, radius }) => ({
   width: 48,
   height: 48,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: colors.surfaceRaised,
 })
-const $sentScreenshot: ThemedStyle<ImageStyle> = ({ colors }) => ({
+const $sentScreenshot: ThemedStyle<ImageStyle> = ({ colors, radius }) => ({
   width: 96,
   height: 160,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   resizeMode: "cover",
   backgroundColor: colors.surface,
 })
-const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $message: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   maxWidth: "85%",
   gap: spacing.xxs,
   paddingHorizontal: spacing.sm,
   paddingVertical: spacing.xs,
-  borderRadius: 12,
+  borderRadius: radius.xl,
 })
 const $mine: ThemedStyle<ViewStyle> = ({ colors }) => ({
   alignSelf: "flex-end",

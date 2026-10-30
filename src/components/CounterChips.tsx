@@ -8,6 +8,7 @@ import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
@@ -842,7 +843,7 @@ const $compactRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
 })
 
-const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxs,
@@ -850,12 +851,12 @@ const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minWidth: CHIP_SIZE,
   justifyContent: "center",
   paddingHorizontal: spacing.xs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1.5,
   borderColor: "transparent",
 })
 
-const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxxs,
@@ -863,7 +864,7 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minWidth: 28,
   justifyContent: "center",
   paddingHorizontal: spacing.xxs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1.5,
   borderColor: "transparent",
 })
@@ -930,11 +931,11 @@ const $sheetFooter: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
 })
 
-const $textButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $textButton: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 36,
   justifyContent: "center",
   paddingHorizontal: spacing.sm,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 
 const $optionScroll: ViewStyle = { flex: 1 }
@@ -950,21 +951,21 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
 
-const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
   minHeight: 40,
   paddingHorizontal: spacing.xs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 
-const $optionRule: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $optionRule: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   justifyContent: "center",
   minHeight: 40,
   paddingHorizontal: spacing.xs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 
 const $optionLabel: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
@@ -986,6 +987,6 @@ const $visuallyHidden: TextStyle = {
 const $selectedDot: ThemedStyle<ViewStyle> = () => ({
   width: 6,
   height: 6,
-  borderRadius: 3,
+  borderRadius: radius.full,
   marginLeft: "auto",
 })

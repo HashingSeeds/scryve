@@ -1181,7 +1181,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         >
           <View style={themed($dialogHeader)}>
             <Text tx="connected:board.finish.title" preset="subheading" />
-            <Text size="xs" tx="connected:board.finish.subtitle" style={themed($dialogSubtitle)} />
+            <Text size="xs" tx="connected:board.finish.subtitle" tone="dim" />
           </View>
           <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
             {game.players.map((player) => (
@@ -1301,7 +1301,7 @@ const $toastLayer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   elevation: 20,
   alignItems: "center",
 })
-const $statusToast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $statusToast: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   maxWidth: 420,
   minHeight: 40,
   flexDirection: "row",
@@ -1311,7 +1311,7 @@ const $statusToast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingHorizontal: spacing.sm,
   borderWidth: 1,
   borderColor: colors.board.border,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: colors.board.surfaceRaised,
 })
 const $unavailableToast: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.error })
@@ -1340,13 +1340,12 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({
   textAlign: "center",
 })
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
 })
 const FINISH_BLOCKERS = {
   offline: {
@@ -1504,10 +1503,10 @@ const $syncValue: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $statusScroll: ThemedStyle<ViewStyle> = () => ({ flexGrow: 0 })
 const $statusList: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
-const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   gap: spacing.xs,
   padding: spacing.sm,
   borderWidth: 1,
   borderColor: colors.error,
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
 })

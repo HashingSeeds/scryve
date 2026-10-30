@@ -25,6 +25,7 @@ import {
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { GameMenuActionKind } from "@/theme/gameMenu"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
@@ -1256,7 +1257,7 @@ const $toolDivider: ViewStyle = {
   top: (ACTION_HEIGHT - TOOL_DIVIDER_HEIGHT) / 2,
   width: 1.5,
   height: TOOL_DIVIDER_HEIGHT,
-  borderRadius: 0.75,
+  borderRadius: radius.full,
   opacity: 0.3,
 }
 const $bagAnchor: ViewStyle = { position: "absolute", zIndex: 30 }
@@ -1329,7 +1330,11 @@ const $statusLine: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.board.border,
   backgroundColor: colors.board.surface,
 })
-const $statusDot: ThemedStyle<ViewStyle> = () => ({ width: 9, height: 9, borderRadius: 4.5 })
+const $statusDot: ThemedStyle<ViewStyle> = () => ({
+  width: 9,
+  height: 9,
+  borderRadius: radius.full,
+})
 const $statusText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.board.text })
 const $disabledAction: ThemedStyle<ViewStyle> = () => ({ opacity: 0.42 })
 const $pressedAction: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })

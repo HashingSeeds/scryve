@@ -167,7 +167,7 @@ function ClaimPicker({
     >
       <View style={themed($header)}>
         <Text preset="subheading" tx="board:claim.title" />
-        <Text size="xs" style={themed($dim)} tx="board:claim.body" />
+        <Text size="xs" tone="dim" tx="board:claim.body" />
       </View>
       {candidates.length > 1 ? (
         <SeatMarks
@@ -204,7 +204,7 @@ function ClaimPicker({
                 </View>
                 <View style={$styles.flex1}>
                   <Text size="sm" weight="medium" numberOfLines={2} text={names} />
-                  <Text size="xxs" numberOfLines={1} style={themed($dim)} text={detailLine(unit)} />
+                  <Text size="xxs" numberOfLines={1} tone="dim" text={detailLine(unit)} />
                 </View>
               </Pressable>
               {selected ? (
@@ -221,7 +221,7 @@ function ClaimPicker({
           )
         })}
       </ScrollView>
-      <Text size="xxs" style={themed($dim)} tx="board:claim.seatNote" />
+      <Text size="xxs" tone="dim" tx="board:claim.seatNote" />
       {error ? <AlertNote text={error} /> : null}
       <View style={themed($dialogActions)}>
         <Button
@@ -340,7 +340,6 @@ export function LocalGameClaimPrompt({
 }
 
 const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $list: ViewStyle = { flexShrink: 1 }
 const $rows: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $game: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
@@ -356,12 +355,12 @@ const $markRow: ViewStyle = {
   flexWrap: "wrap",
   marginHorizontal: -(MARK_TARGET - MARK_SIZE) / 2,
 }
-const $mark: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $mark: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: MARK_TARGET,
   height: MARK_TARGET,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
   borderWidth: 2,
   borderColor: colors.transparent,
 })
@@ -393,5 +392,5 @@ const $checkMark: ThemedStyle<TextStyle> = ({ colors }) => ({
 const $action: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
 })

@@ -12,7 +12,7 @@ import { useAppTheme } from "@/theme/context"
 
 import type { JoinOutcome } from "./nearbyEventClient"
 import { nearbyEventCode, nearbyEventTitle } from "./nearbyEventProtocol"
-import { $dim, $grow, $row, $section, EventFrame } from "../EventFrame"
+import { $grow, $row, $section, EventFrame } from "../EventFrame"
 import { eventErrorText } from "../eventLogic"
 
 export function NearbyEventsScreen({
@@ -96,15 +96,15 @@ export function NearbyEventsScreen({
       {error ? <AlertNote testID="nearby-error" text={error} /> : null}
       <View style={themed($section)}>
         {denied ? (
-          <Text style={themed($dim)} tx="events:nearby.denied" />
+          <Text tone="dim" tx="events:nearby.denied" />
         ) : events.length === 0 ? (
-          <Text style={themed($dim)} tx="events:nearby.searching" />
+          <Text tone="dim" tx="events:nearby.searching" />
         ) : (
           events.map((service) => (
             <View key={service.name} style={themed($row)}>
               <View style={$grow}>
                 <Text weight="medium" numberOfLines={1} text={nearbyEventTitle(service.name)} />
-                <Text size="xxs" style={themed($dim)} text={nearbyEventCode(service.name)} />
+                <Text size="xxs" tone="dim" text={nearbyEventCode(service.name)} />
               </View>
               <Button
                 testID={`join-${nearbyEventCode(service.name)}`}

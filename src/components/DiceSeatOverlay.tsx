@@ -448,14 +448,16 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.
 const $layer: ViewStyle = { ...StyleSheet.absoluteFill, zIndex: 16 }
 const $fill: ViewStyle = StyleSheet.absoluteFill
-const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $overlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
   ...StyleSheet.absoluteFill,
   overflow: "hidden",
-  borderRadius: spacing.lg,
+  borderRadius: radius.xxxl,
   alignItems: "center",
   justifyContent: "center",
 })
-const $compactOverlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({ borderRadius: spacing.md })
+const $compactOverlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.xxl,
+})
 const $ring: ThemedStyle<ViewStyle> = () => ({ borderWidth: 3 })
 const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.board.background,
@@ -475,17 +477,17 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   marginTop: spacing.xs,
 })
-const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 44,
   paddingHorizontal: spacing.md,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1.5,
   justifyContent: "center",
 })
-const $compactOption: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $compactOption: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 38,
   paddingHorizontal: spacing.sm,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1.5,
   justifyContent: "center",
 })

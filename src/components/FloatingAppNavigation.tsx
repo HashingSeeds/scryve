@@ -90,14 +90,14 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "flex-end",
 })
 const $utilityAboveDestination: ViewStyle = { position: "absolute", left: 0, bottom: 0, zIndex: 1 }
-const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minWidth: 92,
   height: 44,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
   borderColor: colors.separator,
-  borderRadius: 22,
+  borderRadius: radius.full,
   backgroundColor: colors.surface,
   paddingHorizontal: spacing.md,
 })

@@ -827,15 +827,15 @@ const $boxName: TextStyle = { textAlign: "center", marginTop: -4, opacity: 0.75 
 const $boxGlyph: TextStyle = { opacity: 0.6 }
 const $boxGlyphDisabled: TextStyle = { opacity: 0.2 }
 
-const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $overlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 8,
   overflow: "hidden",
-  borderRadius: spacing.lg,
+  borderRadius: radius.xxxl,
 })
 
-const $compactOverlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  borderRadius: spacing.md,
+const $compactOverlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.xxl,
 })
 
 const $undo: ThemedStyle<ViewStyle> = () => ({

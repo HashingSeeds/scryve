@@ -61,6 +61,7 @@ import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
@@ -175,9 +176,7 @@ function DeckDetailPlaceholder({
               size="xl"
               text={summary?.name ?? translate("decks:deckView.title")}
             />
-            {loadingMetadata ? (
-              <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
-            ) : null}
+            {loadingMetadata ? <Text size="sm" tone="dim" text={loadingMetadata} /> : null}
             <LoadingProgress
               testID="deck-loading-progress"
               state={failure || access?.message ? "unavailable" : "loading"}
@@ -210,7 +209,7 @@ function DeckDetailPlaceholder({
               <Text preset="subheading" text={statusText} />
               <Text
                 size="sm"
-                style={themed($dimmedText)}
+                tone="dim"
                 tx={
                   failure.kind === "missing"
                     ? "decks:detail.maybeDeleted"
@@ -1317,23 +1316,14 @@ function DeckDetailContent({
                         text={deckVersionLabel(candidate, latestVersionNumber)}
                       />
                       {candidate.note ? (
-                        <Text
-                          size="xxs"
-                          style={themed($dimmedText)}
-                          text={candidate.note}
-                          numberOfLines={2}
-                        />
+                        <Text size="xxs" tone="dim" text={candidate.note} numberOfLines={2} />
                       ) : null}
                     </View>
                     <View style={themed($versionContext)}>
                       {candidateRecord.map((text) => (
                         <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
                       ))}
-                      <Text
-                        size="xxs"
-                        style={themed($dimmedText)}
-                        text={cardCountLabel(candidate.cardQuantity)}
-                      />
+                      <Text size="xxs" tone="dim" text={cardCountLabel(candidate.cardQuantity)} />
                     </View>
                   </TouchableOpacity>
                   {selected && view.canManageVersion ? (
@@ -1571,7 +1561,7 @@ const $versionMore: ViewStyle = {
 const $versionMark: ThemedStyle<ViewStyle> = () => ({
   width: 5,
   height: 34,
-  borderRadius: 3,
+  borderRadius: radius.full,
 })
 const $versionMarkSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.gameMenu.actions.history,
@@ -1597,8 +1587,6 @@ const $actionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $primaryActionButton: ViewStyle = { minWidth: 160, minHeight: 44 }
-
-const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
 const $conflictVersion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,

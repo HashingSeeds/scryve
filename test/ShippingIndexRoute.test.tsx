@@ -627,7 +627,7 @@ describe("shipping index route", () => {
           ? node.props.style({ pressed: false })
           : node.props.style
       const flat = StyleSheet.flatten(style)
-      expect(flat.borderRadius).toBe(darkTheme.radius.lg)
+      expect(flat.borderRadius).toBe(darkTheme.radius.xl)
       if (borderWidth !== undefined) expect(flat.borderWidth).toBe(borderWidth)
     }
   })

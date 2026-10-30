@@ -9,6 +9,7 @@ import { LifeLog, type LifeLogStep } from "@/features/game/LifeLog"
 import type { PlaySystemId } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -424,7 +425,12 @@ const $header: ViewStyle = { flexDirection: "row", alignItems: "center", minHeig
 const $title: TextStyle = { flex: 1 }
 const $closeSlot: ViewStyle = { flex: 1, alignItems: "flex-end" }
 const $close: ViewStyle = { alignItems: "center", height: 28, justifyContent: "center", width: 28 }
-const $closeStroke: ViewStyle = { borderRadius: 1, height: 2, position: "absolute", width: 18 }
+const $closeStroke: ViewStyle = {
+  borderRadius: radius.full,
+  height: 2,
+  position: "absolute",
+  width: 18,
+}
 const $columnReadout: ViewStyle = { flex: 1, justifyContent: "center", minHeight: 64 }
 const $centered: ViewStyle = { alignItems: "center" }
 const $centeredText: TextStyle = { textAlign: "center" }
@@ -441,7 +447,7 @@ const $keyRowBeside: ViewStyle = { flex: 1, gap: 4 }
 const $key: ViewStyle = {
   flex: 1,
   minWidth: 0,
-  borderRadius: 8,
+  borderRadius: radius.md,
   alignItems: "center",
   justifyContent: "center",
 }
@@ -449,7 +455,7 @@ const $actions: ViewStyle = { flexDirection: "row", gap: 5 }
 const $action: ViewStyle = {
   flex: 1,
   minHeight: 38,
-  borderRadius: 8,
+  borderRadius: radius.md,
   alignItems: "center",
   justifyContent: "center",
   paddingHorizontal: 4,

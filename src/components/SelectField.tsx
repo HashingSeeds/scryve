@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import type common from "@/i18n/en/common"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -232,9 +233,7 @@ function MenuOption({
           <Text text={label} numberOfLines={1} style={[themed($optionLabel), $shrink]} />
           {accessory}
         </View>
-        {detail ? (
-          <Text size="xs" text={detail} numberOfLines={2} style={themed($optionDetail)} />
-        ) : null}
+        {detail ? <Text size="xs" text={detail} numberOfLines={2} tone="dim" /> : null}
       </View>
       {selected ? (
         <Text text={CHECK_MARK} style={[themed($optionCheck), { color: colors.tint }]} />
@@ -249,7 +248,7 @@ const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   alignItems: "center",
   gap: spacing.sm,
   paddingHorizontal: spacing.sm,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.palette.neutral100,
@@ -257,8 +256,14 @@ const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
 const $triggerPressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.palette.neutral200,
 })
-const $triggerOpenDown: ViewStyle = { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
-const $triggerOpenUp: ViewStyle = { borderTopLeftRadius: 0, borderTopRightRadius: 0 }
+const $triggerOpenDown: ViewStyle = {
+  borderBottomLeftRadius: radius.none,
+  borderBottomRightRadius: radius.none,
+}
+const $triggerOpenUp: ViewStyle = {
+  borderTopLeftRadius: radius.none,
+  borderTopRightRadius: radius.none,
+}
 const $triggerText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $triggerLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
@@ -269,20 +274,20 @@ const $triggerValue: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $caret: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim, lineHeight: 20 })
 const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.transparent })
 const $menu: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.background,
 })
 const $menuAttachedDown: ViewStyle = {
   borderTopWidth: 0,
-  borderTopLeftRadius: 0,
-  borderTopRightRadius: 0,
+  borderTopLeftRadius: radius.none,
+  borderTopRightRadius: radius.none,
 }
 const $menuAttachedUp: ViewStyle = {
   borderBottomWidth: 0,
-  borderBottomLeftRadius: 0,
-  borderBottomRightRadius: 0,
+  borderBottomLeftRadius: radius.none,
+  borderBottomRightRadius: radius.none,
 }
 const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
@@ -291,7 +296,7 @@ const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxHeight: MIN_MENU_HEIGHT * 2,
 })
 const $menuClip: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  borderRadius: radius.lg - 1,
+  borderRadius: radius.xl - 1,
   overflow: "hidden",
 })
 const $dimmed: ViewStyle = { opacity: 0.5 }
@@ -315,7 +320,6 @@ const $optionPressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $optionText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $optionLabel: ThemedStyle<TextStyle> = () => ({ fontWeight: "400" })
-const $optionDetail: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $optionCheck: ThemedStyle<TextStyle> = () => ({ fontWeight: "700", lineHeight: 20 })
 
 const $optionName: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }

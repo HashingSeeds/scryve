@@ -112,7 +112,7 @@ export function PlayerActionsDialog({
             tx="connected:playerActions.reportPlayer"
             txOptions={{ name: selected.displayName }}
           />
-          <Text size="xs" style={themed($muted)} tx="connected:playerActions.reportExplanation" />
+          <Text size="xs" tone="dim" tx="connected:playerActions.reportExplanation" />
           <View style={themed($choices)}>
             {REPORT_REASONS.map((option) => (
               <ChoiceButton
@@ -169,7 +169,7 @@ export function PlayerActionsDialog({
       ) : (
         <View style={themed($section)}>
           <Text preset="subheading" tx="connected:playerActions.title" />
-          <Text size="xs" style={themed($muted)} tx="connected:playerActions.description" />
+          <Text size="xs" tone="dim" tx="connected:playerActions.description" />
           {onRole ? (
             <Button
               testID="role-from-players-button"
@@ -189,7 +189,7 @@ export function PlayerActionsDialog({
           ) : null}
           <ScrollView style={themed($list)}>
             {opponents.length === 0 ? (
-              <Text size="xs" style={themed($muted)} tx="connected:playerActions.noOtherPlayers" />
+              <Text size="xs" tone="dim" tx="connected:playerActions.noOtherPlayers" />
             ) : null}
             {opponents.map((player) => (
               <View key={player.playerId} style={themed($row)}>
@@ -203,7 +203,7 @@ export function PlayerActionsDialog({
                   <Text numberOfLines={1} text={player.displayName} style={themed($identityName)} />
                   <Text
                     size="xxs"
-                    style={themed($muted)}
+                    tone="dim"
                     tx="connected:seatNumber"
                     txOptions={{ seat: player.seat }}
                   />
@@ -263,4 +263,3 @@ const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $action: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 48 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

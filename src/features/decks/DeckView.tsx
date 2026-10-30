@@ -173,7 +173,7 @@ export function DeckView({
               <Text text={name} preset="heading" size="xl" />
               <Text
                 size="xs"
-                style={themed($dim)}
+                tone="dim"
                 text={[
                   deckGame(game)?.shortLabel ?? game,
                   deckFormatLabel(game, format),
@@ -232,7 +232,7 @@ export function DeckView({
                   <Text
                     size="sm"
                     tx={DECK_TAB_LABELS[value]}
-                    style={tab === value ? undefined : themed($dim)}
+                    tone={tab === value ? undefined : "dim"}
                   />
                 </TouchableOpacity>
               ))}
@@ -339,7 +339,8 @@ export function DeckView({
         <View style={themed($footer)}>
           <Text
             size="xxs"
-            style={[themed($dim), $flex]}
+            tone="dim"
+            style={$flex}
             text={
               dirty
                 ? translate("decks:deckView.unsaved")
@@ -387,7 +388,6 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.sm,
   paddingBottom: spacing.lg,
 })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $notLatest: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginLeft: spacing.sm,

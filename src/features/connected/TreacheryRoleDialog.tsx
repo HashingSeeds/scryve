@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
@@ -68,7 +68,7 @@ export function TreacheryRoleDialog({
       <Text tx={`connected:treachery.goals.${role}`} />
       <Text
         size="xs"
-        style={themed($muted)}
+        tone="dim"
         tx={
           revealed
             ? "connected:treachery.faceUp"
@@ -108,4 +108,3 @@ const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.xs,
 })
 const $action: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 48 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

@@ -19,7 +19,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { EventClockRow } from "./EventClockRow"
-import { $action, $actions, $dim, $grow, $row, $section, EventFrame } from "./EventFrame"
+import { $action, $actions, $grow, $row, $section, EventFrame } from "./EventFrame"
 import {
   canConfirm,
   canReport,
@@ -101,7 +101,6 @@ export function EventScreen({
   notice?: string
   showStoreScreen?: boolean
 }) {
-  const { themed } = useAppTheme()
   const { view } = source
   const command = useCommand()
   const [chosenTab, setTab] = useState<Tab>()
@@ -132,7 +131,7 @@ export function EventScreen({
   const organizerFooter =
     view?.isOrganizer && view.status !== "finished" ? (
       <>
-        {blocker ? <Text size="xs" style={themed($dim)} text={blockerText(blocker)} /> : null}
+        {blocker ? <Text size="xs" tone="dim" text={blockerText(blocker)} /> : null}
         {finalRound ? (
           <Button
             testID="finish-event-footer-button"
@@ -305,7 +304,7 @@ function RoundTab({
             />
           ) : (
             <Text
-              style={themed($dim)}
+              tone="dim"
               tx={
                 view.status === "registration"
                   ? "events:waitingToStart"
@@ -317,7 +316,7 @@ function RoundTab({
           )}
         </View>
       ) : view.status === "registration" ? (
-        <Text style={themed($dim)} tx="events:waitingToStart" />
+        <Text tone="dim" tx="events:waitingToStart" />
       ) : null}
       {view.isOrganizer && view.tables.length > 0 ? (
         <View style={themed($section)}>
@@ -399,7 +398,7 @@ function MyTable({
       {reportedByMe && !view.isOrganizer && confirmers > 0 ? (
         <Text
           size="xs"
-          style={themed($dim)}
+          tone="dim"
           tx="events:waitingForConfirm"
           txOptions={{ count: confirmers }}
         />
@@ -459,7 +458,7 @@ function TableRow({
       <Text style={$grow} numberOfLines={2} text={tablePlayers(view, table)} />
       <Text
         size="xs"
-        style={table.status === "open" ? themed($dim) : undefined}
+        tone={table.status === "open" ? "dim" : undefined}
         text={
           table.result
             ? `${resultText(view, table)}${table.status === "reported" ? ` · ${translate("events:tableStatus.reported")}` : ""}`
@@ -571,7 +570,7 @@ function PlayersTab({
             {player.guest || player.dropped ? (
               <Text
                 size="xs"
-                style={themed($dim)}
+                tone="dim"
                 text={[
                   ...(player.guest ? [translate("events:guest")] : []),
                   ...(player.dropped ? [translate("events:dropped")] : []),
@@ -603,16 +602,21 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
   const tiebreaker = firstTiebreaker(view.system)
   const rows = source.standings
   if (!rows || rows.length === 0 || standingsThroughRound(view) === 0)
-    return <Text style={themed($dim)} tx="events:standings.empty" />
+    return <Text tone="dim" tx="events:standings.empty" />
   return (
     <View testID="standings">
       <View style={themed($row)}>
-        <Text size="xxs" style={themed([$dim, $rank])} tx="events:standings.rank" />
-        <Text size="xxs" style={themed([$dim, $grow])} tx="events:standings.player" />
-        <Text size="xxs" style={themed([$dim, $stat])} tx="events:standings.points" />
-        <Text size="xxs" style={themed([$dim, $stat])} tx="events:standings.record" />
+        <Text size="xxs" tone="dim" style={themed($rank)} tx="events:standings.rank" />
+        <Text size="xxs" tone="dim" style={themed($grow)} tx="events:standings.player" />
+        <Text size="xxs" tone="dim" style={themed($stat)} tx="events:standings.points" />
+        <Text size="xxs" tone="dim" style={themed($stat)} tx="events:standings.record" />
         {tiebreaker ? (
-          <Text size="xxs" style={themed([$dim, $stat])} tx={`events:tiebreaker.${tiebreaker}`} />
+          <Text
+            size="xxs"
+            tone="dim"
+            style={themed($stat)}
+            tx={`events:tiebreaker.${tiebreaker}`}
+          />
         ) : null}
       </View>
       {rows.map((row) => (

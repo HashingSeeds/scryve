@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -76,7 +76,7 @@ export function LocalGameEndDialog({
     >
       <View style={themed($dialogHeader)}>
         <Text tx="board:endGame.title" preset="subheading" />
-        <Text tx="board:endGame.subtitle" size="xs" style={themed($dialogSubtitle)} />
+        <Text tx="board:endGame.subtitle" size="xs" tone="dim" />
       </View>
       <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
         {game.players.map((player, seat) => {
@@ -136,11 +136,10 @@ export function LocalGameEndDialog({
 }
 
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
 })

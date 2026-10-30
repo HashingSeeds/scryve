@@ -1,5 +1,4 @@
 import { useState } from "react"
-import type { TextStyle } from "react-native"
 import { View } from "react-native"
 import * as Updates from "expo-updates"
 
@@ -17,8 +16,6 @@ import {
   setBetaUpdates,
 } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
-import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
 import { analyticsId } from "@/utils/analytics"
 
 import { SettingsPage } from "./SettingsPage"
@@ -42,7 +39,6 @@ export function AboutScreen({
   onOpenCookiePolicy,
   onOpenGameContentNotices,
 }: AboutScreenProps) {
-  const { themed } = useAppTheme()
   const [beta, setBeta] = useState(betaUpdatesChosen)
   const [versionTaps, setVersionTaps] = useState(0)
   const [previewError, setPreviewError] = useState("")
@@ -79,7 +75,7 @@ export function AboutScreen({
       {idLine ? (
         <View>
           <Text size="sm" selectable accessibilityLabel={idLine} text={idLine} />
-          <Text size="xs" style={themed($muted)} tx="account:settings.appInfo.analyticsIdHint" />
+          <Text size="xs" tone="dim" tx="account:settings.appInfo.analyticsIdHint" />
         </View>
       ) : null}
       {isStoreBuild() && (beta || versionTaps >= BETA_UNLOCK_TAPS) ? (
@@ -146,5 +142,3 @@ export function AboutScreen({
     </SettingsPage>
   )
 }
-
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

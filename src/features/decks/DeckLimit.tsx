@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { Platform, ScrollView, TouchableOpacity, View } from "react-native"
 import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -37,7 +37,6 @@ export function DeckCount({ access }: { access?: CloudAccess }) {
 }
 
 function DeckCountLabel({ access }: { access?: CloudAccess }) {
-  const { themed } = useAppTheme()
   const billing = useRevenueCat()
   const capacity = useQuery(api.decks.capacity, access && !access.ready ? "skip" : {})
   if (!capacity || !deckCountVisible(capacity)) return null
@@ -58,7 +57,7 @@ function DeckCountLabel({ access }: { access?: CloudAccess }) {
       <Text
         size="md"
         maxFontSizeMultiplier={1.5}
-        style={themed($count)}
+        tone="dim"
         text={`${capacity.used}/${capacity.limit}`}
       />
     </TouchableOpacity>
@@ -166,7 +165,7 @@ function DeckLimitOptions({
             <Text preset="subheading" accessibilityLiveRegion="polite" tx="decks:deckLimit.title" />
             <Text
               size="sm"
-              style={themed($dim)}
+              tone="dim"
               tx={premium ? "decks:deckLimit.proBody" : "decks:deckLimit.freeBody"}
               txOptions={{ limit, premiumLimit: MAX_PREMIUM_DECKS }}
             />
@@ -192,7 +191,7 @@ function DeckLimitOptions({
           {!premium && !billing.configured ? (
             <Text
               size="xs"
-              style={themed($dim)}
+              tone="dim"
               text={billing.configurationMessage || translate("decks:deckLimit.proUnavailable")}
             />
           ) : null}
@@ -225,7 +224,7 @@ function DeckLimitOptions({
               tx="decks:deckLimit.confirmTitle"
               txOptions={{ name: step.name }}
             />
-            <Text size="sm" style={themed($dim)} tx="decks:deckLimit.moveBody" />
+            <Text size="sm" tone="dim" tx="decks:deckLimit.moveBody" />
           </View>
           <View style={themed($row)}>
             <Button
@@ -263,7 +262,7 @@ function DeckChoices({
   const { themed } = useAppTheme()
   const mine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
   const queuedEdits = useDecksWithQueuedEdits(access?.ownerId, access?.ready ?? false)
-  if (!mine) return <Text size="sm" style={themed($dim)} tx="decks:deckLimit.loading" />
+  if (!mine) return <Text size="sm" tone="dim" tx="decks:deckLimit.loading" />
   return (
     <ScrollView style={$choices} testID="deck-limit-choices">
       {mine.decks
@@ -296,5 +295,3 @@ const $choice: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $count: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

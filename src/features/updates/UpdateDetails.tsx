@@ -73,10 +73,10 @@ export function UpdateDetailsDialog({
   )
 }
 
-const $info: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $info: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 20,
   height: 20,
-  borderRadius: 10,
+  borderRadius: radius.full,
   borderWidth: 1.5,
   borderColor: colors.textDim,
   alignItems: "center",

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, StyleSheet, View } from "react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -53,7 +53,7 @@ export function EventFrame({
           accessibilityLabel={translate("events:loading")}
           style={themed($content)}
         >
-          <Text size="xs" style={themed($dim)} tx="events:loading" />
+          <Text size="xs" tone="dim" tx="events:loading" />
         </View>
       ) : (
         <>
@@ -80,7 +80,6 @@ export const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.xl,
 })
 export const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-export const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 export const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 48,
   flexDirection: "row",

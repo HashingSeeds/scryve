@@ -261,9 +261,9 @@ const $oldGameActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $primaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
 })
 const $secondaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
   borderWidth: 2,
 })

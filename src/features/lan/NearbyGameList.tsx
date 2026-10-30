@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -76,7 +76,7 @@ function NearbyGames({ code, onJoin }: NearbyGameListProps) {
       />
       {games.length === 0 ? (
         <Text
-          style={themed($dimmed)}
+          tone="dim"
           tx={scannedLong ? "connected:nearby.notFound" : "connected:nearby.empty"}
         />
       ) : null}
@@ -97,4 +97,3 @@ function NearbyGames({ code, onJoin }: NearbyGameListProps) {
 }
 
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

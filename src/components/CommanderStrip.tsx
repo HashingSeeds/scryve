@@ -11,6 +11,7 @@ import Animated, {
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
@@ -335,10 +336,10 @@ const $strip: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
 })
 
-const $map: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $map: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   gap: spacing.xxxs,
   padding: spacing.xxs,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 
 const $mapRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -348,7 +349,7 @@ const $mapRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $disc: ThemedStyle<ViewStyle> = () => ({
-  borderRadius: 999,
+  borderRadius: radius.full,
   borderWidth: 1,
   alignItems: "center",
   justifyContent: "center",

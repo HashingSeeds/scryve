@@ -169,7 +169,7 @@ const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   maxHeight: "100%",
   gap: spacing.lg,
   padding: spacing.lg,
-  borderRadius: radius.xl,
+  borderRadius: radius.xxxl,
   borderWidth: 1,
   borderColor: colors.separator,
   backgroundColor: colors.background,
@@ -183,10 +183,10 @@ const $wideDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
 const $bottomDialog: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   maxHeight: "88%",
   borderBottomWidth: 0,
-  borderBottomLeftRadius: 0,
-  borderBottomRightRadius: 0,
-  borderTopLeftRadius: radius.xl,
-  borderTopRightRadius: radius.xl,
+  borderBottomLeftRadius: radius.none,
+  borderBottomRightRadius: radius.none,
+  borderTopLeftRadius: radius.xxxl,
+  borderTopRightRadius: radius.xxxl,
   backgroundColor: colors.surface,
 })
 

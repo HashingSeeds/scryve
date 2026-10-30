@@ -44,7 +44,8 @@ export function NearbyStatusScreen({
           size="sm"
           accessibilityRole={busy ? "progressbar" : "alert"}
           accessibilityLiveRegion="polite"
-          style={themed([$centered, $dimmed])}
+          tone="dim"
+          style={$centered}
           text={message}
         />
         {actions ? <View style={themed($actions)}>{actions}</View> : null}
@@ -66,7 +67,6 @@ const $center: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.xxxl,
 })
 const $centered: TextStyle = { textAlign: "center", maxWidth: 360 }
-const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "stretch",
   alignItems: "center",

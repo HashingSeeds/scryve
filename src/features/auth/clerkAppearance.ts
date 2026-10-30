@@ -1,7 +1,7 @@
 import type { Theme } from "@/theme/types"
 import { typography } from "@/theme/typography"
 
-export function getClerkAppearance({ colors }: Theme) {
+export function getClerkAppearance({ colors, radius }: Theme) {
   return {
     theme: "simple",
     variables: {
@@ -19,7 +19,7 @@ export function getClerkAppearance({ colors }: Theme) {
       colorModalBackdrop: colors.overlay,
       fontFamily: `${typography.primary.normal}, system-ui, sans-serif`,
       fontFamilyButtons: `${typography.primary.semiBold}, system-ui, sans-serif`,
-      borderRadius: "8px",
+      borderRadius: `${radius.md}px`,
       fontSize: "0.95rem",
     },
   } as const

@@ -111,7 +111,7 @@ function StandingRow({
         </View>
       ) : (
         <View style={themed($badge)}>
-          <Text size="xxs" style={themed($muted)} text={String(rank)} />
+          <Text size="xxs" tone="dim" text={String(rank)} />
         </View>
       )}
       <View style={$styles.flex1}>
@@ -119,14 +119,14 @@ function StandingRow({
         <Text
           size="xxs"
           numberOfLines={1}
-          style={themed($muted)}
+          tone="dim"
           text={detail || translate("play:summary.seat", { seat: player.seat })}
         />
       </View>
       <View style={themed($lifeColumn)}>
         <Text size="lg" weight="bold" text={String(player.life)} />
         {changeFromStart === undefined ? null : (
-          <Text size="xxs" style={themed($muted)} text={changeFromStart} />
+          <Text size="xxs" tone="dim" text={changeFromStart} />
         )}
       </View>
     </View>
@@ -286,7 +286,7 @@ export function GameSummaryScreen({
           />
           <Text
             size="xs"
-            style={themed($muted)}
+            tone="dim"
             text={[
               finishedOnLabel(model.finishedAt),
               model.source === "local"
@@ -296,10 +296,8 @@ export function GameSummaryScreen({
               .filter(Boolean)
               .join(" · ")}
           />
-          <Text size="xs" style={themed($muted)} text={metaLine(model)} />
-          {model.terminalReason ? (
-            <Text size="xs" style={themed($muted)} text={model.terminalReason} />
-          ) : null}
+          <Text size="xs" tone="dim" text={metaLine(model)} />
+          {model.terminalReason ? <Text size="xs" tone="dim" text={model.terminalReason} /> : null}
         </View>
 
         <Text
@@ -360,7 +358,7 @@ export function GameSummaryScreen({
           {model.changeCount > 0 ? (
             <Text
               size="xxs"
-              style={themed($muted)}
+              tone="dim"
               tx={timelineOpen ? "play:summary.hide" : "play:summary.show"}
             />
           ) : null}
@@ -369,7 +367,7 @@ export function GameSummaryScreen({
         {model.changeCount === 0 ? (
           <Text
             size="xs"
-            style={themed($muted)}
+            tone="dim"
             text={translate(`play:summary.timeline.noChanges.${systemId}`)}
           />
         ) : timelineOpen ? (
@@ -394,7 +392,7 @@ export function GameSummaryScreen({
               testID="summary-timeline-unavailable"
               accessibilityRole="alert"
               size="xs"
-              style={themed($muted)}
+              tone="dim"
               text={translate(`play:summary.timeline.detailsUnavailable.${systemId}`)}
             />
           ) : (
@@ -415,9 +413,7 @@ export function GameSummaryScreen({
                       style={$styles.flex1}
                       text={player?.name ?? translate("play:summary.unknownPlayer")}
                     />
-                    {change.undo ? (
-                      <Text size="xxs" style={themed($muted)} tx="play:summary.undo" />
-                    ) : null}
+                    {change.undo ? <Text size="xxs" tone="dim" tx="play:summary.undo" /> : null}
                     <Text
                       size="xs"
                       weight="medium"
@@ -430,7 +426,7 @@ export function GameSummaryScreen({
               {timelineItems.length === 0 ? (
                 <Text
                   size="xs"
-                  style={themed($muted)}
+                  tone="dim"
                   text={translate(`play:summary.timeline.noDetails.${systemId}`)}
                 />
               ) : null}
@@ -508,36 +504,36 @@ const $loadingHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingVertical: spacing.sm,
 })
-const $skeletonHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonHeading: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "34%",
   height: 28,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: colors.separator,
 })
-const $skeletonMeta: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonMeta: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "62%",
   height: 12,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonMetaShort: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonMetaShort: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "48%",
   height: 12,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonSectionHeading: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $skeletonSectionHeading: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   width: 96,
   height: 12,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   marginTop: spacing.md,
   marginBottom: spacing.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonColorBar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $skeletonColorBar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: BAR_WIDTH,
   height: 40,
-  borderRadius: spacing.xxs,
+  borderRadius: radius.sm,
   backgroundColor: colors.separator,
 })
 const $skeletonBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -550,37 +546,36 @@ const $skeletonPlayerCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   gap: spacing.xs,
 })
-const $skeletonPlayerName: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonPlayerName: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "52%",
   height: 14,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonPlayerDetail: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonPlayerDetail: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "70%",
   height: 10,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonLife: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonLife: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 54,
   height: 28,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: colors.separator,
 })
-const $skeletonTimelineHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonTimelineHeading: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 128,
   height: 12,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonToggleLabel: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonToggleLabel: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 34,
   height: 10,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
   minHeight: 44,
@@ -632,10 +627,10 @@ const $standingRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $colorBar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $colorBar: ThemedStyle<ViewStyle> = ({ radius }) => ({
   width: BAR_WIDTH,
   height: 40,
-  borderRadius: spacing.xxs,
+  borderRadius: radius.sm,
 })
 const $badge: ThemedStyle<ViewStyle> = () => ({
   width: BADGE_SIZE,
@@ -677,16 +672,16 @@ const $eventDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: EVENT_DOT / 2,
   backgroundColor: colors.separator,
 })
-const $skeletonEventName: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonEventName: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   flex: 1,
   maxWidth: 180,
   height: 12,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })
-const $skeletonEventDelta: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $skeletonEventDelta: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 28,
   height: 12,
-  borderRadius: 3,
+  borderRadius: radius.xs,
   backgroundColor: colors.separator,
 })

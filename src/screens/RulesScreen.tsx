@@ -118,7 +118,7 @@ export function RulesScreen({
           >
             {item.kind === "section" ? (
               <>
-                <Text size="sm" style={[themed($dim), $number]} text={item.id} />
+                <Text size="sm" tone="dim" style={$number} text={item.id} />
                 <Text size="sm" style={$flex} text={item.title} />
               </>
             ) : (
@@ -212,7 +212,7 @@ export function RulesScreen({
           ) : (
             <Text
               size="sm"
-              style={themed($dim)}
+              tone="dim"
               tx="play:rules.downloading"
               txOptions={{ publisher: source.publisher }}
             />
@@ -254,7 +254,7 @@ export function RulesScreen({
           ListEmptyComponent={
             <Text
               size="sm"
-              style={themed($dim)}
+              tone="dim"
               tx={ruleId ? "play:rules.notFound" : "play:rules.noResults"}
             />
           }
@@ -264,14 +264,14 @@ export function RulesScreen({
                 {rules.effectiveDate ? (
                   <Text
                     size="xs"
-                    style={themed($dim)}
+                    tone="dim"
                     tx="play:rules.effective"
                     txOptions={{ date: rules.effectiveDate }}
                   />
                 ) : null}
                 {officialLink}
                 {rules.notice.map((line) => (
-                  <Text key={line} size="xxs" style={themed($dim)} text={line} />
+                  <Text key={line} size="xxs" tone="dim" text={line} />
                 ))}
               </View>
             ) : null
@@ -295,7 +295,7 @@ function RuleText({
 }) {
   const { themed } = useAppTheme()
   return (
-    <Text size="sm" style={dim ? themed($dim) : undefined}>
+    <Text size="sm" tone={dim ? "dim" : undefined}>
       {ruleReferences(text, reference).map((part, index) =>
         typeof part === "string" ? (
           part
@@ -343,5 +343,4 @@ const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.lg,
   gap: spacing.xs,
 })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })

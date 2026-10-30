@@ -10,7 +10,7 @@ import { isPlaySystemId } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 
-import { $dim, $section } from "./EventFrame"
+import { $section } from "./EventFrame"
 import { playerName, resultIsValid } from "./eventLogic"
 import type { EventTableView, EventView } from "./eventSource"
 import type { TableResult } from "../../../convex/lib/events/model"
@@ -102,7 +102,7 @@ export function ResultDialog({
                 onChange={(gamesDrawn) => setDraft({ ...draft, gamesDrawn })}
               />
             ) : null}
-            {valid ? null : <Text size="xs" style={themed($dim)} tx="events:result.twoWinners" />}
+            {valid ? null : <Text size="xs" tone="dim" tx="events:result.twoWinners" />}
           </>
         ) : (
           <>
