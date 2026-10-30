@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, type MutationCtx } from "./_generated/server"
 import { requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
-import { assertDeckKey, assertDeckFingerprint } from "./lib/deckKeys"
+import { assertDeckKey, assertDeckFingerprint, pinnedDeck } from "./lib/deckKeys"
 import { limitResultRate } from "./lib/deckRateLimits"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { assertGameSystem } from "./lib/integrations"
@@ -16,6 +16,7 @@ import {
   assertEventName,
   assertMatchFinishedAt,
   assertRoundNumber,
+  MATCH_FINISHED_AT_GRACE_MS,
   MAX_PLAYERS,
   MIN_PLAYERS,
 } from "./lib/policy"
@@ -133,6 +134,16 @@ export const recordManualMatch = mutation({
       system = attached.deck.game ?? DEFAULT_DECK_GAME
       format = attached.deck.format
     }
+    // why: the app sends the match date's local midnight, so the list stays known through that day.
+    const listKeptSinceMatchDay =
+      attached &&
+      (attached.version.updatedAt ?? attached.version.createdAt) <=
+        finishedAt + MATCH_FINISHED_AT_GRACE_MS
+    const deckFingerprint =
+      args.me.deckFingerprint ??
+      (listKeptSinceMatchDay
+        ? (await pinnedDeck(ctx, attached.version._id)).deckFingerprint
+        : undefined)
     const eventName = args.eventName === undefined ? undefined : assertEventName(args.eventName)
     const roundNumber =
       args.roundNumber === undefined ? undefined : assertRoundNumber(args.roundNumber)
@@ -150,7 +161,7 @@ export const recordManualMatch = mutation({
           : args.me.deckKey
             ? { deckKey: args.me.deckKey }
             : {}),
-        ...(args.me.deckFingerprint ? { deckFingerprint: args.me.deckFingerprint } : {}),
+        ...(deckFingerprint ? { deckFingerprint } : {}),
         ...(attached
           ? {
               deckId: attached.deck._id,
