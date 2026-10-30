@@ -140,12 +140,15 @@ function isGuestDeck(value: unknown): value is GuestDeck {
   )
 }
 
-function isGuestDeckList(value: unknown): value is GuestDeck[] {
-  return (
-    Array.isArray(value) &&
-    value.every(isGuestDeck) &&
-    new Set(value.map((deck) => deck.localId)).size === value.length
-  )
+function partitionDecks(entries: unknown[]) {
+  const decks: GuestDeck[] = []
+  const unreadable: unknown[] = []
+  for (const entry of entries) {
+    if (isGuestDeck(entry) && !decks.some((deck) => deck.localId === entry.localId))
+      decks.push(entry)
+    else unreadable.push(entry)
+  }
+  return { decks, unreadable }
 }
 
 function readRaw(key: string): string | null {
@@ -171,17 +174,24 @@ function parseStored<T>(raw: string, valid: (value: unknown) => value is T): T {
 function readStore() {
   const raw = readRaw(GUEST_DECKS_KEY)
   const legacyRaw = readRaw(LEGACY_GUEST_DECK_KEY)
-  const decks = raw === null ? [] : parseStored(raw, isGuestDeckList)
-  if (legacyRaw === null) return { decks, legacy: false }
+  const { decks, unreadable } = partitionDecks(
+    raw === null ? [] : parseStored(raw, (value): value is unknown[] => Array.isArray(value)),
+  )
+  if (legacyRaw === null) return { decks, unreadable, legacy: false }
   const legacy = parseStored(legacyRaw, isGuestDeck)
   return {
     decks: decks.some((deck) => deck.localId === legacy.localId) ? decks : [...decks, legacy],
+    unreadable,
     legacy: true,
   }
 }
 
+function serialize(decks: GuestDeck[]) {
+  return JSON.stringify([...decks, ...unreadable])
+}
+
 function migrateLegacyDeck(decks: GuestDeck[]) {
-  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) {
+  if (!saveString(GUEST_DECKS_KEY, serialize(decks))) {
     reportStorageFailure("save")
     return false
   }
@@ -195,9 +205,11 @@ function migrateLegacyDeck(decks: GuestDeck[]) {
 
 let loadError: unknown
 let pendingLegacy = false
+let unreadable: unknown[] = []
 
 function readStored(): GuestDeck[] {
   loadError = undefined
+  unreadable = []
   let store: ReturnType<typeof readStore>
   try {
     store = readStore()
@@ -206,6 +218,8 @@ function readStored(): GuestDeck[] {
     reportStorageFailure("load", cause instanceof GuestDeckStorageError ? cause.reason : undefined)
     return []
   }
+  unreadable = store.unreadable
+  if (unreadable.length > 0) reportStorageFailure("load", "unsupported")
   pendingLegacy = store.legacy && !migrateLegacyDeck(store.decks)
   return store.decks
 }
@@ -224,7 +238,7 @@ function writableDecks() {
 }
 
 function commit(decks: GuestDeck[], failure: string) {
-  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) {
+  if (!saveString(GUEST_DECKS_KEY, serialize(decks))) {
     reportStorageFailure("save")
     throw new GuestDeckStorageError(failure)
   }
@@ -312,6 +326,7 @@ export function clearGuestDecks() {
   snapshot = []
   loadError = undefined
   pendingLegacy = false
+  unreadable = []
   notify()
 }
 
