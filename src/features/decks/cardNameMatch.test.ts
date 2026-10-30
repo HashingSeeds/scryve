@@ -1,4 +1,9 @@
-import { cardNameIndex, closestNamesFromCardTop, firstUnambiguousCardName } from "./cardNameMatch"
+import {
+  cardNameIndex,
+  closestNamesFromCardTop,
+  firstUnambiguousCardName,
+  searchCardNames,
+} from "./cardNameMatch"
 
 const index = cardNameIndex(
   [
@@ -58,5 +63,29 @@ describe("closestNamesFromCardTop", () => {
       "Sol Ring",
       "Sol Ring // Sol Ring",
     ])
+  })
+})
+
+describe("searchCardNames", () => {
+  const typed = cardNameIndex(
+    ["Light", "Lightning Axe", "Lightning Bolt", "Sol Ring", "Solemn Simulacrum", "Acidic Slime"],
+    [["Marauding Mutagen", "Acidic Slime"]],
+  )
+
+  it.each([
+    ["the start of a name", "sol r", "Sol Ring"],
+    ["a misspelled name", "lightnig bolt", "Lightning Bolt"],
+    ["a later word in the name", "bolt", "Lightning Bolt"],
+    ["a name printed on another card", "marauding mut", "Acidic Slime"],
+  ])("finds %s first", (_case, query, name) => {
+    expect(searchCardNames(typed, query, 3)[0]).toBe(name)
+  })
+
+  it("ranks a whole-name match above longer names it starts", () => {
+    expect(searchCardNames(typed, "light", 3)).toEqual(["Light", "Lightning Axe", "Lightning Bolt"])
+  })
+
+  it("finds nothing for text unlike any name", () => {
+    expect(searchCardNames(typed, "zzzz", 3)).toEqual([])
   })
 })
