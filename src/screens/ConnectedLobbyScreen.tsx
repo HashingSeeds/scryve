@@ -38,12 +38,14 @@ export function ConnectedLobbyScreen({
   onBack,
   onLeft,
   onManageDecks,
+  onAddDeck,
 }: {
   publicId: string
   onStarted: () => void
   onBack?: () => void
   onLeft?: () => void
   onManageDecks?: (system: string) => void
+  onAddDeck?: () => void
 }) {
   return (
     <ConvexQueryBoundary
@@ -73,6 +75,7 @@ export function ConnectedLobbyScreen({
         onBack={onBack}
         onLeft={onLeft}
         onManageDecks={onManageDecks}
+        onAddDeck={onAddDeck}
       />
     </ConvexQueryBoundary>
   )
@@ -84,12 +87,14 @@ function ConnectedLobbyContent({
   onBack,
   onLeft,
   onManageDecks,
+  onAddDeck,
 }: {
   publicId: string
   onStarted: () => void
   onBack?: () => void
   onLeft?: () => void
   onManageDecks?: (system: string) => void
+  onAddDeck?: () => void
 }) {
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
   const lobby = useQuery(api.games.lobbyProjection, {
@@ -322,6 +327,7 @@ function ConnectedLobbyContent({
         selectingSeats: selectingDeckSeats,
         onSelect: (seat, deckVersionId) => void chooseVersion(seat, deckVersionId),
         onManage: onManageDecks ? () => onManageDecks(lobby.system) : undefined,
+        onAddDeck,
       }}
       appearance={{
         saving: savingAppearance,

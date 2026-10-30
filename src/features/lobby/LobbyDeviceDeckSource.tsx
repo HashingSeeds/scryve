@@ -74,10 +74,10 @@ export function LobbyDeviceDeckSource({
     }
   }
 
-  const syncBlockedReason = !online
-    ? translate("connected:seats.reconnectToSync")
+  const syncBlocked = !online
+    ? "offline"
     : capacity?.canCreate === false
-      ? translate("connected:seats.accountFull")
+      ? "accountFull"
       : undefined
 
   return (
@@ -90,7 +90,7 @@ export function LobbyDeviceDeckSource({
           format: local.deck.format,
           name: local.deck.name,
           cardQuantity: local.deck.cards.reduce((total, card) => total + card.quantity, 0),
-          syncBlockedReason,
+          syncBlocked,
           error: errors[local.localId],
         })),
         syncingLocalId,

@@ -36,8 +36,8 @@ describe("LobbySeatList", () => {
   })
 })
 
-it("offers deck management when a required system has no matching decks", () => {
-  const onManageDecks = jest.fn()
+it("offers a new deck when a required system has no matching decks", () => {
+  const onAddDeck = jest.fn()
   render(
     <ThemeProvider initialContext="dark">
       <LobbySeatList
@@ -54,14 +54,15 @@ it("offers deck management when a required system has no matching decks", () => 
         versionLabel={() => "Current"}
         onSelectVersion={jest.fn()}
         onReport={jest.fn()}
-        onManageDecks={onManageDecks}
+        onManageDecks={jest.fn()}
+        onAddDeck={onAddDeck}
       />
     </ThemeProvider>,
   )
   expect(screen.queryByText("Magic deck")).toBeNull()
   expect(screen.queryByText("Manage decks")).toBeNull()
   fireEvent.press(screen.getByText("+ New deck"))
-  expect(onManageDecks).toHaveBeenCalledTimes(1)
+  expect(onAddDeck).toHaveBeenCalledTimes(1)
 })
 
 it("keeps the selection status visible while a seat with no matching decks is selecting", () => {
@@ -78,6 +79,7 @@ it("keeps the selection status visible while a seat with no matching decks is se
         onSelectVersion={jest.fn()}
         onReport={jest.fn()}
         onManageDecks={jest.fn()}
+        onAddDeck={jest.fn()}
       />
     </ThemeProvider>,
   )
@@ -279,7 +281,7 @@ it("keeps a device deck that can't sync listed, says why, and holds the action",
         system="mtg"
         deckState={{ status: "ready", value: [] }}
         deviceDecks={{
-          decks: [deviceDeck({ syncBlockedReason: "Reconnect to continue." })],
+          decks: [deviceDeck({ syncBlocked: "offline" })],
           onSyncAndUse,
         }}
         versionLabel={() => "Current"}
@@ -323,4 +325,64 @@ it("holds every deck choice while a device deck syncs, so the sync can't overwri
   fireEvent.press(screen.getByTestId("seat-1-deck-no-deck"))
   expect(onSelectVersion).not.toHaveBeenCalled()
   expect(screen.queryByTestId("seat-1-deck-selection-status")).toBeNull()
+})
+
+it("shows an empty account deck dimmed and doesn't let the seat choose it", () => {
+  const onSelectVersion = jest.fn()
+  const onAddDeck = jest.fn()
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        deckRequired
+        system="mtg"
+        deckState={{
+          status: "ready",
+          value: [
+            {
+              _id: "duo",
+              name: "Duo check",
+              cardQuantity: 0,
+              versions: [{ _id: "v1", versionNumber: 1 }],
+            },
+          ],
+        }}
+        versionLabel={() => "Current"}
+        onSelectVersion={onSelectVersion}
+        onManageDecks={jest.fn()}
+        onAddDeck={onAddDeck}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByText("Empty list")).toBeTruthy()
+  fireEvent.press(screen.getByText("Duo check"))
+  expect(onSelectVersion).not.toHaveBeenCalled()
+  fireEvent.press(screen.getByText("+ New deck"))
+  expect(onAddDeck).toHaveBeenCalledTimes(1)
+})
+
+it("offers Free a slot on a device deck when the account is full", () => {
+  const onManageDecks = jest.fn()
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        system="mtg"
+        deckState={{ status: "ready", value: [] }}
+        deviceDecks={{
+          decks: [deviceDeck({ syncBlocked: "accountFull" })],
+          onSyncAndUse: jest.fn(),
+        }}
+        versionLabel={() => "Current"}
+        onSelectVersion={jest.fn()}
+        onManageDecks={onManageDecks}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByText("Account full.")).toBeTruthy()
+  expect(screen.queryByTestId("seat-1-sync-and-use-local-angels")).toBeNull()
+  fireEvent.press(screen.getByText("Free a slot"))
+  expect(onManageDecks).toHaveBeenCalledTimes(1)
 })

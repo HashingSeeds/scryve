@@ -52,7 +52,7 @@ export type LobbyDeviceDeck = {
   format?: string
   name: string
   cardQuantity: number
-  syncBlockedReason?: string
+  syncBlocked?: "offline" | "accountFull"
   error?: string
 }
 
@@ -155,6 +155,7 @@ export function LobbySeatList({
   onReport,
   onEditAppearance,
   onManageDecks,
+  onAddDeck,
 }: {
   seats: LobbySeat[]
   openSeats: number
@@ -172,6 +173,7 @@ export function LobbySeatList({
   onSelectVersion?: (seat: number, deckVersionId?: string) => void
   onReport?: (seat: LobbySeat) => void
   onManageDecks?: () => void
+  onAddDeck?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
   const { themed, theme } = useAppTheme()
@@ -223,6 +225,8 @@ export function LobbySeatList({
             ) ?? [])
           : []
         const noDecks = usableDecks.length === 0 && usableDeviceDecks.length === 0
+        const hasCards = (deck: { cardQuantity?: number }) => deck.cardQuantity !== 0
+        const choosable = usableDecks.some(hasCards) || usableDeviceDecks.some(hasCards)
         const chosenDeck = usableDecks.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
@@ -240,7 +244,20 @@ export function LobbySeatList({
         const showManageDecks = Boolean(
           seat.controlledByMe && onManageDecks && system !== NO_PLAY_SYSTEM,
         )
-        const offerNewDeck = deckState?.status === "ready" && noDecks && showManageDecks
+        const offerNewDeck = Boolean(
+          deckState?.status === "ready" &&
+          !choosable &&
+          seat.controlledByMe &&
+          onAddDeck &&
+          system !== NO_PLAY_SYSTEM,
+        )
+        const newDeckAction = offerNewDeck ? (
+          <TextAction
+            testID={`new-deck-seat-${seat.seat}`}
+            tx="connected:seats.newDeck"
+            onPress={onAddDeck}
+          />
+        ) : null
         return (
           <View key={seat.playerId ?? `seat-${seat.seat}`} style={themed($seat)}>
             <View style={themed($seatRow)}>
@@ -311,7 +328,7 @@ export function LobbySeatList({
                   }
                 />
               </View>
-              {showManageDecks && !offerNewDeck ? (
+              {showManageDecks && !(noDecks && offerNewDeck) ? (
                 <Button
                   testID={`manage-seat-${seat.seat}-decks`}
                   tx="connected:seats.manageDecks"
@@ -376,13 +393,7 @@ export function LobbySeatList({
                   </View>
                 ) : noDecks ? (
                   <View testID={`seat-${seat.seat}-no-decks`} style={themed($deckMessage)}>
-                    {offerNewDeck ? (
-                      <TextAction
-                        testID={`manage-seat-${seat.seat}-decks`}
-                        tx="connected:seats.newDeck"
-                        onPress={onManageDecks}
-                      />
-                    ) : (
+                    {newDeckAction ?? (
                       <Text
                         size="xxs"
                         tone="dim"
@@ -429,10 +440,15 @@ export function LobbySeatList({
                         })}
                         selected={chosenDeck?._id === deck._id}
                         disabled={choicesLocked}
-                        onPress={() => {
-                          const version = deck.versions[deck.versions.length - 1]
-                          if (version) onSelectVersion(seat.seat, version._id)
-                        }}
+                        dimmed={!hasCards(deck)}
+                        onPress={
+                          hasCards(deck)
+                            ? () => {
+                                const version = deck.versions[deck.versions.length - 1]
+                                if (version) onSelectVersion(seat.seat, version._id)
+                              }
+                            : undefined
+                        }
                       />
                     ))}
                     {chosenDeck && chosenDeck.versions.length > 1 ? (
@@ -459,22 +475,32 @@ export function LobbySeatList({
                     ) : null}
                     {usableDeviceDecks.map((deck) => {
                       const syncing = deviceDecks?.syncingLocalId === deck.localId
-                      const empty = deck.cardQuantity === 0
+                      const freeSlot = deck.syncBlocked === "accountFull" && onManageDecks
                       return (
                         <DeckOption
                           key={deck.localId}
                           testID={`seat-${seat.seat}-device-deck-${deck.localId}`}
                           name={deck.name}
                           detail={
-                            deck.syncBlockedReason ?? deck.error ?? cardsLabel(deck.cardQuantity)
+                            deck.syncBlocked === "offline"
+                              ? translate("connected:seats.reconnectToSync")
+                              : deck.syncBlocked === "accountFull"
+                                ? translate("connected:seats.accountFull")
+                                : (deck.error ?? cardsLabel(deck.cardQuantity))
                           }
                           glyph={<DeviceGlyph />}
                           accessibilityLabel={translate("decks:stats.onDeviceLabel", {
                             name: deck.name,
                           })}
-                          dimmed={empty}
+                          dimmed={!hasCards(deck)}
                           action={
-                            empty ? undefined : (
+                            !hasCards(deck) ? undefined : freeSlot ? (
+                              <TextAction
+                                testID={`seat-${seat.seat}-free-slot-${deck.localId}`}
+                                tx="connected:seats.freeSlot"
+                                onPress={onManageDecks}
+                              />
+                            ) : (
                               <TextAction
                                 testID={`seat-${seat.seat}-sync-and-use-${deck.localId}`}
                                 tx={
@@ -483,7 +509,7 @@ export function LobbySeatList({
                                 accessibilityLabel={translate("connected:seats.syncAndUseLabel", {
                                   name: deck.name,
                                 })}
-                                disabled={Boolean(deck.syncBlockedReason) || choicesLocked}
+                                disabled={Boolean(deck.syncBlocked) || choicesLocked}
                                 onPress={() => deviceDecks?.onSyncAndUse(seat.seat, deck.localId)}
                               />
                             )
@@ -491,6 +517,7 @@ export function LobbySeatList({
                         />
                       )
                     })}
+                    {newDeckAction}
                   </View>
                 )}
                 {!deckRequired && seat.deckVersionId && noDecks ? (

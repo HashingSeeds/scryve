@@ -19,6 +19,7 @@ export default function LobbyRoute() {
             params: { lobbyId: params.gameId, system },
           })
         }
+        onAddDeck={() => router.push("/connected/decks/add")}
         onStarted={() =>
           router.replace({
             pathname: "/connected/game/[gameId]",

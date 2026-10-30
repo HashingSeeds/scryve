@@ -83,6 +83,7 @@ export interface LobbyViewProps {
     selectingSeats: ReadonlySet<number>
     onSelect: (seat: number, deckVersionId?: string) => void
     onManage?: () => void
+    onAddDeck?: () => void
   }
   appearance?: {
     saving: boolean
@@ -198,6 +199,7 @@ export function LobbyView({
         system={lobby.system}
         format={lobby.format}
         onManageDecks={decks?.onManage}
+        onAddDeck={decks?.onAddDeck}
         versionLabel={deckVersionLabel}
         selectingDeckSeats={decks?.selectingSeats}
         deckRequired={Boolean(lobby.deckRequired)}

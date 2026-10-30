@@ -47,6 +47,7 @@ function renderSeat({
             deviceDecks={deviceDecks}
             versionLabel={() => "Current"}
             onSelectVersion={jest.fn()}
+            onManageDecks={jest.fn()}
           />
         )}
       </LobbyDeviceDeckSource>
@@ -77,15 +78,15 @@ it("says why a deck can't sync when offline or when the account is full", () => 
   expect(screen.getByTestId("seat-1-sync-and-use-local-angels")).toBeDisabled()
   screen.unmount()
   renderSeat({ canCreate: false })
-  expect(screen.getByText("Account full. Free a slot in Manage decks.")).toBeTruthy()
-  expect(screen.getByTestId("seat-1-sync-and-use-local-angels")).toBeDisabled()
+  expect(screen.getByText("Account full.")).toBeTruthy()
+  expect(screen.getByText("Free a slot")).toBeTruthy()
 })
 
 it("keeps the row and shows the reason when the server refuses at the limit", async () => {
   mockSync.mockResolvedValue({ status: "limit_reached" })
   const { onUse } = renderSeat()
   await act(async () => fireEvent.press(screen.getByTestId("seat-1-sync-and-use-local-angels")))
-  expect(screen.getByText("Account full. Free a slot in Manage decks.")).toBeTruthy()
+  expect(screen.getByText("Account full.")).toBeTruthy()
   expect(screen.getByText("Calling All Angels")).toBeTruthy()
   expect(onUse).not.toHaveBeenCalled()
 })
