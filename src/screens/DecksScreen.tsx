@@ -160,19 +160,12 @@ function DeckRow({
             <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} style={$name} />
             {local ? <DeviceGlyph /> : null}
           </View>
-          <Text
-            size="xxs"
-            numberOfLines={1}
-            style={themed($dimmedText)}
-            text={deckSubtitle(deck, game, showGame)}
-          />
+          <Text size="xxs" numberOfLines={1} tone="dim" text={deckSubtitle(deck, game, showGame)} />
         </View>
         {record || versions ? (
           <View style={themed($rowContext)}>
             {record ? <Text size="xs" weight="bold" numberOfLines={1} text={record} /> : null}
-            {versions ? (
-              <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={versions} />
-            ) : null}
+            {versions ? <Text size="xxs" numberOfLines={1} tone="dim" text={versions} /> : null}
           </View>
         ) : null}
       </TouchableOpacity>
@@ -253,7 +246,7 @@ function DeckShelfUnavailable({ retry }: { retry: () => void }) {
   return (
     <View testID="decks-unavailable" style={themed($empty)}>
       <Text preset="subheading" tx="decks:shelf.unavailable" />
-      <Text size="sm" style={themed($dimmedText)} tx="decks:shelf.loadFailed" />
+      <Text size="sm" tone="dim" tx="decks:shelf.loadFailed" />
       <Button testID="retry-decks" tx="common:retry" onPress={retry} />
     </View>
   )
@@ -420,11 +413,7 @@ function DeckShelf({
     ) : mine && localRows.length && !filtered ? null : mine ? (
       <View style={themed($empty)}>
         <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : titleTx} />
-        <Text
-          size="sm"
-          style={themed($dimmedText)}
-          tx={filtered ? "decks:shelf.tryAnotherSearch" : detailTx}
-        />
+        <Text size="sm" tone="dim" tx={filtered ? "decks:shelf.tryAnotherSearch" : detailTx} />
         {filtered ? <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} /> : null}
       </View>
     ) : (
@@ -757,7 +746,7 @@ export function DecksScreen({
             footer={
               <View testID="decks-offline-state" style={themed($empty)}>
                 <Text preset="subheading" tx="decks:shelf.unavailable" />
-                <Text size="sm" style={themed($dimmedText)} text={unavailableMessage} />
+                <Text size="sm" tone="dim" text={unavailableMessage} />
               </View>
             }
           />
@@ -845,7 +834,7 @@ export function DecksScreen({
               </FilterGroup>
             </View>
           ) : system === ALL_SYSTEMS ? (
-            <Text size="xs" style={themed($dimmedText)} tx="decks:shelf.chooseSystem" />
+            <Text size="xs" tone="dim" tx="decks:shelf.chooseSystem" />
           ) : null}
         </ScrollView>
         <View style={themed($dialogActions)}>
@@ -920,10 +909,10 @@ const $openButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   paddingVertical: spacing.sm,
 })
-const $systemMarker: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $systemMarker: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   width: 6,
   height: 34,
-  borderRadius: spacing.xxxs,
+  borderRadius: radius.xxs,
   marginRight: spacing.sm,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
@@ -939,10 +928,10 @@ const $favoriteButton: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
-const $skeletonMarker: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $skeletonMarker: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   width: 6,
   height: 34,
-  borderRadius: spacing.xxxs,
+  borderRadius: radius.xxs,
   marginRight: spacing.sm,
   backgroundColor: colors.separator,
 })
@@ -961,7 +950,6 @@ const $skeletonSubtitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
   height: 10,
   backgroundColor: colors.separator,
 })
-const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $errorText: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.error,
   paddingVertical: spacing.xs,

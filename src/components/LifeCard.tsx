@@ -1101,12 +1101,12 @@ export const LifeCard = memo(function LifeCard({
 
 const KNOCKBACK = 12
 
-const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   overflow: "hidden",
   padding: spacing.xs,
   borderWidth: 0,
-  borderRadius: spacing.lg,
+  borderRadius: radius.xxxl,
 })
 
 const $content: ThemedStyle<ViewStyle> = () => ({
@@ -1121,9 +1121,9 @@ const $readout: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $compactCard: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   padding: spacing.xxs,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
 })
 
 const $life: ThemedStyle<TextStyle> = () => ({
@@ -1257,15 +1257,15 @@ export function seatIdentityPlacement({
   return { layer, position, rowMaxWidth, trailing }
 }
 
-const $commanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $commanderOverview: ThemedStyle<ViewStyle> = ({ radius }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 7,
   overflow: "hidden",
-  borderRadius: spacing.lg,
+  borderRadius: radius.xxxl,
 })
 
-const $compactCommanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  borderRadius: spacing.md,
+const $compactCommanderOverview: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.xxl,
 })
 
 const $commanderOverviewContent: ThemedStyle<ViewStyle> = () => ({

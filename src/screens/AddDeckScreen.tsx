@@ -959,7 +959,7 @@ export function AddDeckScreen({
             <View style={themed($importSummaryRow)}>
               <Text
                 size="sm"
-                style={themed($label)}
+                tone="dim"
                 text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
               />
               {pastedDraft.attribution ? (
@@ -989,7 +989,7 @@ export function AddDeckScreen({
                   <Text
                     text={attributionLabel(pastedDraft.attribution, " · ")}
                     size="xs"
-                    style={themed($label)}
+                    tone="dim"
                   />
                 </TouchableOpacity>
               ) : null}
@@ -1163,10 +1163,10 @@ export function AddDeckScreen({
             <Text preset="subheading" text={selectedCatalogDeck.name} />
             <Text
               size="sm"
-              style={themed($label)}
+              tone="dim"
               text={`${DECK_GAME_LIST.find((candidate) => candidate.id === selectedCatalogDeck.game)?.shortLabel ?? selectedCatalogDeck.game} · ${deckFormatLabel(selectedCatalogDeck.game, selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game))}${entries.length ? ` · ${cardCountLabel(quantity)}` : ""}`}
             />
-            <Text size="xs" style={themed($label)} text={catalogDeckDetail(selectedCatalogDeck)} />
+            <Text size="xs" tone="dim" text={catalogDeckDetail(selectedCatalogDeck)} />
             {selectedCatalogDeck.kind === "example" ? (
               <Text size="xs" tx="decks:addDeck.datedExample" />
             ) : null}
@@ -1204,7 +1204,7 @@ export function AddDeckScreen({
                   <Text weight="bold" text={section.label} />
                   <Text
                     size="xs"
-                    style={themed($label)}
+                    tone="dim"
                     text={`${sectionEntries.reduce((total, entry) => total + entry.quantity, 0)}`}
                   />
                 </View>
@@ -1300,7 +1300,7 @@ export function AddDeckScreen({
             />
             <Text
               size="sm"
-              style={themed($label)}
+              tone="dim"
               text={[
                 gameLabel,
                 deckFormatLabel(game, previewFormat),
@@ -1310,7 +1310,7 @@ export function AddDeckScreen({
                 .join(" · ")}
             />
             {preconDetail(selectedPrecon) ? (
-              <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
+              <Text size="xs" tone="dim" text={preconDetail(selectedPrecon)} />
             ) : null}
             {["standard", "pioneer", "modern"].includes(previewFormat) ? (
               <Text size="xs" tx="decks:addDeck.originalPrecon" />
@@ -1350,7 +1350,7 @@ export function AddDeckScreen({
               <View key={section.id}>
                 <View style={themed($previewSectionHeader)}>
                   <Text weight="bold" text={section.label} />
-                  <Text size="xs" style={themed($label)} text={`${section.quantity}`} />
+                  <Text size="xs" tone="dim" text={`${section.quantity}`} />
                 </View>
                 {section.entries.map((card) => (
                   <TouchableOpacity
@@ -1480,7 +1480,7 @@ export function AddDeckScreen({
             {browseOffline ? (
               <AlertNote tone="info" text={translate("decks:addDeck.browseOffline")} />
             ) : searching ? (
-              <Text size="xs" style={themed($label)} tx="decks:deckLimit.loading" />
+              <Text size="xs" tone="dim" tx="decks:deckLimit.loading" />
             ) : searchError ? (
               <View style={themed($inlineStatus)}>
                 <AlertNote text={searchError} />
@@ -1531,7 +1531,7 @@ export function AddDeckScreen({
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
                   {preconDetail(deck) ? (
-                    <Text size="xs" style={themed($label)} text={preconDetail(deck)} />
+                    <Text size="xs" tone="dim" text={preconDetail(deck)} />
                   ) : null}
                 </View>
                 <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
@@ -1548,7 +1548,7 @@ export function AddDeckScreen({
               >
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
-                  <Text size="xs" style={themed($label)} text={catalogDeckDetail(deck)} />
+                  <Text size="xs" tone="dim" text={catalogDeckDetail(deck)} />
                 </View>
                 <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
               </TouchableOpacity>
@@ -1715,7 +1715,6 @@ const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   alignItems: "flex-start",
 })
-const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $textAction: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $resultRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 68,
@@ -1756,20 +1755,20 @@ const $previewCardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $previewThumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $previewThumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 36,
   height: 50,
-  borderRadius: spacing.xxxs,
+  borderRadius: radius.xxs,
   overflow: "hidden",
   backgroundColor: colors.separator,
 })
 const $previewThumbnail: ThemedStyle<ImageStyle> = () => ({ width: 36, height: 50 })
 const $previewCardName: ThemedStyle<TextStyle> = () => ({ flex: 1 })
-const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   minHeight: 56,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: spacing.xxxs,
+  borderRadius: radius.xxs,
   backgroundColor: colors.tint,
 })
 const $previewImportButtonDisabled: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })

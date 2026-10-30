@@ -100,7 +100,7 @@ export function DeleteAccountScreen({
                 tx="account:deleteAccount.signedInAs"
                 txOptions={{ email }}
                 size="xs"
-                style={themed($muted)}
+                tone="dim"
               />
             ) : null}
             <TextField
@@ -180,7 +180,7 @@ export function AccountDeletionReceiptScreen({
           testID="account-deletion-last-update"
           text={formatDeletionUpdate(updatedAt)}
           size="xs"
-          style={themed($muted)}
+          tone="dim"
         />
         <Text
           tx={
@@ -191,7 +191,7 @@ export function AccountDeletionReceiptScreen({
                 : "account:deleteAccount.receipt.next.pending"
           }
           size="xs"
-          style={themed($muted)}
+          tone="dim"
         />
         {failed && onSignIn ? (
           <Button
@@ -212,7 +212,7 @@ function SubscriptionNotice({ subscription }: { subscription: ProSubscriptionMan
   return (
     <View style={themed($subscriptionNotice)}>
       <Text tx="account:deleteAccount.subscription.heading" style={themed($strong)} />
-      <Text tx="account:deleteAccount.subscription.body" size="xs" style={themed($muted)} />
+      <Text tx="account:deleteAccount.subscription.body" size="xs" tone="dim" />
       {store === "app_store" || store === "unknown" ? (
         <ManageLink tx="account:deleteAccount.subscription.manageApple" url={APPLE_SUBSCRIPTIONS} />
       ) : null}
@@ -223,7 +223,7 @@ function SubscriptionNotice({ subscription }: { subscription: ProSubscriptionMan
         />
       ) : null}
       {store === "web" || store === "unknown" ? (
-        <Text tx="account:deleteAccount.subscription.web" size="xs" style={themed($muted)} />
+        <Text tx="account:deleteAccount.subscription.web" size="xs" tone="dim" />
       ) : null}
       {subscription.store === "web" && subscription.url ? (
         <ManageLink tx="account:deleteAccount.subscription.manageWeb" url={subscription.url} />
@@ -271,7 +271,7 @@ function DeletionStatusPanel({
           tx={`account:deleteAccount.panel.${panel}.body`}
           txOptions={{ word: DELETE_CONFIRMATION }}
           size="xs"
-          style={themed($muted)}
+          tone="dim"
         />
       </View>
     </View>
@@ -298,7 +298,7 @@ function Step({ number, step }: { number: string; step: (typeof DELETION_STEPS)[
       </View>
       <View style={$flex}>
         <Text tx={`account:deleteAccount.steps.${step}.title`} style={themed($strong)} />
-        <Text tx={`account:deleteAccount.steps.${step}.body`} size="xs" style={themed($muted)} />
+        <Text tx={`account:deleteAccount.steps.${step}.body`} size="xs" tone="dim" />
       </View>
     </View>
   )
@@ -328,7 +328,6 @@ const $lede: ThemedStyle<TextStyle> = ({ colors }) => ({
   fontSize: 17,
   lineHeight: 25,
 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $centerMuted: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
   textAlign: "center",
@@ -357,49 +356,49 @@ const $step: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   paddingVertical: spacing.sm,
 })
-const $stepNumber: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $stepNumber: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 30,
   height: 30,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 15,
+  borderRadius: radius.full,
   backgroundColor: colors.separator,
 })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-const $statusPanel: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $statusPanel: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   flexDirection: "row",
   gap: spacing.md,
   alignItems: "center",
   padding: spacing.lg,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
   borderWidth: 1,
   borderColor: colors.tint,
   backgroundColor: colors.separator,
 })
-const $failurePanel: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $failurePanel: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   flexDirection: "row",
   gap: spacing.md,
   alignItems: "center",
   padding: spacing.lg,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
   borderWidth: 1,
   borderColor: colors.error,
   backgroundColor: colors.errorBackground,
 })
-const $statusMark: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $statusMark: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 38,
   height: 38,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 19,
+  borderRadius: radius.full,
   backgroundColor: colors.tint,
 })
-const $failureMark: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $failureMark: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 38,
   height: 38,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 19,
+  borderRadius: radius.full,
   backgroundColor: colors.error,
 })
 const $statusMarkText: ThemedStyle<TextStyle> = ({ colors }) => ({

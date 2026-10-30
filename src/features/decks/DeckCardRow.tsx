@@ -98,7 +98,7 @@ export function DeckCardRow({
           </TouchableOpacity>
         </View>
       ) : (
-        <Text size="sm" text={`${card.quantity}×`} style={themed($dim)} />
+        <Text size="sm" text={`${card.quantity}×`} tone="dim" />
       )}
     </View>
   )
@@ -134,7 +134,7 @@ export function DeckCardSectionHeader({
           onPress={onChooseCommander}
         />
       ) : (
-        <Text size="sm" style={themed($dim)} text={String(quantity)} />
+        <Text size="sm" tone="dim" text={String(quantity)} />
       )}
     </View>
   )
@@ -151,7 +151,6 @@ const $touch: ViewStyle = {
 const $quantity: TextStyle = { minWidth: 18, textAlign: "center", fontVariant: ["tabular-nums"] }
 const $image: ImageStyle = { width: 32, height: 45 }
 const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

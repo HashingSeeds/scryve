@@ -215,16 +215,16 @@ export function CardFocusDialog({
             />
           ) : null}
           {visibleDetails?.typeLine ? (
-            <Text size="sm" style={themed($dimText)} text={visibleDetails.typeLine} />
+            <Text size="sm" tone="dim" text={visibleDetails.typeLine} />
           ) : null}
           {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
           {visibleDetails?.oracleText ? (
             <CardSymbolText game={card.game} selectable text={visibleDetails.oracleText} />
           ) : null}
-          {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
-          {imageCredit ? <Text size="xxs" style={themed($dimText)} text={imageCredit} /> : null}
+          {printing ? <Text size="xs" tone="dim" text={printing} /> : null}
+          {imageCredit ? <Text size="xxs" tone="dim" text={imageCredit} /> : null}
           {!details && !detailsError ? (
-            <Text size="sm" style={themed($dimText)} tx="decks:cardFocus.loadingDetails" />
+            <Text size="sm" tone="dim" tx="decks:cardFocus.loadingDetails" />
           ) : null}
           {detailsError ? (
             onRetryDetails ? (
@@ -305,12 +305,12 @@ const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
+const $cardImage: ThemedStyle<ImageStyle> = ({ radius }) => ({
   width: "52%",
   maxWidth: 180,
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 const $faceControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

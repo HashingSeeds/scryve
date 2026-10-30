@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { ImageSourcePropType, ImageStyle, TextStyle, ViewStyle } from "react-native"
+import type { ImageSourcePropType, ImageStyle, ViewStyle } from "react-native"
 import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native"
 import {
   getAppIconName,
@@ -197,7 +197,7 @@ export function AppIconPicker() {
             <View pointerEvents="none" style={themed($edge)} />
           </View>
         </View>
-        <Text size="xxs" text={label} style={themed($label)} />
+        <Text size="xxs" text={label} tone="dim" />
       </TouchableOpacity>
     )
   }
@@ -248,4 +248,3 @@ const $edge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderWidth: 1,
   borderColor: colors.border,
 })
-const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

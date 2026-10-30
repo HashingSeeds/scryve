@@ -15,6 +15,7 @@ import type { TableKnockout, TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
@@ -1361,7 +1362,7 @@ const $chipBar: ViewStyle = {
   height: CHIP_BAR_HEIGHT,
   opacity: 0.85,
 }
-const $prizePip: ViewStyle = { borderRadius: 2 }
+const $prizePip: ViewStyle = { borderRadius: radius.xxs }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeRow: ViewStyle = { flexDirection: "row" }
 const $identity: ViewStyle = { flexShrink: 1, minWidth: 0 }
@@ -1374,15 +1375,15 @@ const $drainTrack: ViewStyle = {
 }
 const $drainFill: ViewStyle = { width: "100%", height: "100%", transformOrigin: "left" }
 
-const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   overflow: "hidden",
   padding: spacing.xs,
-  borderRadius: spacing.lg,
+  borderRadius: radius.xxxl,
 })
-const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $compactCard: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   padding: spacing.xxs,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
 })
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.6 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.85 })
@@ -1391,11 +1392,11 @@ const $bench: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
   alignItems: "stretch",
 })
-const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   minWidth: 0,
   maxWidth: 180,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   borderWidth: StyleSheet.hairlineWidth,
   paddingHorizontal: spacing.xxs,
   alignItems: "center",
@@ -1420,11 +1421,11 @@ const $hero: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
   overflow: "hidden",
 })
-const $placeActive: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $placeActive: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   borderWidth: 2,
   borderStyle: "dashed",
-  borderRadius: 16,
+  borderRadius: radius.xxl,
   alignItems: "center",
   justifyContent: "center",
   gap: spacing.xxxs,
@@ -1455,11 +1456,11 @@ const $hp: ThemedStyle<TextStyle> = () => ({
   fontVariant: ["tabular-nums"],
 })
 const $zones: ThemedStyle<ViewStyle> = () => ({ flexDirection: "row" })
-const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $zone: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   justifyContent: "center",
   paddingHorizontal: spacing.xs,
-  borderRadius: 12,
+  borderRadius: radius.xl,
 })
 const GLYPH_SIZE = 44
 const COMPACT_GLYPH_SIZE = 30
@@ -1479,13 +1480,13 @@ const $bottomRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "flex-start",
   gap: spacing.xs,
 })
-const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $prizes: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
   paddingHorizontal: spacing.xs,
   paddingVertical: spacing.xxs,
-  borderRadius: 12,
+  borderRadius: radius.xl,
   maxWidth: "100%",
   marginLeft: "auto",
 })
@@ -1509,11 +1510,11 @@ const $barActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs + 2,
   flexWrap: "wrap",
 })
-const $barButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $barButton: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,
   minHeight: 36,
   minWidth: 72,
-  borderRadius: 10,
+  borderRadius: radius.lg,
   paddingHorizontal: spacing.sm,
   alignItems: "center",
   justifyContent: "center",

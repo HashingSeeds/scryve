@@ -89,9 +89,9 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.sm,
 })
-const $qrTile: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $qrTile: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   padding: spacing.xxs,
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
   backgroundColor: "#FFFFFF",
 })
 const $codeBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({

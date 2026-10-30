@@ -100,7 +100,7 @@ const $layer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   elevation: 90,
   alignItems: "center",
 })
-const $toast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $toast: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
@@ -111,7 +111,7 @@ const $toast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingRight: spacing.xs,
   borderWidth: 1,
   borderColor: colors.separator,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: colors.surface,
 })
 const $message: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

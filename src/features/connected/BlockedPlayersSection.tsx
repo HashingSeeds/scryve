@@ -51,17 +51,17 @@ function BlockedPlayersContent({
           <Text
             tx="connected:blockedPlayers.loading"
             size="xs"
-            style={themed($muted)}
+            tone="dim"
             accessibilityLiveRegion="polite"
           />
         </View>
       ) : !isAuthenticated ? (
         <View testID="blocked-players-signed-out" style={themed($stateRow)}>
-          <Text tx="connected:blockedPlayers.signedOut" size="xs" style={themed($muted)} />
+          <Text tx="connected:blockedPlayers.signedOut" size="xs" tone="dim" />
         </View>
       ) : blocks?.length === 0 ? (
         <View testID="blocked-players-empty" style={themed($stateRow)}>
-          <Text tx="connected:blockedPlayers.empty" size="xs" style={themed($muted)} />
+          <Text tx="connected:blockedPlayers.empty" size="xs" tone="dim" />
         </View>
       ) : (
         <View testID="blocked-players-list" style={themed($list)}>
@@ -140,7 +140,7 @@ function BlockedPlayersFrame({ children }: { children: ReactNode }) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($section)}>
-      <Text size="xs" style={themed($muted)} tx="connected:blockedPlayers.description" />
+      <Text size="xs" tone="dim" tx="connected:blockedPlayers.description" />
       <View testID="blocked-players-state" style={themed($state)}>
         {children}
       </View>
@@ -166,5 +166,4 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $name: ThemedStyle<TextStyle> = () => ({ flex: 1 })
 const $action: ThemedStyle<ViewStyle> = () => ({ minHeight: 44, minWidth: 120 })
 const $retry: ThemedStyle<ViewStyle> = () => ({ minHeight: 40, minWidth: 88 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })

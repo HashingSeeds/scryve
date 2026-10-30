@@ -150,7 +150,7 @@ export function CommanderClaimBanner({
 
 const $layer: ViewStyle = { zIndex: 9 }
 
-const $banner: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $banner: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   position: "absolute",
   flexDirection: "row",
   flexWrap: "wrap",
@@ -160,7 +160,7 @@ const $banner: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   rowGap: spacing.xxxs,
   padding: spacing.xxs,
   paddingLeft: spacing.sm,
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
 })
 
 const $summary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -179,11 +179,11 @@ const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 
-const $action: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $action: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 40,
   justifyContent: "center",
   paddingHorizontal: spacing.sm,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
 })
 
 const $actionLabel: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 20 })

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { useQuery } from "convex/react"
 
@@ -157,7 +157,8 @@ function LocalDeckSyncPicker({
         <View style={themed($row)}>
           <Text
             size="xs"
-            style={[themed($dim), $flex1]}
+            tone="dim"
+            style={$flex1}
             tx="decks:localSync.pro"
             txOptions={{ premiumLimit: MAX_PREMIUM_DECKS }}
           />
@@ -196,4 +197,3 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $flex1: ViewStyle = { flex: 1 }
 const $choices: ViewStyle = { maxHeight: 280 }
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

@@ -199,7 +199,7 @@ export function SegmentedControl({
                 selected &&
                   segmentWidth <= 0 && {
                     backgroundColor: accent,
-                    borderRadius: radius.lg - TRACK_INSET,
+                    borderRadius: radius.xl - TRACK_INSET,
                   },
               ]}
               onPress={() => tap(segment.id)}
@@ -219,7 +219,7 @@ export function SegmentedControl({
 const $track: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   flexDirection: "row",
   padding: TRACK_INSET,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
   borderWidth: TRACK_BORDER_WIDTH,
   borderColor: colors.border,
   backgroundColor: colors.palette.neutral100,
@@ -229,7 +229,7 @@ const $thumbShape: ThemedStyle<ViewStyle> = ({ radius }) => ({
   top: TRACK_INSET,
   bottom: TRACK_INSET,
   left: TRACK_INSET,
-  borderRadius: radius.lg - TRACK_INSET,
+  borderRadius: radius.xl - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
 const $fill: ViewStyle = { flex: 1 }

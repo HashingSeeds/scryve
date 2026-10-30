@@ -96,12 +96,12 @@ export function SeatArrangement({
   )
 }
 
-const $map: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $map: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   alignSelf: "center",
   gap: spacing.xxs,
   padding: spacing.xxs,
   backgroundColor: colors.board.background,
-  borderRadius: 8,
+  borderRadius: radius.md,
 })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,

@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native"
 import Animated, { ZoomIn } from "react-native-reanimated"
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
 
+import { radius } from "@/theme/radius"
 import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -406,7 +407,7 @@ function MarkShape({
 
 const styles = StyleSheet.create({
   closeBar: {
-    borderRadius: 999,
+    borderRadius: radius.full,
     height: "20%",
     left: "6%",
     position: "absolute",

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Icon } from "@/components/Icon"
@@ -57,7 +57,7 @@ export function SettingsRow({ tx, onPress, value, testID, topSeparator }: Settin
       bottomSeparator
       RightComponent={
         <View style={themed($value)}>
-          {value ? <Text text={value} numberOfLines={1} style={themed($muted)} /> : null}
+          {value ? <Text text={value} numberOfLines={1} tone="dim" /> : null}
           <Icon icon="caretRight" size={20} color={colors.textDim} />
         </View>
       }
@@ -85,4 +85,3 @@ const $value: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
   marginStart: spacing.md,
 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

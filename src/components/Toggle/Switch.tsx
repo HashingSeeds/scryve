@@ -4,6 +4,7 @@ import { Animated, Image, ImageStyle, Platform, StyleProp, View, ViewStyle } fro
 import { iconRegistry } from "@/components/Icon"
 import { isRTL } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
@@ -219,7 +220,7 @@ function SwitchAccessibilityLabel(props: SwitchInputProps & { role: "on" | "off"
 
 const $inputOuter: StyleProp<ViewStyle> = [
   $inputOuterBase,
-  { height: 32, width: 56, borderRadius: 16, borderWidth: 0 },
+  { height: 32, width: 56, borderRadius: radius.full, borderWidth: 0 },
 ]
 
 const $switchInner: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -230,7 +231,7 @@ const $switchInner: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 
 const $switchDetail: SwitchToggleProps["inputDetailStyle"] = {
-  borderRadius: 12,
+  borderRadius: radius.full,
   position: "absolute",
   width: 24,
   height: 24,
@@ -257,5 +258,5 @@ const $switchAccessibilityCircle: ViewStyle = {
   borderWidth: 2,
   width: 12,
   height: 12,
-  borderRadius: 6,
+  borderRadius: radius.full,
 }

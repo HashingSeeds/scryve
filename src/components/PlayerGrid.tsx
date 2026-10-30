@@ -22,6 +22,7 @@ import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrient
 import { tableItemRulesOf } from "@/features/rules/gameRules"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
@@ -757,16 +758,16 @@ export function getScreenCornerSquaringStyle(input: {
   const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
   const squared: ViewStyle = {
     ...(touchesTopEdge && touchesLeftEdge && reachesCorner("top", "left")
-      ? { borderTopLeftRadius: 0 }
+      ? { borderTopLeftRadius: radius.none }
       : null),
     ...(touchesTopEdge && touchesRightEdge && reachesCorner("top", "right")
-      ? { borderTopRightRadius: 0 }
+      ? { borderTopRightRadius: radius.none }
       : null),
     ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
-      ? { borderBottomLeftRadius: 0 }
+      ? { borderBottomLeftRadius: radius.none }
       : null),
     ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
-      ? { borderBottomRightRadius: 0 }
+      ? { borderBottomRightRadius: radius.none }
       : null),
   }
   return Object.keys(squared).length ? squared : undefined

@@ -174,7 +174,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
           <>
             <Text
               size="xs"
-              style={themed($dim)}
+              tone="dim"
               text={[deckGame(game)?.shortLabel ?? game, deckFormatLabel(game, format)]
                 .filter(Boolean)
                 .join(" · ")}
@@ -182,7 +182,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
             {empty ? (
               <View style={$hero}>
                 <Text weight="medium" tx="decks:stats.noResults" />
-                <Text size="sm" style={themed($dim)} tx="decks:stats.emptyHint" />
+                <Text size="sm" tone="dim" tx="decks:stats.emptyHint" />
               </View>
             ) : null}
             {!filter && !empty ? (
@@ -201,7 +201,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                   {manualMatches || connectedMatches ? (
                     <Text
                       size="xs"
-                      style={themed($dim)}
+                      tone="dim"
                       text={translate("decks:stats.matchesRecord", {
                         record: `${(manualMatches?.wins ?? 0) + (connectedMatches?.wins ?? 0)}-${(manualMatches?.losses ?? 0) + (connectedMatches?.losses ?? 0)}-${(manualMatches?.draws ?? 0) + (connectedMatches?.draws ?? 0)}`,
                       })}
@@ -210,7 +210,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                   {chance && !honestRate(chance.record).tooFew ? (
                     <Text
                       size="xs"
-                      style={themed($dim)}
+                      tone="dim"
                       tx="decks:stats.chance"
                       txOptions={{
                         rate: honestRate(chance.record).text,
@@ -220,24 +220,19 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                     />
                   ) : null}
                   {range ? (
-                    <Text
-                      size="xs"
-                      style={themed($dim)}
-                      tx="decks:stats.likely"
-                      txOptions={range}
-                    />
+                    <Text size="xs" tone="dim" tx="decks:stats.likely" txOptions={range} />
                   ) : null}
                   {smallSample ? (
                     <Text
                       size="xs"
-                      style={themed($dim)}
+                      tone="dim"
                       tx="decks:stats.smallSample"
                       txOptions={{ count: MIN_RATED_GAMES }}
                     />
                   ) : null}
                 </View>
                 {!summary.scannedAll ? (
-                  <Text size="xs" style={themed($dim)} tx="decks:stats.limited" />
+                  <Text size="xs" tone="dim" tx="decks:stats.limited" />
                 ) : null}
                 {lists.length ? (
                   <>
@@ -360,7 +355,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
           !empty && (games.status === "LoadingFirstPage" || games.status === "Exhausted") ? (
             <Text
               size="sm"
-              style={themed($dim)}
+              tone="dim"
               tx={
                 games.status === "LoadingFirstPage"
                   ? "decks:stats.loading"
@@ -421,7 +416,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 />
                 <Text
                   size="xs"
-                  style={themed($dim)}
+                  tone="dim"
                   text={
                     item.opponents.length
                       ? item.opponents
@@ -433,9 +428,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                   }
                 />
               </View>
-              {item.gamePublicId || item.matchPublicId ? (
-                <Text text="›" style={themed($dim)} />
-              ) : null}
+              {item.gamePublicId || item.matchPublicId ? <Text text="›" tone="dim" /> : null}
             </TouchableOpacity>
           )
         }}

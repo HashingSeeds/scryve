@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { useConvex } from "convex/react"
 
@@ -273,7 +273,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         {savedOffline ? (
           <Text size="xs" testID="match-saved-offline" tx="play:recordMatch.savedOffline" />
         ) : !access.ownerId && access.message ? (
-          <Text size="xs" style={themed($dim)} text={access.message} />
+          <Text size="xs" tone="dim" text={access.message} />
         ) : null}
         {savedOffline ? (
           <Button testID="match-done" tx="common:done" preset="primary" onPress={onSaved} />
@@ -317,7 +317,6 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   alignItems: "flex-end",
 })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
 async function localDeckIds(localId: string) {
   const stored = loadGuestDeck(localId)

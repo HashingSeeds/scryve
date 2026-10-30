@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Text } from "@/components/Text"
 import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
+import { radius } from "@/theme/radius"
 import { storage } from "@/utils/storage"
 
 import type { PeerLatency, SyncLatency } from "./syncLatency"
@@ -68,7 +69,7 @@ const $table: ViewStyle = {
   position: "absolute",
   left: 4,
   padding: 4,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: "rgba(0, 0, 0, 0.7)",
 }
 

@@ -24,7 +24,6 @@ import {
 } from "@/features/stats/deckStatsMath"
 import {
   $content,
-  $dim,
   $numbers,
   $statsRow,
   DeckComparePrompt,
@@ -129,9 +128,7 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
   return (
     <ScrollView contentContainerStyle={themed($content)}>
       <Text text={deckName} preset="heading" />
-      {!summary.scannedAll ? (
-        <Text size="xs" style={themed($dim)} tx="decks:stats.limited" />
-      ) : null}
+      {!summary.scannedAll ? <Text size="xs" tone="dim" tx="decks:stats.limited" /> : null}
       {left && right ? (
         <>
           <View style={themed($statsRow)}>
@@ -166,14 +163,14 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
           {honestRate(left.record).tooFew || honestRate(right.record).tooFew ? (
             <Text
               size="xs"
-              style={themed($dim)}
+              tone="dim"
               tx="decks:stats.smallSample"
               txOptions={{ count: MIN_RATED_GAMES }}
             />
           ) : null}
           <StatsSection title={translate("decks:stats.cardChanges")} />
           {cards.loading ? (
-            <Text size="xs" style={themed($dim)} tx="decks:stats.loading" />
+            <Text size="xs" tone="dim" tx="decks:stats.loading" />
           ) : cards.error ? (
             <AlertNote text={translate("decks:stats.snapshotFailed")} />
           ) : changes ? (
@@ -190,7 +187,7 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
               <Text size="sm" tx="decks:stats.noChanges" />
             )
           ) : (
-            <Text size="sm" style={themed($dim)} tx="decks:stats.missingLists" />
+            <Text size="sm" tone="dim" tx="decks:stats.missingLists" />
           )}
         </>
       ) : (
@@ -240,7 +237,6 @@ function CompareRow({ label, left, right }: { label: string; left: ReactNode; ri
 }
 
 function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] }) {
-  const { themed } = useAppTheme()
   const range = likelyRange(record)
   const { games, tooFew } = honestRate(record)
   return (
@@ -249,9 +245,7 @@ function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] 
         text={games ? `${Math.round((record.wins / games) * 100)}%` : recordText(record)}
         style={$numbers}
       />
-      {range ? (
-        <Text size="xxs" style={themed($dim)} tx="decks:stats.likely" txOptions={range} />
-      ) : null}
+      {range ? <Text size="xxs" tone="dim" tx="decks:stats.likely" txOptions={range} /> : null}
     </View>
   )
 }

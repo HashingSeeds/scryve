@@ -54,7 +54,7 @@ export function AccountScreen({
           <View style={$identityText}>
             <Text text={primaryLabel} preset="subheading" numberOfLines={1} />
             {email && email !== primaryLabel ? (
-              <Text text={email} size="xs" style={themed($muted)} numberOfLines={1} />
+              <Text text={email} size="xs" tone="dim" numberOfLines={1} />
             ) : null}
           </View>
         </View>
@@ -72,7 +72,7 @@ export function AccountScreen({
           >
             <Text tx="account:profile.profileAndSecurity" />
             {"\n"}
-            <Text tx="account:profile.profileDetails" size="xxs" style={themed($muted)} />
+            <Text tx="account:profile.profileDetails" size="xxs" tone="dim" />
           </ListItem>
           {accountControls}
         </View>
@@ -94,7 +94,7 @@ export function AccountScreen({
               onPress={onOpenGameContentNotices}
             />
           </View>
-          <Text tx="account:profile.independence" size="xxs" style={themed($muted)} />
+          <Text tx="account:profile.independence" size="xxs" tone="dim" />
         </View>
 
         <View style={themed($signOut)}>
@@ -109,7 +109,7 @@ export function AccountScreen({
             textStyle={themed($signOutText)}
             onPress={onSignOut}
           />
-          <Text tx="account:localGamesStay" size="xxs" style={themed($muted)} />
+          <Text tx="account:localGamesStay" size="xxs" tone="dim" />
         </View>
       </ScrollView>
     </View>
@@ -181,12 +181,11 @@ const $signOut: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   paddingTop: spacing.lg,
 })
-const $signOutButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $signOutButton: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   minHeight: 50,
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
   borderColor: colors.error,
   backgroundColor: colors.transparent,
 })
 const $signOutText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })

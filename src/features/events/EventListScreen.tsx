@@ -6,7 +6,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 
-import { $action, $actions, $dim, $grow, $row, $section, EventFrame } from "./EventFrame"
+import { $action, $actions, $grow, $row, $section, EventFrame } from "./EventFrame"
 import { eventMeta, eventStatusText } from "./eventLogic"
 import type { EventView } from "./eventSource"
 
@@ -63,7 +63,7 @@ export function EventListScreen({
     >
       {nearby}
       <View style={themed($section)}>
-        {events?.length === 0 ? <Text style={themed($dim)} tx="events:list.empty" /> : null}
+        {events?.length === 0 ? <Text tone="dim" tx="events:list.empty" /> : null}
         {events?.map((event) => (
           <TouchableOpacity
             key={event.id}
@@ -78,7 +78,7 @@ export function EventListScreen({
               <Text
                 size="xxs"
                 numberOfLines={1}
-                style={themed($dim)}
+                tone="dim"
                 text={[
                   eventMeta(event),
                   translate("events:playerCount", { count: event.playerCount }),

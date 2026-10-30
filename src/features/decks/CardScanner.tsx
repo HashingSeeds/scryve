@@ -15,6 +15,7 @@ import { Text } from "@/components/Text"
 import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 import { storage } from "@/utils/storage"
@@ -543,7 +544,7 @@ const $frame: ViewStyle = {
   aspectRatio: 63 / 88,
   borderWidth: 2,
   borderColor: "#FFFFFF",
-  borderRadius: 12,
+  borderRadius: radius.xl,
 }
 const $hint: TextStyle = { color: "#FFFFFF", textAlign: "center", paddingHorizontal: 24 }
 const $permission: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, padding: spacing.lg })

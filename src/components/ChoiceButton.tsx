@@ -105,7 +105,7 @@ function CheckBadge({ selected, color }: { selected: boolean; color: string }) {
 
 const $choice: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 56,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
   justifyContent: "flex-start",
   paddingHorizontal: spacing.sm,
   borderWidth: 2,
@@ -135,10 +135,10 @@ const $trailing: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginStart: spacing.sm,
 })
-const $badge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $badge: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 22,
   height: 22,
-  borderRadius: 11,
+  borderRadius: radius.full,
   borderWidth: 2,
   borderColor: colors.border,
   alignItems: "center",

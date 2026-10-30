@@ -1,10 +1,11 @@
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import {
@@ -89,7 +90,7 @@ export function AppearancePicker({
   return (
     <View style={themed($picker)}>
       <View style={themed($group)}>
-        <Text size="xs" style={themed($label)} tx="connected:appearance.color" />
+        <Text size="xs" tone="dim" tx="connected:appearance.color" />
         <View accessibilityRole="radiogroup" style={themed($row)}>
           {PLAYER_COLOR_CHOICES.map((color) => {
             const selected = color.toUpperCase() === value.color.toUpperCase()
@@ -123,14 +124,14 @@ export function AppearancePicker({
         </View>
       </View>
       <View style={themed($group)}>
-        <Text size="xs" style={themed($label)} tx="connected:appearance.mark" />
+        <Text size="xs" tone="dim" tx="connected:appearance.mark" />
         <View accessibilityRole="radiogroup" style={themed($row)}>
           {shapes.map((shape, index) => shapeOption(shape, index, false))}
         </View>
       </View>
       {proShapes.length ? (
         <View style={themed($group)}>
-          <Text size="xs" style={themed($label)} tx="connected:appearance.pro" />
+          <Text size="xs" tone="dim" tx="connected:appearance.pro" />
           <View accessibilityRole="radiogroup" style={themed($row)}>
             {proShapes.map((shape, index) => shapeOption(shape, index, true))}
           </View>
@@ -148,14 +149,13 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   rowGap: spacing.xxs,
 })
 const $option: ViewStyle = { width: "25%", alignItems: "center" }
-const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $swatch: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $swatch: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   alignItems: "center",
   justifyContent: "center",
   width: 44,
   height: 44,
   padding: spacing.xxs,
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
   borderWidth: 2,
   borderColor: colors.transparent,
 })
@@ -166,4 +166,8 @@ const $exhausted: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderStyle: "dashed",
 })
 const $locked: ViewStyle = { opacity: 0.45 }
-const $colorDot: ThemedStyle<ViewStyle> = () => ({ width: 28, height: 28, borderRadius: 14 })
+const $colorDot: ThemedStyle<ViewStyle> = () => ({
+  width: 28,
+  height: 28,
+  borderRadius: radius.full,
+})

@@ -50,7 +50,7 @@ function PreviewRow({ label, values }: { label: string; values: string[] }) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($previewRow)}>
-      <Text size="xs" text={label} style={[$flex, themed($dim)]} />
+      <Text size="xs" text={label} tone="dim" style={$flex} />
       {values.map((value, index) => (
         <Text key={index} size="sm" text={value} style={[$previewValue, $numbers]} />
       ))}
@@ -76,7 +76,7 @@ function ComparePreview({ lists }: { lists: ComparePreviewLists }) {
         label={translate("decks:stats.record")}
         values={lists.map((list) => recordText(list.record))}
       />
-      <Text size="xs" tx="decks:stats.cardChanges" style={themed($dim)} />
+      <Text size="xs" tx="decks:stats.cardChanges" tone="dim" />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {PREVIEW_CHANGE_WIDTHS.map((width) => (
           <View key={width} style={themed($previewChange)}>
@@ -89,7 +89,6 @@ function ComparePreview({ lists }: { lists: ComparePreviewLists }) {
 }
 
 export function HonestRate({ record }: { record: RecordCounts }) {
-  const { themed } = useAppTheme()
   const rate = honestRate(record)
   return (
     <View style={rate.tooFew ? $fewRate : $rate}>
@@ -97,7 +96,7 @@ export function HonestRate({ record }: { record: RecordCounts }) {
       {rate.tooFew ? null : (
         <Text
           size="xxs"
-          style={themed($dim)}
+          tone="dim"
           text={translate("decks:stats.ofGames", { count: rate.games })}
         />
       )}
@@ -123,10 +122,10 @@ export function StatsRow({
     <>
       <View style={$flex}>
         <Text text={label} size="sm" />
-        {detail ? <Text text={detail} size="xs" style={themed($dim)} /> : null}
+        {detail ? <Text text={detail} size="xs" tone="dim" /> : null}
       </View>
       <HonestRate record={record} />
-      {onPress ? <Text text="›" style={themed($dim)} /> : null}
+      {onPress ? <Text text="›" tone="dim" /> : null}
     </>
   )
   return onPress ? (
@@ -235,8 +234,8 @@ const $previewChange: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   height: spacing.lg,
   justifyContent: "center",
 })
-const $previewBar: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $previewBar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   height: 10,
-  borderRadius: 5,
+  borderRadius: radius.full,
   backgroundColor: colors.separator,
 })

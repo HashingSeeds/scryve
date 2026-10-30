@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, useWindowDimensions, View } from "react-native"
 
 import { translate } from "@/i18n/translate"
@@ -67,7 +67,7 @@ export function ConfirmDialog({
     >
       <ScrollView style={$copyScroll} contentContainerStyle={themed($copy)}>
         <Text preset="subheading" text={title} />
-        {message ? <Text size="sm" style={themed($message)} text={message} /> : null}
+        {message ? <Text size="sm" tone="dim" text={message} /> : null}
         {notice}
       </ScrollView>
       <View style={[themed($actions), large && $stackedActions]}>
@@ -98,7 +98,6 @@ const $stackedActions: ViewStyle = { flexDirection: "column-reverse" }
 const $stackedAction: ViewStyle = { flex: 0 }
 const $confirm: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $copy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $message: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xs,
@@ -106,5 +105,5 @@ const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $action: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
 })

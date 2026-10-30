@@ -53,8 +53,8 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $compactRow = { minHeight: 68 } as const
 const $comfortableRow = { minHeight: 84 } as const
-const $thumbnail: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  borderRadius: spacing.xxxs,
+const $thumbnail: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
+  borderRadius: radius.xxs,
   backgroundColor: colors.separator,
 })
 const $compactThumbnail = { width: 36, height: 50 } as const

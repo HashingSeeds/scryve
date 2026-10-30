@@ -41,7 +41,7 @@ export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenPro
       <View style={themed($content)}>
         <View style={themed($documentHeader)}>
           <Text text={document.title} preset="heading" accessibilityRole="header" />
-          <Text text={lastUpdated} size="xs" style={themed($metadata)} />
+          <Text text={lastUpdated} size="xs" tone="dim" />
         </View>
         {document.sections.map((section, index) => (
           <View key={`${section.heading ?? "section"}-${index}`} style={themed($section)}>
@@ -108,7 +108,6 @@ const $documentHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderColor: colors.separator,
 })
-const $metadata: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $sectionHeading: ThemedStyle<TextStyle> = () => ({ letterSpacing: -0.2 })
 const $body: ThemedStyle<TextStyle> = ({ colors }) => ({

@@ -121,10 +121,10 @@ const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
   textTransform: "uppercase",
   letterSpacing: 1,
 })
-const $chip: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $chip: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.sm,
-  borderRadius: spacing.lg,
+  borderRadius: radius.xxxl,
   borderWidth: 1,
   borderColor: colors.separator,
 })
@@ -143,10 +143,10 @@ const $filterOverlap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
   justifyContent: "center",
 })
-const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 32,
   minWidth: 44,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
   backgroundColor: colors.tintInactive,
   flexDirection: "row",
   alignItems: "center",

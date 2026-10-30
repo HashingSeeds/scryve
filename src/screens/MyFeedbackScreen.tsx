@@ -33,7 +33,7 @@ export function MyFeedbackScreen({
   const empty = items?.length === 0
   return (
     <FeedbackLayout title={translate("feedback:mine.title")} offline={offline} onBack={onBack}>
-      {empty ? <Text tx="feedback:mine.empty" style={themed($muted)} /> : null}
+      {empty ? <Text tx="feedback:mine.empty" tone="dim" /> : null}
       {items?.map((item) => (
         <Pressable
           key={item._id}
@@ -47,13 +47,13 @@ export function MyFeedbackScreen({
               <Text tx="feedback:mine.unread" size="xxs" weight="bold" style={themed($new)} />
             ) : null}
           </View>
-          <Text tx={`feedback:suggest.${item.kind}`} size="xxs" style={themed($muted)} />
+          <Text tx={`feedback:suggest.${item.kind}`} size="xxs" tone="dim" />
         </Pressable>
       ))}
       {empty || items === undefined ? null : (
         <View style={themed($delete)}>
           <Button tx="feedback:mine.deleteAll" onPress={() => setConfirming(true)} />
-          <Text tx="feedback:mine.deleteHint" size="xs" style={themed($muted)} />
+          <Text tx="feedback:mine.deleteHint" size="xs" tone="dim" />
           {deleteFailed ? (
             <Text tx="feedback:mine.deleteFailed" size="xs" accessibilityRole="alert" />
           ) : null}
@@ -91,7 +91,6 @@ const $rowHead: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $grow: TextStyle = { flex: 1 }
 const $pressed: ViewStyle = { opacity: 0.6 }
 const $new: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $delete: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   marginTop: spacing.xl,

@@ -2,6 +2,7 @@ import { View, type TextStyle, type ViewStyle } from "react-native"
 
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
+import { radius } from "@/theme/radius"
 
 import type { CardPhotoText } from "../../../modules/card-text-reader"
 
@@ -52,7 +53,7 @@ const $stats: ViewStyle = {
   top: 4,
   left: 4,
   padding: 4,
-  borderRadius: 4,
+  borderRadius: radius.sm,
   backgroundColor: "rgba(0, 0, 0, 0.7)",
 }
 

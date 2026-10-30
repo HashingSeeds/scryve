@@ -47,12 +47,7 @@ export function SubscriptionControls() {
       <View style={$headingText}>
         <Text preset="subheading" text={PLAN_TITLES[planName]} accessibilityRole="header" />
         {billing.configured ? (
-          <Text
-            size="xs"
-            style={themed($muted)}
-            text={accessStatus}
-            accessibilityLiveRegion="polite"
-          />
+          <Text size="xs" tone="dim" text={accessStatus} accessibilityLiveRegion="polite" />
         ) : null}
       </View>
 
@@ -93,7 +88,6 @@ const $container: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $headingText: ViewStyle = { flex: 1 }
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $button: ThemedStyle<ViewStyle> = () => ({
   minWidth: 112,
   minHeight: 44,

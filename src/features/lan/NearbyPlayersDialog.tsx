@@ -64,7 +64,7 @@ export function NearbyPlayersDialog({
             <Text
               testID={`nearby-away-seat-${player.seat}`}
               size="xs"
-              style={themed($muted)}
+              tone="dim"
               tx="connected:nearby.away"
             />
           ) : null}
@@ -82,4 +82,3 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $name: ThemedStyle<TextStyle> = () => ({ flex: 1 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

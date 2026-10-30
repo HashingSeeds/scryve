@@ -117,21 +117,21 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexWrap: "wrap",
   gap: spacing.xs,
 })
-const $option: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $option: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   alignItems: "center",
   gap: spacing.xxs,
   padding: spacing.xs,
   borderWidth: 2,
   borderColor: colors.border,
-  borderRadius: 12,
+  borderRadius: radius.xl,
 })
 const $selectedOption: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
 const $pressedOption: ThemedStyle<ViewStyle> = () => ({ opacity: 0.78 })
-const $preview: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $preview: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   gap: spacing.xxs,
   padding: spacing.xxs,
   backgroundColor: colors.board.background,
-  borderRadius: 8,
+  borderRadius: radius.md,
 })
 const $previewRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -139,7 +139,7 @@ const $previewRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 const $previewCell: ViewStyle = { flex: 1 }
-const $previewSeat: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $previewSeat: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   backgroundColor: colors.gameMenu.actions.players,
-  borderRadius: 4,
+  borderRadius: radius.sm,
 })

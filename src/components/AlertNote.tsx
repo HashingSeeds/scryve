@@ -29,17 +29,17 @@ export function AlertNote({ text, tone = "error", testID }: AlertNoteProps) {
   )
 }
 
-export const $alert: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+export const $alert: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   gap: spacing.xs,
   padding: spacing.sm,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   backgroundColor: colors.errorBackground,
 })
 export const $alertText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-const $info: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $info: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   gap: spacing.xs,
   padding: spacing.sm,
-  borderRadius: spacing.xs,
+  borderRadius: radius.md,
   borderWidth: 1,
   borderColor: colors.separator,
 })

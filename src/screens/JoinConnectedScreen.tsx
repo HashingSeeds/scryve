@@ -237,7 +237,7 @@ export function JoinConnectedScreen({
           />
           <Text
             size="sm"
-            style={themed($dimmed)}
+            tone="dim"
             tx={token ? "connected:join.invitedBody" : "connected:join.codeBody"}
           />
         </View>
@@ -280,7 +280,7 @@ export function JoinConnectedScreen({
         {picking ? (
           <View style={themed($section)}>
             <Text weight="medium" tx="connected:join.pickSeat" />
-            <Text size="xs" style={themed($dimmed)} tx="connected:join.pickSeatBody" />
+            <Text size="xs" tone="dim" tx="connected:join.pickSeatBody" />
             {openSeats?.map((seat) => (
               <Button
                 key={seat}
@@ -335,7 +335,6 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $codeInput: ThemedStyle<TextStyle> = () => ({ letterSpacing: 4 })
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
 const $secondaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })

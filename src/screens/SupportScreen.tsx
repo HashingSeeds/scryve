@@ -105,11 +105,7 @@ export function SupportScreen({
                     weight="bold"
                     style={themed($cardTitle)}
                   />
-                  <Text
-                    tx={`account:support.gettingStarted.${step}.body`}
-                    size="xs"
-                    style={themed($muted)}
-                  />
+                  <Text tx={`account:support.gettingStarted.${step}.body`} size="xs" tone="dim" />
                 </View>
               ))}
             </View>
@@ -157,13 +153,13 @@ export function SupportScreen({
           </View>
 
           <View style={themed($footer)}>
-            <Text text={COPYRIGHT} size="xxs" style={themed($muted)} />
+            <Text text={COPYRIGHT} size="xxs" tone="dim" />
             {appVersion ? (
               <Text
                 tx="account:support.appVersion"
                 txOptions={{ version: appVersion }}
                 size="xxs"
-                style={themed($muted)}
+                tone="dim"
               />
             ) : null}
           </View>
@@ -190,11 +186,7 @@ function SearchResults({
   if (faqs.length === 0)
     return (
       <View style={themed($section)}>
-        <Text
-          text={translate("feedback:support.noMatch", { query })}
-          size="xs"
-          style={themed($muted)}
-        />
+        <Text text={translate("feedback:support.noMatch", { query })} size="xs" tone="dim" />
         <Button
           text={translate("feedback:support.ask", { query })}
           preset="primary"
@@ -260,10 +252,10 @@ function SupportRow({
     >
       <View style={themed($rowText)}>
         <Text tx={tx} weight="medium" />
-        {detailTx ? <Text tx={detailTx} size="xs" style={themed($muted)} /> : null}
+        {detailTx ? <Text tx={detailTx} size="xs" tone="dim" /> : null}
       </View>
       {badge ? <Text text={badge} size="xs" weight="bold" style={themed($badge)} /> : null}
-      <Text text={CHEVRON} style={themed($muted)} />
+      <Text text={CHEVRON} tone="dim" />
     </Pressable>
   )
 }
@@ -284,11 +276,11 @@ const $badge: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $steps: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
-const $stepCard: ThemedStyle<ViewStyle> = ({ colors, isDark, spacing }) => ({
+const $stepCard: ThemedStyle<ViewStyle> = ({ colors, isDark, spacing, radius }) => ({
   gap: spacing.xxs,
   padding: spacing.md,
   borderWidth: 1,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
   borderColor: colors.separator,
   backgroundColor: isDark ? colors.palette.neutral300 : colors.palette.neutral100,
 })
@@ -298,11 +290,11 @@ const $stepNumber: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 
 const $faqs: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
-const $faqCard: ThemedStyle<ViewStyle> = ({ colors, isDark, spacing }) => ({
+const $faqCard: ThemedStyle<ViewStyle> = ({ colors, isDark, spacing, radius }) => ({
   gap: spacing.xs,
   padding: spacing.md,
   borderWidth: 1,
-  borderRadius: spacing.md,
+  borderRadius: radius.xxl,
   borderColor: colors.separator,
   backgroundColor: isDark ? colors.palette.neutral300 : colors.palette.neutral100,
 })
@@ -324,4 +316,3 @@ const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderTopWidth: 1,
   borderColor: colors.separator,
 })
-const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

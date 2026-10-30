@@ -138,7 +138,7 @@ export function LocalMatchEndDialog({
                 size={24}
               />
               <Text text={player.name} numberOfLines={1} style={themed($name)} />
-              <Text text={String(score.wins[seat])} size="xs" style={themed($wins)} />
+              <Text text={String(score.wins[seat])} size="xs" tone="dim" />
             </View>
             <View style={themed($seatOutcome)}>
               <SegmentedControl
@@ -192,10 +192,9 @@ const $seatName: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexBasis: 120,
 })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
-const $wins: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $seatOutcome: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, flexBasis: 200 })
 const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: radius.lg,
+  borderRadius: radius.xl,
 })

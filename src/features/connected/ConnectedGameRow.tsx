@@ -1,4 +1,4 @@
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
 import { Text } from "@/components/Text"
@@ -30,36 +30,35 @@ export function ConnectedGameRow({
       <View style={themed(waiting ? $waitingDot : $liveDot)} />
       <View style={themed($copy)}>
         <Text weight="medium" numberOfLines={1} text={resumeTitle(game)} />
-        <Text size="xxs" numberOfLines={1} style={themed($detail)} text={resumeDetail(game, now)} />
+        <Text size="xxs" numberOfLines={1} tone="dim" text={resumeDetail(game, now)} />
       </View>
-      <Text size="lg" style={themed($detail)} text="›" />
+      <Text size="lg" tone="dim" text="›" />
     </TouchableOpacity>
   )
 }
 
-const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $row: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 64,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
   paddingVertical: spacing.xs,
   paddingHorizontal: spacing.sm,
-  borderRadius: spacing.sm,
+  borderRadius: radius.xl,
   borderWidth: 1,
   borderColor: colors.separator,
 })
 const $copy: ThemedStyle<ViewStyle> = () => ({ flex: 1, gap: 2 })
-const $detail: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $liveDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $liveDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 10,
   height: 10,
-  borderRadius: 5,
+  borderRadius: radius.full,
   backgroundColor: colors.tint,
 })
-const $waitingDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $waitingDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 10,
   height: 10,
-  borderRadius: 5,
+  borderRadius: radius.full,
   borderWidth: 2,
   borderColor: colors.tint,
 })

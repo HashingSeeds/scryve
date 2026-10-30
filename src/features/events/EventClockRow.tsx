@@ -9,7 +9,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { $dim } from "./EventFrame"
 import { remainingMs } from "./eventLogic"
 import type { ClockAction, EventClock } from "../../../convex/lib/events/commands"
 
@@ -47,7 +46,7 @@ export function EventClockRow({
           accessibilityRole="timer"
           text={left > 0 ? formatRemaining(left) : translate("events:clock.timeUp")}
         />
-        {paused ? <Text size="xs" style={themed($dim)} tx="events:clock.paused" /> : null}
+        {paused ? <Text size="xs" tone="dim" tx="events:clock.paused" /> : null}
       </View>
       {onAction ? (
         <View style={themed($controls)}>

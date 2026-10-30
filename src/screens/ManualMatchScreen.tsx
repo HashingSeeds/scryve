@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { useMutation } from "convex/react"
 
@@ -108,9 +108,9 @@ function SeatRow({ seat }: { seat: ManualMatchSeat }) {
               : seat.displayName
           }
         />
-        {seat.deckName ? <Text size="xxs" style={themed($dim)} text={seat.deckName} /> : null}
+        {seat.deckName ? <Text size="xxs" tone="dim" text={seat.deckName} /> : null}
       </View>
-      {games ? <Text size="xs" style={themed($dim)} text={games} /> : null}
+      {games ? <Text size="xs" tone="dim" text={games} /> : null}
     </View>
   )
 }
@@ -175,7 +175,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
           accessibilityLabel={translate("play:manualMatch.loading")}
           style={themed($content)}
         >
-          <Text size="xs" style={themed($dim)} tx="play:manualMatch.loadingEllipsis" />
+          <Text size="xs" tone="dim" tx="play:manualMatch.loadingEllipsis" />
         </View>
       ) : !value ? (
         <EmptyState
@@ -188,7 +188,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
       ) : (
         <>
           <ScrollView contentContainerStyle={themed($content)} showsVerticalScrollIndicator={false}>
-            <Text size="xs" style={themed($dim)} text={matchMetaLine(value)} />
+            <Text size="xs" tone="dim" text={matchMetaLine(value)} />
             {score ? <Text preset="heading" testID="match-score" text={score} /> : null}
             <View>
               {value.seats.map((seat) => (
@@ -253,4 +253,3 @@ const $badge: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
-const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
