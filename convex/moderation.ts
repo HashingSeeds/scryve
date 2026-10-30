@@ -377,6 +377,7 @@ async function sendModerationEmail({
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to, subject, text }),
+    signal: AbortSignal.timeout(10_000),
   })
   if (!response.ok)
     console.error(`moderation alert email failed: ${response.status} ${await response.text()}`)

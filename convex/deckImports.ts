@@ -959,7 +959,14 @@ async function fetchAndCachePreconstructedOutline(
     intervalMs: 100,
   })
   if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-  const response = await fetch(`${MTGJSON_BASE_URL}/decks/${encodeURIComponent(fileName)}`)
+  const response = await fetch(`${MTGJSON_BASE_URL}/decks/${encodeURIComponent(fileName)}`, {
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => {
+    throw new ConvexError({
+      code: "precon_import_unavailable",
+      message: "Official deck import is temporarily unavailable",
+    })
+  })
   if (!response.ok)
     throw new ConvexError({
       code: "precon_import_unavailable",

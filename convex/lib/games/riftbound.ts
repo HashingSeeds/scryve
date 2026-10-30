@@ -134,6 +134,7 @@ export const RIFTHUNT_DATASET = {
     const response = await fetch(RIFTHUNT_CARDS_URL, {
       method: "HEAD",
       headers: { "User-Agent": SCRYVE_USER_AGENT },
+      signal: AbortSignal.timeout(10_000),
     })
     const modified = response.ok ? response.headers.get("last-modified") : null
     if (!modified) throw new Error(`RiftHunt bulk cards returned ${response.status} without a date`)
