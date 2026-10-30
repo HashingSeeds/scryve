@@ -494,6 +494,31 @@ it.each([
   },
 )
 
+it("rechecks only legendary cards once their Commander rules expire", async () => {
+  const expired = {
+    ...eligible,
+    commanderEligibility: "ineligible",
+    commanderRulesUpdatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+  }
+  saveCardDetails({
+    talrand: { ...expired, typeLine: "Legendary Creature — Human Wizard" },
+    ring: { ...expired, typeLine: "Artifact" },
+  })
+  mockAction.mockResolvedValue({ ...eligible, typeLine: "Legendary Creature — Human Wizard" })
+  const view = chooser(deck.slice(0, 2))
+  await act(async () => {})
+  expect(mockQuery).toHaveBeenCalledWith(expect.anything(), {
+    game: "mtg",
+    items: [{ key: "talrand", scryfallId: "talrand" }],
+  })
+  expect(mockAction).toHaveBeenCalledTimes(1)
+  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    scryfallId: "talrand",
+    deviceId: expect.any(String),
+  })
+  expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
+})
+
 const filters: Parameters<typeof scryfallQuery>[0] = {
   text: "",
   commander: false,
