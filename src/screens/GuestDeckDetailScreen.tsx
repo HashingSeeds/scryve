@@ -296,6 +296,7 @@ export function GuestDeckDetailScreen({
         onFocus={(card) => setFocusedKey(printingKey(card))}
         onIncrement={addCard}
         onDecrement={removeCard}
+        onMove={(card) => setError(edit({ type: "move", card }, rules))}
         undo={
           current.undo
             ? { name: current.undo.name, restore: () => edit({ type: "undo" }, rules) }

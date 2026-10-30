@@ -22,6 +22,7 @@ export function DeckCardRow({
   onFocus,
   onIncrement,
   onDecrement,
+  move,
   testID,
   imageTestID,
   imageSource,
@@ -35,6 +36,7 @@ export function DeckCardRow({
   onFocus: (card: DeckCard) => void
   onIncrement: (card: DeckCard) => void
   onDecrement: (card: DeckCard) => void
+  move?: { label: string; onPress: () => void }
   testID?: string
   imageTestID?: string
   imageSource?: string
@@ -65,6 +67,28 @@ export function DeckCardRow({
       </TouchableOpacity>
       {editing ? (
         <View style={$row}>
+          {move ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={move.label}
+              disabled={disabled}
+              style={$touch}
+              onPress={move.onPress}
+            >
+              <Svg
+                width={16}
+                height={16}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={theme.colors.textDim}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <Path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" />
+              </Svg>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={

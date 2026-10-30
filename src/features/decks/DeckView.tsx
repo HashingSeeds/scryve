@@ -19,9 +19,9 @@ import { DeckAnalysisPanel, useDeckAnalysis } from "./DeckAnalysisPanel"
 import { buildSections } from "./deckBuild"
 import { DeckBuildTools } from "./DeckBuildTools"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
-import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
+import { cardSection, groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
-import { isCommanderPick } from "./deckDraft"
+import { isCommanderPick, moveTarget, sideboardSection } from "./deckDraft"
 import type { DeckStatsRecord } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
@@ -75,6 +75,7 @@ export function DeckView({
   onFocus,
   onIncrement,
   onDecrement,
+  onMove,
   undo,
   stats,
   statsContent,
@@ -114,6 +115,7 @@ export function DeckView({
   onFocus: (card: DeckCard) => void
   onIncrement: (card: DeckCard) => void
   onDecrement: (card: DeckCard) => void
+  onMove?: (card: DeckCard) => void
   undo?: { name: string; restore: () => void }
   statsContent?: ReactNode
   stats?: DeckStatsRecord
@@ -142,6 +144,10 @@ export function DeckView({
     })
   }
   const shownCards = building ? cards : savedCards
+  const side = sideboardSection({ game, format })
+  const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
+  const mainCount = cardCountLabel(totalQuantity(shownCards) - sideCount)
+  const sectionLabel = (id: string) => deckSections.find((section) => section.id === id)?.label
   const cardsMessage = cardsUnavailable ? (
     <Text
       style={themed($notes)}
@@ -197,7 +203,14 @@ export function DeckView({
                 text={[
                   deckGame(game)?.shortLabel ?? game,
                   deckFormatLabel(game, format),
-                  cardsUnavailable ? undefined : cardCountLabel(totalQuantity(shownCards)),
+                  cardsUnavailable
+                    ? undefined
+                    : sideCount
+                      ? translate("decks:deckView.cardCountWithSide", {
+                          main: mainCount,
+                          side: sideCount,
+                        })
+                      : mainCount,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -281,19 +294,33 @@ export function DeckView({
             disabled={busy || editingDisabled}
           />
         )}
-        renderItem={({ item }) => (
-          <DeckCardRow
-            card={item}
-            game={game}
-            format={format}
-            editing={building}
-            subtitle={building ? analysis?.detailsFor(item)?.typeLine : undefined}
-            disabled={rowsDisabled}
-            onFocus={onFocus}
-            onIncrement={onIncrement}
-            onDecrement={onDecrement}
-          />
-        )}
+        renderItem={({ item }) => {
+          const to = building && onMove ? moveTarget({ game, format }, item) : undefined
+          return (
+            <DeckCardRow
+              card={item}
+              game={game}
+              format={format}
+              editing={building}
+              subtitle={building ? analysis?.detailsFor(item)?.typeLine : undefined}
+              disabled={rowsDisabled}
+              onFocus={onFocus}
+              onIncrement={onIncrement}
+              onDecrement={onDecrement}
+              move={
+                to && onMove
+                  ? {
+                      label: translate("decks:cardRow.move", {
+                        card: item.name,
+                        section: sectionLabel(to) ?? to,
+                      }),
+                      onPress: () => onMove(item),
+                    }
+                  : undefined
+              }
+            />
+          )
+        }}
         ListFooterComponent={
           building ? (
             <View style={themed($notes)}>

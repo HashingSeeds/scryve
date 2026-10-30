@@ -3,6 +3,7 @@ import { translate } from "@/i18n/translate"
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
 import { canonicalDecklist } from "../../../convex/lib/deckFingerprint"
+import { deckSections } from "../../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import { identitySection } from "../../../convex/lib/systems"
 
@@ -116,6 +117,40 @@ export function isCommanderPick(deck: DeckRules, card: DeckCard) {
   return identitySection(deck.game, deck.format)?.id === cardSection(card)
 }
 
+export function sideboardSection(deck: DeckRules) {
+  return deckSections(deck.game, deck.format).find(
+    (section) => section.id === "sideboard" || section.id === "side",
+  )
+}
+
+export function moveTarget(deck: DeckRules, card: DeckCard) {
+  const side = sideboardSection(deck)?.id
+  const section = cardSection(card)
+  if (!side) return undefined
+  if (section === "main") return side
+  return section === side ? "main" : undefined
+}
+
+function moveCopy<T extends DeckCard>(
+  cards: readonly T[],
+  entry: T,
+  section: string,
+): { cards: T[] } | { error: string } {
+  const copy: T = {
+    ...entry,
+    quantity: 1,
+    section,
+    ...(entry.board ? ({ board: section === "sideboard" ? "sideboard" : "main" } as const) : {}),
+  }
+  const merges = cards.some((card) => printingKey(card) === printingKey(copy))
+  // why: a lone copy keeps its place in the list, so moving it back leaves the draft clean.
+  if (!merges && entry.quantity === 1)
+    return { cards: cards.map((card) => (card === entry ? copy : card)) }
+  const added = addCopy(cards, copy)
+  if ("error" in added) return added
+  return { cards: adjustCardQuantity(added.cards, entry, -1) }
+}
+
 export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) {
   const identity = identitySection(deck.game, deck.format)
   return (
@@ -164,6 +199,7 @@ export type DeckEdit<Card extends DeckCard = DeckCard> =
       details?: CommanderSelectionDetails
       color?: Card["commanderColor"]
     }
+  | { type: "move"; card: Card }
   | { type: "undo" }
   | { type: "note"; note: string }
 
@@ -194,6 +230,14 @@ export function editDeck<Draft extends DeckEdits>(
         cards: adjustCardQuantity(draft.cards, entry, -1),
         undo: entry.quantity === 1 ? { name: entry.name, cards: draft.cards } : undefined,
       }
+    }
+    case "move": {
+      const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.card))
+      const section = entry && moveTarget(deck, entry)
+      if (!entry || !section) return draft
+      const result = moveCopy(draft.cards, entry, section)
+      if ("error" in result) return result
+      return { ...draft, cards: result.cards, undo: undefined }
     }
     case "chooseCommander": {
       const key = printingKey(edit.card)
