@@ -12,8 +12,9 @@ import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import { fetchCardDetails, loadCardDetails } from "./cardDetailsCache"
-import { analyzeDeck, CURVE_BUCKETS, type ManaColor } from "./deckAnalysis"
+import { analyzeDeck, CURVE_BUCKETS, type DeckAnalysis, type ManaColor } from "./deckAnalysis"
 import { cardDetailsKey, type DeckCard } from "./deckCards"
+import { systemDefinition } from "../../../convex/lib/systems"
 
 const MANA_DOT: Record<ManaColor, string> = {
   W: "#D9C98C",
@@ -25,24 +26,14 @@ const MANA_DOT: Record<ManaColor, string> = {
 
 const CURVE_HEIGHT = 72
 
-export function DeckAnalysisTab({
-  game,
-  format,
-  cards,
-  onChooseCommander,
-}: {
-  game: string
-  format: string
-  cards: DeckCard[]
-  onChooseCommander?: () => void
-}) {
-  const { themed } = useAppTheme()
+export function useDeckAnalysis(game: string, format: string, cards: DeckCard[]) {
+  const enabled = systemDefinition(game)?.deckAnalysis === true
   const client = useConvex()
   const online = useConvexOnline()
   const [details, setDetails] = useState(loadCardDetails)
   const requested = useRef(new Set<string>())
   useEffect(() => {
-    if (!online) return
+    if (!enabled || !online) return
     const pending = cards.filter((card) => {
       const key = cardDetailsKey(card, game)
       if (requested.current.has(key)) return false
@@ -55,11 +46,22 @@ export function DeckAnalysisTab({
       .catch(() => {
         for (const card of pending) requested.current.delete(cardDetailsKey(card, game))
       })
-  }, [client, game, cards, online])
-  const analysis = useMemo(
-    () => analyzeDeck({ cards, format, details: (card) => details[cardDetailsKey(card, game)] }),
-    [cards, format, details, game],
-  )
+  }, [client, enabled, game, cards, online])
+  return useMemo(() => {
+    if (!enabled) return undefined
+    const detailsFor = (card: DeckCard) => details[cardDetailsKey(card, game)]
+    return { detailsFor, analysis: analyzeDeck({ cards, format, details: detailsFor }) }
+  }, [enabled, cards, format, details, game])
+}
+
+export function DeckAnalysisPanel({
+  analysis,
+  onChooseCommander,
+}: {
+  analysis: DeckAnalysis
+  onChooseCommander?: () => void
+}) {
+  const { themed } = useAppTheme()
   const tallest = Math.max(1, ...analysis.curve)
 
   return (

@@ -1,6 +1,5 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { Header } from "@/components/Header"
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
@@ -130,6 +129,7 @@ test("changes a cached commander offline and saves both sections without changin
   })
   mockConnectionState.isWebSocketConnected = false
   const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-mode-build"))
   fireEvent.press(view.getByTestId("choose-commander"))
   expect(view.queryByLabelText("Preview Mountain as commander")).toBeNull()
   fireEvent.press(view.getByLabelText("Preview Talrand as commander"))
@@ -164,12 +164,11 @@ test("changes a cached commander offline and saves both sections without changin
 })
 
 function editNote(view: ReturnType<typeof renderScreen>, value: string) {
-  fireEvent.press(view.getByTestId("deck-tab-notes"))
-  fireEvent.press(view.getByText("Edit notes"))
+  fireEvent.press(view.getByTestId("deck-mode-build"))
   fireEvent.changeText(view.getByTestId("deck-note-input"), value)
 }
 
-test("opens read-only, edits notes in the deck view, and saves locally", () => {
+test("opens in Play, edits notes in Build, and saves locally", () => {
   const view = renderScreen()
   expect(view.getByText("Offline Commander")).toBeTruthy()
   expect(view.queryByTestId("deck-note-input")).toBeNull()
@@ -181,7 +180,6 @@ test("opens read-only, edits notes in the deck view, and saves locally", () => {
   })
   view.unmount()
   const reloaded = renderScreen()
-  fireEvent.press(reloaded.getByTestId("deck-tab-notes"))
   expect(reloaded.getByText("New notes")).toBeTruthy()
 })
 
@@ -196,6 +194,17 @@ test("deck details edits the name without a duplicate notes field", () => {
     expect.objectContaining({ name: "Renamed", note: "Keep this local" }),
     expect.anything(),
   )
+})
+
+test("Play keeps the saved name until a settings rename is saved", () => {
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.changeText(view.getByTestId("deck-name-input"), "Renamed")
+  fireEvent.press(view.getByTestId("deck-settings-save"))
+  expect(view.getByText("Renamed")).toBeTruthy()
+  fireEvent.press(view.getByTestId("deck-mode-play"))
+  expect(view.getByText("Offline Commander")).toBeTruthy()
+  expect(view.queryByText("Renamed")).toBeNull()
 })
 
 test("cancel keeps a guest deck and confirm deletes it", () => {
@@ -231,18 +240,18 @@ test("retains a dirty draft on conflict and storage failure", () => {
   expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
 })
 
-test("supports removing the last copy, Undo, and cancelling an edit", () => {
+test("supports removing the last copy, Undo, and discarding the draft", () => {
   const view = renderScreen()
-  fireEvent.press(view.getByTestId("edit-deck-button"))
+  fireEvent.press(view.getByTestId("deck-mode-build"))
   fireEvent.press(view.getByLabelText("Decrease Sol Ring"))
   fireEvent.press(view.getByLabelText("Remove Sol Ring"))
   expect(view.queryByText("Sol Ring")).toBeNull()
   fireEvent.press(view.getByText("Undo"))
   expect(view.getByText("Sol Ring")).toBeTruthy()
-  fireEvent(view.UNSAFE_getByType(Header), "leftPress")
-  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
-  expect(view.getByText("2×")).toBeTruthy()
-  expect(view.onBack).not.toHaveBeenCalled()
+  expect(view.getByText("1 change")).toBeTruthy()
+  fireEvent.press(view.getByTestId("deck-draft-discard"))
+  expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
+  expect(view.queryByTestId("deck-draft-bar")).toBeNull()
   view.unmount()
   expect(renderScreen().getByText("2×")).toBeTruthy()
 })
@@ -252,7 +261,6 @@ test("keeps an unsaved edit after leaving and saves it from the reopened deck", 
   editNote(first, "Unsaved")
   first.unmount()
   const reopened = renderScreen()
-  fireEvent.press(reopened.getByTestId("deck-tab-notes"))
   expect(reopened.getByDisplayValue("Unsaved")).toBeTruthy()
   fireEvent.press(reopened.getByTestId("save-version-button"))
   expect(mockSaveGuestDeck).toHaveBeenCalledWith(
@@ -260,7 +268,7 @@ test("keeps an unsaved edit after leaving and saves it from the reopened deck", 
     expect.anything(),
   )
   reopened.unmount()
-  expect(renderScreen().queryByText("Cancel")).toBeNull()
+  expect(renderScreen().queryByTestId("deck-draft-bar")).toBeNull()
 })
 
 test("searches new cards into Main deck by default and saves merged copies", async () => {
@@ -276,6 +284,7 @@ test("searches new cards into Main deck by default and saves merged copies", asy
       },
     ])
     const view = renderScreen()
+    fireEvent.press(view.getByTestId("deck-mode-build"))
     fireEvent.press(view.getByTestId("deck-add-cards"))
     fireEvent.changeText(view.getByTestId("card-search-input"), "Island")
     await waitFor(() => expect(view.getByLabelText("Add Island to deck")).toBeTruthy())

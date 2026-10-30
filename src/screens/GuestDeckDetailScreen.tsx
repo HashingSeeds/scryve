@@ -13,8 +13,8 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
-import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
+import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
 import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import {
@@ -22,7 +22,7 @@ import {
   type LocalDeckDraft as GuestDraft,
 } from "@/features/decks/deckDraftStore"
 import { DeckStats } from "@/features/decks/DeckStats"
-import { DeckView, type DeckTab } from "@/features/decks/DeckView"
+import { DeckView, type DeckMode } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
   loadGuestDeck,
@@ -79,18 +79,16 @@ export function GuestDeckDetailScreen({
   const baseRef = useRef(restored?.base ?? stored?.deck)
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
-  const [tab, setTab] = useState<DeckTab>("cards")
-  const [editing, setEditing] = useState(restored !== undefined)
+  const [mode, setMode] = useState<DeckMode>(restored ? "build" : "play")
+  const building = mode === "build"
   const [settings, setSettings] = useState(false)
-  const [adding, setAdding] = useState(false)
-  const [choosingCommander, setChoosingCommander] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingElsewhere = useLocalDeckSyncing(localId)
-  const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
-  const focusedCard = (draft ?? stored?.deck)?.cards.find(
+  // why: Play lists the saved deck, so a card focused there may already be gone from the draft.
+  const focusedCard = (building ? (draft ?? stored?.deck) : (stored?.deck ?? draft))?.cards.find(
     (card) => printingKey(card) === focusedKey,
   )
   const focusedGame = (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME
@@ -106,7 +104,7 @@ export function GuestDeckDetailScreen({
       : undefined,
     picksCommander(focusedGame, (draft ?? stored?.deck)?.format),
   )
-  const currentCommander = editing
+  const currentCommander = building
     ? (draft ?? stored?.deck)?.cards.find((card) => cardSection(card) === "commander")
     : undefined
   useCardDetails(
@@ -213,7 +211,6 @@ export function GuestDeckDetailScreen({
         { ...deckOf(current), name: current.name.trim() },
         { localId: revision.localId },
       )
-      setEditing(false)
       setDraft({ ...saved.deck, commanderSelected: current.commanderSelected })
       baseRef.current = saved.deck
       revisionRef.current = { localId: saved.localId, updatedAt: saved.updatedAt }
@@ -221,6 +218,28 @@ export function GuestDeckDetailScreen({
       setError(cause instanceof Error ? cause.message : translate("decks:guestStorage.saveFailed"))
     }
   }
+
+  const discard = () => {
+    baseRef.current = stored?.deck
+    revisionRef.current = stored
+      ? { localId: stored.localId, updatedAt: stored.updatedAt }
+      : undefined
+    setDraft(stored?.deck)
+    setError(undefined)
+  }
+  const base = baseRef.current
+  const dirty = !sameDraft(current, base)
+  const changes = dirty
+    ? Math.max(
+        1,
+        countCardChanges(base?.cards ?? [], current.cards) +
+          (["name", "format", "note"] as const).filter(
+            (field) => (current[field] ?? "") !== (base?.[field] ?? ""),
+          ).length,
+      )
+    : 0
+  const savedDeck = stored?.deck ?? current
+  const shown = building ? current : savedDeck
 
   return (
     <Screen
@@ -230,15 +249,17 @@ export function GuestDeckDetailScreen({
       contentContainerStyle={themed($screen)}
     >
       <DeckView
-        tab={tab}
-        onTabChange={setTab}
+        mode={mode}
+        onModeChange={setMode}
         guest
-        name={current.name}
+        name={shown.name}
         game={game}
-        format={current.format}
+        format={shown.format}
         cards={current.cards}
+        savedCards={savedDeck.cards}
         note={current.note ?? ""}
-        editing={editing}
+        savedNote={savedDeck.note ?? ""}
+        changes={changes}
         editingDisabled={syncing || syncingElsewhere}
         onStats={
           stored
@@ -247,9 +268,9 @@ export function GuestDeckDetailScreen({
                   pathname: "/connected/decks/stats",
                   params: {
                     deckKey: stored.deckKey ?? stored.localId,
-                    deckName: current.name,
+                    deckName: savedDeck.name,
                     game,
-                    format: current.format,
+                    format: savedDeck.format,
                   },
                 })
             : undefined
@@ -262,33 +283,14 @@ export function GuestDeckDetailScreen({
           ) : undefined
         }
         onAddMatch={
-          onAddMatch && access?.ready && stored && !editing
-            ? () => onAddMatch(current.name)
-            : undefined
+          onAddMatch && access?.ready && stored ? () => onAddMatch(savedDeck.name) : undefined
         }
-        dirty={!sameDraft(current, baseRef.current)}
         onBack={onBack}
-        onEdit={() => setEditing(true)}
         onSave={save}
-        onCancel={() => {
-          if (!sameDraft(current, baseRef.current)) setDiscarding(true)
-          else setEditing(false)
-        }}
+        onDiscard={discard}
         onDetails={() => setSettings(true)}
-        onAdd={() => {
-          setEditing(true)
-          setChoosingCommander(false)
-          setAdding(true)
-        }}
-        onChooseCommander={
-          singleCommander
-            ? () => {
-                setEditing(true)
-                setChoosingCommander(true)
-                setAdding(true)
-              }
-            : undefined
-        }
+        cardSearch={{ onAdd: addCard, onRemove: removeCard }}
+        canChooseCommander={singleCommander}
         commanderWarnings={commanderWarnings}
         onNoteChange={(note) => edit({ type: "note", note }, rules)}
         onFocus={(card) => setFocusedKey(printingKey(card))}
@@ -305,7 +307,7 @@ export function GuestDeckDetailScreen({
               <LocalDeckSyncAction
                 access={access}
                 localId={localId}
-                disabled={editing || !sameDraft(current, baseRef.current)}
+                disabled={dirty}
                 onSynced={onSynced}
                 onSyncingChange={setSyncing}
               />
@@ -323,7 +325,6 @@ export function GuestDeckDetailScreen({
                   revisionRef.current = { localId: latest.localId, updatedAt: latest.updatedAt }
                   setError(undefined)
                   setConflict(false)
-                  setEditing(false)
                 }}
               />
             ) : null}
@@ -335,30 +336,15 @@ export function GuestDeckDetailScreen({
           game={game}
           initial={{ name: current.name, format: current.format }}
           onClose={() => setSettings(false)}
-          onSubmit={(changes) => {
-            update(changes)
+          onSubmit={(settingsChange) => {
+            update(settingsChange)
             setSettings(false)
-            setEditing(true)
+            setMode("build")
           }}
           onDelete={() => {
             setSettings(false)
             setDeleteRevision(revisionRef.current)
             setDeleting(true)
-          }}
-        />
-      ) : null}
-      {adding ? (
-        <CardSearchScreen
-          game={game}
-          format={current.format}
-          initialSection={choosingCommander ? "commander" : undefined}
-          commanderCards={current.cards}
-          onClose={() => setAdding(false)}
-          onRemove={removeCard}
-          onAdd={(card) => {
-            const addError = addCard(card)
-            if (!addError && choosingCommander && isCommanderPick(rules, card)) setAdding(false)
-            return addError
           }}
         />
       ) : null}
@@ -384,8 +370,8 @@ export function GuestDeckDetailScreen({
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
           onClose={() => setFocusedKey(undefined)}
-          onSetCommander={editing && singleCommander ? chooseCommander : undefined}
-          {...(editing
+          onSetCommander={building && singleCommander ? chooseCommander : undefined}
+          {...(building
             ? {
                 onIncrement: isCommanderPick(rules, focusedCard)
                   ? undefined
@@ -398,26 +384,6 @@ export function GuestDeckDetailScreen({
             : {})}
         />
       ) : null}
-      <ConfirmDialog
-        visible={discarding}
-        title={translate("decks:detail.discardTitle")}
-        backdropAccessibilityLabel={translate("decks:detail.cancelDiscard")}
-        message={translate("decks:detail.discardBody")}
-        confirmText={translate("decks:detail.discard")}
-        cancelText={translate("decks:detail.keepEditing")}
-        destructive
-        confirmTestID="guest-deck-discard-confirm"
-        onClose={() => setDiscarding(false)}
-        onConfirm={() => {
-          baseRef.current = stored?.deck
-          revisionRef.current = stored
-            ? { localId: stored.localId, updatedAt: stored.updatedAt }
-            : undefined
-          setDraft(stored?.deck)
-          setEditing(false)
-          setDiscarding(false)
-        }}
-      />
       <ConfirmDialog
         visible={deleting}
         title={translate("decks:guestDetail.deleteTitle")}

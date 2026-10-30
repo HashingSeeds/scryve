@@ -17,6 +17,7 @@ export function DeckCardRow({
   game,
   format,
   editing,
+  subtitle,
   disabled,
   onFocus,
   onIncrement,
@@ -29,6 +30,7 @@ export function DeckCardRow({
   game: string
   format: string
   editing: boolean
+  subtitle?: string
   disabled?: boolean
   onFocus: (card: DeckCard) => void
   onIncrement: (card: DeckCard) => void
@@ -56,7 +58,10 @@ export function DeckCardRow({
           testID={imageTestID}
           style={$image}
         />
-        <Text size="sm" weight="medium" text={card.name} style={$flex} numberOfLines={2} />
+        <View style={$flex}>
+          <Text size="sm" weight="medium" text={card.name} numberOfLines={2} />
+          {subtitle ? <Text size="xxs" tone="dim" text={subtitle} numberOfLines={1} /> : null}
+        </View>
       </TouchableOpacity>
       {editing ? (
         <View style={$row}>

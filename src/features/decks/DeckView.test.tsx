@@ -10,26 +10,36 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => ({ isWebSocketConnected: false }),
 }))
 
+jest.mock("./CardSearchScreen", () => ({
+  CardSearchScreen: ({ initialSection }: { initialSection?: string }) => {
+    const { Text: MockText } = jest.requireActual<typeof import("react-native")>("react-native")
+    return <MockText testID="card-search">{initialSection ?? "cards"}</MockText>
+  },
+}))
+
+const forest = { name: "Forest", quantity: 1, scryfallId: "forest" }
+const island = { name: "Island", quantity: 2, scryfallId: "island" }
+
 function renderDeckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
   const noop = jest.fn()
   return render(
     <ThemeProvider initialContext="dark">
       <DeckView
-        tab="cards"
-        onTabChange={noop}
+        mode="build"
+        onModeChange={noop}
         name="Deck"
         game="mtg"
         format="commander"
-        cards={[{ name: "Forest", quantity: 1, scryfallId: "forest" }]}
+        cards={[forest]}
+        savedCards={[forest]}
         note=""
-        editing={false}
-        dirty={false}
+        savedNote=""
+        changes={0}
         onBack={noop}
-        onEdit={noop}
         onSave={noop}
-        onCancel={noop}
+        onDiscard={noop}
         onDetails={noop}
-        onAdd={noop}
+        cardSearch={{ onAdd: () => undefined, onRemove: noop }}
         onNoteChange={noop}
         onFocus={noop}
         onIncrement={noop}
@@ -40,7 +50,7 @@ function renderDeckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}
   )
 }
 
-it("keeps the back action available in read-only mode", () => {
+it("keeps the back action available", () => {
   const onBack = jest.fn()
   const view = renderDeckView({ cards: [], onBack })
 
@@ -49,19 +59,12 @@ it("keeps the back action available in read-only mode", () => {
 })
 
 it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)(
-  "keeps shared card controls disabled for %s while previews remain available",
+  "keeps Build card controls disabled for %s while previews remain available",
   (disabledState) => {
     const onIncrement = jest.fn()
     const onDecrement = jest.fn()
     const onFocus = jest.fn()
-    const view = renderDeckView({
-      editing: true,
-      dirty: true,
-      [disabledState]: true,
-      onFocus,
-      onIncrement,
-      onDecrement,
-    })
+    const view = renderDeckView({ [disabledState]: true, onFocus, onIncrement, onDecrement })
     expect(view.getByLabelText("Remove Forest")).toBeDisabled()
     expect(view.getByLabelText("Increase Forest")).toBeDisabled()
     fireEvent.press(view.getByLabelText("Remove Forest"))
@@ -73,16 +76,67 @@ it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)
   },
 )
 
-describe("analysis commander nudge", () => {
-  it("opens the commander chooser", () => {
-    const onChooseCommander = jest.fn()
-    const view = renderDeckView({ tab: "analysis", onChooseCommander })
-    fireEvent.press(view.getByLabelText("Choose commander"))
-    expect(onChooseCommander).toHaveBeenCalledTimes(1)
+it("shows the saved list read-only in Play, not the draft", () => {
+  const view = renderDeckView({ mode: "play", cards: [forest], savedCards: [island] })
+
+  expect(view.getByLabelText("2× Island")).toBeTruthy()
+  expect(view.queryByLabelText("1× Forest")).toBeNull()
+  expect(view.queryByLabelText("Increase Island")).toBeNull()
+  expect(view.queryByTestId("deck-add-cards")).toBeNull()
+  expect(view.queryByTestId("deck-note-input")).toBeNull()
+})
+
+it("switches views from the toggle", () => {
+  const onModeChange = jest.fn()
+  const view = renderDeckView({ mode: "play", onModeChange })
+
+  fireEvent.press(view.getByTestId("deck-mode-build"))
+  expect(onModeChange).toHaveBeenCalledWith("build")
+})
+
+describe("draft bar", () => {
+  it("shows the save status when nothing changed", () => {
+    const view = renderDeckView({ saveStatus: "Synced" })
+
+    expect(view.getByText("Synced")).toBeTruthy()
+    expect(view.queryByTestId("deck-draft-bar")).toBeNull()
   })
 
-  it("is plain text when the deck cannot be edited", () => {
-    const view = renderDeckView({ tab: "analysis" })
+  it("counts changes and saves or discards them", () => {
+    const onSave = jest.fn()
+    const onDiscard = jest.fn()
+    const view = renderDeckView({ changes: 2, onSave, onDiscard })
+
+    expect(view.getByText("2 changes")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-version-button"))
+    fireEvent.press(view.getByTestId("deck-draft-discard"))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onDiscard).toHaveBeenCalledTimes(1)
+  })
+})
+
+it("opens card search from the find field", () => {
+  const view = renderDeckView()
+
+  fireEvent.press(view.getByLabelText("Find or add a card"))
+  expect(view.getByTestId("card-search")).toHaveTextContent("cards")
+})
+
+describe("analysis sheet", () => {
+  it("opens from the curve strip and its commander nudge opens the chooser", () => {
+    const view = renderDeckView({ canChooseCommander: true })
+
+    expect(view.queryByTestId("deck-analysis")).toBeNull()
+    fireEvent.press(view.getByTestId("open-deck-analysis"))
+    expect(view.getByTestId("deck-analysis")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-analysis-choose-commander"))
+    expect(view.getByTestId("card-search")).toHaveTextContent("commander")
+  })
+
+  it("leaves the nudge as plain text when the commander cannot be chosen", () => {
+    const view = renderDeckView()
+
+    fireEvent.press(view.getByTestId("open-deck-analysis"))
     expect(view.getByTestId("deck-analysis-no-commander")).toBeTruthy()
     expect(view.queryByTestId("deck-analysis-choose-commander")).toBeNull()
   })
