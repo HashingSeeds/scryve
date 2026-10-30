@@ -1,9 +1,10 @@
-import { type ReactNode } from "react"
-import { SectionList, TouchableOpacity, View } from "react-native"
+import { useState, type ComponentProps, type ReactNode } from "react"
+import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
+import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
@@ -13,58 +14,62 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { DeckAnalysisTab } from "./DeckAnalysisTab"
+import { CardSearchScreen } from "./CardSearchScreen"
+import { DeckAnalysisPanel, useDeckAnalysis } from "./DeckAnalysisPanel"
+import { buildSections } from "./deckBuild"
+import { DeckBuildTools } from "./DeckBuildTools"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
+import { isCommanderPick } from "./deckDraft"
 import type { DeckStatsRecord } from "./deckStatLines"
 import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
-import { systemDefinition, tracksResults } from "../../../convex/lib/systems"
+import { tracksResults } from "../../../convex/lib/systems"
 
-export type DeckTab = "cards" | "notes" | "analysis"
+export type DeckMode = "play" | "build"
 
-export function deckTabs(game?: string): readonly DeckTab[] {
-  return systemDefinition(game)?.deckAnalysis ? ["cards", "analysis", "notes"] : ["cards", "notes"]
-}
+export const DECK_MODES = [
+  { mode: "play", tx: "decks:deckView.play" },
+  { mode: "build", tx: "decks:deckView.build" },
+] as const
 
-export const DECK_TAB_LABELS = {
-  cards: "decks:deckView.cardsTab",
-  notes: "decks:deckView.notesTab",
-  analysis: "decks:deckView.analysisTab",
-} as const
+type CardSearch = Pick<
+  ComponentProps<typeof CardSearchScreen>,
+  "onAdd" | "onRemove" | "offlineCandidates"
+>
 
 export function DeckView({
-  tab,
-  onTabChange: setTab,
+  mode,
+  onModeChange,
   name,
   game,
   format,
   cards,
+  savedCards,
   note,
-  editing,
-  dirty,
+  savedNote,
+  changes,
   busy,
   guest,
   cardsUnavailable,
   cardsLoading,
   cardsCached,
-  canAddOffline,
-  addOfflineNote,
+  addUnavailable,
   editingDisabled,
+  detailsDisabled,
   saveStatus,
   version,
   error,
   onBack,
-  onEdit,
   onSave,
-  onCancel,
+  onDiscard,
   onDetails,
   onVersions,
   onAddMatch,
   onStats,
-  onAdd,
-  onChooseCommander,
+  cardSearch,
+  canChooseCommander,
   commanderWarnings,
   onNoteChange,
   onFocus,
@@ -74,36 +79,36 @@ export function DeckView({
   stats,
   statsContent,
 }: {
-  tab: DeckTab
-  onTabChange: (tab: DeckTab) => void
+  mode: DeckMode
+  onModeChange: (mode: DeckMode) => void
   name: string
   game: string
   format: string
   cards: DeckCard[]
+  savedCards: DeckCard[]
   note: string
-  editing: boolean
-  dirty: boolean
+  savedNote: string
+  changes: number
   busy?: boolean
   guest?: boolean
   cardsUnavailable?: boolean
   cardsLoading?: boolean
   cardsCached?: boolean
-  canAddOffline?: boolean
-  addOfflineNote?: string
+  addUnavailable?: string
   editingDisabled?: boolean
+  detailsDisabled?: boolean
   saveStatus?: string
   version?: { label: string; latest: boolean }
   error?: ReactNode
   onBack: () => void
-  onEdit: () => void
   onSave: () => void
-  onCancel: () => void
+  onDiscard: () => void
   onDetails: () => void
   onVersions?: () => void
   onStats?: () => void
   onAddMatch?: () => void
-  onAdd: () => void
-  onChooseCommander?: () => void
+  cardSearch: CardSearch
+  canChooseCommander?: boolean
   commanderWarnings?: string[]
   onNoteChange: (note: string) => void
   onFocus: (card: DeckCard) => void
@@ -114,9 +119,21 @@ export function DeckView({
   stats?: DeckStatsRecord
 }) {
   const { themed, theme } = useAppTheme()
+  const [search, setSearch] = useState<"cards" | "commander">()
+  const [analysisOpen, setAnalysisOpen] = useState(false)
+  const building = mode === "build"
+  const analysis = useDeckAnalysis(game, format, building ? cards : savedCards)
   const tracked = tracksResults(game)
-  const sections = groupedCards(cards, localizedDeckSections(game, format))
-  if (onChooseCommander && !sections.some((section) => section.board === "commander")) {
+  const deckSections = localizedDeckSections(game, format)
+  const chooseCommander = canChooseCommander ? () => setSearch("commander") : undefined
+  const sections = building
+    ? buildSections(
+        cards,
+        deckSections,
+        analysis && ((card) => analysis.detailsFor(card)?.typeLine),
+      )
+    : groupedCards(savedCards, deckSections)
+  if (building && chooseCommander && !sections.some((section) => section.board === "commander")) {
     sections.unshift({
       board: "commander",
       label: translate("systems:section.commander"),
@@ -124,46 +141,49 @@ export function DeckView({
       quantity: 0,
     })
   }
+  const shownCards = building ? cards : savedCards
+  const cardsMessage = cardsUnavailable ? (
+    <Text
+      style={themed($notes)}
+      tx={cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"}
+    />
+  ) : shownCards.length === 0 ? (
+    <Text
+      style={themed($notes)}
+      text={(building && addUnavailable) || translate("decks:deckView.noCards")}
+    />
+  ) : building && addUnavailable ? (
+    <Text style={themed($notes)} text={addUnavailable} />
+  ) : null
+  const rowsDisabled = busy || cardsUnavailable || cardsCached || editingDisabled
   return (
     <>
       <Header
-        titleTx={
-          editing
-            ? "decks:deckView.editTitle"
-            : guest
-              ? "decks:deckView.guestTitle"
-              : "decks:deckView.title"
-        }
+        titleTx={guest ? "decks:deckView.guestTitle" : "decks:deckView.title"}
         backgroundColor={theme.colors.surface}
-        leftTx={editing ? "common:cancel" : "common:back"}
-        onLeftPress={editing ? onCancel : onBack}
+        leftTx="common:back"
+        onLeftPress={onBack}
         RightActionComponent={
-          <View style={$row}>
-            <TextAction
-              testID={editing ? "save-version-button" : "edit-deck-button"}
-              tx={editing ? (busy ? "decks:saving" : "common:save") : "common:edit"}
-              disabled={busy || editingDisabled || (editing && !dirty)}
-              style={$touch}
-              onPress={editing ? onSave : onEdit}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={translate("decks:deckView.details")}
+            testID="deck-settings-button"
+            style={$touch}
+            disabled={busy || detailsDisabled || editingDisabled}
+            onPress={onDetails}
+          >
+            <Text
+              text="•••"
+              style={busy || detailsDisabled || editingDisabled ? $disabled : undefined}
             />
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={translate("decks:deckView.details")}
-              testID="deck-settings-button"
-              style={$touch}
-              disabled={busy || editing || editingDisabled}
-              onPress={onDetails}
-            >
-              <Text text="•••" style={busy || editing || editingDisabled ? $disabled : undefined} />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         }
       />
       <SectionList
         testID="deck-cards-list"
         style={$flex}
         contentContainerStyle={themed($content)}
-        sections={tab === "cards" ? sections : []}
+        sections={sections}
         keyExtractor={(card, index) => `${printingKey(card)}:${index}`}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
@@ -177,7 +197,7 @@ export function DeckView({
                 text={[
                   deckGame(game)?.shortLabel ?? game,
                   deckFormatLabel(game, format),
-                  cardsUnavailable ? undefined : cardCountLabel(totalQuantity(cards)),
+                  cardsUnavailable ? undefined : cardCountLabel(totalQuantity(shownCards)),
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -187,123 +207,77 @@ export function DeckView({
                   <TextAction
                     testID="deck-version-button"
                     text={version.label}
-                    disabled={editing || busy || !onVersions}
+                    disabled={changes > 0 || busy || !onVersions}
                     onPress={onVersions}
                   />
                   {version.latest ? null : (
                     <Text
                       size="sm"
                       weight="medium"
+                      tone="dim"
                       style={themed($notLatest)}
                       tx="decks:deckView.notLatest"
                     />
                   )}
                 </View>
               ) : null}
-              {tracked && (stats ? <DeckStats record={stats} /> : statsContent)}
-              {tracked && onStats && (stats || statsContent) ? (
-                <TextAction
-                  testID="open-deck-stats"
-                  tx="decks:stats.viewStats"
-                  style={$noteAction}
-                  onPress={onStats}
-                />
-              ) : null}
-              {tracked && onAddMatch ? (
-                <TextAction
-                  testID="add-match-result"
-                  tx="decks:deckView.addMatch"
-                  style={$noteAction}
-                  disabled={editing || busy}
-                  onPress={onAddMatch}
-                />
-              ) : null}
+              {building ? null : (
+                <>
+                  {tracked && (stats ? <DeckStats record={stats} /> : statsContent)}
+                  {tracked && onStats && (stats || statsContent) ? (
+                    <TextAction
+                      testID="open-deck-stats"
+                      tx="decks:stats.viewStats"
+                      style={$noteAction}
+                      onPress={onStats}
+                    />
+                  ) : null}
+                  {tracked && onAddMatch ? (
+                    <TextAction
+                      testID="add-match-result"
+                      tx="decks:deckView.addMatch"
+                      style={$noteAction}
+                      disabled={busy}
+                      onPress={onAddMatch}
+                    />
+                  ) : null}
+                </>
+              )}
             </View>
-            <View style={themed($tabs)} accessibilityRole="tablist">
-              {deckTabs(game).map((value) => (
+            <View style={themed($modes)} accessibilityRole="tablist">
+              {DECK_MODES.map((option) => (
                 <TouchableOpacity
-                  key={value}
+                  key={option.mode}
                   accessibilityRole="tab"
-                  testID={`deck-tab-${value}`}
-                  accessibilityState={{ selected: tab === value }}
-                  style={[themed($tab), tab === value && themed($selectedTab)]}
-                  onPress={() => setTab(value)}
+                  testID={`deck-mode-${option.mode}`}
+                  accessibilityState={{ selected: mode === option.mode }}
+                  style={[themed($mode), mode === option.mode && themed($selectedMode)]}
+                  onPress={() => onModeChange(option.mode)}
                 >
-                  <Text
-                    size="sm"
-                    tx={DECK_TAB_LABELS[value]}
-                    tone={tab === value ? undefined : "dim"}
-                  />
+                  <Text size="sm" tx={option.tx} tone={mode === option.mode ? undefined : "dim"} />
                 </TouchableOpacity>
               ))}
             </View>
-            {tab === "analysis" ? (
-              cardsUnavailable ? (
-                <Text
-                  style={themed($notes)}
-                  tx={
-                    cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"
-                  }
-                />
-              ) : cards.length === 0 ? (
-                <Text style={themed($notes)} tx="decks:deckView.noCards" />
-              ) : (
-                <DeckAnalysisTab
-                  game={game}
-                  format={format}
-                  cards={cards}
-                  onChooseCommander={onChooseCommander}
-                />
-              )
-            ) : tab === "notes" ? (
-              <View style={themed($notes)}>
-                {editing ? (
-                  <TextField
-                    testID="deck-note-input"
-                    accessibilityLabel={translate("decks:deckView.notesLabel")}
-                    value={note}
-                    onChangeText={onNoteChange}
-                    placeholderTx="decks:deckView.notePlaceholder"
-                    multiline
-                    maxLength={1000}
-                    style={$noteInput}
-                  />
-                ) : (
-                  <>
-                    <Text text={note || translate("decks:deckView.noNotes")} size="sm" />
-                    <TextAction
-                      testID="edit-deck-notes"
-                      tx="decks:deckView.editNotes"
-                      style={$noteAction}
-                      disabled={editingDisabled}
-                      onPress={onEdit}
-                    />
-                  </>
-                )}
-              </View>
-            ) : cardsUnavailable ? (
-              <Text
-                style={themed($notes)}
-                tx={
-                  cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"
+            {building ? (
+              <DeckBuildTools
+                analysis={cardsUnavailable || cards.length === 0 ? undefined : analysis?.analysis}
+                findDisabled={
+                  busy || cardsUnavailable || editingDisabled || Boolean(addUnavailable)
                 }
-              />
-            ) : cards.length === 0 ? (
-              <Text
-                style={themed($notes)}
-                text={addOfflineNote ?? translate("decks:deckView.noCards")}
+                onFind={() => setSearch("cards")}
+                onAnalysis={() => setAnalysisOpen(true)}
               />
             ) : null}
-            {addOfflineNote && tab === "cards" && cards.length > 0 ? (
-              <Text style={themed($notes)} text={addOfflineNote} />
-            ) : null}
+            {cardsMessage}
           </>
         }
         renderSectionHeader={({ section }) => (
           <DeckCardSectionHeader
             label={section.label}
             quantity={section.quantity}
-            onChooseCommander={section.board === "commander" ? onChooseCommander : undefined}
+            onChooseCommander={
+              building && section.board === "commander" ? chooseCommander : undefined
+            }
             disabled={busy || editingDisabled}
           />
         )}
@@ -312,20 +286,44 @@ export function DeckView({
             card={item}
             game={game}
             format={format}
-            editing={editing}
-            disabled={busy || cardsUnavailable || cardsCached || editingDisabled}
+            editing={building}
+            subtitle={building ? analysis?.detailsFor(item)?.typeLine : undefined}
+            disabled={rowsDisabled}
             onFocus={onFocus}
             onIncrement={onIncrement}
             onDecrement={onDecrement}
           />
         )}
+        ListFooterComponent={
+          building ? (
+            <View style={themed($notes)}>
+              <Text size="sm" weight="semiBold" tx="decks:build.notes" />
+              <TextField
+                testID="deck-note-input"
+                accessibilityLabel={translate("decks:deckView.notesLabel")}
+                value={note}
+                onChangeText={onNoteChange}
+                placeholderTx="decks:deckView.notePlaceholder"
+                editable={!busy && !editingDisabled}
+                multiline
+                maxLength={1000}
+                style={$noteInput}
+              />
+            </View>
+          ) : savedNote ? (
+            <View style={themed($notes)}>
+              <Text size="sm" weight="semiBold" tx="decks:build.notes" />
+              <Text size="sm" text={savedNote} testID="deck-note" />
+            </View>
+          ) : null
+        }
       />
       <BottomActionBar style={themed($bar)}>
         {error}
-        {commanderWarnings?.map((warning) => (
-          <Text key={warning} size="xs" text={warning} />
-        ))}
-        {undo ? (
+        {building
+          ? commanderWarnings?.map((warning) => <Text key={warning} size="xs" text={warning} />)
+          : null}
+        {building && undo ? (
           <View style={$row}>
             <Text
               size="xs"
@@ -336,32 +334,87 @@ export function DeckView({
             <TextAction tx="common:undo" style={$touch} onPress={undo.restore} />
           </View>
         ) : null}
-        <View style={themed($footer)}>
-          <Text
-            size="xxs"
-            tone="dim"
-            style={$flex}
-            text={
-              dirty
-                ? translate("decks:deckView.unsaved")
-                : (saveStatus ??
-                  (guest
-                    ? translate("decks:deckView.savedOnDevice")
-                    : translate("decks:deckView.saved")))
-            }
-          />
-          <Button
-            testID="deck-add-cards"
-            tx="decks:deckView.addCards"
-            onPress={onAdd}
-            disabled={
-              busy || cardsUnavailable || editingDisabled || (cardsCached && !canAddOffline)
-            }
-            style={$primary}
-            preset="primary"
-          />
-        </View>
+        {changes > 0 ? (
+          <View style={themed($footer)} testID="deck-draft-bar">
+            <Text
+              size="sm"
+              weight="semiBold"
+              style={$flex}
+              tx="decks:build.changes"
+              txOptions={{ count: changes }}
+            />
+            <Button
+              testID="deck-draft-discard"
+              tx="decks:detail.discard"
+              disabled={busy}
+              style={$barButton}
+              onPress={onDiscard}
+            />
+            <Button
+              testID="save-version-button"
+              tx={busy ? "decks:saving" : "common:save"}
+              preset="primary"
+              disabled={busy || editingDisabled}
+              style={$barButton}
+              onPress={onSave}
+            />
+          </View>
+        ) : (
+          <View style={themed($footer)}>
+            <Text
+              size="xxs"
+              tone="dim"
+              style={$flex}
+              text={
+                saveStatus ??
+                translate(guest ? "decks:deckView.savedOnDevice" : "decks:deckView.saved")
+              }
+            />
+          </View>
+        )}
       </BottomActionBar>
+      {search ? (
+        <CardSearchScreen
+          game={game}
+          format={format}
+          offlineCandidates={cardSearch.offlineCandidates}
+          initialSection={search === "commander" ? "commander" : undefined}
+          commanderCards={cards}
+          onClose={() => setSearch(undefined)}
+          onRemove={cardSearch.onRemove}
+          onAdd={(card) => {
+            const addError = cardSearch.onAdd(card)
+            if (!addError && search === "commander" && isCommanderPick({ game, format }, card))
+              setSearch(undefined)
+            return addError
+          }}
+        />
+      ) : null}
+      {analysisOpen && analysis ? (
+        <DialogCard
+          visible
+          placement="bottom"
+          wide
+          onClose={() => setAnalysisOpen(false)}
+          dialogTestID="deck-analysis-sheet"
+          backdropAccessibilityLabel={translate("common:close")}
+          accessibilityViewIsModal
+        >
+          <ScrollView>
+            <Text preset="subheading" tx="decks:build.analysis" />
+            <DeckAnalysisPanel
+              analysis={analysis.analysis}
+              onChooseCommander={
+                chooseCommander &&
+                (() => {
+                  setAnalysisOpen(false)
+                  chooseCommander()
+                })
+              }
+            />
+          </ScrollView>
+        </DialogCard>
+      ) : null}
     </>
   )
 }
@@ -374,8 +427,9 @@ const $touch: ViewStyle = {
   justifyContent: "center",
 }
 const $disabled: TextStyle = { opacity: 0.4 }
-const $noteInput: TextStyle = { minHeight: 160, textAlignVertical: "top" }
+const $noteInput: TextStyle = { minHeight: 120, textAlignVertical: "top" }
 const $noteAction: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
+const $barButton: ViewStyle = { minHeight: 44 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
   paddingBottom: spacing.lg,
@@ -386,26 +440,23 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingTop: spacing.sm,
-  paddingBottom: spacing.lg,
+  paddingBottom: spacing.md,
 })
-const $notLatest: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
-  color: colors.textDim,
-  marginLeft: spacing.sm,
-})
-const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $notLatest: ThemedStyle<TextStyle> = ({ spacing }) => ({ marginLeft: spacing.sm })
+const $modes: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   gap: spacing.lg,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $mode: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
   justifyContent: "center",
   paddingHorizontal: spacing.xxs,
   borderBottomWidth: 2,
   borderBottomColor: "transparent",
 })
-const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
+const $selectedMode: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
 const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.lg,
   gap: spacing.sm,
@@ -419,4 +470,3 @@ const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 720,
   alignSelf: "center",
 })
-const $primary: ViewStyle = { flex: 2, minHeight: 44 }

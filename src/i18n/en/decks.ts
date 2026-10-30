@@ -139,7 +139,6 @@ const decks = {
     maybeDeleted: "This deck may have been deleted.",
     newList: "New list. Earlier results stay with the old one.",
     loadFailed: "Could not load this deck.",
-    editList: "Edit list",
     offlineCard: "You’re offline. Cards already in your decks can be added.",
     saveFailed: "Could not save deck",
     versionLimit_one: "This deck holds up to {{count}} version. Delete one to add another.",
@@ -164,10 +163,6 @@ const decks = {
       "Games already played with it keep their record, but the list will no longer be editable or selectable.",
     keepDeck: "Keep this deck",
     deleteDeckTitle: "Delete this deck?",
-    keepEditing: "Keep editing",
-    discardTitle: "Discard changes?",
-    cancelDiscard: "Cancel discard changes?",
-    discardBody: "Your edits will be lost.",
     // Button that throws away unsaved edits. Must not read like Cancel.
     discard: "Discard",
   },
@@ -459,21 +454,36 @@ const decks = {
     // Shown beside the version name when a newer version of this deck exists.
     notLatest: "Not the latest",
     addMatch: "Add match result",
-    cardsTab: "Cards",
-    notesTab: "Notes",
-    analysisTab: "Analysis",
+    // The deck screen's two views: using the deck at the table, and changing its list.
+    play: "Play",
+    build: "Build",
     notesLabel: "Deck notes",
     notePlaceholder: "Add a note",
-    noNotes: "No notes yet.",
-    editNotes: "Edit notes",
     cardsLoading: "Loading cards…",
     cardsUnavailable: "Card list unavailable offline.",
     noCards: "No cards yet. Add your first card below.",
     removed: "Removed {{card}}",
-    unsaved: "Unsaved changes",
     savedOnDevice: "Saved on device",
     saved: "Saved",
     addCards: "+ Add cards",
+  },
+  build: {
+    // Opens card search to find a card in this deck or add a new one.
+    find: "Find or add a card",
+    // Short for the deck's average mana value, shown beside a small mana curve.
+    average: "Avg",
+    analysis: "Analysis",
+    notes: "Notes",
+    // Unsaved edits waiting in the draft bar.
+    changes_one: "{{count}} change",
+    changes_other: "{{count}} changes",
+    group: {
+      creatures: "Creatures",
+      spells: "Spells",
+      artifacts: "Artifacts",
+      lands: "Lands",
+      other: "Other",
+    },
   },
   analysis: {
     incomplete: "{{count}} of {{size}} cards. Odds use the cards listed.",

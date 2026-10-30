@@ -5,7 +5,6 @@ import { router, useFocusEffect } from "expo-router"
 import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
-import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
@@ -21,7 +20,7 @@ import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
-import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel, deckVersionLabel, recordText } from "@/features/decks/deckCopy"
 import {
@@ -43,7 +42,7 @@ import {
   useDeckVersionCache,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
-import { DECK_TAB_LABELS, deckTabs, DeckView, type DeckTab } from "@/features/decks/DeckView"
+import { DECK_MODES, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import {
   deckQueryVersionId,
@@ -80,7 +79,6 @@ type DeckDialog =
   | "settings"
   | "deleteDeck"
   | "moveDeck"
-  | "discard"
   | "syncConflict"
 
 const NEW_LIST_NOTICE_MS = 8_000
@@ -183,20 +181,16 @@ function DeckDetailPlaceholder({
             />
           </View>
           <View style={themed($tabs)} accessibilityRole="tablist">
-            {deckTabs(summary?.game).map((tab) => (
+            {DECK_MODES.map(({ mode, tx }) => (
               <TouchableOpacity
-                key={tab}
-                testID={`deck-tab-${tab}`}
+                key={mode}
+                testID={`deck-mode-${mode}`}
                 accessibilityRole="tab"
-                accessibilityState={{ selected: tab === "cards", disabled: true }}
-                style={[themed($tab), tab === "cards" && themed($selectedTab)]}
+                accessibilityState={{ selected: mode === "play", disabled: true }}
+                style={[themed($tab), mode === "play" && themed($selectedTab)]}
                 disabled
               >
-                <Text
-                  size="sm"
-                  weight={tab === "cards" ? "bold" : "normal"}
-                  tx={DECK_TAB_LABELS[tab]}
-                />
+                <Text size="sm" tx={tx} tone={mode === "play" ? undefined : "dim"} />
               </TouchableOpacity>
             ))}
           </View>
@@ -223,17 +217,6 @@ function DeckDetailPlaceholder({
         </View>
         <DeckListSkeleton sections={loadingSections} density="comfortable" />
       </ScrollView>
-      <BottomActionBar style={themed($actionBar)}>
-        <View style={themed($actionRow)}>
-          <Button
-            testID="edit-deck-button"
-            tx="decks:detail.editList"
-            preset="primary"
-            style={$primaryActionButton}
-            disabled
-          />
-        </View>
-      </BottomActionBar>
     </Screen>
   )
 }
@@ -331,16 +314,16 @@ function DeckDetailContent({
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
   const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
-  const [tab, setTab] = useState<DeckTab>("cards")
   const {
     draft,
     latest: latestDraft,
     setDraft,
     edit,
   } = useAccountDeckDraft({ ownerId: access?.ownerId, deckId })
+  // why: an unsaved draft brought back from storage reopens where it can be finished.
+  const [mode, setMode] = useState<DeckMode>(draft.editing ? "build" : "play")
+  const building = mode === "build"
   const [dialog, setDialog] = useState<DeckDialog>("none")
-  const [adding, setAdding] = useState(false)
-  const [choosingCommander, setChoosingCommander] = useState(false)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
   const [error, setError] = useState<string>()
   const [newListNotice, setNewListNotice] = useState(false)
@@ -364,6 +347,15 @@ function DeckDetailContent({
   const { deck, cards, cardsUnavailable, cardsCached, version, versionTarget } = view
   const { activeVersionId, activeVersionSummary, failedEdit, failedCardEdit } = view
   const { matchVersionId } = view
+  // why: Build opens its draft on the first change, so controls follow what that draft would allow.
+  const editableCached = draft.editing ? cardsCached : detail === undefined && !versionTarget
+  const changes = view.changes.any
+    ? Math.max(
+        1,
+        (view.changes.cards ? countCardChanges(draft.base, draft.cards) : 0) +
+          (view.changes.note ? 1 : 0),
+      )
+    : 0
   const game = deck?.game ?? "mtg"
   // Known cards from this account's cached versions, filtered to the deck's game system.
   // why: memoized because the card search reruns its offline filter whenever this list changes identity.
@@ -398,7 +390,9 @@ function DeckDetailContent({
     lastWriteMotion.current = writeMotion
     refreshVersionCache()
   }, [refreshVersionCache, writeMotion])
-  const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
+  const focusedCard = (building ? cards : view.displayCards).find(
+    (card) => printingKey(card) === focusedKey,
+  )
   const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
       ? {
@@ -410,7 +404,7 @@ function DeckDetailContent({
       : undefined,
     picksCommander(game, deck?.format),
   )
-  const currentCommander = draft.editing
+  const currentCommander = building
     ? cards.find((card) => cardSection(card) === "commander")
     : undefined
   useCardDetails(
@@ -514,21 +508,23 @@ function DeckDetailContent({
     setError(undefined)
   }
 
+  function ensureDraft() {
+    if (!latestDraft.current.editing) startEditing()
+  }
+
   function discardEdits() {
     setDraft(closedDeckDraft)
     setError(undefined)
   }
 
-  function requestDiscard() {
-    if (view.changes.any) {
-      setDialog("discard")
-      return
-    }
-    discardEdits()
+  function changeMode(next: DeckMode) {
+    if (next === "play" && latestDraft.current.editing && !view.changes.any) discardEdits()
+    setMode(next)
   }
 
   function addCard(card: DeckCard): string | undefined {
     if (knownDeleted || !deck) return undefined
+    ensureDraft()
     const alreadyInDraft = latestDraft.current.cards.some(
       (candidate) => printingKey(candidate) === printingKey(card),
     )
@@ -562,6 +558,7 @@ function DeckDetailContent({
 
   function removeCard(card: DeckCard) {
     if (knownDeleted || !deck) return
+    ensureDraft()
     edit({ type: "remove", card }, { game, format: deck.format })
   }
 
@@ -570,8 +567,9 @@ function DeckDetailContent({
   }
 
   function chooseCommander(color?: DeckCard["commanderColor"]) {
-    if (!focusedCard || !deck || knownDeleted || cardsUnavailable || cardsCached) return
+    if (!focusedCard || !deck || knownDeleted || cardsUnavailable || editableCached) return
     setFocusedKey(undefined)
+    ensureDraft()
     setError(
       edit(
         { type: "chooseCommander", card: focusedCard, details, color },
@@ -645,6 +643,7 @@ function DeckDetailContent({
   }
 
   function chooseVersion(versionId: string) {
+    if (latestDraft.current.editing) discardEdits()
     setNewListNotice(false)
     setSelectedVersionId(versionId as Id<"deckVersions">)
   }
@@ -839,26 +838,27 @@ function DeckDetailContent({
       contentContainerStyle={themed($screen)}
     >
       <DeckView
-        tab={tab}
-        onTabChange={setTab}
+        mode={mode}
+        onModeChange={changeMode}
         name={deck.name}
         game={deck.game}
         format={deck.format}
         cards={cards}
+        savedCards={view.displayCards}
         note={view.note}
-        editing={draft.editing}
-        dirty={view.changes.any}
+        savedNote={deck.note ?? ""}
+        changes={changes}
         busy={busy}
         cardsUnavailable={cardsUnavailable}
         cardsLoading={detailQueryActive ? !offline || firstConnectionPending : access?.loading}
-        cardsCached={cardsCached}
-        canAddOffline={offlineCandidates.length > 0}
-        addOfflineNote={
-          offline && cardsCached && offlineCandidates.length === 0
+        cardsCached={editableCached}
+        addUnavailable={
+          offline && !detail && offlineCandidates.length === 0
             ? translate("decks:detail.noOfflineCards")
             : undefined
         }
         editingDisabled={knownDeleted}
+        detailsDisabled={view.changes.any}
         saveStatus={view.saveStatus}
         version={
           !view.hasVersionRows
@@ -872,9 +872,8 @@ function DeckDetailContent({
         }
         onVersions={() => setDialog("versions")}
         onBack={onBack}
-        onEdit={startEditing}
         onSave={save}
-        onCancel={requestDiscard}
+        onDiscard={discardEdits}
         onStats={() =>
           router.push({
             pathname: "/connected/decks/stats",
@@ -896,23 +895,13 @@ function DeckDetailContent({
           setSettingsMetadataRevision(view.currentMetadataRevision)
           setDialog("settings")
         }}
-        onAdd={() => {
-          if (knownDeleted) return
-          if (!draft.editing) startEditing()
-          setChoosingCommander(false)
-          setAdding(true)
-        }}
-        onChooseCommander={
-          view.singleCommander && !cardsUnavailable && (!cardsCached || versionTarget)
-            ? () => {
-                if (!draft.editing) startEditing()
-                setChoosingCommander(true)
-                setAdding(true)
-              }
-            : undefined
-        }
+        cardSearch={{ offlineCandidates, onAdd: addCard, onRemove: removeCard }}
+        canChooseCommander={view.singleCommander && !cardsUnavailable && !editableCached}
         commanderWarnings={view.commanderWarnings}
-        onNoteChange={(note) => edit({ type: "note", note }, { game, format: deck.format })}
+        onNoteChange={(note) => {
+          ensureDraft()
+          edit({ type: "note", note }, { game, format: deck.format })
+        }}
         onFocus={focusCard}
         onIncrement={addCard}
         onDecrement={removeCard}
@@ -1155,23 +1144,6 @@ function DeckDetailContent({
           </ScrollView>
         </DialogCard>
       ) : null}
-      {adding ? (
-        <CardSearchScreen
-          game={detail?.deck.game ?? deck.game ?? "mtg"}
-          format={detail?.deck.format ?? deck.format}
-          offlineCandidates={offlineCandidates}
-          initialSection={choosingCommander ? "commander" : undefined}
-          commanderCards={draft.cards}
-          onClose={() => setAdding(false)}
-          onRemove={removeCard}
-          onAdd={(card) => {
-            const addError = addCard(card)
-            if (!addError && choosingCommander && isCommanderPick(deck, card)) setAdding(false)
-            return addError
-          }}
-        />
-      ) : null}
-
       {focusedCard ? (
         <CardFocusDialog
           key={printingKey(focusedCard)}
@@ -1194,15 +1166,15 @@ function DeckDetailContent({
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
           onSetCommander={
-            draft.editing &&
+            building &&
             view.singleCommander &&
             !cardsUnavailable &&
-            !cardsCached &&
+            !editableCached &&
             !knownDeleted
               ? chooseCommander
               : undefined
           }
-          {...(draft.editing
+          {...(building
             ? {
                 onIncrement: isCommanderPick(deck, focusedCard)
                   ? undefined
@@ -1278,7 +1250,7 @@ function DeckDetailContent({
                 <TextAction
                   testID="version-picker-__new__"
                   tx="decks:detail.newVersion"
-                  disabled={draft.editing}
+                  disabled={view.changes.any}
                   onPress={startNewVersion}
                 />
               ) : null}
@@ -1299,7 +1271,7 @@ function DeckDetailContent({
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     style={themed($versionSelect)}
-                    disabled={draft.editing}
+                    disabled={view.changes.any}
                     onPress={() => {
                       chooseVersion(candidate._id)
                       setDialog("none")
@@ -1452,41 +1424,6 @@ function DeckDetailContent({
           </View>
         </DialogCard>
       ) : null}
-
-      {dialog === "discard" ? (
-        <DialogCard
-          visible
-          onClose={() => setDialog("none")}
-          closeDisabled={busy}
-          backdropTestID="discard-edits-backdrop"
-          backdropAccessibilityLabel={translate("decks:detail.keepEditing")}
-          dialogTestID="discard-edits-dialog"
-          dialogAccessibilityRole="alert"
-          accessibilityViewIsModal
-        >
-          <Text preset="subheading" tx="decks:detail.discardTitle" style={themed($dialogText)} />
-          <Text size="sm" tx="decks:detail.discardBody" style={themed($dialogText)} />
-          <View style={themed($dialogActions)}>
-            <Button
-              tx="decks:detail.keepEditing"
-              style={themed($dialogButton)}
-              disabled={busy}
-              onPress={() => setDialog("none")}
-            />
-            <Button
-              tx="decks:detail.discard"
-              testID="discard-edits-confirm"
-              preset="destructive"
-              style={themed($dialogButton)}
-              disabled={busy}
-              onPress={() => {
-                setDialog("none")
-                discardEdits()
-              }}
-            />
-          </View>
-        </DialogCard>
-      ) : null}
     </Screen>
   )
 }
@@ -1494,9 +1431,6 @@ function DeckDetailContent({
 const $tabularNumbers: TextStyle = { fontVariant: ["tabular-nums"] }
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $actionBar: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.surface,
-})
 
 const $loadingContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
@@ -1579,13 +1513,7 @@ const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
 })
 
-const $actionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "center",
-  gap: spacing.xs,
-})
 const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $primaryActionButton: ViewStyle = { minWidth: 160, minHeight: 44 }
 
 const $conflictVersion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,
