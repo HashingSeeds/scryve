@@ -490,14 +490,16 @@ async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   return result?.finishedAt
 }
 
-/** why: a player can bring an older version, and a Flesh and Blood hero sets that version's starting life. */
+/** why: a player can bring an older version, and a Flesh and Blood hero sets that version's starting life. Each lookup scans the version's cards, so callers over many decks look up only the versions they need. */
 async function versionStartingValues(
   ctx: QueryCtx,
   deck: Doc<"decks">,
   versions: readonly Doc<"deckVersions">[],
+  needed: (version: Doc<"deckVersions">) => boolean = () => true,
 ) {
   return await Promise.all(
     versions.map(async (version) => {
+      if (!needed(version)) return {}
       const startingValue = await deckStartingValue(
         ctx,
         version._id,
@@ -544,7 +546,12 @@ export const listMine = query({
         .map(async (deck) => {
           const versions = await activeVersions(ctx, deck._id)
           const latest = versions[versions.length - 1]
-          const startingValues = await versionStartingValues(ctx, deck, versions)
+          const startingValues = await versionStartingValues(
+            ctx,
+            deck,
+            versions,
+            (version) => version === latest || version._id === deck.bringingVersionId,
+          )
           const includeImages = await capabilityReleased(
             ctx,
             deck.game ?? DEFAULT_DECK_GAME,
