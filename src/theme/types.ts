@@ -2,6 +2,7 @@ import type { StyleProp } from "react-native"
 
 import { colors as colorsLight } from "./colors"
 import { colors as colorsDark } from "./colorsDark"
+import { radius } from "./radius"
 import { spacing as spacingLight } from "./spacing"
 import { typography } from "./typography"
 
@@ -11,12 +12,14 @@ export type ThemeContextModeT = ImmutableThemeContextModeT | undefined
 
 export type Colors = typeof colorsLight | typeof colorsDark
 export type Spacing = typeof spacingLight
+export type Radius = typeof radius
 
 export type Typography = typeof typography
 
 export interface Theme {
   colors: Colors
   spacing: Spacing
+  radius: Radius
   typography: Typography
   isDark: boolean
 }

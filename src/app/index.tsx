@@ -3,7 +3,6 @@ import { AppState, View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
-import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -261,10 +260,10 @@ const $oldGameActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
 })
 
-const $primaryAction: ThemedStyle<ViewStyle> = () => ({
-  borderRadius: CHOICE_RADIUS,
+const $primaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.lg,
 })
-const $secondaryAction: ThemedStyle<ViewStyle> = () => ({
-  borderRadius: CHOICE_RADIUS,
+const $secondaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.lg,
   borderWidth: 2,
 })

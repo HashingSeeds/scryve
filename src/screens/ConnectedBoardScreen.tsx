@@ -18,7 +18,7 @@ import { useMutation } from "convex/react"
 import { AlertNote } from "@/components/AlertNote"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
-import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
+import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
@@ -1488,10 +1488,10 @@ const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.x
 const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dialogAction: ThemedStyle<ViewStyle> = () => ({
+const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
 })
 const FINISH_BLOCKERS = {
   offline: {

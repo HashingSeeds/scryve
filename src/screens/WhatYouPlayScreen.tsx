@@ -6,7 +6,6 @@ import { Trans } from "react-i18next"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
@@ -143,7 +142,7 @@ const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $list: ViewStyle = { flex: 1 }
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $footer: ThemedStyle<ViewStyle> = (theme) => ({ ...$column(theme), gap: theme.spacing.sm })
-const $primaryAction: ThemedStyle<ViewStyle> = () => ({ borderRadius: CHOICE_RADIUS })
+const $primaryAction: ThemedStyle<ViewStyle> = ({ radius }) => ({ borderRadius: radius.lg })
 const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 

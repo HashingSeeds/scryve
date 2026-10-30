@@ -7,7 +7,6 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { Button } from "./Button"
-import { CHOICE_RADIUS } from "./ChoiceButton"
 import { DialogCard, type DialogOrigin } from "./DialogCard"
 import { Text } from "./Text"
 
@@ -104,8 +103,8 @@ const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xs,
 })
-const $action: ThemedStyle<ViewStyle> = () => ({
+const $action: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
 })

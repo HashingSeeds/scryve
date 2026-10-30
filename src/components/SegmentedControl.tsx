@@ -11,7 +11,6 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import { CHOICE_RADIUS } from "./ChoiceButton"
 import { Text } from "./Text"
 
 export interface Segment {
@@ -55,7 +54,7 @@ export function SegmentedControl({
 }: SegmentedControlProps) {
   const {
     themed,
-    theme: { colors },
+    theme: { colors, radius },
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [trackWidth, setTrackWidth] = useState(0)
@@ -200,7 +199,7 @@ export function SegmentedControl({
                 selected &&
                   segmentWidth <= 0 && {
                     backgroundColor: accent,
-                    borderRadius: CHOICE_RADIUS - TRACK_INSET,
+                    borderRadius: radius.lg - TRACK_INSET,
                   },
               ]}
               onPress={() => tap(segment.id)}
@@ -217,20 +216,20 @@ export function SegmentedControl({
   )
 }
 
-const $track: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $track: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   flexDirection: "row",
   padding: TRACK_INSET,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
   borderWidth: TRACK_BORDER_WIDTH,
   borderColor: colors.border,
   backgroundColor: colors.palette.neutral100,
 })
-const $thumbShape: ThemedStyle<ViewStyle> = () => ({
+const $thumbShape: ThemedStyle<ViewStyle> = ({ radius }) => ({
   position: "absolute",
   top: TRACK_INSET,
   bottom: TRACK_INSET,
   left: TRACK_INSET,
-  borderRadius: CHOICE_RADIUS - TRACK_INSET,
+  borderRadius: radius.lg - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
 const $fill: ViewStyle = { flex: 1 }

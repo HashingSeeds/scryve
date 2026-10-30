@@ -4,7 +4,7 @@ import { ScrollView, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
+import { ChoiceButton } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, type DialogOrigin } from "@/components/DialogCard"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
@@ -139,8 +139,8 @@ const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.x
 const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dialogAction: ThemedStyle<ViewStyle> = () => ({
+const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
 })

@@ -12,6 +12,7 @@ import { typography } from "@/theme/typography"
 type Sizes = keyof typeof $sizeStyles
 type Weights = keyof typeof typography.primary
 type Presets = "default" | "bold" | "heading" | "subheading" | "formLabel" | "formHelper"
+type Tones = keyof typeof $toneStyles
 
 export interface TextProps extends RNTextProps {
   tx?: TxKeyPath
@@ -21,6 +22,7 @@ export interface TextProps extends RNTextProps {
   preset?: Presets
   weight?: Weights
   size?: Sizes
+  tone?: Tones
   children?: ReactNode
 }
 
@@ -28,6 +30,7 @@ export const Text = forwardRef(function Text(props: TextProps, ref: ForwardedRef
   const {
     weight,
     size,
+    tone,
     tx,
     txOptions,
     text,
@@ -47,6 +50,7 @@ export const Text = forwardRef(function Text(props: TextProps, ref: ForwardedRef
     themed($presets[preset]),
     weight && $fontWeightStyles[weight],
     size && $sizeStyles[size],
+    tone && themed($toneStyles[tone]),
     $styleOverride,
   ]
 
@@ -78,6 +82,10 @@ const $baseStyle: ThemedStyle<TextStyle> = (theme) => ({
   ...$fontWeightStyles.normal,
   color: theme.colors.text,
 })
+
+const $toneStyles = {
+  dim: (({ colors }) => ({ color: colors.textDim })) satisfies ThemedStyle<TextStyle>,
+}
 
 const $presets: Record<Presets, ThemedStyleArray<TextStyle>> = {
   default: [$baseStyle],
