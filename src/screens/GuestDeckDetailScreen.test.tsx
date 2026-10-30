@@ -272,6 +272,17 @@ test("syncs a device deck from the actions sheet", async () => {
   expect(mockSync).toHaveBeenCalledWith(mockStored.localId)
 })
 
+test("a deck from another account asks before adding it as new, after the sheet closes", async () => {
+  const addAsNew = jest.fn().mockResolvedValue({ status: "synced", deckId: "deck-10" })
+  mockSync.mockResolvedValue({ status: "other_account", addAsNew })
+  const view = renderSignedIn()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.press(view.getByTestId("deck-action-sync"))
+  fireEvent.press(await view.findByTestId("local-deck-add-as-new"))
+  await waitFor(() => expect(view.onSynced).toHaveBeenCalledWith("deck-10"))
+  expect(view.queryByTestId("deck-actions-sheet")).toBeNull()
+})
+
 test("offline, sync stays listed but blocked while rename and delete still work", () => {
   mockConnectionState.isWebSocketConnected = false
   const view = renderSignedIn({ ...signedIn, ready: false, message: "Reconnect to continue." })

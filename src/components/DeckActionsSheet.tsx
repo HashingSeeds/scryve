@@ -1,5 +1,5 @@
 import type { TextStyle, ViewStyle } from "react-native"
-import { TouchableOpacity, View } from "react-native"
+import { ScrollView, TouchableOpacity } from "react-native"
 
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -37,7 +37,7 @@ export function DeckActionsSheet({
       placement="bottom"
       wide
     >
-      <View>
+      <ScrollView>
         {actions.map(({ id, label, onPress, destructive, detail, blocked }) => {
           const note = blocked ?? detail
           return (
@@ -62,7 +62,7 @@ export function DeckActionsSheet({
             </TouchableOpacity>
           )
         })}
-      </View>
+      </ScrollView>
     </DialogCard>
   )
 }
