@@ -438,6 +438,19 @@ export default {
     saved: "保存済み",
     addCards: "+ カードを追加",
   },
+  play: {
+    bringing: "持っていくデッキ",
+    results: "結果",
+    resultsRecord: "結果 · {{record}}",
+    versus: "vs {{opponents}}",
+    startGame: "ゲームを始める",
+    bringFailed: "持っていくバージョンを変更できませんでした。",
+    source: {
+      local: "ローカル",
+      nearby: "近く",
+      online: "オンライン",
+    },
+  },
   build: {
     find: "カードを探す・追加",
     average: "平均",

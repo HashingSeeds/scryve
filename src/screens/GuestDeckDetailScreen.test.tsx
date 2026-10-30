@@ -17,14 +17,19 @@ const mockStatsQuery = jest.fn((..._args: unknown[]) => ({
   },
   fingerprints: [],
 }))
+const mockGamesQuery = jest.fn((..._args: unknown[]) => ({ page: [] as unknown[] }))
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
 const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvex,
-  // why: the deck capacity query is the only one called with empty args.
+  // why: the deck capacity query is the only one called with empty args, and only recent results page.
   useQuery: (...args: unknown[]) =>
-    JSON.stringify(args[1]) === "{}" ? { used: 1, limit: 2 } : mockStatsQuery(...args),
+    JSON.stringify(args[1]) === "{}"
+      ? { used: 1, limit: 2 }
+      : JSON.stringify(args[1]).includes("paginationOpts")
+        ? mockGamesQuery(...args)
+        : mockStatsQuery(...args),
   useConvexConnectionState: () => mockConnectionState,
   useAction: () => mockSearchCards,
 }))
@@ -57,6 +62,7 @@ let mockCurrent: GuestDeck | undefined = mockStored
 let mockSaveFailure = false
 jest.mock("@/features/decks/guestDeck", () => ({
   isGuestDeckPayload: jest.requireActual("@/features/decks/guestDeck").isGuestDeckPayload,
+  guestDeckRouteId: jest.requireActual("@/features/decks/guestDeck").guestDeckRouteId,
   useGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
   loadGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
   saveGuestDeck: jest.fn((deck: typeof mockStored.deck) => {
@@ -193,6 +199,7 @@ test("changes a cached commander offline and saves both sections without changin
   expect(mockSearchCards).not.toHaveBeenCalled()
   view.unmount()
   const reopened = renderScreen()
+  fireEvent.press(reopened.getByTestId("deck-mode-build"))
   expect(reopened.getByTestId("deck-card-row-commander:talrand")).toBeTruthy()
   expect(reopened.getByText("Magic · Commander · 3 cards")).toBeTruthy()
 })
@@ -214,7 +221,8 @@ test("opens in Play, edits notes in Build, and saves locally", () => {
   })
   view.unmount()
   const reloaded = renderScreen()
-  expect(reloaded.getByText("New notes")).toBeTruthy()
+  fireEvent.press(reloaded.getByTestId("deck-mode-build"))
+  expect(reloaded.getByDisplayValue("New notes")).toBeTruthy()
 })
 
 test("deck details edits the name without a duplicate notes field", () => {
@@ -340,7 +348,9 @@ test("supports removing the last copy, Undo, and discarding the draft", () => {
   expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
   expect(view.queryByTestId("deck-draft-bar")).toBeNull()
   view.unmount()
-  expect(renderScreen().getByText("2×")).toBeTruthy()
+  const reopened = renderScreen()
+  fireEvent.press(reopened.getByTestId("deck-mode-build"))
+  expect(reopened.getByLabelText("2× Sol Ring")).toBeTruthy()
 })
 
 test("keeps an unsaved edit after leaving and saves it from the reopened deck", () => {
@@ -404,6 +414,7 @@ test("loads rules text when opening a saved Magic card", async () => {
   }
   mockSearchCards.mockResolvedValue({ oracleText: "Molecule Man rules text", typeLine: "Creature" })
   const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-mode-build"))
   fireEvent.press(view.getByLabelText("1× Molecule Man"))
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
   expect(mockSearchCards).toHaveBeenCalledWith({
@@ -422,12 +433,25 @@ test("shows lookup errors and retries when the saved card is reopened", async ()
   }
   mockSearchCards.mockRejectedValueOnce(new Error("Card lookup unavailable"))
   const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-mode-build"))
   fireEvent.press(view.getByLabelText("1× Molecule Man"))
   await waitFor(() => expect(view.getByText("Could not load card details")).toBeTruthy())
   fireEvent.press(view.getAllByLabelText("Close card details")[0])
   mockSearchCards.mockResolvedValueOnce({ oracleText: "Molecule Man rules text" })
   fireEvent.press(view.getByLabelText("1× Molecule Man"))
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
+})
+
+test("Play has no versions to bring yet and starts a game with this deck", () => {
+  const view = renderScreen()
+  expect(view.getByTestId("deck-play")).toBeTruthy()
+  expect(view.queryByText("Bringing")).toBeNull()
+  expect(view.getByTestId("deck-play-no-results")).toHaveTextContent("No games yet")
+  fireEvent.press(view.getByText("Start a game"))
+  expect(mockStatsPush).toHaveBeenCalledWith({
+    pathname: "/game/new",
+    params: { deckId: `guest-${mockStored.localId}` },
+  })
 })
 
 test("renders signed-in local deck stats by key as one record", () => {
@@ -448,7 +472,7 @@ test("renders signed-in local deck stats by key as one record", () => {
     </ThemeProvider>,
   )
   expect(mockStatsQuery).toHaveBeenCalledWith(expect.anything(), { deckKey: "stable-deck-key" })
-  expect(view.getByText("4-2")).toBeTruthy()
+  expect(view.getByText("Results · 4-2")).toBeTruthy()
   fireEvent.press(view.getByTestId("open-deck-stats"))
   expect(mockStatsPush).toHaveBeenCalledWith({
     pathname: "/connected/decks/stats",

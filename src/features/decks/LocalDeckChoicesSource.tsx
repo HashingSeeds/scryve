@@ -80,7 +80,9 @@ const deckChoicesOf = (decks: MyDecks): DeckChoices =>
         deck.latestVersionId
           ? [
               {
-                versionId: deck.latestVersionId,
+                versionId: deck.bringingVersionId ?? deck.latestVersionId,
+                deckId: deck._id,
+                deckKey: deck.deckKey,
                 name: deck.name,
                 system: deck.game,
                 format: deck.format,

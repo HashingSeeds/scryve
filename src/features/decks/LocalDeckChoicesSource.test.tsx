@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react-native"
 
 import { DeckSyncRepository, type MineDeck } from "./decksSync"
-import { MyDecksSource } from "./LocalDeckChoicesSource"
+import { LocalDeckChoicesSource, MyDecksSource } from "./LocalDeckChoicesSource"
 
 const URL = "https://scryve-test.convex.cloud"
 let mockLive: { decks: MineDeck[] } | undefined
@@ -42,5 +42,26 @@ describe("MyDecksSource", () => {
     render(<MyDecksSource ownerId="owner-live" onChange={jest.fn()} />)
 
     expect(shelf("owner-live").loadShelf()).toEqual([atraxa])
+  })
+})
+
+describe("LocalDeckChoicesSource", () => {
+  it("offers each deck at the version it brings, else its latest", () => {
+    const deck = { game: "mtg", format: "commander", latestVersionId: "v-2" }
+    mockLive = {
+      decks: [
+        { ...deck, _id: "deck-a", deckKey: "key-a", name: "A", bringingVersionId: "v-1" },
+        { ...deck, _id: "deck-b", deckKey: "key-b", name: "B" },
+      ] as unknown as MineDeck[],
+    }
+    mockProfile = "ready"
+    const onChange = jest.fn()
+
+    render(<LocalDeckChoicesSource ownerId="owner-choices" onChange={onChange} />)
+
+    expect(onChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ versionId: "v-1", deckId: "deck-a", deckKey: "key-a" }),
+      expect.objectContaining({ versionId: "v-2", deckId: "deck-b", deckKey: "key-b" }),
+    ])
   })
 })

@@ -20,11 +20,9 @@ import { DeckAnalysisPanel, useDeckAnalysis } from "./DeckAnalysisPanel"
 import { buildSections } from "./deckBuild"
 import { DeckBuildTools } from "./DeckBuildTools"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
-import { cardSection, groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
+import { cardSection, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
 import { isCommanderPick, moveTarget, sideboardSection } from "./deckDraft"
-import type { DeckStatsRecord } from "./deckStatLines"
-import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 import { tracksResults } from "../../../convex/lib/systems"
 
@@ -49,7 +47,6 @@ export function DeckView({
   cards,
   savedCards,
   note,
-  savedNote,
   changes,
   busy,
   guest,
@@ -67,8 +64,9 @@ export function DeckView({
   onDiscard,
   onDetails,
   onVersions,
+  play,
   onAddMatch,
-  onStats,
+  onStartGame,
   cardSearch,
   canChooseCommander,
   commanderWarnings,
@@ -78,8 +76,6 @@ export function DeckView({
   onDecrement,
   onMove,
   undo,
-  stats,
-  statsContent,
 }: {
   mode: DeckMode
   onModeChange: (mode: DeckMode) => void
@@ -89,7 +85,6 @@ export function DeckView({
   cards: DeckCard[]
   savedCards: DeckCard[]
   note: string
-  savedNote: string
   changes: number
   busy?: boolean
   guest?: boolean
@@ -107,8 +102,9 @@ export function DeckView({
   onDiscard: () => void
   onDetails: () => void
   onVersions?: () => void
-  onStats?: () => void
+  play: ReactNode
   onAddMatch?: () => void
+  onStartGame?: () => void
   cardSearch: CardSearch
   canChooseCommander?: boolean
   commanderWarnings?: string[]
@@ -118,8 +114,6 @@ export function DeckView({
   onDecrement: (card: DeckCard) => void
   onMove?: (card: DeckCard) => void
   undo?: { name: string; restore: () => void }
-  statsContent?: ReactNode
-  stats?: DeckStatsRecord
 }) {
   const { themed, theme } = useAppTheme()
   const [search, setSearch] = useState<"cards" | "commander">()
@@ -137,7 +131,7 @@ export function DeckView({
         deckSections,
         analysis && ((card) => analysis.detailsFor(card)?.typeLine),
       )
-    : groupedCards(savedCards, deckSections)
+    : []
   if (building && chooseCommander && !sections.some((section) => section.board === "commander")) {
     sections.unshift({
       board: "commander",
@@ -151,17 +145,14 @@ export function DeckView({
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
   const mainCount = totalQuantity(shownCards) - sideCount
   const sectionLabel = (id: string) => deckSections.find((section) => section.id === id)?.label
-  const cardsMessage = cardsUnavailable ? (
+  const cardsMessage = !building ? null : cardsUnavailable ? (
     <Text
       style={themed($notes)}
       tx={cardsLoading ? "decks:deckView.cardsLoading" : "decks:deckView.cardsUnavailable"}
     />
   ) : shownCards.length === 0 ? (
-    <Text
-      style={themed($notes)}
-      text={(building && addUnavailable) || translate("decks:deckView.noCards")}
-    />
-  ) : building && addUnavailable ? (
+    <Text style={themed($notes)} text={addUnavailable || translate("decks:deckView.noCards")} />
+  ) : addUnavailable ? (
     <Text style={themed($notes)} text={addUnavailable} />
   ) : null
   const rowsDisabled = busy || cardsUnavailable || cardsCached || editingDisabled
@@ -218,7 +209,7 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
-              {version ? (
+              {building && version ? (
                 <View style={$row}>
                   <TextAction
                     testID="deck-version-button"
@@ -237,28 +228,6 @@ export function DeckView({
                   )}
                 </View>
               ) : null}
-              {building ? null : (
-                <>
-                  {tracked && (stats ? <DeckStats record={stats} /> : statsContent)}
-                  {tracked && onStats && (stats || statsContent) ? (
-                    <TextAction
-                      testID="open-deck-stats"
-                      tx="decks:stats.viewStats"
-                      style={$noteAction}
-                      onPress={onStats}
-                    />
-                  ) : null}
-                  {tracked && onAddMatch ? (
-                    <TextAction
-                      testID="add-match-result"
-                      tx="decks:deckView.addMatch"
-                      style={$noteAction}
-                      disabled={busy}
-                      onPress={onAddMatch}
-                    />
-                  ) : null}
-                </>
-              )}
             </View>
             <View style={themed($modes)} accessibilityRole="tablist">
               {DECK_MODES.map((option) => (
@@ -283,7 +252,9 @@ export function DeckView({
                 onFind={() => setSearch("cards")}
                 onAnalysis={() => setAnalysisOpen(true)}
               />
-            ) : null}
+            ) : (
+              play
+            )}
             {cardsMessage}
           </>
         }
@@ -340,11 +311,6 @@ export function DeckView({
                 style={$noteInput}
               />
             </View>
-          ) : savedNote ? (
-            <View style={themed($notes)}>
-              <Text size="sm" weight="semiBold" tx="decks:build.notes" />
-              <Text size="sm" text={savedNote} testID="deck-note" />
-            </View>
           ) : null
         }
       />
@@ -387,6 +353,26 @@ export function DeckView({
               disabled={busy || editingDisabled}
               style={$barButton}
               onPress={onSave}
+            />
+          </View>
+        ) : !building ? (
+          <View style={[themed($footer), $stretch]} testID="deck-play-bar">
+            {tracked ? (
+              <Button
+                testID="add-match-result"
+                tx="decks:deckView.addMatch"
+                disabled={busy || !onAddMatch}
+                style={[$flex, $barButton]}
+                onPress={onAddMatch}
+              />
+            ) : null}
+            <Button
+              testID="start-game"
+              tx="decks:play.startGame"
+              preset="primary"
+              disabled={busy || !onStartGame}
+              style={[$flex, $barButton]}
+              onPress={onStartGame}
             />
           </View>
         ) : (
@@ -467,6 +453,7 @@ export function DeckView({
   )
 }
 const $flex: ViewStyle = { flex: 1 }
+const $stretch: ViewStyle = { alignItems: "stretch" }
 const $row: ViewStyle = { flexDirection: "row", alignItems: "center" }
 const $touch: ViewStyle = {
   minWidth: 44,
@@ -476,7 +463,6 @@ const $touch: ViewStyle = {
 }
 const $disabled: TextStyle = { opacity: 0.4 }
 const $noteInput: TextStyle = { minHeight: 120, textAlignVertical: "top" }
-const $noteAction: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
 const $barButton: ViewStyle = { minHeight: 44 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,

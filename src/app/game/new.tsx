@@ -60,7 +60,7 @@ export function ReportLocalConnect({
 }
 
 export default function NewLocalGameRoute() {
-  const params = useLocalSearchParams<{ mode?: string; setup?: string }>()
+  const params = useLocalSearchParams<{ mode?: string; setup?: string; deckId?: string }>()
   const auth = useAuthAccess()
   const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
   const [mode, setMode] = useState<NewGameMode>(params.mode === "connected" ? "connected" : "local")
@@ -126,6 +126,7 @@ export default function NewLocalGameRoute() {
         </LocalGamePublishSource>
       ) : null}
       <NewGameScreen
+        initialDeckId={params.deckId}
         defaults={defaults}
         mode={mode}
         initialGame={initialGame}

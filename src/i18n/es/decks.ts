@@ -460,6 +460,19 @@ export default {
     saved: "Guardado",
     addCards: "+ Añadir cartas",
   },
+  play: {
+    bringing: "Versión que llevas",
+    results: "Resultados",
+    resultsRecord: "Resultados · {{record}}",
+    versus: "vs {{opponents}}",
+    startGame: "Iniciar una partida",
+    bringFailed: "No se pudo cambiar la versión que llevas.",
+    source: {
+      local: "Local",
+      nearby: "Cercana",
+      online: "En línea",
+    },
+  },
   build: {
     find: "Buscar o añadir una carta",
     average: "Prom.",

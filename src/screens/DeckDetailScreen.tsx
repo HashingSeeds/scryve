@@ -34,6 +34,7 @@ import {
   startsNewList,
 } from "@/features/decks/deckDraft"
 import { useAccountDeckDraft } from "@/features/decks/deckDraftStore"
+import { DeckPlay } from "@/features/decks/DeckPlay"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { allRecord } from "@/features/decks/deckStatLines"
@@ -56,8 +57,8 @@ import {
   loadAccountDraft,
 } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
-import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import { statsDate } from "@/features/stats/DeckStatsParts"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -69,7 +70,7 @@ import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
-import { picksCommander } from "../../convex/lib/systems"
+import { picksCommander, tracksResults } from "../../convex/lib/systems"
 
 type DeckDialog =
   | "none"
@@ -292,7 +293,6 @@ function DeckDetailContent({
   )
   const deckMetadata = synced.metadata.find((deck) => deck.deckId === deckId)
   const statsDeckKey = deckMetadata?.deckKey ?? detail?.deck.deckKey
-  const stats = useDeckKeyStats(statsDeckKey, access?.ready ?? true)
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
   const firstConnectionPending =
@@ -315,6 +315,7 @@ function DeckDetailContent({
   const deleteVersion = useMutation(api.decks.deleteVersion)
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
+  const setBringingVersion = useMutation(api.decks.setBringingVersion)
   const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const {
     draft,
@@ -330,6 +331,7 @@ function DeckDetailContent({
   const [error, setError] = useState<string>()
   const [newListNotice, setNewListNotice] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [bringingPending, setBringingPending] = useState<string>()
   const [focusedKey, setFocusedKey] = useState<string>()
   const metadataSaveStarted = useRef(false)
   const settingsSaveStarted = useRef(false)
@@ -644,6 +646,17 @@ function DeckDetailContent({
     if (!saved) metadataSaveStarted.current = false
   }
 
+  async function bringVersion(versionId: string) {
+    setBringingPending(versionId)
+    await run(async () => {
+      await setBringingVersion({
+        deckId: deckId as Id<"decks">,
+        versionId: versionId as Id<"deckVersions">,
+      })
+    }, translate("decks:play.bringFailed"))
+    setBringingPending(undefined)
+  }
+
   function chooseVersion(versionId: string) {
     setNewListNotice(false)
     setSelectedVersionId(versionId as Id<"deckVersions">)
@@ -875,7 +888,6 @@ function DeckDetailContent({
         cards={cards}
         savedCards={view.displayCards}
         note={view.note}
-        savedNote={deck.note ?? ""}
         changes={changes}
         busy={busy}
         cardsUnavailable={cardsUnavailable}
@@ -907,18 +919,49 @@ function DeckDetailContent({
         onBack={onBack}
         onSave={save}
         onDiscard={discardEdits}
-        onStats={() =>
-          router.push({
-            pathname: "/connected/decks/stats",
-            params: {
-              deckKey: statsDeckKey,
-              deckName: deck.name,
-              game: deck.game,
-              format: deck.format,
-            },
-          })
+        play={
+          <DeckPlay
+            versions={view.versionRows.map((row) => ({
+              id: row._id,
+              label: openVersionLabel(row, latestVersionNumber),
+              detail: [
+                "updatedAt" in row ? statsDate(row.updatedAt) : undefined,
+                cardCountLabel(row.cardQuantity),
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              record: row.record,
+            }))}
+            bringingId={
+              detail
+                ? (bringingPending ??
+                  detail.deck.bringingVersionId ??
+                  detail.versions[detail.versions.length - 1]?._id)
+                : undefined
+            }
+            bringDisabled={!detail || busy || knownDeleted}
+            onBring={bringVersion}
+            tracked={tracksResults(deck.game)}
+            deckKey={statsDeckKey}
+            ready={access?.ready ?? true}
+            onStats={() =>
+              router.push({
+                pathname: "/connected/decks/stats",
+                params: {
+                  deckKey: statsDeckKey,
+                  deckName: deck.name,
+                  game: deck.game,
+                  format: deck.format,
+                },
+              })
+            }
+          />
         }
-        stats={stats}
+        onStartGame={
+          knownDeleted
+            ? undefined
+            : () => router.push({ pathname: "/game/new", params: { deckId } })
+        }
         onAddMatch={
           onAddMatch && matchVersionId ? () => onAddMatch(matchVersionId, deck.name) : undefined
         }

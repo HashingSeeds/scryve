@@ -12,7 +12,6 @@ import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
@@ -23,10 +22,11 @@ import {
   useLocalDeckDraft,
   type LocalDeckDraft as GuestDraft,
 } from "@/features/decks/deckDraftStore"
-import { DeckStats } from "@/features/decks/DeckStats"
+import { DeckPlay } from "@/features/decks/DeckPlay"
 import { DeckView, type DeckMode } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
+  guestDeckRouteId,
   loadGuestDeck,
   saveGuestDeck,
   useGuestDeck,
@@ -35,7 +35,6 @@ import {
 import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
 import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
-import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { useLocalDeckSyncAction } from "@/features/decks/useLocalDeckSyncAction"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -44,7 +43,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import type { Id } from "../../convex/_generated/dataModel"
 import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
-import { picksCommander } from "../../convex/lib/systems"
+import { picksCommander, tracksResults } from "../../convex/lib/systems"
 
 type GuestDeckDetailScreenProps = {
   localId: string
@@ -98,8 +97,7 @@ export function GuestDeckDetailScreen({
   const offline = useConvexConnectionState()?.isWebSocketConnected === false
   const [leaving, setLeaving] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
-  // why: Play lists the saved deck, so a card focused there may already be gone from the draft.
-  const focusedCard = (building ? (draft ?? stored?.deck) : (stored?.deck ?? draft))?.cards.find(
+  const focusedCard = (draft ?? stored?.deck)?.cards.find(
     (card) => printingKey(card) === focusedKey,
   )
   const focusedGame = (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME
@@ -306,29 +304,37 @@ export function GuestDeckDetailScreen({
         cards={current.cards}
         savedCards={savedDeck.cards}
         note={current.note ?? ""}
-        savedNote={savedDeck.note ?? ""}
         changes={changes}
         editingDisabled={syncing || syncingElsewhere}
-        onStats={
+        play={
+          <DeckPlay
+            tracked={tracksResults(game)}
+            deckKey={stored && (stored.deckKey ?? stored.localId)}
+            ready={Boolean(access?.ready)}
+            onStats={
+              stored
+                ? () =>
+                    router.push({
+                      pathname: "/connected/decks/stats",
+                      params: {
+                        deckKey: stored.deckKey ?? stored.localId,
+                        deckName: savedDeck.name,
+                        game,
+                        format: savedDeck.format,
+                      },
+                    })
+                : undefined
+            }
+          />
+        }
+        onStartGame={
           stored
             ? () =>
                 router.push({
-                  pathname: "/connected/decks/stats",
-                  params: {
-                    deckKey: stored.deckKey ?? stored.localId,
-                    deckName: savedDeck.name,
-                    game,
-                    format: savedDeck.format,
-                  },
+                  pathname: "/game/new",
+                  params: { deckId: guestDeckRouteId(stored.localId) },
                 })
             : undefined
-        }
-        statsContent={
-          access?.ready && stored ? (
-            <ConvexQueryBoundary key={access.ownerId} fallback={() => null}>
-              <LocalDeckStats deckKey={stored.deckKey ?? stored.localId} />
-            </ConvexQueryBoundary>
-          ) : undefined
         }
         onAddMatch={
           onAddMatch && access?.ready && stored ? () => onAddMatch(savedDeck.name) : undefined
@@ -476,8 +482,3 @@ const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.lg,
 })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-
-function LocalDeckStats({ deckKey }: { deckKey: string }) {
-  const record = useDeckKeyStats(deckKey, true)
-  return record ? <DeckStats record={record} /> : null
-}
