@@ -1,24 +1,17 @@
 import type { CommanderSelectionDetails } from "./commanderSelection"
-import { cardSection, printingKey, type DeckCard } from "./deckCards"
+import { cardSection, type DeckCard } from "./deckCards"
 import {
-  addCommanderCard,
-  addDraftCard,
-  addDraftCommander,
-  adjustCardQuantity,
   canChooseCommander,
-  cardLimitError,
-  chooseDraftCommander,
   closeDeckDraft,
   draftChanges,
-  incrementCard,
+  editDeck,
   isCommanderPick,
   openDeckDraft,
   planDeckSave,
-  removeDraftCard,
   reseedDeckDraft,
-  restoreDraftUndo,
-  setDraftNote,
   startsNewList,
+  type DeckDraft,
+  type DeckEdit,
 } from "./deckDraft"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 
@@ -33,38 +26,57 @@ const eligible: CommanderSelectionDetails = {
   commanderLegality: "legal",
   colorIdentity: "U",
 }
-const commanderDeck = { game: "mtg", format: "commander" }
+const partner: CommanderSelectionDetails = { ...eligible, oracleText: "Partner" }
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => card(`Card ${index}`))
 const open = (cards: DeckCard[], note = "") => openDeckDraft({ cards, note, fromCache: false })
 
-describe("deck draft editing", () => {
+type Rules = { game: string; format: string; details?: CommanderSelectionDetails }
+const modern: Rules = { game: "mtg", format: "modern" }
+const commander: Rules = { game: "mtg", format: "commander", details: eligible }
+
+function edit(draft: DeckDraft, change: DeckEdit, { details, ...deck }: Rules = modern) {
+  return editDeck(draft, change, { ...deck, detailsFor: () => details })
+}
+
+function apply(draft: DeckDraft, changes: DeckEdit[], rules: Rules = modern) {
+  return changes.reduce((current, change) => {
+    const next = edit(current, change, rules)
+    if ("error" in next) throw new Error(next.error)
+    return next
+  }, draft)
+}
+
+const summary = (draft: DeckDraft) =>
+  draft.cards.map((entry) => `${entry.quantity} ${cardSection(entry)}:${entry.name}`)
+
+describe("deck draft lifecycle", () => {
   it("is clean when opened and dirty once a count changes", () => {
     const draft = open([card("Sol Ring")], "Ramp")
     expect(draftChanges(draft, "Ramp")).toEqual({ cards: false, note: false, any: false })
-    const added = addDraftCard(draft, card("Sol Ring"))
-    expect(added.cards).toEqual([card("Sol Ring", { quantity: 2 })])
+    const added = apply(draft, [{ type: "add", card: card("Sol Ring") }])
     expect(draftChanges(added, "Ramp")).toEqual({ cards: true, note: false, any: true })
   })
 
   it("treats a commander color change as a card change", () => {
-    const commander = card("Esika", { section: "commander", commanderColor: "G" })
-    const draft = open([commander])
-    expect(
-      draftChanges({ ...draft, cards: [{ ...commander, commanderColor: "U" }] }, "").cards,
-    ).toBe(true)
+    const pick = card("Esika", { section: "commander", commanderColor: "G" })
+    const draft = open([pick])
+    expect(draftChanges({ ...draft, cards: [{ ...pick, commanderColor: "U" }] }, "").cards).toBe(
+      true,
+    )
   })
 
   it("tracks note edits against the saved note", () => {
-    const draft = setDraftNote(open([], "Old"), "New")
+    const draft = apply(open([], "Old"), [{ type: "note", note: "New" }])
     expect(draftChanges(draft, "Old")).toEqual({ cards: false, note: true, any: true })
-    expect(draftChanges(setDraftNote(draft, "Old"), "Old").any).toBe(false)
+    expect(draftChanges(apply(draft, [{ type: "note", note: "Old" }]), "Old").any).toBe(false)
   })
 
   it("is never dirty while closed or while waiting on cached cards", () => {
+    const island = { type: "add", card: card("Island") } as const
     const fromCache = openDeckDraft({ cards: [], note: "", fromCache: true })
-    expect(draftChanges(addDraftCard(fromCache, card("Island")), "").cards).toBe(false)
-    expect(draftChanges(closeDeckDraft(addDraftCard(open([]), card("Island"))), "").any).toBe(false)
+    expect(draftChanges(apply(fromCache, [island]), "").cards).toBe(false)
+    expect(draftChanges(closeDeckDraft(apply(open([]), [island])), "").any).toBe(false)
   })
 
   it("re-seeds a cache-origin draft so it starts clean against the live list", () => {
@@ -73,78 +85,84 @@ describe("deck draft editing", () => {
     expect(draft).toMatchObject({ cards: live, base: live, fromCache: false })
     expect(draftChanges(draft, "").cards).toBe(false)
   })
+})
 
-  it("adds a new printing as its own entry", () => {
-    const draft = addDraftCard(open([card("Island")]), card("Swamp"))
-    expect(draft.cards.map((entry) => entry.name)).toEqual(["Island", "Swamp"])
-  })
-
-  it("offers undo only when the last copy is removed", () => {
-    const start = open([card("Island", { quantity: 2 }), card("Swamp")])
-    const decreased = removeDraftCard(start, start.cards[0])
-    expect(decreased.cards[0].quantity).toBe(1)
-    expect(decreased.undo).toBeUndefined()
-
-    const removed = removeDraftCard(decreased, decreased.cards[1])
-    expect(removed.cards.map((entry) => entry.name)).toEqual(["Island"])
-    expect(removed.undo).toEqual({ name: "Swamp", cards: decreased.cards })
-    expect(restoreDraftUndo(removed)).toMatchObject({ cards: decreased.cards, undo: undefined })
-  })
-
-  it("clears undo on the next add and when the draft closes", () => {
-    const removed = removeDraftCard(open([card("Swamp")]), card("Swamp"))
-    expect(addDraftCard(removed, card("Island")).undo).toBeUndefined()
-    expect(closeDeckDraft(removed).undo).toBeUndefined()
+describe("editDeck", () => {
+  it("adds a copy of a card already in the deck and a new printing as its own entry", () => {
+    const draft = apply(open([card("Island")]), [
+      { type: "add", card: card("Island") },
+      { type: "add", card: card("Swamp") },
+    ])
+    expect(summary(draft)).toEqual(["2 main:Island", "1 main:Swamp"])
   })
 
   it("keeps the same printing in different sections apart", () => {
-    const cards = [card("Island"), card("Island", { section: "sideboard" })]
-    expect(incrementCard(cards, cards[1]).map((entry) => entry.quantity)).toEqual([1, 2])
+    const draft = apply(open([card("Island"), card("Island", { section: "sideboard" })]), [
+      { type: "add", card: card("Island", { section: "sideboard" }) },
+    ])
+    expect(summary(draft)).toEqual(["1 main:Island", "2 sideboard:Island"])
   })
 
-  it("caps a count at 999 copies and drops an entry at zero", () => {
-    const cards = [card("Relentless Rats", { quantity: 998 })]
-    expect(adjustCardQuantity(cards, cards[0], 5)[0].quantity).toBe(999)
-    expect(adjustCardQuantity(cards, cards[0], -998)).toEqual([])
+  it("offers undo only when the last copy is removed, and restores the list", () => {
+    const start = open([card("Island", { quantity: 2 }), card("Swamp")])
+    const decreased = apply(start, [{ type: "remove", card: card("Island") }])
+    expect(summary(decreased)).toEqual(["1 main:Island", "1 main:Swamp"])
+    expect(decreased.undo).toBeUndefined()
+
+    const removed = apply(decreased, [{ type: "remove", card: card("Swamp") }])
+    expect(summary(removed)).toEqual(["1 main:Island"])
+    expect(removed.undo).toEqual({ name: "Swamp", cards: decreased.cards })
+    expect(apply(removed, [{ type: "undo" }])).toMatchObject({
+      cards: decreased.cards,
+      undo: undefined,
+    })
   })
 
-  it("decrements a merged entry above 999 by one copy", () => {
-    const cards = [card("Relentless Rats", { quantity: 1500 })]
-    expect(adjustCardQuantity(cards, cards[0], -1)[0].quantity).toBe(1499)
+  it("counts copies in the deck, not in the removed candidate, when offering undo", () => {
+    const draft = apply(open([card("Island", { quantity: 3 })]), [
+      { type: "remove", card: card("Island", { quantity: 1 }) },
+    ])
+    expect(summary(draft)).toEqual(["2 main:Island"])
+    expect(draft.undo).toBeUndefined()
   })
-})
 
-describe("deck draft limits", () => {
+  it("ignores removing a card the deck does not have", () => {
+    const draft = open([card("Island")])
+    expect(edit(draft, { type: "remove", card: card("Swamp") })).toBe(draft)
+  })
+
+  it("clears undo on the next add and when the draft closes", () => {
+    const removed = apply(open([card("Swamp")]), [{ type: "remove", card: card("Swamp") }])
+    expect(apply(removed, [{ type: "add", card: card("Island") }]).undo).toBeUndefined()
+    expect(closeDeckDraft(removed).undo).toBeUndefined()
+  })
+
+  it("stops a copy past 999 and decrements a merged entry above it by one", () => {
+    const rats = card("Relentless Rats", { quantity: 999 })
+    expect(edit(open([rats]), { type: "add", card: rats })).toEqual({
+      error: "A card can have at most 999 copies.",
+    })
+    const merged = open([{ ...rats, quantity: 1500 }])
+    expect(summary(apply(merged, [{ type: "remove", card: rats }]))).toEqual([
+      "1499 main:Relentless Rats",
+    ])
+  })
+
   it(`stops a new entry at ${MAX_DECK_CARDS} entries but still allows more copies`, () => {
-    const full = entries(MAX_DECK_CARDS)
-    expect(cardLimitError(full, card("One more"))).toBe(
-      `A deck can have at most ${MAX_DECK_CARDS} entries.`,
-    )
-    expect(cardLimitError(full, full[0])).toBeUndefined()
-    expect(cardLimitError(entries(MAX_DECK_CARDS - 1), card("Last"))).toBeUndefined()
-  })
-
-  it("stops a copy past 999", () => {
-    const cards = [card("Relentless Rats", { quantity: 999 })]
-    expect(cardLimitError(cards, cards[0])).toBe("A card can have at most 999 copies.")
-  })
-
-  it("rejects a commander add that would push the deck past the entry limit", () => {
-    const result = addCommanderCard(
-      entries(MAX_DECK_CARDS),
-      card("Talrand", { section: "commander" }),
-      () => eligible,
-    )
-    expect(result).toEqual({ error: `A deck can have at most ${MAX_DECK_CARDS} entries.` })
+    const full = open(entries(MAX_DECK_CARDS))
+    expect(edit(full, { type: "add", card: card("One more") })).toEqual({
+      error: `A deck can have at most ${MAX_DECK_CARDS} entries.`,
+    })
+    expect(edit(full, { type: "add", card: full.cards[0] })).not.toHaveProperty("error")
   })
 })
 
-describe("deck draft commander", () => {
+describe("editDeck commanders", () => {
   it("applies Commander rules only to Magic Commander decks", () => {
     const pick = card("Talrand", { section: "commander" })
-    expect(isCommanderPick(commanderDeck, pick)).toBe(true)
-    expect(isCommanderPick({ game: "mtg", format: "modern" }, pick)).toBe(false)
-    expect(isCommanderPick(commanderDeck, card("Island"))).toBe(false)
+    expect(isCommanderPick(commander, pick)).toBe(true)
+    expect(isCommanderPick(modern, pick)).toBe(false)
+    expect(isCommanderPick(commander, card("Island"))).toBe(false)
   })
 
   it("allows choosing a commander only with at most one in the deck", () => {
@@ -152,15 +170,37 @@ describe("deck draft commander", () => {
       card("Thrasios", { section: "commander" }),
       card("Tymna", { section: "commander" }),
     ]
-    expect(canChooseCommander(commanderDeck, [partners[0]])).toBe(true)
-    expect(canChooseCommander(commanderDeck, partners)).toBe(false)
+    expect(canChooseCommander(commander, [partners[0]])).toBe(true)
+    expect(canChooseCommander(commander, partners)).toBe(false)
     expect(canChooseCommander({ game: "ygo", format: "commander" }, [])).toBe(false)
   })
 
-  it("promotes a card already in the draft and marks the choice", () => {
+  it("adds a searched commander, demotes the old one, and marks the choice", () => {
+    const draft = apply(
+      open([card("Old", { section: "commander" })]),
+      [{ type: "add", card: card("Talrand", { section: "commander" }) }],
+      commander,
+    )
+    expect(summary(draft)).toEqual(["1 main:Old", "1 commander:Talrand"])
+    expect(draft.commanderSelected).toBe(true)
+  })
+
+  it("pairs a searched partner with the current commander", () => {
+    const draft = apply(
+      open([card("Thrasios", { section: "commander" })]),
+      [{ type: "add", card: card("Tymna", { section: "commander" }) }],
+      { ...commander, details: partner },
+    )
+    expect(summary(draft)).toEqual(["1 commander:Thrasios", "1 commander:Tymna"])
+  })
+
+  it("promotes a card already in the draft with the focused card's details", () => {
     const draft = open([card("Old", { section: "commander" }), card("New", { quantity: 2 })])
-    const next = chooseDraftCommander(draft, printingKey(draft.cards[1]), () => eligible)
-    if ("error" in next) throw new Error(next.error)
+    const next = apply(
+      draft,
+      [{ type: "chooseCommander", card: draft.cards[1], details: eligible }],
+      { ...commander, details: undefined },
+    )
     expect(next.commanderSelected).toBe(true)
     expect(next.cards.find((entry) => cardSection(entry) === "commander")?.name).toBe("New")
     expect(next.cards.find((entry) => entry.name === "Old")).toMatchObject({ section: "main" })
@@ -169,41 +209,47 @@ describe("deck draft commander", () => {
   it("returns the rule error and leaves the draft alone for an ineligible card", () => {
     const draft = open([card("Island")])
     expect(
-      chooseDraftCommander(draft, printingKey(draft.cards[0]), () => ({
-        commanderEligibility: "ineligible",
-      })),
+      edit(
+        draft,
+        { type: "chooseCommander", card: draft.cards[0] },
+        { ...commander, details: { commanderEligibility: "ineligible" } },
+      ),
     ).toEqual({ error: "This card cannot be a commander." })
   })
 
-  it("adds a searched commander and demotes the old one", () => {
-    const draft = open([card("Old", { section: "commander" })])
-    const next = addDraftCommander(draft, card("Talrand", { section: "commander" }), () => eligible)
-    if ("error" in next) throw new Error(next.error)
-    expect(next.cards.map((entry) => `${cardSection(entry)}:${entry.name}`)).toEqual([
-      "main:Old",
-      "commander:Talrand",
+  it("rejects a commander add that would push the deck past the entry limit", () => {
+    expect(
+      edit(
+        open(entries(MAX_DECK_CARDS)),
+        { type: "add", card: card("Talrand", { section: "commander" }) },
+        commander,
+      ),
+    ).toEqual({ error: `A deck can have at most ${MAX_DECK_CARDS} entries.` })
+  })
+
+  it.each([
+    ["Flesh and Blood hero", { game: "fab", format: "cc" }, "hero"],
+    ["Riftbound legend", { game: "riftbound", format: "constructed" }, "legend"],
+  ])("holds one %s, replacing it without the Commander picker", (_, deck, section) => {
+    const pick = (name: string) => card(name, { scryfallId: undefined, cardId: name, section })
+    const draft = open([pick("First"), card("Filler", { section: "main", quantity: 3 })])
+    expect(isCommanderPick(deck, pick("Second"))).toBe(true)
+    expect(canChooseCommander(deck, draft.cards)).toBe(false)
+    expect(summary(apply(draft, [{ type: "add", card: pick("Second") }], deck))).toEqual([
+      "3 main:Filler",
+      `1 ${section}:Second`,
     ])
   })
-})
 
-it("holds one Flesh and Blood hero, replacing it without the Commander picker", () => {
-  const fabDeck = { game: "fab", format: "cc" }
-  const hero = (name: string) =>
-    card(name, { scryfallId: undefined, cardId: name, section: "hero" })
-  const deck = [hero("Dorinthea Ironsong"), card("Snatch (red)", { section: "main", quantity: 3 })]
-  expect(isCommanderPick(fabDeck, hero("Kano"))).toBe(true)
-  expect(canChooseCommander(fabDeck, deck)).toBe(false)
-  const result = addCommanderCard(deck, hero("Kano"), () => undefined)
-  expect("cards" in result && result.cards.map(({ name, quantity }) => [name, quantity])).toEqual([
-    ["Snatch (red)", 3],
-    ["Kano", 1],
-  ])
-})
-
-it("keeps the entry limit when a hero joins a full deck", () => {
-  const hero = card("Kano", { scryfallId: undefined, cardId: "Kano", section: "hero" })
-  expect(addCommanderCard(entries(MAX_DECK_CARDS), hero, () => undefined)).toEqual({
-    error: expect.any(String),
+  it.each([
+    ["Pokémon", { game: "pokemon", format: "standard" }, "main"],
+    ["Yu-Gi-Oh", { game: "ygo", format: "advanced" }, "extra"],
+    ["Lorcana", { game: "lorcana", format: "core" }, "main"],
+  ])("adds %s cards as plain copies", (_, deck, section) => {
+    const entry = card("Card", { section })
+    expect(summary(apply(open([entry]), [{ type: "add", card: entry }], deck))).toEqual([
+      `2 ${section}:Card`,
+    ])
   })
 })
 

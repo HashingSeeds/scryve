@@ -1,8 +1,7 @@
-import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { Header } from "@/components/Header"
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
-import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
@@ -296,23 +295,6 @@ test("searches new cards into Main deck by default and saves merged copies", asy
   } finally {
     jest.useRealTimers()
   }
-})
-
-test("keeps every card the scanner adds through an onAdd from an earlier render", () => {
-  const view = renderScreen()
-  fireEvent.press(view.getByTestId("deck-add-cards"))
-  const { onAdd } = view.UNSAFE_getByType(CardSearchScreen).props
-  act(() => {
-    onAdd({ name: "Island", quantity: 1, scryfallId: "island", section: "main" })
-  })
-  act(() => {
-    onAdd({ name: "Forest", quantity: 1, scryfallId: "forest", section: "main" })
-  })
-  fireEvent.press(view.getByText("Done"))
-  fireEvent.press(view.getByTestId("save-version-button"))
-  expect(
-    mockSaveGuestDeck.mock.calls[0][0].cards.map(({ name }: { name: string }) => name),
-  ).toEqual(["Sol Ring", "Island", "Forest"])
 })
 
 test("loads rules text when opening a saved Magic card", async () => {

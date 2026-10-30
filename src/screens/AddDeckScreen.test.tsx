@@ -119,16 +119,6 @@ jest.mock("@/features/decks/guestDeck", () => {
 })
 const mockSaveDeck = jest.mocked(saveGuestDeck)
 
-const mockDeckLimit: { entries: number | undefined } = { entries: undefined }
-
-jest.mock("../../convex/lib/policy", () => {
-  const policy =
-    jest.requireActual<typeof import("../../convex/lib/policy")>("../../convex/lib/policy")
-  return Object.defineProperty({ ...policy }, "MAX_DECK_CARDS", {
-    get: () => mockDeckLimit.entries ?? policy.MAX_DECK_CARDS,
-  })
-})
-
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
 jest.mock("@/features/billing/RevenueCatContext", () => ({
@@ -209,7 +199,6 @@ describe("AddDeckScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockConvexState.client = undefined
-    mockDeckLimit.entries = undefined
     clear()
     clearGuestDecks()
     jest.useFakeTimers()
@@ -633,37 +622,6 @@ describe("AddDeckScreen", () => {
         }),
       ),
     )
-  })
-
-  it("keeps every add and stops at the copy and entry limits when adds land before a re-render", async () => {
-    mockDeckLimit.entries = 3
-    const card = { ...resolvedForest.cards[0], quantity: 999 }
-    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards: [card] })
-    const view = renderAddDeck()
-    enterPasted(view)
-    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-    fireEvent.press(view.getByRole("button", { name: "Edit" }))
-    fireEvent.press(view.getByTestId("import-add-cards"))
-    const add = view.UNSAFE_getByType(CardSearchScreen).props.onAdd
-    const extra = (index: number) => ({
-      ...card,
-      name: `Extra ${index}`,
-      quantity: 1,
-      scryfallId: `extra-${index}`,
-      oracleId: `extra-oracle-${index}`,
-    })
-    act(() => {
-      expect(add({ ...card, quantity: 1 })).toBe("A card can have at most 999 copies.")
-      expect(add(extra(1))).toBeUndefined()
-      expect(add(extra(2))).toBeUndefined()
-      expect(add(extra(3))).toBe("A deck can have at most 3 entries.")
-    })
-    fireEvent.press(
-      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
-    )
-    expect(view.getByText("1001 cards")).toBeTruthy()
-    expect(view.getByText("Extra 1")).toBeTruthy()
-    expect(view.getByText("Extra 2")).toBeTruthy()
   })
 
   async function editColorCommander(quantity: number) {

@@ -27,16 +27,15 @@ import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel, deckNameWarning } from "@/features/decks/deckCopy"
 import {
-  addCommanderCard,
-  adjustCardQuantity,
   canChooseCommander,
-  cardLimitError,
-  incrementCard,
   isCommanderPick,
+  MAX_CARD_COPIES,
+  type DeckEdits,
 } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { guestDeckRouteId, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import { appLocale, type TxKeyPath } from "@/i18n"
@@ -115,7 +114,7 @@ const DECK_LINK_SOURCES = new Map<
   ],
 ])
 
-type PastedDraft = {
+type PastedDraft = DeckEdits<GuestDeckPayload["cards"][number]> & {
   source: string
   kind: "text" | "link"
   attribution?: { sourceName: string; sourceUrl: string; author?: string }
@@ -125,17 +124,7 @@ type PastedDraft = {
     FunctionReturnType<typeof api.deckImports.resolvePasted>,
     "unresolved" | "invalidLines"
   >
-  cards: GuestDeckPayload["cards"]
   omitted: boolean
-}
-
-function importableCards(draft: PastedDraft) {
-  return draft.cards.filter(
-    (card) =>
-      !draft.omitted ||
-      !card.originalReference ||
-      !draft.resolved.unresolved.includes(card.originalReference),
-  )
 }
 
 function attributionLabel(attribution: { sourceName: string; author?: string }, separator: string) {
@@ -387,19 +376,17 @@ export function AddDeckScreen({
   const [deckLink, setDeckLink] = useState("")
   const linkSource = DECK_LINK_SOURCES.get(game)
   const importSource = importKind === "link" ? deckLink : deckList
-  const [pastedDraft, setPastedDraftState] = useState<PastedDraft>()
-  // why: search taps can land before a re-render, so import edits read this ref, which every draft write updates first.
-  const latestPastedDraft = useRef(pastedDraft)
-  function setPastedDraft(next: PastedDraft | undefined) {
-    latestPastedDraft.current = next
-    setPastedDraftState(next)
-  }
+  const {
+    draft: pastedDraft,
+    latest: latestPastedDraft,
+    setDraft: setPastedDraft,
+    edit: editPasted,
+  } = useDeckEditor<PastedDraft | undefined>(undefined)
   const [resolvingPasted, setResolvingPasted] = useState(false)
   const [reviewingPasted, setReviewingPasted] = useState(false)
   const [editingPasted, setEditingPasted] = useState(false)
   const [addingPastedCard, setAddingPastedCard] = useState(false)
   const [choosingPastedCommander, setChoosingPastedCommander] = useState(false)
-  const [pastedCommanderSelected, setPastedCommanderSelected] = useState(false)
   const pastedToken = useRef(0)
   const pastedDraftCurrent =
     pastedDraft?.source === importSource &&
@@ -409,7 +396,7 @@ export function AddDeckScreen({
   const pastedProblems = pastedDraft
     ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
     : []
-  const pastedCards = pastedDraft ? importableCards(pastedDraft) : []
+  const pastedCards = pastedDraft?.cards ?? []
   const sourceAttribution = pastedDraft?.attribution
     ? `Imported from ${attributionLabel(pastedDraft.attribution, " by ")}\n${pastedDraft.attribution.sourceUrl}`
     : ""
@@ -743,7 +730,6 @@ export function AddDeckScreen({
           : {}),
       })
       setEditingPasted(false)
-      setPastedCommanderSelected(false)
       Keyboard.dismiss()
       setReviewingPasted(true)
     } catch (cause) {
@@ -764,7 +750,6 @@ export function AddDeckScreen({
     setFocusedPreviewCard(undefined)
     setAddingPastedCard(false)
     setChoosingPastedCommander(false)
-    setPastedCommanderSelected(false)
     setEditingPasted(false)
     setReviewingPasted(false)
   }
@@ -786,11 +771,9 @@ export function AddDeckScreen({
     })
   }
 
-  function changeImportQuantity(card: DeckCard, delta: number) {
-    const draft = latestPastedDraft.current
-    if (!draft) return
-    if (card.quantity + delta <= 0) setFocusedPreviewCard(undefined)
-    setPastedDraft({ ...draft, cards: adjustCardQuantity(draft.cards, card, delta) })
+  function removeImportCard(card: DeckCard) {
+    if (card.quantity <= 1) setFocusedPreviewCard(undefined)
+    editPasted({ type: "remove", card }, { game, format })
   }
 
   function changeImportFormat(next?: string) {
@@ -807,22 +790,10 @@ export function AddDeckScreen({
   }
 
   function addImportCard(card: GuestDeckPayload["cards"][number]) {
-    const draft = latestPastedDraft.current
-    if (!draft) return translate("decks:addDeck.reviewFirst")
-    const cards = importableCards(draft)
-    if (isCommanderPick({ game, format }, card)) {
-      const cached = loadCardDetails()
-      const result = addCommanderCard(cards, card, (entry) => cached[cardDetailsKey(entry, game)])
-      if ("error" in result) return result.error
-      setPastedDraft({ ...draft, cards: result.cards })
-      setPastedCommanderSelected(true)
-    } else {
-      const limitError = cardLimitError(cards, card)
-      if (limitError) return limitError
-      setPastedDraft({ ...draft, cards: incrementCard(cards, card) })
-    }
-    if (choosingPastedCommander) setAddingPastedCard(false)
-    return undefined
+    if (!latestPastedDraft.current) return translate("decks:addDeck.reviewFirst")
+    const addError = editPasted({ type: "add", card }, { game, format })
+    if (!addError && choosingPastedCommander) setAddingPastedCard(false)
+    return addError
   }
 
   function importPasted() {
@@ -880,11 +851,11 @@ export function AddDeckScreen({
       {...(editingPasted && focusedImportCard
         ? {
             onIncrement:
-              focusedImportCard.quantity >= 999 ||
+              focusedImportCard.quantity >= MAX_CARD_COPIES ||
               isCommanderPick({ game, format }, focusedImportCard)
                 ? undefined
-                : () => changeImportQuantity(focusedImportCard, 1),
-            onDecrement: () => changeImportQuantity(focusedImportCard, -1),
+                : () => addImportCard(focusedImportCard),
+            onDecrement: () => removeImportCard(focusedImportCard),
           }
         : {})}
     />
@@ -910,8 +881,8 @@ export function AddDeckScreen({
 
   if (reviewingPasted && pastedDraft) {
     const singleCommander = canChooseCommander({ game, format }, pastedCards)
-    const cachedRules = pastedCommanderSelected ? loadCardDetails() : {}
-    const commanderWarnings = pastedCommanderSelected
+    const cachedRules = pastedDraft.commanderSelected ? loadCardDetails() : {}
+    const commanderWarnings = pastedDraft.commanderSelected
       ? getCommanderWarnings(
           pastedCards,
           (card) =>
@@ -1046,7 +1017,17 @@ export function AddDeckScreen({
                 testID="omit-import-problems"
                 tx="decks:addDeck.removeProblems"
                 disabled={!pastedDraftCurrent || resolvingPasted}
-                onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
+                onPress={() =>
+                  setPastedDraft({
+                    ...pastedDraft,
+                    omitted: true,
+                    cards: pastedDraft.cards.filter(
+                      (card) =>
+                        !card.originalReference ||
+                        !pastedDraft.resolved.unresolved.includes(card.originalReference),
+                    ),
+                  })
+                }
               />
             </View>
           ) : null}
@@ -1088,8 +1069,8 @@ export function AddDeckScreen({
                       details?.imageUrl
                     }
                     onFocus={(entry) => focusImportCard(entry, section.label)}
-                    onIncrement={(entry) => changeImportQuantity(entry, 1)}
-                    onDecrement={(entry) => changeImportQuantity(entry, -1)}
+                    onIncrement={addImportCard}
+                    onDecrement={removeImportCard}
                   />
                 )
               })}
@@ -1136,7 +1117,7 @@ export function AddDeckScreen({
             commanderCards={pastedCards}
             initialSection={choosingPastedCommander ? "commander" : undefined}
             onAdd={addImportCard}
-            onRemove={(card) => changeImportQuantity(card, -1)}
+            onRemove={removeImportCard}
             onClose={() => {
               Keyboard.dismiss()
               setAddingPastedCard(false)
