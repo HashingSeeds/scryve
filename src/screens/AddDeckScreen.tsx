@@ -34,6 +34,7 @@ import {
 } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { guestDeckRouteId, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
+import { useCapabilityReleased } from "@/features/decks/useCapabilityReleased"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { localizedDeckSections } from "@/features/game/playSystems"
@@ -57,7 +58,7 @@ import {
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
 import type { ProviderGame } from "../../convex/lib/games/providers"
-import { isSystemId, systemDefinition, type SystemId } from "../../convex/lib/systems"
+import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
 const DECK_LIST_HELPERS = {
   mtg: "decks:addDeck.listHelperMtg",
@@ -75,10 +76,6 @@ const MODES = [
   { id: "paste", labelTx: "decks:addDeck.modeImport" },
   { id: "blank", labelTx: "decks:addDeck.modeBuild" },
 ] as const satisfies ReadonlyArray<{ id: CreationMode; labelTx: TxKeyPath }>
-
-const browsable = (game: string) =>
-  systemDefinition(game)?.integration.capabilities.exampleDecks.release === "enabled"
-const startingMode = (game: string): CreationMode => (browsable(game) ? "precon" : "paste")
 
 const SEARCH_DEBOUNCE_MS = 350
 
@@ -364,7 +361,12 @@ export function AddDeckScreen({
   const searchTopDecks = useAction(api.deckCatalogs.browse)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
-  const [mode, setMode] = useState(() => startingMode(game))
+  const browsable = useCapabilityReleased("exampleDecks")(game)
+  const [pickedMode, setMode] = useState<CreationMode>()
+  const mode =
+    pickedMode === "precon" && !browsable
+      ? "paste"
+      : (pickedMode ?? (browsable ? "precon" : "paste"))
   const [catalogStatus, setCatalogStatus] =
     useState<FunctionReturnType<typeof api.deckCatalogs.browse>["status"]>("ready")
   const [catalogCursor, setCatalogCursor] = useState<string | null>(null)
@@ -468,7 +470,7 @@ export function AddDeckScreen({
     setSelectedCatalogDeck(undefined)
     setSelectedPrecon(undefined)
     setFocusedPreviewCard(undefined)
-    setMode(startingMode(next))
+    setMode(undefined)
     setCatalogStatus("ready")
     setCatalogCursor(null)
   }
@@ -1448,7 +1450,7 @@ export function AddDeckScreen({
           accessibilityLabel={translate("decks:addDeck.startingPoint")}
           style={themed($tabs)}
         >
-          {MODES.filter(({ id }) => id !== "precon" || browsable(game)).map((candidate) => (
+          {MODES.filter(({ id }) => id !== "precon" || browsable).map((candidate) => (
             <TouchableOpacity
               key={candidate.id}
               testID={`mode-picker-options-${candidate.id}`}

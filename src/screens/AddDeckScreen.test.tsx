@@ -16,6 +16,7 @@ import { captureAnalytics } from "@/utils/analytics"
 import { clear } from "@/utils/storage"
 
 import { AddDeckScreen, catalogPreviewSections } from "./AddDeckScreen"
+import { integrationFor } from "../../convex/lib/integrations"
 
 const mockPresentPaywall = jest.fn()
 const mockSearch = jest.fn(async () => [
@@ -72,6 +73,7 @@ const mockBrowse = jest.fn(async (args: unknown) => ({
   status: "ready",
   retryAfterMs: undefined as number | undefined,
 }))
+const mockManifest: { value: unknown } = { value: undefined }
 const mockCatalogDetail: {
   value:
     | {
@@ -134,6 +136,7 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => mockConnection,
   useQuery: (reference: string) => {
     if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
+    if (reference === "integrationManifest.list") return mockManifest.value
     return undefined
   },
   useAction: (reference: string) => {
@@ -168,6 +171,7 @@ jest.mock("../../convex/_generated/api", () => ({
       detail: "deckCatalogs.detail",
       browse: "deckCatalogs.browse",
     },
+    integrationManifest: { list: "integrationManifest.list" },
   },
 }))
 
@@ -203,7 +207,33 @@ describe("AddDeckScreen", () => {
     clearGuestDecks()
     jest.useFakeTimers()
     mockCatalogDetail.value = undefined
+    mockManifest.value = undefined
     mockConnection.isWebSocketConnected = true
+  })
+
+  it("hides Browse when the server switches example decks off", () => {
+    const view = renderAddDeck()
+    expect(view.getByTestId("mode-picker-options-precon")).toBeTruthy()
+
+    const mtg = integrationFor("mtg")
+    mockManifest.value = [
+      {
+        ...mtg,
+        capabilities: {
+          ...mtg.capabilities,
+          exampleDecks: { ...mtg.capabilities.exampleDecks, release: "disabled" },
+        },
+      },
+    ]
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
+    expect(view.getByTestId("mode-picker-options-paste").props.accessibilityState.selected).toBe(
+      true,
+    )
   })
 
   it("warns when other players would see a neutral label instead of the deck name", () => {
