@@ -111,14 +111,21 @@ describe("guest deck storage", () => {
     expect(saveGuestDeck(deck).localId).toBeTruthy()
   })
 
-  it("rejects corrupted card fields without overwriting the stored value", () => {
-    const stored = JSON.stringify([
-      { ...legacy, deck: { ...deck, cards: [{ name: "Card", quantity: 1, oracleId: {} }] } },
-    ])
-    storage.set("decks.guest.v2", stored)
-    expect(loadGuestDecks()).toEqual([])
-    expect(() => saveGuestDeck(deck)).toThrow("delete it explicitly")
-    expect(storage.getString("decks.guest.v2")).toBe(stored)
+  it("keeps valid decks usable and preserves an unreadable one through saves", () => {
+    const valid = { ...legacy, localId: "22222222-2222-4222-8222-222222222222" }
+    const invalid = {
+      ...legacy,
+      deck: { ...deck, cards: [{ name: "Card", quantity: 1, oracleId: {} }] },
+    }
+    storage.set("decks.guest.v2", JSON.stringify([legacy, invalid, valid, { ...valid, deck }]))
+    expect(loadGuestDecks()).toEqual([legacy, valid])
+    const saved = saveGuestDeck(deck)
+    saveGuestDeck({ ...deck, name: "Edited" }, { localId: valid.localId })
+    deleteGuestDeck(legacy.localId)
+    expect(loadGuestDecks().map((entry) => entry.localId)).toEqual([valid.localId, saved.localId])
+    expect(JSON.parse(storage.getString("decks.guest.v2") ?? "")).toEqual(
+      expect.arrayContaining([invalid, { ...valid, deck }]),
+    )
   })
 
   it("surfaces read failures before attempting a write", () => {
@@ -196,7 +203,6 @@ describe("guest deck storage", () => {
     expect(loadGuestDecks()[0].movedFromAccount).toBe(true)
     storage.set("decks.guest.v2", JSON.stringify([{ ...saved, movedFromAccount: "yes" }]))
     expect(loadGuestDecks()).toEqual([])
-    expect(() => saveGuestDeck(deck)).toThrow("unsupported")
   })
 
   it("round-trips guest route ids", () => {
