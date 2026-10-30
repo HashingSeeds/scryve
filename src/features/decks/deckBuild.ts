@@ -41,9 +41,10 @@ export function buildSections(
 export function countCardChanges(base: readonly DeckCard[], cards: readonly DeckCard[]) {
   const before = new Map(base.map((card) => [printingKey(card), card]))
   const after = new Map(cards.map((card) => [printingKey(card), card]))
-  return [...new Set([...before.keys(), ...after.keys()])].filter((key) => {
-    const was = before.get(key)
-    const now = after.get(key)
+  const changed = [...base, ...cards].filter((card) => {
+    const was = before.get(printingKey(card))
+    const now = after.get(printingKey(card))
     return was?.quantity !== now?.quantity || was?.commanderColor !== now?.commanderColor
-  }).length
+  })
+  return new Set(changed.map((card) => printingKey({ ...card, section: "" }))).size
 }

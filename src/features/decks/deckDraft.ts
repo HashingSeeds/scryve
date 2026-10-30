@@ -3,6 +3,7 @@ import { translate } from "@/i18n/translate"
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
 import { canonicalDecklist } from "../../../convex/lib/deckFingerprint"
+import { deckSections } from "../../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import { identitySection } from "../../../convex/lib/systems"
 
@@ -64,15 +65,11 @@ export function startsNewList(base: readonly DeckCard[], cards: readonly DeckCar
 }
 
 export function cardsChanged(cards: readonly DeckCard[], base: readonly DeckCard[]) {
-  return (
-    cards.length !== base.length ||
-    cards.some(
-      (card, index) =>
-        printingKey(card) !== printingKey(base[index]) ||
-        card.quantity !== base[index].quantity ||
-        card.commanderColor !== base[index].commanderColor,
-    )
-  )
+  const rows = (list: readonly DeckCard[]) =>
+    list.map((card) => `${printingKey(card)}|${card.quantity}|${card.commanderColor ?? ""}`).sort()
+  const now = rows(cards)
+  const was = rows(base)
+  return now.length !== was.length || now.some((row, index) => row !== was[index])
 }
 
 function adjustCardQuantity<T extends DeckCard>(cards: readonly T[], card: T, delta: number) {
@@ -114,6 +111,39 @@ function addCopy<T extends DeckCard>(cards: readonly T[], card: T) {
 
 export function isCommanderPick(deck: DeckRules, card: DeckCard) {
   return identitySection(deck.game, deck.format)?.id === cardSection(card)
+}
+
+export function sideboardSection(deck: DeckRules) {
+  return deckSections(deck.game, deck.format).find(
+    (section) => section.id === "sideboard" || section.id === "side",
+  )
+}
+
+export function moveTarget(deck: DeckRules, card: DeckCard) {
+  const side = sideboardSection(deck)?.id
+  const section = cardSection(card)
+  if (!side) return undefined
+  if (section === "main") return side
+  return section === side ? "main" : undefined
+}
+
+function moveCopy<T extends DeckCard>(
+  cards: readonly T[],
+  entry: T,
+  section: string,
+): { cards: T[] } | { error: string } {
+  const board = section === "sideboard" ? "sideboard" : "main"
+  const copy: T =
+    entry.section === undefined && entry.board
+      ? { ...entry, quantity: 1, board }
+      : { ...entry, quantity: 1, section, ...(entry.board ? { board } : {}) }
+  const merges = cards.some((card) => printingKey(card) === printingKey(copy))
+  // why: a lone copy keeps its place in the list, so moving it back leaves the draft clean.
+  if (!merges && entry.quantity === 1)
+    return { cards: cards.map((card) => (card === entry ? copy : card)) }
+  const added = addCopy(cards, copy)
+  if ("error" in added) return added
+  return { cards: adjustCardQuantity(added.cards, entry, -1) }
 }
 
 export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) {
@@ -164,6 +194,7 @@ export type DeckEdit<Card extends DeckCard = DeckCard> =
       details?: CommanderSelectionDetails
       color?: Card["commanderColor"]
     }
+  | { type: "move"; card: Card }
   | { type: "undo" }
   | { type: "note"; note: string }
 
@@ -194,6 +225,14 @@ export function editDeck<Draft extends DeckEdits>(
         cards: adjustCardQuantity(draft.cards, entry, -1),
         undo: entry.quantity === 1 ? { name: entry.name, cards: draft.cards } : undefined,
       }
+    }
+    case "move": {
+      const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.card))
+      const section = entry && moveTarget(deck, entry)
+      if (!entry || !section) return draft
+      const result = moveCopy(draft.cards, entry, section)
+      if ("error" in result) return result
+      return { ...draft, cards: result.cards, undo: undefined }
     }
     case "chooseCommander": {
       const key = printingKey(edit.card)

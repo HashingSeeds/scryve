@@ -908,6 +908,11 @@ function DeckDetailContent({
         onFocus={focusCard}
         onIncrement={addCard}
         onDecrement={removeCard}
+        onMove={(card) => {
+          if (knownDeleted) return
+          ensureDraft()
+          setError(edit({ type: "move", card }, { game, format: deck.format }))
+        }}
         undo={
           draft.undo
             ? {

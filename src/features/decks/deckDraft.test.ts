@@ -157,6 +157,57 @@ describe("editDeck", () => {
   })
 })
 
+describe("editDeck move", () => {
+  const move = (target: DeckCard) => ({ type: "move", card: target }) as const
+
+  it("moves one copy between main and sideboard, and back leaves the draft clean", () => {
+    const start = open([card("Bolt", { quantity: 4 }), card("Path")])
+    const out = apply(start, [move(card("Bolt")), move(card("Path"))])
+    expect(summary(out)).toEqual(["3 main:Bolt", "1 sideboard:Path", "1 sideboard:Bolt"])
+
+    const back = apply(out, [
+      move(card("Bolt", { section: "sideboard" })),
+      move(card("Path", { section: "sideboard" })),
+    ])
+    expect(summary(back)).toEqual(["4 main:Bolt", "1 main:Path"])
+    expect(draftChanges(back, "").cards).toBe(false)
+  })
+
+  it("is clean after a round trip that reorders the list", () => {
+    const start = open([card("Bolt"), card("Path"), card("Bolt", { section: "sideboard" })])
+    const out = apply(start, [move(card("Bolt"))])
+    const back = apply(out, [move(card("Bolt", { section: "sideboard" }))])
+    expect(summary(back)).toEqual(["1 main:Path", "1 sideboard:Bolt", "1 main:Bolt"])
+    expect(draftChanges(back, "").cards).toBe(false)
+  })
+
+  it("keeps the board field in step for Magic cards", () => {
+    const legacy = card("Bolt", { board: "main" })
+    const moved = apply(open([legacy]), [move(legacy)])
+    expect(moved.cards).toEqual([card("Bolt", { board: "sideboard" })])
+    expect(apply(moved, [move(moved.cards[0])]).cards).toEqual([legacy])
+  })
+
+  it("uses the Side Deck in Yu-Gi-Oh and does nothing where there is no sideboard", () => {
+    const ygo = { game: "ygo", format: "advanced" }
+    expect(summary(apply(open([card("Ash")]), [move(card("Ash"))], ygo))).toEqual(["1 side:Ash"])
+
+    const pokemon = open([card("Pikachu", { quantity: 2 })])
+    expect(edit(pokemon, move(card("Pikachu")), { game: "pokemon", format: "standard" })).toBe(
+      pokemon,
+    )
+    const extra = open([card("Dragon", { section: "extra" })])
+    expect(edit(extra, move(card("Dragon", { section: "extra" })), ygo)).toBe(extra)
+  })
+
+  it("stops at the copy limit without losing the source copy", () => {
+    const draft = open([card("Rats"), card("Rats", { section: "sideboard", quantity: 999 })])
+    expect(edit(draft, move(card("Rats")))).toEqual({
+      error: "A card can have at most 999 copies.",
+    })
+  })
+})
+
 describe("editDeck commanders", () => {
   it("applies Commander rules only to Magic Commander decks", () => {
     const pick = card("Talrand", { section: "commander" })

@@ -69,3 +69,13 @@ it("counts each changed printing once", () => {
   expect(countCardChanges(base, cards)).toBe(4)
   expect(countCardChanges(base, base)).toBe(0)
 })
+
+it("counts a card moved between main and sideboard as one change", () => {
+  const base = [{ name: "Bolt", quantity: 4 }]
+  const cards = [
+    { name: "Bolt", quantity: 3 },
+    { name: "Bolt", quantity: 1, section: "sideboard" },
+  ]
+
+  expect(countCardChanges(base, cards)).toBe(1)
+})

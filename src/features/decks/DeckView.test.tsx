@@ -122,6 +122,42 @@ it("opens card search from the find field", () => {
   expect(view.getByTestId("card-search")).toHaveTextContent("cards")
 })
 
+describe("sideboard", () => {
+  const bolt = { name: "Bolt", quantity: 4, scryfallId: "bolt" }
+  const path = { name: "Path", quantity: 2, scryfallId: "path", section: "sideboard" }
+
+  it("counts main and side apart and moves a copy either way with ⇄", () => {
+    const onMove = jest.fn()
+    const view = renderDeckView({ format: "modern", cards: [bolt, path], onMove })
+
+    expect(view.getByText("Magic · Modern · 4 + 2")).toBeTruthy()
+    expect(view.getByText("Sideboard")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Move one Bolt to Sideboard"))
+    fireEvent.press(view.getByLabelText("Move one Path to Main deck"))
+    expect(onMove.mock.calls).toEqual([[bolt], [path]])
+  })
+
+  it("has no ⇄ where the format has no sideboard, or in Play", () => {
+    const onMove = jest.fn()
+    expect(
+      renderDeckView({
+        game: "pokemon",
+        format: "standard",
+        cards: [bolt],
+        onMove,
+      }).queryByLabelText(/Move one/),
+    ).toBeNull()
+    expect(
+      renderDeckView({
+        mode: "play",
+        format: "modern",
+        savedCards: [bolt],
+        onMove,
+      }).queryByLabelText(/Move one/),
+    ).toBeNull()
+  })
+})
+
 describe("analysis sheet", () => {
   it("opens from the curve strip and its commander nudge opens the chooser", () => {
     const view = renderDeckView({ canChooseCommander: true })
