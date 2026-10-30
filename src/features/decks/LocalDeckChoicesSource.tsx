@@ -6,6 +6,7 @@ import {
   ConnectedProfileProvider,
   useConnectedProfile,
 } from "@/features/connected/useConnectedProfile"
+import { versionTitle } from "@/features/decks/deckCopy"
 import {
   DeckSyncRepository,
   getDeckSyncController,
@@ -76,11 +77,17 @@ export function MyDecksSource({
 const deckChoicesOf = (decks: MyDecks): DeckChoices =>
   decks === undefined || decks === "unavailable"
     ? decks
-    : decks.flatMap((deck) =>
-        deck.latestVersionId
+    : decks.flatMap((deck) => {
+        const versionId = deck.bringingVersionId ?? deck.latestVersionId
+        const version = deck.versions.find((candidate) => candidate._id === versionId)
+        return versionId
           ? [
               {
-                versionId: deck.bringingVersionId ?? deck.latestVersionId,
+                versionId,
+                versionLabel:
+                  version && deck.versions.length > 1
+                    ? versionTitle(version, deck.versionNumber ?? version.versionNumber)
+                    : undefined,
                 deckId: deck._id,
                 deckKey: deck.deckKey,
                 name: deck.name,
@@ -93,8 +100,8 @@ const deckChoicesOf = (decks: MyDecks): DeckChoices =>
                     : deck.startingValue,
               },
             ]
-          : [],
-      )
+          : []
+      })
 
 export function LocalDeckChoicesSource({
   ownerId,

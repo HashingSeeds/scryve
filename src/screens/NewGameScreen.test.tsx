@@ -1153,6 +1153,7 @@ describe("NewGameScreen", () => {
       },
       {
         versionId: "v-red-1",
+        versionLabel: "Version 1",
         deckId: "deck-red",
         name: "Mono Red",
         system: "mtg",
@@ -1176,7 +1177,7 @@ describe("NewGameScreen", () => {
     view.rerender(opened({ ownerId: "owner-a" }))
     view.rerender(opened({ ownerId: "owner-a", decks }))
 
-    expect(screen.getByLabelText("Your deck, Mono Red")).toBeTruthy()
+    expect(screen.getByLabelText("Your deck, Mono Red · Version 1")).toBeTruthy()
     await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
     expect(onStartLocal).toHaveBeenCalledWith(
       expect.any(Array),

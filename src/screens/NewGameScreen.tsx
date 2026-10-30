@@ -956,7 +956,7 @@ function NewGameForm({
                           : []),
                         ...deckChoices.map((choice) => ({
                           id: deckChoiceId(choice)!,
-                          label: choice.name,
+                          label: [choice.name, choice.versionLabel].filter(Boolean).join(" · "),
                           accessory: choice.localId ? <DeviceGlyph /> : undefined,
                           accessibilityLabel: choice.localId
                             ? translate("decks:stats.onDeviceLabel", { name: choice.name })

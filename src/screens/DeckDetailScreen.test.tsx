@@ -1435,8 +1435,8 @@ describe("DeckDetailScreen", () => {
       expect(within(main).getByText("3-1")).toBeTruthy()
       expect(within(side).getByText("Version 2 · vs Control")).toBeTruthy()
       expect(within(side).getByText("0-0")).toBeTruthy()
-      expect(side).toBeSelected()
-      expect(main).not.toBeSelected()
+      expect(side).toBeChecked()
+      expect(main).not.toBeChecked()
 
       fireEvent.press(main)
       await waitFor(() =>
@@ -1463,9 +1463,9 @@ describe("DeckDetailScreen", () => {
         ],
       }
       const view = renderDetail()
-      expect(view.getByTestId("bring-version-version-main")).toBeSelected()
+      expect(view.getByTestId("bring-version-version-main")).toBeChecked()
       const side = view.getByTestId("bring-version-version-sideboard")
-      expect(side).not.toBeSelected()
+      expect(side).not.toBeChecked()
       expect(within(side).getByText("1-0")).toBeTruthy()
     })
 

@@ -9,6 +9,7 @@ import { saveListSnapshot } from "./listSnapshots"
 
 export type DeckChoice = {
   versionId?: string
+  versionLabel?: string
   deckId?: string
   deckKey?: string
   localId?: string

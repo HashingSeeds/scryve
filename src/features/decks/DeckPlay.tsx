@@ -59,7 +59,8 @@ export function DeckPlay<VersionId extends string>({
                 key={version.id}
                 testID={`bring-version-${version.id}`}
                 accessibilityRole="radio"
-                accessibilityState={{ selected, disabled: bringDisabled || !onBring }}
+                aria-checked={selected}
+                aria-disabled={bringDisabled || !onBring}
                 disabled={bringDisabled || !onBring}
                 style={[themed($option), index > 0 && themed($divided)]}
                 onPress={() => onBring?.(version.id)}

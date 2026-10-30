@@ -23,7 +23,12 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
-import { cardCountLabel, deckVersionLabel, recordText } from "@/features/decks/deckCopy"
+import {
+  cardCountLabel,
+  deckVersionLabel,
+  recordText,
+  versionTitle,
+} from "@/features/decks/deckCopy"
 import {
   closeDeckDraft,
   closedDeckDraft,
@@ -88,17 +93,6 @@ const NEW_LIST_NOTICE_MS = 8_000
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
-}
-
-function openVersionLabel(
-  version: { name?: string; versionNumber: number },
-  latestVersionNumber: number,
-) {
-  const numbered = translate("decks:numberedVersion", { number: version.versionNumber })
-  const name = deckVersionLabel(version, latestVersionNumber)
-  return name === numbered
-    ? numbered
-    : translate("decks:deckView.version", { number: version.versionNumber, name })
 }
 
 export type DeckDetailSummary = {
@@ -914,7 +908,7 @@ function DeckDetailContent({
             ? undefined
             : activeVersionSummary
               ? {
-                  label: openVersionLabel(activeVersionSummary, latestVersionNumber),
+                  label: versionTitle(activeVersionSummary, latestVersionNumber),
                   latest: activeVersionSummary.versionNumber >= latestVersionNumber,
                 }
               : { label: translate("decks:detail.versions"), latest: true }
@@ -931,7 +925,7 @@ function DeckDetailContent({
           <DeckPlay
             versions={view.versionRows.map((row) => ({
               id: row._id,
-              label: openVersionLabel(row, latestVersionNumber),
+              label: versionTitle(row, latestVersionNumber),
               detail: [
                 "updatedAt" in row ? statsDate(row.updatedAt) : undefined,
                 cardCountLabel(row.cardQuantity),

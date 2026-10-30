@@ -46,13 +46,18 @@ describe("MyDecksSource", () => {
 })
 
 describe("LocalDeckChoicesSource", () => {
-  it("offers each deck at the version it brings, else its latest, with the latest hero's life only", () => {
-    const deck = { game: "fab", format: "cc", latestVersionId: "v-2", startingValue: 40 }
+  it("offers each deck at the version it brings, named when it has several", () => {
+    const deck = { game: "fab", format: "cc", latestVersionId: "v-2", versionNumber: 2 }
+    const versions = [
+      { _id: "v-1", versionNumber: 1 },
+      { _id: "v-2", versionNumber: 2, name: "Budget" },
+    ]
     mockLive = {
       decks: [
-        { ...deck, _id: "deck-a", deckKey: "key-a", name: "A", bringingVersionId: "v-1" },
-        { ...deck, _id: "deck-b", deckKey: "key-b", name: "B" },
-      ] as unknown as MineDeck[],
+        { ...deck, _id: "deck-a", deckKey: "key-a", name: "A", versions, bringingVersionId: "v-1" },
+        { ...deck, _id: "deck-b", deckKey: "key-b", name: "B", versions },
+        { ...deck, _id: "deck-c", deckKey: "key-c", name: "C", versions: [versions[1]] },
+      ].map((entry) => ({ ...entry, startingValue: 40 })) as unknown as MineDeck[],
     }
     mockProfile = "ready"
     const onChange = jest.fn()
@@ -62,16 +67,19 @@ describe("LocalDeckChoicesSource", () => {
     expect(onChange).toHaveBeenLastCalledWith([
       expect.objectContaining({
         versionId: "v-1",
+        versionLabel: "Version 1",
         deckId: "deck-a",
         deckKey: "key-a",
         startingValue: undefined,
       }),
       expect.objectContaining({
         versionId: "v-2",
+        versionLabel: "Version 2 · Budget",
         deckId: "deck-b",
         deckKey: "key-b",
         startingValue: 40,
       }),
+      expect.objectContaining({ versionId: "v-2", versionLabel: undefined, startingValue: 40 }),
     ])
   })
 })
