@@ -4,6 +4,7 @@ import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import { env, internalMutation, internalQuery, mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
+import { IDENTITY_RETRY_CAP_MS } from "./accountDeletionActions"
 import { deleteAccountFeedback } from "./feedback"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
@@ -20,7 +21,6 @@ const MODERATION_BATCH_SIZE = 50
 const DELETED_ACCOUNT_LABEL = "(deleted account)"
 const STALL_SWEEP_BATCH_SIZE = 100
 
-export const IDENTITY_RETRY_CAP_MS = 10 * 60 * 1000
 // why: scheduled actions run at most once, so a crashed Clerk step leaves no retry. Past the longest retry delay plus one attempt, nothing is scheduled or running.
 const STALLED_IDENTITY_MS = IDENTITY_RETRY_CAP_MS + 5 * 60 * 1000
 

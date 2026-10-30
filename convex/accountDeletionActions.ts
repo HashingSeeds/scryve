@@ -2,7 +2,8 @@ import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import { env, internalAction } from "./_generated/server"
-import { IDENTITY_RETRY_CAP_MS } from "./accountDeletion"
+
+export const IDENTITY_RETRY_CAP_MS = 10 * 60 * 1000
 
 function retryDelayMs(attempts: number) {
   return Math.min(60_000 * 2 ** attempts, IDENTITY_RETRY_CAP_MS)
