@@ -471,6 +471,7 @@ function DeckDetailContent({
 
   async function run(work: () => Promise<void>, fallback: string) {
     if (access && !access.ready) {
+      setError(access.message ?? translate("account:cloud.reconnect"))
       access.request()
       return false
     }
@@ -773,7 +774,13 @@ function DeckDetailContent({
   }
 
   function confirmKeepOnDevice() {
+    setError(undefined)
     setDialog("moveDeck")
+  }
+
+  function confirmDeleteDeck() {
+    setError(undefined)
+    setDialog("deleteDeck")
   }
 
   async function keepOnDevice() {
@@ -786,6 +793,17 @@ function DeckDetailContent({
   }
 
   async function deleteDeck() {
+    if (view.canQueueMetadata) {
+      try {
+        setError(undefined)
+        metadataWrites.remove(deckId)
+        setDialog("none")
+        onBack()
+      } catch (cause) {
+        fail(cause, translate("decks:detail.deleteFailed"))
+      }
+      return
+    }
     await run(async () => {
       await archiveDeck({ deckId: deckId as Id<"decks"> })
       setDialog("none")
@@ -1232,7 +1250,7 @@ function DeckDetailContent({
           busy={busy}
           error={error}
           onSubmit={submitSettings}
-          onDelete={() => setDialog("deleteDeck")}
+          onDelete={confirmDeleteDeck}
           {...(onMovedToDevice && !hasQueuedEdits ? { onKeepOnDevice: confirmKeepOnDevice } : {})}
           onClose={() => setDialog("none")}
         />
@@ -1418,6 +1436,7 @@ function DeckDetailContent({
         >
           <Text preset="subheading" tx="decks:detail.deleteDeckTitle" style={themed($dialogText)} />
           <Text size="sm" tx="decks:deleteDeck.body" style={themed($dialogText)} />
+          {error ? <AlertNote text={error} /> : null}
           <View style={themed($dialogActions)}>
             <Button
               tx="common:cancel"

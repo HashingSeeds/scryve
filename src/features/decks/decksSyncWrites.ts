@@ -107,7 +107,7 @@ function parsePending(value: unknown): PendingDeckWrite | null {
     typeof value.format !== "string" ||
     typeof value.game !== "string" ||
     typeof value.note !== "string" ||
-    value.deleted !== false ||
+    typeof value.deleted !== "boolean" ||
     typeof value.queuedAt !== "number" ||
     !Number.isSafeInteger(value.attempts) ||
     (value.lastAttemptAt !== undefined && typeof value.lastAttemptAt !== "number") ||
@@ -280,17 +280,27 @@ export class DeckMetadataWriteController {
   }
 
   update(deckId: string, patch: DeckMetadataPatch, expectedRevision?: number): void {
-    if (this.outbox.capacityBlocked)
-      throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
-    if (this.snapshot.failures.some((failure) => failure.action.deckId === deckId))
-      throw new Error("Resolve the saved local edit before making another change")
+    this.assertWritable(deckId)
     this.enqueue(deckId, patch, expectedRevision)
     void this.drain()
   }
 
+  remove(deckId: string): void {
+    this.assertWritable(deckId)
+    this.enqueue(deckId, { deleted: true })
+    void this.drain()
+  }
+
+  private assertWritable(deckId: string) {
+    if (this.outbox.capacityBlocked)
+      throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
+    if (this.snapshot.failures.some((failure) => failure.action.deckId === deckId))
+      throw new Error("Resolve the saved local edit before making another change")
+  }
+
   private enqueue(
     deckId: string,
-    patch: DeckMetadataPatch,
+    patch: DeckMetadataPatch & { deleted?: boolean },
     expectedRevision?: number,
     supersedes?: string[],
   ): void {
@@ -309,7 +319,7 @@ export class DeckMetadataWriteController {
       format: assertDeckFormat(patch.format ?? current.format),
       game: current.game,
       note: assertDeckNote(patch.note ?? current.note),
-      deleted: false,
+      deleted: patch.deleted ?? false,
       queuedAt: now,
       attempts: 0,
       ...(supersedes ? { supersedes } : {}),
@@ -346,10 +356,10 @@ export class DeckMetadataWriteController {
         ? right
         : left,
     )
-    const { deckId, name, format, note } = latest.action
+    const { deckId, name, format, note, deleted } = latest.action
     this.enqueue(
       deckId,
-      { name, format, note },
+      { name, format, note, deleted },
       undefined,
       related.map((entry) => entry.action.operationId),
     )
@@ -386,7 +396,7 @@ export class DeckMetadataWriteController {
             code: "sync_conflict",
             message: DECK_CONFLICT_REASON,
           })
-        const result = await this.client.mutation(api.decks.syncWrite, {
+        const write = {
           id: action.id,
           operationId: action.operationId,
           expectedOwnerId: this.repository.ownerId,
@@ -396,12 +406,19 @@ export class DeckMetadataWriteController {
           format: action.format,
           game: action.game,
           note: action.note,
-          deleted: false,
-        })
+          deleted: action.deleted,
+        }
+        let result = await this.client.mutation(api.decks.syncWrite, write)
+        if (action.deleted && "status" in result && !result.deck.deleted)
+          result = await this.client.mutation(api.decks.syncWrite, {
+            ...write,
+            operationId: randomUUID(),
+            expectedRevision: result.deck.revision,
+          })
         const deck = "status" in result ? result.deck : result
         if (this.reads) this.reads.acceptMetadata([deck])
         else this.repository.mergeMetadata([deck])
-        if ("status" in result)
+        if ("status" in result && !(action.deleted && deck.deleted))
           throw new ConvexError({
             code: "sync_conflict",
             message: DECK_CONFLICT_REASON,
@@ -492,5 +509,6 @@ export function useDeckMetadataWrites(
       controller?.update(deckId, patch, expectedRevision),
     discardFailure: (operationId: string) => controller?.discardFailure(operationId),
     reapplyFailure: (operationId: string) => controller?.reapplyFailure(operationId),
+    remove: (deckId: string) => controller?.remove(deckId),
   }
 }
