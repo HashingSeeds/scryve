@@ -117,7 +117,7 @@ describe("deckStats.matchups", () => {
     await expect(t.query(api.deckStats.matchups, {})).rejects.toThrow()
   })
 
-  it("hides a blocked opponent's name and deck but keeps their commander", async () => {
+  it("hides a blocked opponent's name, deck and commander", async () => {
     const t = makeConvexTest()
     const actor = await signedIn(t, "owner")
     const { userId } = actor
@@ -144,17 +144,18 @@ describe("deckStats.matchups", () => {
 
     expect(matchups.byPlayer).toEqual([])
     expect(matchups.byDeck).toEqual([])
-    expect(matchups.byIdentity.map((row) => row.key)).toEqual(["atraxa"])
+    expect(matchups.byIdentity).toEqual([])
   })
 
-  it("never returns a deck or guest name the name gate hides", async () => {
+  it("never returns a deck, guest or commander name the name gate hides", async () => {
     const t = makeConvexTest()
     const actor = await signedIn(t, "owner")
     const { userId } = actor
     await result(t, userId, {
       opponents: [
         { displayName: "kkk", deck: { name: "Hitler Youth", identity: atraxa } },
-        { displayName: "Bob", deck: { deckKey: "bobs", name: "Nazi Zombies" } },
+        { displayName: "Bob", deck: { deckKey: "bobs", name: "Nazi Zombies", identity: partners } },
+        { displayName: "Cy", deck: { identity: [{ cardId: "spam", name: "Pedo Lord" }] } },
       ],
     })
     await result(t, userId, {
@@ -168,9 +169,12 @@ describe("deckStats.matchups", () => {
       ["hidden", "Deck", 2],
       ["deck:bobs", "Deck", 1],
     ])
+    expect(matchups.byDeck.every((row) => row.identity === null)).toBe(true)
+    expect(matchups.byIdentity).toEqual([])
     expect(matchups.byPlayer.map((row) => [row.key, row.displayName, row.games])).toEqual([
       ["hidden", "Player", 2],
       ["name:bob", "Bob", 1],
+      ["name:cy", "Cy", 1],
     ])
   })
 

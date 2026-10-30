@@ -1344,3 +1344,47 @@ it("imports Magic catalog examples into the existing deck and version model", as
   ).toBe(15)
   expect(detail.cards.every((card) => card.oracleId && card.scryfallId)).toBe(true)
 })
+
+it("gives each version its own hero's starting life", async () => {
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "fab-owner")
+  const deckId = await actor.mutation(api.decks.create, {
+    name: "Heroes",
+    game: "fab",
+    format: "cc",
+  })
+  const oldVersionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
+  const newVersionId = await actor.mutation(api.decks.createVersion, { deckId, name: "Young" })
+  await t.run(async (ctx) => {
+    for (const [deckVersionId, cardId, health] of [
+      [oldVersionId, "dorinthea", "40"],
+      [newVersionId, "young-dorinthea", "20"],
+    ] as const) {
+      await ctx.db.insert("gameCards", {
+        game: "fab",
+        identityNamespace: "fab-cube-card",
+        cardId,
+        name: cardId,
+        nameNormalized: cardId,
+        facets: [{ key: "health", value: health }],
+        updatedAt: 0,
+      })
+      await ctx.db.insert("deckCards", {
+        deckVersionId,
+        game: "fab",
+        identityNamespace: "fab-cube-card",
+        cardId,
+        name: cardId,
+        section: "hero",
+        quantity: 1,
+      })
+    }
+  })
+
+  const [deck] = (await actor.query(api.decks.listMine)).decks
+  const { versions } = await actor.query(api.decks.detail, { deckId })
+
+  expect(deck.versions.map((version) => version.startingValue)).toEqual([40, 20])
+  expect(deck.startingValue).toBe(20)
+  expect(versions.map((version) => version.startingValue)).toEqual([40, 20])
+})

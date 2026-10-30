@@ -1,6 +1,8 @@
 import { ConvexError, v, type Infer } from "convex/values"
 
 import { assertDeckFingerprint, assertDeckKey } from "./deckKeys"
+import { integration } from "./integrations"
+import { nameFailsGate } from "./nameFilter"
 import { assertDeckName } from "./policy"
 import { identitySection } from "./systems"
 import type { Doc, Id } from "../_generated/dataModel"
@@ -66,18 +68,55 @@ function assertIdentity(identity: DeckIdentity) {
   return normalized
 }
 
-export function assertDeckLabel(label: DeckLabel | undefined): DeckLabel | undefined {
+/** why: identity names come from clients, so a card the catalog knows takes the catalog's name, and every name then passes the read gate before it is stored. */
+async function catalogIdentity(
+  ctx: QueryCtx,
+  game: string | undefined,
+  identity: DeckIdentity,
+): Promise<DeckIdentity | undefined> {
+  const namespace = game ? integration(game)?.identityNamespace : undefined
+  const cards = await Promise.all(
+    identity.map(async (card) => {
+      const known =
+        game && namespace
+          ? await ctx.db
+              .query("gameCards")
+              .withIndex("by_game_and_identity_namespace_and_card_id", (q) =>
+                q.eq("game", game).eq("identityNamespace", namespace).eq("cardId", card.cardId),
+              )
+              .unique()
+          : null
+      return known ? { ...card, name: known.name } : card
+    }),
+  )
+  return gatedIdentity(cards)
+}
+
+/** why: names stored before the catalog check can fail the gate. A missing identity reads as the deck name, so one bad name drops the whole identity. */
+export function gatedIdentity(identity: DeckIdentity | undefined) {
+  return identity?.every(({ name }) => !nameFailsGate(name)) ? identity : undefined
+}
+
+export async function assertDeckLabel(
+  ctx: QueryCtx,
+  game: string | undefined,
+  label: DeckLabel | undefined,
+): Promise<DeckLabel | undefined> {
   if (!label) return undefined
   if (label.fingerprint !== undefined && label.deckKey === undefined)
     throw invalidLabel("A list fingerprint needs its deck key")
   const name = label.name?.trim() ? assertDeckName(label.name) : undefined
+  const identity =
+    label.identity !== undefined
+      ? await catalogIdentity(ctx, game, assertIdentity(label.identity))
+      : undefined
   const checked = {
     ...(label.deckKey !== undefined ? { deckKey: assertDeckKey(label.deckKey) } : {}),
     ...(label.fingerprint !== undefined
       ? { fingerprint: assertDeckFingerprint(label.fingerprint) }
       : {}),
     ...(name ? { name } : {}),
-    ...(label.identity !== undefined ? { identity: assertIdentity(label.identity) } : {}),
+    ...(identity ? { identity } : {}),
   }
   return Object.keys(checked).length ? checked : undefined
 }
@@ -99,7 +138,8 @@ export async function deckIdentityOf(
     const cardId = card.cardId ?? card.oracleId
     return cardId ? [{ cardId, name: card.name }] : []
   })
-  return identity.length === cards.length ? normalizedIdentity(identity) : undefined
+  const normalized = identity.length === cards.length ? normalizedIdentity(identity) : undefined
+  return normalized && (await catalogIdentity(ctx, system, normalized))
 }
 
 type Seat = {

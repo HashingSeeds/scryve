@@ -490,6 +490,25 @@ async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   return result?.finishedAt
 }
 
+/** why: a player can bring an older version, and a Flesh and Blood hero sets that version's starting life. */
+async function versionStartingValues(
+  ctx: QueryCtx,
+  deck: Doc<"decks">,
+  versions: readonly Doc<"deckVersions">[],
+) {
+  return await Promise.all(
+    versions.map(async (version) => {
+      const startingValue = await deckStartingValue(
+        ctx,
+        version._id,
+        deck.game ?? DEFAULT_DECK_GAME,
+        deck.format,
+      )
+      return startingValue === undefined ? {} : { startingValue }
+    }),
+  )
+}
+
 function publicDeck(deck: Doc<"decks">, versions: readonly Doc<"deckVersions">[]) {
   const { bringingVersionId, ...rest } = deck
   return {
@@ -525,6 +544,7 @@ export const listMine = query({
         .map(async (deck) => {
           const versions = await activeVersions(ctx, deck._id)
           const latest = versions[versions.length - 1]
+          const startingValues = await versionStartingValues(ctx, deck, versions)
           const includeImages = await capabilityReleased(
             ctx,
             deck.game ?? DEFAULT_DECK_GAME,
@@ -536,20 +556,14 @@ export const listMine = query({
             latestVersionId: latest?._id,
             versionNumber: latest?.versionNumber,
             versionCount: versions.length,
-            versions: versions.map((version) => ({
+            versions: versions.map((version, index) => ({
               _id: version._id,
               name: version.name,
               versionNumber: version.versionNumber,
+              ...startingValues[index],
             })),
             cardQuantity: latest?.cardQuantity,
-            startingValue: latest
-              ? await deckStartingValue(
-                  ctx,
-                  latest._id,
-                  deck.game ?? DEFAULT_DECK_GAME,
-                  deck.format,
-                )
-              : undefined,
+            startingValue: startingValues.at(-1)?.startingValue,
             coverImageUrl:
               latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
             lastPlayedAt: await lastPlayedAt(ctx, deck),
@@ -913,8 +927,9 @@ export const detail = query({
   handler: async (ctx, args) => {
     const { user, deck } = await ownedDeck(ctx, args.deckId)
     const stored = await activeVersions(ctx, deck._id)
+    const startingValues = await versionStartingValues(ctx, deck, stored)
     const versions = await Promise.all(
-      stored.map(async (version) => ({
+      stored.map(async (version, index) => ({
         _id: version._id,
         versionNumber: version.versionNumber,
         name: version.name,
@@ -924,6 +939,7 @@ export const detail = query({
         createdAt: version.createdAt,
         updatedAt: version.updatedAt ?? version.createdAt,
         record: await versionRecord(ctx, version._id),
+        ...startingValues[index],
       })),
     )
     const selected =

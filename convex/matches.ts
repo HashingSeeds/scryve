@@ -174,16 +174,18 @@ export const recordManualMatch = mutation({
         ...scoreFields(args.me),
         outcome: args.me.outcome,
       },
-      ...args.opponents.map((opponent) => ({
-        seat: opponent.seat,
-        displayName: assertDisplayName(opponent.displayName),
-        ...(opponent.deckName === undefined || opponent.deckName.trim() === ""
-          ? {}
-          : { deckName: assertDeckName(opponent.deckName) }),
-        deckLabel: assertDeckLabel(opponent.deckLabel),
-        ...scoreFields(opponent),
-        outcome: opponent.outcome,
-      })),
+      ...(await Promise.all(
+        args.opponents.map(async (opponent) => ({
+          seat: opponent.seat,
+          displayName: assertDisplayName(opponent.displayName),
+          ...(opponent.deckName === undefined || opponent.deckName.trim() === ""
+            ? {}
+            : { deckName: assertDeckName(opponent.deckName) }),
+          deckLabel: await assertDeckLabel(ctx, system, opponent.deckLabel),
+          ...scoreFields(opponent),
+          outcome: opponent.outcome,
+        })),
+      )),
     ].sort((left, right) => left.seat - right.seat)
     const matchId = await ctx.db.insert("matches", {
       publicId: args.publicId,

@@ -111,6 +111,38 @@ describe("local games", () => {
     expect(unlabeled.opponents).toEqual([{ displayName: "Bob", outcome: "win" }])
   })
 
+  it("store each commander under its catalog name, and drop an unknown card's gated name", async () => {
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "host")
+    await t.run((ctx) =>
+      ctx.db.insert("gameCards", {
+        game: "mtg",
+        identityNamespace: "scryfall-oracle",
+        cardId: "atraxa",
+        name: "Atraxa, Praetors' Voice",
+        nameNormalized: "atraxa, praetors' voice",
+        facets: [],
+        updatedAt: FINISHED_AT,
+      }),
+    )
+    const forged = { identity: [{ cardId: "atraxa", name: "Hitler" }] }
+    const unknown = { name: "Bob's deck", identity: [{ cardId: "made-up", name: "Nazi Lord" }] }
+    await actor.mutation(
+      api.games.publishFinishedLocalGame,
+      localGame([
+        me,
+        { ...them, deckLabel: forged },
+        { ...them, localId: "cy", seat: 3, displayName: "Cy", deckLabel: unknown },
+      ]),
+    )
+
+    const [result] = await resultsOf(t, actor.userId)
+    expect(result.opponents?.map((opponent) => opponent.deck)).toEqual([
+      { identity: [{ cardId: "atraxa", name: "Atraxa, Praetors' Voice" }] },
+      { name: "Bob's deck" },
+    ])
+  })
+
   it("rejects a label whose fingerprint has no deck key, or with three identity cards", async () => {
     const t = makeConvexTest()
     const actor = await signedIn(t, "host")

@@ -1458,7 +1458,12 @@ export const publishFinishedLocalGame = mutation({
                 : {}),
           }
     const deckLabels = new Map(
-      args.players.map((player) => [player.localId, assertDeckLabel(player.deckLabel)]),
+      await Promise.all(
+        args.players.map(
+          async (player) =>
+            [player.localId, await assertDeckLabel(ctx, gameSystem, player.deckLabel)] as const,
+        ),
+      ),
     )
     const gameId = await ctx.db.insert("games", {
       publicId,
@@ -2275,7 +2280,9 @@ export const labelGuestSeatDeck = mutation({
         code: "guest_seat_required",
         message: "Only a guest seat can be labeled",
       })
-    await ctx.db.patch(player._id, { deckLabel: assertDeckLabel(args.deckLabel ?? undefined) })
+    await ctx.db.patch(player._id, {
+      deckLabel: await assertDeckLabel(ctx, gameDeckRules(game)[0], args.deckLabel ?? undefined),
+    })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return null
   },
