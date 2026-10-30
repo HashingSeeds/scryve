@@ -158,6 +158,11 @@ const events = {
     join: "Join",
     joining: "Joining…",
     reconnecting: "Reconnecting to the host…",
+    replaceUnsaved: {
+      title: "Replace your last event?",
+      message: "It isn't saved to an account, so hosting a new event deletes it from this device.",
+      confirm: "Replace",
+    },
     rejected: {
       code: "That event's code changed. Pick it again.",
       protocol: "The host needs the same Scryve version as you.",

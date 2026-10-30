@@ -4,6 +4,7 @@ import type { Service } from "react-native-zeroconf"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { translate } from "@/i18n/translate"
@@ -26,7 +27,7 @@ export function NearbyEventsScreen({
   onOpenHosted,
   onJoin,
 }: {
-  hosted: { name: string; detail: string; running: boolean } | null
+  hosted: { name: string; detail: string; running: boolean; unsaved: boolean } | null
   events: readonly Service[]
   denied: boolean
   name: string
@@ -40,6 +41,7 @@ export function NearbyEventsScreen({
   const { themed } = useAppTheme()
   const [joining, setJoining] = useState<string>()
   const [error, setError] = useState<string>()
+  const [replacing, setReplacing] = useState(false)
 
   async function join(service: Service) {
     setJoining(service.name)
@@ -64,7 +66,7 @@ export function NearbyEventsScreen({
           tx="events:nearby.host"
           preset="primary"
           disabled={hosted?.running}
-          onPress={onHost}
+          onPress={() => (hosted?.unsaved ? setReplacing(true) : onHost())}
         />
       }
     >
@@ -114,6 +116,20 @@ export function NearbyEventsScreen({
           ))
         )}
       </View>
+      <ConfirmDialog
+        visible={replacing}
+        title={translate("events:nearby.replaceUnsaved.title")}
+        message={translate("events:nearby.replaceUnsaved.message")}
+        confirmText={translate("events:nearby.replaceUnsaved.confirm")}
+        destructive
+        confirmTestID="replace-hosted-event"
+        backdropAccessibilityLabel={translate("common:cancel")}
+        onConfirm={() => {
+          setReplacing(false)
+          onHost()
+        }}
+        onClose={() => setReplacing(false)}
+      />
     </EventFrame>
   )
 }
