@@ -1234,7 +1234,7 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.versionDetails")}
           submitLabel={translate("common:save")}
-          initialName={deckVersionLabel(activeVersionSummary, latestVersionNumber)}
+          initialName={deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber)}
           initialNote={activeVersionSummary.note ?? ""}
           notesLocked={!view.premium}
           busy={busy}
