@@ -1,14 +1,19 @@
 import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
-import type { Doc } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
 import { query, type QueryCtx } from "./_generated/server"
 import { maskSummaryPlayersForViewer } from "./games"
 import { requireUser } from "./lib/auth"
 import { assertDeckKey } from "./lib/deckKeys"
 import { blockedUserIdsFor, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, HIDDEN_PLAYER_NAME, nameFailsGate } from "./lib/nameFilter"
-import type { DeckIdentity, ResultOpponent } from "./lib/opponentDecks"
+import {
+  summarySeats,
+  type DeckIdentity,
+  type DeckLabel,
+  type ResultOpponent,
+} from "./lib/opponentDecks"
 import { boundedPaginationOptions } from "./lib/pagination"
 import { resultDeckKey } from "./lib/results"
 
@@ -119,6 +124,16 @@ export const summary = query({
   },
 })
 
+function shownIdentity(
+  seat: { userId?: Id<"users">; deckName?: string; deckLabel?: DeckLabel },
+  blocked: Set<Id<"users">>,
+) {
+  if (seat.userId && blocked.has(seat.userId)) return undefined
+  const deckName = seat.deckName ?? seat.deckLabel?.name
+  if (deckName !== undefined && nameFailsGate(deckName)) return undefined
+  return seat.deckLabel?.identity
+}
+
 export const games = query({
   args: {
     deckKey: v.string(),
@@ -156,15 +171,28 @@ export const games = query({
         page.page.map(async (result) => {
           const summary = result.summaryId ? await ctx.db.get(result.summaryId) : null
           const match = !summary && result.matchId ? await ctx.db.get(result.matchId) : null
+          const seats = summary ? summarySeats(summary.players) : []
           const opponents = summary
             ? maskSummaryPlayersForViewer(summary.players, key.userId, blocked, {
                 localGame: result.source === "local",
-              })
-                .filter((player) => player.userId !== key.userId)
-                .map((player) => ({ name: player.displayName, deckName: player.deckNameAtFinish }))
+              }).flatMap((player, index) =>
+                player.userId === key.userId
+                  ? []
+                  : [
+                      {
+                        name: player.displayName,
+                        deckName: player.deckNameAtFinish,
+                        identity: shownIdentity(seats[index], blocked),
+                      },
+                    ],
+              )
             : (match?.seats ?? [])
                 .filter((seat) => seat.userId !== key.userId)
-                .map((seat) => ({ name: seat.displayName, deckName: seat.deckName }))
+                .map((seat) => ({
+                  name: seat.displayName,
+                  deckName: seat.deckName,
+                  identity: shownIdentity(seat, blocked),
+                }))
           return {
             resultId: result.resultId,
             kind: result.kind,

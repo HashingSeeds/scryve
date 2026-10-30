@@ -376,6 +376,7 @@ export default defineSchema({
     game: v.optional(v.string()),
     note: v.optional(v.string()),
     favoritedAt: v.optional(v.number()),
+    bringingVersionId: v.optional(v.id("deckVersions")),
     // why: archivedAt means deleted. The name predates unsynced decks and stays for installed clients.
     archivedAt: v.optional(v.number()),
     unsyncedAt: v.optional(v.number()),

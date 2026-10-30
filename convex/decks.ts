@@ -406,8 +406,13 @@ async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   return result?.finishedAt
 }
 
-function publicDeck(deck: Doc<"decks">) {
-  return { ...deck, game: deck.game ?? DEFAULT_DECK_GAME }
+function publicDeck(deck: Doc<"decks">, versions: readonly Doc<"deckVersions">[]) {
+  const { bringingVersionId, ...rest } = deck
+  return {
+    ...rest,
+    game: deck.game ?? DEFAULT_DECK_GAME,
+    ...(versions.some((version) => version._id === bringingVersionId) ? { bringingVersionId } : {}),
+  }
 }
 
 export const capacity = query({
@@ -443,7 +448,7 @@ export const listMine = query({
           )
           const record = await keyRecord(ctx, deck)
           return {
-            ...publicDeck(deck),
+            ...publicDeck(deck, versions),
             latestVersionId: latest?._id,
             versionNumber: latest?.versionNumber,
             versionCount: versions.length,
@@ -751,6 +756,21 @@ export const setFavorite = mutation({
   },
 })
 
+export const setBringingVersion = mutation({
+  args: { deckId: v.id("decks"), versionId: v.union(v.id("deckVersions"), v.null()) },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    assertNotArchived(deck)
+    if (args.versionId !== null) {
+      const version = await ctx.db.get(args.versionId)
+      if (!version || version.deckId !== deck._id || version.archivedAt !== undefined)
+        throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+    }
+    await ctx.db.patch(deck._id, { bringingVersionId: args.versionId ?? undefined })
+    return null
+  },
+})
+
 function projectCard(deck: Doc<"decks">, includeImages: boolean, card: Doc<"deckCards">) {
   if (includeImages) {
     const imageUrl = isProviderGame(deck.game)
@@ -796,7 +816,7 @@ export const detail = query({
       : []
     const includeImages = await capabilityReleased(ctx, deck.game ?? DEFAULT_DECK_GAME, "images")
     return {
-      deck: publicDeck(deck),
+      deck: publicDeck(deck, stored),
       versions,
       version: selected ?? null,
       cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
