@@ -159,6 +159,9 @@ export default {
       "이 버전으로 이미 진행한 게임의 기록은 유지되지만, 목록은 더 이상 편집하거나 선택할 수 없습니다.",
     keepDeck: "이 덱 유지",
     deleteDeckTitle: "이 덱을 삭제할까요?",
+    keepEditing: "계속 편집",
+    discardTitle: "변경 사항을 폐기할까요?",
+    discardBody: "편집한 내용이 사라집니다.",
     discard: "폐기",
   },
   guestStorage: {

@@ -163,6 +163,9 @@ const decks = {
       "Games already played with it keep their record, but the list will no longer be editable or selectable.",
     keepDeck: "Keep this deck",
     deleteDeckTitle: "Delete this deck?",
+    keepEditing: "Keep editing",
+    discardTitle: "Discard changes?",
+    discardBody: "Your edits will be lost.",
     // Button that throws away unsaved edits. Must not read like Cancel.
     discard: "Discard",
   },

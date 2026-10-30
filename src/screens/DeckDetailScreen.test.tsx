@@ -1563,6 +1563,8 @@ describe("DeckDetailScreen", () => {
     expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
     expect(view.getByText("2 changes")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-draft-discard"))
+    expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-discard-confirm"))
     expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     expect(view.queryByTestId("deck-draft-bar")).toBeNull()
     expect(mockSaveVersion).not.toHaveBeenCalled()

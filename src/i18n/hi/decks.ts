@@ -167,6 +167,9 @@ export default {
       "इसके साथ खेले जा चुके गेम का रिकॉर्ड बना रहेगा, लेकिन सूची अब संपादित या चुनी नहीं जा सकेगी।",
     keepDeck: "यह डेक रखें",
     deleteDeckTitle: "यह डेक हटाएँ?",
+    keepEditing: "संपादन जारी रखें",
+    discardTitle: "बदलाव छोड़ दें?",
+    discardBody: "आपके बदलाव खो जाएँगे।",
     discard: "बदलाव छोड़ें",
   },
   guestStorage: {

@@ -4,6 +4,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
@@ -123,6 +124,8 @@ export function DeckView({
   const { themed, theme } = useAppTheme()
   const [search, setSearch] = useState<"cards" | "commander">()
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  if (discarding && changes === 0) setDiscarding(false)
   const building = mode === "build"
   const analysis = useDeckAnalysis(game, format, building ? cards : savedCards)
   const tracked = tracksResults(game)
@@ -375,7 +378,7 @@ export function DeckView({
               tx="decks:detail.discard"
               disabled={busy}
               style={$barButton}
-              onPress={onDiscard}
+              onPress={() => setDiscarding(true)}
             />
             <Button
               testID="save-version-button"
@@ -417,6 +420,24 @@ export function DeckView({
           }}
         />
       ) : null}
+      <ConfirmDialog
+        visible={discarding}
+        title={translate("decks:detail.discardTitle")}
+        message={translate("decks:detail.discardBody")}
+        confirmText={translate("decks:detail.discard")}
+        cancelText={translate("decks:detail.keepEditing")}
+        backdropAccessibilityLabel={translate("decks:detail.keepEditing")}
+        destructive
+        busy={busy}
+        dialogTestID="deck-discard-dialog"
+        confirmTestID="deck-discard-confirm"
+        cancelTestID="deck-discard-cancel"
+        onClose={() => setDiscarding(false)}
+        onConfirm={() => {
+          setDiscarding(false)
+          onDiscard()
+        }}
+      />
       {analysisOpen && analysis ? (
         <DialogCard
           visible

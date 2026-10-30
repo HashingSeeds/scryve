@@ -184,6 +184,9 @@ export default {
       "Les parties déjà jouées avec elle conservent leur historique, mais la liste ne sera plus modifiable ni sélectionnable.",
     keepDeck: "Garder ce deck",
     deleteDeckTitle: "Supprimer ce deck ?",
+    keepEditing: "Continuer la modification",
+    discardTitle: "Abandonner les modifications ?",
+    discardBody: "Vos modifications seront perdues.",
     discard: "Abandonner",
   },
   guestStorage: {
