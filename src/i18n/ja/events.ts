@@ -146,6 +146,12 @@ export default {
     join: "参加",
     joining: "参加中…",
     reconnecting: "主催者に再接続しています…",
+    replaceUnsaved: {
+      title: "前回のイベントを置き換えますか?",
+      message:
+        "アカウントに保存されていないため、新しいイベントを開催するとこのデバイスから削除されます。",
+      confirm: "置き換える",
+    },
     rejected: {
       code: "イベントのコードが変わりました。もう一度選んでください。",
       protocol: "主催者とScryveのバージョンをそろえてください。",

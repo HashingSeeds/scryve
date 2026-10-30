@@ -149,6 +149,12 @@ export default {
     join: "Unirse",
     joining: "Uniéndote…",
     reconnecting: "Reconectando con el organizador…",
+    replaceUnsaved: {
+      title: "¿Reemplazar tu último evento?",
+      message:
+        "No está guardado en una cuenta, así que si creas un evento nuevo, se eliminará de este dispositivo.",
+      confirm: "Reemplazar",
+    },
     rejected: {
       code: "El código de ese evento cambió. Vuelve a elegirlo.",
       protocol: "El organizador necesita la misma versión de Scryve que tú.",

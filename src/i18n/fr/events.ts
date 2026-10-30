@@ -150,6 +150,12 @@ export default {
     join: "Rejoindre",
     joining: "Connexion…",
     reconnecting: "Reconnexion à l'organisateur…",
+    replaceUnsaved: {
+      title: "Remplacer votre dernier événement ?",
+      message:
+        "Il n'est pas enregistré dans un compte : en héberger un nouveau le supprimera de cet appareil.",
+      confirm: "Remplacer",
+    },
     rejected: {
       code: "Le code de cet événement a changé. Choisissez-le à nouveau.",
       protocol: "L'organisateur doit avoir la même version de Scryve que vous.",

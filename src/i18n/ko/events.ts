@@ -145,6 +145,11 @@ export default {
     join: "참가",
     joining: "참가 중…",
     reconnecting: "주최자에 다시 연결하는 중…",
+    replaceUnsaved: {
+      title: "마지막 이벤트를 교체할까요?",
+      message: "계정에 저장되지 않았으므로 새 이벤트를 만들면 이 기기에서 삭제됩니다.",
+      confirm: "교체",
+    },
     rejected: {
       code: "이벤트 코드가 바뀌었습니다. 다시 선택하세요.",
       protocol: "주최자와 같은 Scryve 버전이 필요합니다.",

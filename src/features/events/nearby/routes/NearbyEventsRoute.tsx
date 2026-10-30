@@ -16,7 +16,7 @@ import { loadLanName, saveLanName } from "@/features/lan/lanAvailability"
 const leave = () => (router.canGoBack() ? router.back() : router.replace("/"))
 
 export default function NearbyEventsRoute() {
-  const { event } = useNearbyEventHost()
+  const { event, importedFor } = useNearbyEventHost()
   useNearbyImport()
   const { events, denied } = useNearbyEvents(
     event ? nearbyEventServiceName(event.code, event.name) : null,
@@ -30,6 +30,7 @@ export default function NearbyEventsRoute() {
               name: event.name,
               detail: eventStatusText(event),
               running: event.status !== "finished",
+              unsaved: event.status === "finished" && importedFor === null,
             }
           : null
       }
