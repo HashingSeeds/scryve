@@ -36,6 +36,8 @@ export const GAME_RULES = {
       poison: "104.3d",
       energy: "107.14",
       commanderTax: "903.8",
+      monarch: "725",
+      initiative: "726",
     } satisfies Partial<Record<MagicTableItemId, string>>,
   },
   pokemon: { kind: "link", pageUrl: "https://www.pokemon.com/us/pokemon-tcg/rules" },
