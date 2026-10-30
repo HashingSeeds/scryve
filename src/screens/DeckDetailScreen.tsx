@@ -331,7 +331,7 @@ function DeckDetailContent({
   const [error, setError] = useState<string>()
   const [newListNotice, setNewListNotice] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [bringingPending, setBringingPending] = useState<string>()
+  const [bringingPending, setBringingPending] = useState<Id<"deckVersions">>()
   const [focusedKey, setFocusedKey] = useState<string>()
   const metadataSaveStarted = useRef(false)
   const settingsSaveStarted = useRef(false)
@@ -646,13 +646,10 @@ function DeckDetailContent({
     if (!saved) metadataSaveStarted.current = false
   }
 
-  async function bringVersion(versionId: string) {
+  async function bringVersion(versionId: Id<"deckVersions">) {
     setBringingPending(versionId)
     await run(async () => {
-      await setBringingVersion({
-        deckId: deckId as Id<"decks">,
-        versionId: versionId as Id<"deckVersions">,
-      })
+      await setBringingVersion({ deckId: deckId as Id<"decks">, versionId })
     }, translate("decks:play.bringFailed"))
     setBringingPending(undefined)
   }
@@ -867,6 +864,17 @@ function DeckDetailContent({
   const { accountMetadata, versionConflict, versionCardConflict, failureMessage } = view
   const copyFromVersion = activeVersionSummary ?? version
   const latestVersionNumber = Math.max(...view.versionRows.map((row) => row.versionNumber))
+  const shelfDeck = synced.decks.find((candidate) => candidate._id === deckId)
+  const savedBringingId = detail
+    ? detail.deck.bringingVersionId
+    : shelfDeck && "bringingVersionId" in shelfDeck
+      ? shelfDeck.bringingVersionId
+      : undefined
+  const bringingId =
+    bringingPending ??
+    view.versionRows.find((row) => row._id === savedBringingId)?._id ??
+    view.versionRows.find((row) => row.versionNumber === latestVersionNumber)?._id
+  const playVersionId = matchVersionId && detail && bringingId ? bringingId : matchVersionId
   const syncError =
     failedEdit || failedCardEdit ? (
       <Button tx="decks:detail.reviewChanges" onPress={() => setDialog("syncConflict")} />
@@ -930,15 +938,9 @@ function DeckDetailContent({
               ]
                 .filter(Boolean)
                 .join(" · "),
-              record: row.record,
+              record: row.record && allRecord(row.record),
             }))}
-            bringingId={
-              detail
-                ? (bringingPending ??
-                  detail.deck.bringingVersionId ??
-                  detail.versions[detail.versions.length - 1]?._id)
-                : undefined
-            }
+            bringingId={bringingId}
             bringDisabled={!detail || busy || knownDeleted}
             onBring={bringVersion}
             tracked={tracksResults(deck.game)}
@@ -963,7 +965,7 @@ function DeckDetailContent({
             : () => router.push({ pathname: "/game/new", params: { deckId } })
         }
         onAddMatch={
-          onAddMatch && matchVersionId ? () => onAddMatch(matchVersionId, deck.name) : undefined
+          onAddMatch && playVersionId ? () => onAddMatch(playVersionId, deck.name) : undefined
         }
         onDetails={() => {
           if (knownDeleted) return

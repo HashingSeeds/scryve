@@ -1172,7 +1172,8 @@ describe("NewGameScreen", () => {
         />
       </ThemeProvider>
     )
-    const view = render(opened({ ownerId: "owner-a" }))
+    const view = render(opened(undefined))
+    view.rerender(opened({ ownerId: "owner-a" }))
     view.rerender(opened({ ownerId: "owner-a", decks }))
 
     expect(screen.getByLabelText("Your deck, Mono Red")).toBeTruthy()

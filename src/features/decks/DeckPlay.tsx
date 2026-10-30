@@ -19,10 +19,15 @@ import { api } from "../../../convex/_generated/api"
 
 const RECENT_RESULTS = 5
 
-export type PlayVersion = { id: string; label: string; detail?: string; record?: DeckRecord }
+export type PlayVersion<VersionId extends string = string> = {
+  id: VersionId
+  label: string
+  detail?: string
+  record?: DeckRecord
+}
 type Result = FunctionReturnType<typeof api.deckStats.games>["page"][number]
 
-export function DeckPlay({
+export function DeckPlay<VersionId extends string>({
   versions,
   bringingId,
   bringDisabled,
@@ -32,10 +37,10 @@ export function DeckPlay({
   ready,
   onStats,
 }: {
-  versions?: readonly PlayVersion[]
-  bringingId?: string
+  versions?: readonly PlayVersion<VersionId>[]
+  bringingId?: VersionId
   bringDisabled?: boolean
-  onBring?: (id: string) => void
+  onBring?: (id: VersionId) => void
   tracked: boolean
   deckKey?: string
   ready: boolean

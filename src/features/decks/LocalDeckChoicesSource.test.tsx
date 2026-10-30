@@ -46,8 +46,8 @@ describe("MyDecksSource", () => {
 })
 
 describe("LocalDeckChoicesSource", () => {
-  it("offers each deck at the version it brings, else its latest", () => {
-    const deck = { game: "mtg", format: "commander", latestVersionId: "v-2" }
+  it("offers each deck at the version it brings, else its latest, with the latest hero's life only", () => {
+    const deck = { game: "fab", format: "cc", latestVersionId: "v-2", startingValue: 40 }
     mockLive = {
       decks: [
         { ...deck, _id: "deck-a", deckKey: "key-a", name: "A", bringingVersionId: "v-1" },
@@ -60,8 +60,18 @@ describe("LocalDeckChoicesSource", () => {
     render(<LocalDeckChoicesSource ownerId="owner-choices" onChange={onChange} />)
 
     expect(onChange).toHaveBeenLastCalledWith([
-      expect.objectContaining({ versionId: "v-1", deckId: "deck-a", deckKey: "key-a" }),
-      expect.objectContaining({ versionId: "v-2", deckId: "deck-b", deckKey: "key-b" }),
+      expect.objectContaining({
+        versionId: "v-1",
+        deckId: "deck-a",
+        deckKey: "key-a",
+        startingValue: undefined,
+      }),
+      expect.objectContaining({
+        versionId: "v-2",
+        deckId: "deck-b",
+        deckKey: "key-b",
+        startingValue: 40,
+      }),
     ])
   })
 })

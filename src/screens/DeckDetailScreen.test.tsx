@@ -1447,14 +1447,26 @@ describe("DeckDetailScreen", () => {
       )
     })
 
-    it("marks the version the account brings", () => {
+    it("marks the version the account brings and counts its manual results", () => {
       mockDetail.value = {
         ...loadedDetail,
         deck: { ...loadedDetail.deck, bringingVersionId: "version-main" },
+        versions: [
+          mainVersion,
+          {
+            ...sideboardVersion,
+            record: {
+              ...sideboardVersion.record,
+              manual: { matches: { total: 1, wins: 1, losses: 0, draws: 0 } },
+            },
+          },
+        ],
       }
       const view = renderDetail()
       expect(view.getByTestId("bring-version-version-main")).toBeSelected()
-      expect(view.getByTestId("bring-version-version-sideboard")).not.toBeSelected()
+      const side = view.getByTestId("bring-version-version-sideboard")
+      expect(side).not.toBeSelected()
+      expect(within(side).getByText("1-0")).toBeTruthy()
     })
 
     it("names opponents by commander, then deck, under the deck's record", () => {
@@ -2342,7 +2354,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Sol Ring")).toBeTruthy()
   })
 
-  it("opens match entry with the live version and hides it without one", () => {
+  it("opens match entry for the version brought, and disables it without a live version", () => {
     const onAddMatch = jest.fn()
     const screen = () => (
       <ThemeProvider initialContext="light">
@@ -2356,7 +2368,15 @@ describe("DeckDetailScreen", () => {
     )
     const view = render(screen())
     fireEvent.press(view.getByTestId("add-match-result"))
-    expect(onAddMatch).toHaveBeenCalledWith("version-main", "Existing Deck")
+    expect(onAddMatch).toHaveBeenLastCalledWith("version-sideboard", "Existing Deck")
+
+    mockDetail.value = {
+      ...loadedDetail,
+      deck: { ...loadedDetail.deck, bringingVersionId: "version-main" },
+    }
+    view.rerender(screen())
+    fireEvent.press(view.getByTestId("add-match-result"))
+    expect(onAddMatch).toHaveBeenLastCalledWith("version-main", "Existing Deck")
 
     mockDetail.value = { ...loadedDetail, version: null, cards: [] }
     view.rerender(screen())

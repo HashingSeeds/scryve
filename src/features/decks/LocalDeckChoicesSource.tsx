@@ -86,7 +86,11 @@ const deckChoicesOf = (decks: MyDecks): DeckChoices =>
                 name: deck.name,
                 system: deck.game,
                 format: deck.format,
-                startingValue: deck.startingValue,
+                // why: listMine reads startingValue from the latest version, so an older version's hero would start at the wrong life.
+                startingValue:
+                  deck.bringingVersionId && deck.bringingVersionId !== deck.latestVersionId
+                    ? undefined
+                    : deck.startingValue,
               },
             ]
           : [],

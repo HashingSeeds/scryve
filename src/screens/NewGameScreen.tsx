@@ -456,7 +456,7 @@ function NewGameForm({
         (candidate.localId !== undefined && guestDeckRouteId(candidate.localId) === wanted),
     )
     if (!choice || !isSystemId(choice.system)) {
-      if (!account || account.decks !== undefined) wantedDeckId.current = undefined
+      if (account?.decks !== undefined) wantedDeckId.current = undefined
       return
     }
     if (choice.system !== system || choice.format !== format) {
@@ -467,10 +467,7 @@ function NewGameForm({
       })
       return
     }
-    if (!account) {
-      wantedDeckId.current = undefined
-      return
-    }
+    if (!account) return
     if (effectiveMeSeat === undefined) {
       const seat = account.defaultMeSeat ?? 0
       chooseMeSeat(String(seat < playerCount ? seat : 0))
