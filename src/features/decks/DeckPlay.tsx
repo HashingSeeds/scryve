@@ -118,13 +118,23 @@ function ThisMatch({ pool, swaps, onSideboard, onReset }: PlayMatch) {
       <PlaySection
         tx="decks:play.thisMatch"
         action={
-          swapped && onReset ? (
-            <TextAction
-              testID="sideboard-reset"
-              tx="decks:play.reset"
-              size="xs"
-              onPress={onReset}
-            />
+          swapped && onSideboard ? (
+            <>
+              <TextAction
+                testID="play-sideboard"
+                tx="decks:sideboard.open"
+                size="xs"
+                onPress={onSideboard}
+              />
+              {onReset ? (
+                <TextAction
+                  testID="sideboard-reset"
+                  tx="decks:play.reset"
+                  size="xs"
+                  onPress={onReset}
+                />
+              ) : null}
+            </>
           ) : undefined
         }
       />
@@ -164,14 +174,6 @@ function ThisMatch({ pool, swaps, onSideboard, onReset }: PlayMatch) {
           ) : null}
         </View>
       )}
-      {swapped && onSideboard ? (
-        <TextAction
-          testID="play-sideboard"
-          tx="decks:sideboard.open"
-          style={$alignStart}
-          onPress={onSideboard}
-        />
-      ) : null}
     </View>
   )
 }
@@ -365,7 +367,6 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $win: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
-const $alignStart: ViewStyle = { alignSelf: "flex-start" }
 const $swaps: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xxxs,
   paddingBottom: spacing.sm,

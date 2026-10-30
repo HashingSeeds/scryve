@@ -76,8 +76,8 @@ export function SideboardSwapSheet({
       wide
       style={themed($sheet)}
     >
-      <View style={themed($header)}>
-        <Text preset="subheading" tx="decks:sideboard.title" style={$flex} />
+      <View>
+        <Text preset="subheading" tx="decks:sideboard.title" />
         <Text
           testID="sideboard-counts"
           size="xs"
@@ -174,11 +174,6 @@ const $tabular: TextStyle = { fontVariant: ["tabular-nums"] }
 const $disabled: ViewStyle = { opacity: 0.35 }
 const $quantity: TextStyle = { minWidth: 28, textAlign: "center", fontVariant: ["tabular-nums"] }
 const $sheet: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm, maxHeight: "90%" })
-const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-})
 const $section: ThemedStyle<TextStyle> = ({ spacing }) => ({
   textTransform: "uppercase",
   letterSpacing: 0.8,
