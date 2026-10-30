@@ -148,6 +148,18 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("counter-rule-1")).toBeNull()
   })
 
+  it("opens a designation's rule from the plus sheet without taking it", () => {
+    const openRule = jest.fn()
+    const table = seat({ tableItemRules: { monarch: "725", initiative: "726" }, openRule })
+    const view = chips(table)
+
+    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    expect(view.getByTestId("designation-rule-1-initiative")).toHaveTextContent("726")
+    fireEvent.press(view.getByLabelText("Rule 725"))
+    expect(openRule).toHaveBeenCalledWith("725")
+    expect(table.takeDesignation).not.toHaveBeenCalled()
+  })
+
   it("shows another device's chips without letting this one change them", () => {
     const table = seat({ counters: { poison: 10 }, held: ["monarch"], editable: false })
     const view = chips(table)

@@ -647,6 +647,7 @@ function CounterSheet({
             {seat.rules.designations.map((option, index) => {
               const holds = seat.held.includes(option.id)
               const optionLabel = tableItemLabel(option)
+              const optionRule = seat.tableItemRules?.[option.id]
               return (
                 <SheetOption
                   key={option.id}
@@ -660,6 +661,15 @@ function CounterSheet({
                   )}
                   selected={holds}
                   ink={ink}
+                  rule={
+                    optionRule && openRule
+                      ? {
+                          id: optionRule,
+                          testID: `designation-rule-${seatNumber}-${option.id}`,
+                          onPress: () => openRule(optionRule),
+                        }
+                      : undefined
+                  }
                   onPress={() => {
                     if (holds) seat.releaseDesignation(option.id)
                     else seat.takeDesignation(option.id)
@@ -736,6 +746,7 @@ function SheetOption({
   accessibilityLabel,
   selected,
   ink,
+  rule,
   onPress,
 }: {
   ref?: Ref<View>
@@ -747,47 +758,64 @@ function SheetOption({
   accessibilityLabel: string
   selected?: boolean
   ink: string
+  rule?: { id: string; testID: string; onPress: () => void }
   onPress: () => void
 }) {
   const { themed } = useAppTheme()
   return (
-    <BoardPressable
-      ref={ref}
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ selected: !!selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        themed($option),
-        pressed && { backgroundColor: overlayTint(ink, 0.14) },
-      ]}
-    >
-      <TableGlyph id={id} size={16} color={ink} />
-      {value !== undefined ? (
+    <View style={$optionCell}>
+      <BoardPressable
+        ref={ref}
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ selected: !!selected }}
+        onPress={onPress}
+        style={({ pressed }) => [
+          themed($option),
+          pressed && { backgroundColor: overlayTint(ink, 0.14) },
+        ]}
+      >
+        <TableGlyph id={id} size={16} color={ink} />
+        {value !== undefined ? (
+          <Text
+            text={String(value)}
+            weight="bold"
+            size="xs"
+            style={[themed($optionValue), { color: ink }]}
+          />
+        ) : step !== undefined ? (
+          <Text
+            text={`+${step}`}
+            weight="medium"
+            size="xs"
+            style={[themed($optionValue), { color: ink }, $muted]}
+          />
+        ) : null}
         <Text
-          text={String(value)}
-          weight="bold"
+          text={label}
+          weight={selected ? "bold" : "medium"}
           size="xs"
-          style={[themed($optionValue), { color: ink }]}
+          numberOfLines={1}
+          style={[themed($optionLabel), { color: ink }, !selected && $muted]}
         />
-      ) : step !== undefined ? (
-        <Text
-          text={`+${step}`}
-          weight="medium"
-          size="xs"
-          style={[themed($optionValue), { color: ink }, $muted]}
-        />
+        {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
+      </BoardPressable>
+      {rule ? (
+        <BoardPressable
+          testID={rule.testID}
+          accessibilityRole="link"
+          accessibilityLabel={translate("board:counters.rule", { rule: rule.id })}
+          onPress={rule.onPress}
+          style={({ pressed }) => [
+            themed($optionRule),
+            pressed && { backgroundColor: overlayTint(ink, 0.14) },
+          ]}
+        >
+          <Text text={rule.id} size="xs" style={[$ruleLink, { color: ink }]} />
+        </BoardPressable>
       ) : null}
-      <Text
-        text={label}
-        weight={selected ? "bold" : "medium"}
-        size="xs"
-        numberOfLines={1}
-        style={[themed($optionLabel), { color: ink }, !selected && $muted]}
-      />
-      {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
-    </BoardPressable>
+    </View>
   )
 }
 
@@ -920,12 +948,21 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   rowGap: spacing.xxxs,
 })
 
+const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
+
 const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
   minHeight: 40,
-  width: "50%",
+  paddingHorizontal: spacing.xs,
+  borderRadius: spacing.xs,
+})
+
+const $optionRule: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  justifyContent: "center",
+  minHeight: 40,
   paddingHorizontal: spacing.xs,
   borderRadius: spacing.xs,
 })
