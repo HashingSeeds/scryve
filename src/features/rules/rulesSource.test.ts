@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react-native"
+import { renderHook, waitFor } from "@testing-library/react-native"
 
 import { storage } from "@/utils/storage"
 
@@ -83,16 +83,15 @@ it("prefetchRules downloads once, shares the download with Rules, and skips a cu
   expect(loadStoredRules(MAGIC, store)?.rules).toBe(rules)
 })
 
-it("prefetchRules downloads again when the stored copy has a URL but no usable text", async () => {
+it("prefetchRules trusts a stored copy's URL without parsing its text", () => {
   const store = memoryStore()
   store.set("scryve.rules.url.v1", MAGIC.url)
-  store.set("scryve.rules.text.v1", "<html />")
+  store.set("scryve.rules.text.v1", SOURCE)
+  const source = { ...MAGIC, parse: jest.fn(MAGIC.parse) }
   const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
-  prefetchRules(MAGIC, store, fetcher)
-  expect(fetcher).toHaveBeenCalledTimes(1)
-  await downloadRules(MAGIC, store, fetcher)
-  expect(fetcher).toHaveBeenCalledTimes(1)
-  expect(loadStoredRules(MAGIC, store)?.rules.effectiveDate).toBe("September 25, 2026")
+  prefetchRules(source, store, fetcher)
+  expect(source.parse).not.toHaveBeenCalled()
+  expect(fetcher).not.toHaveBeenCalled()
 })
 
 it("shows rules a prefetch stored after the screen first read the cache", () => {
@@ -108,6 +107,25 @@ it("shows rules a prefetch stored after the screen first read the cache", () => 
   const { result } = renderHook(() => useComprehensiveRules(MAGIC))
   expect(result.current.rules?.effectiveDate).toBe("September 25, 2026")
   expect(fetcher).not.toHaveBeenCalled()
+  jest.restoreAllMocks()
+})
+
+it("Rules downloads again when the stored copy has a URL but no usable text", async () => {
+  const source = { ...MAGIC, cacheKey: "scryve.rules.unusable" }
+  const stored = new Map([
+    ["scryve.rules.unusable.url.v1", MAGIC.url],
+    ["scryve.rules.unusable.text.v1", "<html />"],
+  ])
+  jest.spyOn(storage, "getString").mockImplementation((key) => stored.get(key))
+  jest.spyOn(storage, "set").mockImplementation((key, value) => {
+    if (typeof value === "string") stored.set(key, value)
+  })
+  const fetcher = jest
+    .spyOn(global, "fetch")
+    .mockResolvedValue(new Response(SOURCE, { status: 200 }))
+  const { result } = renderHook(() => useComprehensiveRules(source))
+  await waitFor(() => expect(result.current.rules?.effectiveDate).toBe("September 25, 2026"))
+  expect(fetcher).toHaveBeenCalledTimes(1)
   jest.restoreAllMocks()
 })
 
