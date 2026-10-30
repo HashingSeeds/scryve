@@ -359,8 +359,6 @@ export default {
     unknownAttacker: "統率者",
     assignFrom: "{{identity}}からの統率者ダメージを設定",
     assignFromStale: "{{identity}}からの統率者ダメージを設定、情報が古い",
-    showOverviewFor: "{{identity}}の統率者ダメージを表示",
-    expandsGrid: "統率者ダメージの一覧を開く",
   },
   outReason: {
     commanderDamage: "統率者ダメージ",

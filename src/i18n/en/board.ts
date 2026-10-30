@@ -352,8 +352,6 @@ const board = {
     unknownAttacker: "Commander",
     assignFrom: "Assign commander damage from {{identity}}",
     assignFromStale: "Assign commander damage from {{identity}}, out of date",
-    showOverviewFor: "Show commander damage for {{identity}}",
-    expandsGrid: "Expands the commander damage grid",
   },
   outReason: {
     commanderDamage: "commander damage",

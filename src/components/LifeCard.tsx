@@ -102,7 +102,7 @@ export type LifeCardCommanderDamage = Omit<
   CommanderDamageBoardProps,
   "contentRotation" | "compact" | "foreground" | "seatNumber"
 > & {
-  inspection?: { open: boolean; onToggle: () => void }
+  inspection: { open: boolean; onToggle: () => void }
   attackerName?: string
   attacker?: CommanderAttacker
   commanders?: readonly ArmedCommander[]
@@ -190,7 +190,7 @@ export const LifeCard = memo(function LifeCard({
     themed,
     theme: { spacing },
   } = useAppTheme()
-  const localCommander = !!commanderDamage?.inspection
+  const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const foreground = accessibleForeground(color)
@@ -235,14 +235,13 @@ export const LifeCard = memo(function LifeCard({
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
-  const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
-  const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
+  const commanderOverviewOpen = !!commanderDamage?.inspection.open
   const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
   const [boardBounds, setBoardBounds] = useState<LayoutRectangle | null>(null)
   const overviewProgress = useSharedValue(commanderOverviewOpen ? 1 : 0)
   useEffect(() => {
-    if (!localCommander) return
+    if (!commanderSeat) return
     if (commanderOverviewOpen) setOverviewVisible(true)
     if (commanderOverviewDuration === 0) {
       overviewProgress.value = commanderOverviewOpen ? 1 : 0
@@ -258,8 +257,8 @@ export const LifeCard = memo(function LifeCard({
         if (finished && !commanderOverviewOpen) runOnJS(setOverviewVisible)(false)
       },
     )
-  }, [localCommander, commanderOverviewOpen, commanderOverviewDuration, overviewProgress])
-  const localOverviewVisible = localCommander && (commanderOverviewOpen || overviewVisible)
+  }, [commanderSeat, commanderOverviewOpen, commanderOverviewDuration, overviewProgress])
+  const overviewShown = commanderSeat && (commanderOverviewOpen || overviewVisible)
   const headerEdge = { 0: "top", 90: "right", [-90]: "left", 180: "bottom" } as const
   const headerPadding = {
     0: "paddingTop",
@@ -273,12 +272,11 @@ export const LifeCard = memo(function LifeCard({
     [-90]: "paddingRight",
     180: "paddingTop",
   } as const
-  const overviewInsets = {
+  const boardInsets = {
     ...safeContentStyle,
     [headerPadding[contentRotation]]: (contentInsets?.[headerEdge[contentRotation]] ?? 0) + 56,
     [footerPadding[contentRotation]]: 0,
   }
-  const boardInsets = localCommander ? overviewInsets : safeContentStyle
   const lifeOffset = Math.max(
     (Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height) / 2 -
       (contentInsets?.[headerEdge[contentRotation]] ?? 0) -
@@ -339,10 +337,6 @@ export const LifeCard = memo(function LifeCard({
       },
     ],
   }))
-  const commanderOverviewEntering =
-    reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
-  const commanderOverviewExiting =
-    reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
   const calculator = !!playSystemRules(system).counter.calculator
@@ -462,7 +456,7 @@ export const LifeCard = memo(function LifeCard({
   }, [defending])
   const chipSpot = (attackerId: PlayerId) =>
     (commanderDamage?.incoming[attackerId] ?? 0) > 0 ? stripPips.get(attackerId) : undefined
-  const lifeMuted = attackerSide || (!localCommander && commanderOverviewOpen)
+  const lifeMuted = attackerSide
   const lifeFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
   }))
@@ -501,18 +495,13 @@ export const LifeCard = memo(function LifeCard({
     ],
   }))
   const lifeControlsShown =
-    !commanderCovers &&
-    !commanderOverviewOpen &&
-    !localOverviewVisible &&
-    !tableSheetOpen &&
-    !diceCovers &&
-    ownership !== "unowned"
+    !commanderCovers && !overviewShown && !tableSheetOpen && !diceCovers && ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
   const commanderStripShown =
-    !!commanderDamage?.inspection &&
+    commanderSeat &&
     !commanderCovers &&
     !tableSheetOpen &&
     !diceCovers &&
@@ -535,7 +524,7 @@ export const LifeCard = memo(function LifeCard({
   const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
   // why: beside the commander strip a short seat cuts every name to a few letters, so in commander games such seats keep just their mark from the start; judged by seat length alone so seats of one size match.
   const markOnly =
-    !!commanderDamage?.inspection &&
+    commanderSeat &&
     seatRun > 0 &&
     seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.mark - identityMetrics.gap <
       MIN_NAME_ROOM
@@ -588,20 +577,6 @@ export const LifeCard = memo(function LifeCard({
     setCardSize((current) =>
       current.width === width && current.height === height ? current : { width, height },
     )
-  }
-
-  function openCommanderOverview() {
-    onPlayStart?.()
-    setCommanderOverviewOpen(true)
-  }
-
-  function closeCommanderOverview() {
-    setCommanderOverviewOpen(false)
-  }
-
-  function beginCommanderAssignment() {
-    setCommanderOverviewOpen(false)
-    commanderDamage?.onPressSword?.()
   }
 
   return (
@@ -659,25 +634,21 @@ export const LifeCard = memo(function LifeCard({
         pointerEvents={
           commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
         }
-        accessibilityElementsHidden={
-          (!localCommander && commanderOverviewOpen) || attackerSide || tableSheetOpen || diceCovers
-        }
+        accessibilityElementsHidden={attackerSide || tableSheetOpen || diceCovers}
         importantForAccessibility={
-          (!localCommander && commanderOverviewOpen) || attackerSide || tableSheetOpen || diceCovers
-            ? "no-hide-descendants"
-            : "auto"
+          attackerSide || tableSheetOpen || diceCovers ? "no-hide-descendants" : "auto"
         }
         style={[
           themed($content),
           lifeFadeStyle,
-          localOverviewVisible && $overviewReadout,
+          overviewShown && $overviewReadout,
           floodedBy.takeover && $aboveFlood,
         ]}
       >
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[themed($readout), localCommander && overviewLifeStyle]}
+          style={[themed($readout), commanderSeat && overviewLifeStyle]}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>
@@ -737,12 +708,9 @@ export const LifeCard = memo(function LifeCard({
           style={[themed($eliminated), locked && $lockedOverlay]}
         />
       ) : null}
-      {commanderDamage && (commanderOverviewOpen || localOverviewVisible) && !commanderCardMode ? (
-        <Animated.View
+      {commanderDamage && overviewShown && !commanderCardMode ? (
+        <View
           testID={`commander-overview-seat-${seatNumber}`}
-          entering={localCommander ? undefined : commanderOverviewEntering}
-          exiting={localCommander ? undefined : commanderOverviewExiting}
-          accessibilityViewIsModal={!localCommander}
           style={[
             themed($commanderOverview),
             compact && themed($compactCommanderOverview),
@@ -756,7 +724,7 @@ export const LifeCard = memo(function LifeCard({
             <Animated.View
               testID={`commander-overview-board-seat-${seatNumber}`}
               onLayout={(event) => setBoardBounds(event.nativeEvent.layout)}
-              style={localCommander ? boardStyle : undefined}
+              style={boardStyle}
             >
               <CommanderDamageBoard
                 ownerPlayerId={commanderDamage.ownerPlayerId}
@@ -766,7 +734,7 @@ export const LifeCard = memo(function LifeCard({
                 columns={commanderDamage.columns}
                 incoming={commanderDamage.incoming}
                 lethal={commanderDamage.lethal}
-                onPressSword={beginCommanderAssignment}
+                onPressSword={commanderDamage.onPressSword}
                 seatNumber={seatNumber}
                 contentRotation={contentRotation}
                 compact={compact}
@@ -792,37 +760,7 @@ export const LifeCard = memo(function LifeCard({
               />
             </Animated.View>
           </View>
-          {!localCommander ? (
-            <View
-              key={contentRotation}
-              pointerEvents="box-none"
-              style={[
-                themed($cornerLayer),
-                identityCorner.layer,
-                { transform: [{ rotate: `${contentRotation}deg` }] },
-              ]}
-            >
-              <BoardPressable
-                testID={`commander-overview-close-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel={translate("board:commander.closeFor", { identity })}
-                onPress={closeCommanderOverview}
-                hitSlop={12}
-                style={[themed($overviewClose), identityCorner.position]}
-              >
-                <PlayerMark
-                  seatNumber={seatNumber}
-                  shape={shape}
-                  color={foreground}
-                  insetSwordColor={color}
-                  closeIcon
-                  size={identityMetrics.mark}
-                  style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
-                />
-              </BoardPressable>
-            </View>
-          ) : null}
-        </Animated.View>
+        </View>
       ) : null}
       {/* why: the − and + fade out as commander mode or a sheet takes the card and back in after, but not when the board first draws. */}
       <LayoutAnimationConfig skipEntering>
@@ -930,7 +868,7 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCovers && !tableSheetOpen && !diceCovers ? (
+      {commanderDamage && !commanderCovers && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -944,7 +882,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
-          open={localOverviewVisible}
+          open={overviewShown}
           inspectDisabled={inspectDisabled}
           closeIconStyle={overviewCloseStyle}
           onToggle={commanderDamage.inspection.onToggle}
@@ -952,10 +890,7 @@ export const LifeCard = memo(function LifeCard({
           onPipsChange={setStripPips}
         />
       ) : null}
-      {!commanderCovers &&
-      !tableSheetOpen &&
-      !dice?.view &&
-      !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
+      {!commanderCovers && !tableSheetOpen && !dice?.view ? (
         // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
         <View
           key={contentRotation}
@@ -1007,7 +942,7 @@ export const LifeCard = memo(function LifeCard({
                   stripAtEdge && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
-              {commanderDamage?.inspection ? (
+              {commanderDamage ? (
                 <BoardPressable
                   testID={`commander-mark-seat-${seatNumber}`}
                   accessibilityRole="button"
@@ -1020,20 +955,7 @@ export const LifeCard = memo(function LifeCard({
                   accessibilityState={{ disabled: !!disabled }}
                   disabled={disabled}
                   hitSlop={8}
-                  onPress={beginCommanderAssignment}
-                  style={({ pressed }) => pressed && { opacity: 0.72 }}
-                >
-                  {seatIdentity}
-                </BoardPressable>
-              ) : commanderDamage ? (
-                <BoardPressable
-                  testID={`commander-mark-seat-${seatNumber}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={translate("board:commander.showOverviewFor", { identity })}
-                  accessibilityHint={translate("board:commander.expandsGrid")}
-                  accessibilityState={{ expanded: false }}
-                  hitSlop={12}
-                  onPress={openCommanderOverview}
+                  onPress={commanderDamage.onPressSword}
                   style={({ pressed }) => pressed && { opacity: 0.72 }}
                 >
                   {seatIdentity}
@@ -1104,8 +1026,7 @@ export const LifeCard = memo(function LifeCard({
       !claimShown &&
       !diceCovers &&
       !commanderCovers &&
-      !commanderOverviewOpen &&
-      !localOverviewVisible &&
+      !overviewShown &&
       !editorOpen ? (
         <CounterChips
           seat={seatTable}

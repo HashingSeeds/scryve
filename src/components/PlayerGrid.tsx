@@ -60,7 +60,7 @@ export interface CommanderDamageGridBinding {
   incomingFor: (playerId: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
   lethal: number
   attack: CommanderAttack
-  inspection?: { playerId: PlayerId | null; onChange: (playerId: PlayerId | null) => void }
+  inspection: { playerId: PlayerId | null; onChange: (playerId: PlayerId | null) => void }
   pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
   onPressSword: (player: GamePlayer) => void
 }
@@ -498,19 +498,17 @@ export function PlayerGrid({
                       commanderDamage && attack && boardSeats
                         ? {
                             ownerPlayerId: player.id,
-                            players: commanderDamage.inspection ? commanderPlayers : undefined,
-                            inspection: commanderDamage.inspection
-                              ? {
-                                  open: commanderDamage.inspection.playerId === player.id,
-                                  onToggle: stable(`inspect:${player.id}`, () =>
-                                    commanderDamage.inspection?.onChange(
-                                      commanderDamage.inspection.playerId === player.id
-                                        ? null
-                                        : player.id,
-                                    ),
-                                  ),
-                                }
-                              : undefined,
+                            players: commanderPlayers,
+                            inspection: {
+                              open: commanderDamage.inspection.playerId === player.id,
+                              onToggle: stable(`inspect:${player.id}`, () =>
+                                commanderDamage.inspection.onChange(
+                                  commanderDamage.inspection.playerId === player.id
+                                    ? null
+                                    : player.id,
+                                ),
+                              ),
+                            },
                             seats: boardSeats.seats,
                             rows: boardSeats.rows,
                             columns: boardSeats.columns,

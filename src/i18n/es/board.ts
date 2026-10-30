@@ -386,8 +386,6 @@ export default {
     unknownAttacker: "Comandante",
     assignFrom: "Asignar daño de comandante de {{identity}}",
     assignFromStale: "Asignar daño de comandante de {{identity}}, desactualizado",
-    showOverviewFor: "Mostrar el daño de comandante de {{identity}}",
-    expandsGrid: "Expande la cuadrícula de daño de comandante",
   },
   outReason: {
     commanderDamage: "daño de comandante",
