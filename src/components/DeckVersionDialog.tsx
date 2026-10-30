@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { ViewStyle } from "react-native"
-import { View } from "react-native"
+import { ScrollView, View } from "react-native"
 
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -59,65 +59,72 @@ export function DeckVersionDialog({
       placement="bottom"
       wide
     >
-      <Text preset="subheading" text={title} />
-      <TextField
-        testID="version-name-input"
-        labelTx="decks:versionDialog.name"
-        helperTx="decks:versionDialog.nameHelper"
-        value={name}
-        maxLength={40}
-        onChangeText={setName}
-      />
-      {notesLocked ? null : (
+      <ScrollView
+        contentContainerStyle={themed($content)}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
+        <Text preset="subheading" text={title} />
         <TextField
-          testID="version-note-input"
-          labelTx="decks:versionDialog.notes"
-          helperTx="decks:versionDialog.notesHelper"
-          value={note}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          maxLength={1000}
-          onChangeText={setNote}
+          testID="version-name-input"
+          labelTx="decks:versionDialog.name"
+          helperTx="decks:versionDialog.nameHelper"
+          value={name}
+          maxLength={40}
+          onChangeText={setName}
         />
-      )}
-      {copyFromLabel ? (
-        <View style={themed($choices)}>
-          <ChoiceButton
-            testID="version-copy-cards"
-            text={translate("decks:versionDialog.copyFrom", { version: copyFromLabel })}
-            detail={translate("decks:versionDialog.copyDetail")}
-            selected={copyCards}
-            onPress={() => setCopyCards(true)}
+        {notesLocked ? null : (
+          <TextField
+            testID="version-note-input"
+            labelTx="decks:versionDialog.notes"
+            helperTx="decks:versionDialog.notesHelper"
+            value={note}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            maxLength={1000}
+            onChangeText={setNote}
           />
-          <ChoiceButton
-            testID="version-empty-cards"
-            tx="decks:versionDialog.empty"
-            detail={translate("decks:versionDialog.emptyDetail")}
-            selected={!copyCards}
-            onPress={() => setCopyCards(false)}
-          />
-        </View>
-      ) : null}
-      {error ? <AlertNote text={error} /> : null}
-      <Button
-        testID="version-submit"
-        text={busy ? translate("decks:saving") : submitLabel}
-        preset="primary"
-        disabled={busy || !name.trim()}
-        onPress={() => onSubmit({ name, note, copyCards })}
-      />
-      {onDelete ? (
+        )}
+        {copyFromLabel ? (
+          <View style={themed($choices)}>
+            <ChoiceButton
+              testID="version-copy-cards"
+              text={translate("decks:versionDialog.copyFrom", { version: copyFromLabel })}
+              detail={translate("decks:versionDialog.copyDetail")}
+              selected={copyCards}
+              onPress={() => setCopyCards(true)}
+            />
+            <ChoiceButton
+              testID="version-empty-cards"
+              tx="decks:versionDialog.empty"
+              detail={translate("decks:versionDialog.emptyDetail")}
+              selected={!copyCards}
+              onPress={() => setCopyCards(false)}
+            />
+          </View>
+        ) : null}
+        {error ? <AlertNote text={error} /> : null}
         <Button
-          testID="delete-version-button"
-          tx="decks:versionDialog.delete"
-          preset="destructive"
-          disabled={busy}
-          onPress={onDelete}
+          testID="version-submit"
+          text={busy ? translate("decks:saving") : submitLabel}
+          preset="primary"
+          disabled={busy || !name.trim()}
+          onPress={() => onSubmit({ name, note, copyCards })}
         />
-      ) : null}
+        {onDelete ? (
+          <Button
+            testID="delete-version-button"
+            tx="decks:versionDialog.delete"
+            preset="destructive"
+            disabled={busy}
+            onPress={onDelete}
+          />
+        ) : null}
+      </ScrollView>
     </DialogCard>
   )
 }
 
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
