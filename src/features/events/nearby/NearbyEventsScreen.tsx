@@ -62,7 +62,7 @@ export function NearbyEventsScreen({
         <Button
           testID="host-nearby-event"
           tx="events:nearby.host"
-          preset="reversed"
+          preset="primary"
           disabled={hosted?.running}
           onPress={onHost}
         />

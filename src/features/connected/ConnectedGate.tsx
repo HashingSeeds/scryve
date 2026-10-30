@@ -159,7 +159,7 @@ export function BackendGate({
     return (
       <GateScreen>
         <Text accessibilityRole="alert" tx="connected:gate.signInPrompt" />
-        <Button tx="connected:gate.signIn" preset="reversed" onPress={onReauthenticate} />
+        <Button tx="connected:gate.signIn" preset="primary" onPress={onReauthenticate} />
         {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
@@ -190,7 +190,7 @@ export function BackendGate({
         {usernameError ? <Text accessibilityRole="alert" text={usernameError} /> : null}
         <Button
           tx={savingUsername ? "connected:saving" : "connected:gate.username.save"}
-          preset="reversed"
+          preset="primary"
           disabled={savingUsername || !isUsernameValid(username)}
           onPress={async () => {
             try {
@@ -248,7 +248,7 @@ export function BackendGate({
     return (
       <GateScreen>
         <Text accessibilityRole="alert" tx="connected:gate.authFailed" />
-        <Button tx="connected:gate.signInAgain" preset="reversed" onPress={onReauthenticate} />
+        <Button tx="connected:gate.signInAgain" preset="primary" onPress={onReauthenticate} />
         {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>
     )
@@ -256,7 +256,7 @@ export function BackendGate({
     return (
       <GateScreen>
         <Text accessibilityRole="alert" text={connectedProfile.message} />
-        <Button tx="connected:gate.retrySetup" preset="reversed" onPress={connectedProfile.retry} />
+        <Button tx="connected:gate.retrySetup" preset="primary" onPress={connectedProfile.retry} />
         <Button tx="connected:gate.signInAgain" onPress={onReauthenticate} />
         {onBack ? <Button tx="connected:gate.backToLocalPlay" onPress={onBack} /> : null}
       </GateScreen>

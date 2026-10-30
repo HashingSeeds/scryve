@@ -122,7 +122,7 @@ export function LocalGameEndDialog({
           testID="confirm-end-game-button"
           tx="board:endGame.end"
           disabled={!endResultSelected}
-          preset="reversed"
+          preset="primary"
           style={themed($dialogAction)}
           onPress={() =>
             finish(() =>

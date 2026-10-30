@@ -315,7 +315,7 @@ export function JoinConnectedScreen({
                   ? (access.actionLabel ?? translate("connected:join.join"))
                   : translate("connected:join.join")
             }
-            preset="reversed"
+            preset="primary"
             style={embedded ? undefined : themed($primaryAction)}
             onPress={() => void join()}
           />

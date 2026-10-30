@@ -90,7 +90,7 @@ export function TreacheryRoleDialog({
                   ? "connected:treachery.revealConfirm"
                   : "connected:treachery.reveal"
             }
-            preset={confirming ? "reversed" : "default"}
+            preset={confirming ? "primary" : "secondary"}
             disabled={busy || !online}
             style={themed($action)}
             onPress={() => void revealRole()}

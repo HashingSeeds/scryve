@@ -4,6 +4,7 @@ import Svg, { Path } from "react-native-svg"
 
 import { CardImage } from "@/components/CardImage"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -119,24 +120,19 @@ export function DeckCardSectionHeader({
     <View style={themed($section)}>
       <Text size="sm" weight="semiBold" text={label} style={$flex} />
       {onChooseCommander ? (
-        <TouchableOpacity
+        <TextAction
           testID="choose-commander"
-          accessibilityRole="button"
           accessibilityLabel={
             quantity
               ? translate("decks:cardRow.changeCommander")
               : translate("decks:cardRow.chooseCommander")
           }
+          tx={quantity ? "decks:cardRow.change" : "decks:cardRow.choose"}
+          size="xs"
           disabled={disabled}
           style={$touch}
           onPress={onChooseCommander}
-        >
-          <Text
-            size="xs"
-            style={themed($action)}
-            tx={quantity ? "decks:cardRow.change" : "decks:cardRow.choose"}
-          />
-        </TouchableOpacity>
+        />
       ) : (
         <Text size="sm" style={themed($dim)} text={String(quantity)} />
       )}

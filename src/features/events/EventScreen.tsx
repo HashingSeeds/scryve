@@ -133,7 +133,7 @@ export function EventScreen({
         {finalRound ? (
           <Button
             testID="finish-event-footer-button"
-            preset="reversed"
+            preset="primary"
             disabled={command.busy || blocker !== undefined}
             tx="events:finish.action"
             onPress={() => setConfirming("finish")}
@@ -141,7 +141,7 @@ export function EventScreen({
         ) : (
           <Button
             testID="start-round-button"
-            preset="reversed"
+            preset="primary"
             disabled={command.busy || blocker !== undefined}
             tx="events:startRound"
             txOptions={{ round: view.round + 1 }}
@@ -423,7 +423,7 @@ function MyTable({
       {canConfirm(view, table) && !reportedByMe ? (
         <Button
           testID="confirm-button"
-          preset="reversed"
+          preset="primary"
           disabled={busy}
           tx="events:confirm"
           onPress={() => onConfirm(table)}

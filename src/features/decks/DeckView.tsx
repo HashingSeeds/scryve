@@ -6,6 +6,7 @@ import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -134,21 +135,13 @@ export function DeckView({
         onLeftPress={editing ? onCancel : onBack}
         RightActionComponent={
           <View style={$row}>
-            <TouchableOpacity
-              accessibilityRole="button"
+            <TextAction
               testID={editing ? "save-version-button" : "edit-deck-button"}
+              tx={editing ? (busy ? "decks:saving" : "common:save") : "common:edit"}
               disabled={busy || editingDisabled || (editing && !dirty)}
               style={$touch}
               onPress={editing ? onSave : onEdit}
-            >
-              <Text
-                tx={editing ? (busy ? "decks:saving" : "common:save") : "common:edit"}
-                style={[
-                  themed($action),
-                  (busy || editingDisabled || (editing && !dirty)) && $disabled,
-                ]}
-              />
-            </TouchableOpacity>
+            />
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={translate("decks:deckView.details")}
@@ -187,29 +180,21 @@ export function DeckView({
               />
               {tracked && (stats ? <DeckStats record={stats} /> : statsContent)}
               {tracked && onStats && (stats || statsContent) ? (
-                <TouchableOpacity
+                <TextAction
                   testID="open-deck-stats"
-                  accessibilityRole="button"
+                  tx="decks:stats.viewStats"
                   style={$noteAction}
                   onPress={onStats}
-                >
-                  <Text size="sm" tx="decks:stats.viewStats" style={themed($action)} />
-                </TouchableOpacity>
+                />
               ) : null}
               {tracked && onAddMatch ? (
-                <TouchableOpacity
+                <TextAction
                   testID="add-match-result"
-                  accessibilityRole="button"
+                  tx="decks:deckView.addMatch"
                   style={$noteAction}
                   disabled={editing || busy}
                   onPress={onAddMatch}
-                >
-                  <Text
-                    size="sm"
-                    tx="decks:deckView.addMatch"
-                    style={[themed($action), (editing || busy) && $disabled]}
-                  />
-                </TouchableOpacity>
+                />
               ) : null}
             </View>
             <View style={themed($tabs)} accessibilityRole="tablist">
@@ -264,18 +249,13 @@ export function DeckView({
                 ) : (
                   <>
                     <Text text={note || translate("decks:deckView.noNotes")} size="sm" />
-                    <TouchableOpacity
+                    <TextAction
                       testID="edit-deck-notes"
+                      tx="decks:deckView.editNotes"
                       style={$noteAction}
-                      accessibilityRole="button"
                       disabled={editingDisabled}
                       onPress={onEdit}
-                    >
-                      <Text
-                        tx="decks:deckView.editNotes"
-                        style={[themed($action), editingDisabled && $disabled]}
-                      />
-                    </TouchableOpacity>
+                    />
                   </>
                 )}
               </View>
@@ -331,9 +311,7 @@ export function DeckView({
               tx="decks:deckView.removed"
               txOptions={{ card: undo.name }}
             />
-            <TouchableOpacity style={$touch} accessibilityRole="button" onPress={undo.restore}>
-              <Text tx="common:undo" style={themed($action)} />
-            </TouchableOpacity>
+            <TextAction tx="common:undo" style={$touch} onPress={undo.restore} />
           </View>
         ) : null}
         <View style={themed($footer)}>
@@ -388,7 +366,6 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.lg,
 })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   gap: spacing.lg,

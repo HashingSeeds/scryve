@@ -17,6 +17,7 @@ import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
@@ -902,20 +903,8 @@ export function AddDeckScreen({
             : translate("decks:addDeck.noListsYet", { format: deckFormatLabel(game, format) })
         }
       />
-      <Button
-        tx="decks:addDeck.pasteList"
-        preset="reversed"
-        style={themed($previewImportButton)}
-        textStyle={themed($previewImportButtonText)}
-        onPress={() => setMode("paste")}
-      />
-      <TouchableOpacity
-        accessibilityRole="button"
-        style={themed($plainAction)}
-        onPress={() => setMode("blank")}
-      >
-        <Text tx="decks:versionDialog.empty" style={themed($textAction)} />
-      </TouchableOpacity>
+      <Button tx="decks:addDeck.pasteList" preset="primary" onPress={() => setMode("paste")} />
+      <TextAction tx="decks:versionDialog.empty" onPress={() => setMode("blank")} />
     </View>
   )
 
@@ -1126,7 +1115,7 @@ export function AddDeckScreen({
             <Button
               testID="save-import-button"
               tx="decks:addDeck.saveOnDevice"
-              preset="reversed"
+              preset="primary"
               style={$flex1}
               disabled={
                 resolvingPasted ||
@@ -1199,17 +1188,15 @@ export function AddDeckScreen({
               <Text size="xs" tx="decks:addDeck.datedExample" />
             ) : null}
             {selectedCatalogDeck.sourceUrl ? (
-              <TouchableOpacity
+              <TextAction
                 accessibilityRole="link"
-                style={themed($plainAction)}
+                tx="decks:addDeck.viewSource"
                 onPress={() =>
                   void Linking.openURL(selectedCatalogDeck.sourceUrl!).catch(() =>
                     setError(translate("decks:addDeck.openSourceFailed")),
                   )
                 }
-              >
-                <Text tx="decks:addDeck.viewSource" style={themed($textAction)} />
-              </TouchableOpacity>
+              />
             ) : null}
             <LoadingProgress
               state={catalogDetail ? "complete" : "loading"}
@@ -1281,7 +1268,7 @@ export function AddDeckScreen({
           <Button
             testID="import-catalog-deck"
             tx="decks:addDeck.saveDeckOnDevice"
-            preset="reversed"
+            preset="primary"
             disabled={!catalogDetail}
             onPress={importTopDeck}
           />
@@ -1514,13 +1501,10 @@ export function AddDeckScreen({
             ) : searchError ? (
               <View style={themed($inlineStatus)}>
                 <AlertNote text={searchError} />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={themed($plainAction)}
+                <TextAction
+                  tx="common:retry"
                   onPress={() => void runCatalogSearch(preconQuery, searchCursor.current)}
-                >
-                  <Text tx="common:retry" style={themed($textAction)} />
-                </TouchableOpacity>
+                />
               </View>
             ) : catalogDecks.length === 0 &&
               precons.length === 0 &&
@@ -1543,14 +1527,11 @@ export function AddDeckScreen({
                         : translate("decks:addDeck.refreshFailed")
                   }
                 />
-                <TouchableOpacity
-                  accessibilityRole="button"
+                <TextAction
+                  tx="decks:addDeck.checkAgain"
                   disabled={searching}
-                  style={[themed($plainAction), searching && themed($previewImportButtonDisabled)]}
                   onPress={() => void runCatalogSearch(preconQuery)}
-                >
-                  <Text tx="decks:addDeck.checkAgain" style={themed($textAction)} />
-                </TouchableOpacity>
+                />
               </View>
             ) : null}
             {precons.map((deck) => (
@@ -1704,7 +1685,7 @@ export function AddDeckScreen({
                         ? translate("decks:addDeck.reviewSourceDeck", { source: linkSource.name })
                         : translate("decks:addDeck.reviewList")
               }
-              preset="reversed"
+              preset="primary"
               disabled={resolvingPasted || !importSource.trim()}
               onPress={reviewPasted}
             />
@@ -1724,7 +1705,7 @@ export function AddDeckScreen({
             {noteField}
             <Button
               tx="decks:addDeck.createDeck"
-              preset="reversed"
+              preset="primary"
               disabled={!name.trim()}
               onPress={createBlank}
             />
@@ -1811,11 +1792,6 @@ const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $previewImportButtonDisabled: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 const $previewImportButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: accessibleForeground(colors.tint),
-})
-
-const $plainAction: ThemedStyle<ViewStyle> = () => ({
-  minHeight: 44,
-  justifyContent: "center",
 })
 
 const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

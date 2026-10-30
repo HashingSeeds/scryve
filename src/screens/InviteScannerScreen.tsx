@@ -123,7 +123,7 @@ export function InviteScannerScreen({
         titleTx="connected:scanner.title"
         bodyTx="connected:scanner.webUnavailable"
         actions={
-          <Button tx="connected:scanner.enterManually" preset="reversed" onPress={onCancel} />
+          <Button tx="connected:scanner.enterManually" preset="primary" onPress={onCancel} />
         }
       />
     )
@@ -146,13 +146,13 @@ export function InviteScannerScreen({
             {canAsk ? (
               <Button
                 tx="connected:scanner.permission.allow"
-                preset="reversed"
+                preset="primary"
                 onPress={() => void requestPermission()}
               />
             ) : (
               <Button
                 tx="connected:scanner.permission.openSettings"
-                preset="reversed"
+                preset="primary"
                 onPress={() => void Linking.openSettings().then(() => AppState.currentState)}
               />
             )}
@@ -170,7 +170,7 @@ export function InviteScannerScreen({
         titleTx="connected:scanner.title"
         notice={<AlertNote text={translate("connected:scanner.nativeUnavailable")} />}
         actions={
-          <Button tx="connected:scanner.enterManually" preset="reversed" onPress={onCancel} />
+          <Button tx="connected:scanner.enterManually" preset="primary" onPress={onCancel} />
         }
       />
     )
@@ -186,7 +186,7 @@ export function InviteScannerScreen({
         <>
           <Button
             tx={openingScanner ? "connected:scanner.opening" : "connected:scanner.open"}
-            preset="reversed"
+            preset="primary"
             disabled={openingScanner}
             onPress={() => void openScanner()}
           />

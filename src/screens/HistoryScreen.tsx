@@ -692,7 +692,7 @@ export function HistoryScreen({
           />
           <Button
             style={themed($dialogButton)}
-            preset="reversed"
+            preset="primary"
             text={
               loadingFirstPage || loadingMore
                 ? translate("play:history.showLoaded")

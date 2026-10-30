@@ -673,7 +673,7 @@ export function CurrentGameScreen({
               <Button
                 testID="next-game-button"
                 tx="board:match.nextGame"
-                preset="reversed"
+                preset="primary"
                 style={themed($dialogButton)}
                 onPress={() => setMatchPrompt(undefined)}
               />

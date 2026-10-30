@@ -82,12 +82,8 @@ export function ConfirmDialog({
         <Button
           testID={confirmTestID}
           text={confirmText}
-          preset="reversed"
-          style={[
-            themed($action),
-            large && $stackedAction,
-            destructive && themed($destructiveAction),
-          ]}
+          preset={destructive ? "destructive" : "primary"}
+          style={[themed($action), large && $stackedAction]}
           disabled={busy || confirmDisabled}
           onPress={onConfirm}
         />
@@ -112,8 +108,4 @@ const $action: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   minHeight: 48,
   borderRadius: CHOICE_RADIUS,
-})
-const $destructiveAction: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.error,
-  borderColor: colors.error,
 })

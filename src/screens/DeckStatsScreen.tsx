@@ -9,6 +9,7 @@ import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { MIN_RATED_GAMES } from "@/features/decks/deckCopy"
@@ -223,9 +224,9 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                       title={translate("decks:stats.lists")}
                       action={
                         lists.filter((list) => list.fingerprint !== null).length < 2 ? undefined : (
-                          <TouchableOpacity
-                            accessibilityRole="button"
+                          <TextAction
                             testID="stats-compare"
+                            tx="decks:stats.compare"
                             disabled={!capacity}
                             style={$actionTouch}
                             onPress={() =>
@@ -236,9 +237,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                                   })
                                 : setProPrompt(true)
                             }
-                          >
-                            <Text tx="decks:stats.compare" size="sm" style={themed($action)} />
-                          </TouchableOpacity>
+                          />
                         )
                       }
                     />
@@ -440,7 +439,6 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
 const $hero: ViewStyle = { paddingVertical: 24, gap: 4 }
 const $headline: TextStyle = { fontSize: 64, lineHeight: 76, fontWeight: "700" }
 const $actionTouch: ViewStyle = { minHeight: 44, justifyContent: "center", paddingLeft: 12 }
-const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $win: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
 const $loss: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 

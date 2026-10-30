@@ -17,6 +17,7 @@ import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
@@ -1252,20 +1253,12 @@ function DeckDetailContent({
               <View style={themed($versionHeading)}>
                 <Text weight="bold" size="sm" tx="decks:detail.versions" />
                 {detail || view.canQueueVersions ? (
-                  <TouchableOpacity
+                  <TextAction
                     testID="version-picker-__new__"
-                    accessibilityRole="button"
-                    accessibilityLabel={translate("decks:detail.newVersion")}
+                    tx="decks:detail.newVersion"
                     disabled={draft.editing}
                     onPress={startNewVersion}
-                  >
-                    <Text
-                      weight="bold"
-                      size="sm"
-                      style={themed($textAction)}
-                      tx="decks:detail.newVersion"
-                    />
-                  </TouchableOpacity>
+                  />
                 ) : null}
               </View>
               {view.versionRows.map((candidate) => {
@@ -1366,8 +1359,8 @@ function DeckDetailContent({
             <Button
               tx="common:delete"
               testID="delete-version-confirm"
-              style={[themed($dialogButton), themed($destructiveButton)]}
-              textStyle={themed($destructiveText)}
+              preset="destructive"
+              style={themed($dialogButton)}
               disabled={busy}
               onPress={confirmDeleteVersion}
             />
@@ -1403,7 +1396,7 @@ function DeckDetailContent({
             <Button
               tx={busy ? "decks:deckLimit.moving" : "decks:deckLimit.move"}
               testID="move-deck-confirm"
-              preset="reversed"
+              preset="primary"
               style={themed($dialogButton)}
               disabled={busy}
               onPress={() => void keepOnDevice()}
@@ -1434,8 +1427,8 @@ function DeckDetailContent({
             <Button
               tx="common:delete"
               testID="delete-deck-confirm"
-              style={[themed($dialogButton), themed($destructiveButton)]}
-              textStyle={themed($destructiveText)}
+              preset="destructive"
+              style={themed($dialogButton)}
               disabled={busy}
               onPress={deleteDeck}
             />
@@ -1466,8 +1459,8 @@ function DeckDetailContent({
             <Button
               tx="decks:detail.discard"
               testID="discard-edits-confirm"
-              style={[themed($dialogButton), themed($destructiveButton)]}
-              textStyle={themed($destructiveText)}
+              preset="destructive"
+              style={themed($dialogButton)}
               disabled={busy}
               onPress={() => {
                 setDialog("none")
@@ -1533,7 +1526,6 @@ const $versionHeading: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "space-between",
   gap: spacing.sm,
 })
-const $textAction: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $versionRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 72,
   flexDirection: "row",
@@ -1587,12 +1579,6 @@ const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs
 const $primaryActionButton: ViewStyle = { minWidth: 160, minHeight: 44 }
 
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.errorBackground,
-  borderColor: colors.error,
-  borderWidth: 1,
-})
-const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
 const $conflictVersion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,

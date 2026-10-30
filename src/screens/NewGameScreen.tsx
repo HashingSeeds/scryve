@@ -84,7 +84,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
-import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
   PLAYER_MARK_SHAPES,
@@ -957,13 +956,9 @@ function NewGameForm({
                         : undefined
                 }
                 tx={connectedMode || gameBlocksStart ? undefined : "play:startGame"}
-                preset="reversed"
+                preset="primary"
                 TextProps={$footerButtonText}
-                style={[
-                  footerRow && themed($footerAction),
-                  gameBlocksStart && themed($endCurrentButton),
-                ]}
-                textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
+                style={footerRow && themed($footerAction)}
                 disabled={
                   localGameBlocksStart
                     ? matchBlocks
@@ -1015,7 +1010,6 @@ function NewGameForm({
                   testID="connect-local-button"
                   text={localConnect?.access?.label ?? translate("play:newGame.connect")}
                   TextProps={$footerButtonText}
-                  preset="reversed"
                   style={footerRow ? themed($footerAction) : undefined}
                   disabled={localConnect?.busy || localConnect?.ready === false}
                   accessibilityHint={translate("play:newGame.connectHint")}
@@ -1220,7 +1214,7 @@ function NewGameForm({
         <Button
           testID="setup-options-done"
           tx="common:done"
-          preset="reversed"
+          preset="primary"
           onPress={() => setOptionsOpen(false)}
         />
       </DialogCard>
@@ -1382,7 +1376,7 @@ function NewGameForm({
             <Button
               testID="save-local-appearance-button"
               tx="common:save"
-              preset="reversed"
+              preset="primary"
               style={themed($dialogButton)}
               onPress={saveAppearance}
             />
@@ -1551,13 +1545,6 @@ const $resumeText: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexShrink: 1,
   color: colors.tint,
   textAlign: "center",
-})
-
-const $endCurrentButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.tint,
-})
-const $endCurrentButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: accessibleForeground(colors.tint),
 })
 
 const $setupHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({

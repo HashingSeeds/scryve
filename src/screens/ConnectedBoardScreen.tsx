@@ -174,7 +174,6 @@ function ConnectedBoardShell({
               <Button
                 testID="retry-connected-board-button"
                 tx="common:tryAgain"
-                preset="reversed"
                 style={themed($statusAction)}
                 textStyle={themed($statusActionText)}
                 onPress={state.retry}
@@ -1406,7 +1405,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     ? "play:finish"
                     : "play:abandon"
               }
-              preset={finishResultSelected ? "reversed" : "filled"}
+              preset={finishResultSelected ? "primary" : "secondary"}
               disabled={view.finishing || Boolean(finishBlocker)}
               style={themed($dialogAction)}
               onPress={async () => {

@@ -15,7 +15,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 
 import { Text, TextProps as AppTextProps } from "./Text"
 
-type Presets = "default" | "filled" | "reversed" | "primary"
+type Presets = "primary" | "secondary" | "destructive"
 type ButtonTextProps = Omit<AppTextProps, "tx" | "text" | "txOptions" | "children">
 
 export interface ButtonAccessoryProps {
@@ -63,7 +63,7 @@ export function Button(props: ButtonProps) {
 
   const { themed } = useAppTheme()
 
-  const preset: Presets = props.preset ?? "default"
+  const preset: Presets = props.preset ?? "secondary"
   function $viewStyle({ pressed }: PressableStateCallbackType): StyleProp<ViewStyle> {
     return [
       themed($viewPresets[preset]),
@@ -155,7 +155,7 @@ const $leftAccessoryStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $viewPresets: Record<Presets, ThemedStyleArray<ViewStyle>> = {
   primary: [$styles.row, $baseViewStyle, ({ colors }) => ({ backgroundColor: colors.tint })],
-  default: [
+  secondary: [
     $styles.row,
     $baseViewStyle,
     ({ colors }) => ({
@@ -164,55 +164,37 @@ const $viewPresets: Record<Presets, ThemedStyleArray<ViewStyle>> = {
       backgroundColor: colors.palette.neutral100,
     }),
   ],
-  filled: [
-    $styles.row,
-    $baseViewStyle,
-    ({ colors }) => ({ backgroundColor: colors.palette.neutral300 }),
-  ],
-  reversed: [
-    $styles.row,
-    $baseViewStyle,
-    ({ colors }) => ({ backgroundColor: colors.palette.neutral800 }),
-  ],
+  destructive: [$styles.row, $baseViewStyle, ({ colors }) => ({ backgroundColor: colors.error })],
 }
 
 const $textPresets: Record<Presets, ThemedStyleArray<TextStyle>> = {
   primary: [$baseTextStyle, ({ colors }) => ({ color: accessibleForeground(colors.tint) })],
-  default: [$baseTextStyle],
-  filled: [$baseTextStyle],
-  reversed: [$baseTextStyle, ({ colors }) => ({ color: colors.palette.neutral100 })],
+  secondary: [$baseTextStyle],
+  destructive: [$baseTextStyle, ({ colors }) => ({ color: accessibleForeground(colors.error) })],
 }
 
 const $pressedViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
   primary: () => ({ opacity: 0.85 }),
-  default: ({ colors }) => ({ backgroundColor: colors.palette.neutral200 }),
-  filled: ({ colors }) => ({ backgroundColor: colors.palette.neutral400 }),
-  reversed: ({ colors }) => ({ backgroundColor: colors.palette.neutral700 }),
+  secondary: ({ colors }) => ({ backgroundColor: colors.palette.neutral200 }),
+  destructive: () => ({ opacity: 0.85 }),
 }
 
 const $pressedTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
   primary: () => ({}),
-  default: () => ({ opacity: 0.9 }),
-  filled: () => ({ opacity: 0.9 }),
-  reversed: () => ({ opacity: 0.9 }),
+  secondary: () => ({ opacity: 0.9 }),
+  destructive: () => ({}),
 }
 
-const $disabledViewStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderColor: colors.textDim,
-  borderStyle: "solid",
-  opacity: 0.55,
-})
-
-const $disabledSolidViewStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.palette.neutral400,
-  opacity: 0.8,
-})
+const $disabledFilledViewStyle: ThemedStyle<ViewStyle> = () => ({ opacity: 0.55 })
 
 const $disabledViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
-  primary: () => ({ opacity: 0.55 }),
-  default: $disabledViewStyle,
-  filled: $disabledViewStyle,
-  reversed: $disabledSolidViewStyle,
+  primary: $disabledFilledViewStyle,
+  secondary: ({ colors }) => ({
+    borderColor: colors.textDim,
+    borderStyle: "solid",
+    opacity: 0.55,
+  }),
+  destructive: $disabledFilledViewStyle,
 }
 
 const $disabledTextStyle: ThemedStyle<TextStyle> = () => ({
@@ -221,7 +203,6 @@ const $disabledTextStyle: ThemedStyle<TextStyle> = () => ({
 
 const $disabledTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
   primary: $disabledTextStyle,
-  default: $disabledTextStyle,
-  filled: $disabledTextStyle,
-  reversed: ({ colors }) => ({ color: colors.palette.neutral800 }),
+  secondary: $disabledTextStyle,
+  destructive: $disabledTextStyle,
 }

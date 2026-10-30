@@ -124,8 +124,7 @@ export function DeleteAccountScreen({
                     : "account:deleteAccount.submit.delete"
               }
               disabled={confirmation.trim().toUpperCase() !== DELETE_CONFIRMATION || isSubmitting}
-              style={themed($dangerButton)}
-              textStyle={themed($dangerButtonText)}
+              preset="destructive"
               onPress={onRequestDeletion}
             />
             <Text
@@ -197,7 +196,7 @@ export function AccountDeletionReceiptScreen({
         {failed && onSignIn ? (
           <Button
             tx="account:deleteAccount.receipt.signInToRetry"
-            preset="reversed"
+            preset="primary"
             onPress={onSignIn}
           />
         ) : null}
@@ -366,12 +365,6 @@ const $stepNumber: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: 15,
   backgroundColor: colors.separator,
 })
-const $dangerButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  minHeight: 52,
-  borderColor: colors.error,
-  backgroundColor: colors.transparent,
-})
-const $dangerButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $statusPanel: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",

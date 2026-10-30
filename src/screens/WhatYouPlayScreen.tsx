@@ -111,7 +111,7 @@ export function WhatYouPlayScreen({ defaultPlayerCount, onChoose }: WhatYouPlayS
           <Button
             testID="what-you-play-start"
             tx="play:whatYouPlay.play"
-            preset="reversed"
+            preset="primary"
             style={themed($primaryAction)}
             disabled={!chosen}
             onPress={() => {

@@ -54,7 +54,7 @@ export function EventListScreen({
           <Button
             testID="new-event-button"
             tx="events:newEvent"
-            preset="reversed"
+            preset="primary"
             style={$action}
             onPress={onNew}
           />
