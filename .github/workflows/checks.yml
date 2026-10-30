@@ -58,6 +58,10 @@ jobs:
               - 'assets/**'
               - 'web/**'
               - 'patches/**'
+              - 'js-patches/**'
+              # why: the app imports convex/lib and convex/_generated; the rest of convex/ is server-only.
+              - 'convex/lib/**'
+              - 'convex/_generated/**'
               - 'babel.config.js'
               - 'metro.config.js'
               - 'package.json'
