@@ -12,6 +12,7 @@ const { clearInterval, clearTimeout, setInterval, setTimeout } = require("node:t
 const { parseArgs } = require("node:util")
 
 const { previewKey, previewName } = require("./preview.cjs")
+const { SYSTEM_IDS } = require("../convex/lib/systems/definitions.ts")
 
 const USAGE = `Stand-in players for connected games on a Convex preview.
 
@@ -254,6 +255,7 @@ class Bot {
       displayName: this.name,
       color: COLORS[this.slot % COLORS.length],
       deviceId: this.deviceId,
+      systems: SYSTEM_IDS,
       variants: ["treachery"],
     })
     this.publicId = seat.publicId
