@@ -18,8 +18,13 @@ export const isCommanderDamageDelta = (value: unknown): value is number =>
 
 export const PARTNER_COMMANDER = 1
 
-export const isCommanderSlot = (value: unknown): value is typeof PARTNER_COMMANDER | undefined =>
+export type CommanderSlot = typeof PARTNER_COMMANDER | undefined
+
+export const isCommanderSlot = (value: unknown): value is CommanderSlot =>
   value === undefined || value === PARTNER_COMMANDER
+
+export const commanderField = (commander: CommanderSlot) =>
+  commander === undefined ? {} : { commander }
 
 export interface SeatOwner {
   userId?: string

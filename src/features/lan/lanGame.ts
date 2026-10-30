@@ -1,13 +1,15 @@
 import { translate } from "@/i18n/translate"
 
 import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
-import type { ClaimStatus } from "../../../convex/lib/gameEngine"
+import type {
+  ClaimStatus,
+  GameWrite as MemoryWrite,
+  GameWriteResult as MemoryWriteResult,
+} from "../../../convex/lib/gameEngine"
 import {
   commanderTotals,
   writeMemoryGame,
   type MemoryGame,
-  type MemoryWrite,
-  type MemoryWriteResult,
 } from "../../../convex/lib/gameEngineMemory"
 import { commanderLethalDamage } from "../../../convex/lib/gameRules"
 import {

@@ -3,13 +3,13 @@ import { ConvexError } from "convex/values"
 import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import { engineGameOf, type EngineError } from "./lib/gameEngine"
 import {
-  writeMemoryGame,
-  type MemoryAck,
-  type MemoryGame,
-  type MemoryWrite,
-} from "./lib/gameEngineMemory"
+  engineGameOf,
+  type EngineError,
+  type GameAck as MemoryAck,
+  type GameWrite as MemoryWrite,
+} from "./lib/gameEngine"
+import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
 import type { TableAction } from "./lib/table"
 
 const token = "t".repeat(43)
@@ -591,5 +591,58 @@ describe("engine parity: confirm and decline commander damage", () => {
       deviceId: HOST_DEVICE,
     })
     await game.expectSameState()
+  })
+})
+
+describe("memory engine: partner commanders", () => {
+  it("keeps a partner's claims and totals apart from the first commander's", () => {
+    const seat = (id: string) => ({ id, userId: id, deviceId: `device-${id}`, currentLife: 40 })
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      seats: new Map([
+        ["attacker", seat("attacker")],
+        ["defender", seat("defender")],
+      ]),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const claim = (operationId: string, delta: number, commander?: number) =>
+      writeMemoryGame(
+        memory,
+        { userId: "attacker", isHost: true },
+        {
+          kind: "commander.claim",
+          fromPlayerId: "attacker",
+          toPlayerId: "defender",
+          ...(commander === undefined ? {} : { commander }),
+          delta,
+          operationId,
+          deviceId: "device-attacker",
+          clientCreatedAt: CREATED_AT,
+        },
+        CREATED_AT,
+      )
+    const confirm = (operationId: string) =>
+      writeMemoryGame(
+        memory,
+        { userId: "defender", isHost: false },
+        {
+          kind: "commander.resolve",
+          decision: "confirmed",
+          operationId,
+          deviceId: "device-defender",
+          clientCreatedAt: CREATED_AT,
+        },
+        CREATED_AT,
+      )
+
+    expect(claim("claim-first-commander", 5)).toMatchObject({ ack: { status: "pending" } })
+    expect(claim("claim-partner-commander", 6, 1)).toMatchObject({ ack: { status: "pending" } })
+    expect(confirm("claim-first-commander")).toMatchObject({ ack: { total: 5, currentLife: 35 } })
+    expect(confirm("claim-partner-commander")).toMatchObject({ ack: { total: 6, currentLife: 29 } })
   })
 })
