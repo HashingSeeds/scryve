@@ -15,6 +15,24 @@ describe("pastedLines", () => {
     ])
   })
 
+  it("reads the block after the only blank line as the sideboard, like the importer", () => {
+    const list = "4 Lightning Bolt\n4 Lightnig Helix\n\n2 Pyroblsat"
+    expect(pastedLines(list, "Lightnig Helix")).toEqual([{ quantity: 4, board: "main" }])
+    expect(pastedLines(list, "Pyroblsat")).toEqual([{ quantity: 2, board: "sideboard" }])
+  })
+
+  it("reads a trailing block that completes 100 cards as the commander", () => {
+    expect(pastedLines("98 Plains\n1 Sol Ring\n\n1 Captian America", "Captian America")).toEqual([
+      { quantity: 1, board: "commander" },
+    ])
+  })
+
+  it("skips sections the importer skips", () => {
+    expect(pastedLines("Maybeboard\n3 Swrods\n\nDeck\n1 Swrods", "Swrods")).toEqual([
+      { quantity: 1, board: "main" },
+    ])
+  })
+
   it("finds printed lines by their full reference", () => {
     expect(
       pastedLines("Commander\n1 Captian America (SLD) 12 *F*", "Captian America (SLD) 12 *F*"),

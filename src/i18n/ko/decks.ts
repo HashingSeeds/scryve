@@ -564,7 +564,7 @@ export default {
     openSourceFailed: "덱 소스를 열 수 없습니다.",
     viewSource: "원본 덱 보기",
     loadingTopDeck: "Top Deck 불러오는 중",
-    previewCard: "{{card}} 미리보기",
+    openDeck: "{{card}} 열기",
     saveDeckOnDevice: "이 기기에 덱 저장",
     saveDeck: "덱 저장",
     originalPrecon:
@@ -579,7 +579,7 @@ export default {
     refreshing: "덱 새로고침 중. 저장된 결과는 계속 사용할 수 있습니다.",
     refreshFailed: "덱을 새로고침할 수 없습니다. 저장된 결과는 계속 사용할 수 있습니다.",
     checkAgain: "다시 확인",
-    preview: "미리보기",
+    open: "열기",
     loadMore: "더 보기",
     importSource: "가져오기 소스",
     pasteText: "텍스트 붙여넣기",

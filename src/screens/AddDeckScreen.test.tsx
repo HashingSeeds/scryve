@@ -413,11 +413,11 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it("replaces a not-found line with a searched card in the line's copies and section", async () => {
+  it("replaces a not-found sideboard line with a searched card in the line's copies and section", async () => {
     mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, unresolved: ["Cap's Shield"] })
     const view = renderAddDeck()
     chooseFormat(view, "modern")
-    enterPasted(view, "2 Forest\nSideboard\n3 Cap's Shield")
+    enterPasted(view, "2 Forest\n\n3 Cap's Shield")
     await waitFor(() => expect(view.getByText("Not found")).toBeTruthy())
     fireEvent.press(view.getByLabelText("Search for a card to replace Cap's Shield"))
     act(() => {

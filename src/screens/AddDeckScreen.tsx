@@ -736,11 +736,16 @@ export function AddDeckScreen({
   function problemCopies(draft: ImportDraft, problem: ImportProblem) {
     const placeholders = draft.cards.filter((card) => card.originalReference === problem.line)
     if (placeholders.length > 0)
-      return placeholders.map((card) => ({ quantity: card.quantity, section: cardSection(card) }))
+      return placeholders.map((card) => ({
+        quantity: card.quantity,
+        section: cardSection(card),
+        board: card.board,
+      }))
     if (draft.origin.kind === "text")
       return pastedLines(draft.origin.source, problem.line).map(({ quantity, board }) => ({
         quantity,
         section: board,
+        board,
       }))
     return undefined
   }
@@ -749,20 +754,17 @@ export function AddDeckScreen({
     const draft = editor.latest.current
     if (!draft) return undefined
     const copies = problemCopies(draft, problem) ?? [
-      { quantity: card.quantity, section: cardSection(card) },
+      { quantity: card.quantity, section: cardSection(card), board: card.board },
     ]
     const rest = withoutProblem(draft, problem)
     const normalized = normalizeImportedCards(
       [
         ...rest.cards,
-        ...copies.map(({ quantity, section }) => ({
+        ...copies.map(({ quantity, section, board }) => ({
           ...card,
           quantity,
           section,
-          ...(card.scryfallId &&
-          (section === "main" || section === "sideboard" || section === "commander")
-            ? { board: section }
-            : {}),
+          ...(card.scryfallId && board ? { board } : {}),
         })),
       ],
       draft.game,
@@ -1183,7 +1185,7 @@ export function AddDeckScreen({
                 key={deck.fileName}
                 testID={`precon-result-${deck.fileName}`}
                 accessibilityRole="button"
-                accessibilityLabel={translate("decks:addDeck.previewCard", { card: deck.name })}
+                accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
                 disabled={previewLoading}
@@ -1195,14 +1197,14 @@ export function AddDeckScreen({
                     <Text size="xs" tone="dim" text={preconDetail(deck)} />
                   ) : null}
                 </View>
-                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
+                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.open" />
               </TouchableOpacity>
             ))}
             {catalogDecks.map((deck) => (
               <TouchableOpacity
                 key={deck._id}
                 accessibilityRole="button"
-                accessibilityLabel={translate("decks:addDeck.previewCard", { card: deck.name })}
+                accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
                 onPress={() => setSelectedCatalogDeck(deck)}
@@ -1211,7 +1213,7 @@ export function AddDeckScreen({
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
                   <Text size="xs" tone="dim" text={catalogDeckDetail(deck)} />
                 </View>
-                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
+                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.open" />
               </TouchableOpacity>
             ))}
             {catalogCursor ? (

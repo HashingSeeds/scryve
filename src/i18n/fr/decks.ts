@@ -607,7 +607,7 @@ export default {
     openSourceFailed: "Impossible d’ouvrir la source du deck.",
     viewSource: "Voir le deck source",
     loadingTopDeck: "Chargement du Top Deck",
-    previewCard: "Aperçu de {{card}}",
+    openDeck: "Ouvrir {{card}}",
     saveDeckOnDevice: "Enregistrer le deck sur cet appareil",
     saveDeck: "Enregistrer le deck",
     originalPrecon:
@@ -627,7 +627,7 @@ export default {
     refreshFailed:
       "Impossible d’actualiser les decks. Les résultats enregistrés restent disponibles.",
     checkAgain: "Vérifier à nouveau",
-    preview: "Aperçu",
+    open: "Ouvrir",
     loadMore: "Charger plus",
     importSource: "Source d’import",
     pasteText: "Coller du texte",

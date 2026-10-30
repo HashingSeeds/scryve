@@ -600,7 +600,7 @@ export default {
     openSourceFailed: "No se pudo abrir el origen del mazo.",
     viewSource: "Ver mazo de origen",
     loadingTopDeck: "Cargando Top Deck",
-    previewCard: "Vista previa de {{card}}",
+    openDeck: "Abrir {{card}}",
     saveDeckOnDevice: "Guardar mazo en este dispositivo",
     saveDeck: "Guardar mazo",
     originalPrecon:
@@ -620,7 +620,7 @@ export default {
     refreshFailed:
       "No se pudieron actualizar los mazos. Los resultados guardados siguen disponibles.",
     checkAgain: "Comprobar de nuevo",
-    preview: "Vista previa",
+    open: "Abrir",
     loadMore: "Cargar más",
     importSource: "Origen de importación",
     pasteText: "Pegar texto",

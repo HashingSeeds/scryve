@@ -575,7 +575,7 @@ export default {
     openSourceFailed: "デッキのソースを開けませんでした。",
     viewSource: "元のデッキを見る",
     loadingTopDeck: "Top Deckを読み込み中",
-    previewCard: "{{card}}をプレビュー",
+    openDeck: "{{card}}を開く",
     saveDeckOnDevice: "このデバイスにデッキを保存",
     saveDeck: "デッキを保存",
     originalPrecon:
@@ -589,7 +589,7 @@ export default {
     refreshing: "デッキを更新中。保存済みの結果は引き続き利用できます。",
     refreshFailed: "デッキを更新できませんでした。保存済みの結果は引き続き利用できます。",
     checkAgain: "再確認",
-    preview: "プレビュー",
+    open: "開く",
     loadMore: "さらに読み込む",
     importSource: "インポート元",
     pasteText: "テキストを貼り付け",
