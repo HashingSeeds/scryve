@@ -173,9 +173,19 @@ describe("editDeck move", () => {
     expect(draftChanges(back, "").cards).toBe(false)
   })
 
+  it("is clean after a round trip that reorders the list", () => {
+    const start = open([card("Bolt"), card("Path"), card("Bolt", { section: "sideboard" })])
+    const out = apply(start, [move(card("Bolt"))])
+    const back = apply(out, [move(card("Bolt", { section: "sideboard" }))])
+    expect(summary(back)).toEqual(["1 main:Path", "1 sideboard:Bolt", "1 main:Bolt"])
+    expect(draftChanges(back, "").cards).toBe(false)
+  })
+
   it("keeps the board field in step for Magic cards", () => {
-    const moved = apply(open([card("Bolt", { board: "main" })]), [move(card("Bolt"))])
-    expect(moved.cards).toEqual([card("Bolt", { board: "sideboard", section: "sideboard" })])
+    const legacy = card("Bolt", { board: "main" })
+    const moved = apply(open([legacy]), [move(legacy)])
+    expect(moved.cards).toEqual([card("Bolt", { board: "sideboard" })])
+    expect(apply(moved, [move(moved.cards[0])]).cards).toEqual([legacy])
   })
 
   it("uses the Side Deck in Yu-Gi-Oh and does nothing where there is no sideboard", () => {

@@ -65,15 +65,11 @@ export function startsNewList(base: readonly DeckCard[], cards: readonly DeckCar
 }
 
 export function cardsChanged(cards: readonly DeckCard[], base: readonly DeckCard[]) {
-  return (
-    cards.length !== base.length ||
-    cards.some(
-      (card, index) =>
-        printingKey(card) !== printingKey(base[index]) ||
-        card.quantity !== base[index].quantity ||
-        card.commanderColor !== base[index].commanderColor,
-    )
-  )
+  const rows = (list: readonly DeckCard[]) =>
+    list.map((card) => `${printingKey(card)}|${card.quantity}|${card.commanderColor ?? ""}`).sort()
+  const now = rows(cards)
+  const was = rows(base)
+  return now.length !== was.length || now.some((row, index) => row !== was[index])
 }
 
 function adjustCardQuantity<T extends DeckCard>(cards: readonly T[], card: T, delta: number) {
@@ -136,12 +132,11 @@ function moveCopy<T extends DeckCard>(
   entry: T,
   section: string,
 ): { cards: T[] } | { error: string } {
-  const copy: T = {
-    ...entry,
-    quantity: 1,
-    section,
-    ...(entry.board ? ({ board: section === "sideboard" ? "sideboard" : "main" } as const) : {}),
-  }
+  const board = section === "sideboard" ? "sideboard" : "main"
+  const copy: T =
+    entry.section === undefined && entry.board
+      ? { ...entry, quantity: 1, board }
+      : { ...entry, quantity: 1, section, ...(entry.board ? { board } : {}) }
   const merges = cards.some((card) => printingKey(card) === printingKey(copy))
   // why: a lone copy keeps its place in the list, so moving it back leaves the draft clean.
   if (!merges && entry.quantity === 1)
