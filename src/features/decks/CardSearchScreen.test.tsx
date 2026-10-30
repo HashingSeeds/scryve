@@ -616,9 +616,12 @@ describe("with the device's card name list", () => {
     ])
   })
 
-  it("leaves Scryfall syntax to Scryfall", async () => {
-    const view = adder()
-    await search(view, "t:instant lightning")
-    expect(mockAction).toHaveBeenCalledTimes(1)
-  })
+  it.each(["t:instant lightning", "lightning bolt and zzzz", "lightning OR bolt"])(
+    "leaves Scryfall syntax like %s to Scryfall",
+    async (text) => {
+      const view = adder()
+      await search(view, text)
+      expect(mockAction).toHaveBeenCalledTimes(1)
+    },
+  )
 })

@@ -64,7 +64,7 @@ const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 const COLOR_MATCH_OPERATOR = { exact: "=", additional: ">=", within: "<=" } as const
 const NAME_MATCHES = 20
-const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-/
+const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 type ColorMatch = keyof typeof COLOR_MATCH_OPERATOR
 
 export function scryfallQuery({
