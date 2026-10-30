@@ -15,12 +15,16 @@ import { useDeckVersionWrites } from "./decksVersionWrites"
 import {
   acknowledgeGuestDeckImport,
   deleteGuestDeck,
+  guestDeckRouteId,
   loadGuestDeck,
   saveGuestDeck,
   useGuestDecks,
+  type GuestDeckPayload,
 } from "./guestDeck"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+
+export type DeckHome = "account" | "device"
 
 export type LocalDeckSyncResult =
   | { status: "synced"; deckId: Id<"decks"> }
@@ -250,6 +254,22 @@ export function useLocalDeckSync(ownerId: string | undefined) {
   )
 
   return { sync, keepOnDevice }
+}
+
+// why: the deck lands on this device first, so a failed account save (full, offline, conflict) still keeps it.
+export function useSaveNewDeck(ownerId: string | undefined) {
+  const { sync } = useLocalDeckSync(ownerId)
+  return useCallback(
+    async (payload: GuestDeckPayload, home: DeckHome) => {
+      const { localId } = saveGuestDeck(payload)
+      if (home === "account" && ownerId) {
+        const result = await sync(localId).catch(() => undefined)
+        if (result?.status === "synced") return result.deckId
+      }
+      return guestDeckRouteId(localId)
+    },
+    [ownerId, sync],
+  )
 }
 
 // why: moving snapshots the server copy, so a deck with edits still queued on this device would lose them.

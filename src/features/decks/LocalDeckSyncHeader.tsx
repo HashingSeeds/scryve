@@ -40,16 +40,15 @@ export function LocalDeckSyncHeader({
   const [picking, setPicking] = useState(false)
   const [makingRoom, setMakingRoom] = useState(false)
   const free = capacity ? capacity.limit - capacity.used : 0
+  if (!ownerId || !capacity || !localDecks.length) return null
   return (
     <View testID="local-deck-sync-header" style={themed($row)}>
       <Text size="xs" tx="decks:shelf.onDevice" style={$flex1} />
-      {ownerId && capacity && localDecks.length ? (
-        <Button
-          testID="local-deck-sync-choose"
-          tx="decks:localSync.sync"
-          onPress={() => (free > 0 ? setPicking(true) : setMakingRoom(true))}
-        />
-      ) : null}
+      <Button
+        testID="local-deck-sync-choose"
+        tx="decks:localSync.sync"
+        onPress={() => (free > 0 ? setPicking(true) : setMakingRoom(true))}
+      />
       {makingRoom ? (
         <DeckLimitDialog
           access={access}
@@ -60,7 +59,7 @@ export function LocalDeckSyncHeader({
           }}
         />
       ) : null}
-      {ownerId && capacity && picking && free > 0 ? (
+      {picking && free > 0 ? (
         <LocalDeckSyncPicker
           ownerId={ownerId}
           excludedLocalIds={excludedLocalIds}

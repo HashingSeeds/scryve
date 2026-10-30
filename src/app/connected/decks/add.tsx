@@ -10,8 +10,9 @@ const leaveAdd = () => goBack("/connected/decks")
 export default function AddDeckRoute() {
   return (
     <CloudScreen onBack={leaveAdd}>
-      {() => (
+      {(access) => (
         <AddDeckScreen
+          access={access}
           onBack={leaveAdd}
           onCreated={(deckId) => {
             captureAnalytics("deck_used", { feature: "saved" })

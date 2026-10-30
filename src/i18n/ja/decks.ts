@@ -505,7 +505,6 @@ export default {
     allFormats: "すべてのフォーマット",
     search: "デッキを検索",
     onDevice: "このデバイス内",
-    synced: "同期済み",
     guestEmpty: "このデバイスにデッキを保存できます。アカウントは不要です。",
     dismissFilters: "フィルターを閉じる",
     system: "システム",
@@ -583,6 +582,7 @@ export default {
     loadingTopDeck: "Top Deckを読み込み中",
     previewCard: "{{card}}をプレビュー",
     saveDeckOnDevice: "このデバイスにデッキを保存",
+    saveDeck: "デッキを保存",
     originalPrecon:
       "元のプレコンのリストです。このフォーマットでは使えないカードが含まれる場合があります。",
     loadingImages: "カード画像を読み込み中",
@@ -619,6 +619,17 @@ export default {
     reviewSourceDeck: "{{source}}のデッキを確認",
     reviewList: "デッキリストを確認",
     createDeck: "デッキを作成",
+  },
+  saveTo: {
+    label: "保存先",
+    account: "アカウント",
+    left: "残り{{left}}/{{limit}}",
+    full: "満杯 · {{used}}/{{limit}}同期済み",
+    checking: "空きを確認中…",
+    offline: "オフライン",
+    freeSlot: "空きを作る",
+    device: "このデバイス",
+    deviceDetail: "このデバイスのみ。あとで同期できます。",
   },
   saveStatus: {
     notSynced: "ローカルの編集は未同期",

@@ -2,6 +2,7 @@ import { Linking } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
@@ -58,6 +59,10 @@ const mockConvexClient = { action: jest.fn() }
 const mockConnection = { isWebSocketConnected: true }
 const mockConvexState: { client: typeof mockConvexClient | undefined } = { client: undefined }
 const mockResolvePasted = jest.fn()
+const mockImportGuest = jest.fn()
+const mockCapacity: {
+  value?: { used: number; limit: number; premium: boolean; canCreate: boolean }
+} = {}
 const mockResolveLink = jest.fn()
 type MockCatalogDeck = {
   _id: string
@@ -134,6 +139,10 @@ jest.mock("@/features/billing/RevenueCatContext", () => ({
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexState.client,
   useConvexConnectionState: () => mockConnection,
+  useMutation: (reference: string) =>
+    reference === "decks.importGuest" ? mockImportGuest : jest.fn(),
+  useQueries: (queries: Record<string, unknown>) =>
+    "capacity" in queries ? { capacity: mockCapacity.value } : {},
   useQuery: (reference: string) => {
     if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (reference === "integrationManifest.list") return mockManifest.value
@@ -172,6 +181,12 @@ jest.mock("../../convex/_generated/api", () => ({
       browse: "deckCatalogs.browse",
     },
     integrationManifest: { list: "integrationManifest.list" },
+    decks: {
+      capacity: "decks.capacity",
+      importGuest: "decks.importGuest",
+      moveToDevice: "decks.moveToDevice",
+      listMine: "decks.listMine",
+    },
   },
 }))
 
@@ -209,6 +224,7 @@ describe("AddDeckScreen", () => {
     mockCatalogDetail.value = undefined
     mockManifest.value = undefined
     mockConnection.isWebSocketConnected = true
+    mockCapacity.value = undefined
   })
 
   it("hides Browse when the server switches example decks off", () => {
@@ -1463,7 +1479,7 @@ describe("AddDeckScreen", () => {
     jest.useRealTimers()
   })
 
-  it("saves a guest's second blank deck locally", () => {
+  it("saves a guest's second blank deck locally", async () => {
     const first = saveGuestDeck({ name: "First", format: "commander", game: "mtg", cards: [] })
     const onCreated = jest.fn()
     const view = render(
@@ -1477,7 +1493,7 @@ describe("AddDeckScreen", () => {
     const [saved, second] = loadGuestDecks()
     expect(saved).toEqual(first)
     expect(second?.deck.name).toBe("Guest deck")
-    expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(second.localId))
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(second.localId)))
   })
 
   it("offers paste and empty deck actions for a format with no lists", async () => {
@@ -1797,7 +1813,7 @@ describe("AddDeckScreen", () => {
     })
   })
 
-  it("creates a deck on this device without waiting on the server", () => {
+  it("creates a deck on this device without waiting on the server", async () => {
     mockConnection.isWebSocketConnected = false
     const onCreated = jest.fn()
     const view = renderAddDeck(onCreated)
@@ -1806,7 +1822,76 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByText("Create deck"))
     const [saved] = loadGuestDecks()
     expect(saved?.deck).toMatchObject({ name: "Offline Deck", cards: [] })
-    expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(saved.localId))
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(saved.localId)))
+  })
+
+  describe("Save to", () => {
+    const access: CloudAccess = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner",
+      request: jest.fn(),
+    }
+
+    function renderSignedIn(onCreated = jest.fn()) {
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <AddDeckScreen access={access} onBack={jest.fn()} onCreated={onCreated} />
+        </ThemeProvider>,
+      )
+      chooseMode(view, "blank")
+      return view
+    }
+
+    it("saves a new deck to the account by default, counting room against the player's own limit", async () => {
+      mockCapacity.value = { used: 3, limit: 100, premium: true, canCreate: true }
+      mockImportGuest.mockImplementation(async ({ localUpdatedAt }) => ({
+        status: "imported",
+        deckId: "deck-1",
+        localUpdatedAt,
+      }))
+      const onCreated = jest.fn()
+      const view = renderSignedIn(onCreated)
+      expect(
+        view.getByRole("radio", { name: "Account, 97 of 100 left", checked: true }),
+      ).toBeTruthy()
+      fireEvent.changeText(view.getByTestId("deck-name-input"), "Synced Deck")
+      fireEvent.press(view.getByText("Create deck"))
+      await waitFor(() => expect(onCreated).toHaveBeenCalledWith("deck-1"))
+      expect(mockImportGuest).toHaveBeenCalledWith(expect.objectContaining({ name: "Synced Deck" }))
+      expect(loadGuestDecks()).toEqual([])
+    })
+
+    it("makes the player's last pick the next deck's default", async () => {
+      mockCapacity.value = { used: 0, limit: 2, premium: false, canCreate: true }
+      const first = renderSignedIn()
+      fireEvent.press(first.getByTestId("save-destination-device"))
+      first.unmount()
+      const onCreated = jest.fn()
+      const view = renderSignedIn(onCreated)
+      expect(view.getByRole("radio", { name: /^This device/, checked: true })).toBeTruthy()
+      fireEvent.changeText(view.getByTestId("deck-name-input"), "Kept here")
+      fireEvent.press(view.getByText("Create deck"))
+      const [saved] = loadGuestDecks()
+      await waitFor(() => expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(saved.localId)))
+      expect(mockImportGuest).not.toHaveBeenCalled()
+    })
+
+    it("says a full account is full and offers to free a slot before saving", () => {
+      mockCapacity.value = { used: 2, limit: 2, premium: false, canCreate: false }
+      const view = renderSignedIn()
+      expect(view.getByRole("radio", { name: "Account, Full · 2 of 2 synced" })).toBeDisabled()
+      expect(view.getByRole("radio", { name: /^This device/, checked: true })).toBeTruthy()
+      fireEvent.press(view.getByTestId("save-destination-free-slot"))
+      expect(view.getByTestId("deck-limit-dialog")).toBeTruthy()
+    })
+
+    it("gives guests no choice to make", () => {
+      const view = renderAddDeck()
+      chooseMode(view, "blank")
+      expect(view.queryByTestId("save-destination")).toBeNull()
+    })
   })
 
   it("counts down a Scryfall cooldown and retries while keeping the outline", async () => {

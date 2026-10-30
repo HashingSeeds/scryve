@@ -539,7 +539,6 @@ export default {
     allFormats: "Tous les formats",
     search: "Rechercher des decks",
     onDevice: "Sur cet appareil",
-    synced: "Synchronisé",
     guestEmpty: "Enregistrez un deck sur cet appareil. Aucun compte requis.",
     dismissFilters: "Fermer les filtres",
     system: "Jeu",
@@ -619,6 +618,7 @@ export default {
     loadingTopDeck: "Chargement du Top Deck",
     previewCard: "Aperçu de {{card}}",
     saveDeckOnDevice: "Enregistrer le deck sur cet appareil",
+    saveDeck: "Enregistrer le deck",
     originalPrecon:
       "Liste précon d’origine. Certaines cartes peuvent ne plus être légales dans ce format.",
     loadingImages: "Chargement des images des cartes",
@@ -665,6 +665,17 @@ export default {
     reviewSourceDeck: "Vérifier le deck {{source}}",
     reviewList: "Vérifier la liste du deck",
     createDeck: "Créer le deck",
+  },
+  saveTo: {
+    label: "Enregistrer dans",
+    account: "Compte",
+    left: "{{left}} sur {{limit}} restant(s)",
+    full: "Complet · {{used}} sur {{limit}} synchronisés",
+    checking: "Vérification de l'espace…",
+    offline: "Hors ligne",
+    freeSlot: "Libérer une place",
+    device: "Cet appareil",
+    deviceDetail: "Uniquement ici. Synchronisez-le plus tard.",
   },
   saveStatus: {
     notSynced: "Modification locale non synchronisée",

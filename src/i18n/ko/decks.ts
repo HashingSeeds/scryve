@@ -498,7 +498,6 @@ export default {
     allFormats: "모든 포맷",
     search: "덱 검색",
     onDevice: "이 기기",
-    synced: "동기화됨",
     guestEmpty: "이 기기에 덱을 저장하세요. 계정이 필요 없습니다.",
     dismissFilters: "필터 닫기",
     system: "시스템",
@@ -572,6 +571,7 @@ export default {
     loadingTopDeck: "Top Deck 불러오는 중",
     previewCard: "{{card}} 미리보기",
     saveDeckOnDevice: "이 기기에 덱 저장",
+    saveDeck: "덱 저장",
     originalPrecon:
       "오리지널 프리콘 목록입니다. 이 포맷에서 더 이상 사용할 수 없는 카드가 있을 수 있습니다.",
     loadingImages: "카드 이미지 불러오는 중",
@@ -608,6 +608,17 @@ export default {
     reviewSourceDeck: "{{source}} 덱 검토",
     reviewList: "덱 리스트 검토",
     createDeck: "덱 만들기",
+  },
+  saveTo: {
+    label: "저장 위치",
+    account: "계정",
+    left: "{{limit}}개 중 {{left}}개 남음",
+    full: "가득 참 · {{limit}}개 중 {{used}}개 동기화됨",
+    checking: "여유 공간 확인 중…",
+    offline: "오프라인",
+    freeSlot: "자리 비우기",
+    device: "이 기기",
+    deviceDetail: "이 기기에만 저장됩니다. 나중에 동기화하세요.",
   },
   saveStatus: {
     notSynced: "로컬 편집 동기화 안 됨",

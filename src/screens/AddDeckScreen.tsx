@@ -19,6 +19,7 @@ import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
@@ -33,7 +34,9 @@ import {
   type DeckEdits,
 } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
-import { guestDeckRouteId, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
+import { type GuestDeckPayload } from "@/features/decks/guestDeck"
+import { useSaveNewDeck } from "@/features/decks/localDeckSync"
+import { SaveDestination, useSaveDestination } from "@/features/decks/SaveDestination"
 import { useCapabilityReleased } from "@/features/decks/useCapabilityReleased"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckEditor } from "@/features/decks/useDeckEditor"
@@ -348,11 +351,16 @@ function previewSections(
 export function AddDeckScreen({
   onBack,
   onCreated,
+  access,
 }: {
   onBack: () => void
   onCreated: (deckId: string) => void
+  access?: CloudAccess
 }) {
   const { themed } = useAppTheme()
+  const destination = useSaveDestination(access)
+  const saveNewDeck = useSaveNewDeck(destination.access?.ownerId)
+  const [saving, setSaving] = useState(false)
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
@@ -442,13 +450,19 @@ export function AddDeckScreen({
     setError(convexErrorMessage(cause, fallback))
   }
 
-  function saveGuest(payload: GuestDeckPayload) {
+  async function saveGuest(payload: GuestDeckPayload) {
+    if (saving) return
+    setSaving(true)
     try {
-      onCreated(guestDeckRouteId(saveGuestDeck(payload).localId))
+      onCreated(await saveNewDeck(payload, destination.value))
     } catch (cause) {
       fail(cause, translate("decks:addDeck.saveLocalFailed"))
+    } finally {
+      setSaving(false)
     }
   }
+  const saveTx = (deviceTx: TxKeyPath) => (destination.access ? "decks:addDeck.saveDeck" : deviceTx)
+  const saveDestination = <SaveDestination destination={destination} />
 
   function invalidatePasted() {
     pastedToken.current += 1
@@ -572,7 +586,7 @@ export function AddDeckScreen({
   }, [online])
 
   function createBlank() {
-    saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
+    void saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
   }
 
   const previewPrecon = useCallback(
@@ -662,7 +676,7 @@ export function AddDeckScreen({
 
   function importPrecon() {
     if (!selectedPrecon || !resolvedPrecon || resolvedPrecon.unresolved.length) return
-    saveGuest({
+    void saveGuest({
       name: resolvedPrecon.name || selectedPrecon.name,
       format: format ? format : preconstructedFormat(selectedPrecon.type),
       game,
@@ -672,7 +686,7 @@ export function AddDeckScreen({
 
   function importTopDeck() {
     if (!selectedCatalogDeck || !catalogDetail) return
-    saveGuest({
+    void saveGuest({
       name: selectedCatalogDeck.name,
       format: selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
       game: selectedCatalogDeck.game,
@@ -807,7 +821,7 @@ export function AddDeckScreen({
       pastedCards.length === 0
     )
       return
-    saveGuest({
+    void saveGuest({
       name,
       format,
       game,
@@ -1083,6 +1097,7 @@ export function AddDeckScreen({
           {commanderWarnings.map((warning) => (
             <Text key={warning} size="xs" text={warning} />
           ))}
+          {saveDestination}
           <View style={themed($configRow)}>
             {editingPasted ? (
               <Button
@@ -1097,10 +1112,11 @@ export function AddDeckScreen({
             ) : null}
             <Button
               testID="save-import-button"
-              tx="decks:addDeck.saveOnDevice"
+              tx={saveTx("decks:addDeck.saveOnDevice")}
               preset="primary"
               style={$flex1}
               disabled={
+                saving ||
                 resolvingPasted ||
                 !pastedDraftCurrent ||
                 (!pastedDraft.omitted && pastedProblems.length > 0) ||
@@ -1247,12 +1263,12 @@ export function AddDeckScreen({
         </ScrollView>
         <BottomActionBar>
           {error ? <AlertNote text={error} /> : null}
-
+          {saveDestination}
           <Button
             testID="import-catalog-deck"
-            tx="decks:addDeck.saveDeckOnDevice"
+            tx={saveTx("decks:addDeck.saveDeckOnDevice")}
             preset="primary"
-            disabled={!catalogDetail}
+            disabled={saving || !catalogDetail}
             onPress={importTopDeck}
           />
         </BottomActionBar>
@@ -1275,7 +1291,7 @@ export function AddDeckScreen({
     const configuredSections = localizedDeckSections(game, previewFormat)
     const sections = previewSections(cards, configuredSections)
     const unresolved = resolvedPrecon?.unresolved.length ?? 0
-    const cannotImport = previewLoading || !resolvedPrecon || unresolved > 0
+    const cannotImport = saving || previewLoading || !resolvedPrecon || unresolved > 0
 
     return (
       <Screen
@@ -1382,6 +1398,7 @@ export function AddDeckScreen({
           )}
         </ScrollView>
         <BottomActionBar>
+          {saveDestination}
           <TouchableOpacity
             testID="import-preview-button"
             accessibilityRole="button"
@@ -1396,7 +1413,7 @@ export function AddDeckScreen({
             <Text
               weight="bold"
               style={themed($previewImportButtonText)}
-              tx="decks:addDeck.saveDeckOnDevice"
+              tx={saveTx("decks:addDeck.saveDeckOnDevice")}
             />
           </TouchableOpacity>
         </BottomActionBar>
@@ -1686,10 +1703,11 @@ export function AddDeckScreen({
               onChangeText={setName}
             />
             {noteField}
+            {saveDestination}
             <Button
               tx="decks:addDeck.createDeck"
               preset="primary"
-              disabled={!name.trim()}
+              disabled={saving || !name.trim()}
               onPress={createBlank}
             />
           </View>

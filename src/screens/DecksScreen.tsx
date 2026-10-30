@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { FlatList, ScrollView, SectionList, TouchableOpacity, View } from "react-native"
+import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import Svg, { Path } from "react-native-svg"
@@ -18,11 +18,11 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
+import { DeckHomeGlyph } from "@/features/decks/DeckHomeGlyph"
 import { DeckCount } from "@/features/decks/DeckLimit"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { allRecord, keyStatsRecord, type DeckStatsRecord } from "@/features/decks/deckStatLines"
-import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
@@ -53,6 +53,7 @@ type ShelfDeck = {
   cardQuantity?: number
   lastPlayedAt?: number
   favoritedAt?: number
+  updatedAt?: number
   record?: DeckStatsRecord
   keyRecord?: DeckStatsRecord
 }
@@ -116,12 +117,15 @@ function DeckRow({
   deck,
   showGame,
   needsReview,
+  favoriteSlot,
   onPress,
   onToggleFavorite,
 }: {
   deck: ShelfDeck
   showGame: boolean
   needsReview?: boolean
+  /** why: device decks can't be favorites, but in a list with account decks their lane icon still lines up. */
+  favoriteSlot?: boolean
   onPress: (reviewChanges?: boolean) => void
   onToggleFavorite?: () => void
 }) {
@@ -156,10 +160,7 @@ function DeckRow({
         onPress={() => onPress()}
       >
         <View style={themed($rowCopy)}>
-          <View style={$nameRow}>
-            <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} style={$name} />
-            {local ? <DeviceGlyph /> : null}
-          </View>
+          <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} />
           <Text size="xxs" numberOfLines={1} tone="dim" text={deckSubtitle(deck, game, showGame)} />
         </View>
         {record || versions ? (
@@ -168,6 +169,9 @@ function DeckRow({
             {versions ? <Text size="xxs" numberOfLines={1} tone="dim" text={versions} /> : null}
           </View>
         ) : null}
+        <View testID={`deck-home-lane-${deck._id}`} style={$homeLane}>
+          <DeckHomeGlyph home={local ? "device" : "account"} />
+        </View>
       </TouchableOpacity>
       {needsReview ? (
         <TouchableOpacity
@@ -198,6 +202,8 @@ function DeckRow({
             color={favorite ? theme.colors.tint : theme.colors.textDim}
           />
         </TouchableOpacity>
+      ) : favoriteSlot ? (
+        <View style={themed($favoriteButton)} />
       ) : null}
     </View>
   )
@@ -300,7 +306,6 @@ function LocalDeckList({
       contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={rows.length ? <Text size="xs" tx="decks:shelf.onDevice" /> : null}
       renderItem={({ item: row }) => (
         <DeckRow deck={row} showGame={showGame} onPress={() => selectLocalDeck(row, onSelect)} />
       )}
@@ -387,9 +392,17 @@ function DeckShelf({
         .filter((deck) => matchesSearch(deck, search)),
     [collectionDecks, format, search, system],
   )
-  const filtered =
-    (collectionDecks.length > 0 || (hasLocalDecks && !localRows.length)) &&
-    visibleDecks.length === 0
+  const rows = (() => {
+    const merged = [
+      ...visibleDecks.map((deck) => ({ home: "account" as const, deck })),
+      ...deviceRows.map((deck) => ({ home: "device" as const, deck })),
+    ]
+    if (collection === "favorites") return merged
+    const rank = (deck: ShelfDeck) =>
+      collection === "recent" ? -recentDeckIds.indexOf(String(deck._id)) : (deck.updatedAt ?? 0)
+    return merged.sort((left, right) => rank(right.deck) - rank(left.deck))
+  })()
+  const filtered = (collectionDecks.length > 0 || hasLocalDecks) && rows.length === 0
   const { titleTx, detailTx } = EMPTY_COLLECTION[collection]
 
   async function toggleFavorite(deck: ShelfDeck) {
@@ -410,30 +423,25 @@ function DeckShelf({
         <Text tx="decks:shelf.reconnect" />
         <Button tx="common:tryAgain" onPress={() => void synced.retry()} />
       </View>
-    ) : mine && localRows.length && !filtered ? null : mine ? (
+    ) : !mine ? (
+      <DeckShelfSkeleton />
+    ) : rows.length ? null : (
       <View style={themed($empty)}>
         <Text preset="subheading" tx={filtered ? "decks:shelf.nothingMatches" : titleTx} />
         <Text size="sm" tone="dim" tx={filtered ? "decks:shelf.tryAnotherSearch" : detailTx} />
         {filtered ? <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} /> : null}
       </View>
-    ) : (
-      <DeckShelfSkeleton />
     )
-  const sections = [
-    ...(visibleDecks.length || emptyShelf ? [{ key: "synced" as const, data: visibleDecks }] : []),
-    ...(deviceRows.length ? [{ key: "local" as const, data: deviceRows }] : []),
-  ]
 
   return (
-    <SectionList
+    <FlatList
       testID="decks-list"
-      sections={sections}
+      data={rows}
       extraData={failedDeckIds}
-      keyExtractor={(deck) => String(deck._id)}
+      keyExtractor={(row) => String(row.deck._id)}
       contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      stickySectionHeadersEnabled={false}
       ListHeaderComponent={
         <View>
           {leftovers.error ? (
@@ -457,43 +465,38 @@ function DeckShelf({
               />
             </View>
           ) : null}
+          {deviceRows.length ? (
+            <LocalDeckSyncHeader
+              key={access?.ownerId}
+              access={access}
+              excludedLocalIds={leftovers.localIds}
+            />
+          ) : null}
+          {emptyShelf}
         </View>
       }
-      renderSectionHeader={({ section }) =>
-        section.key === "local" ? (
-          <LocalDeckSyncHeader
-            key={access?.ownerId}
-            access={access}
-            excludedLocalIds={leftovers.localIds}
-          />
-        ) : (
-          <Text size="xs" tx="decks:shelf.synced" />
-        )
-      }
-      renderSectionFooter={({ section }) =>
-        section.key === "synced" && !section.data.length ? emptyShelf : null
-      }
-      renderItem={({ item: deck, section }) =>
-        section.key === "local" ? (
+      renderItem={({ item: row }) =>
+        row.home === "device" ? (
           <DeckRow
-            deck={deck}
+            deck={row.deck}
             showGame={system === ALL_SYSTEMS}
-            onPress={() => selectLocalDeck(deck, onSelect)}
+            favoriteSlot
+            onPress={() => selectLocalDeck(row.deck, onSelect)}
           />
         ) : (
           <DeckRow
-            deck={deck}
+            deck={row.deck}
             showGame={system === ALL_SYSTEMS}
-            needsReview={failedDeckIds.has(String(deck._id))}
-            onToggleFavorite={() => void toggleFavorite(deck)}
+            needsReview={failedDeckIds.has(String(row.deck._id))}
+            onToggleFavorite={() => void toggleFavorite(row.deck)}
             onPress={(reviewChanges) => {
               onSelect({
                 ...(reviewChanges ? { reviewChanges } : {}),
-                deckId: deck._id,
-                name: deck.name,
-                game: deck.game ?? DEFAULT_DECK_GAME,
-                format: deck.format,
-                cardQuantity: deck.cardQuantity,
+                deckId: row.deck._id,
+                name: row.deck.name,
+                game: row.deck.game ?? DEFAULT_DECK_GAME,
+                format: row.deck.format,
+                cardQuantity: row.deck.cardQuantity,
               })
             }}
           />
@@ -570,6 +573,7 @@ export function DecksScreen({
   const filterCount = Number(system !== ALL_SYSTEMS) + Number(activeFormat !== ALL_FORMATS)
   const guestRows: ShelfDeck[] = guestDecks.map((guest) => ({
     _id: guestDeckRouteId(guest.localId),
+    updatedAt: guest.updatedAt,
     name: guest.deck.name,
     game: guest.deck.game ?? DEFAULT_DECK_GAME,
     format: guest.deck.format,
@@ -959,5 +963,4 @@ const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xl,
 })
 
-const $nameRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
-const $name: TextStyle = { flexShrink: 1 }
+const $homeLane: ViewStyle = { width: 22, alignItems: "center" }
