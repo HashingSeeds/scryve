@@ -24,6 +24,27 @@ import {
 import { storedPlaySystem } from "../game/playSystems"
 import { setOutboxWriter } from "../sync/durableOutbox"
 
+function queue(repository: ConnectedGameRepository, queued: PendingLifeAction) {
+  return repository.outbox(queued.event.gameId).enqueue(queued)
+}
+
+function stored(repository: ConnectedGameRepository, gameId = "game-public") {
+  return repository.outbox(gameId).getState()
+}
+
+async function rejectQueued(repository: ConnectedGameRepository, reason: string, failedAt: number) {
+  const outbox = repository.outbox("game-public", {
+    send: () => Promise.reject(new Error(reason)),
+    rejectReason: () => reason,
+    backoff: { baseMs: 250, maxMs: 8_000 },
+    now: () => failedAt,
+  })
+  const stop = outbox.start()
+  await new Promise(setImmediate)
+  stop()
+  return outbox.getState()
+}
+
 function action(operationId: string, queuedAt = 1, actorId = "user-1"): PendingLifeAction {
   return {
     schemaVersion: 1,
@@ -48,24 +69,21 @@ describe("connected MMKV repository", () => {
     const repository = new ConnectedGameRepository(storage, "user-1")
     for (const toPlayerId of ["player-1", "player-2"]) {
       const pending = action(`commander-claim-${toPlayerId}`)
-      repository.enqueue(
-        {
-          ...pending,
-          event: {
-            ...pending.event,
-            type: "commanderDamage.submitted",
-            fromPlayerId: asPlayerId("player-1"),
-            toPlayerId: asPlayerId(toPlayerId),
-            delta: 5,
-            deviceId: asDeviceId("device-valid-001"),
-          },
+      queue(repository, {
+        ...pending,
+        event: {
+          ...pending.event,
+          type: "commanderDamage.submitted",
+          fromPlayerId: asPlayerId("player-1"),
+          toPlayerId: asPlayerId(toPlayerId),
+          delta: 5,
+          deviceId: asDeviceId("device-valid-001"),
         },
-        [],
-      )
+      })
     }
-    expect(
-      repository.loadOutbox("game-public").map((pending) => pending.event.operationId),
-    ).toEqual(["commander-claim-player-2"])
+    expect(stored(repository).pending.map((pending) => pending.event.operationId)).toEqual([
+      "commander-claim-player-2",
+    ])
   })
 
   it("rejects a saturated outbox before writing another pending record", () => {
@@ -78,12 +96,12 @@ describe("connected MMKV repository", () => {
       action("operation-capacity-01", 1, "user-1"),
       action("operation-capacity-02", 2, "user-1"),
     ]
-    repository.enqueue(pending[0], [])
-    repository.enqueue(pending[1], pending.slice(0, 1))
+    const outbox = repository.outbox("game-public")
+    outbox.enqueue(pending[0])
+    outbox.enqueue(pending[1])
 
-    const result = repository.enqueue(action("operation-capacity-03", 3, "user-1"), pending)
-
-    expect(result).toMatchObject({ accepted: false, reason: "record_limit", pending })
+    expect(outbox.enqueue(action("operation-capacity-03", 3, "user-1"))).toBe(false)
+    expect(outbox.getState().pending).toEqual(pending)
     expect(
       storage.getString(
         CONNECTED_KEYS.outboxRecord("game-public", "operation-capacity-03", "user-1"),
@@ -93,15 +111,15 @@ describe("connected MMKV repository", () => {
 
   it("recovers durable outbox records after process death and acknowledges exactly one", () => {
     const storage = new MemoryStorage()
-    new ConnectedGameRepository(storage).enqueue(action("operation-first-1", 1))
-    new ConnectedGameRepository(storage).enqueue(action("operation-second", 2))
+    queue(new ConnectedGameRepository(storage), action("operation-first-1", 1))
+    queue(new ConnectedGameRepository(storage), action("operation-second", 2))
     const restarted = new ConnectedGameRepository(storage)
-    expect(restarted.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
+    expect(stored(restarted).pending.map((item) => item.event.operationId)).toEqual([
       "operation-first-1",
       "operation-second",
     ])
-    restarted.acknowledge("game-public", "operation-first-1")
-    expect(restarted.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
+    restarted.outbox("game-public").acknowledge(["operation-first-1"])
+    expect(stored(restarted).pending.map((item) => item.event.operationId)).toEqual([
       "operation-second",
     ])
   })
@@ -122,8 +140,8 @@ describe("connected MMKV repository", () => {
       queuedAt: 1,
       attempts: 0,
     }
-    new ConnectedGameRepository(storage).enqueue(tableAction)
-    expect(new ConnectedGameRepository(storage).loadOutbox("game-public")).toEqual([tableAction])
+    queue(new ConnectedGameRepository(storage), tableAction)
+    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([tableAction])
   })
 
   it("keeps client-created time as the tie-breaker for equal queue times", () => {
@@ -137,10 +155,10 @@ describe("connected MMKV repository", () => {
       ...action("operation-client-time-earlier", 10),
       event: { ...action("operation-client-time-earlier", 10).event, clientCreatedAt: 5 },
     }
-    repository.enqueue(laterClientTime)
-    repository.enqueue(earlierClientTime)
+    queue(repository, laterClientTime)
+    queue(repository, earlierClientTime)
 
-    expect(repository.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
+    expect(stored(repository).pending.map((item) => item.event.operationId)).toEqual([
       earlierClientTime.event.operationId,
       laterClientTime.event.operationId,
     ])
@@ -153,13 +171,11 @@ describe("connected MMKV repository", () => {
       CONNECTED_KEYS.outboxRecord("game-public", "operation-orphaned"),
       JSON.stringify(orphan),
     )
-    expect(new ConnectedGameRepository(storage).loadOutbox("game-public")).toEqual([orphan])
+    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([orphan])
 
     storage.set(CONNECTED_KEYS.outboxIndex("game-public"), JSON.stringify(["operation-missing"]))
     expect(
-      new ConnectedGameRepository(storage)
-        .loadOutbox("game-public")
-        .map((item) => item.event.operationId),
+      stored(new ConnectedGameRepository(storage)).pending.map((item) => item.event.operationId),
     ).toEqual(["operation-orphaned"])
     expect(JSON.parse(storage.getString(CONNECTED_KEYS.outboxIndex("game-public"))!)).toEqual([
       "operation-orphaned",
@@ -170,7 +186,7 @@ describe("connected MMKV repository", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-a")
     const pending = action("operation-corrupt-failure", 1, "user-a")
-    repository.enqueue(pending, [])
+    queue(repository, pending)
     const failedKey = CONNECTED_KEYS.failedRecord(
       "game-public",
       pending.event.operationId,
@@ -178,7 +194,7 @@ describe("connected MMKV repository", () => {
     )
     storage.set(failedKey, JSON.stringify({ schemaVersion: 2, action: pending }))
 
-    expect(repository.loadOutbox("game-public")).toEqual([pending])
+    expect(stored(repository).pending).toEqual([pending])
     expect(storage.getString(failedKey)).toBeUndefined()
 
     storage.set(
@@ -193,7 +209,7 @@ describe("connected MMKV repository", () => {
         failedAt: 2,
       }),
     )
-    expect(repository.loadOutbox("game-public")).toEqual([pending])
+    expect(stored(repository).pending).toEqual([pending])
     expect(storage.getString(failedKey)).toBeUndefined()
   })
 
@@ -205,9 +221,9 @@ describe("connected MMKV repository", () => {
       JSON.stringify([legacy, { secret: "no" }]),
     )
     const repository = new ConnectedGameRepository(storage)
-    expect(repository.loadOutbox("game-public")).toHaveLength(1)
+    expect(stored(repository).pending).toHaveLength(1)
     expect(storage.getString(CONNECTED_KEYS.legacyOutbox("game-public"))).toBeUndefined()
-    expect(repository.loadOutbox("game-public")).toHaveLength(1)
+    expect(stored(repository).pending).toHaveLength(1)
   })
 
   it("rejects explicit future pending and nested failed-action versions", () => {
@@ -222,8 +238,8 @@ describe("connected MMKV repository", () => {
       CONNECTED_KEYS.failedRecord("game-public", "operation-future-v2"),
       JSON.stringify({ schemaVersion: 1, action: future, reason: "future", failedAt: 1 }),
     )
-    expect(repository.loadOutbox("game-public")).toEqual([])
-    expect(repository.loadFailed("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
+    expect(stored(repository).failures).toEqual([])
   })
 
   it("rejects malformed persisted identifiers and non-finite timestamps", () => {
@@ -236,24 +252,24 @@ describe("connected MMKV repository", () => {
         event: { ...malformed.event, deviceId: "bad", clientCreatedAt: null },
       }),
     )
-    expect(new ConnectedGameRepository(storage).loadOutbox("game-public")).toEqual([])
+    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([])
   })
 
-  it("moves permanent failures out of pending but retains recovery details", () => {
+  it("moves permanent failures out of pending but retains recovery details", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage)
-    repository.enqueue(action("operation-rejected"))
-    repository.fail("game-public", "operation-rejected", "Game is not active", 50)
-    expect(repository.loadOutbox("game-public")).toEqual([])
-    expect(repository.loadFailed("game-public")[0]).toMatchObject({
+    queue(repository, action("operation-rejected"))
+    await rejectQueued(repository, "Game is not active", 50)
+    expect(stored(repository).pending).toEqual([])
+    expect(stored(repository).failures[0]).toMatchObject({
       reason: "Game is not active",
       failedAt: 50,
     })
-    repository.dismissFailed("game-public", "operation-rejected")
-    expect(repository.loadFailed("game-public")).toEqual([])
+    repository.outbox("game-public").dismiss("operation-rejected")
+    expect(stored(repository).failures).toEqual([])
   })
 
-  it("keeps a rejected action pending when unresolved-failure storage is full", () => {
+  it("keeps a rejected action pending when unresolved-failure storage is full", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1", {
       maxFailedRecords: 1,
@@ -261,37 +277,28 @@ describe("connected MMKV repository", () => {
     })
     const first = action("operation-failure-cap-01", 1, "user-1")
     const second = action("operation-failure-cap-02", 2, "user-1")
-    repository.enqueue(first, [])
-    repository.fail("game-public", first.event.operationId, "Game is not active", 10)
-    repository.enqueue(second, [])
+    queue(repository, first)
+    await rejectQueued(repository, "Game is not active", 10)
+    queue(repository, second)
 
-    const result = repository.failAction(
-      second,
-      "Game is not active",
-      20,
-      repository.loadFailed("game-public"),
-      [second],
-    )
-
-    expect(result).toMatchObject({ accepted: false, reason: "record_limit" })
-    expect(repository.loadFailed("game-public")).toHaveLength(1)
-    expect(repository.loadOutbox("game-public")).toEqual([second])
+    expect(await rejectQueued(repository, "Game is not active", 20)).toMatchObject({
+      capacityBlocked: true,
+    })
+    expect(stored(repository).failures).toHaveLength(1)
+    expect(stored(repository).pending).toMatchObject([
+      { event: { operationId: second.event.operationId } },
+    ])
   })
 
-  it("compacts failure reasons to the versioned byte budget without dropping the failure", () => {
+  it("compacts failure reasons to the versioned byte budget without dropping the failure", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1", {
       maxFailureReasonBytes: 16,
     })
     const rejected = action("operation-compact-reason", 1, "user-1")
-    repository.enqueue(rejected, [])
-    repository.fail(
-      "game-public",
-      rejected.event.operationId,
-      "This server rejection reason is deliberately much too long",
-      10,
-    )
-    const failure = repository.loadFailed("game-public")[0]
+    queue(repository, rejected)
+    await rejectQueued(repository, "This server rejection reason is deliberately much too long", 10)
+    const failure = stored(repository).failures[0]
     expect(failure.reason.endsWith("…")).toBe(true)
     expect(Buffer.byteLength(failure.reason, "utf8")).toBeLessThanOrEqual(16)
     expect(failure.action.event.operationId).toBe(rejected.event.operationId)
@@ -304,21 +311,21 @@ describe("connected MMKV repository", () => {
       ...action("operation-longer-game"),
       event: { ...action("operation-longer-game").event, gameId: asGameId("game.one") },
     }
-    repository.enqueue(longer)
-    expect(repository.loadOutbox("game")).toEqual([])
-    expect(repository.loadOutbox("game.one")).toHaveLength(1)
+    queue(repository, longer)
+    expect(stored(repository, "game").pending).toEqual([])
+    expect(stored(repository, "game.one").pending).toHaveLength(1)
   })
 
   it("isolates cached projection, pending, and failed state by Clerk subject", () => {
     const storage = new MemoryStorage()
     const accountA = new ConnectedGameRepository(storage, "user-a")
     const accountB = new ConnectedGameRepository(storage, "user-b")
-    accountA.enqueue(action("operation-account-a", 1, "user-a"))
-    accountB.enqueue(action("operation-account-b", 2, "user-b"))
-    expect(accountB.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
+    queue(accountA, action("operation-account-a", 1, "user-a"))
+    queue(accountB, action("operation-account-b", 2, "user-b"))
+    expect(stored(accountB).pending.map((item) => item.event.operationId)).toEqual([
       "operation-account-b",
     ])
-    expect(accountA.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
+    expect(stored(accountA).pending.map((item) => item.event.operationId)).toEqual([
       "operation-account-a",
     ])
   })
@@ -335,7 +342,7 @@ describe("connected MMKV repository", () => {
         failedAt: 1,
       }),
     )
-    expect(new ConnectedGameRepository(storage, "user-a").loadFailed("game-public")).toEqual([])
+    expect(stored(new ConnectedGameRepository(storage, "user-a")).failures).toEqual([])
   })
 
   it("rejects a failed record whose nested game does not match its scoped key", () => {
@@ -353,7 +360,7 @@ describe("connected MMKV repository", () => {
         failedAt: 1,
       }),
     )
-    expect(new ConnectedGameRepository(storage, "user-a").loadFailed("game-public")).toEqual([])
+    expect(stored(new ConnectedGameRepository(storage, "user-a")).failures).toEqual([])
   })
 
   it("persists membership-migration completion per Clerk subject", () => {
@@ -372,12 +379,12 @@ describe("connected MMKV repository", () => {
     const storage = new MemoryStorage()
     const legacyA = { ...action("operation-legacy-a", 1, "user-a"), schemaVersion: undefined }
     storage.set(CONNECTED_KEYS.legacyOutbox("game-public"), JSON.stringify([legacyA]))
-    expect(new ConnectedGameRepository(storage, "user-b").loadOutbox("game-public")).toEqual([])
+    expect(stored(new ConnectedGameRepository(storage, "user-b")).pending).toEqual([])
     expect(storage.getString(CONNECTED_KEYS.legacyOutbox("game-public"))).toBeDefined()
     expect(
-      new ConnectedGameRepository(storage, "user-a")
-        .loadOutbox("game-public")
-        .map((item) => item.event.operationId),
+      stored(new ConnectedGameRepository(storage, "user-a")).pending.map(
+        (item) => item.event.operationId,
+      ),
     ).toEqual(["operation-legacy-a"])
     expect(storage.getString(CONNECTED_KEYS.legacyOutbox("game-public"))).toBeUndefined()
   })
@@ -410,30 +417,31 @@ describe("connected MMKV repository", () => {
     expect(storage.getString(scopedKey)).toBeUndefined()
   })
 
-  it("cleans a terminal game only after pending and failed actions are resolved", () => {
+  it("cleans a terminal game only after pending and failed actions are resolved", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-a")
     const terminal: ConnectedProjection = { ...projection(1, 25), status: "finished" }
     const pending = action("operation-terminal-pending", 1, "user-a")
     repository.saveProjection(terminal)
-    repository.enqueue(pending, [])
+    queue(repository, pending)
 
-    expect(repository.cleanupTerminalGame(terminal, [pending], [])).toBe(false)
+    expect(repository.cleanupTerminalGame(terminal, repository.outbox("game-public"))).toBe(false)
     expect(repository.loadProjection("game-public")).not.toBeNull()
 
-    repository.acknowledge("game-public", pending.event.operationId)
+    repository.outbox("game-public").acknowledge([pending.event.operationId])
     const rejected = action("operation-terminal-failed", 2, "user-a")
-    repository.enqueue(rejected, [])
-    repository.fail("game-public", rejected.event.operationId, "Game is not active", 3)
-    const retainedFailures = repository.loadFailed("game-public")
-    expect(repository.cleanupTerminalGame(terminal, [], retainedFailures)).toBe(false)
+    queue(repository, rejected)
+    await rejectQueued(repository, "Game is not active", 3)
+    expect(repository.cleanupTerminalGame(terminal, repository.outbox("game-public"))).toBe(false)
     expect(repository.loadProjection("game-public")).not.toBeNull()
 
-    repository.dismissFailed("game-public", rejected.event.operationId)
-    expect(repository.cleanupTerminalGame(terminal, [], [])).toBe(true)
+    const outbox = repository.outbox("game-public")
+    outbox.dismiss(rejected.event.operationId)
+    expect(repository.cleanupTerminalGame(terminal, outbox)).toBe(true)
     expect(repository.loadProjection("game-public")).toBeNull()
-    expect(repository.loadOutbox("game-public")).toEqual([])
-    expect(repository.loadFailed("game-public")).toEqual([])
+    expect([...storage.values.keys()].filter((key) => key.startsWith("count.connected."))).toEqual(
+      [],
+    )
   })
 
   it("sends every queued action kind without the stored writer provenance", async () => {
@@ -471,8 +479,7 @@ describe("connected MMKV repository", () => {
       },
     }
     setOutboxWriter({ app: "1.4.0", update: "update-a", runtime: "runtime-1" })
-    for (const queued of [life, claim, resolution])
-      repository.enqueue(queued, repository.loadOutbox("game-public"))
+    for (const queued of [life, claim, resolution]) queue(repository, queued)
     setOutboxWriter(undefined)
     expect(
       [...storage.values.values()].filter((value) => value.includes('"writtenBy"')),
@@ -488,7 +495,7 @@ describe("connected MMKV repository", () => {
       confirmCommanderDamage: jest.fn(acknowledge),
       declineCommanderDamage: jest.fn(acknowledge),
     }
-    for (const queued of repository.loadOutbox("game-public"))
+    for (const queued of stored(repository).pending)
       await sendQueuedAction(mutations, "game-public", queued)
 
     const sent = Object.values(mutations).flatMap((mutation) => mutation.mock.calls)
@@ -500,35 +507,7 @@ describe("connected MMKV repository", () => {
   })
 })
 
-describe("queued life change coalescing", () => {
-  it("adds a tap to a never-sent life change only in the same direction", () => {
-    const storage = new MemoryStorage()
-    const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-life-0001"), [])
-
-    expect(
-      repository.addToUnsentLifeChange("game-public", "operation-life-0001", 3)?.event,
-    ).toEqual(expect.objectContaining({ operationId: "operation-life-0001", delta: 8 }))
-    expect(repository.addToUnsentLifeChange("game-public", "operation-life-0001", -1)).toBeNull()
-    expect(
-      new ConnectedGameRepository(storage, "user-1")
-        .loadOutbox("game-public")
-        .map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
-    ).toEqual([8])
-  })
-
-  it("leaves a life change alone once any drain has attempted it", () => {
-    const storage = new MemoryStorage()
-    const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-life-0001"), [])
-    repository.updateAttempt("game-public", "operation-life-0001", 2)
-
-    expect(repository.addToUnsentLifeChange("game-public", "operation-life-0001", 3)).toBeNull()
-    expect(repository.loadOutbox("game-public")[0].event).toEqual(
-      expect.objectContaining({ delta: 5 }),
-    )
-  })
-
+describe("stored life changes", () => {
   it("reads and sends pending and failed life changes as v0.1.1 stored them", async () => {
     const storage = new MemoryStorage()
     const pendingId = "operation_0f4c2b7e9a1d4c6b8e2f3a5d7c9b1e0f"
@@ -571,10 +550,10 @@ describe("queued life change coalescing", () => {
     storage.set(CONNECTED_KEYS.failedIndex("game-public", "user-1"), JSON.stringify([failedId]))
     const repository = new ConnectedGameRepository(storage, "user-1")
 
-    const pending = repository.loadOutbox("game-public")
-    expect(
-      repository.loadFailed("game-public").map(({ action }) => action.event.operationId),
-    ).toEqual([failedId])
+    const pending = stored(repository).pending
+    expect(stored(repository).failures.map(({ action }) => action.event.operationId)).toEqual([
+      failedId,
+    ])
     expect([...storage.values.keys()].filter((key) => key.startsWith("quarantine:"))).toEqual([])
     const changeLife = jest.fn(async (args: { operationId: string }) => ({
       operationId: args.operationId,
@@ -710,7 +689,7 @@ describe("connected resume index", () => {
     }
     repository.syncResumeIndex([resumeEntry("game-other", 5)], true)
     repository.saveProjection(projection)
-    repository.enqueue(action("operation-resume-001"))
+    queue(repository, action("operation-resume-001"))
     const writes = jest.spyOn(storage, "set")
 
     observe(projection)
@@ -734,7 +713,7 @@ describe("connected resume index", () => {
     observeAfterRemount({ ...projection, status: "finished", serverUpdatedAt: 12 })
     expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual(["game-other"])
     expect(repository.loadProjection(projection.publicId)?.status).toBe("active")
-    expect(repository.loadOutbox(projection.publicId)).toHaveLength(1)
+    expect(stored(repository, projection.publicId).pending).toHaveLength(1)
   })
 
   it("merges partial pages with cached entries and replaces only on an exhausted page set", () => {

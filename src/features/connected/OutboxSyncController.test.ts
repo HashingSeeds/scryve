@@ -1,3 +1,7 @@
+import { ConvexError } from "convex/values"
+
+import { emitTelemetry } from "@/utils/telemetry"
+
 import type { PendingLifeAction } from "./model"
 import { OutboxSyncController, type OutboxSyncEnvironment } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
@@ -66,6 +70,22 @@ function action(operationId: string, delta: -5 | -1 | 1 | 5, queuedAt: number): 
   }
 }
 
+function stored(repository: ConnectedGameRepository) {
+  return repository.outbox("game-public").getState()
+}
+
+async function parkFailure(repository: ConnectedGameRepository, reason: string, failedAt: number) {
+  const outbox = repository.outbox("game-public", {
+    send: () => Promise.reject(new Error(reason)),
+    rejectReason: () => reason,
+    backoff: { baseMs: 250, maxMs: 8_000 },
+    now: () => failedAt,
+  })
+  const stop = outbox.start()
+  await new Promise(setImmediate)
+  stop()
+}
+
 async function settle() {
   for (let tick = 0; tick < 20; tick += 1) await Promise.resolve()
 }
@@ -119,7 +139,7 @@ describe("outbox sync controller", () => {
     expect(sent).toHaveLength(1)
     expect(controller.getSnapshot().pending).toEqual([])
     expect(controller.getSnapshot().connectionStatus).toBe("connected")
-    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
   })
 
   it.each(["projection-first", "acknowledgement-first"] as const)(
@@ -128,7 +148,7 @@ describe("outbox sync controller", () => {
       const storage = new MemoryStorage()
       const repository = new ConnectedGameRepository(storage, "user-1")
       const queued = action("operation-atomic-projection", 5, 1)
-      repository.enqueue(queued, [])
+      repository.outbox("game-public").enqueue(queued)
       let acknowledge!: (value: { operationId: string }) => void
       const sent = new Promise<{ operationId: string }>((resolve) => {
         acknowledge = resolve
@@ -167,7 +187,7 @@ describe("outbox sync controller", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     const queued = action("operation-barrier-0001", 5, 1)
-    repository.enqueue(queued, [])
+    repository.outbox("game-public").enqueue(queued)
     const { controller, sent } = harness({
       storage,
       repository,
@@ -195,7 +215,7 @@ describe("outbox sync controller", () => {
     const repository = new ConnectedGameRepository(storage, "user-1")
     const queued = action("operation-restart-barrier", 5, 1)
     repository.saveProjection(projection(0, 20))
-    repository.enqueue(queued, [])
+    repository.outbox("game-public").enqueue(queued)
     const first = harness({ storage, repository, awaitProjectionBarrier: true })
 
     first.controller.onRemoteProjection(projection(0, 20))
@@ -208,7 +228,7 @@ describe("outbox sync controller", () => {
     })
     await settle()
 
-    expect(first.repository.loadOutbox("game-public")).toHaveLength(1)
+    expect(stored(first.repository).pending).toHaveLength(1)
     const restarted = harness({ storage, awaitProjectionBarrier: true })
     expect(restarted.controller.getSnapshot()).toMatchObject({
       pending: [{ event: { operationId: queued.event.operationId } }],
@@ -226,7 +246,7 @@ describe("outbox sync controller", () => {
     restarted.controller.onRemoteProjection(projection(1, 25))
     await settle()
 
-    expect(restarted.repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(restarted.repository).pending).toEqual([])
     const restored = harness({ storage, awaitProjectionBarrier: true })
     expect(restored.controller.getSnapshot()).toMatchObject({
       pending: [],
@@ -238,7 +258,7 @@ describe("outbox sync controller", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     const queued = action("operation-barrier-0002", 5, 1)
-    repository.enqueue(queued, [])
+    repository.outbox("game-public").enqueue(queued)
     const { controller } = harness({
       storage,
       repository,
@@ -263,7 +283,7 @@ describe("outbox sync controller", () => {
   it("keeps syncing, not offline, and retries when the projection barrier times out", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-barrier-timeout", 5, 1), [])
+    repository.outbox("game-public").enqueue(action("operation-barrier-timeout", 5, 1))
     const { clock, controller, sent } = harness({
       storage,
       repository,
@@ -303,14 +323,14 @@ describe("outbox sync controller", () => {
     controller.resolveCommanderDamage(claim, true)
     expect(controller.getSnapshot().pending).toHaveLength(1)
     expect(controller.getSnapshot().changeError).toBeUndefined()
-    expect(repository.loadOutbox("game-public")).toHaveLength(1)
+    expect(stored(repository).pending).toHaveLength(1)
 
     controller.setEnvironment(ONLINE)
     await settle()
 
     expect(sent).toHaveLength(1)
     expect(controller.getSnapshot().pending).toEqual([])
-    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
   })
 
   it("queues only the Life Points a Yu-Gi-Oh! seat has left, and nothing once it is at 0", () => {
@@ -337,7 +357,7 @@ describe("outbox sync controller", () => {
     ])
 
     expect(controller.getSnapshot().pending).toEqual([])
-    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
     expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
   })
 
@@ -347,9 +367,9 @@ describe("outbox sync controller", () => {
       { toPlayerId: "player-2", delta: 4 },
       { toPlayerId: "player-2", commander: 1, delta: 2 },
     ])
-    const queued = repository
-      .loadOutbox("game-public")
-      .flatMap(({ event }) => (event.type === "commanderDamage.submitted" ? [event] : []))
+    const queued = stored(repository).pending.flatMap(({ event }) =>
+      event.type === "commanderDamage.submitted" ? [event] : [],
+    )
     expect(queued.find((event) => event.delta === 4)).not.toHaveProperty("commander")
     expect(queued.find((event) => event.delta === 2)).toMatchObject({ commander: 1 })
   })
@@ -358,7 +378,7 @@ describe("outbox sync controller", () => {
     const { controller, repository } = harness()
     controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-1", delta: 4 }])
     expect(controller.getSnapshot().pending).toEqual([])
-    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
     expect(controller.getSnapshot().changeError).toBe("A commander cannot damage itself")
   })
 
@@ -376,7 +396,7 @@ describe("outbox sync controller", () => {
     for (let tap = 0; tap < 300; tap += 1) controller.changeLife("player-1", -1)
 
     expect(controller.getSnapshot().changeError).toBeUndefined()
-    expect(repository.loadOutbox("game-public")).toHaveLength(1)
+    expect(stored(repository).pending).toHaveLength(1)
     expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(100)
     controller.setEnvironment(ONLINE)
     await settle()
@@ -443,17 +463,114 @@ describe("outbox sync controller", () => {
   it("never adds a tap to a change queued before this session", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-earlier-0001", 5, 1), [])
+    repository.outbox("game-public").enqueue(action("operation-earlier-0001", 5, 1))
     const { controller } = harness({ storage, repository })
     controller.onRemoteProjection(projection(0, 20))
 
     controller.changeLife("player-1", 5)
 
     expect(
-      repository
-        .loadOutbox("game-public")
-        .map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
+      stored(repository).pending.map(({ event }) =>
+        event.type === "life.changed" ? event.delta : null,
+      ),
     ).toEqual([5, 5])
+  })
+
+  it("adds taps to a never-sent life change only in the same direction, and keeps the sum across a restart", () => {
+    const storage = new MemoryStorage()
+    const { controller } = harness({ storage })
+
+    controller.changeLife("player-1", 5)
+    controller.changeLife("player-1", 3)
+    controller.changeLife("player-1", -1)
+
+    expect(
+      harness({ storage })
+        .controller.getSnapshot()
+        .pending.map(({ event }) => (event.type === "life.changed" ? event.delta : null)),
+    ).toEqual([8, -1])
+  })
+
+  it("keeps a tap queued while an earlier change is in flight once that change settles", async () => {
+    let releaseFirst!: (value: { operationId: string }) => void
+    const sent: string[] = []
+    const { controller } = harness({
+      send: (queued) => {
+        sent.push(queued.event.operationId)
+        return sent.length === 1
+          ? new Promise((resolve) => {
+              releaseFirst = resolve
+            })
+          : new Promise(() => {})
+      },
+    })
+    controller.setEnvironment(ONLINE)
+    controller.changeLife("player-1", 1)
+    await settle()
+    controller.changeLife("player-2", 5)
+
+    releaseFirst({ operationId: sent[0] })
+    await settle()
+
+    expect(
+      controller
+        .getSnapshot()
+        .pending.map(({ event }) => (event.type === "life.changed" ? event.playerId : null)),
+    ).toEqual(["player-2"])
+  })
+
+  it("reports each acknowledgement's write kind and each drain's outcome", async () => {
+    jest.mocked(emitTelemetry).mockClear()
+    const { controller } = harness()
+    controller.setEnvironment(ONLINE)
+
+    controller.changeLife("player-1", 5)
+    await settle()
+
+    expect(emitTelemetry).toHaveBeenCalledWith(
+      "mutation.ack",
+      expect.objectContaining({ writeKind: "life", outcome: "success", attemptCount: 1 }),
+    )
+    expect(emitTelemetry).toHaveBeenCalledWith("outbox.drain", {
+      acknowledgedCount: 1,
+      failedCount: 0,
+      outcome: "success",
+    })
+  })
+
+  it("keeps an auth-expired change pending and parks one the game rejects for good", async () => {
+    const errors = [new Error("Authentication required"), new Error("Game is not active")]
+    const { clock, controller } = harness({
+      send: async () => {
+        throw errors.shift()
+      },
+    })
+    controller.setEnvironment(ONLINE)
+    controller.changeLife("player-1", 1)
+    await settle()
+    expect(controller.getSnapshot()).toMatchObject({ pending: [{ attempts: 1 }], failed: [] })
+
+    clock.advance(500)
+    await settle()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      pending: [],
+      failed: [{ reason: "Game is not active" }],
+    })
+  })
+
+  it("parks a coded rejection under its message", async () => {
+    const { controller } = harness({
+      send: async () => {
+        throw new ConvexError({ code: "game_not_active", message: "Game is not active" })
+      },
+    })
+    controller.setEnvironment(ONLINE)
+
+    controller.changeLife("player-1", 1)
+    await settle()
+
+    expect(controller.getSnapshot().failed).toMatchObject([{ reason: "Game is not active" }])
   })
 
   it("tells the attacker when the server declines a claim the defender has not answered yet", async () => {
@@ -469,7 +586,7 @@ describe("outbox sync controller", () => {
     controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-2", delta: 5 }])
     await settle()
 
-    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
     expect(controller.getSnapshot().changeError).toBe(
       "5 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
     )
@@ -592,7 +709,7 @@ describe("outbox sync controller", () => {
   it("schedules a backoff retry after a transient send failure", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-transient-01", 1, 1), [])
+    repository.outbox("game-public").enqueue(action("operation-transient-01", 1, 1))
     const attempts: string[] = []
     const { clock, controller } = harness({
       storage,
@@ -624,9 +741,9 @@ describe("outbox sync controller", () => {
     })
     const prior = action("operation-prior-failed", 1, 1)
     const blocked = action("operation-blocked-fail", 5, 2)
-    repository.enqueue(prior, [])
-    repository.fail("game-public", prior.event.operationId, "Game is not active", 10)
-    repository.enqueue(blocked, [])
+    repository.outbox("game-public").enqueue(prior)
+    await parkFailure(repository, "Game is not active", 10)
+    repository.outbox("game-public").enqueue(blocked)
     const { controller } = harness({
       storage,
       repository,
@@ -655,8 +772,8 @@ describe("outbox sync controller", () => {
     const repository = new ConnectedGameRepository(storage, "user-1")
     const first = action("operation-flap-first-1", 1, 1)
     const second = action("operation-flap-second", 5, 2)
-    repository.enqueue(first, [])
-    repository.enqueue(second, [first])
+    repository.outbox("game-public").enqueue(first)
+    repository.outbox("game-public").enqueue(second)
     let releaseFirst!: (value: { operationId: string }) => void
     const deferred = new Promise<{ operationId: string }>((resolve) => {
       releaseFirst = resolve
@@ -680,7 +797,7 @@ describe("outbox sync controller", () => {
     releaseFirst({ operationId: first.event.operationId })
     await settle()
     expect(sent).toEqual([first.event.operationId, second.event.operationId])
-    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(stored(repository).pending).toEqual([])
   })
 
   it("returns an identical snapshot until state actually changes", () => {
@@ -709,7 +826,7 @@ describe("outbox sync controller", () => {
   it("cancels a pending retry timer when disposed", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
-    repository.enqueue(action("operation-disposed-01", 1, 1), [])
+    repository.outbox("game-public").enqueue(action("operation-disposed-01", 1, 1))
     const attempts: string[] = []
     const { clock, controller } = harness({
       storage,

@@ -4,6 +4,7 @@ import {
   type DurableFailedRecord,
   type DurableOutboxCodec,
   type DurableOutboxKeys,
+  type DurableOutboxLimits,
   type DurablePendingRecord,
   type QuarantineReport,
   setOutboxWriter,
@@ -23,12 +24,15 @@ interface NoteFailure extends DurableFailedRecord<NoteOperation> {
   schemaVersion: 1
 }
 
-const keys: DurableOutboxKeys = {
-  pendingIndex: (scope, owner) => `notes.pendingIndex.v1.${owner}.${scope}`,
-  pendingRecord: (scope, operationId, owner) => `notes.pending.v1.${owner}.${scope}.${operationId}`,
-  failedIndex: (scope, owner) => `notes.failedIndex.v1.${owner}.${scope}`,
-  failedRecord: (scope, operationId, owner) => `notes.failed.v1.${owner}.${scope}.${operationId}`,
-}
+const keysFor = (owner: string): DurableOutboxKeys => ({
+  pendingIndex: `notes.pendingIndex.v1.${owner}.deck`,
+  pendingRecordPrefix: `notes.pending.v1.${owner}.deck.`,
+  failedIndex: `notes.failedIndex.v1.${owner}.deck`,
+  failedRecordPrefix: `notes.failed.v1.${owner}.deck.`,
+})
+const keys = keysFor("owner")
+const pendingRecordKey = (operationId: string) => keys.pendingRecordPrefix + operationId
+const failedRecordKey = (operationId: string) => keys.failedRecordPrefix + operationId
 
 const codec: DurableOutboxCodec<NoteOperation, NoteFailure> = {
   parsePending: (value) => {
@@ -62,8 +66,38 @@ const codec: DurableOutboxCodec<NoteOperation, NoteFailure> = {
     failedAt,
   }),
   operationId: (action) => action.id,
-  belongsToScope: (action, ownerId, scopeId) =>
-    action.ownerId === ownerId && action.scopeId === scopeId,
+}
+
+function outboxFor(
+  storage: MemoryStorage,
+  {
+    owner = "owner",
+    notes = codec,
+    limits,
+  }: {
+    owner?: string
+    notes?: DurableOutboxCodec<NoteOperation, NoteFailure>
+    limits?: Partial<DurableOutboxLimits>
+  } = {},
+) {
+  return new DurableOutbox({
+    storage,
+    keys: keysFor(owner),
+    codec: notes,
+    owns: (action) => action.ownerId === owner && action.scopeId === "deck",
+    limits,
+  })
+}
+
+function fail(
+  outbox: DurableOutbox<NoteOperation, NoteFailure>,
+  operationId: string,
+  reason: string,
+  failedAt: number,
+) {
+  const pending = outbox.loadPending()
+  const action = pending.find((candidate) => candidate.id === operationId)!
+  return outbox.failAction(action, reason, failedAt, outbox.loadFailed(), pending)
 }
 
 function operation(
@@ -89,44 +123,41 @@ function operation(
 describe("durable outbox", () => {
   it("supports a different operation shape and repairs a torn index", () => {
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const outbox = outboxFor(storage)
     const first = operation("note-1", 2)
     const second = operation("note-2", 1)
-    outbox.enqueue(first, "deck")
-    storage.set(keys.pendingRecord("deck", "note-2", "owner"), JSON.stringify(second))
+    outbox.enqueue(first)
+    storage.set(pendingRecordKey("note-2"), JSON.stringify(second))
 
-    expect(outbox.loadPending("deck")).toEqual([second, first])
-    expect(JSON.parse(storage.getString(keys.pendingIndex("deck", "owner"))!)).toEqual([
-      "note-1",
-      "note-2",
-    ])
+    expect(outbox.loadPending()).toEqual([second, first])
+    expect(JSON.parse(storage.getString(keys.pendingIndex)!)).toEqual(["note-1", "note-2"])
   })
 
   it("quarantines unreadable records instead of deleting them", () => {
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const outbox = outboxFor(storage)
     const quarantined = () =>
       [...storage.values]
         .filter(([key]) => key.startsWith(DURABLE_QUARANTINE_PREFIX))
         .map(([, value]) => value)
         .sort()
-    const pendingKey = keys.pendingRecord("deck", "note-future", "owner")
+    const pendingKey = pendingRecordKey("note-future")
     const future = JSON.stringify({ ...operation("note-future", 1), payload: { body: "v2" } })
     const rewritten = JSON.stringify({ ...operation("note-future", 2), payload: { body: "v3" } })
     const done = operation("note-done", 1)
     const staleDone = JSON.stringify({ ...done, payload: { body: "v2" } })
     const failedDone = codec.createFailure(done, "rejected", 2)
     storage.set(pendingKey, future)
-    storage.set(keys.failedRecord("deck", "note-torn", "owner"), '{"action":')
-    storage.set(keys.pendingRecord("deck", "note-done", "owner"), staleDone)
-    storage.set(keys.failedRecord("deck", "note-done", "owner"), JSON.stringify(failedDone))
-    storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
+    storage.set(failedRecordKey("note-torn"), '{"action":')
+    storage.set(pendingRecordKey("note-done"), staleDone)
+    storage.set(failedRecordKey("note-done"), JSON.stringify(failedDone))
+    storage.set(pendingRecordKey("note-empty"), "")
 
     const now = jest.spyOn(Date, "now").mockReturnValue(1)
-    const pending = outbox.loadPending("deck")
-    const failed = outbox.loadFailed("deck")
+    const pending = outbox.loadPending()
+    const failed = outbox.loadFailed()
     storage.set(pendingKey, rewritten)
-    outbox.loadPending("deck")
+    outbox.loadPending()
     now.mockRestore()
 
     expect(pending).toEqual([])
@@ -139,15 +170,15 @@ describe("durable outbox", () => {
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
-    outbox.enqueue(operation("note-valid", 1), "deck")
-    outbox.loadPending("deck")
+    const outbox = outboxFor(storage)
+    outbox.enqueue(operation("note-valid", 1))
+    outbox.loadPending()
     expect(report).not.toHaveBeenCalled()
 
-    storage.set(keys.pendingRecord("deck", "note-secret", "owner"), '{"note":"private"}')
-    storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
-    outbox.loadPending("deck")
-    outbox.loadPending("deck")
+    storage.set(pendingRecordKey("note-secret"), '{"note":"private"}')
+    storage.set(pendingRecordKey("note-empty"), "")
+    outbox.loadPending()
+    outbox.loadPending()
 
     expect(report.mock.calls).toEqual([
       [
@@ -163,50 +194,55 @@ describe("durable outbox", () => {
 
   it("won't revive an operation another tab failed and dismissed", () => {
     const storage = new MemoryStorage()
-    const staleTab = new DurableOutbox(storage, "owner", keys, codec)
-    const otherTab = new DurableOutbox(storage, "owner", keys, codec)
+    const staleTab = outboxFor(storage)
+    const otherTab = outboxFor(storage)
     const rejected = operation("note-rejected", 1)
-    otherTab.enqueue(rejected, "deck")
-    const stalePending = staleTab.loadPending("deck")
-    otherTab.fail("deck", "note-rejected", "rejected", 2)
-    otherTab.dismissFailed("deck", "note-rejected")
+    otherTab.enqueue(rejected)
+    const stalePending = staleTab.loadPending()
+    fail(otherTab, "note-rejected", "rejected", 2)
+    otherTab.dismissFailed("note-rejected")
 
-    expect(staleTab.updateAttempt("deck", "note-rejected", 3)).toBeNull()
-    expect(staleTab.failAction(rejected, "deck", "rejected", 3, [], stalePending)).toEqual({
+    expect(staleTab.updateAttempt("note-rejected", 3)).toBeNull()
+    expect(staleTab.failAction(rejected, "rejected", 3, [], stalePending)).toEqual({
       accepted: true,
       failed: [],
       pending: [],
     })
-    expect(staleTab.loadFailed("deck")).toEqual([])
-    expect(staleTab.loadPending("deck")).toEqual([])
+    expect(staleTab.loadFailed()).toEqual([])
+    expect(staleTab.loadPending()).toEqual([])
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
-    outbox.enqueue(operation("note-ack", 1), "deck")
-    outbox.acknowledge("deck", "note-ack")
-    outbox.acknowledge("deck", "note-ack")
+    const outbox = outboxFor(storage)
+    outbox.enqueue(operation("note-ack", 1))
+    outbox.acknowledge("note-ack")
+    outbox.acknowledge("note-ack")
 
-    expect(outbox.loadPending("deck")).toEqual([])
+    expect(outbox.loadPending()).toEqual([])
   })
 
   it("enforces pending record and byte bounds", () => {
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec, {
-      maxPendingRecords: 1,
-      maxPendingBytes: 10_000,
+    const outbox = outboxFor(storage, {
+      limits: {
+        maxPendingRecords: 1,
+        maxPendingBytes: 10_000,
+      },
     })
-    outbox.enqueue(operation("note-cap-1", 1), "deck")
-    expect(outbox.enqueue(operation("note-cap-2", 2), "deck")).toMatchObject({
+    outbox.enqueue(operation("note-cap-1", 1))
+    expect(outbox.enqueue(operation("note-cap-2", 2))).toMatchObject({
       accepted: false,
       reason: "record_limit",
     })
 
-    const byteLimited = new DurableOutbox(storage, "owner-2", keys, codec, {
-      maxPendingBytes: 1,
+    const byteLimited = outboxFor(storage, {
+      owner: "owner-2",
+      limits: {
+        maxPendingBytes: 1,
+      },
     })
-    expect(byteLimited.enqueue(operation("note-byte", 1), "deck")).toMatchObject({
+    expect(byteLimited.enqueue(operation("note-byte", 1))).toMatchObject({
       accepted: false,
       reason: "byte_limit",
     })
@@ -245,75 +281,69 @@ describe("durable outbox provenance", () => {
   it("stamps the writing build on every record and never hands it to the codec's caller", () => {
     setOutboxWriter(writer)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const outbox = outboxFor(storage)
     const note = operation("note-1", 1)
-    const pendingKey = keys.pendingRecord("deck", "note-1", "owner")
-    outbox.enqueue(note, "deck")
+    const pendingKey = pendingRecordKey("note-1")
+    outbox.enqueue(note)
 
     expect(stored(storage, pendingKey)).toEqual({ ...note, writtenBy: writer })
     expect(storage.getString(pendingKey)).toMatch(/^\{"writtenBy":/)
-    expect(outbox.loadPending("deck")).toEqual([note])
+    expect(outbox.loadPending()).toEqual([note])
 
     setOutboxWriter(otherWriter)
-    outbox.updateAttempt("deck", "note-1", 5)
+    outbox.updateAttempt("note-1", 5)
     expect(stored(storage, pendingKey).writtenBy).toEqual(otherWriter)
 
-    outbox.fail("deck", "note-1", "rejected", 6)
-    const failed = stored(storage, keys.failedRecord("deck", "note-1", "owner"))
+    fail(outbox, "note-1", "rejected", 6)
+    const failed = stored(storage, failedRecordKey("note-1"))
     expect(failed.writtenBy).toEqual(otherWriter)
     expect(failed.action).not.toHaveProperty("writtenBy")
-    expect(outbox.loadFailed("deck")[0].action).not.toHaveProperty("writtenBy")
+    expect(outbox.loadFailed()[0].action).not.toHaveProperty("writtenBy")
   })
 
   it("reads records with no provenance, and one an older build wrapped with the action's", () => {
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const outbox = outboxFor(storage)
     const legacy = operation("note-legacy", 1)
     const rewrapped = operation("note-rewrapped", 2)
-    storage.set(keys.pendingRecord("deck", "note-legacy", "owner"), JSON.stringify(legacy))
+    storage.set(pendingRecordKey("note-legacy"), JSON.stringify(legacy))
     storage.set(
-      keys.failedRecord("deck", "note-rewrapped", "owner"),
+      failedRecordKey("note-rewrapped"),
       JSON.stringify(
         codec.createFailure({ ...rewrapped, writtenBy: writer } as NoteOperation, "x", 3),
       ),
     )
 
-    expect(outbox.loadPending("deck")).toEqual([legacy])
-    expect(outbox.loadFailed("deck")).toEqual([codec.createFailure(rewrapped, "x", 3)])
+    expect(outbox.loadPending()).toEqual([legacy])
+    expect(outbox.loadFailed()).toEqual([codec.createFailure(rewrapped, "x", 3)])
   })
 
   it("budgets the bytes on disk, not this build's re-serialization of them", () => {
     const storage = new MemoryStorage()
     setOutboxWriter(writer)
     const first = operation("note-first", 1)
-    new DurableOutbox(storage, "owner", keys, codec).enqueue(first, "deck")
-    new DurableOutbox(storage, "owner", keys, codec).fail("deck", "note-first", "x", 2)
-    new DurableOutbox(storage, "owner", keys, codec).enqueue(operation("note-held", 3), "deck")
+    outboxFor(storage).enqueue(first)
+    fail(outboxFor(storage), "note-first", "x", 2)
+    outboxFor(storage).enqueue(operation("note-held", 3))
     const onDisk = (key: string) => bytes(storage.getString(key)!)
     setOutboxWriter(undefined)
     const second = operation("note-second", 4)
-    const pendingLimit =
-      onDisk(keys.pendingRecord("deck", "note-held", "owner")) + bytes(JSON.stringify(second)) - 1
+    const pendingLimit = onDisk(pendingRecordKey("note-held")) + bytes(JSON.stringify(second)) - 1
     const failedLimit =
-      onDisk(keys.failedRecord("deck", "note-first", "owner")) +
+      onDisk(failedRecordKey("note-first")) +
       bytes(JSON.stringify(codec.createFailure(second, "x", 5))) -
       1
-    const outbox = new DurableOutbox(storage, "owner", keys, codec, {
-      maxPendingBytes: pendingLimit,
-      maxFailedBytes: failedLimit,
+    const outbox = outboxFor(storage, {
+      limits: {
+        maxPendingBytes: pendingLimit,
+        maxFailedBytes: failedLimit,
+      },
     })
 
-    expect(outbox.enqueue(second, "deck")).toMatchObject({ accepted: false, reason: "byte_limit" })
-    new DurableOutbox(storage, "owner", keys, codec).enqueue(second, "deck")
+    expect(outbox.enqueue(second)).toMatchObject({ accepted: false, reason: "byte_limit" })
+    outboxFor(storage).enqueue(second)
     expect(
-      outbox.failAction(
-        second,
-        "deck",
-        "x",
-        5,
-        outbox.loadFailed("deck"),
-        outbox.loadPending("deck"),
-      ),
+      outbox.failAction(second, "x", 5, outbox.loadFailed(), outbox.loadPending()),
     ).toMatchObject({ accepted: false, reason: "byte_limit" })
   })
 
@@ -322,7 +352,7 @@ describe("durable outbox provenance", () => {
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    const outbox = outboxFor(storage, { notes })
     const future = JSON.stringify({
       ...operation("note-future", 1),
       op: "create",
@@ -337,12 +367,12 @@ describe("durable outbox provenance", () => {
       failedAt: 1,
       writtenBy: { app: sentinel },
     })
-    storage.set(keys.pendingRecord("deck", "note-future", "owner"), future)
-    storage.set(keys.pendingRecord("deck", "note-torn", "owner"), torn)
-    storage.set(keys.failedRecord("deck", "note-foreign", "owner"), foreign)
+    storage.set(pendingRecordKey("note-future"), future)
+    storage.set(pendingRecordKey("note-torn"), torn)
+    storage.set(failedRecordKey("note-foreign"), foreign)
 
-    outbox.loadPending("deck")
-    outbox.loadFailed("deck")
+    outbox.loadPending()
+    outbox.loadFailed()
 
     expect(report.mock.calls).toEqual([
       [
@@ -418,9 +448,8 @@ describe("durable outbox provenance", () => {
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, {
-      ...notes,
-      knownKeys: ["cards", "name", "quantity", "byName"],
+    const outbox = outboxFor(storage, {
+      notes: { ...notes, knownKeys: ["cards", "name", "quantity", "byName"] },
     })
     const dataKeys = [
       "Sol Ring",
@@ -429,7 +458,7 @@ describe("durable outbox provenance", () => {
       "1700000000000",
     ]
     storage.set(
-      keys.failedRecord("deck", "note-nested", "owner"),
+      failedRecordKey("note-nested"),
       JSON.stringify({
         schemaVersion: 1,
         action: {
@@ -441,7 +470,7 @@ describe("durable outbox provenance", () => {
       }),
     )
 
-    outbox.loadFailed("deck")
+    outbox.loadFailed()
 
     const [record] = reported(report)
     expect(record.shape).toEqual({
@@ -471,16 +500,13 @@ describe("durable outbox provenance", () => {
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    const outbox = outboxFor(storage, { notes })
     const stamped = (id: string, writtenBy: Record<string, string>) =>
-      storage.set(
-        keys.pendingRecord("deck", id, "owner"),
-        JSON.stringify({ writtenBy, id, payload: { body: 1 } }),
-      )
+      storage.set(pendingRecordKey(id), JSON.stringify({ writtenBy, id, payload: { body: 1 } }))
     stamped("note-clerk", { ...writer, update: clerkId })
     stamped("note-names", { app: "Sol Ring", update: "Island", runtime: clerkId, commit: clerkId })
 
-    outbox.loadPending("deck")
+    outbox.loadPending()
 
     expect(reported(report).map((record) => record.writtenBy)).toEqual([
       { app: writer.app, update: "unknown", runtime: digest, commit: digest },
@@ -494,17 +520,17 @@ describe("durable outbox provenance", () => {
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    const outbox = outboxFor(storage, { notes })
     for (const [id, update] of [
       ["note-copied", operationId],
       ["note-real", writer.update],
     ])
       storage.set(
-        keys.pendingRecord("deck", id, "owner"),
+        pendingRecordKey(id),
         JSON.stringify({ writtenBy: { ...writer, update }, id, payload: { body: 1 } }),
       )
 
-    outbox.loadPending("deck")
+    outbox.loadPending()
 
     expect(JSON.stringify(report.mock.calls)).not.toMatch(
       new RegExp([operationId, writer.update, writer.runtime, writer.commit].join("|")),

@@ -1,15 +1,12 @@
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import {
-  DurableOutbox,
-  type DurableEnqueueResult,
-  type DurableFailResult,
   type DurableOutboxCodec,
-  type DurableOutboxKeys,
   type DurableOutboxLimits,
   type DurableStringStorage,
   type FieldName,
 } from "@/features/sync/durableOutbox"
+import { createOutbox, type Outbox, type OutboxSender } from "@/features/sync/outbox"
 import { storage as mmkvStorage } from "@/utils/storage"
 
 import type { ResumableGame } from "./connectedCopy"
@@ -40,8 +37,7 @@ export interface ConnectedStringStorage extends DurableStringStorage {}
 
 export interface ConnectedPersistenceLimits extends DurableOutboxLimits {}
 
-export type EnqueueResult = DurableEnqueueResult<PendingLifeAction>
-export type FailActionResult = DurableFailResult<PendingLifeAction, FailedLifeAction>
+export type ConnectedOutbox = Outbox<PendingLifeAction, FailedLifeAction>
 
 export const RESUME_INDEX_LIMIT = 30
 
@@ -76,13 +72,6 @@ export const CONNECTED_KEYS = {
     `count.connected.resume.v1.${deployment}.${ownerScoped(ownerId)}`,
   legacyOutbox: (gameId: string) => `count.connected.outbox.v0.${gameId}`,
 } as const
-
-const outboxKeys: DurableOutboxKeys = {
-  pendingIndex: CONNECTED_KEYS.outboxIndex,
-  pendingRecord: CONNECTED_KEYS.outboxRecord,
-  failedIndex: CONNECTED_KEYS.failedIndex,
-  failedRecord: CONNECTED_KEYS.failedRecord,
-}
 
 function parseJson(value: string | undefined): unknown {
   if (!value) return null
@@ -429,8 +418,6 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parseFailed,
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),
   operationId: (action) => action.event.operationId,
-  belongsToScope: (action, ownerId, gameId) =>
-    action.event.gameId === gameId && (ownerId === "anonymous" || action.event.actorId === ownerId),
   compare: (left, right) =>
     left.queuedAt - right.queuedAt ||
     left.event.clientCreatedAt - right.event.clientCreatedAt ||
@@ -445,15 +432,33 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
 }
 
 export class ConnectedGameRepository {
-  private readonly outbox: DurableOutbox<PendingLifeAction, FailedLifeAction>
-
   constructor(
     private readonly storage: ConnectedStringStorage = mmkvStorage,
     private readonly ownerId = "anonymous",
-    limits: Partial<ConnectedPersistenceLimits> = {},
+    private readonly limits: Partial<ConnectedPersistenceLimits> = {},
     private readonly deployment = connectedDeploymentScope(),
-  ) {
-    this.outbox = new DurableOutbox(storage, ownerId, outboxKeys, outboxCodec, limits)
+  ) {}
+
+  outbox(gameId: string, sender?: OutboxSender<PendingLifeAction>): ConnectedOutbox {
+    const outbox = createOutbox({
+      storage: this.storage,
+      keys: {
+        pendingIndex: CONNECTED_KEYS.outboxIndex(gameId, this.ownerId),
+        pendingRecordPrefix: CONNECTED_KEYS.outboxRecord(gameId, "", this.ownerId),
+        failedIndex: CONNECTED_KEYS.failedIndex(gameId, this.ownerId),
+        failedRecordPrefix: CONNECTED_KEYS.failedRecord(gameId, "", this.ownerId),
+      },
+      codec: outboxCodec,
+      owns: (action) => action.event.gameId === gameId && this.ownsActor(action),
+      limits: this.limits,
+      sender,
+    })
+    this.migrateLegacyOutbox(gameId, outbox)
+    return outbox
+  }
+
+  private ownsActor(action: PendingLifeAction): boolean {
+    return this.ownerId === "anonymous" || action.event.actorId === this.ownerId
   }
 
   saveProjection(projection: ConnectedProjection): void {
@@ -549,114 +554,28 @@ export class ConnectedGameRepository {
     )
   }
 
-  enqueue(action: PendingLifeAction, currentPending?: readonly PendingLifeAction[]): EnqueueResult {
-    return this.outbox.enqueue(action, action.event.gameId, currentPending)
-  }
-
-  addToUnsentLifeChange(
-    gameId: string,
-    operationId: string,
-    delta: number,
-  ): PendingLifeAction | null {
-    return this.outbox.rewriteUnattempted(gameId, operationId, (action) => {
-      const { event } = action
-      if (event.type !== "life.changed" || event.compensatesOperationId) return null
-      const sum = event.delta + delta
-      if (Math.sign(event.delta) !== Math.sign(delta) || !isLifeDelta(sum)) return null
-      return { ...action, event: { ...event, delta: sum } }
-    })
-  }
-
-  loadOutbox(gameId: string): PendingLifeAction[] {
-    this.migrateLegacyOutbox(gameId)
-    return this.outbox.loadPending(gameId)
-  }
-
-  updateAttempt(
-    gameId: string,
-    operationId: string,
-    attemptedAt: number,
-  ): PendingLifeAction | null {
-    return this.outbox.updateAttempt(gameId, operationId, attemptedAt)
-  }
-
-  acknowledge(gameId: string, operationId: string): void {
-    this.outbox.acknowledge(gameId, operationId)
-  }
-
-  fail(
-    gameId: string,
-    operationId: string,
-    reason: string,
-    failedAt = Date.now(),
-  ): FailActionResult | null {
-    return this.outbox.fail(gameId, operationId, reason, failedAt)
-  }
-
-  failAction(
-    action: PendingLifeAction,
-    reason: string,
-    failedAt: number,
-    currentFailed: readonly FailedLifeAction[],
-    currentPending: readonly PendingLifeAction[],
-  ): FailActionResult {
-    return this.outbox.failAction(
-      action,
-      action.event.gameId,
-      reason,
-      failedAt,
-      currentFailed,
-      currentPending,
-    )
-  }
-
-  loadFailed(gameId: string): FailedLifeAction[] {
-    return this.outbox.loadFailed(gameId)
-  }
-
-  dismissFailed(gameId: string, operationId: string): void {
-    this.outbox.dismissFailed(gameId, operationId)
-  }
-
-  cleanupTerminalGame(
-    projection: ConnectedProjection,
-    pending: readonly PendingLifeAction[],
-    failed: readonly FailedLifeAction[],
-  ): boolean {
+  cleanupTerminalGame(projection: ConnectedProjection, outbox: ConnectedOutbox): boolean {
+    const { pending, failures } = outbox.getState()
     if (
       (projection.status !== "finished" && projection.status !== "abandoned") ||
       pending.length > 0 ||
-      failed.length > 0
+      failures.length > 0
     )
       return false
-    const gameId = projection.publicId
-    const recordPrefixes = [
-      CONNECTED_KEYS.outboxRecord(gameId, "", this.ownerId),
-      CONNECTED_KEYS.failedRecord(gameId, "", this.ownerId),
-    ]
-    for (const key of this.storage.getAllKeys()) {
-      if (recordPrefixes.some((prefix) => key.startsWith(prefix))) this.storage.delete(key)
-    }
-    this.storage.delete(CONNECTED_KEYS.projection(gameId, this.ownerId))
-    this.storage.delete(CONNECTED_KEYS.outboxIndex(gameId, this.ownerId))
-    this.storage.delete(CONNECTED_KEYS.failedIndex(gameId, this.ownerId))
+    outbox.clear()
+    this.storage.delete(CONNECTED_KEYS.projection(projection.publicId, this.ownerId))
     return true
   }
 
-  private migrateLegacyOutbox(gameId: string): void {
+  private migrateLegacyOutbox(gameId: string, outbox: ConnectedOutbox): void {
     const legacyKey = CONNECTED_KEYS.legacyOutbox(gameId)
     const legacy = parseJson(this.storage.getString(legacyKey))
     if (!Array.isArray(legacy)) return
     const remaining: unknown[] = []
-    let pending = this.outbox.loadPending(gameId)
     for (const candidate of legacy) {
       const action = parsePending(candidate)
       if (!action || action.event.gameId !== gameId) continue
-      if (this.ownerId === "anonymous" || action.event.actorId === this.ownerId) {
-        const result = this.outbox.enqueue(action, gameId, pending)
-        if (result.accepted) pending = result.pending
-        else remaining.push(candidate)
-      } else remaining.push(candidate)
+      if (!this.ownsActor(action) || !outbox.enqueue(action)) remaining.push(candidate)
     }
     if (remaining.length) this.storage.set(legacyKey, JSON.stringify(remaining))
     else this.storage.delete(legacyKey)

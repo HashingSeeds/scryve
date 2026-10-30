@@ -3,16 +3,13 @@ import { useConvex, type ConvexReactClient } from "convex/react"
 import { ConvexError } from "convex/values"
 
 import { scopedOwnerId } from "@/features/decks/decksSync"
-import { drainOutbox } from "@/features/sync/drainOutbox"
 import {
-  DurableOutbox,
   type DurableFailedRecord,
   type DurableOutboxCodec,
-  type DurableOutboxKeys,
   type DurablePendingRecord,
   type DurableStringStorage,
 } from "@/features/sync/durableOutbox"
-import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
+import { createOutbox, type Outbox, type OutboxSender } from "@/features/sync/outbox"
 import { translate } from "@/i18n/translate"
 import { convexErrorCode, convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
@@ -34,21 +31,6 @@ export interface ManualMatchOutboxSnapshot {
   pending: PendingManualMatch[]
   failures: FailedManualMatch[]
   capacityBlocked: boolean
-}
-
-const SCOPE = "manual"
-const RETRY_DELAY_MS = 2_000
-
-function outboxKeys(deploymentUrl?: string): DurableOutboxKeys {
-  const owner = (ownerId: string) => scopedOwnerId(ownerId, deploymentUrl)
-  return {
-    pendingIndex: (_scope, ownerId) => `scryve.matches.pending.v1.${owner(ownerId)}`,
-    pendingRecord: (_scope, publicId, ownerId) =>
-      `scryve.matches.pendingRecord.v1.${owner(ownerId)}.${publicId}`,
-    failedIndex: (_scope, ownerId) => `scryve.matches.failed.v1.${owner(ownerId)}`,
-    failedRecord: (_scope, publicId, ownerId) =>
-      `scryve.matches.failedRecord.v1.${owner(ownerId)}.${publicId}`,
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -91,7 +73,6 @@ const codec: DurableOutboxCodec<PendingManualMatch, FailedManualMatch> = {
   parseFailed,
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),
   operationId: (action) => action.args.publicId,
-  belongsToScope: (action, ownerId, scope) => action.ownerId === ownerId && scope === SCOPE,
 }
 
 const RECOVERABLE_CODES = new Set(["unauthenticated", "user_not_synced", "rate_limited"])
@@ -105,70 +86,54 @@ function isPermanentRejection(cause: unknown) {
   )
 }
 
-export class ManualMatchRepository {
-  private readonly outbox: DurableOutbox<PendingManualMatch, FailedManualMatch>
+export type ManualMatchOutbox = Outbox<PendingManualMatch, FailedManualMatch>
 
-  constructor(
-    readonly ownerId: string,
-    local: DurableStringStorage = storage,
-    deploymentUrl?: string,
-  ) {
-    this.outbox = new DurableOutbox(local, ownerId, outboxKeys(deploymentUrl), codec)
-  }
-
-  enqueue(action: PendingManualMatch) {
-    return this.outbox.enqueue(action, SCOPE)
-  }
-
-  loadPending() {
-    return this.outbox.loadPending(SCOPE)
-  }
-
-  loadFailed() {
-    return this.outbox.loadFailed(SCOPE)
-  }
-
-  updateAttempt(publicId: string, attemptedAt: number) {
-    return this.outbox.updateAttempt(SCOPE, publicId, attemptedAt)
-  }
-
-  acknowledge(publicId: string) {
-    this.outbox.acknowledge(SCOPE, publicId)
-  }
-
-  failAction(
-    action: PendingManualMatch,
-    reason: string,
-    failedAt: number,
-    currentFailed: readonly FailedManualMatch[],
-    currentPending: readonly PendingManualMatch[],
-  ) {
-    return this.outbox.failAction(action, SCOPE, reason, failedAt, currentFailed, currentPending)
-  }
+export function manualMatchOutbox(
+  ownerId: string,
+  local: DurableStringStorage = storage,
+  deploymentUrl?: string,
+  sender?: OutboxSender<PendingManualMatch>,
+): ManualMatchOutbox {
+  const owner = scopedOwnerId(ownerId, deploymentUrl)
+  return createOutbox({
+    storage: local,
+    keys: {
+      pendingIndex: `scryve.matches.pending.v1.${owner}`,
+      pendingRecordPrefix: `scryve.matches.pendingRecord.v1.${owner}.`,
+      failedIndex: `scryve.matches.failed.v1.${owner}`,
+      failedRecordPrefix: `scryve.matches.failedRecord.v1.${owner}.`,
+    },
+    codec,
+    owns: (action) => action.ownerId === ownerId,
+    sender,
+  })
 }
 
 export class ManualMatchController {
-  private readonly outbox: OutboxController<ManualMatchOutboxSnapshot>
-  private retryAfterMs = 0
+  private readonly outbox: ManualMatchOutbox
+  private readonly now: () => number
 
   constructor(
     private readonly client: Pick<ConvexReactClient, "mutation">,
-    private readonly repository: ManualMatchRepository,
-    private readonly now: () => number = Date.now,
+    readonly ownerId: string,
+    {
+      storage: local = storage,
+      deploymentUrl,
+      now = Date.now,
+    }: { storage?: DurableStringStorage; deploymentUrl?: string; now?: () => number } = {},
   ) {
-    this.outbox = createOutboxController({
-      snapshot: ({ capacityBlocked }) => ({
-        pending: this.repository.loadPending(),
-        failures: this.repository.loadFailed(),
-        capacityBlocked,
-      }),
-      drain: (shouldContinue) => this.drainOnce(shouldContinue),
-      retryDelay: (result) =>
-        Math.max(
-          this.retryAfterMs,
-          Math.min(60_000, RETRY_DELAY_MS * 2 ** Math.min(result.pending[0]?.attempts ?? 0, 5)),
-        ),
-      onResult: () => this.outbox.publish(),
+    this.now = now
+    this.outbox = manualMatchOutbox(ownerId, local, deploymentUrl, {
+      send: async (action) => {
+        await this.send(action.args)
+        return { operationId: action.args.publicId }
+      },
+      rejectReason: (cause) =>
+        isPermanentRejection(cause)
+          ? convexErrorMessage(cause, translate("play:recordMatch.saveFailed"))
+          : undefined,
+      retryAfterMs: convexRetryAfterMs,
+      now,
     })
   }
 
@@ -176,8 +141,8 @@ export class ManualMatchController {
     return this.outbox.state$
   }
 
-  get getSnapshot() {
-    return this.outbox.getSnapshot
+  getSnapshot(): ManualMatchOutboxSnapshot {
+    return this.outbox.getState()
   }
 
   start(): () => void {
@@ -189,16 +154,14 @@ export class ManualMatchController {
   }
 
   record(args: RecordManualMatchArgs): void {
-    const result = this.repository.enqueue({
+    const accepted = this.outbox.enqueue({
       schemaVersion: 1,
-      ownerId: this.repository.ownerId,
+      ownerId: this.ownerId,
       args,
       queuedAt: this.now(),
       attempts: 0,
     })
-    if (!result.accepted) throw new Error(translate("play:recordMatch.queueFull"))
-    this.outbox.publish()
-    void this.drain()
+    if (!accepted) throw new Error(translate("play:recordMatch.queueFull"))
   }
 
   private async send(args: RecordManualMatchArgs) {
@@ -210,31 +173,6 @@ export class ManualMatchController {
       const { deckVersionId: _, ...me } = args.me
       return await this.client.mutation(api.matches.recordManualMatch, { ...args, me })
     }
-  }
-
-  private drainOnce(shouldContinue: () => boolean) {
-    this.retryAfterMs = 0
-    return drainOutbox({
-      repository: this.repository,
-      currentFailures: () => this.repository.loadFailed(),
-      operationId: (action) => action.args.publicId,
-      now: this.now,
-      classifyFailure: (cause) => {
-        if (isPermanentRejection(cause))
-          return {
-            kind: "reject" as const,
-            reason: convexErrorMessage(cause, translate("play:recordMatch.saveFailed")),
-          }
-        this.retryAfterMs = convexRetryAfterMs(cause) ?? 0
-        return { kind: "retry" as const }
-      },
-      send: async (action) => {
-        await this.send(action.args)
-        return { operationId: action.args.publicId }
-      },
-      shouldContinue,
-      onChange: () => this.outbox.publish(),
-    })
   }
 }
 
@@ -251,10 +189,7 @@ export function getManualMatchController(
   }
   const existing = byOwner.get(ownerId)
   if (existing) return existing
-  const controller = new ManualMatchController(
-    client,
-    new ManualMatchRepository(ownerId, storage, client.url),
-  )
+  const controller = new ManualMatchController(client, ownerId, { deploymentUrl: client.url })
   byOwner.set(ownerId, controller)
   return controller
 }

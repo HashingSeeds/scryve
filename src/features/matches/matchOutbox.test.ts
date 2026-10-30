@@ -1,7 +1,7 @@
 import type { ConvexReactClient } from "convex/react"
 
 import { buildManualMatchArgs, defaultManualMatchDraft } from "./manualMatchForm"
-import { ManualMatchController, ManualMatchRepository } from "./matchOutbox"
+import { ManualMatchController } from "./matchOutbox"
 import { api } from "../../../convex/_generated/api"
 import { makeConvexTest, signedIn } from "../../../test/convexTest"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
@@ -35,8 +35,7 @@ async function setup() {
     },
   } as unknown as ConvexReactClient
   const local = new MemoryStorage()
-  const relaunch = () =>
-    new ManualMatchController(client, new ManualMatchRepository("owner", local))
+  const relaunch = () => new ManualMatchController(client, "owner", { storage: local })
   const matches = () => t.run((ctx) => ctx.db.query("matches").collect())
   return { relaunch, matches, sent, loseAcknowledgement: () => (loseNextAcknowledgement = true) }
 }

@@ -3,8 +3,8 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 import { clear } from "@/utils/storage"
 
 import { DeckSyncRepository, useDeckSync } from "./decksSync"
-import { DeckSyncWriteRepository, useDeckMetadataWrites } from "./decksSyncWrites"
-import { DeckVersionWriteRepository, useDeckVersionWrites } from "./decksVersionWrites"
+import { deckWriteOutbox, useDeckMetadataWrites } from "./decksSyncWrites"
+import { useDeckVersionWrites, versionWriteOutbox } from "./decksVersionWrites"
 import type { Id } from "../../../convex/_generated/dataModel"
 
 const deck = {
@@ -43,8 +43,10 @@ jest.mock("convex/react", () => ({ useConvex: () => mockClient }))
 
 it("waits for readiness, preserves offline edits, and resumes both write queues on reconnect", async () => {
   clear()
-  const metadata = new DeckSyncWriteRepository("owner-a", undefined, mockClient.url)
-  const versions = new DeckVersionWriteRepository("owner-a", undefined, mockClient.url)
+  const storedMetadata = () =>
+    deckWriteOutbox("owner-a", undefined, mockClient.url).getState().pending
+  const storedVersions = () =>
+    versionWriteOutbox("owner-a", undefined, mockClient.url).getState().pending
   new DeckSyncRepository("owner-a", undefined, mockClient.url).mergeMetadata([deck])
   const hook = renderHook(
     ({ ready }: { ready: boolean }) => ({
@@ -68,16 +70,16 @@ it("waits for readiness, preserves offline edits, and resumes both write queues 
       0,
     )
   })
-  expect(metadata.loadPending()).toHaveLength(1)
-  expect(versions.loadPending()).toHaveLength(1)
+  expect(storedMetadata()).toHaveLength(1)
+  expect(storedVersions()).toHaveLength(1)
   expect(mockClient.query.mock.calls.length).toBe(0)
   expect(mockClient.watchQuery.mock.calls.length).toBe(0)
   expect(mockClient.mutation.mock.calls.length).toBe(0)
 
   hook.rerender({ ready: true })
   await waitFor(() => {
-    expect(metadata.loadPending()).toHaveLength(0)
-    expect(versions.loadPending()).toHaveLength(0)
+    expect(storedMetadata()).toHaveLength(0)
+    expect(storedVersions()).toHaveLength(0)
   })
   expect(mockClient.query).toHaveBeenCalled()
   expect(mockClient.mutation).toHaveBeenCalledTimes(2)
@@ -96,13 +98,13 @@ it("waits for readiness, preserves offline edits, and resumes both write queues 
   })
   expect(mockClient.query.mock.calls.length).toBe(0)
   expect(mockClient.mutation.mock.calls.length).toBe(0)
-  expect(metadata.loadPending()).toHaveLength(1)
-  expect(versions.loadPending()).toHaveLength(1)
+  expect(storedMetadata()).toHaveLength(1)
+  expect(storedVersions()).toHaveLength(1)
 
   hook.rerender({ ready: true })
   await waitFor(() => {
-    expect(metadata.loadPending()).toHaveLength(0)
-    expect(versions.loadPending()).toHaveLength(0)
+    expect(storedMetadata()).toHaveLength(0)
+    expect(storedVersions()).toHaveLength(0)
   })
   expect(mockClient.query).toHaveBeenCalled()
   expect(mockClient.mutation).toHaveBeenCalledTimes(2)

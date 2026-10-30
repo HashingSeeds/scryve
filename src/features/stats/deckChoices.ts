@@ -1,8 +1,5 @@
 import { DeckSyncRepository } from "@/features/decks/decksSync"
-import {
-  DeckVersionWriteRepository,
-  newestPendingCardWrite,
-} from "@/features/decks/decksVersionWrites"
+import { newestPendingCardWrite, versionWriteOutbox } from "@/features/decks/decksVersionWrites"
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
 import { translate } from "@/i18n/translate"
@@ -62,7 +59,7 @@ export function chosenDeckCards(
   }
   if (!deck.versionId) return undefined
   const cache = new DeckVersionCacheRepository(ownerId, undefined, deploymentUrl)
-  const pending = new DeckVersionWriteRepository(ownerId, undefined, deploymentUrl).loadPending()
+  const { pending } = versionWriteOutbox(ownerId, undefined, deploymentUrl).getState()
   const cards =
     newestPendingCardWrite(
       pending,

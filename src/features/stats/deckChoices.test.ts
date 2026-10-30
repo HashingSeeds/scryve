@@ -20,9 +20,7 @@ const mockLoadGuestDeck = jest.fn()
 
 jest.mock("@/features/decks/decksVersionWrites", () => ({
   ...jest.requireActual("@/features/decks/decksVersionWrites"),
-  DeckVersionWriteRepository: jest
-    .fn()
-    .mockImplementation(() => ({ loadPending: mockLoadPending })),
+  versionWriteOutbox: jest.fn(() => ({ getState: () => ({ pending: mockLoadPending() }) })),
 }))
 jest.mock("@/features/decks/deckVersionsCache", () => ({
   DeckVersionCacheRepository: jest
