@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { router } from "expo-router"
@@ -14,9 +14,9 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { getCommanderWarnings, selectCommander } from "@/features/decks/commanderSelection"
+import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
-import { addCommanderCard, canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
+import { canChooseCommander, isCommanderPick, type DeckEdits } from "@/features/decks/deckDraft"
 import { DeckStats } from "@/features/decks/DeckStats"
 import { DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
@@ -30,6 +30,7 @@ import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncAction } from "@/features/decks/LocalDeckSyncAction"
 import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -38,7 +39,6 @@ import type { ThemedStyle } from "@/theme/types"
 
 import type { Id } from "../../convex/_generated/dataModel"
 import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
-import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 import { picksCommander } from "../../convex/lib/systems"
 
 type GuestDeckDetailScreenProps = {
@@ -49,9 +49,14 @@ type GuestDeckDetailScreenProps = {
   onAddMatch?: (deckName: string) => void
 }
 type GuestCard = GuestDeckPayload["cards"][number]
+type GuestDraft = GuestDeckPayload & Pick<DeckEdits<GuestCard>, "undo" | "commanderSelected">
 
-function sameDraft(a: GuestDeckPayload | undefined, b: GuestDeckPayload | undefined) {
-  return JSON.stringify(a) === JSON.stringify(b)
+function deckOf({ undo: _undo, commanderSelected: _selected, ...deck }: GuestDraft) {
+  return deck
+}
+
+function sameDraft(a: GuestDraft | undefined, b: GuestDraft | undefined) {
+  return JSON.stringify(a && deckOf(a)) === JSON.stringify(b && deckOf(b))
 }
 
 export function GuestDeckDetailScreen({
@@ -64,14 +69,12 @@ export function GuestDeckDetailScreen({
   const { themed, theme } = useAppTheme()
   const stored = useGuestDeck(localId)
   const [restored] = useState(() => (stored ? loadLocalDraft(localId) : undefined))
-  const [draft, setDraftState] = useState<GuestDeckPayload | undefined>(
-    () => restored?.deck ?? stored?.deck,
-  )
-  const draftRef = useRef(draft)
-  const setDraft = useCallback((next: GuestDeckPayload | undefined) => {
-    draftRef.current = next
-    setDraftState(next)
-  }, [])
+  const {
+    draft,
+    latest: draftRef,
+    setDraft,
+    edit,
+  } = useDeckEditor<GuestDraft | undefined>(() => restored?.deck ?? stored?.deck)
   const revisionRef = useRef(
     restored?.revision ??
       (stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined),
@@ -82,18 +85,17 @@ export function GuestDeckDetailScreen({
   const [tab, setTab] = useState<DeckTab>("cards")
   const [editing, setEditing] = useState(restored !== undefined)
   const [settings, setSettings] = useState(false)
-  const [undo, setUndo] = useState<{ name: string; cards: GuestCard[] }>()
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
-  const [commanderSelected, setCommanderSelected] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingElsewhere = useLocalDeckSyncing(localId)
   const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [focusedIndex, setFocusedIndex] = useState<number>()
-  const focusedCard =
-    focusedIndex === undefined ? undefined : (draft ?? stored?.deck)?.cards[focusedIndex]
+  const [focusedKey, setFocusedKey] = useState<string>()
+  const focusedCard = (draft ?? stored?.deck)?.cards.find(
+    (card) => printingKey(card) === focusedKey,
+  )
   const focusedGame = (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME
   const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
@@ -127,7 +129,7 @@ export function GuestDeckDetailScreen({
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   useEffect(() => {
     if (stored && sameDraft(draftRef.current, baseRef.current)) {
-      setDraft(stored.deck)
+      setDraft({ ...stored.deck, commanderSelected: draftRef.current?.commanderSelected })
       baseRef.current = stored.deck
       revisionRef.current = { localId: stored.localId, updatedAt: stored.updatedAt }
     } else if (!stored && sameDraft(draftRef.current, baseRef.current)) {
@@ -135,13 +137,13 @@ export function GuestDeckDetailScreen({
       baseRef.current = undefined
       revisionRef.current = undefined
     }
-  }, [setDraft, stored])
+  }, [draftRef, setDraft, stored])
 
   useEffect(() => {
     const base = baseRef.current
     const revision = revisionRef.current
     if (draft && base && revision && !sameDraft(draft, base))
-      keepLocalDraft(localId, { deck: draft, base, revision })
+      keepLocalDraft(localId, { deck: deckOf(draft), base, revision })
     else forgetLocalDraft(localId)
   }, [draft, localId])
 
@@ -166,13 +168,13 @@ export function GuestDeckDetailScreen({
     )
   }
 
-  const current = draft ?? stored?.deck
+  const current: GuestDraft | undefined = draft ?? stored?.deck
   if (!current) return null
   const game = current.game ?? DEFAULT_DECK_GAME
   const rules = { game, format: current.format }
   const singleCommander = canChooseCommander(rules, current.cards)
-  const cachedRules = commanderSelected ? loadCardDetails() : {}
-  const commanderWarnings = commanderSelected
+  const cachedRules = current.commanderSelected ? loadCardDetails() : {}
+  const commanderWarnings = current.commanderSelected
     ? getCommanderWarnings(current.cards, (card) => cachedRules[cardDetailsKey(card, game)])
     : []
   const sections = localizedDeckSections(game, current.format)
@@ -181,33 +183,14 @@ export function GuestDeckDetailScreen({
     return sections.find((section) => section.id === id)?.label ?? id
   }
 
-  const latest = () => draftRef.current ?? current
-  const updateCard = (index: number, card: GuestCard | undefined) =>
-    setDraft({
-      ...latest(),
-      cards: latest().cards.flatMap((entry, cardIndex) =>
-        cardIndex === index && card ? [card] : cardIndex === index ? [] : [entry],
-      ),
-    })
-  const update = (changes: Partial<GuestDeckPayload>) => setDraft({ ...latest(), ...changes })
+  const update = (changes: Partial<GuestDeckPayload>) =>
+    setDraft({ ...(draftRef.current ?? current), ...changes })
+  const addCard = (card: GuestCard) => edit({ type: "add", card }, rules)
+  const removeCard = (card: GuestCard) => edit({ type: "remove", card }, rules)
   const chooseCommander = (color?: GuestCard["commanderColor"]) => {
     if (!focusedCard) return
-    const cached = loadCardDetails()
-    const result = selectCommander(
-      current.cards,
-      printingKey(focusedCard),
-      (card) => (card === focusedCard ? details : cached[cardDetailsKey(card, game)]),
-      color,
-    )
-    setFocusedIndex(undefined)
-    if ("error" in result) {
-      setError(result.error)
-      return
-    }
-    setError(undefined)
-    setUndo(undefined)
-    update({ cards: result.cards })
-    setCommanderSelected(true)
+    setFocusedKey(undefined)
+    setError(edit({ type: "chooseCommander", card: focusedCard, details, color }, rules))
   }
   const save = () => {
     setError(undefined)
@@ -230,12 +213,11 @@ export function GuestDeckDetailScreen({
     }
     try {
       const saved = saveGuestDeck(
-        { ...current, name: current.name.trim() },
+        { ...deckOf(current), name: current.name.trim() },
         { localId: revision.localId },
       )
       setEditing(false)
-      setUndo(undefined)
-      setDraft(saved.deck)
+      setDraft({ ...saved.deck, commanderSelected: current.commanderSelected })
       baseRef.current = saved.deck
       revisionRef.current = { localId: saved.localId, updatedAt: saved.updatedAt }
     } catch (cause) {
@@ -311,32 +293,13 @@ export function GuestDeckDetailScreen({
             : undefined
         }
         commanderWarnings={commanderWarnings}
-        onNoteChange={(note) => update({ note })}
-        onFocus={(card) => setFocusedIndex(current.cards.indexOf(card))}
-        onIncrement={(card) => {
-          setUndo(undefined)
-          updateCard(current.cards.indexOf(card), {
-            ...card,
-            quantity: Math.min(999, card.quantity + 1),
-          })
-        }}
-        onDecrement={(card) => {
-          if (card.quantity === 1) setUndo({ name: card.name, cards: current.cards })
-          else setUndo(undefined)
-          updateCard(
-            current.cards.indexOf(card),
-            card.quantity > 1 ? { ...card, quantity: card.quantity - 1 } : undefined,
-          )
-        }}
+        onNoteChange={(note) => edit({ type: "note", note }, rules)}
+        onFocus={(card) => setFocusedKey(printingKey(card))}
+        onIncrement={addCard}
+        onDecrement={removeCard}
         undo={
-          undo
-            ? {
-                name: undo.name,
-                restore: () => {
-                  update({ cards: undo.cards })
-                  setUndo(undefined)
-                },
-              }
+          current.undo
+            ? { name: current.undo.name, restore: () => edit({ type: "undo" }, rules) }
             : undefined
         }
         error={
@@ -359,12 +322,10 @@ export function GuestDeckDetailScreen({
                   const latest = loadGuestDeck(localId)
                   if (!latest) return
                   setDraft(latest.deck)
-                  setCommanderSelected(false)
                   baseRef.current = latest.deck
                   revisionRef.current = { localId: latest.localId, updatedAt: latest.updatedAt }
                   setError(undefined)
                   setConflict(false)
-                  setUndo(undefined)
                   setEditing(false)
                 }}
               />
@@ -396,47 +357,15 @@ export function GuestDeckDetailScreen({
           initialSection={choosingCommander ? "commander" : undefined}
           commanderCards={current.cards}
           onClose={() => setAdding(false)}
-          onRemove={(card) => {
-            const { cards } = latest()
-            const index = cards.findIndex((entry) => printingKey(entry) === printingKey(card))
-            const entry = cards[index]
-            if (!entry) return
-            updateCard(
-              index,
-              entry.quantity > 1 ? { ...entry, quantity: entry.quantity - 1 } : undefined,
-            )
-          }}
+          onRemove={removeCard}
           onAdd={(card) => {
-            setUndo(undefined)
-            const { cards } = latest()
-            if (isCommanderPick(rules, card)) {
-              const cached = loadCardDetails()
-              const result = addCommanderCard(
-                cards,
-                card,
-                (entry) => cached[cardDetailsKey(entry, game)],
-              )
-              if ("error" in result) return result.error
-              update({ cards: result.cards })
-              setCommanderSelected(true)
-              if (choosingCommander) setAdding(false)
-              return undefined
-            }
-            const index = cards.findIndex((entry) => printingKey(entry) === printingKey(card))
-            if (index >= 0) {
-              const entry = cards[index]
-              if (entry.quantity >= 999) return translate("decks:draft.copyLimit", { limit: 999 })
-              updateCard(index, { ...entry, quantity: entry.quantity + 1 })
-            } else {
-              if (cards.length >= MAX_DECK_CARDS)
-                return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
-              update({ cards: [...cards, card] })
-            }
-            return undefined
+            const addError = addCard(card)
+            if (!addError && choosingCommander && isCommanderPick(rules, card)) setAdding(false)
+            return addError
           }}
         />
       ) : null}
-      {focusedCard && focusedIndex !== undefined ? (
+      {focusedCard ? (
         <CardFocusDialog
           key={printingKey(focusedCard)}
           card={{
@@ -457,25 +386,16 @@ export function GuestDeckDetailScreen({
           detailsError={detailsError}
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
-          onClose={() => setFocusedIndex(undefined)}
+          onClose={() => setFocusedKey(undefined)}
           onSetCommander={editing && singleCommander ? chooseCommander : undefined}
           {...(editing
             ? {
                 onIncrement: isCommanderPick(rules, focusedCard)
                   ? undefined
-                  : () =>
-                      updateCard(focusedIndex, {
-                        ...focusedCard,
-                        quantity: Math.min(999, focusedCard.quantity + 1),
-                      }),
+                  : () => addCard(focusedCard),
                 onDecrement: () => {
-                  if (focusedCard.quantity <= 1) setFocusedIndex(undefined)
-                  updateCard(
-                    focusedIndex,
-                    focusedCard.quantity > 1
-                      ? { ...focusedCard, quantity: focusedCard.quantity - 1 }
-                      : undefined,
-                  )
+                  if (focusedCard.quantity <= 1) setFocusedKey(undefined)
+                  removeCard(focusedCard)
                 },
               }
             : {})}
@@ -497,9 +417,7 @@ export function GuestDeckDetailScreen({
             ? { localId: stored.localId, updatedAt: stored.updatedAt }
             : undefined
           setDraft(stored?.deck)
-          setCommanderSelected(false)
           setEditing(false)
-          setUndo(undefined)
           setDiscarding(false)
         }}
       />

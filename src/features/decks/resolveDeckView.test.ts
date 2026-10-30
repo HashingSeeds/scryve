@@ -1,5 +1,5 @@
 import type { DeckCard } from "./deckCards"
-import { addDraftCard, closedDeckDraft, openDeckDraft } from "./deckDraft"
+import { closedDeckDraft, openDeckDraft } from "./deckDraft"
 import type { SyncedDeck } from "./decksSync"
 import type { PendingDeckWrite } from "./decksSyncWrites"
 import type { PendingVersionWrite } from "./decksVersionWrites"
@@ -223,10 +223,10 @@ describe("resolveDeckView cards", () => {
   })
 
   it("renders the open draft and its unsaved changes", () => {
-    const draft = addDraftCard(
-      openDeckDraft({ cards: [card("Island", 2)], note: "Server note", fromCache: false }),
-      card("Swamp"),
-    )
+    const draft = {
+      ...openDeckDraft({ cards: [card("Island", 2)], note: "Server note", fromCache: false }),
+      cards: [card("Island", 2), card("Swamp")],
+    }
     const view = resolveDeckView(input({ detail: detail(), draft }))
     expect(names(view.cards)).toEqual(["2 Island", "1 Swamp"])
     expect(names(view.displayCards)).toEqual(["2 Island"])

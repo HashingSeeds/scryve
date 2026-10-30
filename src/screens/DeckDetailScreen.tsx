@@ -25,19 +25,12 @@ import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel, deckVersionLabel, recordText } from "@/features/decks/deckCopy"
 import {
-  addDraftCard,
-  addDraftCommander,
-  cardLimitError,
-  chooseDraftCommander,
   closeDeckDraft,
   closedDeckDraft,
   isCommanderPick,
   openDeckDraft,
   planDeckSave,
-  removeDraftCard,
   reseedDeckDraft,
-  restoreDraftUndo,
-  setDraftNote,
   startsNewList,
   type DeckDraft,
 } from "@/features/decks/deckDraft"
@@ -63,6 +56,7 @@ import {
   loadAccountDraft,
 } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -336,13 +330,12 @@ function DeckDetailContent({
   const archiveDeck = useMutation(api.decks.archive)
   const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const [tab, setTab] = useState<DeckTab>("cards")
-  const [draft, setDraftState] = useState(restored?.draft ?? closedDeckDraft)
-  // why: search taps can land before a re-render, so limit checks read this ref, which every draft write updates first.
-  const latestDraft = useRef(draft)
-  const setDraft = useCallback((update: DeckDraft | ((current: DeckDraft) => DeckDraft)) => {
-    latestDraft.current = typeof update === "function" ? update(latestDraft.current) : update
-    setDraftState(latestDraft.current)
-  }, [])
+  const {
+    draft,
+    latest: latestDraft,
+    setDraft,
+    edit,
+  } = useDeckEditor<DeckDraft>(restored?.draft ?? closedDeckDraft)
   const [dialog, setDialog] = useState<DeckDialog>("none")
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
@@ -435,8 +428,8 @@ function DeckDetailContent({
   const { displayCards } = view
   useEffect(() => {
     if (!draft.editing || !draft.fromCache || detail === undefined) return
-    setDraft((current) => reseedDeckDraft(current, displayCards))
-  }, [detail, displayCards, draft.editing, draft.fromCache, setDraft])
+    setDraft(reseedDeckDraft(latestDraft.current, displayCards))
+  }, [detail, displayCards, draft.editing, draft.fromCache, latestDraft, setDraft])
 
   // Keeps the persistent cache fresh with live reads so the next offline session is current.
   useEffect(() => {
@@ -531,11 +524,11 @@ function DeckDetailContent({
   }
 
   function addCard(card: DeckCard): string | undefined {
-    if (knownDeleted) return undefined
+    if (knownDeleted || !deck) return undefined
     const alreadyInDraft = latestDraft.current.cards.some(
       (candidate) => printingKey(candidate) === printingKey(card),
     )
-    if (!alreadyInDraft && offline) {
+    if (!alreadyInDraft && offline && !isCommanderPick(deck, card)) {
       const entry = offlineCardEntry(card)
       if (!entry) {
         const offlineError = translate("decks:detail.offlineCard")
@@ -550,8 +543,7 @@ function DeckDetailContent({
         ...(card.board ? { board: card.board } : {}),
       }
     }
-    setDraft((current) => addDraftCard(current, card))
-    return undefined
+    return edit({ type: "add", card }, { game, format: deck.format })
   }
 
   /**
@@ -565,8 +557,8 @@ function DeckDetailContent({
   }
 
   function removeCard(card: DeckCard) {
-    if (knownDeleted) return
-    setDraft((current) => removeDraftCard(current, card))
+    if (knownDeleted || !deck) return
+    edit({ type: "remove", card }, { game, format: deck.format })
   }
 
   function focusCard(card: DeckCard) {
@@ -574,21 +566,14 @@ function DeckDetailContent({
   }
 
   function chooseCommander(color?: DeckCard["commanderColor"]) {
-    if (!focusedCard || knownDeleted || cardsUnavailable || cardsCached) return
-    const cached = loadCardDetails()
-    const next = chooseDraftCommander(
-      latestDraft.current,
-      printingKey(focusedCard),
-      (card) => (card === focusedCard ? details : cached[cardDetailsKey(card, game)]),
-      color,
-    )
+    if (!focusedCard || !deck || knownDeleted || cardsUnavailable || cardsCached) return
     setFocusedKey(undefined)
-    if ("error" in next) {
-      setError(next.error)
-      return
-    }
-    setError(undefined)
-    setDraft(next)
+    setError(
+      edit(
+        { type: "chooseCommander", card: focusedCard, details, color },
+        { game, format: deck.format },
+      ),
+    )
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -615,7 +600,7 @@ function DeckDetailContent({
     const finish = () => {
       captureAnalytics("deck_used", { feature: "saved" })
       setNewListNotice(newList)
-      setDraft(closeDeckDraft)
+      setDraft(closeDeckDraft(latestDraft.current))
     }
     if (plan.immediate) {
       try {
@@ -896,13 +881,16 @@ function DeckDetailContent({
             : undefined
         }
         commanderWarnings={view.commanderWarnings}
-        onNoteChange={(note) => setDraft((current) => setDraftNote(current, note))}
+        onNoteChange={(note) => edit({ type: "note", note }, { game, format: deck.format })}
         onFocus={focusCard}
         onIncrement={addCard}
         onDecrement={removeCard}
         undo={
           draft.undo
-            ? { name: draft.undo.name, restore: () => setDraft(restoreDraftUndo) }
+            ? {
+                name: draft.undo.name,
+                restore: () => edit({ type: "undo" }, { game, format: deck.format }),
+              }
             : undefined
         }
         error={
@@ -1146,21 +1134,9 @@ function DeckDetailContent({
           onClose={() => setAdding(false)}
           onRemove={removeCard}
           onAdd={(card) => {
-            if (isCommanderPick(deck, card)) {
-              const cached = loadCardDetails()
-              const next = addDraftCommander(
-                latestDraft.current,
-                card,
-                (entry) => cached[cardDetailsKey(entry, deck.game)],
-              )
-              if ("error" in next) return next.error
-              setDraft(next)
-              if (choosingCommander) setAdding(false)
-              return undefined
-            }
-            const limitError = cardLimitError(latestDraft.current.cards, card)
-            if (limitError) return limitError
-            return addCard(card)
+            const addError = addCard(card)
+            if (!addError && choosingCommander && isCommanderPick(deck, card)) setAdding(false)
+            return addError
           }}
         />
       ) : null}

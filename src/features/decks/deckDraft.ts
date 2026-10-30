@@ -51,10 +51,6 @@ export function reseedDeckDraft(draft: DeckDraft, cards: DeckCard[]): DeckDraft 
   return { ...draft, cards, base: cards, fromCache: false }
 }
 
-export function setDraftNote(draft: DeckDraft, note: string): DeckDraft {
-  return { ...draft, note }
-}
-
 export function draftChanges(draft: DeckDraft, savedNote: string | undefined) {
   const cards = draft.editing && !draft.fromCache && cardsChanged(draft.cards, draft.base)
   const note = draft.editing && draft.note !== (savedNote ?? "")
@@ -79,11 +75,7 @@ export function cardsChanged(cards: readonly DeckCard[], base: readonly DeckCard
   )
 }
 
-export function adjustCardQuantity<T extends DeckCard>(
-  cards: readonly T[],
-  card: T,
-  delta: number,
-) {
+function adjustCardQuantity<T extends DeckCard>(cards: readonly T[], card: T, delta: number) {
   return cards.flatMap((entry) =>
     printingKey(entry) !== printingKey(card)
       ? [entry]
@@ -101,35 +93,23 @@ export function adjustCardQuantity<T extends DeckCard>(
   )
 }
 
-export function incrementCard<T extends DeckCard>(cards: readonly T[], card: T) {
-  return cards.some((entry) => printingKey(entry) === printingKey(card))
-    ? adjustCardQuantity(cards, card, 1)
-    : [...cards, card]
-}
-
-export function addDraftCard(draft: DeckDraft, card: DeckCard): DeckDraft {
-  return { ...draft, cards: incrementCard(draft.cards, card), undo: undefined }
-}
-
-export function removeDraftCard(draft: DeckDraft, card: DeckCard): DeckDraft {
-  return {
-    ...draft,
-    cards: adjustCardQuantity(draft.cards, card, -1),
-    undo: card.quantity === 1 ? { name: card.name, cards: draft.cards } : undefined,
-  }
-}
-
-export function restoreDraftUndo(draft: DeckDraft): DeckDraft {
-  return draft.undo ? { ...draft, cards: draft.undo.cards, undo: undefined } : draft
-}
-
-export function cardLimitError(cards: readonly DeckCard[], card: DeckCard) {
+function cardLimitError(cards: readonly DeckCard[], card: DeckCard) {
   const existing = cards.find((entry) => printingKey(entry) === printingKey(card))
   if (existing && existing.quantity >= MAX_CARD_COPIES)
     return translate("decks:draft.copyLimit", { limit: MAX_CARD_COPIES })
   if (!existing && cards.length >= MAX_DECK_CARDS)
     return translate("decks:draft.entryLimit", { limit: MAX_DECK_CARDS })
   return undefined
+}
+
+function addCopy<T extends DeckCard>(cards: readonly T[], card: T) {
+  const error = cardLimitError(cards, card)
+  if (error) return { error }
+  return {
+    cards: cards.some((entry) => printingKey(entry) === printingKey(card))
+      ? adjustCardQuantity(cards, card, 1)
+      : [...cards, card],
+  }
 }
 
 export function isCommanderPick(deck: DeckRules, card: DeckCard) {
@@ -147,7 +127,7 @@ export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) 
   )
 }
 
-export function addCommanderCard<T extends DeckCard>(
+function addIdentityCard<T extends DeckCard>(
   cards: readonly T[],
   card: T,
   detailsFor: CardDetailsLookup<T>,
@@ -168,25 +148,70 @@ export function addCommanderCard<T extends DeckCard>(
   return { cards: result.cards }
 }
 
-export function addDraftCommander(
-  draft: DeckDraft,
-  card: DeckCard,
-  detailsFor: CardDetailsLookup,
-): DeckDraft | { error: string } {
-  const result = addCommanderCard(draft.cards, card, detailsFor)
-  if ("error" in result) return result
-  return { ...draft, cards: result.cards, undo: undefined, commanderSelected: true }
+export type DeckEdits<Card extends DeckCard = DeckCard> = {
+  cards: Card[]
+  note?: string
+  undo?: { name: string; cards: Card[] }
+  commanderSelected?: boolean
 }
 
-export function chooseDraftCommander(
-  draft: DeckDraft,
-  selectedKey: string,
-  detailsFor: CardDetailsLookup,
-  commanderColor?: DeckCard["commanderColor"],
-): DeckDraft | { error: string } {
-  const result = selectCommander(draft.cards, selectedKey, detailsFor, commanderColor)
-  if ("error" in result) return result
-  return { ...draft, cards: result.cards, undo: undefined, commanderSelected: true }
+export type DeckEdit<Card extends DeckCard = DeckCard> =
+  | { type: "add"; card: Card }
+  | { type: "remove"; card: Card }
+  | {
+      type: "chooseCommander"
+      card: Card
+      details?: CommanderSelectionDetails
+      color?: Card["commanderColor"]
+    }
+  | { type: "undo" }
+  | { type: "note"; note: string }
+
+export function editDeck<Draft extends DeckEdits>(
+  draft: Draft,
+  edit: DeckEdit<Draft["cards"][number]>,
+  deck: DeckRules & { detailsFor: CardDetailsLookup<Draft["cards"][number]> },
+): Draft | { error: string } {
+  switch (edit.type) {
+    case "add": {
+      const pick = isCommanderPick(deck, edit.card)
+      const result = pick
+        ? addIdentityCard(draft.cards, edit.card, deck.detailsFor)
+        : addCopy(draft.cards, edit.card)
+      if ("error" in result) return result
+      return {
+        ...draft,
+        cards: result.cards,
+        undo: undefined,
+        ...(pick ? { commanderSelected: true } : {}),
+      }
+    }
+    case "remove": {
+      const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.card))
+      if (!entry) return draft
+      return {
+        ...draft,
+        cards: adjustCardQuantity(draft.cards, entry, -1),
+        undo: entry.quantity === 1 ? { name: entry.name, cards: draft.cards } : undefined,
+      }
+    }
+    case "chooseCommander": {
+      const key = printingKey(edit.card)
+      const result = selectCommander(
+        draft.cards,
+        key,
+        (card) =>
+          edit.details && printingKey(card) === key ? edit.details : deck.detailsFor(card),
+        edit.color,
+      )
+      if ("error" in result) return result
+      return { ...draft, cards: result.cards, undo: undefined, commanderSelected: true }
+    }
+    case "undo":
+      return draft.undo ? { ...draft, cards: draft.undo.cards, undo: undefined } : draft
+    case "note":
+      return { ...draft, note: edit.note }
+  }
 }
 
 type SaveTarget = "queue" | "mutation" | "none"
