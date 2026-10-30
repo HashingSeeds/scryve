@@ -778,14 +778,12 @@ describe("CurrentGameScreen", () => {
       expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
     })
 
-    it("keeps the menu during assignment and turns it into an exit for inspection", () => {
+    it("keeps the menu during assignment, returns to the attack when it closes, and turns it into an exit for inspection", () => {
       const view = renderGame()
       armCommander(view, 1)
       expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
       fireEvent.press(view.getByTestId("game-menu-button"))
-      expect(view.queryByTestId("commander-hit-seat-2")).toBeNull()
       fireEvent.press(view.getByTestId("game-menu-button"))
-      armCommander(view, 1)
       fireEvent.press(view.getByTestId("commander-hit-seat-2"))
       expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("1")
       expect(life(view, 2)).toBe("39")

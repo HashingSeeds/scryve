@@ -34,6 +34,7 @@ export function AppUtilityMenu({
   onSupport,
   onAccount,
   onOpenHeightChange,
+  onChoose,
   accountEntry = "account",
 }: {
   visible?: boolean
@@ -45,6 +46,8 @@ export function AppUtilityMenu({
   onSupport: () => void
   onAccount: () => void
   onOpenHeightChange?: (height: number) => void
+  // why: runs before any item, so a screen can settle its own state before the app moves on.
+  onChoose?: () => void
   accountEntry?: AccountEntry
 }) {
   const { themed } = useAppTheme()
@@ -96,6 +99,7 @@ export function AppUtilityMenu({
   if (!visible) return null
   const choose = (action: () => void) => {
     close()
+    onChoose?.()
     action()
   }
   const slotStyle = open ? { width: openWidth, height: ITEM_HEIGHT * itemCount } : undefined

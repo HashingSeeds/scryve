@@ -204,7 +204,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("layout-tabletop").props.accessibilityState.selected).toBe(true)
   })
 
-  it("sends staged commander damage when the menu opens", async () => {
+  it("holds staged commander damage through the menu and sends it when a petal takes over the board", async () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: {
@@ -216,8 +216,13 @@ describe("ConnectedBoardScreen", () => {
 
     fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
     fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
-    fireEvent.press(screen.getByTestId("game-menu-button"))
+    openConnectedMenu()
+    openConnectedMenu()
+    expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
+    expect(screen.getByTestId("commander-hit-seat-1")).toBeTruthy()
 
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("players-button"))
     await waitFor(() =>
       expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
         { toPlayerId: "player-2", delta: 1 },

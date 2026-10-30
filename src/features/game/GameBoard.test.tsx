@@ -68,6 +68,22 @@ describe("GameBoard chrome", () => {
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
+  it("finishes an attack before an app destination leaves the board", () => {
+    const dispatch = jest.fn()
+    const onHistory = jest.fn(() => expect(dispatch).toHaveBeenCalledWith({ type: "send" }))
+    renderBoard({
+      attack: { dispatch, inspectedPlayerId: null },
+      onHistory,
+      onSettings: jest.fn(),
+      onSupport: jest.fn(),
+      onAccount: jest.fn(),
+    })
+    openMenu()
+    fireEvent.press(screen.getByTestId("utility-menu-button"))
+    fireEvent.press(screen.getByTestId("utility-history-button"))
+    expect(onHistory).toHaveBeenCalledTimes(1)
+  })
+
   it("gives Decks the rules petal when the game has no rules", () => {
     const onDecks = jest.fn()
     renderBoard({ onDecks })
@@ -77,11 +93,21 @@ describe("GameBoard chrome", () => {
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
-  it("sends a staged attack when the menu opens and exits an inspected commander", () => {
+  it("pauses an attack under the menu, finishes it when a petal takes over the board, and exits an inspected commander", () => {
     const dispatch = jest.fn()
-    const view = renderBoard({ attack: { dispatch, inspectedPlayerId: null } })
+    const view = renderBoard({
+      system: "mtg",
+      onRules: jest.fn(),
+      attack: { dispatch, inspectedPlayerId: null },
+    })
     openMenu()
-    expect(dispatch).toHaveBeenLastCalledWith({ type: "send" })
+    openMenu()
+    openMenu()
+    fireEvent.press(screen.getByTestId("rules-button"))
+    expect(dispatch).not.toHaveBeenCalled()
+    openMenu()
+    fireEvent.press(screen.getByTestId("players-button"))
+    expect(dispatch).toHaveBeenCalledWith({ type: "send" })
 
     view.rerender(
       <ThemeProvider initialContext="dark">
