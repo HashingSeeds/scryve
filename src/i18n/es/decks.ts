@@ -179,6 +179,9 @@ export default {
       "Las partidas ya jugadas con ella conservan su registro, pero la lista ya no se podrá editar ni seleccionar.",
     keepDeck: "Conservar este mazo",
     deleteDeckTitle: "¿Eliminar este mazo?",
+    keepEditing: "Seguir editando",
+    discardTitle: "¿Descartar cambios?",
+    discardBody: "Se perderán tus cambios.",
     discard: "Descartar",
   },
   guestStorage: {

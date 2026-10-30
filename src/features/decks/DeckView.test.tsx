@@ -102,15 +102,27 @@ describe("draft bar", () => {
     expect(view.queryByTestId("deck-draft-bar")).toBeNull()
   })
 
-  it("counts changes and saves or discards them", () => {
+  it("counts changes and saves them", () => {
     const onSave = jest.fn()
-    const onDiscard = jest.fn()
-    const view = renderDeckView({ changes: 2, onSave, onDiscard })
+    const view = renderDeckView({ changes: 2, onSave })
 
     expect(view.getByText("2 changes")).toBeTruthy()
     fireEvent.press(view.getByTestId("save-version-button"))
-    fireEvent.press(view.getByTestId("deck-draft-discard"))
     expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it("asks before Discard drops the changes", () => {
+    const onDiscard = jest.fn()
+    const view = renderDeckView({ changes: 2, onDiscard })
+
+    fireEvent.press(view.getByTestId("deck-draft-discard"))
+    expect(view.getByText("Discard changes?")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-discard-cancel"))
+    expect(onDiscard).not.toHaveBeenCalled()
+    expect(view.queryByTestId("deck-discard-dialog")).toBeNull()
+
+    fireEvent.press(view.getByTestId("deck-draft-discard"))
+    fireEvent.press(view.getByTestId("deck-discard-confirm"))
     expect(onDiscard).toHaveBeenCalledTimes(1)
   })
 })

@@ -163,6 +163,9 @@ export default {
       "このバージョンで行ったゲームの記録は残りますが、リストの編集や選択はできなくなります。",
     keepDeck: "このデッキを残す",
     deleteDeckTitle: "このデッキを削除しますか?",
+    keepEditing: "編集を続ける",
+    discardTitle: "変更を破棄しますか?",
+    discardBody: "編集内容は失われます。",
     discard: "破棄",
   },
   guestStorage: {

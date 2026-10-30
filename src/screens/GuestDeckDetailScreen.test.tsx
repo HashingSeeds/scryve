@@ -336,6 +336,7 @@ test("supports removing the last copy, Undo, and discarding the draft", () => {
   expect(view.getByText("Sol Ring")).toBeTruthy()
   expect(view.getByText("1 change")).toBeTruthy()
   fireEvent.press(view.getByTestId("deck-draft-discard"))
+  fireEvent.press(view.getByTestId("deck-discard-confirm"))
   expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
   expect(view.queryByTestId("deck-draft-bar")).toBeNull()
   view.unmount()
