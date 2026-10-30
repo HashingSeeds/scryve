@@ -97,7 +97,7 @@ export function NewEventScreen({
           {error ? <AlertNote testID="new-event-error" text={error} /> : null}
           <Button
             testID="create-event-button"
-            preset="reversed"
+            preset="primary"
             disabled={busy || !name.trim()}
             text={translate(busy ? "events:create.creating" : "events:create.create")}
             onPress={() => void create()}

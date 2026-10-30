@@ -20,6 +20,7 @@ import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
@@ -676,20 +677,14 @@ export function CardSearchScreen({
                 ) : null}
               </View>
               {!choosingCommander ? (
-                <TouchableOpacity
+                <TextAction
                   style={$add}
-                  accessibilityRole="button"
                   accessibilityLabel={translate("decks:cardSearch.addCard", {
                     card: entry.card.name,
                   })}
+                  tx="decks:cardSearch.add"
                   onPress={() => addOffline(entry)}
-                >
-                  <Text
-                    size="sm"
-                    style={{ color: theme.colors.brandText }}
-                    tx="decks:cardSearch.add"
-                  />
-                </TouchableOpacity>
+                />
               ) : null}
             </ResultRow>
           ))}
@@ -723,18 +718,12 @@ export function CardSearchScreen({
                 ) : null}
               </View>
               {!choosingCommander ? (
-                <TouchableOpacity
+                <TextAction
                   style={$add}
-                  accessibilityRole="button"
                   accessibilityLabel={translate("decks:cardSearch.addCard", { card: card.name })}
+                  tx="decks:cardSearch.add"
                   onPress={() => add(card)}
-                >
-                  <Text
-                    size="sm"
-                    style={{ color: theme.colors.brandText }}
-                    tx="decks:cardSearch.add"
-                  />
-                </TouchableOpacity>
+                />
               ) : null}
             </ResultRow>
           ))}

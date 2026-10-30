@@ -40,7 +40,7 @@ export default function AccountRoute() {
         />
         <Text accessibilityRole="alert" text={prompt} />
         {auth.configured && !auth.isSignedIn ? (
-          <Button tx="account:profile.reauthenticate" preset="reversed" onPress={auth.openAuth} />
+          <Button tx="account:profile.reauthenticate" preset="primary" onPress={auth.openAuth} />
         ) : null}
         {hasDeletionReceipt ? <AccountDataControls onOpen={openAccountData} /> : null}
         <Button

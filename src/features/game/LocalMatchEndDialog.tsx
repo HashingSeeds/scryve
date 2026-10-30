@@ -168,7 +168,7 @@ export function LocalMatchEndDialog({
         <Button
           testID="confirm-end-match-button"
           tx="board:matchEnd.end"
-          preset="reversed"
+          preset="primary"
           style={themed($dialogAction)}
           onPress={confirm}
         />

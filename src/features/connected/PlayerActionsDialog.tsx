@@ -98,7 +98,7 @@ export function PlayerActionsDialog({
         <View style={themed($section)}>
           <Text preset="subheading" tx="connected:playerActions.thanks" />
           <Text testID="player-actions-confirmation" accessibilityRole="alert" text={done} />
-          <Button tx="common:close" preset="reversed" onPress={onClose} />
+          <Button tx="common:close" preset="primary" onPress={onClose} />
         </View>
       ) : selected ? (
         <ScrollView
@@ -146,7 +146,7 @@ export function PlayerActionsDialog({
             <Button
               testID="submit-player-report-button"
               tx={busy ? "connected:playerActions.sending" : "connected:playerActions.sendReport"}
-              preset="reversed"
+              preset="primary"
               disabled={busy}
               style={themed($action)}
               onPress={() =>

@@ -39,6 +39,24 @@ describe("Button", () => {
     },
   )
 
+  it.each(["light", "dark"] as const)(
+    "fills destructive actions with the error color and a readable label in %s mode",
+    (mode) => {
+      const themeColors = mode === "dark" ? darkColors : lightColors
+      const view = render(
+        <ThemeProvider initialContext={mode}>
+          <Button testID="delete" text="Delete deck" preset="destructive" />
+        </ThemeProvider>,
+      )
+      const button = StyleSheet.flatten(view.getByTestId("delete").props.style)
+      const label = StyleSheet.flatten(view.getByText("Delete deck").props.style)
+      expect(button.backgroundColor).toBe(themeColors.error)
+      expect(
+        contrastRatio(label.color as string, button.backgroundColor as string),
+      ).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
   it("keeps nested text overrides presentation-only", () => {
     const nestedButtonContentIsExcluded: NestedButtonContentIsExcluded = true
 
@@ -112,14 +130,14 @@ describe("Button", () => {
     (mode) => {
       const view = render(
         <ThemeProvider initialContext={mode}>
-          <Button testID="cta" text="Start game" preset="reversed" disabled />
+          <Button testID="cta" text="Start game" preset="primary" disabled />
         </ThemeProvider>,
       )
 
       const button = StyleSheet.flatten(view.getByTestId("cta").props.style)
       const label = StyleSheet.flatten(view.getByText("Start game").props.style)
 
-      expect(label.textDecorationLine).toBeUndefined()
+      expect(label.textDecorationLine ?? "none").toBe("none")
       expect(button.borderStyle).toBeUndefined()
       expect(
         contrastRatio(label.color as string, button.backgroundColor as string),

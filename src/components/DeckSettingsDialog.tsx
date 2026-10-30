@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react"
 import { ScrollView } from "react-native"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -99,8 +99,7 @@ export function DeckSettingsDialog({
         <Button
           testID="delete-deck-button"
           tx="decks:settings.delete"
-          style={themed($destructiveButton)}
-          textStyle={themed($destructiveText)}
+          preset="destructive"
           disabled={busy}
           onPress={onDelete}
         />
@@ -108,12 +107,5 @@ export function DeckSettingsDialog({
     </DialogCard>
   )
 }
-
-const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.errorBackground,
-  borderColor: colors.error,
-  borderWidth: 1,
-})
-const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })

@@ -39,7 +39,7 @@ export class ConnectedErrorBoundary extends Component<Props, State> {
         <Button
           testID="retry-connected-button"
           tx="common:retry"
-          preset="reversed"
+          preset="primary"
           onPress={() => this.setState({ error: undefined })}
         />
         {this.props.onBack ? (

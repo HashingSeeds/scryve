@@ -94,7 +94,7 @@ export function RoundClockDialog({
             <Button
               testID="round-clock-next"
               tx="board:roundClock.nextTurn"
-              preset="reversed"
+              preset="primary"
               disabled={areRoundTurnsDone(view)}
               style={themed($dialogButton)}
               onPress={() => onChange((current) => stepRoundTurn(current, system, 1))}
@@ -125,7 +125,7 @@ export function RoundClockDialog({
           <Button
             testID="round-clock-pause"
             tx={paused ? "board:roundClock.resume" : "board:roundClock.pause"}
-            preset="reversed"
+            preset="primary"
             style={themed($wide)}
             onPress={() =>
               onChange((current) => (paused ? resumeRoundClock(current) : pauseRoundClock(current)))

@@ -462,7 +462,7 @@ export function GameSummaryScreen({
           <Button
             testID="second-game-get-help"
             tx="play:summary.openHelp"
-            preset="reversed"
+            preset="primary"
             style={themed($helpBarButton)}
             onPress={() => {
               setShowHelp(false)

@@ -176,7 +176,7 @@ function DeckLimitOptions({
               <Button
                 testID="deck-limit-upgrade"
                 tx="decks:deckLimit.upgrade"
-                preset="reversed"
+                preset="primary"
                 disabled={!billing.configured || billing.isLoading}
                 onPress={onUpgrade}
               />
@@ -238,7 +238,7 @@ function DeckLimitOptions({
             <Button
               testID="deck-limit-confirm-move"
               tx={busy ? "decks:deckLimit.moving" : "decks:deckLimit.move"}
-              preset="reversed"
+              preset="primary"
               style={$flex1}
               disabled={busy}
               onPress={() => void confirmMove(step.id)}

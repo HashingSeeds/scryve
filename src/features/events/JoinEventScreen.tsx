@@ -79,7 +79,7 @@ export function JoinEventScreen({
           {error ? <AlertNote testID="join-event-error" text={error} /> : null}
           <Button
             testID="join-event-submit"
-            preset="reversed"
+            preset="primary"
             disabled={busy || !valid}
             text={translate(busy ? "events:join.joining" : "events:join.join")}
             onPress={() => void join(code)}

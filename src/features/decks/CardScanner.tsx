@@ -418,7 +418,7 @@ export function CardScanner({
                 />
                 <Button
                   testID="card-scan-keep-scanning"
-                  preset="reversed"
+                  preset="primary"
                   tx="decks:cardScan.keepScanning"
                   onPress={() => setReviewing(false)}
                 />
@@ -504,7 +504,7 @@ export function CardScanner({
         ) : permission ? (
           <BottomActionBar>
             <Button
-              preset="reversed"
+              preset="primary"
               tx={canAsk ? "decks:cardScan.allow" : "decks:cardScan.openSettings"}
               onPress={() => void (canAsk ? requestPermission() : Linking.openSettings())}
             />

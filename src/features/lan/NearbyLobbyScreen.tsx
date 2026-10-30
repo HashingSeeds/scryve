@@ -162,7 +162,7 @@ export function OpenSettingsButton() {
   return (
     <Button
       tx="connected:nearby.openSettings"
-      preset="reversed"
+      preset="primary"
       onPress={() => void Linking.openSettings()}
     />
   )

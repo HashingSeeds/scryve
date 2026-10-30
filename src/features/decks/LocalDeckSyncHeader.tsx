@@ -177,7 +177,7 @@ function LocalDeckSyncPicker({
         <Button
           testID="local-deck-sync-confirm"
           tx={busy ? "decks:localSync.syncing" : "decks:localSync.sync"}
-          preset="reversed"
+          preset="primary"
           style={$flex1}
           disabled={busy || !selected.length || selected.length > free}
           onPress={() => void syncSelected()}

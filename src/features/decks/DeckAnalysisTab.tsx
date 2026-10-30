@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { TouchableOpacity, View } from "react-native"
+import { View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useConvex } from "convex/react"
 
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -82,15 +83,14 @@ export function DeckAnalysisTab({
                 testID="deck-analysis-no-commander"
               />
               {onChooseCommander ? (
-                <TouchableOpacity
+                <TextAction
                   testID="deck-analysis-choose-commander"
-                  accessibilityRole="button"
                   accessibilityLabel={translate("decks:cardRow.chooseCommander")}
+                  tx="decks:cardRow.choose"
+                  size="xs"
                   style={$choose}
                   onPress={onChooseCommander}
-                >
-                  <Text size="xs" style={themed($action)} tx="decks:cardRow.choose" />
-                </TouchableOpacity>
+                />
               ) : null}
             </View>
           ) : null}
@@ -273,7 +273,6 @@ const $panel: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $group: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $choose: ViewStyle = {
   minWidth: 44,
   minHeight: 44,

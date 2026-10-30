@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { ScrollView, View } from "react-native"
 import { useMutation } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -10,6 +10,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadGuestDeck } from "@/features/decks/guestDeck"
@@ -182,9 +183,9 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
                 txOptions={{ number: index + 1 }}
               />
               {draft.opponents.length > 1 ? (
-                <TouchableOpacity
+                <TextAction
                   testID={`match-remove-opponent-${index}`}
-                  accessibilityRole="button"
+                  tx="common:remove"
                   disabled={busy}
                   onPress={() =>
                     setDraft({
@@ -192,9 +193,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
                       opponents: draft.opponents.filter((_, candidate) => candidate !== index),
                     })
                   }
-                >
-                  <Text size="sm" tx="common:remove" style={themed($action)} />
-                </TouchableOpacity>
+                />
               ) : null}
             </View>
             <TextField
@@ -228,15 +227,13 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
           </View>
         ))}
         {draft.opponents.length < MAX_OPPONENTS ? (
-          <TouchableOpacity
+          <TextAction
             testID="match-add-opponent"
-            accessibilityRole="button"
+            tx="play:recordMatch.addOpponent"
             style={$touch}
             disabled={busy}
             onPress={() => setDraft(withOpponentAdded(draft))}
-          >
-            <Text size="sm" tx="play:recordMatch.addOpponent" style={themed($action)} />
-          </TouchableOpacity>
+          />
         ) : null}
         <View style={themed($row)}>
           <TextField
@@ -311,7 +308,6 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-end",
 })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 
 async function localDeckIds(localId: string) {
   const stored = loadGuestDeck(localId)

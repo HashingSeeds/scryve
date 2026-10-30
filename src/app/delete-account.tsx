@@ -32,7 +32,7 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
         onLeftPress={() => router.back()}
       />
       <Text accessibilityRole="alert" tx="account:deleteAccount.route.statusCheckFailed" />
-      <Button tx="common:tryAgain" preset="reversed" onPress={() => void retry()} />
+      <Button tx="common:tryAgain" preset="primary" onPress={() => void retry()} />
       <Button
         tx="account:openPlay"
         onPress={() => router.dismissTo({ pathname: "/", params: { destination: "play" } })}
@@ -76,7 +76,7 @@ export default function DeleteAccountRoute() {
           />
           <Text accessibilityRole="alert" text={signInPrompt} />
           {auth.configured ? (
-            <Button tx="account:signIn" preset="reversed" onPress={auth.openAuth} />
+            <Button tx="account:signIn" preset="primary" onPress={auth.openAuth} />
           ) : null}
           <Button
             tx="account:openPlay"

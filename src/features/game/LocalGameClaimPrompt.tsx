@@ -238,7 +238,7 @@ function ClaimPicker({
               ? translate("board:claim.keepOnDevice")
               : translate("board:claim.addGames", { count: selectedCount })
           }
-          preset="reversed"
+          preset="primary"
           style={themed($action)}
           onPress={confirm}
         />

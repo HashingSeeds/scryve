@@ -324,7 +324,7 @@ export function LobbyView({
           <Button
             testID="return-to-game-button"
             tx="connected:nearby.backToGame"
-            preset="reversed"
+            preset="primary"
             style={themed($primaryAction)}
             onPress={onReturnToGame}
           />
@@ -337,7 +337,7 @@ export function LobbyView({
                   ? translate("connected:lobby.starting")
                   : (startLabel ?? translate("play:startGame"))
               }
-              preset="reversed"
+              preset="primary"
               style={themed($primaryAction)}
               disabled={startBlocked}
               onPress={onStart}
@@ -448,7 +448,7 @@ export function LobbyView({
             <Button
               testID="save-appearance-button"
               tx={appearance.saving ? "connected:saving" : "common:save"}
-              preset="reversed"
+              preset="primary"
               style={themed($dialogButton)}
               disabled={appearance.saving}
               onPress={() => void saveAppearance()}
@@ -558,7 +558,7 @@ export function LobbyStatusScreen({
         ) : null}
       </ScrollView>
       <BottomActionBar style={themed($surface)}>
-        <Button tx="play:startGame" preset="reversed" style={themed($primaryAction)} disabled />
+        <Button tx="play:startGame" preset="primary" style={themed($primaryAction)} disabled />
       </BottomActionBar>
     </Screen>
   )

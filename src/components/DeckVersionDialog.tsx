@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { translate } from "@/i18n/translate"
@@ -103,7 +103,7 @@ export function DeckVersionDialog({
       <Button
         testID="version-submit"
         text={busy ? translate("decks:saving") : submitLabel}
-        preset="reversed"
+        preset="primary"
         disabled={busy || !name.trim()}
         onPress={() => onSubmit({ name, note, copyCards })}
       />
@@ -111,8 +111,7 @@ export function DeckVersionDialog({
         <Button
           testID="delete-version-button"
           tx="decks:versionDialog.delete"
-          style={themed($destructiveButton)}
-          textStyle={themed($destructiveText)}
+          preset="destructive"
           disabled={busy}
           onPress={onDelete}
         />
@@ -122,9 +121,3 @@ export function DeckVersionDialog({
 }
 
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.errorBackground,
-  borderColor: colors.error,
-  borderWidth: 1,
-})
-const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })

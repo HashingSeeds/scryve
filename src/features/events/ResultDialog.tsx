@@ -138,7 +138,7 @@ export function ResultDialog({
         ) : null}
         <Button
           testID="save-result-button"
-          preset="reversed"
+          preset="primary"
           tx="events:result.save"
           disabled={busy || !valid}
           style={themed($dialogButton)}

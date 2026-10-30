@@ -57,9 +57,7 @@ export function SupportScreen({
       title={translate("account:support.title")}
       offline={offline}
       onBack={onBack}
-      footer={
-        <Button tx="feedback:support.suggest" preset="reversed" onPress={() => onSuggest()} />
-      }
+      footer={<Button tx="feedback:support.suggest" preset="primary" onPress={() => onSuggest()} />}
     >
       <TextField
         placeholderTx="feedback:support.search"
@@ -199,7 +197,7 @@ function SearchResults({
         />
         <Button
           text={translate("feedback:support.ask", { query })}
-          preset="reversed"
+          preset="primary"
           onPress={() => onSuggest(query)}
         />
       </View>
