@@ -288,7 +288,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
                   : (access.actionLabel ?? translate("play:manualMatch.signIn"))
             }
             preset="primary"
-            disabled={busy || access.loading}
+            disabled={busy || (!access.ownerId && access.loading)}
             onPress={save}
           />
         )}

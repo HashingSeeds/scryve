@@ -74,8 +74,8 @@ it("records a local deck's key, list and name with the match", async () => {
   })
 })
 
-it("saves offline on this device without blocking Back", async () => {
-  const { view, onBack, onSaved } = renderScreen(signedIn(false))
+it("saves on this device while the account is unreachable, without blocking Back", async () => {
+  const { view, onBack, onSaved } = renderScreen({ ...signedIn(false), loading: true })
   fireEvent.press(view.getByTestId("match-save"))
 
   await waitFor(() => expect(view.getByTestId("match-saved-offline")).toBeTruthy())
