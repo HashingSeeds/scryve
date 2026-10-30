@@ -155,6 +155,8 @@ export default {
       protocol: "주최자와 같은 Scryve 버전이 필요합니다.",
       closed: "그 이벤트는 끝났습니다.",
       invalid: "주최자가 이 기기를 거부했습니다.",
+      unreachable:
+        "해당 이벤트에 연결할 수 없습니다. 같은 Wi-Fi에 연결되어 있는지 확인한 후 다시 시도하세요.",
     },
   },
   settings: {

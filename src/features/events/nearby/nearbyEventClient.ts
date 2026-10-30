@@ -20,7 +20,9 @@ import type { PlayerStanding } from "../../../../convex/lib/events/model"
 import type { EventView } from "../eventSource"
 
 const RECONNECT_MS = 2_000
+const JOIN_TIMEOUT_MS = 10_000
 
+export type JoinOutcome = "joined" | "unreachable" | NearbyRejection
 export type ClientStatus = "idle" | "connecting" | "connected" | "lost" | "rejected"
 
 export interface NearbyClientState {
@@ -59,7 +61,8 @@ class NearbyEventClient {
   readonly latency = new SyncLatency({ transport: "nearby", role: "guest", scope: "event" })
   private nextId = 1
   private retry: ReturnType<typeof setTimeout> | undefined
-  private joined: (outcome: "joined" | NearbyRejection) => void = () => undefined
+  private joining:
+    { resolve: (outcome: JoinOutcome) => void; timer: ReturnType<typeof setTimeout> } | undefined
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener)
@@ -73,17 +76,25 @@ class NearbyEventClient {
     for (const listener of this.listeners) listener()
   }
 
-  join(service: Service, code: string, name: string): Promise<"joined" | NearbyRejection> {
+  join(service: Service, code: string, name: string): Promise<JoinOutcome> {
     this.leave()
     this.target = { service, code, name }
     this.set({ ...IDLE, code, status: "connecting" })
     return new Promise((resolve) => {
-      this.joined = resolve
+      this.joining = { resolve, timer: setTimeout(() => this.leave(), JOIN_TIMEOUT_MS) }
       void this.connect()
     })
   }
 
+  private settleJoin(outcome: JoinOutcome) {
+    if (!this.joining) return
+    clearTimeout(this.joining.timer)
+    this.joining.resolve(outcome)
+    this.joining = undefined
+  }
+
   leave() {
+    this.settleJoin("unreachable")
     this.latency.report()
     clearTimeout(this.retry)
     this.target = undefined
@@ -142,12 +153,12 @@ class NearbyEventClient {
     switch (message.t) {
       case "welcome":
         this.set({ status: "connected" })
-        this.joined("joined")
+        this.settleJoin("joined")
         return
       case "rejected":
         this.target = undefined
         this.set({ status: "rejected", rejection: message.reason, rejectionCode: message.code })
-        this.joined(message.reason)
+        this.settleJoin(message.reason)
         return
       case "view":
       case "patch": {

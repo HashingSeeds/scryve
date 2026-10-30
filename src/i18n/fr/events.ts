@@ -161,6 +161,8 @@ export default {
       protocol: "L'organisateur doit avoir la même version de Scryve que vous.",
       closed: "Cet événement est terminé.",
       invalid: "L'organisateur a refusé cet appareil.",
+      unreachable:
+        "Impossible de joindre cet événement. Vérifiez que vous êtes sur le même Wi-Fi, puis réessayez.",
     },
   },
   settings: {

@@ -79,3 +79,25 @@ it("times a command until the host's next update shows it, not until the host an
   )
   jest.useRealTimers()
 })
+
+it("gives up on a host it can't reach and stops retrying", async () => {
+  jest.useFakeTimers()
+  jest.mocked(connectLan).mockReset().mockRejectedValue(new Error("unreachable"))
+  const joining = nearbyEventClient.join(service, CODE, "Ada")
+  await jest.advanceTimersByTimeAsync(10_000)
+  await expect(joining).resolves.toBe("unreachable")
+  const attempts = jest.mocked(connectLan).mock.calls.length
+  await jest.advanceTimersByTimeAsync(10_000)
+  expect(connectLan).toHaveBeenCalledTimes(attempts)
+  jest.useRealTimers()
+})
+
+it("ends a pending join when the player leaves", async () => {
+  jest
+    .mocked(connectLan)
+    .mockReset()
+    .mockReturnValue(new Promise(() => {}))
+  const joining = nearbyEventClient.join(service, CODE, "Ada")
+  nearbyEventClient.leave()
+  await expect(joining).resolves.toBe("unreachable")
+})
