@@ -14,6 +14,20 @@ function response(body: unknown, status = 200) {
   )
 }
 
+function stallFetchUntilTimeout() {
+  const timeout = AbortSignal.timeout.bind(AbortSignal)
+  const timeoutSpy = jest.spyOn(AbortSignal, "timeout").mockImplementation(() => timeout(10))
+  jest
+    .spyOn(global, "fetch")
+    .mockImplementation(
+      (_input, init) =>
+        new Promise((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
+        ),
+    )
+  return timeoutSpy
+}
+
 const pokemonCard = {
   id: "base1-4",
   localId: "4",
@@ -25,6 +39,14 @@ const pokemonCard = {
 
 describe("card provider caching and health", () => {
   afterEach(() => jest.restoreAllMocks())
+
+  it("gives up on a stalled Scryfall search as unavailable", async () => {
+    const timeoutSpy = stallFetchUntilTimeout()
+    await expect(
+      makeConvexTest().action(api.cards.search, { query: "Llanowar Elves" }),
+    ).rejects.toMatchObject({ data: { code: "scryfall_unavailable" } })
+    expect(timeoutSpy).toHaveBeenCalledWith(10_000)
+  })
 
   it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {
     const t = makeConvexTest()

@@ -26,6 +26,20 @@ function deckListResponse() {
   } as unknown as Response)
 }
 
+function stallFetchUntilTimeout() {
+  const timeout = AbortSignal.timeout.bind(AbortSignal)
+  const timeoutSpy = jest.spyOn(AbortSignal, "timeout").mockImplementation(() => timeout(10))
+  jest
+    .spyOn(global, "fetch")
+    .mockImplementation(
+      (_input, init) =>
+        new Promise((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
+        ),
+    )
+  return timeoutSpy
+}
+
 const preconCardId = "22222222-2222-2222-2222-222222222222"
 
 function resolvedPreconResponse(url: string, deckName = "Avengers Assemble") {
@@ -883,6 +897,22 @@ describe("preconstructed catalog caching", () => {
       expect(results.every((result) => result.name === "Avengers Assemble")).toBe(true)
     } finally {
       fetchSpy.mockRestore()
+    }
+  })
+
+  it("gives up on a stalled MTGJSON deck file as unavailable", async () => {
+    const timeoutSpy = stallFetchUntilTimeout()
+    try {
+      await expect(
+        makeConvexTest()
+          .withIdentity({ subject: "stalled-precon-user" })
+          .action(api.deckImports.previewPreconstructed, {
+            fileName: "AvengersAssemble",
+          }),
+      ).rejects.toMatchObject({ data: { code: "precon_import_unavailable" } })
+      expect(timeoutSpy).toHaveBeenCalledWith(10_000)
+    } finally {
+      jest.restoreAllMocks()
     }
   })
 

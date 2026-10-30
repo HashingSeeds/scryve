@@ -175,7 +175,10 @@ export const refreshUsernameFromClerk = internalAction({
     const fetchStartedAt = Date.now()
     const response = await fetch(
       `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
-      { headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` } },
+      {
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+        signal: AbortSignal.timeout(10_000),
+      },
     )
     if (!response.ok) {
       console.error(`Clerk username refresh failed with status ${response.status}`)

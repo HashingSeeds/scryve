@@ -11,6 +11,7 @@ const SCRYFALL_HEADERS = {
 }
 
 export const SCRYFALL_RATE_LIMIT_BLOCK_MS = 30_000
+const SCRYFALL_TIMEOUT_MS = 10_000
 
 type ScryfallRequestOptions = {
   method?: "GET" | "POST"
@@ -65,6 +66,12 @@ export async function fetchScryfall(
       ...(options.body ? { "Content-Type": "application/json" } : {}),
     },
     body: options.body,
+    signal: AbortSignal.timeout(SCRYFALL_TIMEOUT_MS),
+  }).catch(() => {
+    throw new ConvexError({
+      code: "scryfall_unavailable",
+      message: "Scryfall is temporarily unavailable",
+    })
   })
   if (response.status === 429)
     await ctx.runMutation(internal.externalApiRateLimits.block, {
