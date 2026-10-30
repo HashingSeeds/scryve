@@ -74,6 +74,7 @@ import { picksCommander } from "../../convex/lib/systems"
 type DeckDialog =
   | "none"
   | "newVersion"
+  | "versions"
   | "renameVersion"
   | "deleteVersion"
   | "settings"
@@ -86,6 +87,14 @@ const NEW_LIST_NOTICE_MS = 8_000
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
+}
+
+function openVersionLabel(version: { name?: string; versionNumber: number }) {
+  const numbered = translate("decks:numberedVersion", { number: version.versionNumber })
+  const name = deckVersionLabel(version)
+  return name === numbered
+    ? numbered
+    : translate("decks:deckView.version", { number: version.versionNumber, name })
 }
 
 export type DeckDetailSummary = {
@@ -190,14 +199,6 @@ function DeckDetailPlaceholder({
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity
-            testID="current-version-button"
-            style={themed($currentVersion)}
-            disabled
-          >
-            <Text size="xs" style={themed($dimmedText)} tx="decks:detail.currentVersion" />
-            <Text weight="medium" tx="decks:detail.current" />
-          </TouchableOpacity>
           {access?.message ? (
             <Button text={access.actionLabel ?? access.message} onPress={access.request} />
           ) : null}
@@ -804,6 +805,7 @@ function DeckDetailContent({
   const configuredSections = localizedDeckSections(deck.game, deck.format)
   const { accountMetadata, versionConflict, versionCardConflict, failureMessage } = view
   const copyFromVersion = activeVersionSummary ?? version
+  const latestVersionNumber = Math.max(...view.versionRows.map((row) => row.versionNumber))
   const syncError =
     failedEdit || failedCardEdit ? (
       <Button tx="decks:detail.reviewChanges" onPress={() => setDialog("syncConflict")} />
@@ -838,6 +840,17 @@ function DeckDetailContent({
         }
         editingDisabled={knownDeleted}
         saveStatus={view.saveStatus}
+        version={
+          !view.hasVersionRows
+            ? undefined
+            : activeVersionSummary
+              ? {
+                  label: openVersionLabel(activeVersionSummary),
+                  latest: activeVersionSummary.versionNumber >= latestVersionNumber,
+                }
+              : { label: translate("decks:detail.versions"), latest: true }
+        }
+        onVersions={() => setDialog("versions")}
         onBack={onBack}
         onEdit={startEditing}
         onSave={save}
@@ -1223,88 +1236,101 @@ function DeckDetailContent({
           onDelete={() => setDialog("deleteDeck")}
           {...(onMovedToDevice && !hasQueuedEdits ? { onKeepOnDevice: confirmKeepOnDevice } : {})}
           onClose={() => setDialog("none")}
+        />
+      ) : null}
+
+      {dialog === "versions" ? (
+        <DialogCard
+          visible
+          onClose={() => setDialog("none")}
+          closeDisabled={busy}
+          backdropTestID="deck-versions-backdrop"
+          backdropAccessibilityLabel={translate("common:close")}
+          dialogTestID="deck-versions-dialog"
+          accessibilityViewIsModal
+          placement="bottom"
+          wide
         >
-          {view.hasVersionRows ? (
-            <View style={themed($versions)}>
-              <View style={themed($versionHeading)}>
-                <Text weight="bold" size="sm" tx="decks:detail.versions" />
-                {detail || view.canQueueVersions ? (
-                  <TextAction
-                    testID="version-picker-__new__"
-                    tx="decks:detail.newVersion"
+          <ScrollView contentContainerStyle={themed($versions)}>
+            <View style={themed($versionHeading)}>
+              <Text preset="subheading" tx="decks:detail.versions" />
+              {detail || view.canQueueVersions ? (
+                <TextAction
+                  testID="version-picker-__new__"
+                  tx="decks:detail.newVersion"
+                  disabled={draft.editing}
+                  onPress={startNewVersion}
+                />
+              ) : null}
+            </View>
+            {view.versionRows.map((candidate) => {
+              const selected = candidate._id === activeVersionId
+              // Live records only; cached rows must not present unknown stats as fresh.
+              const candidateCounts = candidate.record ? allRecord(candidate.record) : undefined
+              const candidateRecord = candidateCounts?.games
+                ? [recordText(candidateCounts)]
+                : detail
+                  ? [translate("decks:detail.unplayed")]
+                  : []
+              return (
+                <View key={candidate._id} style={themed($versionRow)}>
+                  <TouchableOpacity
+                    testID={`version-picker-${candidate._id}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={themed($versionSelect)}
                     disabled={draft.editing}
-                    onPress={startNewVersion}
-                  />
-                ) : null}
-              </View>
-              {view.versionRows.map((candidate) => {
-                const selected = candidate._id === activeVersionId
-                // Live records only; cached rows must not present unknown stats as fresh.
-                const candidateCounts = candidate.record ? allRecord(candidate.record) : undefined
-                const candidateRecord = candidateCounts?.games
-                  ? [recordText(candidateCounts)]
-                  : detail
-                    ? [translate("decks:detail.unplayed")]
-                    : []
-                return (
-                  <View key={candidate._id} style={themed($versionRow)}>
-                    <TouchableOpacity
-                      testID={`version-picker-${candidate._id}`}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      style={themed($versionSelect)}
-                      disabled={draft.editing}
-                      onPress={() => {
-                        chooseVersion(candidate._id)
-                        setDialog("none")
-                      }}
-                    >
-                      <View
-                        testID={`version-marker-${candidate._id}`}
-                        style={[themed($versionMark), selected && themed($versionMarkSelected)]}
-                      />
-                      <View style={themed($versionCopy)}>
-                        <Text weight="medium" text={deckVersionLabel(candidate)} />
-                        {candidate.note ? (
-                          <Text
-                            size="xxs"
-                            style={themed($dimmedText)}
-                            text={candidate.note}
-                            numberOfLines={2}
-                          />
-                        ) : null}
-                      </View>
-                      <View style={themed($versionContext)}>
-                        {candidateRecord.map((text) => (
-                          <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
-                        ))}
+                    onPress={() => {
+                      chooseVersion(candidate._id)
+                      setDialog("none")
+                    }}
+                  >
+                    <View
+                      testID={`version-marker-${candidate._id}`}
+                      style={[themed($versionMark), selected && themed($versionMarkSelected)]}
+                    />
+                    <View style={themed($versionCopy)}>
+                      <Text weight="medium" text={deckVersionLabel(candidate)} />
+                      {candidate.note ? (
                         <Text
                           size="xxs"
                           style={themed($dimmedText)}
-                          text={cardCountLabel(candidate.cardQuantity)}
+                          text={candidate.note}
+                          numberOfLines={2}
                         />
-                      </View>
+                      ) : null}
+                    </View>
+                    <View style={themed($versionContext)}>
+                      {candidateRecord.map((text) => (
+                        <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
+                      ))}
+                      <Text
+                        size="xxs"
+                        style={themed($dimmedText)}
+                        text={cardCountLabel(candidate.cardQuantity)}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  {selected && view.canManageVersion ? (
+                    <TouchableOpacity
+                      testID="rename-version-button"
+                      accessibilityRole="button"
+                      accessibilityLabel={translate("decks:detail.versionDetails")}
+                      style={$versionMore}
+                      onPress={() => {
+                        if (!draft.editing) pinVersionTarget()
+                        setDialog("renameVersion")
+                      }}
+                    >
+                      <Text size="lg" text="•••" />
                     </TouchableOpacity>
-                    {selected && view.canManageVersion ? (
-                      <TouchableOpacity
-                        testID="rename-version-button"
-                        accessibilityRole="button"
-                        accessibilityLabel={translate("decks:detail.versionDetails")}
-                        style={$versionMore}
-                        onPress={() => {
-                          if (!draft.editing) pinVersionTarget()
-                          setDialog("renameVersion")
-                        }}
-                      >
-                        <Text size="lg" text="•••" />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                )
-              })}
-            </View>
-          ) : null}
-        </DeckSettingsDialog>
+                  ) : null}
+                </View>
+              )
+            })}
+            {error ? <AlertNote text={error} /> : null}
+          </ScrollView>
+        </DialogCard>
       ) : null}
 
       {dialog === "deleteVersion" ? (
@@ -1486,14 +1512,6 @@ const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderBottomColor: "transparent",
 })
 const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
-const $currentVersion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingVertical: spacing.xs,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
 const $versions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $versionHeading: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 36,

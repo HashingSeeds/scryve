@@ -565,7 +565,7 @@ describe("DeckDetailScreen", () => {
 
     expect(view.getByText("2×")).toBeTruthy()
     expect(view.getByText("Sol Ring")).toBeTruthy()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-version-sideboard"))
 
     mockVersionCacheState.version = cachedVersions[1]
@@ -725,7 +725,7 @@ describe("DeckDetailScreen", () => {
       </ThemeProvider>
     )
     const view = render(screen())
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-version-main"))
     mockVersionCacheState.version = main
     mockVersionCacheState.cards = [solRing]
@@ -1428,7 +1428,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Sol Ring")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-tab-notes"))
     expect(view.getByText("Ramp into big spells")).toBeTruthy()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
     expect(view.getByText("3-1")).toBeTruthy()
     expect(view.getByText("Unplayed")).toBeTruthy()
@@ -1456,7 +1456,6 @@ describe("DeckDetailScreen", () => {
     expect(view.getAllByText(name)).toHaveLength(1)
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByTestId("deck-tab-cards")).toBeTruthy()
-    expect(view.getByTestId("current-version-button")).toBeTruthy()
     expect(view.getByText("Commander")).toBeTruthy()
     expect(view.getByText("Main deck")).toBeTruthy()
     expect(view.getByTestId("edit-deck-button")).toBeDisabled()
@@ -1519,7 +1518,7 @@ describe("DeckDetailScreen", () => {
       fireEvent.press(view.getByTestId("save-version-button"))
       expect(await view.findByText(notice)).toBeTruthy()
 
-      fireEvent.press(view.getByTestId("deck-settings-button"))
+      fireEvent.press(view.getByTestId("deck-version-button"))
       fireEvent.press(view.getByTestId("version-picker-version-sideboard"))
       expect(view.queryByText(notice)).toBeNull()
     })
@@ -1660,14 +1659,26 @@ describe("DeckDetailScreen", () => {
 
   it("switches the version being viewed", () => {
     const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-version-sideboard"))
     expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1", versionId: "version-sideboard" })
   })
 
+  it("names the version on screen and flags it when a newer one exists", () => {
+    const older = renderDetail()
+    expect(older.getByTestId("deck-version-button")).toHaveTextContent("Version 1 · Current")
+    expect(older.getByText("Not the latest")).toBeTruthy()
+    older.unmount()
+
+    mockDetail.value = { ...loadedDetail, version: sideboardVersion }
+    const latest = renderDetail()
+    expect(latest.getByTestId("deck-version-button")).toHaveTextContent("Version 2 · vs Control")
+    expect(latest.queryByText("Not the latest")).toBeNull()
+  })
+
   it("creates a version seeded from the one on screen", async () => {
     const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-__new__"))
     fireEvent.changeText(view.getByTestId("version-name-input"), "Budget swap")
     fireEvent.changeText(view.getByTestId("version-note-input"), "Cut the fast mana")
@@ -1687,7 +1698,7 @@ describe("DeckDetailScreen", () => {
       capacity: { used: 1, limit: 1, premium: false, canCreate: false },
     }
     const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-__new__"))
     expect(view.queryByTestId("deck-version-dialog")).toBeNull()
     expect(
@@ -1698,7 +1709,7 @@ describe("DeckDetailScreen", () => {
 
   it("keeps the rename button beside the version row so web has no nested buttons", () => {
     const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     expect(
       within(view.getByTestId("version-picker-version-main")).queryByTestId(
         "rename-version-button",
@@ -1709,7 +1720,7 @@ describe("DeckDetailScreen", () => {
 
   it("deletes the selected version from the version editor behind a confirmation", async () => {
     const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     fireEvent.press(view.getByTestId("delete-version-button"))
     fireEvent.press(view.getByTestId("delete-version-confirm"))
@@ -1728,7 +1739,7 @@ describe("DeckDetailScreen", () => {
       request: jest.fn(),
     }
     const view = renderDetail(access)
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     fireEvent.changeText(view.getByTestId("version-name-input"), "Queued rename")
     fireEvent.press(view.getByTestId("version-submit"))
@@ -1786,7 +1797,7 @@ describe("DeckDetailScreen", () => {
     )
     const view = render(screen)
 
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     expect(view.getByTestId("deck-version-dialog")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("version-name-input"), "Offline renamed")
@@ -1802,7 +1813,7 @@ describe("DeckDetailScreen", () => {
     )
     expect(mockUpdateVersion).not.toHaveBeenCalled()
 
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     fireEvent.press(view.getByTestId("delete-version-button"))
     fireEvent.press(view.getByTestId("delete-version-confirm"))
@@ -1813,7 +1824,7 @@ describe("DeckDetailScreen", () => {
     mockVersionCacheState.versions = [cachedMain]
     mockVersionCacheState.version = cachedMain
     view.rerender(screen)
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     expect(view.queryByTestId("delete-version-button")).toBeNull()
   })
@@ -1828,7 +1839,7 @@ describe("DeckDetailScreen", () => {
       request: jest.fn(),
     }
     const view = renderDetail(access)
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     fireEvent.press(view.getByTestId("delete-version-button"))
     fireEvent.press(view.getByTestId("delete-version-confirm"))
@@ -1859,7 +1870,7 @@ describe("DeckDetailScreen", () => {
         op: "cards",
       },
     ]
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-__new__"))
     fireEvent.changeText(view.getByTestId("version-name-input"), "Budget swap")
     fireEvent.press(view.getByTestId("version-submit"))
@@ -1913,7 +1924,7 @@ describe("DeckDetailScreen", () => {
       request: jest.fn(),
     })
     expect(view.getByText("Sol Ring")).toBeTruthy()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-__new__"))
     fireEvent.changeText(view.getByTestId("version-name-input"), "Copy offline")
     fireEvent.press(view.getByTestId("version-submit"))
@@ -1929,7 +1940,7 @@ describe("DeckDetailScreen", () => {
       versions: [mainVersion],
     }
     const view = renderDetail()
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("rename-version-button"))
     expect(view.queryByTestId("delete-version-button")).toBeNull()
   })
@@ -1961,7 +1972,6 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Deck unavailable")).toBeTruthy()
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
     expect(view.getByTestId("deck-tab-cards")).toBeTruthy()
-    expect(view.getByTestId("current-version-button")).toBeTruthy()
     expect(view.getByTestId("edit-deck-button")).toBeDisabled()
 
     mockDetail.error = undefined
@@ -2075,7 +2085,7 @@ describe("DeckDetailScreen", () => {
     const view = render(screen())
     expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1" })
 
-    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
     fireEvent.press(view.getByTestId("version-picker-__new__"))
     fireEvent.changeText(view.getByTestId("version-name-input"), "Offline draft")
     fireEvent.press(view.getByTestId("version-submit"))

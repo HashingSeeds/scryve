@@ -53,12 +53,14 @@ export function DeckView({
   addOfflineNote,
   editingDisabled,
   saveStatus,
+  version,
   error,
   onBack,
   onEdit,
   onSave,
   onCancel,
   onDetails,
+  onVersions,
   onAddMatch,
   onStats,
   onAdd,
@@ -90,12 +92,14 @@ export function DeckView({
   addOfflineNote?: string
   editingDisabled?: boolean
   saveStatus?: string
+  version?: { label: string; latest: boolean }
   error?: ReactNode
   onBack: () => void
   onEdit: () => void
   onSave: () => void
   onCancel: () => void
   onDetails: () => void
+  onVersions?: () => void
   onStats?: () => void
   onAddMatch?: () => void
   onAdd: () => void
@@ -178,6 +182,24 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
+              {version ? (
+                <View style={$row}>
+                  <TextAction
+                    testID="deck-version-button"
+                    text={version.label}
+                    disabled={editing || busy || !onVersions}
+                    onPress={onVersions}
+                  />
+                  {version.latest ? null : (
+                    <Text
+                      size="sm"
+                      weight="medium"
+                      style={themed($notLatest)}
+                      tx="decks:deckView.notLatest"
+                    />
+                  )}
+                </View>
+              ) : null}
               {tracked && (stats ? <DeckStats record={stats} /> : statsContent)}
               {tracked && onStats && (stats || statsContent) ? (
                 <TextAction
@@ -366,6 +388,10 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.lg,
 })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $notLatest: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
+  color: colors.textDim,
+  marginLeft: spacing.sm,
+})
 const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   gap: spacing.lg,

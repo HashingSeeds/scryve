@@ -135,8 +135,6 @@ const decks = {
     notFound: "Deck not found",
     unavailable: "Deck unavailable",
     loading: "Loading deck",
-    currentVersion: "Current version",
-    current: "Current ›",
     maybeDeleted: "This deck may have been deleted.",
     newList: "New list. Earlier results stay with the old one.",
     loadFailed: "Could not load this deck.",
@@ -454,6 +452,10 @@ const decks = {
     editTitle: "Edit deck",
     guestTitle: "Local deck",
     details: "Deck details",
+    // The deck version on screen: its number, then the name the player gave it.
+    version: "Version {{number}} · {{name}}",
+    // Shown beside the version name when a newer version of this deck exists.
+    notLatest: "Not the latest",
     addMatch: "Add match result",
     cardsTab: "Cards",
     notesTab: "Notes",
