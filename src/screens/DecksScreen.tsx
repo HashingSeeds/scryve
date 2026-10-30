@@ -154,7 +154,7 @@ function DeckRow({
             ? translate("decks:stats.onDeviceLabel", { name: deck.name })
             : needsReview
               ? translate("decks:shelf.needsReview", { name: deck.name })
-              : deck.name
+              : translate("decks:shelf.inAccountLabel", { name: deck.name })
         }
         activeOpacity={0.75}
         onPress={() => onPress()}

@@ -539,6 +539,7 @@ export default {
     allFormats: "Tous les formats",
     search: "Rechercher des decks",
     onDevice: "Sur cet appareil",
+    inAccountLabel: "{{name}}, dans votre compte",
     guestEmpty: "Enregistrez un deck sur cet appareil. Aucun compte requis.",
     dismissFilters: "Fermer les filtres",
     system: "Jeu",

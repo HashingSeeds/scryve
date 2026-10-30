@@ -511,6 +511,7 @@ export default {
     allFormats: "सभी फ़ॉर्मैट",
     search: "डेक खोजें",
     onDevice: "इस डिवाइस पर",
+    inAccountLabel: "{{name}}, आपके खाते में",
     guestEmpty: "इस डिवाइस पर डेक सेव करें। खाते की ज़रूरत नहीं।",
     dismissFilters: "फ़िल्टर बंद करें",
     system: "सिस्टम",

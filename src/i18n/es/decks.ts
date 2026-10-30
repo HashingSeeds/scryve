@@ -533,6 +533,7 @@ export default {
     allFormats: "Todos los formatos",
     search: "Buscar mazos",
     onDevice: "En este dispositivo",
+    inAccountLabel: "{{name}}, en tu cuenta",
     guestEmpty: "Guarda un mazo en este dispositivo. No necesitas cuenta.",
     dismissFilters: "Cerrar filtros",
     system: "Sistema",

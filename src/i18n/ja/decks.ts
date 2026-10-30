@@ -505,6 +505,7 @@ export default {
     allFormats: "すべてのフォーマット",
     search: "デッキを検索",
     onDevice: "このデバイス内",
+    inAccountLabel: "{{name}}(アカウント内)",
     guestEmpty: "このデバイスにデッキを保存できます。アカウントは不要です。",
     dismissFilters: "フィルターを閉じる",
     system: "システム",

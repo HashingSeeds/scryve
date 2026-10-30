@@ -498,6 +498,7 @@ export default {
     allFormats: "모든 포맷",
     search: "덱 검색",
     onDevice: "이 기기",
+    inAccountLabel: "{{name}}, 내 계정에 있음",
     guestEmpty: "이 기기에 덱을 저장하세요. 계정이 필요 없습니다.",
     dismissFilters: "필터 닫기",
     system: "시스템",

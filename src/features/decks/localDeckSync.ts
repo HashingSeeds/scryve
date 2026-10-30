@@ -26,6 +26,8 @@ import type { Id } from "../../../convex/_generated/dataModel"
 
 export type DeckHome = "account" | "device"
 
+const SAVE_TO_ACCOUNT_WAIT_MS = 5000
+
 export type LocalDeckSyncResult =
   | { status: "synced"; deckId: Id<"decks"> }
   | { status: "limit_reached" }
@@ -263,7 +265,11 @@ export function useSaveNewDeck(ownerId: string | undefined) {
     async (payload: GuestDeckPayload, home: DeckHome) => {
       const { localId } = saveGuestDeck(payload)
       if (home === "account" && ownerId) {
-        const result = await sync(localId).catch(() => undefined)
+        // why: Convex holds a mutation through a dropped connection, so an unbounded wait would freeze the save; the sync keeps running and the device deck screen waits on it.
+        const result = await Promise.race([
+          sync(localId).catch(() => undefined),
+          new Promise<undefined>((resolve) => setTimeout(resolve, SAVE_TO_ACCOUNT_WAIT_MS)),
+        ])
         if (result?.status === "synced") return result.deckId
       }
       return guestDeckRouteId(localId)

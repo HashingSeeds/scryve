@@ -286,7 +286,9 @@ describe("DecksScreen", () => {
     expect(accountCard.getByTestId("deck-home-account")).toBeTruthy()
     expect(accountCard.queryByTestId("deck-home-device")).toBeNull()
     const names = list.getAllByRole("button").map((button) => button.props.accessibilityLabel)
-    expect(names.indexOf("Local deck, on this device")).toBeLessThan(names.indexOf("Existing Deck"))
+    expect(names.indexOf("Local deck, on this device")).toBeLessThan(
+      names.indexOf("Existing Deck, in your account"),
+    )
   })
 
   it("shows a local deck's record from its key totals only while its account is signed in", () => {
@@ -481,7 +483,7 @@ describe("DecksScreen", () => {
     expect(view.getByText("3-2")).toBeTruthy()
     expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
     expect(view.getAllByText("Recent")).toHaveLength(1)
-    fireEvent.press(view.getByLabelText("Existing Deck"))
+    fireEvent.press(view.getByLabelText("Existing Deck, in your account"))
     expect(onSelect).toHaveBeenCalledWith({
       deckId: "existing-deck",
       name: "Existing Deck",
@@ -561,7 +563,7 @@ describe("DecksScreen", () => {
     expect(
       view.queryByTestId("deck-needs-review-standard-deck", { includeHiddenElements: true }),
     ).toBeNull()
-    expect(view.getByLabelText("Mono Red")).toBeTruthy()
+    expect(view.getByLabelText("Mono Red, in your account")).toBeTruthy()
   })
 
   it.each([

@@ -1863,6 +1863,19 @@ describe("AddDeckScreen", () => {
       expect(loadGuestDecks()).toEqual([])
     })
 
+    it("opens the deck on this device when the account save stalls", async () => {
+      mockCapacity.value = { used: 0, limit: 2, premium: false, canCreate: true }
+      mockImportGuest.mockReturnValue(new Promise(() => {}))
+      const onCreated = jest.fn()
+      const view = renderSignedIn(onCreated)
+      fireEvent.changeText(view.getByTestId("deck-name-input"), "Stalled")
+      fireEvent.press(view.getByText("Create deck"))
+      const [saved] = loadGuestDecks()
+      expect(onCreated).not.toHaveBeenCalled()
+      await act(async () => jest.advanceTimersByTime(5000))
+      expect(onCreated).toHaveBeenCalledWith(guestDeckRouteId(saved.localId))
+    })
+
     it("makes the player's last pick the next deck's default", async () => {
       mockCapacity.value = { used: 0, limit: 2, premium: false, canCreate: true }
       const first = renderSignedIn()

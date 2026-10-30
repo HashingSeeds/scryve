@@ -553,6 +553,7 @@ const decks = {
     allFormats: "All formats",
     search: "Search decks",
     onDevice: "On this device",
+    inAccountLabel: "{{name}}, in your account",
     guestEmpty: "Save a deck on this device. No account needed.",
     dismissFilters: "Dismiss filters",
     system: "System",
