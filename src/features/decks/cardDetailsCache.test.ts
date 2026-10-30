@@ -1,3 +1,5 @@
+import { storage } from "@/utils/storage"
+
 import {
   loadCardDetails,
   prefetchCardDetails,
@@ -13,8 +15,7 @@ jest.mock("expo-image", () => ({
   },
 }))
 
-function memoryStore(): CardDetailStore {
-  const values = new Map<string, string>()
+function memoryStore(values = new Map<string, string>()): CardDetailStore {
   return {
     getString: (key) => values.get(key),
     set: (key, value) => {
@@ -26,6 +27,7 @@ function memoryStore(): CardDetailStore {
   }
 }
 
+const DETAILS_KEY = "scryve.cards.details.v1"
 const solRing = { oracleText: "{T}: Add {C}{C}.", typeLine: "Artifact" }
 
 describe("card details cache", () => {
@@ -37,10 +39,43 @@ describe("card details cache", () => {
     saveCardDetails({ ring: solRing }, store)
     expect(readCardDetail("ring", store)).toEqual(solRing)
     expect(readCardDetail("missing", store)).toBeUndefined()
-    store.set("scryve.cards.details.v1", "not-json{")
-    expect(loadCardDetails(store)).toEqual({})
-    store.set("scryve.cards.details.v1", JSON.stringify({ bad: 42, ring: solRing }))
-    expect(loadCardDetails(store)).toEqual({ ring: solRing })
+    expect(loadCardDetails(memoryStore(new Map([[DETAILS_KEY, "not-json{"]])))).toEqual({})
+    const mixed = JSON.stringify({ bad: 42, ring: solRing })
+    expect(loadCardDetails(memoryStore(new Map([[DETAILS_KEY, mixed]])))).toEqual({ ring: solRing })
+  })
+
+  it("keeps details saved by earlier versions and persists new ones for the next session", () => {
+    const values = new Map([[DETAILS_KEY, JSON.stringify({ ring: solRing })]])
+    const store = memoryStore(values)
+    saveCardDetails({ bolt: { typeLine: "Instant" } }, store)
+    saveCardDetails({ island: { typeLine: "Land" } }, store)
+    expect(loadCardDetails(store)).toEqual({
+      ring: solRing,
+      bolt: { typeLine: "Instant" },
+      island: { typeLine: "Land" },
+    })
+    expect(loadCardDetails(memoryStore(values))).toEqual(loadCardDetails(store))
+  })
+
+  it("reparses after MMKV is wiped outside the cache", () => {
+    saveCardDetails({ ring: solRing })
+    storage.clearAll()
+    expect(loadCardDetails()).toEqual({})
+  })
+
+  it("evicts the least recently saved details past 1,500 entries", () => {
+    const store = memoryStore()
+    saveCardDetails(
+      Object.fromEntries(Array.from({ length: 1500 }, (_, i) => [`card-${i}`, solRing])),
+      store,
+    )
+    saveCardDetails({ "card-0": solRing }, store)
+    saveCardDetails({ fresh: solRing }, store)
+    const keys = Object.keys(loadCardDetails(store))
+    expect(keys).toHaveLength(1500)
+    expect(keys).toContain("card-0")
+    expect(keys).toContain("fresh")
+    expect(keys).not.toContain("card-1")
   })
 
   it("warms uncached version cards with one batch and prefetches images to disk", async () => {
