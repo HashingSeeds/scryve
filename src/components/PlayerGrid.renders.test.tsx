@@ -40,6 +40,7 @@ const commanderDamage = {
     against: jest.fn(),
     dispatch: jest.fn(),
   },
+  inspection: { playerId: null, onChange: jest.fn() },
   onPressSword: jest.fn(),
 }
 

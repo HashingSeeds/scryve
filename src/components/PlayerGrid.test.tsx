@@ -56,6 +56,7 @@ const idleCommanderDamage = {
     against: jest.fn(),
     dispatch: jest.fn(),
   },
+  inspection: { playerId: null, onChange: jest.fn() },
   onPressSword: jest.fn(),
 }
 
@@ -78,6 +79,7 @@ function CommanderGrid({
         incomingFor: () => ({}),
         lethal: 21,
         attack,
+        inspection: { playerId: null, onChange: () => {} },
         onPressSword:
           onPressSword ?? ((player) => attack.dispatch({ type: "press", playerId: player.id })),
       }}

@@ -384,8 +384,6 @@ export default {
     unknownAttacker: "Commandant",
     assignFrom: "Attribuer des blessures de commandant de {{identity}}",
     assignFromStale: "Attribuer des blessures de commandant de {{identity}}, périmé",
-    showOverviewFor: "Afficher les blessures de commandant de {{identity}}",
-    expandsGrid: "Déploie la grille des blessures de commandant",
   },
   outReason: {
     commanderDamage: "blessures de commandant",

@@ -52,6 +52,7 @@ function commanderDamage(
     ...commanderSeats,
     incoming: {},
     lethal: 21,
+    inspection: { open: false, onToggle: jest.fn() },
     ...overrides,
   }
 }
@@ -188,7 +189,7 @@ describe("LifeCard", () => {
         color,
         compact,
         onChange: jest.fn(),
-        commanderDamage: commanderDamage({ inspection: { open: false, onToggle: jest.fn() } }),
+        commanderDamage: commanderDamage(),
       }
       const view = render(
         <ThemeProvider initialContext="dark">
@@ -303,7 +304,6 @@ describe("LifeCard", () => {
           onChange={jest.fn()}
           commanderDamage={commanderDamage({
             players: commanderPlayers,
-            inspection: { open: false, onToggle: jest.fn() },
           })}
         />
       </ThemeProvider>,
@@ -775,7 +775,6 @@ describe("LifeCard", () => {
           commanderDamage={commanderDamage({
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
-            inspection: { open: false, onToggle: jest.fn() },
             onPressSword,
           })}
           onChange={jest.fn()}
@@ -845,7 +844,6 @@ describe("LifeCard", () => {
           commanderDamage={commanderDamage({
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 3 },
-            inspection: { open: false, onToggle: jest.fn() },
             onPressSword: jest.fn(),
           })}
           onChange={jest.fn()}
@@ -862,33 +860,6 @@ describe("LifeCard", () => {
     expect(StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style)).toMatchObject({
       maxWidth: 193 / 2 - 12 - 12,
     })
-  })
-
-  it("expands the commander grid from the player mark and closes it again", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={20}
-          color="#41476E"
-          commanderDamage={commanderDamage()}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
-    fireEvent.press(view.getByTestId("commander-mark-seat-1"))
-    expect(view.getByTestId("commander-overview-seat-1")).toBeTruthy()
-    expect(view.getByTestId("commander-board-seat-1")).toBeTruthy()
-    expect(view.getByTestId("player-mark-close", { includeHiddenElements: true })).toBeTruthy()
-
-    fireEvent.press(view.getByTestId("commander-overview-close-seat-1"))
-    act(() => jest.runAllTimers())
-    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
-    expect(view.queryByTestId("commander-overview-seat-1")).toBeNull()
-    expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
   })
 
   it("keeps undo off the attacker's edge and out from under the menu", () => {

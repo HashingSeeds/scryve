@@ -358,8 +358,6 @@ export default {
     unknownAttacker: "커맨더",
     assignFrom: "{{identity}}의 커맨더 피해 지정",
     assignFromStale: "{{identity}}의 커맨더 피해 지정, 오래된 정보",
-    showOverviewFor: "{{identity}}의 커맨더 피해 보기",
-    expandsGrid: "커맨더 피해 표를 펼칩니다",
   },
   outReason: {
     commanderDamage: "커맨더 피해",

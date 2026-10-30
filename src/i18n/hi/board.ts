@@ -370,8 +370,6 @@ export default {
     unknownAttacker: "कमांडर",
     assignFrom: "{{identity}} से कमांडर डैमेज असाइन करें",
     assignFromStale: "{{identity}} से कमांडर डैमेज असाइन करें, पुराना",
-    showOverviewFor: "{{identity}} के लिए कमांडर डैमेज दिखाएँ",
-    expandsGrid: "कमांडर डैमेज ग्रिड को बड़ा करता है",
   },
   outReason: {
     commanderDamage: "कमांडर डैमेज",
