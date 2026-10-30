@@ -1,5 +1,6 @@
 import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
+import { LinearGradient } from "react-native-svg"
 
 import * as seatCommander from "@/features/decks/seatCommander"
 import { asPlayerId } from "@/features/game/domain"
@@ -33,7 +34,7 @@ import {
   type PlayerGridProps,
 } from "./PlayerGrid"
 import type { OutState } from "../../convex/lib/outReason"
-import type { TableState } from "../../convex/lib/table"
+import { EMPTY_TABLE, type TableState } from "../../convex/lib/table"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -131,6 +132,39 @@ function tableGrid(table: TableState) {
 }
 
 describe("PlayerGrid", () => {
+  it("draws a foil player's Pro mark in foil on a Pokémon seat, and leaves a free mark flat", () => {
+    const rules = playTableRules("pokemon", "standard")
+    const table = EMPTY_TABLE
+    const runtime: TableRuntime = {
+      table,
+      tableRules: rules,
+      ...createTableActions(
+        () => ({ table, rules, playerIds: [], lifeOf: () => 6, canAct: () => true }),
+        () => true,
+      ),
+    }
+    const [crown, circle] = players(2)
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid
+          players={[
+            { ...crown, shape: "crown" },
+            { ...circle, shape: "circle" },
+          ]}
+          system="pokemon"
+          table={runtime}
+          isPlayerFoil={() => true}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    const gradients = (seat: number) =>
+      within(view.getByTestId(`seat-identity-seat-${seat}`)).UNSAFE_queryAllByType(LinearGradient)
+    expect(gradients(1)).toHaveLength(1)
+    expect(gradients(2)).toHaveLength(0)
+  })
+
   it("sends a seat's life change to the latest onChange after the board re-renders", () => {
     const first = jest.fn()
     const latest = jest.fn()

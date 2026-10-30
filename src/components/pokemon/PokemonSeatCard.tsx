@@ -37,7 +37,7 @@ import {
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
-import { shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
+import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
 import {
   findPokemon,
   pokemonBoardOf,
@@ -73,6 +73,7 @@ export interface PokemonSeatCardProps {
   playerName: string
   seatNumber: number
   shape?: PlayerMarkShape
+  foil?: boolean
   prizes: number
   color: string
   compact?: boolean
@@ -118,6 +119,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   playerName,
   seatNumber,
   shape,
+  foil,
   prizes,
   color,
   compact,
@@ -641,6 +643,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             shape={shape}
             color={ink}
             compact={cramped}
+            foil={foil && !!shape && isProMarkShape(shape)}
             staleSince={staleSince}
             style={[$identity, { marginLeft: identityMetrics.edge - padding }]}
           />
