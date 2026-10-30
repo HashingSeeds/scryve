@@ -186,6 +186,9 @@ export function analyticsProperties(event: string, properties: Record<string, un
   // why: an OTA update carries the newer config version; the binary's own version is the one installed.
   result.app_version =
     Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "unknown"
+  // why: OTA releases keep the binary's app_version; the commit is what tells two updates apart.
+  const releaseCommit: unknown = Constants.expoConfig?.extra?.releaseCommit
+  if (typeof releaseCommit === "string" && releaseCommit) result.commit = releaseCommit.slice(0, 12)
   return result
 }
 
