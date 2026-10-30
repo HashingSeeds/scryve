@@ -213,6 +213,23 @@ it("keeps scan counts and heat but nothing else from a finished scan", () => {
   )
 })
 
+it("tags events with the running update's commit and still drops SDK device metadata", () => {
+  jest.doMock("expo-constants", () => ({
+    __esModule: true,
+    default: {
+      expoConfig: { extra: { releaseCommit: "0123456789abcdef0123456789abcdef01234567" } },
+    },
+  }))
+  let properties: ReturnType<typeof import("./analytics").analyticsProperties> = null
+  jest.isolateModules(() => {
+    const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+    properties = analyticsProperties("app_opened", { $device_id: "private" })
+  })
+  jest.dontMock("expo-constants")
+  expect(properties).toEqual(expect.objectContaining({ commit: "0123456789ab" }))
+  expect(properties).not.toHaveProperty("$device_id")
+})
+
 it("allowlists completion entry points without adding them to game starts", () => {
   const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
   for (const end_source of ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"])
