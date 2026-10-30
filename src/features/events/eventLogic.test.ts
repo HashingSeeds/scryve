@@ -12,6 +12,7 @@ import {
   standingsThroughRound,
   startRoundBlocker,
 } from "../../../convex/lib/events/commands"
+import { MAX_EVENT_ROUNDS } from "../../../convex/lib/events/model"
 
 const table = (overrides: Partial<EventTableView> = {}): EventTableView => ({
   id: "t1",
@@ -68,6 +69,13 @@ describe("startRoundBlocker", () => {
     expect(startRoundBlocker(event({ structure: "pods", round: 0, tables: [] }))).toEqual({
       kind: "players",
       count: 3,
+    })
+  })
+
+  it("names missing results before the round cap, so the final round can still finish", () => {
+    expect(startRoundBlocker(event({ round: MAX_EVENT_ROUNDS }))).toEqual({ kind: "results" })
+    expect(startRoundBlocker(event({ round: MAX_EVENT_ROUNDS, tables: [reported] }))).toEqual({
+      kind: "maxRounds",
     })
   })
 })
