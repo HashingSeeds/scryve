@@ -293,3 +293,34 @@ it("keeps a device deck that can't sync listed, says why, and holds the action",
   fireEvent.press(action)
   expect(onSyncAndUse).not.toHaveBeenCalled()
 })
+
+it("holds every deck choice while a device deck syncs, so the sync can't overwrite a newer pick", () => {
+  const onSelectVersion = jest.fn()
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        system="mtg"
+        deckState={{
+          status: "ready",
+          value: [
+            { _id: "avengers", name: "Avengers", versions: [{ _id: "v1", versionNumber: 1 }] },
+          ],
+        }}
+        deviceDecks={{
+          decks: [deviceDeck()],
+          syncingLocalId: "local-angels",
+          onSyncAndUse: jest.fn(),
+        }}
+        versionLabel={() => "Current"}
+        onSelectVersion={onSelectVersion}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByText("Syncing…")).toBeTruthy()
+  fireEvent.press(screen.getByTestId("seat-1-deck-avengers"))
+  fireEvent.press(screen.getByTestId("seat-1-deck-no-deck"))
+  expect(onSelectVersion).not.toHaveBeenCalled()
+  expect(screen.queryByTestId("seat-1-deck-selection-status")).toBeNull()
+})

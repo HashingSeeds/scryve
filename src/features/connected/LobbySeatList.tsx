@@ -124,10 +124,11 @@ function DeckOption({
   return (
     <TouchableOpacity
       testID={testID}
-      accessibilityRole="radio"
+      accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? name}
-      accessibilityState={{ checked: selected, disabled }}
-      aria-checked={selected}
+      // why: react-native-web ignores accessibilityState, and only button roles keep Space activation.
+      {...{ "aria-pressed": selected }}
+      accessibilityState={{ selected, disabled }}
       disabled={disabled}
       activeOpacity={0.75}
       style={[themed($option), disabled && $dimmed]}
@@ -234,6 +235,8 @@ export function LobbySeatList({
         const deckReady = Boolean(seat.deckVersionId)
         const ready = !seat.away && (!deckRequired || deckReady)
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
+        // why: a device sync that lands later would replace any deck picked while it ran.
+        const choicesLocked = selectingDeck || deviceDecks?.syncingLocalId !== undefined
         const showManageDecks = Boolean(
           seat.controlledByMe && onManageDecks && system !== NO_PLAY_SYSTEM,
         )
@@ -394,7 +397,6 @@ export function LobbySeatList({
                 ) : (
                   <View
                     testID={`seat-${seat.seat}-deck`}
-                    accessibilityRole="radiogroup"
                     accessibilityLabel={translate("connected:seats.deck")}
                   >
                     {deckRequired ? null : (
@@ -402,7 +404,7 @@ export function LobbySeatList({
                         testID={`seat-${seat.seat}-deck-${NO_DECK_ID}`}
                         name={translate("connected:seats.noDeck")}
                         selected={!chosenDeck}
-                        disabled={selectingDeck}
+                        disabled={choicesLocked}
                         onPress={() => onSelectVersion(seat.seat)}
                       />
                     )}
@@ -426,7 +428,7 @@ export function LobbySeatList({
                           name: deck.name,
                         })}
                         selected={chosenDeck?._id === deck._id}
-                        disabled={selectingDeck}
+                        disabled={choicesLocked}
                         onPress={() => {
                           const version = deck.versions[deck.versions.length - 1]
                           if (version) onSelectVersion(seat.seat, version._id)
@@ -440,7 +442,7 @@ export function LobbySeatList({
                         chips={chosenDeck.versions.map((version) => ({
                           id: version._id,
                           label: versionLabel(version, latestVersionNumber),
-                          disabled: selectingDeck,
+                          disabled: choicesLocked,
                         }))}
                         selectedId={seat.deckVersionId ?? ""}
                         onSelect={(versionId) => onSelectVersion(seat.seat, versionId)}
@@ -481,11 +483,7 @@ export function LobbySeatList({
                                 accessibilityLabel={translate("connected:seats.syncAndUseLabel", {
                                   name: deck.name,
                                 })}
-                                disabled={
-                                  Boolean(deck.syncBlockedReason) ||
-                                  deviceDecks?.syncingLocalId !== undefined ||
-                                  selectingDeck
-                                }
+                                disabled={Boolean(deck.syncBlockedReason) || choicesLocked}
                                 onPress={() => deviceDecks?.onSyncAndUse(seat.seat, deck.localId)}
                               />
                             )
@@ -498,7 +496,7 @@ export function LobbySeatList({
                 {!deckRequired && seat.deckVersionId && noDecks ? (
                   <Button
                     tx="connected:seats.noDeck"
-                    disabled={selectingDeck}
+                    disabled={choicesLocked}
                     onPress={() => onSelectVersion(seat.seat)}
                   />
                 ) : null}
