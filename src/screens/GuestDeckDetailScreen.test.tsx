@@ -378,3 +378,26 @@ test("does not query account stats while signed out", () => {
   renderScreen()
   expect(mockStatsQuery).not.toHaveBeenCalled()
 })
+
+test("moving a card to the sideboard and back leaves nothing to save", () => {
+  const bolt = { name: "Bolt", quantity: 1, scryfallId: "bolt", board: "main" as const }
+  mockCurrent = {
+    ...mockStored,
+    deck: {
+      ...mockStored.deck,
+      format: "modern",
+      cards: [
+        bolt,
+        { name: "Path", quantity: 1, scryfallId: "path", board: "main" },
+        { ...bolt, board: "sideboard" },
+      ],
+    },
+  }
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-mode-build"))
+  fireEvent.press(view.getByLabelText("Move one Bolt to Sideboard"))
+  expect(view.getByTestId("deck-draft-bar")).toBeTruthy()
+  fireEvent.press(view.getByLabelText("Move one Bolt to Main deck"))
+
+  expect(view.queryByTestId("deck-draft-bar")).toBeNull()
+})

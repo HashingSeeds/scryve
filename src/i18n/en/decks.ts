@@ -451,7 +451,7 @@ const decks = {
     editTitle: "Edit deck",
     guestTitle: "Local deck",
     details: "Deck details",
-    // Card count under the deck name when it has a sideboard: main deck, then sideboard, e.g. "60 + 15".
+    // Card count under the deck name when it has a sideboard: main deck count, then sideboard count, as bare numbers, e.g. "60 + 15".
     cardCountWithSide: "{{main}} + {{side}}",
     // The deck version on screen: its number, then the name the player gave it.
     version: "Version {{number}} · {{name}}",

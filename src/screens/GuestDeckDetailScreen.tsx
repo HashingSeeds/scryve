@@ -58,7 +58,9 @@ function deckOf({ undo: _undo, commanderSelected: _selected, ...deck }: GuestDra
 }
 
 function sameDraft(a: GuestDraft | undefined, b: GuestDraft | undefined) {
-  return JSON.stringify(a && deckOf(a)) === JSON.stringify(b && deckOf(b))
+  const contents = (draft: GuestDraft | undefined) =>
+    draft && { ...deckOf(draft), cards: draft.cards.map((card) => JSON.stringify(card)).sort() }
+  return JSON.stringify(contents(a)) === JSON.stringify(contents(b))
 }
 
 export function GuestDeckDetailScreen({

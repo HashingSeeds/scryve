@@ -146,7 +146,7 @@ export function DeckView({
   const shownCards = building ? cards : savedCards
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
-  const mainCount = cardCountLabel(totalQuantity(shownCards) - sideCount)
+  const mainCount = totalQuantity(shownCards) - sideCount
   const sectionLabel = (id: string) => deckSections.find((section) => section.id === id)?.label
   const cardsMessage = cardsUnavailable ? (
     <Text
@@ -210,7 +210,7 @@ export function DeckView({
                           main: mainCount,
                           side: sideCount,
                         })
-                      : mainCount,
+                      : cardCountLabel(mainCount),
                 ]
                   .filter(Boolean)
                   .join(" · ")}

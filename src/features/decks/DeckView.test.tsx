@@ -130,7 +130,7 @@ describe("sideboard", () => {
     const onMove = jest.fn()
     const view = renderDeckView({ format: "modern", cards: [bolt, path], onMove })
 
-    expect(view.getByText("Magic · Modern · 4 cards + 2")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 4 + 2")).toBeTruthy()
     expect(view.getByText("Sideboard")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Move one Bolt to Sideboard"))
     fireEvent.press(view.getByLabelText("Move one Path to Main deck"))
