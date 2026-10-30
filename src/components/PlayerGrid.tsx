@@ -468,8 +468,9 @@ export function PlayerGrid({
                 )
               }
               return (
+                // why: keyed by seat, so a rematch's new player ids reuse the card; remounting every seat each game kept the old cards' native animation memory.
                 <View
-                  key={player.id}
+                  key={`seat-${index}`}
                   testID={`player-cell-seat-${seatNumber}`}
                   style={themed($cell)}
                 >

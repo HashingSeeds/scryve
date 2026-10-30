@@ -245,10 +245,13 @@ export const LifeCard = memo(function LifeCard({
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
   const [boardBounds, setBoardBounds] = useState<LayoutRectangle | null>(null)
   const overviewProgress = useSharedValue(commanderOverviewOpen ? 1 : 0)
+  const overviewPlayerId = useRef(playerId)
   useEffect(() => {
+    const reseated = overviewPlayerId.current !== playerId
+    overviewPlayerId.current = playerId
     if (!commanderSeat) return
     if (commanderOverviewOpen) setOverviewVisible(true)
-    if (commanderOverviewDuration === 0) {
+    if (commanderOverviewDuration === 0 || reseated) {
       overviewProgress.value = commanderOverviewOpen ? 1 : 0
       setOverviewVisible(commanderOverviewOpen)
       return
@@ -262,7 +265,7 @@ export const LifeCard = memo(function LifeCard({
         if (finished && !commanderOverviewOpen) runOnJS(setOverviewVisible)(false)
       },
     )
-  }, [commanderSeat, commanderOverviewOpen, commanderOverviewDuration, overviewProgress])
+  }, [commanderSeat, commanderOverviewOpen, commanderOverviewDuration, overviewProgress, playerId])
   const overviewShown = commanderSeat && (commanderOverviewOpen || overviewVisible)
   const headerEdge = { 0: "top", 90: "right", [-90]: "left", 180: "bottom" } as const
   const headerPadding = {
@@ -347,20 +350,29 @@ export const LifeCard = memo(function LifeCard({
   const calculator = !!playSystemRules(system).counter.calculator
   // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
   const [tableSheetOpen, setTableSheetOpen] = useState(false)
+  const [seatedPlayerId, setSeatedPlayerId] = useState(playerId)
+  if (seatedPlayerId !== playerId) {
+    setSeatedPlayerId(playerId)
+    setPreview(0)
+    setEditorOpen(false)
+    setTableSheetOpen(false)
+    setOverviewVisible(commanderOverviewOpen)
+  }
   useEffect(() => {
     if (tableSheetOpen || editorOpen) onPlayStart?.()
   }, [editorOpen, onPlayStart, tableSheetOpen])
-  const recentDelta = useRecentDelta(life)
-  const previousLife = useRef(life)
+  const recentDelta = useRecentDelta(life, playerId)
+  const announced = useRef({ life, playerId })
   useEffect(() => {
-    if (previousLife.current === life) return
-    previousLife.current = life
+    const before = announced.current
+    announced.current = { life, playerId }
+    if (before.life === life || before.playerId !== playerId) return
     if (Platform.OS === "ios") {
       AccessibilityInfo.announceForAccessibility(
         translate("board:lifeCard.now", { identity, value: counterValueLabel(system, life) }),
       )
     }
-  }, [identity, life, system])
+  }, [identity, life, playerId, system])
 
   const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
   const armedCommanderId = commanderDamage?.armedPlayerId
@@ -1033,6 +1045,7 @@ export const LifeCard = memo(function LifeCard({
       !overviewShown &&
       !editorOpen ? (
         <CounterChips
+          key={playerId}
           seat={seatTable}
           seatNumber={seatNumber}
           identity={identity}
