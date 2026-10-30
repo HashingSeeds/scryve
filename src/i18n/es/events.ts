@@ -160,6 +160,8 @@ export default {
       protocol: "El organizador necesita la misma versión de Scryve que tú.",
       closed: "Ese evento terminó.",
       invalid: "El organizador rechazó este dispositivo.",
+      unreachable:
+        "No se pudo conectar con ese evento. Asegúrate de estar en la misma red Wi-Fi e inténtalo de nuevo.",
     },
   },
   settings: {

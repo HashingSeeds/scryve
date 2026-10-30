@@ -157,6 +157,8 @@ export default {
       protocol: "主催者とScryveのバージョンをそろえてください。",
       closed: "そのイベントは終了しました。",
       invalid: "主催者がこの端末を拒否しました。",
+      unreachable:
+        "イベントに接続できませんでした。同じWi-Fiに接続していることを確認して、もう一度お試しください。",
     },
   },
   settings: {

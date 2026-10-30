@@ -10,7 +10,7 @@ import { TextField } from "@/components/TextField"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 
-import type { NearbyRejection } from "./nearbyEventProtocol"
+import type { JoinOutcome } from "./nearbyEventClient"
 import { nearbyEventCode, nearbyEventTitle } from "./nearbyEventProtocol"
 import { $dim, $grow, $row, $section, EventFrame } from "../EventFrame"
 import { eventErrorText } from "../eventLogic"
@@ -36,7 +36,7 @@ export function NearbyEventsScreen({
   onBack: () => void
   onHost: () => void
   onOpenHosted: () => void
-  onJoin: (service: Service) => Promise<"joined" | NearbyRejection>
+  onJoin: (service: Service) => Promise<JoinOutcome>
 }) {
   const { themed } = useAppTheme()
   const [joining, setJoining] = useState<string>()

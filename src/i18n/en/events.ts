@@ -168,6 +168,7 @@ const events = {
       protocol: "The host needs the same Scryve version as you.",
       closed: "That event has ended.",
       invalid: "The host refused this device.",
+      unreachable: "Couldn't reach that event. Make sure you're on the same Wi-Fi, then try again.",
     },
   },
   settings: {

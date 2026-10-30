@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Redirect, router } from "expo-router"
 
 import { EventScreen } from "@/features/events/EventScreen"
@@ -15,6 +16,8 @@ const leave = () => {
 export default function NearbyEventRoute() {
   const source = useClientEventSource()
   const { status } = useNearbyEventClient()
+  // why: swipe and hardware back skip the header's leave, which left the client reconnecting forever.
+  useEffect(() => () => nearbyEventClient.leave(), [])
   // why: the connection lives in memory, so after a restart the player picks the event again.
   if (status === "idle") return <Redirect href="/events/nearby" />
   return (

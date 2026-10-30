@@ -118,6 +118,7 @@
   "nearby.rejected.protocol": "ffb20be11075",
   "nearby.rejected.closed": "818a24369225",
   "nearby.rejected.invalid": "88fb6ecd5e9b",
+  "nearby.rejected.unreachable": "741e8ba1b32a",
   "settings.rounds": "ff158f0b85d0",
   "settings.suggested": "346d45a4f7ac",
   "settings.roundMinutes": "94f2bd9ad647",
