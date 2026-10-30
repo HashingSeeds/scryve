@@ -16,7 +16,11 @@ import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
-import { canChooseCommander, isCommanderPick, type DeckEdits } from "@/features/decks/deckDraft"
+import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
+import {
+  useLocalDeckDraft,
+  type LocalDeckDraft as GuestDraft,
+} from "@/features/decks/deckDraftStore"
 import { DeckStats } from "@/features/decks/DeckStats"
 import { DeckView, type DeckTab } from "@/features/decks/DeckView"
 import {
@@ -30,7 +34,6 @@ import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncAction } from "@/features/decks/LocalDeckSyncAction"
 import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
-import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -49,7 +52,6 @@ type GuestDeckDetailScreenProps = {
   onAddMatch?: (deckName: string) => void
 }
 type GuestCard = GuestDeckPayload["cards"][number]
-type GuestDraft = GuestDeckPayload & Pick<DeckEdits<GuestCard>, "undo" | "commanderSelected">
 
 function deckOf({ undo: _undo, commanderSelected: _selected, ...deck }: GuestDraft) {
   return deck
@@ -69,12 +71,7 @@ export function GuestDeckDetailScreen({
   const { themed, theme } = useAppTheme()
   const stored = useGuestDeck(localId)
   const [restored] = useState(() => (stored ? loadLocalDraft(localId) : undefined))
-  const {
-    draft,
-    latest: draftRef,
-    setDraft,
-    edit,
-  } = useDeckEditor<GuestDraft | undefined>(() => restored?.deck ?? stored?.deck)
+  const { draft, latest: draftRef, setDraft, edit } = useLocalDeckDraft({ localId })
   const revisionRef = useRef(
     restored?.revision ??
       (stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined),
