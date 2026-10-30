@@ -196,6 +196,60 @@ function cardSearch(offlineCandidates?: KnownCardEntry[]) {
   )
 }
 
+it("keeps the last results on screen while the next search is pending", async () => {
+  jest.useFakeTimers()
+  mockAction.mockResolvedValue([searchCard])
+  const view = cardSearch()
+  fireEvent.changeText(view.getByTestId("card-search-input"), "bar")
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(view.getByText("Baral")).toBeTruthy()
+  fireEvent.changeText(view.getByTestId("card-search-input"), "bara")
+  expect(view.getByText("Baral")).toBeTruthy()
+  expect(view.getByLabelText("Searching…")).toBeTruthy()
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(view.queryByLabelText("Searching…")).toBeNull()
+})
+
+it("searches within the commander's colors until the player clears them", async () => {
+  jest.useFakeTimers()
+  saveCardDetails({ talrand: { ...eligible, colorIdentity: "UR" } })
+  mockAction.mockResolvedValue([])
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardSearchScreen
+        game="mtg"
+        format="commander"
+        initialSection="main"
+        commanderCards={[{ ...deck[0], section: "commander" }, deck[1]]}
+        onAdd={jest.fn()}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const selected = (color: string) =>
+    view.getByTestId(`card-color-${color}`).props.accessibilityState.selected
+  expect(["W", "U", "B", "R", "G"].map(selected)).toEqual([false, true, false, true, false])
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).not.toHaveBeenCalled()
+  fireEvent.changeText(view.getByTestId("card-search-input"), "bolt")
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
+    game: "mtg",
+    query: "(bolt) id<=ur",
+  })
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  fireEvent.press(view.getByText("Clear all"))
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(selected("U")).toBe(false)
+  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
+    game: "mtg",
+    query: "bolt",
+  })
+})
+
 it("filters cached cards by color identity offline", () => {
   mockConnection.isWebSocketConnected = false
   saveCardDetails({
@@ -444,18 +498,19 @@ const filters: Parameters<typeof scryfallQuery>[0] = {
   text: "",
   commander: false,
   colors: [],
-  exactColors: true,
+  colorMatch: "exact",
   keywords: [],
 }
 
-it.each([
+it.each<[string, Partial<typeof filters>, string]>([
   ["plain text", { text: "bar" }, "bar"],
   ["colors alone", { colors: ["U", "B"] }, "id=ub"],
   [
     "text with additional colors allowed",
-    { text: 'o:"draw a card" or t:wizard', colors: ["U", "B"], exactColors: false },
+    { text: 'o:"draw a card" or t:wizard', colors: ["U", "B"], colorMatch: "additional" },
     '(o:"draw a card" or t:wizard) id>=ub',
   ],
+  ["colors within a commander's identity", { colors: ["U", "R"], colorMatch: "within" }, "id<=ur"],
   ["colorless", { text: "sol", colors: ["C", "U"] }, "(sol) id:c"],
   ["a commander name", { text: "ar", commander: true }, "(ar) is:commander f:commander"],
   [
@@ -465,7 +520,7 @@ it.each([
   ],
   [
     "commander colors or more",
-    { commander: true, colors: ["U", "B"], exactColors: false },
+    { commander: true, colors: ["U", "B"], colorMatch: "additional" },
     'is:commander f:commander (id>=ub or o:"choose a color")',
   ],
   ["colorless commanders", { commander: true, colors: ["C"] }, "is:commander f:commander id:c"],

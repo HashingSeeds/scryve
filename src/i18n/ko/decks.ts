@@ -315,6 +315,7 @@ export default {
     noResults: "카드를 찾을 수 없습니다.",
     dismissFilters: "커맨더 필터 닫기",
     colorMatch: "색 일치",
+    withinColors: "이 색 안에서",
     allowAdditional: "추가 색 허용",
     exactColors: "이 색만",
     searchKeywords: "키워드 검색",

@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react"
-import { Keyboard, Modal, Platform, ScrollView, TouchableOpacity, View } from "react-native"
+import {
+  ActivityIndicator,
+  Keyboard,
+  Modal,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import type { ViewStyle } from "react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -21,7 +29,7 @@ import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
-import { TextField } from "@/components/TextField"
+import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
@@ -33,7 +41,13 @@ import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
-import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
+import {
+  cardDetailsKey,
+  cardSection,
+  printingKey,
+  type CommanderColor,
+  type DeckCard,
+} from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
@@ -47,24 +61,26 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
+const COLOR_MATCH_OPERATOR = { exact: "=", additional: ">=", within: "<=" } as const
+type ColorMatch = keyof typeof COLOR_MATCH_OPERATOR
 
 export function scryfallQuery({
   text,
   commander,
   colors,
-  exactColors,
+  colorMatch,
   keywords,
 }: {
   text: string
   commander: boolean
   colors: string[]
-  exactColors: boolean
+  colorMatch: ColorMatch
   keywords: string[]
 }) {
   const identity = colors.includes("C")
     ? "id:c"
     : colors.length
-      ? `id${exactColors ? "=" : ">="}${colors.join("").toLowerCase()}`
+      ? `id${COLOR_MATCH_OPERATOR[colorMatch]}${colors.join("").toLowerCase()}`
       : ""
   const filters = [
     commander ? "is:commander f:commander" : "",
@@ -132,8 +148,28 @@ export function CardSearchScreen({
 
   const offline = connection?.isWebSocketConnected === false
   const [cachedRules, setCachedRules] = useState(() => loadCardDetails())
-  const [colorFilters, setColorFilters] = useState<string[]>([])
-  const [exactColors, setExactColors] = useState(true)
+  const [startingFilters] = useState<{ colors: string[]; colorMatch: ColorMatch }>(() => {
+    const identities = (commanderCards ?? [])
+      .filter((card) => cardSection(card) === "commander")
+      .map((card) => {
+        const details = cachedRules[cardDetailsKey(card, game)]
+        return details?.colorIdentity !== undefined &&
+          details.commanderEligibility === "color-choice"
+          ? details.colorIdentity + (card.commanderColor ?? "")
+          : details?.colorIdentity
+      })
+    if (
+      !filtersCards ||
+      choosingCommander ||
+      !identities.length ||
+      identities.some((identity) => identity === undefined)
+    )
+      return { colors: [], colorMatch: "exact" }
+    const colors = COMMANDER_COLORS.filter((color) => identities.join("").includes(color))
+    return { colors: colors.length ? colors : ["C"], colorMatch: "within" }
+  })
+  const [colorFilters, setColorFilters] = useState<string[]>(startingFilters.colors)
+  const [colorMatch, setColorMatch] = useState(startingFilters.colorMatch)
   const [keywords, setKeywords] = useState<string[]>([])
   const needsKeywords = keywords.length > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -149,8 +185,9 @@ export function CardSearchScreen({
     }
   })
   const [keywordError, setKeywordError] = useState<string>()
+  const pickedColors = colorFilters.length > 0 && colorFilters !== startingFilters.colors
   const searchRequested =
-    query.trim().length >= 2 || (filtersCards && (colorFilters.length > 0 || keywords.length > 0))
+    query.trim().length >= 2 || (filtersCards && (pickedColors || keywords.length > 0))
 
   useEffect(() => {
     if (!filtersOpen || offline || !convex) return
@@ -190,10 +227,12 @@ export function CardSearchScreen({
     if (colorFilters.includes("C")) return details?.colorIdentity === "" && !canChooseColor
     const identity = details?.colorIdentity
     if (identity === undefined) return false
+    const within = [...identity].every((color) => colorFilters.includes(color))
+    if (colorMatch === "within") return within
     const missing = colorFilters.filter((color) => !identity.includes(color))
     return (
       (missing.length === 0 || (canChooseColor && missing.length === 1)) &&
-      (!exactColors || [...identity].every((color) => colorFilters.includes(color)))
+      (colorMatch === "additional" || within)
     )
   }
 
@@ -297,19 +336,19 @@ export function CardSearchScreen({
     if (searchError?.retryAfterMs && !offline) return
     let active = true
     setSearchError(undefined)
-    setResults(undefined)
-    setOfflineResults(undefined)
     setMessage(undefined)
-    setBusy(searchRequested)
+    setBusy(searchRequested && !offline)
+    if (!searchRequested || offline) {
+      setResults(undefined)
+      setOfflineResults(undefined)
+    }
     if (!searchRequested) return
     if (offline) {
-      setBusy(false)
       const wanted = (
         choosingCommander ? query.slice(0, 80).replace(/[()"]/g, " ").trim() : query.trim()
       ).toLowerCase()
       const cached = loadCardDetails()
       setCachedRules(cached)
-      setResults(undefined)
       setOfflineResults(
         (offlineCandidates ?? []).filter((entry) => {
           const rules = cached[cardDetailsKey(entry.card, game)]
@@ -335,17 +374,18 @@ export function CardSearchScreen({
             text: query.trim(),
             commander: choosingCommander,
             colors: colorFilters,
-            exactColors,
+            colorMatch,
             keywords,
           }),
         })
         if (active) setResults(found)
       } catch (cause) {
-        if (active)
-          setSearchError({
-            message: convexErrorMessage(cause, translate("decks:cardSearch.searchFailed")),
-            retryAfterMs: convexRetryAfterMs(cause),
-          })
+        if (!active) return
+        setResults(undefined)
+        setSearchError({
+          message: convexErrorMessage(cause, translate("decks:cardSearch.searchFailed")),
+          retryAfterMs: convexRetryAfterMs(cause),
+        })
       } finally {
         if (active) setBusy(false)
       }
@@ -362,7 +402,7 @@ export function CardSearchScreen({
     offlineCandidates,
     choosingCommander,
     colorFilters,
-    exactColors,
+    colorMatch,
     keywords,
     searchRequested,
     searchAttempt,
@@ -509,6 +549,7 @@ export function CardSearchScreen({
               returnKeyType="search"
               onChangeText={setQuery}
               containerStyle={$queryField}
+              RightAccessory={busy ? SearchBusy : undefined}
             />
             {CAN_READ_CARDS && prereleaseBuild() && filtersCards && !choosingCommander ? (
               <Button
@@ -532,13 +573,7 @@ export function CardSearchScreen({
           ) : null}
           {filtersCards ? (
             <View style={$filterRow}>
-              <ScrollView
-                horizontal
-                style={$filterScroll}
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={[$pills, themed($colorScroll)]}
-              >
+              <View style={[$pills, themed($colorPills)]}>
                 {SEARCH_COLORS.map((color) => (
                   <FilterPill
                     key={color}
@@ -548,10 +583,10 @@ export function CardSearchScreen({
                     onPress={() => toggleColor(color)}
                   />
                 ))}
-              </ScrollView>
+              </View>
               <FilterButton
                 testID="card-filters-button"
-                count={keywords.length + (!exactColors ? 1 : 0)}
+                count={keywords.length + (colorMatch !== startingFilters.colorMatch ? 1 : 0)}
                 onPress={() => setFiltersOpen(true)}
               />
             </View>
@@ -645,7 +680,6 @@ export function CardSearchScreen({
               tx={offline ? "decks:cardSearch.searchCached" : "decks:cardSearch.searchScryfall"}
             />
           ) : null}
-          {busy ? <Text size="sm" tx="decks:cardSearch.searching" /> : null}
           {offline ? <Text size="xxs" tx="decks:cardSearch.offline" /> : null}
           {cachedCandidates?.map((entry, index) => (
             <ResultRow
@@ -727,7 +761,7 @@ export function CardSearchScreen({
               ) : null}
             </ResultRow>
           ))}
-          {catalogResults?.length === 0 ? <Text tx="decks:cardSearch.noResults" /> : null}
+          {!busy && catalogResults?.length === 0 ? <Text tx="decks:cardSearch.noResults" /> : null}
           {catalogResults?.length && imageCredit ? (
             <Text size="xxs" style={{ color: theme.colors.textDim }} text={imageCredit} />
           ) : null}
@@ -758,14 +792,19 @@ export function CardSearchScreen({
           <ScrollView contentContainerStyle={$filterBody} keyboardShouldPersistTaps="handled">
             <FilterGroup heading={translate("decks:cardSearch.colorMatch")}>
               <FilterPill
+                label={translate("decks:cardSearch.withinColors")}
+                selected={colorMatch === "within"}
+                onPress={() => setColorMatch("within")}
+              />
+              <FilterPill
                 label={translate("decks:cardSearch.allowAdditional")}
-                selected={!exactColors}
-                onPress={() => setExactColors(false)}
+                selected={colorMatch === "additional"}
+                onPress={() => setColorMatch("additional")}
               />
               <FilterPill
                 label={translate("decks:cardSearch.exactColors")}
-                selected={exactColors}
-                onPress={() => setExactColors(true)}
+                selected={colorMatch === "exact"}
+                onPress={() => setColorMatch("exact")}
               />
             </FilterGroup>
             <TextField
@@ -808,7 +847,7 @@ export function CardSearchScreen({
               onPress={() => {
                 setColorFilters([])
                 setKeywords([])
-                setExactColors(true)
+                setColorMatch(startingFilters.colorMatch)
               }}
             />
             <Button
@@ -865,6 +904,17 @@ export function CardSearchScreen({
     </Modal>
   )
 }
+function SearchBusy({ style }: TextFieldAccessoryProps) {
+  const { theme } = useAppTheme()
+  return (
+    <ActivityIndicator
+      style={style}
+      color={theme.colors.textDim}
+      accessibilityLabel={translate("decks:cardSearch.searching")}
+    />
+  )
+}
+
 const $screen: ViewStyle = { flex: 1 }
 const $results: ViewStyle = { flex: 1 }
 const $name: ViewStyle = { flex: 1 }
@@ -901,8 +951,8 @@ const $filterBody: ViewStyle = { gap: 16 }
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
 const $searchResults: ViewStyle = { paddingTop: 8 }
 
-const $filterScroll: ViewStyle = { flex: 1 }
-const $colorScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexWrap: "nowrap",
+// why: FilterButton overlaps its left neighbor by spacing.md; the padding keeps that off the pills.
+const $colorPills: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
   paddingRight: spacing.md,
 })

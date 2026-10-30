@@ -347,6 +347,7 @@ export default {
     noResults: "Aucune carte trouvée.",
     dismissFilters: "Fermer les filtres de commandant",
     colorMatch: "Correspondance de couleur",
+    withinColors: "Dans ces couleurs",
     allowAdditional: "Autoriser d'autres couleurs",
     exactColors: "Exactement ces couleurs",
     searchKeywords: "Rechercher des mots-clés",
