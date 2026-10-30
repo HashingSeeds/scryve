@@ -389,7 +389,7 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $dim: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $notLatest: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
-  color: colors.error,
+  color: colors.textDim,
   marginLeft: spacing.sm,
 })
 const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
