@@ -20,9 +20,9 @@ jest.mock("./CardSearchScreen", () => ({
 const forest = { name: "Forest", quantity: 1, scryfallId: "forest" }
 const island = { name: "Island", quantity: 2, scryfallId: "island" }
 
-function renderDeckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
+function deckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
   const noop = jest.fn()
-  return render(
+  return (
     <ThemeProvider initialContext="dark">
       <DeckView
         mode="build"
@@ -46,8 +46,12 @@ function renderDeckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}
         onDecrement={noop}
         {...overrides}
       />
-    </ThemeProvider>,
+    </ThemeProvider>
   )
+}
+
+function renderDeckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
+  return render(deckView(overrides))
 }
 
 it("keeps the back action available", () => {
@@ -124,6 +128,15 @@ describe("draft bar", () => {
     fireEvent.press(view.getByTestId("deck-draft-discard"))
     fireEvent.press(view.getByTestId("deck-discard-confirm"))
     expect(onDiscard).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not reopen the confirm after the draft empties elsewhere", () => {
+    const view = renderDeckView({ changes: 1 })
+
+    fireEvent.press(view.getByTestId("deck-draft-discard"))
+    view.rerender(deckView({ changes: 0 }))
+    view.rerender(deckView({ changes: 1 }))
+    expect(view.queryByTestId("deck-discard-dialog")).toBeNull()
   })
 })
 

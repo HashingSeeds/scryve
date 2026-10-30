@@ -125,6 +125,8 @@ export function DeckView({
   const [search, setSearch] = useState<"cards" | "commander">()
   const [analysisOpen, setAnalysisOpen] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+  // A draft that empties elsewhere (another device saved it) closes the confirm for good.
+  if (discarding && changes === 0) setDiscarding(false)
   const building = mode === "build"
   const analysis = useDeckAnalysis(game, format, building ? cards : savedCards)
   const tracked = tracksResults(game)
@@ -420,7 +422,7 @@ export function DeckView({
         />
       ) : null}
       <ConfirmDialog
-        visible={discarding && changes > 0}
+        visible={discarding}
         title={translate("decks:detail.discardTitle")}
         message={translate("decks:detail.discardBody")}
         confirmText={translate("decks:detail.discard")}
