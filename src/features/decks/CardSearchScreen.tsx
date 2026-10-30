@@ -278,9 +278,13 @@ export function CardSearchScreen({
           (!needsKeywords || details.keywords !== undefined),
         )
       }
-      const missing = cardsToCheck.filter(
-        (card) => !hasCurrentRules(cached[cardDetailsKey(card, game)]),
-      )
+      function mayLead(details?: FocusedCardDetails) {
+        return details?.typeLine === undefined || details.typeLine.includes("Legendary")
+      }
+      const missing = cardsToCheck.filter((card) => {
+        const details = cached[cardDetailsKey(card, game)]
+        return !hasCurrentRules(details) && mayLead(details)
+      })
       try {
         const items = missing.flatMap((card) =>
           card.scryfallId ? [{ key: cardDetailsKey(card, game), scryfallId: card.scryfallId }] : [],
@@ -294,7 +298,7 @@ export function CardSearchScreen({
         }
         for (const card of missing) {
           const key = cardDetailsKey(card, game)
-          if (hasCurrentRules(cached[key])) continue
+          if (hasCurrentRules(cached[key]) || !mayLead(cached[key])) continue
           const id =
             card.scryfallId ??
             [card.printingId, card.providerCardId].find(
