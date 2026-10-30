@@ -48,6 +48,7 @@ export function ImportBuild({
   problems,
   onApplyGuess,
   onRemoveProblem,
+  onReplaceProblem,
   onRemoveAllProblems,
   error,
   commanderWarnings,
@@ -75,6 +76,7 @@ export function ImportBuild({
   problems: readonly ImportProblem[]
   onApplyGuess: (problem: ImportProblem, card: string) => Promise<string | undefined>
   onRemoveProblem: (problem: ImportProblem) => void
+  onReplaceProblem: (problem: ImportProblem, card: Card) => string | undefined
   onRemoveAllProblems: () => void
   error?: string
   commanderWarnings: string[]
@@ -354,12 +356,13 @@ export function ImportBuild({
           onClose={() => setSearch(undefined)}
           onRemove={onRemove}
           onAdd={(card) => {
+            if (search.fixing) {
+              const replaceError = onReplaceProblem(search.fixing, card)
+              if (!replaceError) setSearch({})
+              return replaceError
+            }
             const addError = onAdd(card)
             if (addError) return addError
-            if (search.fixing) {
-              onRemoveProblem(search.fixing)
-              setSearch({})
-            }
             if (search.commander && isCommanderPick({ game, format }, card)) setSearch(undefined)
             return undefined
           }}

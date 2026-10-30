@@ -1,21 +1,30 @@
-import { lineCardName, pastedLine } from "./importLines"
+import { lineCardName, pastedLines } from "./importLines"
 
-describe("pastedLine", () => {
+describe("pastedLines", () => {
   it("keeps the copies and section the misspelled line asked for", () => {
     const list = "Deck\n4 Lightnig Bolt\n\nSideboard\n2 Pyroblsat\nSB: 1 Negaet"
-    expect(pastedLine(list, "Lightnig Bolt")).toEqual({ quantity: 4, board: "main" })
-    expect(pastedLine(list, "Pyroblsat")).toEqual({ quantity: 2, board: "sideboard" })
-    expect(pastedLine(list, "Negaet")).toEqual({ quantity: 1, board: "sideboard" })
+    expect(pastedLines(list, "Lightnig Bolt")).toEqual([{ quantity: 4, board: "main" }])
+    expect(pastedLines(list, "Pyroblsat")).toEqual([{ quantity: 2, board: "sideboard" }])
+    expect(pastedLines(list, "Negaet")).toEqual([{ quantity: 1, board: "sideboard" }])
+  })
+
+  it("keeps every copy when the same misspelling is in more than one section", () => {
+    expect(pastedLines("2 Lightnig Bolt\nSideboard\n1 Lightnig Bolt", "Lightnig Bolt")).toEqual([
+      { quantity: 2, board: "main" },
+      { quantity: 1, board: "sideboard" },
+    ])
   })
 
   it("finds printed lines by their full reference", () => {
     expect(
-      pastedLine("Commander\n1 Captian America (SLD) 12 *F*", "Captian America (SLD) 12"),
-    ).toEqual({ quantity: 1, board: "commander" })
+      pastedLines("Commander\n1 Captian America (SLD) 12 *F*", "Captian America (SLD) 12 *F*"),
+    ).toEqual([{ quantity: 1, board: "commander" }])
   })
 
   it("adds one copy to the main deck when the line is not in the text", () => {
-    expect(pastedLine("1 Sol Ring", "Swrods to Plowshare")).toEqual({ quantity: 1, board: "main" })
+    expect(pastedLines("1 Sol Ring", "Swrods to Plowshare")).toEqual([
+      { quantity: 1, board: "main" },
+    ])
   })
 })
 

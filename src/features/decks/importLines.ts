@@ -19,9 +19,14 @@ export function lineCardName(line: string) {
   return line.replace(FINISH, "").replace(PRINTING, "").trim()
 }
 
-export function pastedLine(list: string, reference: string) {
-  const wanted = reference.trim().toLowerCase()
-  let board: NonNullable<DeckCard["board"]> = "main"
+type Board = NonNullable<DeckCard["board"]>
+
+const referenceKey = (reference: string) => reference.replace(FINISH, "").trim().toLowerCase()
+
+export function pastedLines(list: string, reference: string) {
+  const wanted = referenceKey(reference)
+  const copies = new Map<Board, number>()
+  let board: Board = "main"
   for (const source of list.split(/\r?\n/)) {
     const line = source.trim()
     const heading = HEADINGS.get(line.replace(/[:\s]+$/, "").toLowerCase())
@@ -30,11 +35,11 @@ export function pastedLine(list: string, reference: string) {
       continue
     }
     const match = line.match(ENTRY)
-    if (match?.[2].replace(FINISH, "").trim().toLowerCase() !== wanted) continue
-    return {
-      quantity: Number(match[1]),
-      board: /^SB:/i.test(line) ? ("sideboard" as const) : board,
-    }
+    if (!match || referenceKey(match[2]) !== wanted) continue
+    const lineBoard = /^SB:/i.test(line) ? "sideboard" : board
+    copies.set(lineBoard, (copies.get(lineBoard) ?? 0) + Number(match[1]))
   }
-  return { quantity: 1, board: "main" as const }
+  return copies.size
+    ? [...copies].map(([section, quantity]) => ({ quantity, board: section }))
+    : [{ quantity: 1, board: "main" as Board }]
 }

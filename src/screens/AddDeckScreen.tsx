@@ -25,7 +25,7 @@ import { isCommanderPick, MAX_CARD_COPIES, type DeckEdits } from "@/features/dec
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { type GuestDeckPayload } from "@/features/decks/guestDeck"
 import { ImportBuild } from "@/features/decks/ImportBuild"
-import { pastedLine, type ImportProblem } from "@/features/decks/importLines"
+import { pastedLines, type ImportProblem } from "@/features/decks/importLines"
 import { useSaveNewDeck } from "@/features/decks/localDeckSync"
 import { SaveDestination, useSaveDestination } from "@/features/decks/SaveDestination"
 import { useCapabilityReleased } from "@/features/decks/useCapabilityReleased"
@@ -719,9 +719,10 @@ export function AddDeckScreen({
     setError(undefined)
   }
 
-  function withoutProblem(draft: ImportDraft, problem: ImportProblem) {
+  function withoutProblem(draft: ImportDraft, problem: ImportProblem): ImportDraft {
     return {
       ...draft,
+      undo: undefined,
       problems: draft.problems.filter(
         (entry) => entry.line !== problem.line || entry.kind !== problem.kind,
       ),
@@ -730,6 +731,47 @@ export function AddDeckScreen({
           ? draft.cards.filter((card) => card.originalReference !== problem.line)
           : draft.cards,
     }
+  }
+
+  function problemCopies(draft: ImportDraft, problem: ImportProblem) {
+    const placeholders = draft.cards.filter((card) => card.originalReference === problem.line)
+    if (placeholders.length > 0)
+      return placeholders.map((card) => ({ quantity: card.quantity, section: cardSection(card) }))
+    if (draft.origin.kind === "text")
+      return pastedLines(draft.origin.source, problem.line).map(({ quantity, board }) => ({
+        quantity,
+        section: board,
+      }))
+    return undefined
+  }
+
+  function replaceProblem(problem: ImportProblem, card: ImportedDeckCard) {
+    const draft = editor.latest.current
+    if (!draft) return undefined
+    const copies = problemCopies(draft, problem) ?? [
+      { quantity: card.quantity, section: cardSection(card) },
+    ]
+    const rest = withoutProblem(draft, problem)
+    const normalized = normalizeImportedCards(
+      [
+        ...rest.cards,
+        ...copies.map(({ quantity, section }) => ({
+          ...card,
+          quantity,
+          section,
+          ...(card.scryfallId &&
+          (section === "main" || section === "sideboard" || section === "commander")
+            ? { board: section }
+            : {}),
+        })),
+      ],
+      draft.game,
+      draft.format,
+    )
+    if ("overflow" in normalized)
+      return translate("decks:addDeck.overflowAfterMatch", { card: normalized.overflow })
+    editor.setDraft({ ...rest, cards: normalized.cards })
+    return undefined
   }
 
   function removeProblem(problem: ImportProblem) {
@@ -743,40 +785,28 @@ export function AddDeckScreen({
   }
 
   async function applyGuess(problem: ImportProblem, cardName: string) {
-    const target = editor
+    const started = editor.latest.current
     try {
       const { cards } = await cardsByName({ names: [cardName], deviceId })
       const found = cards.find((card) => card.name === cardName)
       if (!found) return translate("decks:importBuild.useFailed", { card: cardName })
       saveCardDetails({ [found.scryfallId]: found })
-      const draft = target.latest.current
+      const draft = editor.latest.current
       if (
-        !draft?.problems.some((entry) => entry.line === problem.line && entry.kind === problem.kind)
+        !started ||
+        !sameOrigin(draft, started.origin) ||
+        draft?.game !== started.game ||
+        !draft.problems.some((entry) => entry.line === problem.line && entry.kind === problem.kind)
       )
         return undefined
-      const line =
-        draft.origin.kind === "text"
-          ? pastedLine(draft.origin.source, problem.line)
-          : { quantity: 1, board: "main" as const }
-      const normalized = normalizeImportedCards(
-        [
-          ...draft.cards,
-          {
-            name: found.name,
-            oracleId: found.oracleId,
-            scryfallId: found.scryfallId,
-            imageUrl: found.imageUrl,
-            smallImageUrl: found.smallImageUrl,
-            ...line,
-          },
-        ],
-        draft.game,
-        draft.format,
-      )
-      if ("overflow" in normalized)
-        return translate("decks:addDeck.overflowAfterMatch", { card: normalized.overflow })
-      target.setDraft({ ...withoutProblem(draft, problem), cards: normalized.cards })
-      return undefined
+      return replaceProblem(problem, {
+        name: found.name,
+        oracleId: found.oracleId,
+        scryfallId: found.scryfallId,
+        imageUrl: found.imageUrl,
+        smallImageUrl: found.smallImageUrl,
+        quantity: 1,
+      })
     } catch (cause) {
       return convexErrorMessage(cause, translate("decks:importBuild.useFailed", { card: cardName }))
     }
@@ -968,6 +998,7 @@ export function AddDeckScreen({
           problems={importDraft?.problems ?? []}
           onApplyGuess={applyGuess}
           onRemoveProblem={removeProblem}
+          onReplaceProblem={replaceProblem}
           onRemoveAllProblems={removeAllProblems}
           error={error}
           commanderWarnings={commanderWarnings}

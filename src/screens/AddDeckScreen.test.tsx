@@ -413,10 +413,11 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it("drops a not-found line once a searched card replaces it", async () => {
+  it("replaces a not-found line with a searched card in the line's copies and section", async () => {
     mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, unresolved: ["Cap's Shield"] })
     const view = renderAddDeck()
-    enterPasted(view, "2 Forest\n1 Cap's Shield")
+    chooseFormat(view, "modern")
+    enterPasted(view, "2 Forest\nSideboard\n3 Cap's Shield")
     await waitFor(() => expect(view.getByText("Not found")).toBeTruthy())
     fireEvent.press(view.getByLabelText("Search for a card to replace Cap's Shield"))
     act(() => {
@@ -434,8 +435,23 @@ describe("AddDeckScreen", () => {
     fireEvent.press(
       within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
     )
-    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
-    expect(view.getByTestId("save-import-button")).toBeEnabled()
+    expect(view.getByLabelText("3× Sol Ring")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockSaveDeck).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: [
+            expect.objectContaining({ name: "Forest", quantity: 2 }),
+            expect.objectContaining({
+              scryfallId: "ring-print",
+              quantity: 3,
+              section: "sideboard",
+              board: "sideboard",
+            }),
+          ],
+        }),
+      ),
+    )
   })
 
   it("removes unmatched generic cards while preserving a matched printing with the same name", async () => {
@@ -454,18 +470,22 @@ describe("AddDeckScreen", () => {
       originalReference: "Pikachu BAD 99",
       cardId: undefined,
     }
+    const raichu = { ...known, name: "Raichu", quantity: 1, originalReference: "Raichu SVI 64" }
     mockResolvePasted.mockResolvedValueOnce({
-      cards: [known, unmatched],
+      cards: [known, unmatched, { ...raichu, cardId: "sv1-64" }],
       unresolved: [unmatched.originalReference],
       invalidLines: [],
     })
     const view = renderAddDeck()
     chooseGame(view, "pokemon")
-    const source = "2 Pikachu SVI 63\n1 Pikachu BAD 99"
+    const source = "2 Pikachu SVI 63\n1 Pikachu BAD 99\n1 Raichu SVI 64"
     enterPasted(view, source)
     await waitFor(() => expect(view.getByLabelText("1× Pikachu")).toBeTruthy())
     expect(view.getByTestId("save-import-button")).toBeDisabled()
+    fireEvent.press(view.getByLabelText("Remove Raichu"))
+    expect(view.getByText("Removed Raichu")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Remove Pikachu BAD 99"))
+    expect(view.queryByText("Removed Raichu")).toBeNull()
     expect(view.queryByLabelText("1× Pikachu")).toBeNull()
     expect(view.getByLabelText("2× Pikachu")).toBeTruthy()
     expect(view.getByText(/ · 2 cards · Not saved$/)).toBeTruthy()
