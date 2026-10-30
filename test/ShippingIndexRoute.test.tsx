@@ -2,7 +2,6 @@ import { AppState, Linking, Pressable, StyleSheet } from "react-native"
 import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
-import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRepository, connectedDeploymentScope } from "@/features/connected/persistence"
@@ -628,7 +627,7 @@ describe("shipping index route", () => {
           ? node.props.style({ pressed: false })
           : node.props.style
       const flat = StyleSheet.flatten(style)
-      expect(flat.borderRadius).toBe(CHOICE_RADIUS)
+      expect(flat.borderRadius).toBe(darkTheme.radius.lg)
       if (borderWidth !== undefined) expect(flat.borderWidth).toBe(borderWidth)
     }
   })

@@ -4,7 +4,6 @@ import { ScrollView, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { SegmentedControl } from "@/components/SegmentedControl"
@@ -195,8 +194,8 @@ const $seatName: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
 const $wins: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $seatOutcome: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, flexBasis: 200 })
-const $dialogAction: ThemedStyle<ViewStyle> = () => ({
+const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
 })

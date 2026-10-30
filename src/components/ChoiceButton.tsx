@@ -9,8 +9,6 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { Button, type ButtonProps } from "./Button"
 import { Text } from "./Text"
 
-export const CHOICE_RADIUS = 12
-
 export interface ChoiceButtonProps extends Omit<
   ButtonProps,
   "preset" | "LeftAccessory" | "RightAccessory"
@@ -105,9 +103,9 @@ function CheckBadge({ selected, color }: { selected: boolean; color: string }) {
   )
 }
 
-const $choice: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $choice: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 56,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
   justifyContent: "flex-start",
   paddingHorizontal: spacing.sm,
   borderWidth: 2,

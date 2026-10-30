@@ -9,7 +9,6 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import { CHOICE_RADIUS } from "./ChoiceButton"
 import { Text } from "./Text"
 
 export interface SelectOption {
@@ -163,7 +162,7 @@ export function SelectField({
             $entrance,
           ]}
         >
-          <ScrollView style={$menuClip} contentContainerStyle={themed($menuContent)}>
+          <ScrollView style={themed($menuClip)} contentContainerStyle={themed($menuContent)}>
             {clearLabel ? (
               <MenuOption
                 testID={testID ? `${testID}-option-none` : undefined}
@@ -244,13 +243,13 @@ function MenuOption({
   )
 }
 
-const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 56,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
   paddingHorizontal: spacing.sm,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.palette.neutral100,
@@ -269,8 +268,8 @@ const $triggerLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
 const $triggerValue: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $caret: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim, lineHeight: 20 })
 const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.transparent })
-const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderRadius: CHOICE_RADIUS,
+const $menu: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
+  borderRadius: radius.lg,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.background,
@@ -291,7 +290,10 @@ const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "80%",
   maxHeight: MIN_MENU_HEIGHT * 2,
 })
-const $menuClip: ViewStyle = { borderRadius: CHOICE_RADIUS - 1, overflow: "hidden" }
+const $menuClip: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.lg - 1,
+  overflow: "hidden",
+})
 const $dimmed: ViewStyle = { opacity: 0.5 }
 const $menuContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingVertical: spacing.xxs })
 const $optionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({

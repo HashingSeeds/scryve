@@ -163,13 +163,13 @@ const $bottomDialogLayout: ThemedStyle<ViewStyle> = () => ({
   paddingHorizontal: 0,
   paddingBottom: 0,
 })
-const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   width: "100%",
   maxWidth: 420,
   maxHeight: "100%",
   gap: spacing.lg,
   padding: spacing.lg,
-  borderRadius: spacing.lg,
+  borderRadius: radius.xl,
   borderWidth: 1,
   borderColor: colors.separator,
   backgroundColor: colors.background,
@@ -180,13 +180,13 @@ const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   elevation: 16,
 })
 const $wideDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
-const $bottomDialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $bottomDialog: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   maxHeight: "88%",
   borderBottomWidth: 0,
   borderBottomLeftRadius: 0,
   borderBottomRightRadius: 0,
-  borderTopLeftRadius: spacing.lg,
-  borderTopRightRadius: spacing.lg,
+  borderTopLeftRadius: radius.xl,
+  borderTopRightRadius: radius.xl,
   backgroundColor: colors.surface,
 })
 

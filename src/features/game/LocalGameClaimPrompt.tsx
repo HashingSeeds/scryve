@@ -5,7 +5,6 @@ import { usePathname } from "expo-router"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
@@ -391,8 +390,8 @@ const $checkMark: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: accessibleForeground(colors.tint),
   lineHeight: 18,
 })
-const $action: ThemedStyle<ViewStyle> = () => ({
+const $action: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
   minHeight: 48,
-  borderRadius: CHOICE_RADIUS,
+  borderRadius: radius.lg,
 })
