@@ -466,6 +466,19 @@ export default {
     saved: "Enregistré",
     addCards: "+ Ajouter des cartes",
   },
+  play: {
+    bringing: "Joué avec",
+    results: "Résultats",
+    resultsRecord: "Résultats · {{record}}",
+    versus: "contre {{opponents}}",
+    startGame: "Lancer une partie",
+    bringFailed: "Impossible de changer la version que vous jouez.",
+    source: {
+      local: "Local",
+      nearby: "À proximité",
+      online: "En ligne",
+    },
+  },
   build: {
     find: "Trouver ou ajouter une carte",
     average: "Moy.",

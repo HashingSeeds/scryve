@@ -482,6 +482,23 @@ const decks = {
     saved: "Saved",
     addCards: "+ Add cards",
   },
+  play: {
+    // Heading over the deck's versions. The player picks the one they bring to their next games.
+    bringing: "Bringing",
+    results: "Results",
+    // Heading over recent games with the deck's win-loss record, e.g. "Results · 2-1".
+    resultsRecord: "Results · {{record}}",
+    // A recent game's opponents, named by their commanders or decks, e.g. "vs Atraxa, Krenko".
+    versus: "vs {{opponents}}",
+    startGame: "Start a game",
+    bringFailed: "Couldn't change the version you bring.",
+    // Where a recent game was played.
+    source: {
+      local: "Local",
+      nearby: "Nearby",
+      online: "Online",
+    },
+  },
   build: {
     // Opens card search to find a card in this deck or add a new one.
     find: "Find or add a card",

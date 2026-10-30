@@ -33,7 +33,7 @@ function deckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
         cards={[forest]}
         savedCards={[forest]}
         note=""
-        savedNote=""
+        play={null}
         changes={0}
         onBack={noop}
         onSave={noop}
@@ -80,14 +80,52 @@ it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)
   },
 )
 
-it("shows the saved list read-only in Play, not the draft", () => {
-  const view = renderDeckView({ mode: "play", cards: [forest], savedCards: [island] })
+it("shows the Play body and no card list in Play", () => {
+  const { Text: MockText } = jest.requireActual<typeof import("react-native")>("react-native")
+  const view = renderDeckView({
+    mode: "play",
+    cards: [forest],
+    savedCards: [island],
+    play: <MockText testID="play-body" />,
+  })
 
-  expect(view.getByLabelText("2× Island")).toBeTruthy()
+  expect(view.getByTestId("play-body")).toBeTruthy()
+  expect(view.getByText("Magic · Commander · 2 cards")).toBeTruthy()
+  expect(view.queryByLabelText("2× Island")).toBeNull()
   expect(view.queryByLabelText("1× Forest")).toBeNull()
-  expect(view.queryByLabelText("Increase Island")).toBeNull()
-  expect(view.queryByTestId("deck-add-cards")).toBeNull()
   expect(view.queryByTestId("deck-note-input")).toBeNull()
+})
+
+describe("Play bar", () => {
+  it("records a match or starts a game", () => {
+    const onAddMatch = jest.fn()
+    const onStartGame = jest.fn()
+    const view = renderDeckView({ mode: "play", onAddMatch, onStartGame })
+
+    fireEvent.press(view.getByText("Add match result"))
+    fireEvent.press(view.getByText("Start a game"))
+    expect(onAddMatch).toHaveBeenCalledTimes(1)
+    expect(onStartGame).toHaveBeenCalledTimes(1)
+  })
+
+  it("has no match entry for a game without results", () => {
+    const view = renderDeckView({
+      mode: "play",
+      game: "riftbound",
+      format: "constructed",
+      onAddMatch: jest.fn(),
+    })
+
+    expect(view.queryByText("Add match result")).toBeNull()
+    expect(view.getByText("Start a game")).toBeTruthy()
+  })
+
+  it("gives way to the draft bar while Build has unsaved changes", () => {
+    const view = renderDeckView({ mode: "play", changes: 1, onStartGame: jest.fn() })
+
+    expect(view.getByTestId("deck-draft-bar")).toBeTruthy()
+    expect(view.queryByTestId("deck-play-bar")).toBeNull()
+  })
 })
 
 it("switches views from the toggle", () => {
@@ -162,21 +200,13 @@ describe("sideboard", () => {
     expect(onMove.mock.calls).toEqual([[bolt], [path]])
   })
 
-  it("has no ⇄ where the format has no sideboard, or in Play", () => {
+  it("has no ⇄ where the format has no sideboard", () => {
     const onMove = jest.fn()
     expect(
       renderDeckView({
         game: "pokemon",
         format: "standard",
         cards: [bolt],
-        onMove,
-      }).queryByLabelText(/Move one/),
-    ).toBeNull()
-    expect(
-      renderDeckView({
-        mode: "play",
-        format: "modern",
-        savedCards: [bolt],
         onMove,
       }).queryByLabelText(/Move one/),
     ).toBeNull()

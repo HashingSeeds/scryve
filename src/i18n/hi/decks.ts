@@ -441,6 +441,19 @@ export default {
     saved: "सहेजा गया",
     addCards: "+ कार्ड जोड़ें",
   },
+  play: {
+    bringing: "साथ ले जा रहे हैं",
+    results: "नतीजे",
+    resultsRecord: "नतीजे · {{record}}",
+    versus: "बनाम {{opponents}}",
+    startGame: "गेम शुरू करें",
+    bringFailed: "आप जो वर्शन साथ ले जाते हैं, उसे बदला नहीं जा सका।",
+    source: {
+      local: "लोकल",
+      nearby: "आस-पास",
+      online: "ऑनलाइन",
+    },
+  },
   build: {
     find: "कार्ड खोजें या जोड़ें",
     average: "औसत",

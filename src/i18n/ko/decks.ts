@@ -431,6 +431,19 @@ export default {
     saved: "저장됨",
     addCards: "+ 카드 추가",
   },
+  play: {
+    bringing: "사용할 버전",
+    results: "결과",
+    resultsRecord: "결과 · {{record}}",
+    versus: "vs {{opponents}}",
+    startGame: "게임 시작",
+    bringFailed: "사용할 버전을 변경하지 못했습니다.",
+    source: {
+      local: "로컬",
+      nearby: "근처",
+      online: "온라인",
+    },
+  },
   build: {
     find: "카드 찾기 또는 추가",
     average: "평균",

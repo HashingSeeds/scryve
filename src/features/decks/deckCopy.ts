@@ -31,6 +31,17 @@ export function deckVersionLabel(
   )
 }
 
+export function versionTitle(
+  version: { name?: string; versionNumber: number },
+  latestVersionNumber: number,
+) {
+  const numbered = translate("decks:numberedVersion", { number: version.versionNumber })
+  const name = deckVersionLabel(version, latestVersionNumber)
+  return name === numbered
+    ? numbered
+    : translate("decks:deckView.version", { number: version.versionNumber, name })
+}
+
 export function deckNameWarning(name: string) {
   return nameFailsGate(name)
     ? translate("decks:hiddenNameWarning", { hiddenName: HIDDEN_DECK_NAME })

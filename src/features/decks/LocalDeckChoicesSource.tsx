@@ -6,6 +6,7 @@ import {
   ConnectedProfileProvider,
   useConnectedProfile,
 } from "@/features/connected/useConnectedProfile"
+import { versionTitle } from "@/features/decks/deckCopy"
 import {
   DeckSyncRepository,
   getDeckSyncController,
@@ -76,19 +77,31 @@ export function MyDecksSource({
 const deckChoicesOf = (decks: MyDecks): DeckChoices =>
   decks === undefined || decks === "unavailable"
     ? decks
-    : decks.flatMap((deck) =>
-        deck.latestVersionId
+    : decks.flatMap((deck) => {
+        const versionId = deck.bringingVersionId ?? deck.latestVersionId
+        const version = deck.versions.find((candidate) => candidate._id === versionId)
+        return versionId
           ? [
               {
-                versionId: deck.latestVersionId,
+                versionId,
+                versionLabel:
+                  version && deck.versions.length > 1
+                    ? versionTitle(version, deck.versionNumber ?? version.versionNumber)
+                    : undefined,
+                deckId: deck._id,
+                deckKey: deck.deckKey,
                 name: deck.name,
                 system: deck.game,
                 format: deck.format,
-                startingValue: deck.startingValue,
+                // why: listMine reads startingValue from the latest version, so an older version's hero would start at the wrong life.
+                startingValue:
+                  deck.bringingVersionId && deck.bringingVersionId !== deck.latestVersionId
+                    ? undefined
+                    : deck.startingValue,
               },
             ]
-          : [],
-      )
+          : []
+      })
 
 export function LocalDeckChoicesSource({
   ownerId,

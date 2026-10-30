@@ -29,7 +29,7 @@ import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
-import { useGuestDecks } from "@/features/decks/guestDeck"
+import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import {
   createLocalGame,
   hasLocalGameStarted,
@@ -96,7 +96,12 @@ import {
 import { isCommanderFormat } from "../../convex/lib/gameRules"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
-import { identitySection, startingValueRange, systemDefinition } from "../../convex/lib/systems"
+import {
+  identitySection,
+  isSystemId,
+  startingValueRange,
+  systemDefinition,
+} from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
@@ -157,6 +162,7 @@ export interface NewGameScreenProps {
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
   localConnect?: LocalConnectFeed
   localMatchEnd?: { game: LocalGame; onEnd: (outcomes: MatchSeatOutcome[]) => void }
+  initialDeckId?: string
 }
 
 export interface LocalConnectFeed {
@@ -217,6 +223,7 @@ function NewGameForm({
   onNearby,
   localConnect,
   localMatchEnd,
+  initialDeckId,
 }: NewGameScreenProps & {
   replaying?: RecentSetup
   onReplay: (setup: RecentSetup) => void
@@ -438,6 +445,37 @@ function NewGameForm({
         : undefined,
     [account, deck, effectiveMeSeat],
   )
+  // why: decks load after mount, and each step below needs the previous one rendered: the format filters the deck list, and only a claimed seat can hold a deck.
+  const wantedDeckId = useRef(initialDeckId)
+  useEffect(() => {
+    const wanted = wantedDeckId.current
+    if (!wanted || localGame || pinning) return
+    const choice = [...(deckList ?? []), ...localDeckChoices(guestDecks)].find(
+      (candidate) =>
+        candidate.deckId === wanted ||
+        (candidate.localId !== undefined && guestDeckRouteId(candidate.localId) === wanted),
+    )
+    if (!choice || !isSystemId(choice.system)) {
+      if (account?.decks !== undefined) wantedDeckId.current = undefined
+      return
+    }
+    if (choice.system !== system || choice.format !== format) {
+      chooseGameType({
+        id: gameTypeId(choice.system, choice.format),
+        system: choice.system,
+        format: choice.format,
+      })
+      return
+    }
+    if (!account) return
+    if (effectiveMeSeat === undefined) {
+      const seat = account.defaultMeSeat ?? 0
+      chooseMeSeat(String(seat < playerCount ? seat : 0))
+      return
+    }
+    wantedDeckId.current = undefined
+    void chooseDeck(deckChoiceId(choice))
+  })
   const valid = nearbyMode
     ? validLife
     : connectedMode
@@ -918,7 +956,7 @@ function NewGameForm({
                           : []),
                         ...deckChoices.map((choice) => ({
                           id: deckChoiceId(choice)!,
-                          label: choice.name,
+                          label: [choice.name, choice.versionLabel].filter(Boolean).join(" · "),
                           accessory: choice.localId ? <DeviceGlyph /> : undefined,
                           accessibilityLabel: choice.localId
                             ? translate("decks:stats.onDeviceLabel", { name: choice.name })

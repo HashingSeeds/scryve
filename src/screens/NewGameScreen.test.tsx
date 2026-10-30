@@ -1141,6 +1141,55 @@ describe("NewGameScreen", () => {
     )
   })
 
+  it("starts with the deck it was opened for, at that deck's bringing version", async () => {
+    const onStartLocal = jest.fn()
+    const decks = [
+      {
+        versionId: "v-atraxa",
+        deckId: "deck-atraxa",
+        name: "Atraxa",
+        system: "mtg",
+        format: "commander",
+      },
+      {
+        versionId: "v-red-1",
+        versionLabel: "Version 1",
+        deckId: "deck-red",
+        name: "Mono Red",
+        system: "mtg",
+        format: "standard",
+      },
+    ]
+    const opened = (account: NewGameScreenProps["account"]) => (
+      <ThemeProvider initialContext="light">
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+          initialDeckId="deck-red"
+          account={account}
+        />
+      </ThemeProvider>
+    )
+    const view = render(opened(undefined))
+    view.rerender(opened({ ownerId: "owner-a" }))
+    view.rerender(opened({ ownerId: "owner-a", decks }))
+
+    expect(screen.getByLabelText("Your deck, Mono Red · Version 1")).toBeTruthy()
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      20,
+      expect.objectContaining({
+        system: "mtg",
+        format: "standard",
+        account: expect.objectContaining({ meSeat: 0, deckVersionId: "v-red-1" }),
+      }),
+    )
+  })
+
   it("drops the previous account's seat and deck when the signed-in owner changes", () => {
     const onStartLocal = jest.fn()
     const decks = [{ versionId: "v-standard", name: "Mono Red", system: "mtg", format: "standard" }]
