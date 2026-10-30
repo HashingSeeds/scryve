@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from "react"
 
 import { hasLocalGameStarted } from "@/features/game/domain"
 import type { LocalGame } from "@/features/game/types"
+import { pinnedListCards } from "@/features/stats/listSnapshots"
 import { storage } from "@/utils/storage"
 
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
@@ -86,13 +87,12 @@ export function betweenGames(game: LocalGame | null | undefined) {
   return match.gameNumber > 1 && !hasLocalGameStarted(game) ? match : undefined
 }
 
-export function matchSeatDeck(game: LocalGame): SeatDeck | undefined {
-  const account = game.account
+export function matchSeatDeck(account: LocalGame["account"]): SeatDeck | undefined {
   if (!account?.mePlayerId) return undefined
-  if (account.deckVersionId) return { ownerId: account.ownerId, versionId: account.deckVersionId }
-  return account.deckKey && account.deckFingerprint
-    ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
-    : undefined
+  const { ownerId, deckVersionId, deckKey, deckFingerprint } = account
+  if (deckKey && deckFingerprint && (!deckVersionId || pinnedListCards(deckKey, deckFingerprint)))
+    return { deckKey, fingerprint: deckFingerprint }
+  return deckVersionId ? { ownerId, versionId: deckVersionId } : undefined
 }
 
 export function swapPool(
@@ -138,7 +138,9 @@ export function useMatchSideboard(
   deck: { game: string | undefined; format: string | undefined },
 ) {
   const match = game?.status === "active" && !game.match?.result ? game.match : undefined
-  const cards = useSeatDeckCards(match && game ? matchSeatDeck(game) : undefined)
+  const account = match ? game?.account : undefined
+  const seatDeck = useMemo(() => matchSeatDeck(account), [account])
+  const cards = useSeatDeckCards(seatDeck)
   const swaps = useMatchSwaps(match?.id)
   const { game: system, format } = deck
   const pool = useMemo(

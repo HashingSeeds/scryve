@@ -1,6 +1,14 @@
 import { createLocalGame, createNextMatchGame } from "@/features/game/domain"
+import { saveListSnapshot } from "@/features/stats/listSnapshots"
 
-import { betweenGames, loadMatchSwaps, saveMatchSwaps, swapPool, swapsOf } from "./matchSideboard"
+import {
+  betweenGames,
+  loadMatchSwaps,
+  matchSeatDeck,
+  saveMatchSwaps,
+  swapPool,
+  swapsOf,
+} from "./matchSideboard"
 
 const cards = [
   { name: "Lightning Bolt", quantity: 4, section: "main" },
@@ -62,5 +70,24 @@ describe("match sideboard", () => {
       result: { kind: "win", winnerPlayerIds: [first.players[0].id] },
     })
     expect(betweenGames(second)?.gameNumber).toBe(2)
+  })
+  it("reads the list pinned when the match began before the cached version", () => {
+    const { account } = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 20,
+      account: {
+        ownerId: "owner",
+        meSeat: 0,
+        deckVersionId: "version-1",
+        deckKey: "deck-key",
+        deckFingerprint: "fingerprint-1",
+      },
+    })
+    expect(matchSeatDeck(account)).toEqual({ ownerId: "owner", versionId: "version-1" })
+    saveListSnapshot("deck-key", "fingerprint-1", cards)
+    expect(matchSeatDeck(account)).toEqual({ deckKey: "deck-key", fingerprint: "fingerprint-1" })
   })
 })
