@@ -1668,7 +1668,7 @@ describe("DeckDetailScreen", () => {
 
   it("names the version on screen and flags it when a newer one exists", () => {
     const older = renderDetail()
-    expect(older.getByTestId("deck-version-button")).toHaveTextContent("Version 1 · Current")
+    expect(older.getByTestId("deck-version-button")).toHaveTextContent(/^Version 1$/)
     expect(older.getByText("Not the latest")).toBeTruthy()
     older.unmount()
 
@@ -1718,6 +1718,21 @@ describe("DeckDetailScreen", () => {
       ),
     ).toBeNull()
     expect(view.getByLabelText("Version details")).toBe(view.getByTestId("rename-version-button"))
+  })
+
+  it("keeps an older default-named version's default name when only its note is saved", async () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("deck-version-button"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    fireEvent.changeText(view.getByTestId("version-note-input"), "New note")
+    fireEvent.press(view.getByTestId("version-submit"))
+    await waitFor(() =>
+      expect(mockUpdateVersion).toHaveBeenCalledWith({
+        versionId: "version-main",
+        name: "Current",
+        note: "New note",
+      }),
+    )
   })
 
   it("deletes the selected version from the version editor behind a confirmation", async () => {

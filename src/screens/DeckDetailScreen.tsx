@@ -89,9 +89,12 @@ function boardLabel(sections: readonly { id: string; label: string }[], board: s
   return sections.find((section) => section.id === board)?.label ?? board
 }
 
-function openVersionLabel(version: { name?: string; versionNumber: number }) {
+function openVersionLabel(
+  version: { name?: string; versionNumber: number },
+  latestVersionNumber: number,
+) {
   const numbered = translate("decks:numberedVersion", { number: version.versionNumber })
-  const name = deckVersionLabel(version)
+  const name = deckVersionLabel(version, latestVersionNumber)
   return name === numbered
     ? numbered
     : translate("decks:deckView.version", { number: version.versionNumber, name })
@@ -864,7 +867,7 @@ function DeckDetailContent({
             ? undefined
             : activeVersionSummary
               ? {
-                  label: openVersionLabel(activeVersionSummary),
+                  label: openVersionLabel(activeVersionSummary, latestVersionNumber),
                   latest: activeVersionSummary.versionNumber >= latestVersionNumber,
                 }
               : { label: translate("decks:detail.versions"), latest: true }
@@ -1217,7 +1220,9 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.newVersion")}
           submitLabel={translate("decks:detail.createVersion")}
-          copyFromLabel={copyFromVersion ? deckVersionLabel(copyFromVersion) : undefined}
+          copyFromLabel={
+            copyFromVersion ? deckVersionLabel(copyFromVersion, latestVersionNumber) : undefined
+          }
           busy={busy}
           error={error}
           onSubmit={submitNewVersion}
@@ -1229,7 +1234,7 @@ function DeckDetailContent({
         <DeckVersionDialog
           title={translate("decks:detail.versionDetails")}
           submitLabel={translate("common:save")}
-          initialName={deckVersionLabel(activeVersionSummary)}
+          initialName={deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber)}
           initialNote={activeVersionSummary.note ?? ""}
           notesLocked={!view.premium}
           busy={busy}
@@ -1307,7 +1312,10 @@ function DeckDetailContent({
                       style={[themed($versionMark), selected && themed($versionMarkSelected)]}
                     />
                     <View style={themed($versionCopy)}>
-                      <Text weight="medium" text={deckVersionLabel(candidate)} />
+                      <Text
+                        weight="medium"
+                        text={deckVersionLabel(candidate, latestVersionNumber)}
+                      />
                       {candidate.note ? (
                         <Text
                           size="xxs"

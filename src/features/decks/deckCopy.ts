@@ -21,10 +21,14 @@ export function cardCountLabel(quantity: number) {
   return translate("decks:cardCount", { count: quantity })
 }
 
-export function deckVersionLabel(version: { name?: string; versionNumber: number }) {
-  return version.name?.trim()
-    ? versionLabel(version)
-    : translate("decks:numberedVersion", { number: version.versionNumber })
+export function deckVersionLabel(
+  version: { name?: string; versionNumber: number },
+  latestVersionNumber: number,
+) {
+  return (
+    versionLabel(version, latestVersionNumber) ??
+    translate("decks:numberedVersion", { number: version.versionNumber })
+  )
 }
 
 export function deckNameWarning(name: string) {

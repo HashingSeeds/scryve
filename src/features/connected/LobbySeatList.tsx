@@ -59,7 +59,10 @@ export function LobbySeatList({
   openSeats: number
   totalSeats?: number
   deckState?: LobbyDeckState
-  versionLabel: (version: { versionNumber: number; name?: string }) => string
+  versionLabel: (
+    version: { versionNumber: number; name?: string },
+    latestVersionNumber: number,
+  ) => string
   selectingDeckSeats?: ReadonlySet<number>
   deckRequired?: boolean
   system?: string
@@ -118,6 +121,9 @@ export function LobbySeatList({
         const chosenVersion = chosenDeck?.versions.find(
           (version) => version._id === seat.deckVersionId,
         )
+        const latestVersionNumber = Math.max(
+          ...(chosenDeck?.versions.map((version) => version.versionNumber) ?? []),
+        )
         const deckReady = Boolean(seat.deckVersionId)
         const ready = !seat.away && (!deckRequired || deckReady)
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
@@ -173,7 +179,9 @@ export function LobbySeatList({
                       [
                         seat.controlledByMe ? translate("connected:seats.you") : undefined,
                         chosenDeck?.name,
-                        chosenVersion ? versionLabel(chosenVersion) : undefined,
+                        chosenVersion
+                          ? versionLabel(chosenVersion, latestVersionNumber)
+                          : undefined,
                       ]
                         .filter(Boolean)
                         .join(" · ") ||
@@ -318,7 +326,7 @@ export function LobbySeatList({
                         accessibilityLabel={translate("connected:seats.deckVersion")}
                         chips={chosenDeck.versions.map((version) => ({
                           id: version._id,
-                          label: versionLabel(version),
+                          label: versionLabel(version, latestVersionNumber),
                           disabled: selectingDeck,
                         }))}
                         selectedId={seat.deckVersionId ?? ""}

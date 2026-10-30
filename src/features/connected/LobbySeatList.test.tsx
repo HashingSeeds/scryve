@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native"
 
+import { deckVersionLabel } from "@/features/decks/deckCopy"
 import { ThemeProvider } from "@/theme/context"
 
 import { LobbySeatList } from "./LobbySeatList"
@@ -149,4 +150,42 @@ it("only offers decks matching the lobby format", () => {
   )
   expect(screen.queryByText("Commander deck")).toBeNull()
   expect(screen.getByText("Vintage deck")).toBeTruthy()
+})
+
+it("reads an older default-named version by number in the seat and version picker", () => {
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[
+          {
+            seat: 1,
+            displayName: "Ada",
+            color: "#7C3AED",
+            controlledByMe: true,
+            deckVersionId: "v1",
+          },
+        ]}
+        openSeats={0}
+        system="mtg"
+        deckState={{
+          status: "ready",
+          value: [
+            {
+              _id: "deck",
+              name: "Atraxa",
+              versions: [
+                { _id: "v1", versionNumber: 1, name: "Current" },
+                { _id: "v2", versionNumber: 2, name: "Budget" },
+              ],
+            },
+          ],
+        }}
+        versionLabel={deckVersionLabel}
+        onSelectVersion={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByText("You · Atraxa · Version 1")).toBeTruthy()
+  expect(screen.getByTestId("seat-1-version")).toHaveTextContent(/Version 1.*Budget/)
+  expect(screen.queryByText("Current")).toBeNull()
 })
