@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Keyboard, Linking, ScrollView, TouchableOpacity, View } from "react-native"
-import { type ImageStyle } from "expo-image"
+import { Keyboard, Linking, TouchableOpacity, View } from "react-native"
 import { useAction, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
-import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { CardImage } from "@/components/CardImage"
-import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { RetryableError } from "@/components/RetryableError"
@@ -21,25 +17,21 @@ import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
-import { loadCardDetails } from "@/features/decks/cardDetailsCache"
-import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import { loadCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
-import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
-import { cardCountLabel, deckNameWarning } from "@/features/decks/deckCopy"
-import {
-  canChooseCommander,
-  isCommanderPick,
-  MAX_CARD_COPIES,
-  type DeckEdits,
-} from "@/features/decks/deckDraft"
+import { deckNameWarning } from "@/features/decks/deckCopy"
+import { isCommanderPick, MAX_CARD_COPIES, type DeckEdits } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { type GuestDeckPayload } from "@/features/decks/guestDeck"
+import { ImportBuild } from "@/features/decks/ImportBuild"
+import { pastedLines, type ImportProblem } from "@/features/decks/importLines"
 import { useSaveNewDeck } from "@/features/decks/localDeckSync"
 import { SaveDestination, useSaveDestination } from "@/features/decks/SaveDestination"
 import { useCapabilityReleased } from "@/features/decks/useCapabilityReleased"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckEditor } from "@/features/decks/useDeckEditor"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import { appLocale, type TxKeyPath } from "@/i18n"
@@ -47,7 +39,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
-import { accessibleForeground } from "@/utils/colorContrast"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
@@ -114,23 +105,29 @@ const DECK_LINK_SOURCES = new Map<
   ],
 ])
 
-type PastedDraft = DeckEdits<GuestDeckPayload["cards"][number]> & {
-  source: string
-  kind: "text" | "link"
+type ImportedDeckCard = GuestDeckPayload["cards"][number]
+
+type ImportOrigin = { kind: "text" | "link" | "catalog" | "precon"; source: string }
+
+type ImportDraft = DeckEdits<ImportedDeckCard> & {
+  origin: ImportOrigin
+  name?: string
   attribution?: { sourceName: string; sourceUrl: string; author?: string }
   game: string
   format: string
-  resolved: Pick<
-    FunctionReturnType<typeof api.deckImports.resolvePasted>,
-    "unresolved" | "invalidLines"
-  >
-  omitted: boolean
+  problems: ImportProblem[]
 }
 
 function attributionLabel(attribution: { sourceName: string; author?: string }, separator: string) {
   return attribution.author
     ? `${attribution.sourceName}${separator}${attribution.author}`
     : attribution.sourceName
+}
+
+function sameOrigin(draft: ImportDraft | undefined, origin: ImportOrigin | undefined) {
+  return Boolean(
+    draft && origin && draft.origin.kind === origin.kind && draft.origin.source === origin.source,
+  )
 }
 
 type PreconstructedDeck = {
@@ -172,15 +169,6 @@ type GenericImportedCard = {
   quantity: number
 }
 
-function catalogCardDetailKey(
-  card: Pick<
-    FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
-    "game" | "cardId" | "printingId" | "providerCardId" | "name" | "originalReference"
-  >,
-) {
-  return `${card.game}:${card.cardId ?? card.printingId ?? card.providerCardId ?? `${card.name}:${card.originalReference ?? ""}`}`
-}
-
 type FocusedPreviewCard = {
   detailKey: string
   name: string
@@ -198,12 +186,6 @@ type FocusedPreviewCard = {
 type PreconstructedDeckOutline = {
   name: string
   cards: PreviewCard[]
-}
-
-type ResolvedPreconstructedDeck = {
-  name: string
-  unresolved: string[]
-  cards: ImportedCard[]
 }
 
 type CatalogDeck = {
@@ -239,11 +221,11 @@ function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
   }))
 }
 
-function normalizeImportedCards(cards: GuestDeckPayload["cards"], game: string, format: string) {
+function normalizeImportedCards(cards: ImportedDeckCard[], game: string, format: string) {
   const supportsCommander = localizedDeckSections(game, format).some(
     (section) => section.id === "commander",
   )
-  const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
+  const cardsByPrinting = new Map<string, ImportedDeckCard>()
   for (const entry of cards) {
     const card = { ...entry }
     if (!supportsCommander && cardSection(card) === "commander") {
@@ -264,6 +246,10 @@ function preconDetail(deck: PreconstructedDeck) {
   return ["Wizards", deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
     .filter(Boolean)
     .join(" · ")
+}
+
+function preconFormat(deck: PreconstructedDeck, format: string) {
+  return format ? format : preconstructedFormat(deck.type)
 }
 
 const PUBLISHERS = new Map([
@@ -304,50 +290,6 @@ function catalogDeckDetail(deck: CatalogDeck) {
     .join(" · ")
 }
 
-function totalQuantity(cards: PreviewCard[]) {
-  return cards.reduce((total, card) => total + card.quantity, 0)
-}
-
-export function catalogPreviewSections<Entry extends { section: string }>(
-  entries: Entry[],
-  configured: readonly { id: string; label: string }[],
-) {
-  const knownIds = new Set(configured.map((section) => section.id))
-  const unknownEntries = entries.filter((entry) => !knownIds.has(entry.section))
-  return [
-    ...configured.map((section) => ({
-      ...section,
-      entries: entries.filter((entry) => entry.section === section.id),
-    })),
-    ...(unknownEntries.length > 0
-      ? [{ id: "other", label: translate("decks:addDeck.otherSection"), entries: unknownEntries }]
-      : []),
-  ].filter((section) => section.entries.length > 0)
-}
-
-function previewSections(
-  cards: PreviewCard[],
-  configured: readonly { id: string; label: string }[],
-) {
-  const knownIds = new Set(configured.map((section) => section.id))
-  const extras = [
-    ...new Set(cards.map((card) => card.board).filter((board) => !knownIds.has(board))),
-  ]
-  return [
-    ...configured,
-    ...extras.map((id) => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1) })),
-  ]
-    .map((section) => {
-      const entries = cards.filter((card) => card.board === section.id)
-      return {
-        ...section,
-        entries,
-        quantity: totalQuantity(entries),
-      }
-    })
-    .filter((section) => section.entries.length > 0)
-}
-
 export function AddDeckScreen({
   onBack,
   onCreated,
@@ -362,11 +304,13 @@ export function AddDeckScreen({
   const saveNewDeck = useSaveNewDeck(destination.access?.ownerId)
   const [saving, setSaving] = useState(false)
   const savingNow = useRef(false)
+  const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
   const resolveLink = useAction(api.deckImports.resolveLink)
+  const cardsByName = useAction(api.cards.byNames)
   const searchTopDecks = useAction(api.deckCatalogs.browse)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
@@ -387,37 +331,24 @@ export function AddDeckScreen({
   const [deckLink, setDeckLink] = useState("")
   const linkSource = DECK_LINK_SOURCES.get(game)
   const importSource = importKind === "link" ? deckLink : deckList
-  const {
-    draft: pastedDraft,
-    latest: latestPastedDraft,
-    setDraft: setPastedDraft,
-    edit: editPasted,
-  } = useDeckEditor<PastedDraft | undefined>(undefined)
+  const pasted = useDeckEditor<ImportDraft | undefined>(undefined)
+  const example = useDeckEditor<ImportDraft | undefined>(undefined)
+  const { draft: pastedDraft, setDraft: setPastedDraft } = pasted
+  const { latest: latestExample, setDraft: setExampleDraft } = example
   const [resolvingPasted, setResolvingPasted] = useState(false)
-  const [reviewingPasted, setReviewingPasted] = useState(false)
-  const [editingPasted, setEditingPasted] = useState(false)
-  const [addingPastedCard, setAddingPastedCard] = useState(false)
-  const [choosingPastedCommander, setChoosingPastedCommander] = useState(false)
+  const [buildingPasted, setBuildingPasted] = useState(false)
   const pastedToken = useRef(0)
   const pastedDraftCurrent =
-    pastedDraft?.source === importSource &&
-    pastedDraft.kind === importKind &&
+    pastedDraft?.origin.source === importSource &&
+    pastedDraft.origin.kind === importKind &&
     pastedDraft.game === game &&
     pastedDraft.format === format
-  const pastedProblems = pastedDraft
-    ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
-    : []
-  const pastedCards = pastedDraft?.cards ?? []
-  const sourceAttribution = pastedDraft?.attribution
-    ? `Imported from ${attributionLabel(pastedDraft.attribution, " by ")}\n${pastedDraft.attribution.sourceUrl}`
-    : ""
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
   const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
   const [selectedCatalogDeck, setSelectedCatalogDeck] = useState<CatalogDeck>()
   const [selectedPrecon, setSelectedPrecon] = useState<PreconstructedDeck>()
   const [preconOutline, setPreconOutline] = useState<PreconstructedDeckOutline>()
-  const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [focusedPreviewCard, setFocusedPreviewCard] = useState<FocusedPreviewCard>()
   const {
@@ -447,6 +378,31 @@ export function AddDeckScreen({
     api.deckCatalogs.detail,
     selectedCatalogDeck ? { catalogDeckId: selectedCatalogDeck._id } : "skip",
   )
+  const exampleOrigin: ImportOrigin | undefined = selectedCatalogDeck
+    ? { kind: "catalog", source: selectedCatalogDeck._id }
+    : selectedPrecon
+      ? { kind: "precon", source: selectedPrecon.fileName }
+      : undefined
+  const exampleDraft = sameOrigin(example.draft, exampleOrigin) ? example.draft : undefined
+  const editor = buildingPasted ? pasted : example
+  const importDraft = buildingPasted ? pastedDraft : exampleDraft
+
+  useEffect(() => {
+    if (!selectedCatalogDeck || catalogDetail?.deck._id !== selectedCatalogDeck._id) return
+    const origin = { kind: "catalog", source: selectedCatalogDeck._id } as const
+    if (sameOrigin(latestExample.current, origin)) return
+    setExampleDraft({
+      origin,
+      name: selectedCatalogDeck.name,
+      game: selectedCatalogDeck.game,
+      format: selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
+      cards: catalogDetail.entries.map(
+        ({ _id, _creationTime, catalogDeckId: _catalogDeckId, ...entry }) => entry,
+      ),
+      problems: [],
+    })
+  }, [catalogDetail, latestExample, selectedCatalogDeck, setExampleDraft])
+
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
   }
@@ -465,7 +421,6 @@ export function AddDeckScreen({
     }
   }
   const saveTx = (deviceTx: TxKeyPath) => (destination.access ? "decks:addDeck.saveDeck" : deviceTx)
-  const saveDestination = <SaveDestination destination={destination} />
 
   function invalidatePasted() {
     pastedToken.current += 1
@@ -599,7 +554,6 @@ export function AddDeckScreen({
       try {
         setSelectedPrecon(deck)
         if (!keepOutline) setPreconOutline(undefined)
-        setResolvedPrecon(undefined)
         setError(undefined)
         setPreviewError(undefined)
         setPreviewRetryAfterMs(undefined)
@@ -608,7 +562,17 @@ export function AddDeckScreen({
         if (previewToken.current !== token) return
         setPreconOutline(outline)
         const resolved = await resolvePreconstructed({ fileName: deck.fileName })
-        if (previewToken.current === token) setResolvedPrecon(resolved)
+        if (previewToken.current !== token) return
+        const deckFormat = preconFormat(deck, format)
+        const normalized = normalizeImportedCards(importCards(resolved.cards), game, deckFormat)
+        setExampleDraft({
+          origin: { kind: "precon", source: deck.fileName },
+          name: resolved.name || deck.name,
+          game,
+          format: deckFormat,
+          cards: "overflow" in normalized ? importCards(resolved.cards) : normalized.cards,
+          problems: resolved.unresolved.map((line) => ({ line, kind: "unmatched" })),
+        })
       } catch (cause) {
         if (previewToken.current === token) {
           setPreviewError(convexErrorMessage(cause, translate("decks:addDeck.previewFailed")))
@@ -618,85 +582,25 @@ export function AddDeckScreen({
         if (previewToken.current === token) setPreviewLoading(false)
       }
     },
-    [previewPreconstructed, resolvePreconstructed],
+    [format, game, previewPreconstructed, resolvePreconstructed, setExampleDraft],
   )
 
-  function closePreview() {
+  function openPrecon(deck: PreconstructedDeck) {
+    if (sameOrigin(latestExample.current, { kind: "precon", source: deck.fileName }))
+      setSelectedPrecon(deck)
+    else void previewPrecon(deck)
+  }
+
+  function closeExample() {
     previewToken.current += 1
+    setPreviewLoading(false)
     setPreviewRetryAfterMs(undefined)
+    setSelectedCatalogDeck(undefined)
     setSelectedPrecon(undefined)
     setPreconOutline(undefined)
-    setResolvedPrecon(undefined)
     setFocusedPreviewCard(undefined)
     setPreviewError(undefined)
     setError(undefined)
-  }
-
-  function focusPreviewCard(card: PreviewCard, boardLabel: string) {
-    const focused = {
-      detailKey: card.scryfallId ?? `mtg:${card.name}`,
-      name: card.name,
-      imageUrl: card.imageUrl,
-      smallImageUrl: card.smallImageUrl,
-      quantity: card.quantity,
-      boardLabel,
-      scryfallId: card.scryfallId,
-    }
-    setFocusedPreviewCard(focused)
-  }
-
-  function focusCatalogCard(
-    card: Pick<
-      FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
-      | "game"
-      | "cardId"
-      | "printingId"
-      | "providerCardId"
-      | "scryfallId"
-      | "name"
-      | "originalReference"
-      | "quantity"
-      | "imageUrl"
-      | "smallImageUrl"
-    >,
-    boardLabel: string,
-  ) {
-    const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
-    const focused = {
-      detailKey: catalogCardDetailKey(card),
-      name: card.name,
-      imageUrl: card.imageUrl,
-      smallImageUrl: card.smallImageUrl,
-      quantity: card.quantity,
-      boardLabel,
-      game: card.game,
-      catalogCardId,
-      scryfallId: card.scryfallId,
-      originalReference: card.originalReference,
-    }
-    setFocusedPreviewCard(focused)
-  }
-
-  function importPrecon() {
-    if (!selectedPrecon || !resolvedPrecon || resolvedPrecon.unresolved.length) return
-    void saveGuest({
-      name: resolvedPrecon.name || selectedPrecon.name,
-      format: format ? format : preconstructedFormat(selectedPrecon.type),
-      game,
-      cards: importCards(resolvedPrecon.cards),
-    })
-  }
-
-  function importTopDeck() {
-    if (!selectedCatalogDeck || !catalogDetail) return
-    void saveGuest({
-      name: selectedCatalogDeck.name,
-      format: selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
-      game: selectedCatalogDeck.game,
-      cards: catalogDetail.entries.map(
-        ({ _id, _creationTime, catalogDeckId: _catalogDeckId, ...entry }) => entry,
-      ),
-    })
   }
 
   async function reviewPasted() {
@@ -716,7 +620,7 @@ export function AddDeckScreen({
       const resolved = result.resolved
       const suggestedFormat =
         result.kind === "link"
-          ? pastedDraft?.kind === "link" && pastedDraft.source === deckLink
+          ? pastedDraft?.origin.kind === "link" && pastedDraft.origin.source === deckLink
             ? format
             : (result.resolved.format ?? format)
           : format
@@ -731,13 +635,14 @@ export function AddDeckScreen({
         setFormat(suggestedFormat)
       }
       setPastedDraft({
-        source: importSource,
-        kind: importKind,
+        origin: { kind: importKind, source: importSource },
         game,
         format: suggestedFormat,
-        resolved,
         cards: normalized.cards,
-        omitted: false,
+        problems: [
+          ...resolved.unresolved.map((line) => ({ line, kind: "unmatched" as const })),
+          ...resolved.invalidLines.map((line) => ({ line, kind: "invalid" as const })),
+        ],
         ...(result.kind === "link"
           ? {
               attribution: {
@@ -748,9 +653,8 @@ export function AddDeckScreen({
             }
           : {}),
       })
-      setEditingPasted(false)
       Keyboard.dismiss()
-      setReviewingPasted(true)
+      setBuildingPasted(true)
     } catch (cause) {
       if (pastedToken.current === token)
         fail(
@@ -764,72 +668,181 @@ export function AddDeckScreen({
     }
   }
 
-  function changeImportSource() {
+  function leaveImport() {
+    if (!buildingPasted) {
+      closeExample()
+      return
+    }
     invalidatePasted()
     setFocusedPreviewCard(undefined)
-    setAddingPastedCard(false)
-    setChoosingPastedCommander(false)
-    setEditingPasted(false)
-    setReviewingPasted(false)
-  }
-
-  function editImport() {
-    setFocusedPreviewCard(undefined)
-    if (editingPasted) Keyboard.dismiss()
-    setEditingPasted((current) => !current)
+    setBuildingPasted(false)
   }
 
   function focusImportCard(card: DeckCard, boardLabel: string) {
+    const cardGame = importDraft?.game ?? game
     setFocusedPreviewCard({
       ...card,
-      detailKey: cardDetailsKey(card, game),
+      detailKey: cardDetailsKey(card, cardGame),
       printingKey: printingKey(card),
-      game,
+      game: cardGame,
       catalogCardId: card.cardId ?? card.printingId ?? card.providerCardId,
       boardLabel,
     })
   }
 
-  function removeImportCard(card: DeckCard) {
-    if (card.quantity <= 1) setFocusedPreviewCard(undefined)
-    editPasted({ type: "remove", card }, { game, format })
+  function addImportCard(card: ImportedDeckCard) {
+    const draft = editor.latest.current
+    if (!draft) return undefined
+    return editor.edit({ type: "add", card }, draft)
   }
 
-  function changeImportFormat(next?: string) {
-    if (!next || !pastedDraft) return
-    const normalized = normalizeImportedCards(pastedDraft.cards, game, next)
+  function removeImportCard(card: DeckCard) {
+    const draft = editor.latest.current
+    if (!draft) return
+    if (card.quantity <= 1) setFocusedPreviewCard(undefined)
+    editor.edit({ type: "remove", card }, draft)
+  }
+
+  function changeImportFormat(next: string) {
+    const draft = editor.latest.current
+    if (!draft) return
+    const normalized = normalizeImportedCards(draft.cards, draft.game, next)
     if ("overflow" in normalized) {
       setError(translate("decks:addDeck.overflowOnFormat", { card: normalized.overflow }))
       return
     }
-    setDeckFormat(next)
-    setFormat(next)
-    setPastedDraft({ ...pastedDraft, format: next, cards: normalized.cards })
+    if (buildingPasted) {
+      setDeckFormat(next)
+      setFormat(next)
+    }
+    editor.setDraft({ ...draft, format: next, cards: normalized.cards })
     setError(undefined)
   }
 
-  function addImportCard(card: GuestDeckPayload["cards"][number]) {
-    if (!latestPastedDraft.current) return translate("decks:addDeck.reviewFirst")
-    const addError = editPasted({ type: "add", card }, { game, format })
-    if (!addError && choosingPastedCommander) setAddingPastedCard(false)
-    return addError
+  function withoutProblem(draft: ImportDraft, problem: ImportProblem): ImportDraft {
+    return {
+      ...draft,
+      undo: undefined,
+      problems: draft.problems.filter(
+        (entry) => entry.line !== problem.line || entry.kind !== problem.kind,
+      ),
+      cards:
+        problem.kind === "unmatched"
+          ? draft.cards.filter((card) => card.originalReference !== problem.line)
+          : draft.cards,
+    }
   }
 
-  function importPasted() {
+  function problemCopies(draft: ImportDraft, problem: ImportProblem) {
+    const placeholders = draft.cards.filter((card) => card.originalReference === problem.line)
+    if (placeholders.length > 0)
+      return placeholders.map((card) => ({
+        quantity: card.quantity,
+        section: cardSection(card),
+        board: card.board,
+      }))
+    if (draft.origin.kind === "text")
+      return pastedLines(draft.origin.source, problem.line).map(({ quantity, board }) => ({
+        quantity,
+        section: board,
+        board,
+      }))
+    return undefined
+  }
+
+  function replaceProblem(problem: ImportProblem, card: ImportedDeckCard) {
+    const draft = editor.latest.current
+    if (!draft) return undefined
+    const copies = problemCopies(draft, problem) ?? [
+      { quantity: card.quantity, section: cardSection(card), board: card.board },
+    ]
+    const rest = withoutProblem(draft, problem)
+    const normalized = normalizeImportedCards(
+      [
+        ...rest.cards,
+        ...copies.map(({ quantity, section, board }) => ({
+          ...card,
+          quantity,
+          section,
+          ...(card.scryfallId && board ? { board } : {}),
+        })),
+      ],
+      draft.game,
+      draft.format,
+    )
+    if ("overflow" in normalized)
+      return translate("decks:addDeck.overflowAfterMatch", { card: normalized.overflow })
+    editor.setDraft({ ...rest, cards: normalized.cards })
+    return undefined
+  }
+
+  function removeProblem(problem: ImportProblem) {
+    const draft = editor.latest.current
+    if (draft) editor.setDraft(withoutProblem(draft, problem))
+  }
+
+  function removeAllProblems() {
+    const draft = editor.latest.current
+    if (draft) editor.setDraft(draft.problems.reduce(withoutProblem, draft))
+  }
+
+  async function applyGuess(problem: ImportProblem, cardName: string) {
+    const started = editor.latest.current
+    try {
+      const { cards } = await cardsByName({ names: [cardName], deviceId })
+      const found = cards.find((card) => card.name === cardName)
+      if (!found) return translate("decks:importBuild.useFailed", { card: cardName })
+      saveCardDetails({ [found.scryfallId]: found })
+      const draft = editor.latest.current
+      if (
+        !started ||
+        !sameOrigin(draft, started.origin) ||
+        draft?.game !== started.game ||
+        !draft.problems.some((entry) => entry.line === problem.line && entry.kind === problem.kind)
+      )
+        return undefined
+      return replaceProblem(problem, {
+        name: found.name,
+        oracleId: found.oracleId,
+        scryfallId: found.scryfallId,
+        imageUrl: found.imageUrl,
+        smallImageUrl: found.smallImageUrl,
+        quantity: 1,
+      })
+    } catch (cause) {
+      return convexErrorMessage(cause, translate("decks:importBuild.useFailed", { card: cardName }))
+    }
+  }
+
+  const importName = buildingPasted
+    ? name
+    : (exampleDraft?.name ?? selectedCatalogDeck?.name ?? selectedPrecon?.name ?? "")
+
+  function renameImport(next: string) {
+    if (buildingPasted) setName(next)
+    else if (exampleDraft) setExampleDraft({ ...exampleDraft, name: next })
+  }
+
+  function saveImport() {
     if (
-      !pastedDraft ||
-      !pastedDraftCurrent ||
-      resolvingPasted ||
-      (!pastedDraft.omitted && pastedProblems.length > 0) ||
-      pastedCards.length === 0
+      !importDraft ||
+      (buildingPasted && (!pastedDraftCurrent || resolvingPasted)) ||
+      importDraft.problems.length > 0 ||
+      importDraft.cards.length === 0 ||
+      !importName.trim()
     )
       return
+    const attribution = importDraft.attribution
     void saveGuest({
-      name,
-      format,
-      game,
-      ...(sourceAttribution ? { note: sourceAttribution } : {}),
-      cards: pastedCards,
+      name: importName,
+      format: importDraft.format,
+      game: importDraft.game,
+      ...(attribution
+        ? {
+            note: `Imported from ${attributionLabel(attribution, " by ")}\n${attribution.sourceUrl}`,
+          }
+        : {}),
+      cards: importDraft.cards,
     })
   }
 
@@ -848,37 +861,6 @@ export function AddDeckScreen({
       }}
     />
   )
-  const focusedImportCard = reviewingPasted
-    ? pastedCards.find((card) => printingKey(card) === focusedPreviewCard?.printingKey)
-    : undefined
-  const previewCardDialog = focusedPreviewCard ? (
-    <CardFocusDialog
-      card={{
-        game: focusedPreviewCard.game ?? "mtg",
-        cardId: focusedPreviewCard.scryfallId ?? focusedPreviewCard.catalogCardId,
-        name: focusedPreviewCard.name,
-        imageUrl: focusedPreviewCard.imageUrl,
-        smallImageUrl: focusedPreviewCard.smallImageUrl,
-        quantity: focusedImportCard?.quantity ?? focusedPreviewCard.quantity,
-        boardLabel: focusedPreviewCard.boardLabel,
-      }}
-      details={previewDetailsByKey[focusedPreviewCard.detailKey]}
-      detailsError={previewDetailsError}
-      detailsRetryAfterMs={previewDetailsRetryAfterMs}
-      onRetryDetails={retryPreviewDetails}
-      onClose={() => setFocusedPreviewCard(undefined)}
-      {...(editingPasted && focusedImportCard
-        ? {
-            onIncrement:
-              focusedImportCard.quantity >= MAX_CARD_COPIES ||
-              isCommanderPick({ game, format }, focusedImportCard)
-                ? undefined
-                : () => addImportCard(focusedImportCard),
-            onDecrement: () => removeImportCard(focusedImportCard),
-          }
-        : {})}
-    />
-  ) : null
   const emptyCatalog = (
     <View style={themed($stack)}>
       <Text
@@ -898,529 +880,190 @@ export function AddDeckScreen({
     </View>
   )
 
-  if (reviewingPasted && pastedDraft) {
-    const singleCommander = canChooseCommander({ game, format }, pastedCards)
-    const cachedRules = pastedDraft.commanderSelected ? loadCardDetails() : {}
-    const commanderWarnings = pastedDraft.commanderSelected
-      ? getCommanderWarnings(
-          pastedCards,
-          (card) =>
-            cachedRules[cardDetailsKey(card, game)] ??
-            previewDetailsByKey[cardDetailsKey(card, game)],
-        )
-      : []
-    const sections = catalogPreviewSections(
-      pastedCards.map((card) => ({ ...card, section: cardSection(card) })),
-      localizedDeckSections(pastedDraft.game, pastedDraft.format),
+  if ((buildingPasted && pastedDraft) || exampleOrigin) {
+    const draftGame = importDraft?.game ?? selectedCatalogDeck?.game ?? game
+    const draftFormat =
+      importDraft?.format ??
+      (selectedCatalogDeck
+        ? (selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game))
+        : selectedPrecon
+          ? preconFormat(selectedPrecon, format)
+          : format)
+    const cards: DeckCard[] | undefined = importDraft?.cards ?? preconOutline?.cards
+    const cachedRules = importDraft?.commanderSelected ? loadCardDetails() : {}
+    const commanderWarnings =
+      importDraft?.commanderSelected && cards
+        ? getCommanderWarnings(
+            cards,
+            (card) =>
+              cachedRules[cardDetailsKey(card, draftGame)] ??
+              previewDetailsByKey[cardDetailsKey(card, draftGame)],
+          )
+        : []
+    const focusedImportCard = importDraft?.cards.find(
+      (card) => printingKey(card) === focusedPreviewCard?.printingKey,
     )
-    if (
-      editingPasted &&
-      singleCommander &&
-      !sections.some((section) => section.id === "commander")
-    ) {
-      sections.unshift({
-        id: "commander",
-        label: translate("systems:section.commander"),
-        entries: [],
-      })
-    }
-    return (
-      <Screen
-        key="import-review"
-        preset="fixed"
-        safeAreaEdges={["bottom"]}
-        contentContainerStyle={themed($previewScreen)}
+    const attribution = importDraft?.attribution
+    const details = attribution ? (
+      <TouchableOpacity
+        accessibilityRole="link"
+        accessibilityLabel={
+          attribution.author
+            ? translate("decks:addDeck.viewOnBy", {
+                source: attribution.sourceName,
+                author: attribution.author,
+              })
+            : translate("decks:addDeck.viewOn", { source: attribution.sourceName })
+        }
+        style={$importAttribution}
+        onPress={() =>
+          void Linking.openURL(attribution.sourceUrl).catch(() =>
+            setError(translate("decks:addDeck.openFailed", { source: attribution.sourceName })),
+          )
+        }
       >
-        <Header
-          titleTx={editingPasted ? "decks:deckView.editTitle" : "decks:addDeck.reviewTitle"}
-          leftTx="common:back"
-          onLeftPress={changeImportSource}
-          rightTx={editingPasted ? "common:done" : "common:edit"}
-          onRightPress={editImport}
-        />
-        <ScrollView
-          testID="pasted-deck-review"
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={themed($previewContent)}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={themed($previewSummary)}>
-            {editingPasted ? (
-              <View style={themed($importFields)}>
-                <TextField
-                  testID="deck-name-input"
-                  accessibilityLabel={translate("decks:settings.name")}
-                  placeholderTx="decks:settings.name"
-                  value={name}
-                  maxLength={80}
-                  helper={deckNameWarning(name)}
-                  onChangeText={(next) => {
-                    setName(next)
-                  }}
-                />
-                <SelectField
-                  testID="format-picker-options"
-                  label={translate("decks:settings.format")}
-                  field="format"
-                  value={format}
-                  options={deckFormats(game)}
-                  onSelect={changeImportFormat}
-                />
-              </View>
-            ) : (
-              <Text
-                preset="subheading"
-                text={name.trim() || translate("decks:addDeck.importedDeck")}
-              />
-            )}
-            <View style={themed($importSummaryRow)}>
-              <Text
-                size="sm"
-                tone="dim"
-                text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
-              />
-              {pastedDraft.attribution ? (
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  accessibilityLabel={
-                    pastedDraft.attribution.author
-                      ? translate("decks:addDeck.viewOnBy", {
-                          source: pastedDraft.attribution.sourceName,
-                          author: pastedDraft.attribution.author,
-                        })
-                      : translate("decks:addDeck.viewOn", {
-                          source: pastedDraft.attribution.sourceName,
-                        })
-                  }
-                  style={$importAttribution}
-                  onPress={() =>
-                    void Linking.openURL(pastedDraft.attribution!.sourceUrl).catch(() =>
-                      setError(
-                        translate("decks:addDeck.openFailed", {
-                          source: pastedDraft.attribution!.sourceName,
-                        }),
-                      ),
-                    )
-                  }
-                >
-                  <Text
-                    text={attributionLabel(pastedDraft.attribution, " · ")}
-                    size="xs"
-                    tone="dim"
-                  />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          </View>
-          {error ? <AlertNote text={error} /> : null}
-          {!name.trim() ? <AlertNote text={translate("decks:addDeck.nameRequired")} /> : null}
-          {pastedProblems.length > 0 && !pastedDraft.omitted ? (
-            <View style={themed($stack)}>
-              <Text weight="bold" tx="decks:addDeck.fixLines" />
-              {pastedDraft.resolved.unresolved.map((line, index) => (
-                <Text
-                  key={`unmatched:${index}`}
-                  tx="decks:addDeck.unmatchedLine"
-                  txOptions={{ line }}
-                />
-              ))}
-              {pastedDraft.resolved.invalidLines.map((line, index) => (
-                <Text
-                  key={`invalid:${index}`}
-                  tx="decks:addDeck.invalidLine"
-                  txOptions={{ line }}
-                />
-              ))}
-              <Text tx="decks:addDeck.changeSource" />
-              <Button
-                testID="omit-import-problems"
-                tx="decks:addDeck.removeProblems"
-                disabled={!pastedDraftCurrent || resolvingPasted}
-                onPress={() =>
-                  setPastedDraft({
-                    ...pastedDraft,
-                    omitted: true,
-                    cards: pastedDraft.cards.filter(
-                      (card) =>
-                        !card.originalReference ||
-                        !pastedDraft.resolved.unresolved.includes(card.originalReference),
-                    ),
-                  })
-                }
-              />
-            </View>
-          ) : null}
-          {pastedDraft.omitted ? (
-            <AlertNote
-              text={translate("decks:addDeck.problemsRemoved", { count: pastedProblems.length })}
-            />
-          ) : null}
-          {sections.map((section) => (
-            <View key={section.id}>
-              <DeckCardSectionHeader
-                label={section.label}
-                quantity={section.entries.reduce((total, card) => total + card.quantity, 0)}
-                onChooseCommander={
-                  editingPasted && singleCommander && section.id === "commander"
-                    ? () => {
-                        setFocusedPreviewCard(undefined)
-                        setChoosingPastedCommander(true)
-                        setAddingPastedCard(true)
-                      }
-                    : undefined
-                }
-              />
-              {section.entries.map((card, index) => {
-                const details = previewDetailsByKey[cardDetailsKey(card, game)]
-                return (
-                  <DeckCardRow
-                    key={`${printingKey(card)}:${index}`}
-                    card={card}
-                    game={game}
-                    format={format}
-                    editing={editingPasted}
-                    testID={`import-card-${section.id}-${index}`}
-                    imageTestID={`import-card-thumbnail-${section.id}-${index}`}
-                    imageSource={
-                      card.smallImageUrl ??
-                      details?.smallImageUrl ??
-                      card.imageUrl ??
-                      details?.imageUrl
-                    }
-                    onFocus={(entry) => focusImportCard(entry, section.label)}
-                    onIncrement={addImportCard}
-                    onDecrement={removeImportCard}
-                  />
-                )
-              })}
-            </View>
-          ))}
-        </ScrollView>
-        <BottomActionBar>
-          {commanderWarnings.map((warning) => (
-            <Text key={warning} size="xs" text={warning} />
-          ))}
-          {saveDestination}
-          <View style={themed($configRow)}>
-            {editingPasted ? (
-              <Button
-                testID="import-add-cards"
-                tx="decks:deckView.addCards"
-                onPress={() => {
-                  setChoosingPastedCommander(false)
-                  setAddingPastedCard(true)
-                }}
-                style={$flex1}
-              />
-            ) : null}
-            <Button
-              testID="save-import-button"
-              tx={saveTx("decks:addDeck.saveOnDevice")}
-              preset="primary"
-              style={$flex1}
-              disabled={
-                saving ||
-                resolvingPasted ||
-                !pastedDraftCurrent ||
-                (!pastedDraft.omitted && pastedProblems.length > 0) ||
-                pastedCards.length === 0 ||
-                !name.trim()
-              }
-              onPress={importPasted}
-            />
-          </View>
-        </BottomActionBar>
-        {previewCardDialog}
-        {addingPastedCard ? (
-          <CardSearchScreen
-            game={game}
-            format={format}
-            commanderCards={pastedCards}
-            initialSection={choosingPastedCommander ? "commander" : undefined}
-            onAdd={addImportCard}
-            onRemove={removeImportCard}
-            onClose={() => {
-              Keyboard.dismiss()
-              setAddingPastedCard(false)
-            }}
+        <Text text={attributionLabel(attribution, " · ")} size="xs" tone="dim" />
+      </TouchableOpacity>
+    ) : selectedCatalogDeck ? (
+      <>
+        <Text size="xs" tone="dim" text={catalogDeckDetail(selectedCatalogDeck)} />
+        {selectedCatalogDeck.kind === "example" ? (
+          <Text size="xs" tone="dim" tx="decks:addDeck.datedExample" />
+        ) : null}
+        {selectedCatalogDeck.sourceUrl ? (
+          <TextAction
+            accessibilityRole="link"
+            tx="decks:addDeck.viewSource"
+            size="xs"
+            style={$importAttribution}
+            onPress={() =>
+              void Linking.openURL(selectedCatalogDeck.sourceUrl!).catch(() =>
+                setError(translate("decks:addDeck.openSourceFailed")),
+              )
+            }
           />
         ) : null}
-      </Screen>
-    )
-  }
-
-  if (selectedCatalogDeck) {
-    const entries = (catalogDetail?.entries ?? []).map((entry) => {
-      const details = previewDetailsByKey[catalogCardDetailKey(entry)]
-      return {
-        ...entry,
-        imageUrl: entry.imageUrl ?? details?.imageUrl,
-        smallImageUrl: entry.smallImageUrl ?? details?.smallImageUrl ?? details?.imageUrl,
-      }
-    })
-    const quantity = entries.reduce((total, entry) => total + entry.quantity, 0)
-    return (
-      <Screen
-        preset="fixed"
-        safeAreaEdges={["bottom"]}
-        contentContainerStyle={themed($previewScreen)}
-      >
-        <Header
-          titleTx="decks:addDeck.previewTitle"
-          leftTx="common:back"
-          onLeftPress={() => {
-            setSelectedCatalogDeck(undefined)
-            setFocusedPreviewCard(undefined)
-          }}
-        />
-        <ScrollView
-          testID="catalog-deck-preview"
-          contentContainerStyle={themed($previewContent)}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={themed($previewSummary)}>
-            <Text preset="subheading" text={selectedCatalogDeck.name} />
-            <Text
-              size="sm"
-              tone="dim"
-              text={`${DECK_GAME_LIST.find((candidate) => candidate.id === selectedCatalogDeck.game)?.shortLabel ?? selectedCatalogDeck.game} · ${deckFormatLabel(selectedCatalogDeck.game, selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game))}${entries.length ? ` · ${cardCountLabel(quantity)}` : ""}`}
-            />
-            <Text size="xs" tone="dim" text={catalogDeckDetail(selectedCatalogDeck)} />
-            {selectedCatalogDeck.kind === "example" ? (
-              <Text size="xs" tx="decks:addDeck.datedExample" />
-            ) : null}
-            {selectedCatalogDeck.sourceUrl ? (
-              <TextAction
-                accessibilityRole="link"
-                tx="decks:addDeck.viewSource"
-                onPress={() =>
-                  void Linking.openURL(selectedCatalogDeck.sourceUrl!).catch(() =>
-                    setError(translate("decks:addDeck.openSourceFailed")),
-                  )
-                }
-              />
-            ) : null}
-            <LoadingProgress
-              state={catalogDetail ? "complete" : "loading"}
-              accessibilityText={
-                catalogDetail
-                  ? translate("decks:addDeck.previewReady")
-                  : translate("decks:addDeck.loadingTopDeck")
-              }
-            />
-          </View>
-          {catalogPreviewSections(
-            entries,
-            localizedDeckSections(
-              selectedCatalogDeck.game,
-              selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
-            ),
-          ).map((section) => {
-            const sectionEntries = section.entries
-            return (
-              <View key={section.id}>
-                <View style={themed($previewSectionHeader)}>
-                  <Text weight="bold" text={section.label} />
-                  <Text
-                    size="xs"
-                    tone="dim"
-                    text={`${sectionEntries.reduce((total, entry) => total + entry.quantity, 0)}`}
-                  />
-                </View>
-                {sectionEntries.map((entry) => (
-                  <TouchableOpacity
-                    key={entry._id}
-                    accessibilityRole="button"
-                    accessibilityLabel={translate("decks:addDeck.previewCard", {
-                      card: entry.name,
-                    })}
-                    activeOpacity={0.75}
-                    style={themed($previewCardRow)}
-                    onPress={() => focusCatalogCard(entry, section.label)}
-                  >
-                    <View style={themed($previewThumbnailSlot)}>
-                      <CardImage
-                        game={selectedCatalogDeck.game}
-                        cardId={
-                          entry.scryfallId ??
-                          entry.cardId ??
-                          entry.printingId ??
-                          entry.providerCardId
-                        }
-                        source={entry.smallImageUrl ?? entry.imageUrl}
-                        accessibilityLabel={entry.name}
-                        compact
-                        testID={`catalog-card-thumbnail-${entry._id}`}
-                        style={themed($previewThumbnail)}
-                      />
-                    </View>
-                    <Text
-                      style={themed($previewCardName)}
-                      text={`${entry.quantity}× ${entry.name}`}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )
-          })}
-        </ScrollView>
-        <BottomActionBar>
-          {error ? <AlertNote text={error} /> : null}
-          {saveDestination}
-          <Button
-            testID="import-catalog-deck"
-            tx={saveTx("decks:addDeck.saveDeckOnDevice")}
-            preset="primary"
-            disabled={saving || !catalogDetail}
-            onPress={importTopDeck}
+        {importDraft ? null : (
+          <LoadingProgress
+            state="loading"
+            accessibilityText={translate("decks:addDeck.loadingTopDeck")}
           />
-        </BottomActionBar>
-        {previewCardDialog}
-      </Screen>
-    )
-  }
-
-  if (selectedPrecon) {
-    const previewFormat = format ? format : preconstructedFormat(selectedPrecon.type)
-    const cards = (resolvedPrecon?.cards ?? preconOutline?.cards ?? []).map((card) => {
-      const details = previewDetailsByKey[card.scryfallId ?? `mtg:${card.name}`]
-      return {
-        ...card,
-        imageUrl: card.imageUrl ?? details?.imageUrl,
-        smallImageUrl: card.smallImageUrl ?? details?.smallImageUrl ?? details?.imageUrl,
-      }
-    })
-    const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
-    const configuredSections = localizedDeckSections(game, previewFormat)
-    const sections = previewSections(cards, configuredSections)
-    const unresolved = resolvedPrecon?.unresolved.length ?? 0
-    const cannotImport = saving || previewLoading || !resolvedPrecon || unresolved > 0
-
+        )}
+      </>
+    ) : selectedPrecon ? (
+      <>
+        {preconDetail(selectedPrecon) ? (
+          <Text size="xs" tone="dim" text={preconDetail(selectedPrecon)} />
+        ) : null}
+        {["standard", "pioneer", "modern"].includes(draftFormat) ? (
+          <Text size="xs" tone="dim" tx="decks:addDeck.originalPrecon" />
+        ) : null}
+        {importDraft ? null : (
+          <LoadingProgress
+            testID="precon-loading-progress"
+            state={previewLoading ? "loading" : "unavailable"}
+            accessibilityText={
+              previewLoading
+                ? preconOutline
+                  ? translate("decks:addDeck.loadingImages")
+                  : translate("decks:addDeck.loadingOfficial")
+                : translate("decks:addDeck.previewUnavailable")
+            }
+          />
+        )}
+        {previewError ? (
+          <RetryableError
+            message={previewError}
+            retryAfterMs={previewRetryAfterMs}
+            onRetry={() => void previewPrecon(selectedPrecon, true)}
+            testID="retry-precon-preview"
+          />
+        ) : null}
+      </>
+    ) : null
     return (
       <Screen
+        key="import-build"
         preset="fixed"
         safeAreaEdges={["bottom"]}
-        contentContainerStyle={themed($previewScreen)}
+        contentContainerStyle={$importScreen}
       >
-        <Header
-          titleTx="decks:addDeck.previewTitle"
-          leftTx="common:back"
-          onLeftPress={closePreview}
-        />
-        <ScrollView
-          testID="precon-preview"
-          contentContainerStyle={themed($previewContent)}
-          showsVerticalScrollIndicator={false}
+        <ImportBuild
+          name={importName}
+          onNameChange={renameImport}
+          game={draftGame}
+          format={draftFormat}
+          onFormatChange={changeImportFormat}
+          cards={cards}
+          editable={Boolean(importDraft)}
+          details={details}
+          problems={importDraft?.problems ?? []}
+          onApplyGuess={applyGuess}
+          onRemoveProblem={removeProblem}
+          onReplaceProblem={replaceProblem}
+          onRemoveAllProblems={removeAllProblems}
+          error={error}
+          commanderWarnings={commanderWarnings}
+          undo={
+            importDraft?.undo
+              ? {
+                  name: importDraft.undo.name,
+                  restore: () => editor.edit({ type: "undo" }, importDraft),
+                }
+              : undefined
+          }
+          destination={destination}
+          saveTx={saveTx("decks:addDeck.saveDeckOnDevice")}
+          saving={saving}
+          saveDisabled={
+            saving ||
+            !importDraft ||
+            (buildingPasted && (resolvingPasted || !pastedDraftCurrent)) ||
+            importDraft.problems.length > 0 ||
+            importDraft.cards.length === 0 ||
+            !importName.trim()
+          }
+          onSave={saveImport}
+          onBack={leaveImport}
+          onFocus={focusImportCard}
+          onAdd={addImportCard}
+          onRemove={removeImportCard}
+          imageFor={(card) => {
+            const details = previewDetailsByKey[cardDetailsKey(card, draftGame)]
+            return (
+              card.smallImageUrl ?? details?.smallImageUrl ?? card.imageUrl ?? details?.imageUrl
+            )
+          }}
         >
-          <View style={themed($previewSummary)}>
-            <Text
-              preset="subheading"
-              text={resolvedPrecon?.name || preconOutline?.name || selectedPrecon.name}
-            />
-            <Text
-              size="sm"
-              tone="dim"
-              text={[
-                gameLabel,
-                deckFormatLabel(game, previewFormat),
-                cards.length ? cardCountLabel(totalQuantity(cards)) : undefined,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            />
-            {preconDetail(selectedPrecon) ? (
-              <Text size="xs" tone="dim" text={preconDetail(selectedPrecon)} />
-            ) : null}
-            {["standard", "pioneer", "modern"].includes(previewFormat) ? (
-              <Text size="xs" tx="decks:addDeck.originalPrecon" />
-            ) : null}
-            <LoadingProgress
-              testID="precon-loading-progress"
-              state={previewLoading ? "loading" : resolvedPrecon ? "complete" : "unavailable"}
-              accessibilityText={
-                previewLoading
-                  ? preconOutline
-                    ? translate("decks:addDeck.loadingImages")
-                    : translate("decks:addDeck.loadingOfficial")
-                  : resolvedPrecon
-                    ? translate("decks:addDeck.previewReady")
-                    : translate("decks:addDeck.previewUnavailable")
-              }
-            />
-          </View>
-
-          {previewError && selectedPrecon ? (
-            <RetryableError
-              message={previewError}
-              retryAfterMs={previewRetryAfterMs}
-              onRetry={() => void previewPrecon(selectedPrecon, true)}
-              testID="retry-precon-preview"
+          {focusedPreviewCard ? (
+            <CardFocusDialog
+              card={{
+                game: focusedPreviewCard.game ?? "mtg",
+                cardId: focusedPreviewCard.scryfallId ?? focusedPreviewCard.catalogCardId,
+                name: focusedPreviewCard.name,
+                imageUrl: focusedPreviewCard.imageUrl,
+                smallImageUrl: focusedPreviewCard.smallImageUrl,
+                quantity: focusedImportCard?.quantity ?? focusedPreviewCard.quantity,
+                boardLabel: focusedPreviewCard.boardLabel,
+              }}
+              details={previewDetailsByKey[focusedPreviewCard.detailKey]}
+              detailsError={previewDetailsError}
+              detailsRetryAfterMs={previewDetailsRetryAfterMs}
+              onRetryDetails={retryPreviewDetails}
+              onClose={() => setFocusedPreviewCard(undefined)}
+              {...(focusedImportCard
+                ? {
+                    onIncrement:
+                      focusedImportCard.quantity >= MAX_CARD_COPIES ||
+                      isCommanderPick({ game: draftGame, format: draftFormat }, focusedImportCard)
+                        ? undefined
+                        : () => addImportCard(focusedImportCard),
+                    onDecrement: () => removeImportCard(focusedImportCard),
+                  }
+                : {})}
             />
           ) : null}
-          {error ? <AlertNote text={error} /> : null}
-          {unresolved > 0 ? (
-            <AlertNote text={translate("decks:addDeck.unresolvedCards", { count: unresolved })} />
-          ) : null}
-
-          {cards.length === 0 && previewLoading ? (
-            <DeckListSkeleton sections={configuredSections} />
-          ) : (
-            sections.map((section) => (
-              <View key={section.id}>
-                <View style={themed($previewSectionHeader)}>
-                  <Text weight="bold" text={section.label} />
-                  <Text size="xs" tone="dim" text={`${section.quantity}`} />
-                </View>
-                {section.entries.map((card) => (
-                  <TouchableOpacity
-                    key={`${card.board}:${card.scryfallId ?? card.name}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={translate("decks:addDeck.previewCard", { card: card.name })}
-                    activeOpacity={0.75}
-                    style={themed($previewCardRow)}
-                    onPress={() => focusPreviewCard(card, section.label)}
-                  >
-                    <View style={themed($previewThumbnailSlot)}>
-                      <CardImage
-                        game="mtg"
-                        cardId={card.scryfallId}
-                        source={card.smallImageUrl ?? card.imageUrl}
-                        accessibilityLabel={card.name}
-                        compact
-                        style={themed($previewThumbnail)}
-                      />
-                    </View>
-                    <Text
-                      style={themed($previewCardName)}
-                      text={`${card.quantity}× ${card.name}`}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))
-          )}
-        </ScrollView>
-        <BottomActionBar>
-          {saveDestination}
-          <TouchableOpacity
-            testID="import-preview-button"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: cannotImport }}
-            style={[
-              themed($previewImportButton),
-              cannotImport && themed($previewImportButtonDisabled),
-            ]}
-            disabled={cannotImport}
-            onPress={() => void importPrecon()}
-          >
-            <Text
-              weight="bold"
-              style={themed($previewImportButtonText)}
-              tx={saveTx("decks:addDeck.saveDeckOnDevice")}
-            />
-          </TouchableOpacity>
-        </BottomActionBar>
-        {previewCardDialog}
+        </ImportBuild>
       </Screen>
     )
   }
@@ -1542,11 +1185,11 @@ export function AddDeckScreen({
                 key={deck.fileName}
                 testID={`precon-result-${deck.fileName}`}
                 accessibilityRole="button"
-                accessibilityLabel={translate("decks:addDeck.previewCard", { card: deck.name })}
+                accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
                 disabled={previewLoading}
-                onPress={() => previewPrecon(deck)}
+                onPress={() => openPrecon(deck)}
               >
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
@@ -1554,14 +1197,14 @@ export function AddDeckScreen({
                     <Text size="xs" tone="dim" text={preconDetail(deck)} />
                   ) : null}
                 </View>
-                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
+                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.open" />
               </TouchableOpacity>
             ))}
             {catalogDecks.map((deck) => (
               <TouchableOpacity
                 key={deck._id}
                 accessibilityRole="button"
-                accessibilityLabel={translate("decks:addDeck.previewCard", { card: deck.name })}
+                accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
                 onPress={() => setSelectedCatalogDeck(deck)}
@@ -1570,7 +1213,7 @@ export function AddDeckScreen({
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
                   <Text size="xs" tone="dim" text={catalogDeckDetail(deck)} />
                 </View>
-                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.preview" />
+                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.open" />
               </TouchableOpacity>
             ))}
             {catalogCursor ? (
@@ -1666,12 +1309,12 @@ export function AddDeckScreen({
             {pastedDraftCurrent ? (
               <Button
                 testID="return-import-review-button"
-                tx="decks:addDeck.returnToReview"
+                tx="decks:addDeck.returnToDeck"
                 disabled={resolvingPasted}
                 onPress={() => {
                   if (resolvingPasted) return
                   Keyboard.dismiss()
-                  setReviewingPasted(true)
+                  setBuildingPasted(true)
                 }}
               />
             ) : null}
@@ -1682,11 +1325,9 @@ export function AddDeckScreen({
                   ? translate("decks:addDeck.loadingDeck")
                   : pastedDraftCurrent
                     ? translate("decks:addDeck.reloadSource")
-                    : pastedDraft
-                      ? translate("decks:detail.reviewChanges")
-                      : importKind === "link" && linkSource
-                        ? translate("decks:addDeck.reviewSourceDeck", { source: linkSource.name })
-                        : translate("decks:addDeck.reviewList")
+                    : importKind === "link" && linkSource
+                      ? translate("decks:addDeck.importSourceDeck", { source: linkSource.name })
+                      : translate("decks:addDeck.importList")
               }
               preset="primary"
               disabled={resolvingPasted || !importSource.trim()}
@@ -1706,7 +1347,7 @@ export function AddDeckScreen({
               onChangeText={setName}
             />
             {noteField}
-            {saveDestination}
+            <SaveDestination destination={destination} />
             <Button
               tx="decks:addDeck.createDeck"
               preset="primary"
@@ -1722,12 +1363,12 @@ export function AddDeckScreen({
   )
 }
 
-const $importFields: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,
 })
 const $flex1 = { flex: 1 } as const
+const $importScreen: ViewStyle = { flex: 1, width: "100%" }
 const $configRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xs,
@@ -1746,57 +1387,6 @@ const $resultRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $previewScreen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $previewContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: "100%",
-  maxWidth: 720,
-  alignSelf: "center",
-  paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.lg,
-})
-const $previewSummary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xxxs,
-  paddingTop: spacing.sm,
-  paddingBottom: spacing.xs,
-})
-const $previewSectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingTop: spacing.md,
-  paddingBottom: spacing.xxs,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $previewCardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 68,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $previewThumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
-  width: 36,
-  height: 50,
-  borderRadius: radius.xxs,
-  overflow: "hidden",
-  backgroundColor: colors.separator,
-})
-const $previewThumbnail: ThemedStyle<ImageStyle> = () => ({ width: 36, height: 50 })
-const $previewCardName: ThemedStyle<TextStyle> = () => ({ flex: 1 })
-const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
-  minHeight: 56,
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: radius.xxs,
-  backgroundColor: colors.tint,
-})
-const $previewImportButtonDisabled: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
-const $previewImportButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: accessibleForeground(colors.tint),
-})
-
 const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   gap: spacing.md,
@@ -1811,16 +1401,9 @@ const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderBottomColor: "transparent",
 })
 const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.text })
-
-const $importSummaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  alignItems: "center",
-  justifyContent: "space-between",
-  columnGap: spacing.sm,
-})
 const $importAttribution: ViewStyle = {
   minHeight: 44,
   maxWidth: "100%",
   justifyContent: "center",
+  alignSelf: "flex-start",
 }
