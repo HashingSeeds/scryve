@@ -12,6 +12,7 @@ export interface CardDetailStore {
   getString(key: string): string | undefined
   set(key: string, value: string): void
   delete(key: string): void
+  addOnValueChangedListener?(listener: (key: string) => void): unknown
 }
 
 const DETAILS_KEY = "scryve.cards.details.v1"
@@ -22,36 +23,60 @@ function isDetails(value: unknown): value is FocusedCardDetails {
   return Object.values(value).every((field) => field === undefined || typeof field === "string")
 }
 
-export function loadCardDetails(
-  store: CardDetailStore = storage,
-): Record<string, FocusedCardDetails> {
+const sessionDetails = new WeakMap<CardDetailStore, Map<string, FocusedCardDetails>>()
+const watchedStores = new WeakSet<CardDetailStore>()
+let writingOwnBlob = false
+
+function detailsFor(store: CardDetailStore): Map<string, FocusedCardDetails> {
+  const existing = sessionDetails.get(store)
+  if (existing) return existing
+  if (!watchedStores.has(store)) {
+    watchedStores.add(store)
+    store.addOnValueChangedListener?.((key) => {
+      if (key === DETAILS_KEY && !writingOwnBlob) sessionDetails.delete(store)
+    })
+  }
   let parsed: unknown = null
   try {
     parsed = JSON.parse(store.getString(DETAILS_KEY) ?? "null")
-  } catch {
-    return {}
-  }
-  if (typeof parsed !== "object" || parsed === null) return {}
-  return Object.fromEntries(
-    Object.entries(parsed).filter((entry): entry is [string, FocusedCardDetails] =>
-      isDetails(entry[1]),
-    ),
-  )
+  } catch {}
+  const entries =
+    typeof parsed === "object" && parsed !== null
+      ? Object.entries(parsed).filter((entry): entry is [string, FocusedCardDetails] =>
+          isDetails(entry[1]),
+        )
+      : []
+  const details = new Map(entries)
+  sessionDetails.set(store, details)
+  return details
+}
+
+export function loadCardDetails(
+  store: CardDetailStore = storage,
+): Record<string, FocusedCardDetails> {
+  return Object.fromEntries(detailsFor(store))
 }
 
 export function saveCardDetails(
   entries: Record<string, FocusedCardDetails>,
   store: CardDetailStore = storage,
 ): void {
-  const merged = { ...loadCardDetails(store), ...entries }
-  const keys = Object.keys(merged)
-  for (const key of keys.slice(0, Math.max(0, keys.length - MAX_DETAILS_ENTRIES))) {
-    delete merged[key]
+  const details = detailsFor(store)
+  for (const [key, value] of Object.entries(entries)) {
+    details.delete(key)
+    details.set(key, value)
   }
+  for (const key of details.keys()) {
+    if (details.size <= MAX_DETAILS_ENTRIES) break
+    details.delete(key)
+  }
+  writingOwnBlob = true
   try {
-    store.set(DETAILS_KEY, JSON.stringify(merged))
+    store.set(DETAILS_KEY, JSON.stringify(Object.fromEntries(details)))
   } catch (error) {
     console.error("[card-details-cache] failed to persist", error)
+  } finally {
+    writingOwnBlob = false
   }
 }
 
@@ -59,10 +84,11 @@ export function readCardDetail(
   key: string,
   store: CardDetailStore = storage,
 ): FocusedCardDetails | undefined {
-  return loadCardDetails(store)[key]
+  return detailsFor(store).get(key)
 }
 
 export function clearCardDetails(store: CardDetailStore = storage): void {
+  sessionDetails.delete(store)
   try {
     store.delete(DETAILS_KEY)
   } catch (error) {
