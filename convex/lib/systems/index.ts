@@ -1,6 +1,7 @@
 import {
   SYSTEM_IDS,
   SYSTEMS,
+  type Capability,
   type CounterDefinition,
   type DeckSection,
   type FormatDefinition,
@@ -18,6 +19,9 @@ export function isSystemId(value: unknown): value is SystemId {
 export function systemDefinition(system: unknown): SystemDefinition | undefined {
   return isSystemId(system) ? SYSTEMS[system] : undefined
 }
+
+export const isReleased = (...states: readonly Pick<Capability, "technical" | "release">[]) =>
+  states.every(({ technical, release }) => technical === "available" && release === "enabled")
 
 export function tracksResults(system: unknown): boolean {
   return systemDefinition(system)?.resultTracking ?? true

@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values"
 
 import {
+  isReleased,
   isSystemId,
   SYSTEMS,
   type CapabilityKey,
@@ -71,10 +72,5 @@ export async function capabilityReleased(
 ) {
   const integrationState = await capabilityState(ctx, game, "integration")
   const state = await capabilityState(ctx, game, capability)
-  return (
-    integrationState.technical === "available" &&
-    integrationState.release === "enabled" &&
-    state.technical === "available" &&
-    state.release === "enabled"
-  )
+  return isReleased(integrationState, state)
 }

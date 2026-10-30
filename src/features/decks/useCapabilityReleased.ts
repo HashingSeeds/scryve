@@ -4,17 +4,14 @@ import { useConvexOnline } from "@/features/connected/useConvexOnline"
 
 import { api } from "../../../convex/_generated/api"
 import {
+  isReleased,
   systemDefinition,
   type CapabilityKey,
   type IntegrationDefinition,
 } from "../../../convex/lib/systems"
 
-type Capabilities = IntegrationDefinition["capabilities"]
-
-const released = (capabilities: Capabilities, key: CapabilityKey) =>
-  [capabilities.integration, capabilities[key]].every(
-    ({ technical, release }) => technical === "available" && release === "enabled",
-  )
+const released = (capabilities: IntegrationDefinition["capabilities"], key: CapabilityKey) =>
+  isReleased(capabilities.integration, capabilities[key])
 
 export function useCapabilityReleased(key: CapabilityKey) {
   const manifest = useQuery(api.integrationManifest.list)
