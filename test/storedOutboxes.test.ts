@@ -13,6 +13,7 @@ import { MemoryStorage } from "./support/memoryStorage"
 
 jest.mock("@/utils/telemetry", () => ({ emitTelemetry: jest.fn() }))
 
+// why: main's own writers produced these at 2a5c6572 (decks, games) and b0757e9f (matches), copied byte for byte; a hand edit would hide a key or record change.
 const STORED_BY_V0_2_1: Record<string, string> = {
   "count.connected.failed.index.v1.6:user-1.11:game-public": '["operation-failed-000001"]',
   "count.connected.failed.record.v1.6:user-1.11:game-public.operation-failed-000001":

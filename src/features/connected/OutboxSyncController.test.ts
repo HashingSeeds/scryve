@@ -767,6 +767,73 @@ describe("outbox sync controller", () => {
     ).toEqual([blocked.event.operationId])
   })
 
+  describe("a game paused at failure capacity", () => {
+    async function blockedGame() {
+      let accepting = false
+      const sent: string[] = []
+      const { clock, controller } = harness({
+        repository: new ConnectedGameRepository(new MemoryStorage(), "user-1", {
+          maxFailedRecords: 2,
+          maxFailedBytes: 10_000,
+        }),
+        send: async ({ event }) => {
+          sent.push(event.operationId)
+          if (!accepting) throw new Error("Game is not active")
+          return { operationId: event.operationId }
+        },
+      })
+      controller.onRemoteProjection(projection(0, 20))
+      controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+      for (const delta of [1, -1, 1, -1] as const) {
+        clock.time += 1
+        controller.changeLife("player-1", delta)
+      }
+      const [, , blocked] = controller.getSnapshot().pending
+      controller.setEnvironment(ONLINE)
+      await settle()
+      expect(controller.getSnapshot()).toMatchObject({
+        pending: [{ event: { operationId: blocked.event.operationId } }, {}],
+        failed: [{}, {}],
+        changeError: expect.stringMatching(/need review/i),
+      })
+      accepting = true
+      return { blocked: blocked.event.operationId, controller, sent }
+    }
+
+    it.each([
+      [
+        "a projection that confirms the blocked change",
+        (controller: OutboxSyncController, blocked: string) =>
+          controller.onRemoteProjection({ ...projection(1, 21), recentOperationIds: [blocked] }),
+      ],
+      [
+        "a projection without it",
+        (controller: OutboxSyncController) => controller.onRemoteProjection(projection(1, 20)),
+      ],
+      ["a new tap", (controller: OutboxSyncController) => controller.changeLife("player-2", 1)],
+      [
+        "a tap folded into the last queued change",
+        (controller: OutboxSyncController) => controller.changeLife("player-1", -1),
+      ],
+      [
+        "a reconnect",
+        (controller: OutboxSyncController) => {
+          controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+          controller.setEnvironment(ONLINE)
+        },
+      ],
+    ])("sends the rest after %s", async (_trigger, trigger) => {
+      const { blocked, controller, sent } = await blockedGame()
+
+      trigger(controller, blocked)
+      await settle()
+
+      expect(controller.getSnapshot()).toMatchObject({ pending: [], failed: [{}, {}] })
+      expect(controller.getSnapshot().changeError).toBeUndefined()
+      expect(sent.filter((operationId) => operationId === blocked).length).toBeLessThanOrEqual(2)
+    })
+  })
+
   it("reruns a drain after authentication refresh invalidates the active drain", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")

@@ -221,7 +221,9 @@ export class OutboxSyncController {
       this.timingLive = false
     }
     this.publish()
-    if (changed && this.canSync()) void this.outbox.drain()
+    if (!changed || !this.canSync()) return
+    this.outbox.resume()
+    void this.outbox.drain()
   }
 
   onRemoteProjection(remote: unknown, status?: ConnectedOperationStatus): void {
@@ -268,6 +270,7 @@ export class OutboxSyncController {
       emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: pending.length })
     }
     this.outbox.acknowledge(incoming.recentOperationIds)
+    this.outbox.resume()
     this.publish()
     this.resolveProjectionWaiter()
   }

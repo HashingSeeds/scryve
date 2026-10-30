@@ -48,6 +48,7 @@ export interface Outbox<Pending, Failed> {
   ): Pending | null
   acknowledge(operationIds: Iterable<string>): void
   dismiss(operationId: string): void
+  resume(): void
   clear(): void
   start(): () => void
   drain(): Promise<void>
@@ -99,6 +100,12 @@ export function createOutbox<
       drainRequested = false
       if (!draining) void drain()
     })
+  }
+
+  // why: a change to the queue may let the write that hit the failure cap through, so it lifts the pause.
+  const queueChanged = (next: Partial<OutboxState<Pending, Failed>>) => {
+    update({ ...next, capacityBlocked: false })
+    requestDrain()
   }
 
   async function drain(): Promise<void> {
@@ -188,14 +195,13 @@ export function createOutbox<
     enqueue: (action) => {
       const result = store.enqueue(action, current().pending)
       if (!result.accepted) return false
-      update({ pending: result.pending })
-      requestDrain()
+      queueChanged({ pending: result.pending })
       return true
     },
     rewriteUnattempted: (operationId, rewrite) => {
       const rewritten = store.rewriteUnattempted(operationId, rewrite)
       if (rewritten)
-        update({
+        queueChanged({
           pending: store.order(
             current().pending.map((queued) => (idOf(queued) === operationId ? rewritten : queued)),
           ),
@@ -210,15 +216,16 @@ export function createOutbox<
       const remaining = pending.filter((action) => !settled.has(idOf(action)))
       if (remaining.length === pending.length) return
       for (const action of pending) if (settled.has(idOf(action))) store.acknowledge(idOf(action))
-      update({ pending: remaining })
+      queueChanged({ pending: remaining })
     },
     dismiss: (operationId) => {
       store.dismissFailed(operationId)
-      update({
+      queueChanged({
         failures: current().failures.filter((failure) => idOf(failure.action) !== operationId),
-        capacityBlocked: false,
       })
-      requestDrain()
+    },
+    resume: () => {
+      if (current().capacityBlocked) queueChanged({})
     },
     clear: () => {
       store.clear()
