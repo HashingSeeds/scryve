@@ -708,6 +708,12 @@ export const importGuest = mutation({
       const sameDeck =
         compared.length === sent.length &&
         live.name === args.name.trim() &&
+        (versions?.every(
+          (version, index) =>
+            compared[index].name === version.name.trim() &&
+            (compared[index].note ?? "") === (version.note ?? "").trim(),
+        ) ??
+          true) &&
         (
           await Promise.all(
             compared.map(
@@ -726,13 +732,13 @@ export const importGuest = mutation({
       }
     }
     await deckForKey(ctx, user._id, existing ? existing.deckKey : (args.deckKey ?? args.localId))
-    const capacity = await deckCapacity(ctx, user)
-    if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
     if (versions) {
       const versionLimit = await deckVersionCapacity(ctx, user, versions.length)
       if (versions.length > versionLimit.limit)
         return { status: "version_limit" as const, capacity: versionLimit }
     }
+    const capacity = await deckCapacity(ctx, user)
+    if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
     const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
     await requireReleasedCapability(ctx, game, "deckImport")
     assertDeckSize(args.cards, game)

@@ -213,6 +213,35 @@ describe("importGuest with versions", () => {
         guest([{ name: "Tuned", cards: shock }], { ...otherDevice, localUpdatedAt: 5 }),
       ),
     ).resolves.toMatchObject({ status: "already_imported", localUpdatedAt: null })
+    await expect(
+      actor.mutation(
+        api.decks.importGuest,
+        guest(
+          [
+            { name: "Current", cards: bolt },
+            { name: "Tuned", note: "Renamed on this device", cards: shock },
+          ],
+          { ...otherDevice, localUpdatedAt: 5 },
+        ),
+      ),
+    ).resolves.toMatchObject({ status: "already_imported", localUpdatedAt: null })
+  })
+
+  it("reports the version limit before the deck limit", async () => {
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "owner")
+    for (const name of ["One", "Two"])
+      await actor.mutation(api.decks.create, { name, format: "modern" })
+    await expect(
+      actor.mutation(
+        api.decks.importGuest,
+        guest([
+          { name: "One", cards: bolt },
+          { name: "Two", cards: shock },
+          { name: "Three", cards: burn },
+        ]),
+      ),
+    ).resolves.toMatchObject({ status: "version_limit" })
   })
 })
 
