@@ -179,6 +179,50 @@ describe("LifeCard", () => {
     expect(view.getByText("−")).toBeTruthy()
   })
 
+  it("starts a new player in the seat clean: no life flash, sheet, or editor from the last game", () => {
+    const seat = (playerId: string, life: number, counters: Record<string, number>) => (
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerId={playerId}
+          playerName="Ada"
+          seatNumber={1}
+          life={life}
+          color="#41476E"
+          seatTable={{
+            rules: playTableRules("mtg", "commander"),
+            counters,
+            held: [],
+            editable: true,
+            adjustCounter: jest.fn(),
+            takeDesignation: jest.fn(),
+            releaseDesignation: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(seat("game-1-seat-1", 40, { poison: 2 }))
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 200 } },
+    })
+    view.rerender(seat("game-1-seat-1", 12, { poison: 2 }))
+    expect(view.getByText("-28")).toBeTruthy()
+    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    expect(view.getByTestId("counter-sheet-seat-1")).toBeTruthy()
+
+    view.rerender(seat("game-2-seat-1", 40, {}))
+
+    expect(view.queryByText("+28")).toBeNull()
+    expect(view.queryByText("-28")).toBeNull()
+    expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
+    expect(view.queryByTestId("counter-chip-1-poison")).toBeNull()
+    expect(view.getByText("+")).toBeTruthy()
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+    view.rerender(seat("game-3-seat-1", 40, {}))
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
+  })
+
   it.each([false, true])(
     "preserves seat colors and theme rounding in local commander modes, compact=%s",
     (compact) => {

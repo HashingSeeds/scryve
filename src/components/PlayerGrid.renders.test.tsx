@@ -64,4 +64,22 @@ describe("PlayerGrid renders", () => {
 
     expect(Object.fromEntries(mockRenders)).toEqual({ 2: 1 })
   })
+
+  it("keeps every seat's card mounted through a rematch's new player ids", () => {
+    const grid = (current: typeof players) => (
+      <ThemeProvider>
+        <PlayerGrid players={current} onChange={jest.fn()} />
+      </ThemeProvider>
+    )
+    const view = render(grid(players))
+    const before = players.map(({ seat }) => view.getByTestId(`life-card-seat-${seat + 1}`))
+
+    view.rerender(
+      grid(players.map((player) => ({ ...player, id: asPlayerId(`rematch-${player.seat}`) }))),
+    )
+
+    players.forEach(({ seat }) =>
+      expect(view.getByTestId(`life-card-seat-${seat + 1}`)).toBe(before[seat]),
+    )
+  })
 })

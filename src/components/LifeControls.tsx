@@ -102,14 +102,15 @@ export interface RecentDelta {
 
 const NO_RECENT_DELTA: RecentDelta = { get: () => 0, subscribe: () => () => {} }
 
-export function useRecentDelta(life: number): RecentDelta {
+export function useRecentDelta(life: number, playerId?: string): RecentDelta {
   const [store] = useState(createRecentDeltaStore)
-  const previousLife = useRef(life)
+  const previous = useRef({ life, playerId })
   useLayoutEffect(() => {
-    const difference = life - previousLife.current
-    previousLife.current = life
-    if (difference !== 0) store.add(difference)
-  }, [life, store])
+    const before = previous.current
+    previous.current = { life, playerId }
+    if (before.playerId !== playerId) store.clear()
+    else if (life !== before.life) store.add(life - before.life)
+  }, [life, playerId, store])
   useEffect(() => store.stop, [store])
   return store
 }
@@ -132,6 +133,10 @@ function createRecentDeltaStore() {
       publish(delta + difference)
       clearTimeout(timer)
       timer = setTimeout(() => publish(0), RECENT_DELTA_VISIBLE_MS)
+    },
+    clear: () => {
+      clearTimeout(timer)
+      if (delta !== 0) publish(0)
     },
     stop: () => clearTimeout(timer),
   }
