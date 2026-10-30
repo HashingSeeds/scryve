@@ -14,13 +14,12 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSequence,
   withTiming,
 } from "react-native-reanimated"
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import type { LifeDelta, PlayerId } from "@/features/game/types"
+import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,14 +32,12 @@ import { BoardPressable } from "./BoardPressable"
 import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
-  BADGE,
-  COMPACT_BADGE,
   CommanderDamageCardControls,
-  RAM_MS,
-  CommanderChipsHome,
+  shadowReached,
+  SWAP_MS,
   CommanderTakeoverBackdrop,
   deepShade,
-  type CommanderChipsHomeFrom,
+  SHADOW_INK,
   PulseRing,
   TAKEOVER_LAYERS,
   useCommanderTakeover,
@@ -50,11 +47,20 @@ import {
 } from "./CommanderDamageCardControls"
 import {
   commanderTakeover,
+  lifeInk,
+  OUT_CAUSE_GAP,
+  OUT_LABEL,
+  outInk,
+  STRUCK_LIFE,
   type CommanderFacing,
   type CommanderReach,
-  type CommanderTakeover,
 } from "./commanderDamageLayout"
-import { CommanderStrip, commanderDamageDealers, commanderStripMovesInward } from "./CommanderStrip"
+import {
+  CommanderStrip,
+  commanderDamageDealers,
+  commanderStripCorner,
+  commanderStripMovesInward,
+} from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
@@ -93,8 +99,8 @@ import { Text } from "./Text"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const COMMANDER_OVERVIEW_MS = 220
-// why: matches the commander controls' entrance, so the life total and its − and + cross-fade with them.
-const LIFE_FADE_MS = 160
+// why: matches the attacker's power boxes swapping in, so the life total and its − and + cross-fade with them.
+const LIFE_FADE_MS = SWAP_MS
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -114,7 +120,6 @@ export type LifeCardCommanderDamage = Omit<
   takeBack?: number
   onHit?: () => void
   onUndo?: () => void
-  onAdjust?: (step: number, index: number) => void
   acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
   pendingClaims?: readonly CommanderClaim[]
@@ -359,26 +364,50 @@ export const LifeCard = memo(function LifeCard({
 
   const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
   const armedCommanderId = commanderDamage?.armedPlayerId
-  const defending =
+  const attacked =
     !!commanderDamage && !!armedCommanderId && armedCommanderId !== commanderDamage.ownerPlayerId
+  // why: a seat already out when an attack starts sits it out, untouchable and unshaded. One knocked out during the attack stays a target until it ends, so the lethal hit can still be undone.
+  const [outWhenArmed, setOutWhenArmed] = useState(() => (out ? armedCommanderId : undefined))
+  const [armedSeen, setArmedSeen] = useState(armedCommanderId)
+  if (armedSeen !== armedCommanderId) {
+    setArmedSeen(armedCommanderId)
+    setOutWhenArmed(out ? armedCommanderId : undefined)
+  }
+  const sittingOut = attacked && outWhenArmed === armedCommanderId
+  const defending = attacked && !sittingOut
   const armedCommanders = commanderDamage?.commanders ?? [
     { power: 1, total: (armedCommanderId && commanderDamage?.incoming[armedCommanderId]) || 0 },
   ]
+  const causeFontSize = out && out.cause !== "life" ? fontSizeFor(String(out.amount).length) : 0
+  const causeGlyphSize = Math.round(causeFontSize * 0.5)
+  const causeGlyphShown =
+    out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
+  // why: the disc rings whatever the readout shows, so an out seat's stacked readout gets a disc of its own size.
+  const readoutInk = !out
+    ? lifeInk(resolvedLifeFontSize, shownDigits)
+    : out.cause === "life"
+      ? outInk({
+          fontSize: resolvedLifeFontSize,
+          digits: shownDigits,
+          below: { ...OUT_LABEL, chars: translate("board:lifeCard.outLabel").length },
+        })
+      : outInk({
+          fontSize: causeFontSize,
+          digits: String(out.amount).length,
+          lead: causeGlyphShown ? causeGlyphSize + OUT_CAUSE_GAP : 0,
+          below: { ...STRUCK_LIFE, chars: shownDigits },
+        })
   const takeover =
     defending && cardSize.width > 0
       ? commanderTakeover({
           card: cardSize,
           rotation: contentRotation,
-          lifeFontSize: resolvedLifeFontSize,
-          lifeDigits: shownDigits,
-          badgeSize: compact ? COMPACT_BADGE : BADGE,
-          badgeCount: armedCommanders.length,
+          lifeFontSize: out && out.cause !== "life" ? causeFontSize : resolvedLifeFontSize,
+          ink: readoutInk,
           reach: commanderDamage?.reach,
         })
       : undefined
   const floodedBy = useCommanderTakeover(takeover, commanderDamage?.attacker?.color)
-  const [away, setAway] = useState<CommanderChipsHomeFrom | null>(null)
-  const endAway = useCallback(() => setAway(null), [])
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -392,7 +421,7 @@ export const LifeCard = memo(function LifeCard({
           onToggle: commanderDamage.onToggleCommander ?? (() => {}),
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
-      : commanderDamage && armedCommanderId
+      : commanderDamage && defending
         ? {
             kind: "target",
             attackerName:
@@ -401,61 +430,39 @@ export const LifeCard = memo(function LifeCard({
             commanders: armedCommanders,
             lethal: commanderDamage.lethal,
             facing: commanderDamage.facing ?? {},
+            stripCorner: commanderStripCorner(contentRotation, contentInsets),
             takeover,
-            arriving: !!away,
+            wave: floodedBy.wave,
             acted: !!commanderDamage.acted,
             dealt: commanderDamage.dealt ?? 0,
             takeBack: commanderDamage.takeBack ?? 0,
             onHit: commanderDamage.onHit ?? (() => {}),
             onUndo: commanderDamage.onUndo ?? (() => {}),
-            onAdjust: commanderDamage.onAdjust ?? (() => {}),
           }
         : undefined
-  const [stripPips, setStripPips] = useState<ReadonlyMap<PlayerId, LayoutRectangle>>(
-    () => new Map(),
-  )
-  const homeFrom = useRef<CommanderChipsHomeFrom | null>(null)
-  const [home, setHome] = useState<CommanderChipsHomeFrom | null>(null)
-  const endHome = useCallback(() => setHome(null), [])
-  const [flewOutFor, setFlewOutFor] = useState<PlayerId | null>(null)
   const attackerSide = commanderCardMode?.kind === "source"
   // why: a defender's own controls stay until the attacker's flood has covered them.
   const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
-  const defenderChips = (
-    shown: CommanderTakeover,
-    attackerId: PlayerId,
-  ): CommanderChipsHomeFrom => ({
-    attackerId,
-    color: commanderDamage?.attacker?.color ?? foreground,
-    rotation: contentRotation,
-    chips: shown.cardBadges.map((offset, index) => ({
-      x: cardSize.width / 2 + offset.x,
-      y: cardSize.height / 2 + offset.y,
-      size: shown.badges[index].size,
-      total: armedCommanders[index]?.total ?? 0,
-    })),
+  const shownFlood = floodedBy.takeover?.flood
+  // why: a connected game holds hits until the attacker sends them, so the lit total reads the attack's own running totals, the stronger partner's, to move with each tap.
+  const stripIncoming =
+    defending && armedCommanderId && commanderDamage
+      ? {
+          ...commanderDamage.incoming,
+          [armedCommanderId]: Math.max(...armedCommanders.map(({ total }) => total)),
+        }
+      : undefined
+  // why: a readout too big for its disc shrinks into it as the shadow's edge passes the disc, and grows back as it drains.
+  const readoutFit = floodedBy.takeover?.fit ?? 1
+  const fitFlood = readoutFit < 1 ? shownFlood : undefined
+  const fitWave = floodedBy.wave
+  const readoutFitStyle = useAnimatedStyle(() => {
+    if (readoutFit >= 1) return { transform: [{ scale: 1 }] }
+    const reached = fitFlood
+      ? shadowReached(fitFlood, fitWave.value, fitFlood.discGap)
+      : fitWave.value
+    return { transform: [{ scale: 1 + (readoutFit - 1) * reached }] }
   })
-  // why: a defender's chips fly out of the strip as an attack starts. The chips it shows when the attack ends are handed to a layer that flies them home, since the attack's own controls unmount with it.
-  const targeted = commanderCardMode?.kind === "target"
-  if (targeted && takeover && armedCommanderId && flewOutFor !== armedCommanderId) {
-    setFlewOutFor(armedCommanderId)
-    setAway(defenderChips(takeover, armedCommanderId))
-  }
-  if (!defending && flewOutFor) {
-    setFlewOutFor(null)
-    setAway(null)
-  }
-  useEffect(() => {
-    if (targeted && takeover && armedCommanderId && commanderCovers)
-      homeFrom.current = defenderChips(takeover, armedCommanderId)
-  })
-  useEffect(() => {
-    if (defending || !homeFrom.current) return
-    setHome(homeFrom.current)
-    homeFrom.current = null
-  }, [defending])
-  const chipSpot = (attackerId: PlayerId) =>
-    (commanderDamage?.incoming[attackerId] ?? 0) > 0 ? stripPips.get(attackerId) : undefined
   const lifeMuted = attackerSide
   const lifeFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
@@ -466,22 +473,18 @@ export const LifeCard = memo(function LifeCard({
       ? commanderCardMode.commanders.reduce((sum, { total }) => sum + total, 0)
       : undefined
   const knockFacing = commanderCardMode?.kind === "target" ? commanderCardMode.facing : undefined
-  const rammed = !!takeover
   const lastDefenderTotal = useRef(defenderTotal)
   useEffect(() => {
     const previous = lastDefenderTotal.current
     lastDefenderTotal.current = defenderTotal
     if (defenderTotal === undefined || previous === undefined || defenderTotal <= previous) return
     if (reducedMotion !== false) return
-    knock.value = withDelay(
-      rammed ? RAM_MS : 0,
-      withSequence(
-        withTiming(1, { duration: 95 }),
-        withTiming(-0.25, { duration: 130 }),
-        withTiming(0, { duration: 155 }),
-      ),
+    knock.value = withSequence(
+      withTiming(1, { duration: 95 }),
+      withTiming(-0.25, { duration: 130 }),
+      withTiming(0, { duration: 155 }),
     )
-  }, [defenderTotal, knock, rammed, reducedMotion])
+  }, [defenderTotal, knock, reducedMotion])
   const facingX = knockFacing?.x === "left" ? 1 : knockFacing?.x === "right" ? -1 : 0
   const facingY = knockFacing?.y === "top" ? 1 : knockFacing?.y === "bottom" ? -1 : 0
   const knockDirection = takeover?.knock ?? {
@@ -495,21 +498,28 @@ export const LifeCard = memo(function LifeCard({
     ],
   }))
   const lifeControlsShown =
-    !commanderCovers && !overviewShown && !tableSheetOpen && !diceCovers && ownership !== "unowned"
+    !commanderCovers &&
+    !sittingOut &&
+    !overviewShown &&
+    !tableSheetOpen &&
+    !diceCovers &&
+    ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
+  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
   const commanderStripShown =
     commanderSeat &&
-    !commanderCovers &&
+    (!commanderCovers || defending) &&
     !tableSheetOpen &&
     !diceCovers &&
-    commanderDamageDealers(
-      commanderDamage.players ?? [],
-      commanderDamage.ownerPlayerId,
-      commanderDamage.incoming,
-    ).length > 0
+    (defending ||
+      commanderDamageDealers(
+        commanderDamage.players ?? [],
+        commanderDamage.ownerPlayerId,
+        commanderDamage.incoming,
+      ).length > 0)
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   const identityCorner = seatIdentityPlacement({
@@ -549,8 +559,6 @@ export const LifeCard = memo(function LifeCard({
   }, [frozen])
 
   const outLabel = out && translate("board:lifeCard.out", { reason: out.reason })
-  const causeFontSize = out && out.cause !== "life" ? fontSizeFor(String(out.amount).length) : 0
-  const causeGlyphSize = Math.round(causeFontSize * 0.5)
   const lifeFontStyle: TextStyle = {
     fontSize: resolvedLifeFontSize,
     lineHeight: getLifeLineHeight(resolvedLifeFontSize),
@@ -624,12 +632,6 @@ export const LifeCard = memo(function LifeCard({
           defenderColor={color}
         />
       ) : null}
-      {home ? (
-        <CommanderChipsHome from={home} target={chipSpot(home.attackerId)} onDone={endHome} />
-      ) : null}
-      {away ? (
-        <CommanderChipsHome from={away} target={chipSpot(away.attackerId)} away onDone={endAway} />
-      ) : null}
       <Animated.View
         pointerEvents={
           commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
@@ -641,6 +643,7 @@ export const LifeCard = memo(function LifeCard({
         style={[
           themed($content),
           lifeFadeStyle,
+          readoutFitStyle,
           overviewShown && $overviewReadout,
           floodedBy.takeover && $aboveFlood,
         ]}
@@ -868,26 +871,26 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage && !commanderCovers && !tableSheetOpen && !diceCovers ? (
+      {commanderDamage && (!commanderCovers || defending) && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
           ownerPlayerId={commanderDamage.ownerPlayerId}
           players={commanderDamage.players ?? []}
           seats={commanderDamage.seats}
-          incoming={commanderDamage.incoming}
+          incoming={stripIncoming ?? commanderDamage.incoming}
           lethal={commanderDamage.lethal}
-          foreground={foreground}
+          foreground={defending ? SHADOW_INK : foreground}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
           open={overviewShown}
-          inspectDisabled={inspectDisabled}
+          attackerId={defending ? armedCommanderId : undefined}
+          inspectDisabled={inspectDisabled || sittingOut}
           closeIconStyle={overviewCloseStyle}
           onToggle={commanderDamage.inspection.onToggle}
           onBoundsChange={setStripBounds}
-          onPipsChange={setStripPips}
         />
       ) : null}
       {!commanderCovers && !tableSheetOpen && !dice?.view ? (
@@ -952,8 +955,8 @@ export const LifeCard = memo(function LifeCard({
                       : "board:commander.assignFrom",
                     { identity },
                   )}
-                  accessibilityState={{ disabled: !!disabled }}
-                  disabled={disabled}
+                  accessibilityState={{ disabled: !!disabled || sittingOut }}
+                  disabled={disabled || sittingOut}
                   hitSlop={8}
                   onPress={commanderDamage.onPressSword}
                   style={({ pressed }) => pressed && { opacity: 0.72 }}
@@ -1026,6 +1029,7 @@ export const LifeCard = memo(function LifeCard({
       !claimShown &&
       !diceCovers &&
       !commanderCovers &&
+      !sittingOut &&
       !overviewShown &&
       !editorOpen ? (
         <CounterChips
@@ -1284,20 +1288,18 @@ const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
 const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
 
-const $outCause: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
+const $outCause: ViewStyle = { flexDirection: "row", alignItems: "center", gap: OUT_CAUSE_GAP }
 
 const $outAmount: TextStyle = { width: "auto" }
 
-const $outLabel: ThemedStyle<TextStyle> = ({ spacing }) => ({
-  fontSize: 14,
+const $outLabel: ThemedStyle<TextStyle> = () => ({
+  ...OUT_LABEL,
   letterSpacing: 2,
   textTransform: "uppercase",
-  marginTop: -spacing.xs,
 })
 
 const $struckLife: ThemedStyle<TextStyle> = () => ({
-  fontSize: 22,
-  lineHeight: 28,
+  ...STRUCK_LIFE,
   textDecorationLine: "line-through",
 })
 

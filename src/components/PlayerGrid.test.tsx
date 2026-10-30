@@ -301,11 +301,9 @@ describe("PlayerGrid", () => {
       armFirstSeat(view)
       expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("2")
       expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("4")
-      expect(view.getByTestId("commander-badge-seat-2-partner")).toBeTruthy()
 
       view.rerender(grid(true))
       expect(view.queryByTestId("commander-power-seat-1-partner")).toBeNull()
-      expect(view.queryByTestId("commander-badge-seat-2-partner")).toBeNull()
     } finally {
       partners.mockRestore()
     }

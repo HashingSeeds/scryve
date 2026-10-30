@@ -1,7 +1,12 @@
-import { memo, useEffect, useState, type ComponentProps } from "react"
+import { memo, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
-import Animated from "react-native-reanimated"
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated"
 
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
@@ -9,8 +14,10 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { TAKEOVER_LAYERS } from "./CommanderDamageCardControls"
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
 import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
@@ -43,8 +50,9 @@ export interface CommanderStripProps {
   open: boolean
   inspectDisabled?: boolean
   closeIconStyle?: ComponentProps<typeof Animated.View>["style"]
+  // why: while a commander attacks this seat, the strip stays over the shadow with that attacker's total lit and the rest faded, and taps fall through to the hit target.
+  attackerId?: PlayerId
   onBoundsChange?: (bounds: LayoutRectangle) => void
-  onPipsChange?: (pips: ReadonlyMap<PlayerId, LayoutRectangle>) => void
   onToggle: () => void
 }
 
@@ -72,9 +80,9 @@ export const CommanderStrip = memo(function CommanderStrip({
   open,
   inspectDisabled,
   closeIconStyle,
+  attackerId,
   onToggle,
   onBoundsChange,
-  onPipsChange,
 }: CommanderStripProps) {
   const {
     themed,
@@ -82,24 +90,6 @@ export const CommanderStrip = memo(function CommanderStrip({
   } = useAppTheme()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
   const [mapBounds, setMapBounds] = useState<LayoutRectangle | null>(null)
-  const [rowBounds, setRowBounds] = useState<ReadonlyMap<number, LayoutRectangle>>(new Map())
-  const [pipBounds, setPipBounds] = useState<
-    ReadonlyMap<PlayerId, { row: number; bounds: LayoutRectangle }>
-  >(new Map())
-  useEffect(() => {
-    if (!onPipsChange || !stripBounds || !mapBounds) return
-    const pips = new Map<PlayerId, LayoutRectangle>()
-    for (const [playerId, { row, bounds }] of pipBounds) {
-      const rowOrigin = rowBounds.get(row)
-      if (!rowOrigin) continue
-      pips.set(playerId, {
-        ...bounds,
-        x: stripBounds.x + mapBounds.x + rowOrigin.x + bounds.x,
-        y: stripBounds.y + mapBounds.y + rowOrigin.y + bounds.y,
-      })
-    }
-    onPipsChange(pips)
-  }, [stripBounds, mapBounds, rowBounds, pipBounds, onPipsChange])
   useEffect(() => {
     if (stripBounds && mapBounds) {
       onBoundsChange?.({
@@ -123,18 +113,21 @@ export const CommanderStrip = memo(function CommanderStrip({
     justifyContent: vertical === "top" ? "flex-start" : "flex-end",
     padding: spacing.xxs,
   }
-  if (dealt.length === 0) return null
+  if (dealt.length === 0 && !attackerId) return null
+  const attackerName = players.find(({ id }) => id === attackerId)?.name
 
   return (
     <View
       testID={`commander-strip-seat-${seatNumber}`}
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
+      pointerEvents={attackerId ? "none" : "auto"}
       style={[
         themed($strip),
         stripEdge(corner, spacing.xs, contentInsets, screenEdges),
         {
           flexDirection: stripDirection(contentRotation),
         },
+        attackerId && $aboveShadow,
       ]}
     >
       <BoardPressable
@@ -157,7 +150,8 @@ export const CommanderStrip = memo(function CommanderStrip({
               })
         }
         accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
-        disabled={inspectDisabled}
+        accessible={!attackerId}
+        disabled={inspectDisabled || !!attackerId}
         hitSlop={open ? 12 : 2}
         onPress={onToggle}
         style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
@@ -165,12 +159,9 @@ export const CommanderStrip = memo(function CommanderStrip({
         {boardRows.map((row, rowIndex) => (
           <View
             key={rowIndex}
-            onLayout={({ nativeEvent: { layout } }) =>
-              setRowBounds((current) => new Map(current).set(rowIndex, layout))
-            }
             pointerEvents="none"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden={!attackerId}
+            importantForAccessibility={attackerId ? "auto" : "no-hide-descendants"}
             style={[themed($mapRow), open && $hidden]}
           >
             {row.map(({ playerId }) => {
@@ -183,7 +174,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                   <View
                     key={playerId}
                     testID={`commander-own-seat-${seatNumber}`}
-                    style={[themed($ownSeat), size]}
+                    style={[themed($ownSeat), size, attackerId && $faded]}
                   >
                     <PlayerMark
                       seatNumber={playerIndex + 1}
@@ -196,25 +187,33 @@ export const CommanderStrip = memo(function CommanderStrip({
                 )
               const total = incoming[playerId] ?? 0
               const ink = accessibleForeground(player.color)
-              return (
+              const attacking = playerId === attackerId
+              const pip = (
                 <View
                   key={playerId}
                   testID={`commander-pip-seat-${seatNumber}-${playerId}`}
-                  onLayout={({ nativeEvent: { layout } }) =>
-                    setPipBounds((current) =>
-                      new Map(current).set(playerId, { row: rowIndex, bounds: layout }),
-                    )
+                  accessible={attacking}
+                  accessibilityLabel={
+                    attacking
+                      ? translate("board:commander.totalFrom", {
+                          damage: total,
+                          name: attackerName,
+                        })
+                      : undefined
                   }
                   style={[
                     themed($disc),
                     size,
                     { backgroundColor: player.color, borderColor: overlayTint(foreground, 0.5) },
-                    total === 0 && themed($idleDisc),
+                    total === 0 && !attacking && themed($idleDisc),
                     total >= lethal && [themed($lethalDisc), { borderColor: foreground }],
+                    attacking && { borderColor: foreground },
+                    attackerId && !attacking && $faded,
                   ]}
                 >
-                  {total > 0 ? (
+                  {total > 0 || attacking ? (
                     <Text
+                      testID={attacking ? `commander-total-seat-${seatNumber}` : undefined}
                       text={String(total)}
                       weight="bold"
                       maxFontSizeMultiplier={1}
@@ -235,6 +234,13 @@ export const CommanderStrip = memo(function CommanderStrip({
                   )}
                 </View>
               )
+              return attacking ? (
+                <Pop key={playerId} value={total}>
+                  {pip}
+                </Pop>
+              ) : (
+                pip
+              )
             })}
           </View>
         ))}
@@ -249,6 +255,21 @@ export const CommanderStrip = memo(function CommanderStrip({
     </View>
   )
 }, structurallyEqual)
+
+/** why: the attacker's total pops as each hit lands, so a tap reads on the strip the defender is watching. */
+function Pop({ value, children }: { value: number; children: ReactNode }) {
+  const reducedMotion = useReducedMotion()
+  const scale = useSharedValue(1)
+  const previous = useRef(value)
+  useEffect(() => {
+    const before = previous.current
+    previous.current = value
+    if (value <= before || reducedMotion !== false) return
+    scale.value = withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 200 }))
+  }, [reducedMotion, scale, value])
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  return <Animated.View style={style}>{children}</Animated.View>
+}
 
 function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirection"] {
   if (rotation === 90) return "column"
@@ -273,6 +294,16 @@ export function commanderStripMovesInward(
 ) {
   const [edge, side] = STRIP_CORNER[rotation]
   return insets?.cutout?.edge === side && insets.cutout.side === edge
+}
+
+/** why: the card corner the strip sits in, so other corner controls can keep clear of it. */
+export function commanderStripCorner(
+  rotation: LifeCardContentRotation,
+  insets?: LifeCardContentInsets,
+) {
+  const [edge, side] = stripCorner(rotation, insets)
+  const [x, y] = edge === "left" || edge === "right" ? [edge, side] : [side, edge]
+  return { x, y } as { x: "left" | "right"; y: "top" | "bottom" }
 }
 
 function stripCorner(rotation: LifeCardContentRotation, insets?: LifeCardContentInsets) {
@@ -346,3 +377,5 @@ const $ownSeat: ThemedStyle<ViewStyle> = () => ({
 })
 
 const $hidden: ViewStyle = { opacity: 0 }
+const $faded: ViewStyle = { opacity: 0.3 }
+const $aboveShadow: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }
