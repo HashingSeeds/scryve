@@ -1668,7 +1668,7 @@ describe("DeckDetailScreen", () => {
 
   it("names the version on screen and flags it when a newer one exists", () => {
     const older = renderDetail()
-    expect(older.getByTestId("deck-version-button")).toHaveTextContent("Version 1 · Current")
+    expect(older.getByTestId("deck-version-button")).toHaveTextContent(/^Version 1$/)
     expect(older.getByText("Not the latest")).toBeTruthy()
     older.unmount()
 
