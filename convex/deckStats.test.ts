@@ -246,6 +246,79 @@ it("masks a blocked opponent's name the way History does", async () => {
   expect(await opponents()).not.toContain("rivalname")
 })
 
+const atraxa = [{ cardId: "atraxa", name: "Atraxa, Praetors' Voice" }]
+const krenko = [{ cardId: "krenko", name: "Krenko, Mob Boss" }]
+
+it("lists each opponent's commanders unless that player is blocked", async () => {
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const args = game("local-game-000000010", { win: true, finishedAt: T })
+  args.players[1] = { ...args.players[1], deckLabel: { identity: atraxa } }
+  await actor.mutation(api.games.publishFinishedLocalGame, args)
+  const identities = async () =>
+    (
+      await actor.query(api.deckStats.games, {
+        deckKey: "burn",
+        paginationOpts: { numItems: 10, cursor: null },
+      })
+    ).page[0].opponents.map((opponent) => opponent.identity)
+  expect(await identities()).toEqual([atraxa])
+
+  await t.run(async (ctx) => {
+    const owner = (await ctx.db.query("users").first())!
+    const rival = await ctx.db.insert("users", {
+      clerkUserId: "rival",
+      displayName: "rival",
+      createdAt: T,
+      updatedAt: T,
+    })
+    const summary = (await ctx.db.query("gameSummaries").first())!
+    await ctx.db.patch(summary._id, {
+      players: summary.players.map((player, index) =>
+        index === 1 ? { ...player, userId: rival } : player,
+      ),
+    })
+    await ctx.db.insert("userBlocks", {
+      blockerUserId: owner._id,
+      blockedUserId: rival,
+      createdAt: T,
+    })
+  })
+  expect(await identities()).toEqual([undefined])
+})
+
+it("hides an opponent's commanders behind a deck name that fails the name filter", async () => {
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const deckId = await actor.mutation(api.decks.create, { name: "Burn", format: "commander" })
+  const deckVersionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })
+  await actor.mutation(api.matches.recordManualMatch, {
+    publicId: "manual-identity-000001",
+    bestOf: 1,
+    finishedAt: T,
+    me: { seat: 1, deckVersionId, outcome: "win" },
+    opponents: [
+      { seat: 2, displayName: "Ana", deckLabel: { identity: krenko }, outcome: "loss" },
+      {
+        seat: 3,
+        displayName: "Cy",
+        deckName: "Shitty Dragons",
+        deckLabel: { identity: atraxa },
+        outcome: "loss",
+      },
+    ],
+  })
+  const { deckKey } = (await actor.query(api.decks.listMine)).decks[0]
+  const page = await actor.query(api.deckStats.games, {
+    deckKey,
+    paginationOpts: { numItems: 10, cursor: null },
+  })
+  expect(page.page[0].opponents).toEqual([
+    { name: "Ana", deckName: undefined, identity: krenko },
+    { name: "Cy", deckName: "Shitty Dragons", identity: undefined },
+  ])
+})
+
 it("counts a connected match through its games only", async () => {
   const t = makeConvexTest()
   const actor = await signedIn(t, "owner")

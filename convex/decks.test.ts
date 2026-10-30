@@ -1226,6 +1226,59 @@ describe("deck versions", () => {
     })
   })
 
+  it("remembers the version a player brings until they clear it or delete that version", async () => {
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "bring-owner", "Bring Owner")
+    await premiumVersions(t, "bring-owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Bring", format: "commander" })
+    const pickedId = await actor.mutation(api.decks.createVersion, { deckId, name: "Spicy" })
+    await actor.mutation(api.decks.createVersion, { deckId, name: "Newest" })
+    const bringing = async () => ({
+      list: (await actor.query(api.decks.listMine)).decks[0].bringingVersionId,
+      detail: (await actor.query(api.decks.detail, { deckId })).deck.bringingVersionId,
+    })
+    expect(await bringing()).toEqual({ list: undefined, detail: undefined })
+
+    const before = (await actor.query(api.decks.listMine)).decks[0].updatedAt
+    await actor.mutation(api.decks.setBringingVersion, { deckId, versionId: pickedId })
+    expect(await bringing()).toEqual({ list: pickedId, detail: pickedId })
+    expect((await actor.query(api.decks.listMine)).decks[0].updatedAt).toBe(before)
+
+    await actor.mutation(api.decks.setBringingVersion, { deckId, versionId: null })
+    expect(await bringing()).toEqual({ list: undefined, detail: undefined })
+
+    await actor.mutation(api.decks.setBringingVersion, { deckId, versionId: pickedId })
+    await actor.mutation(api.decks.deleteVersion, { versionId: pickedId })
+    expect(await bringing()).toEqual({ list: undefined, detail: undefined })
+    await expect(
+      actor.mutation(api.decks.setBringingVersion, { deckId, versionId: pickedId }),
+    ).rejects.toMatchObject({ data: { code: "deck_version_not_found" } })
+  })
+
+  it("lets only the owner pick a version, and only one of that deck's", async () => {
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "bring-authz-owner", "Owner")
+    const other = await signedIn(t, "bring-authz-other", "Other")
+    const deckId = await owner.mutation(api.decks.create, { name: "Mine", format: "commander" })
+    const otherDeckId = await other.mutation(api.decks.create, {
+      name: "Theirs",
+      format: "commander",
+    })
+    const [mine] = (await owner.query(api.decks.detail, { deckId })).versions
+    const [theirs] = (await other.query(api.decks.detail, { deckId: otherDeckId })).versions
+
+    await expect(
+      other.mutation(api.decks.setBringingVersion, { deckId, versionId: mine._id }),
+    ).rejects.toMatchObject({ data: { code: "deck_not_found" } })
+    await expect(
+      owner.mutation(api.decks.setBringingVersion, { deckId, versionId: theirs._id }),
+    ).rejects.toMatchObject({ data: { code: "deck_version_not_found" } })
+    await expect(
+      t.mutation(api.decks.setBringingVersion, { deckId, versionId: null }),
+    ).rejects.toMatchObject({ data: { code: "unauthenticated" } })
+    expect((await owner.query(api.decks.detail, { deckId })).deck.bringingVersionId).toBeUndefined()
+  })
+
   it("favorites and unfavorites an owned deck without changing its content order", async () => {
     const t = makeConvexTest()
     const actor = await signedIn(t, "favorite-owner", "Favorite Owner")
