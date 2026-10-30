@@ -341,6 +341,7 @@ export default {
     noResults: "No se encontraron cartas.",
     dismissFilters: "Cerrar filtros de comandante",
     colorMatch: "Coincidencia de color",
+    withinColors: "Dentro de estos colores",
     allowAdditional: "Permitir colores adicionales",
     exactColors: "Exactamente estos colores",
     searchKeywords: "Buscar palabras clave",

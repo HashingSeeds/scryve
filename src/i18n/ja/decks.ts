@@ -320,6 +320,7 @@ export default {
     noResults: "カードが見つかりません。",
     dismissFilters: "統率者フィルターを閉じる",
     colorMatch: "色が一致",
+    withinColors: "これらの色の範囲内",
     allowAdditional: "他の色を許可",
     exactColors: "これらの色のみ",
     searchKeywords: "キーワードを検索",

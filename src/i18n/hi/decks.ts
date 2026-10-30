@@ -324,6 +324,7 @@ export default {
     noResults: "कोई कार्ड नहीं मिला।",
     dismissFilters: "कमांडर फ़िल्टर बंद करें",
     colorMatch: "कलर मैच",
+    withinColors: "केवल इन कलर में",
     allowAdditional: "अतिरिक्त रंगों की अनुमति दें",
     exactColors: "ठीक यही रंग",
     searchKeywords: "कीवर्ड खोजें",

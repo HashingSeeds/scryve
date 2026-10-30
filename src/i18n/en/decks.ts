@@ -339,6 +339,7 @@ const decks = {
     noResults: "No cards found.",
     dismissFilters: "Dismiss commander filters",
     colorMatch: "Color match",
+    withinColors: "Within these colors",
     allowAdditional: "Allow additional colors",
     exactColors: "Exactly these colors",
     searchKeywords: "Search keywords",
