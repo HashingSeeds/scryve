@@ -95,15 +95,21 @@ export function useBoardChrome({
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeLayout = useCallback(() => setLayoutOpen(false), [])
+  // why: the menu pauses a commander attack rather than ending it, so closing the menu returns to the attack as it was. A petal that takes over or leaves the board finishes the attack first, sending any held hits as the attacker's check would.
+  const finishAttack = useCallback(() => dispatch({ type: "send" }), [dispatch])
   const fromMenu = useCallback(
-    (run: () => void) => (event?: GestureResponderEvent) => {
-      setDialogOrigin(
-        event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
-      )
-      setMenuOpen(false)
-      run()
-    },
-    [],
+    (run: () => void, { keepsAttack = false } = {}) =>
+      (event?: GestureResponderEvent) => {
+        setDialogOrigin(
+          event?.nativeEvent
+            ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
+            : undefined,
+        )
+        setMenuOpen(false)
+        if (!keepsAttack) finishAttack()
+        run()
+      },
+    [finishAttack],
   )
   const pressThird = stable("third", third.onPress)
   const pressEnd = stable("end", end.onPress)
@@ -116,6 +122,7 @@ export function useBoardChrome({
   const showDecks = stable("decks", () => onDecks?.())
   const pickedDiceTool = stable("diceTool", () => {
     setMenuOpen(false)
+    finishAttack()
     onDiceTool?.()
   })
   const diceTools = useMemo(
@@ -134,7 +141,11 @@ export function useBoardChrome({
       { kind: "dice", label: translate("board:menu.dice"), tools: diceTools },
       { ...thirdPetal, onPress: fromMenu(pressThird) },
       hasRules
-        ? { kind: "rules", label: translate("board:menu.rules"), onPress: fromMenu(showRules) }
+        ? {
+            kind: "rules",
+            label: translate("board:menu.rules"),
+            onPress: fromMenu(showRules, { keepsAttack: true }),
+          }
         : {
             kind: "decks",
             label: translate("common:appNavigation.decks"),
@@ -158,11 +169,7 @@ export function useBoardChrome({
     ],
   )
 
-  const toggleMenu = useCallback(() => {
-    dispatch({ type: "send" })
-    setMenuOpen((current) => !current)
-  }, [dispatch])
-  const exitCommander = useCallback(() => dispatch({ type: "send" }), [dispatch])
+  const toggleMenu = useCallback(() => setMenuOpen((current) => !current), [])
   const { open: diceOpen, close: closeDice } = dice
   const diceArmed = dice.grid.armed
   const exitAction = useMemo(
@@ -174,14 +181,25 @@ export function useBoardChrome({
             ...(diceArmed ? { heldTool: diceArmed } : {}),
           }
         : inspectedPlayerId
-          ? { label: translate("board:menu.exitCommander"), onPress: exitCommander }
+          ? { label: translate("board:menu.exitCommander"), onPress: finishAttack }
           : undefined,
-    [closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommander],
+    [closeDice, diceArmed, diceOpen, inspectedPlayerId, finishAttack],
   )
   const pressStatus = stable("status", () => {
     setMenuOpen(false)
     statusLine?.onPress()
   })
+  const leave = (key: string, go: (() => void) | undefined) =>
+    go &&
+    stable(`leave:${key}`, () => {
+      finishAttack()
+      go()
+    })
+  const leaveToDecks = leave("decks", onDecks)
+  const leaveToHistory = leave("history", onHistory)
+  const leaveToSettings = leave("settings", onSettings)
+  const leaveToSupport = leave("support", onSupport)
+  const leaveToAccount = leave("account", onAccount)
   const statusText = statusLine?.text
   const statusTone = statusLine?.tone
   const shownStatusLine = useMemo(
@@ -210,14 +228,14 @@ export function useBoardChrome({
       onClose: closeMenu,
     },
     navigation:
-      menuOpen && onHistory && onSettings && onSupport && onAccount
+      menuOpen && leaveToHistory && leaveToSettings && leaveToSupport && leaveToAccount
         ? {
             accountEntry,
-            onDecks: hasRules ? onDecks : undefined,
-            onHistory,
-            onSettings,
-            onSupport,
-            onAccount,
+            onDecks: hasRules ? leaveToDecks : undefined,
+            onHistory: leaveToHistory,
+            onSettings: leaveToSettings,
+            onSupport: leaveToSupport,
+            onAccount: leaveToAccount,
           }
         : undefined,
   }
