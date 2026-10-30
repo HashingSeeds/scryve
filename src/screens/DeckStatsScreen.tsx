@@ -6,6 +6,7 @@ import { usePaginatedQuery, useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
+import { EmptyState } from "@/components/EmptyState"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -106,8 +107,28 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
     setFilter(next)
     listRef.current?.scrollToOffset({ offset: 0, animated: false })
   }
-  if (!ready) return <AlertNote tone="info" text={translate("decks:shelf.reconnect")} />
-  if (!summary) return <Text tx="decks:stats.loading" />
+  const notice = access.loading ? (
+    <Text tx="decks:stats.loading" />
+  ) : !access.ready ? (
+    <EmptyState
+      imageSource={null}
+      headingTx={access.signedIn ? "decks:stats.unavailable" : "decks:stats.signIn"}
+      content={access.signedIn ? (access.message ?? translate("account:cloud.reconnect")) : ""}
+      button={
+        access.actionLabel ?? translate(access.signedIn ? "common:tryAgain" : "account:signIn")
+      }
+      buttonOnPress={access.request}
+    />
+  ) : !deckKey ? (
+    <EmptyState
+      imageSource={null}
+      headingTx="decks:stats.noResults"
+      contentTx="decks:stats.emptyHint"
+    />
+  ) : !summary ? (
+    <Text tx="decks:stats.loading" />
+  ) : null
+  if (notice || !summary) return <View style={[themed($content), $hero]}>{notice}</View>
   const record = exactRecord(summary.all, "all")
   const empty = record.games === 0
   const rate = honestRate(record)
@@ -442,4 +463,4 @@ const $actionTouch: ViewStyle = { minHeight: 44, justifyContent: "center", paddi
 const $win: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
 const $loss: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
-const $screen: ViewStyle = { flex: 1 }
+const $screen: ViewStyle = { flex: 1, justifyContent: "flex-start" }

@@ -42,6 +42,7 @@ export default {
     noChanges: "카드 변경 없음.",
     comparePro: "Scryve Pro로 목록을 비교하세요.",
     unavailable: "통계를 불러올 수 없습니다.",
+    signIn: "로그인하여 덱 통계를 확인하세요",
     viewStats: "덱 통계 보기",
     onDeviceLabel: "{{name}}, 이 기기에만 저장됨",
     limited: "최근 200개 결과를 기준으로 한 분석입니다.",

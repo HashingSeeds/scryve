@@ -42,6 +42,7 @@ const decks = {
     noChanges: "No card changes.",
     comparePro: "Compare lists with Scryve Pro.",
     unavailable: "Stats unavailable.",
+    signIn: "Sign in to see deck stats",
     viewStats: "View deck stats",
     onDeviceLabel: "{{name}}, on this device",
     limited: "Breakdowns cover the latest 200 results.",

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { ThemeProvider } from "@/theme/context"
 import { captureAnalytics } from "@/utils/analytics"
 
@@ -82,7 +83,7 @@ jest.mock("convex/react", () => ({
 jest.mock("@/features/billing/RevenueCatContext", () => ({
   useRevenueCat: () => ({ configured: true, isLoading: false, presentPaywall: mockPaywall }),
 }))
-const screen = (access = deckStatsAccess) => (
+const screen = (access: CloudAccess = deckStatsAccess) => (
   <ThemeProvider initialContext="dark">
     <DeckStatsScreen {...deckStatsParams} access={access} onBack={jest.fn()} />
   </ThemeProvider>
@@ -240,8 +241,52 @@ it("handles loading, empty, and disconnected states without inventing rates", ()
   for (const header of ["Lists", "Pod size", "Games", "Source"])
     expect(view.queryByText(header)).toBeNull()
   expect(view.queryByTestId("stats-headline")).toBeNull()
-  view.rerender(screen({ ...deckStatsAccess, ready: false }))
-  expect(view.getByText("Reconnect to load your decks.")).toBeTruthy()
+})
+
+it("asks signed-out players to sign in instead of saying reconnect", () => {
+  const request = jest.fn()
+  const view = render(
+    screen({ ready: false, loading: false, signedIn: false, actionLabel: "Sign in", request }),
+  )
+  expect(view.getByText("Sign in to see deck stats")).toBeTruthy()
+  expect(view.queryByText(/Reconnect/)).toBeNull()
+  fireEvent.press(view.getByText("Sign in"))
+  expect(request).toHaveBeenCalled()
+  expect(mockPagination).toHaveBeenLastCalledWith("games", "skip", { initialNumItems: 20 })
+})
+
+it("offers a retry while offline, and waits quietly while access loads", () => {
+  const request = jest.fn()
+  const offline = {
+    ...deckStatsAccess,
+    ready: false,
+    message: "Reconnect to continue.",
+    actionLabel: "Try again",
+    request,
+  }
+  const view = render(screen(offline))
+  expect(view.getByText("Stats unavailable.")).toBeTruthy()
+  expect(view.getByText("Reconnect to continue.")).toBeTruthy()
+  fireEvent.press(view.getByText("Try again"))
+  expect(request).toHaveBeenCalled()
+  view.rerender(screen({ ...offline, loading: true }))
+  expect(view.getByText("Loading stats…")).toBeTruthy()
+  expect(view.queryByText("Try again")).toBeNull()
+})
+
+it("says a deck without a stats key has no results yet", () => {
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <DeckStatsScreen
+        {...deckStatsParams}
+        deckKey=""
+        access={deckStatsAccess}
+        onBack={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  expect(view.getByText("No results yet")).toBeTruthy()
+  expect(view.getByText(/Play a game with this deck/)).toBeTruthy()
   expect(mockPagination).toHaveBeenLastCalledWith("games", "skip", { initialNumItems: 20 })
 })
 

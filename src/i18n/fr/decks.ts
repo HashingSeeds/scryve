@@ -48,6 +48,7 @@ export default {
     noChanges: "Aucun changement de cartes.",
     comparePro: "Comparez les listes avec Scryve Pro.",
     unavailable: "Statistiques indisponibles.",
+    signIn: "Connectez-vous pour voir les statistiques du deck",
     viewStats: "Voir les statistiques du deck",
     onDeviceLabel: "{{name}}, sur cet appareil",
     limited: "Les détails portent sur les 200 derniers résultats.",
