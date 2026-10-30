@@ -42,7 +42,7 @@ function storedUrl(source: TextRules, store: RulesStore) {
 
 function isCurrent(source: TextRules, store: RulesStore) {
   return (
-    loadStoredRules(source, store)?.url === source.url &&
+    storedUrl(source, store) === source.url &&
     (!source.revalidate || entries(checked, store).has(source.cacheKey))
   )
 }
@@ -133,9 +133,9 @@ export function useComprehensiveRules(source: TextRules) {
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!canDownload) return
-    if (isCurrent(source, storage)) {
-      const latest = loadStoredRules(source)?.rules
-      if (latest) setRules(latest)
+    const stored = isCurrent(source, storage) ? loadStoredRules(source)?.rules : undefined
+    if (stored) {
+      setRules(stored)
       return
     }
     let active = true
