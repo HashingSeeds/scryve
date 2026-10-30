@@ -303,7 +303,6 @@ export default {
     notCached:
       "Este tablero no está guardado en este teléfono. Vuelve a conectarte para cargar la partida aquí.",
     anotherSeat: "Otro asiento",
-    closeLayout: "Cerrar selector de diseño",
     failedAction: {
       life: {
         none: "No se pudo sincronizar un cambio de {{delta}} vidas",
@@ -320,15 +319,10 @@ export default {
       declineCommanderDamage: "No se pudo sincronizar el rechazo del daño de comandante",
     },
     menu: {
-      layout: "Diseño",
-      dice: "Dados",
       players: "Jugadores",
       history: "Historial",
-      rules: "Reglas",
       end: "Terminar",
       leave: "Salir",
-      closeDice: "Cerrar dados",
-      exitCommanderDamage: "Salir del daño de comandante",
     },
     status: {
       close: "Cerrar estado de la partida conectada",
