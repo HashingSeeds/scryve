@@ -3,8 +3,10 @@ import { v } from "convex/values"
 import { internal } from "./_generated/api"
 import { env, internalAction } from "./_generated/server"
 
+export const IDENTITY_RETRY_CAP_MS = 10 * 60 * 1000
+
 function retryDelayMs(attempts: number) {
-  return Math.min(60 * 2 ** attempts, 3600) * 1000
+  return Math.min(60_000 * 2 ** attempts, IDENTITY_RETRY_CAP_MS)
 }
 
 export const deleteClerkIdentity = internalAction({
@@ -19,6 +21,7 @@ export const deleteClerkIdentity = internalAction({
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+          signal: AbortSignal.timeout(10_000),
         },
       )
       if (response.ok || response.status === 404) {

@@ -4,6 +4,7 @@ import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import { env, internalMutation, internalQuery, mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
+import { IDENTITY_RETRY_CAP_MS } from "./accountDeletionActions"
 import { deleteAccountFeedback } from "./feedback"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { deletedIdentityHash, requireIdentity } from "./lib/auth"
@@ -18,6 +19,10 @@ const EVENT_BATCH_SIZE = 50
 const USER_DATA_BATCH_SIZE = 50
 const MODERATION_BATCH_SIZE = 50
 const DELETED_ACCOUNT_LABEL = "(deleted account)"
+const STALL_SWEEP_BATCH_SIZE = 100
+
+// why: scheduled actions run at most once, so a crashed Clerk step leaves no retry. Past the longest retry delay plus one attempt, nothing is scheduled or running.
+const STALLED_IDENTITY_MS = IDENTITY_RETRY_CAP_MS + 5 * 60 * 1000
 
 type AccountDeletionStatus = Doc<"accountDeletionRequests">["status"]
 
@@ -93,6 +98,10 @@ async function restartRequest(ctx: MutationCtx, request: Doc<"accountDeletionReq
   return status
 }
 
+function isStalledIdentity(request: Doc<"accountDeletionRequests">, now: number) {
+  return request.status === "identity_pending" && now - request.updatedAt > STALLED_IDENTITY_MS
+}
+
 export const requestCurrentAccountDeletion = mutation({
   args: { confirmation: v.literal("DELETE") },
   handler: async (ctx) => {
@@ -101,7 +110,9 @@ export const requestCurrentAccountDeletion = mutation({
     const existing = await requestByClerkUser(ctx, identity.subject)
     if (existing) {
       const status =
-        existing.status === "failed" ? await restartRequest(ctx, existing) : existing.status
+        existing.status === "failed" || isStalledIdentity(existing, Date.now())
+          ? await restartRequest(ctx, existing)
+          : existing.status
       const receipt = existing.receiptId ? await ctx.db.get(existing.receiptId) : null
       if (receipt) return { requestId: existing._id, receiptToken: receipt.token, status }
 
@@ -132,6 +143,24 @@ export const requestCurrentAccountDeletion = mutation({
         requestId,
       })
     return { requestId, receiptToken: receipt.receiptToken, status }
+  },
+})
+
+/** why: installed clients sign out while a request is identity_pending, so nobody asks again for a stalled Clerk step. */
+export const restartStalledIdentityDeletions = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("accountDeletionRequests")
+      .paginate({ numItems: STALL_SWEEP_BATCH_SIZE, cursor: args.cursor ?? null })
+    const now = Date.now()
+    for (const request of page)
+      if (isStalledIdentity(request, now)) await restartRequest(ctx, request)
+    if (!isDone)
+      await ctx.scheduler.runAfter(0, internal.accountDeletion.restartStalledIdentityDeletions, {
+        cursor: continueCursor,
+      })
+    return null
   },
 })
 

@@ -53,6 +53,12 @@ crons.interval(
   internal.moderation.purgeExpiredReports,
   {},
 )
+crons.interval(
+  "restart stalled account deletions",
+  { minutes: 15 },
+  internal.accountDeletion.restartStalledIdentityDeletions,
+  {},
+)
 crons.interval("prune old receipts", { hours: 24 }, internal.crons.pruneOldReceipts, {})
 crons.cron("send renewal reminders", "0 * * * *", internal.notifications.remindRenewals, {})
 crons.interval(

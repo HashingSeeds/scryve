@@ -1,7 +1,21 @@
-import { makeConvexTest } from "../test/convexTest"
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 
 const inviteToken = "d".repeat(43)
+const STALLED_MS = 16 * 60 * 1000
+
+async function scheduledClerkDeletions(t: ConvexTestHarness) {
+  const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())
+  return scheduled.filter(
+    (job) => job.name.includes("deleteClerkIdentity") && job.state.kind === "pending",
+  )
+}
+
+async function requestIdentityDeletion(t: ConvexTestHarness, clerkUserId: string) {
+  return await t
+    .withIdentity({ subject: clerkUserId })
+    .mutation(api.accountDeletion.requestCurrentAccountDeletion, { confirmation: "DELETE" })
+}
 
 describe("account deletion", () => {
   const previousClerkSecret = process.env.CLERK_SECRET_KEY
@@ -646,6 +660,92 @@ describe("account deletion", () => {
     expect(receipt).toMatchObject({ status: "failed", canRetry: true })
     expect(receipt).not.toHaveProperty("lastError")
     expect(JSON.stringify(receipt)).not.toContain("Clerk")
+  })
+
+  it("gives up on a hung Clerk call and schedules a retry", async () => {
+    const timeout = AbortSignal.timeout.bind(AbortSignal)
+    const timeoutSpy = jest.spyOn(AbortSignal, "timeout").mockImplementation(() => timeout(10))
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementation(
+        (_input, init) =>
+          new Promise((_resolve, reject) =>
+            init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
+          ),
+      )
+    try {
+      const t = makeConvexTest()
+      const { requestId } = await requestIdentityDeletion(t, "hung-clerk-user")
+      await t.action(internal.accountDeletionActions.deleteClerkIdentity, { requestId })
+
+      expect(timeoutSpy).toHaveBeenCalledWith(10_000)
+      expect(await t.run((ctx) => ctx.db.get(requestId))).toMatchObject({
+        status: "identity_pending",
+        attempts: 1,
+      })
+      expect((await scheduledClerkDeletions(t)).some((job) => job.scheduledTime > Date.now())).toBe(
+        true,
+      )
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it("completes when Clerk already deleted the identity", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 404 }))
+    try {
+      const t = makeConvexTest()
+      const { requestId, receiptToken } = await requestIdentityDeletion(t, "already-gone-user")
+      await t.action(internal.accountDeletionActions.deleteClerkIdentity, { requestId })
+
+      expect(await t.run((ctx) => ctx.db.get(requestId))).toBeNull()
+      await expect(
+        t.query(api.accountDeletion.deletionReceipt, { receiptToken }),
+      ).resolves.toMatchObject({ status: "completed" })
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it("restarts a stalled Clerk step when asked again, but not a fresh one", async () => {
+    const t = makeConvexTest()
+    const { requestId } = await requestIdentityDeletion(t, "stalled-identity-user")
+    await requestIdentityDeletion(t, "stalled-identity-user")
+    expect(await scheduledClerkDeletions(t)).toHaveLength(1)
+
+    await t.run((ctx) =>
+      ctx.db.patch(requestId, { attempts: 3, updatedAt: Date.now() - STALLED_MS }),
+    )
+    const restarted = await requestIdentityDeletion(t, "stalled-identity-user")
+
+    expect(restarted.status).toBe("identity_pending")
+    expect(await scheduledClerkDeletions(t)).toHaveLength(2)
+    expect(await t.run((ctx) => ctx.db.get(requestId))).toMatchObject({
+      attempts: 0,
+      updatedAt: Date.now(),
+    })
+  })
+
+  it("sweeps stalled Clerk steps and leaves fresh and failed requests alone", async () => {
+    const t = makeConvexTest()
+    const stalled = await requestIdentityDeletion(t, "swept-stalled-user")
+    const fresh = await requestIdentityDeletion(t, "swept-fresh-user")
+    const failed = await requestIdentityDeletion(t, "swept-failed-user")
+    await t.run(async (ctx) => {
+      await ctx.db.patch(stalled.requestId, { updatedAt: Date.now() - STALLED_MS })
+      await ctx.db.patch(failed.requestId, {
+        status: "failed",
+        updatedAt: Date.now() - STALLED_MS,
+      })
+    })
+
+    await t.mutation(internal.accountDeletion.restartStalledIdentityDeletions, {})
+
+    const scheduled = await scheduledClerkDeletions(t)
+    expect(scheduled.filter((job) => job.args[0].requestId === stalled.requestId)).toHaveLength(2)
+    expect(scheduled.filter((job) => job.args[0].requestId === fresh.requestId)).toHaveLength(1)
+    expect(scheduled.filter((job) => job.args[0].requestId === failed.requestId)).toHaveLength(1)
+    expect(await t.run((ctx) => ctx.db.get(failed.requestId))).toMatchObject({ status: "failed" })
   })
 
   it("fails before changing data when Clerk deletion is not configured", async () => {
