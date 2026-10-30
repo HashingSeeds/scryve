@@ -32,8 +32,8 @@ import {
   planDeckSave,
   reseedDeckDraft,
   startsNewList,
-  type DeckDraft,
 } from "@/features/decks/deckDraft"
+import { useAccountDeckDraft } from "@/features/decks/deckDraftStore"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { allRecord } from "@/features/decks/deckStatLines"
@@ -56,7 +56,6 @@ import {
   loadAccountDraft,
 } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
-import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -338,7 +337,7 @@ function DeckDetailContent({
     latest: latestDraft,
     setDraft,
     edit,
-  } = useDeckEditor<DeckDraft>(restored?.draft ?? closedDeckDraft)
+  } = useAccountDeckDraft({ ownerId: access?.ownerId, deckId })
   const [dialog, setDialog] = useState<DeckDialog>("none")
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
