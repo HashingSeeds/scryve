@@ -353,6 +353,8 @@ const play = {
     saving: "Saving…",
     saveResult: "Save result",
     saveFailed: "Could not save this match. Try again.",
+    savedOffline: "Saved on this device. It syncs when you're back online.",
+    queueFull: "Too many matches are waiting to sync. Reconnect before adding more.",
     error: {
       opponentName: "Opponent {{number}} needs a name",
       nameLength: "Names must be at most {{max}} characters",

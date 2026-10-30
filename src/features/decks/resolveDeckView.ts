@@ -115,6 +115,16 @@ export function resolveDeckView(input: DeckViewInput) {
   const staleSelection = selectedVersionId !== undefined && detail?.version?._id !== mappedSelection
   const version = staleSelection ? undefined : (detail?.version ?? undefined)
   const activeVersionId = version?._id ?? cachedVersion?.versionId
+  const mappedCachedVersionId =
+    cachedVersion && versionWrites.mappedVersion(cachedVersion.versionId)
+  // why: a version made offline has no server id until its create syncs, and the server rejects a match that names it.
+  const cachedServerVersionId =
+    cachedVersion &&
+    !cachedVersion.deleted &&
+    !(cachedVersion.local && mappedCachedVersionId === cachedVersion.versionId)
+      ? (mappedCachedVersionId as Id<"deckVersions">)
+      : undefined
+  const matchVersionId = knownDeleted ? undefined : (version?._id ?? cachedServerVersionId)
   const storedCards = version ? deckCardsFromRows(detail?.cards ?? []) : []
   const cachedCards =
     (detail === undefined || staleSelection) && versionCache.cards !== undefined
@@ -219,6 +229,7 @@ export function resolveDeckView(input: DeckViewInput) {
     canQueueVersions,
     version,
     activeVersionId,
+    matchVersionId,
     versionTarget,
     displayCards,
     cards,

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
-import { useMutation } from "convex/react"
+import { useConvex } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -27,15 +27,14 @@ import {
   type ManualMatchDraft,
   type SeatOutcome,
 } from "@/features/matches/manualMatchForm"
+import { getManualMatchController } from "@/features/matches/matchOutbox"
 import { localDeckChoices } from "@/features/stats/deckChoices"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { convexErrorMessage } from "@/utils/convexError"
 
-import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { MAX_DISPLAY_NAME_LENGTH, MAX_EVENT_NAME_LENGTH } from "../../convex/lib/policy"
 
@@ -58,11 +57,12 @@ const ISO_DATE_PLACEHOLDER = "YYYY-MM-DD"
 
 export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatchScreenProps) {
   const { themed, theme } = useAppTheme()
-  const recordMatch = useMutation(api.matches.recordManualMatch)
+  const client = useConvex()
   // why: one id per form so a retried save cannot record the match twice.
   const [publicId] = useState(() => createClientId("match"))
   const [draft, setDraft] = useState<ManualMatchDraft>(() => defaultManualMatchDraft())
   const [busy, setBusy] = useState(false)
+  const [savedOffline, setSavedOffline] = useState(false)
   const [error, setError] = useState<string>()
   const twoPlayer = draft.opponents.length === 1
   const outcomeSegments = OUTCOME_OPTIONS.map(({ id, labelTx }) => ({
@@ -84,7 +84,8 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
   }
 
   async function save() {
-    if (!access.ready) {
+    const { ownerId } = access
+    if (!ownerId) {
       access.request()
       return
     }
@@ -101,10 +102,11 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         setBusy(false)
         return
       }
-      await recordMatch(built.args)
-      onSaved()
+      getManualMatchController(client, ownerId).record(built.args)
+      if (access.ready) onSaved()
+      else setSavedOffline(true)
     } catch (cause) {
-      setError(convexErrorMessage(cause, translate("play:recordMatch.saveFailed")))
+      setError(cause instanceof Error ? cause.message : translate("play:recordMatch.saveFailed"))
       setBusy(false)
     }
   }
@@ -120,7 +122,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         titleTx="play:recordMatch.title"
         backgroundColor={theme.colors.surface}
         leftTx="common:back"
-        onLeftPress={busy ? undefined : onBack}
+        onLeftPress={onBack}
       />
       <ScrollView
         contentContainerStyle={themed($content)}
@@ -268,20 +270,28 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       </ScrollView>
       <BottomActionBar>
         {error ? <AlertNote text={error} /> : null}
-        {access.message ? <Text size="xs" style={themed($dim)} text={access.message} /> : null}
-        <Button
-          testID="match-save"
-          text={
-            busy
-              ? translate("play:recordMatch.saving")
-              : access.ready
-                ? translate("play:recordMatch.saveResult")
-                : (access.actionLabel ?? translate("play:manualMatch.signIn"))
-          }
-          preset="primary"
-          disabled={busy || access.loading}
-          onPress={save}
-        />
+        {savedOffline ? (
+          <Text size="xs" testID="match-saved-offline" tx="play:recordMatch.savedOffline" />
+        ) : !access.ownerId && access.message ? (
+          <Text size="xs" style={themed($dim)} text={access.message} />
+        ) : null}
+        {savedOffline ? (
+          <Button testID="match-done" tx="common:done" preset="primary" onPress={onSaved} />
+        ) : (
+          <Button
+            testID="match-save"
+            text={
+              busy
+                ? translate("play:recordMatch.saving")
+                : access.ownerId
+                  ? translate("play:recordMatch.saveResult")
+                  : (access.actionLabel ?? translate("play:manualMatch.signIn"))
+            }
+            preset="primary"
+            disabled={busy || (!access.ownerId && access.loading)}
+            onPress={save}
+          />
+        )}
       </BottomActionBar>
     </Screen>
   )

@@ -336,6 +336,8 @@ export default {
     saving: "저장 중…",
     saveResult: "결과 저장",
     saveFailed: "이 매치를 저장할 수 없습니다. 다시 시도하세요.",
+    savedOffline: "이 기기에 저장했습니다. 다시 온라인이 되면 동기화됩니다.",
+    queueFull: "동기화를 기다리는 매치가 너무 많습니다. 더 추가하기 전에 다시 연결하세요.",
     error: {
       opponentName: "상대 {{number}}의 이름이 필요합니다",
       nameLength: "이름은 최대 {{max}}자까지 입력할 수 있습니다",

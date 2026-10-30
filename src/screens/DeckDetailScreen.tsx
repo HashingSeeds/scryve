@@ -362,6 +362,7 @@ function DeckDetailContent({
   })
   const { deck, cards, cardsUnavailable, cardsCached, version, versionTarget } = view
   const { activeVersionId, activeVersionSummary, failedEdit, failedCardEdit } = view
+  const { matchVersionId } = view
   const game = deck?.game ?? "mtg"
   // Known cards from this account's cached versions, filtered to the deck's game system.
   // why: memoized because the card search reruns its offline filter whenever this list changes identity.
@@ -868,9 +869,7 @@ function DeckDetailContent({
         }
         stats={stats}
         onAddMatch={
-          onAddMatch && version && !knownDeleted
-            ? () => onAddMatch(version._id, deck.name)
-            : undefined
+          onAddMatch && matchVersionId ? () => onAddMatch(matchVersionId, deck.name) : undefined
         }
         onDetails={() => {
           if (knownDeleted) return

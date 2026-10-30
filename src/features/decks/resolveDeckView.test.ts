@@ -321,6 +321,30 @@ describe("resolveDeckView metadata and status", () => {
   })
 })
 
+describe("resolveDeckView matchVersionId", () => {
+  it("adds a match against the cached version while offline, but not an unsynced one", () => {
+    const offline = (version: StoredVersion, mappedVersion = (id: string) => id) =>
+      resolveDeckView(
+        input({
+          versionCache: { versions: [version], version, cards: [] },
+          versionWrites: { ...input().versionWrites, mappedVersion },
+        }),
+      ).matchVersionId
+    expect(offline(storedVersion())).toBe(versionId)
+    const draft = storedVersion({ versionId: provisionalId, local: true })
+    expect(offline(draft)).toBeUndefined()
+    expect(offline(draft, () => versionId)).toBe(versionId)
+    expect(
+      resolveDeckView(
+        input({
+          syncedMetadata: [syncedDeck({ deleted: true })],
+          versionCache: { versions: [storedVersion()], version: storedVersion(), cards: [] },
+        }),
+      ).matchVersionId,
+    ).toBeUndefined()
+  })
+})
+
 describe("deckQueryVersionId", () => {
   it("reads the default version until a provisional offline version is acknowledged", () => {
     const provisional = [storedVersion({ versionId: provisionalId, local: true })]

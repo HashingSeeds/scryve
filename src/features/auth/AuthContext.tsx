@@ -23,6 +23,7 @@ import {
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
 import { NearbyOnlyWebSocket, useNearbyOnly } from "@/features/lan/nearbyOnly"
+import { ManualMatchSyncSession } from "@/features/matches/ManualMatchSyncSession"
 import { translate } from "@/i18n/translate"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
@@ -133,6 +134,7 @@ export function ConfiguredAuth({
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <LocalGamePublishSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
+      <ManualMatchSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       {/* why: the hinted user counts as the account, so Clerk confirming that user at launch does not remount the app. */}
       <RevenueCatProvider

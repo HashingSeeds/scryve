@@ -360,6 +360,10 @@ export default {
     saving: "Enregistrement…",
     saveResult: "Enregistrer le résultat",
     saveFailed: "Impossible d'enregistrer ce match. Réessayez.",
+    savedOffline:
+      "Enregistré sur cet appareil. La synchronisation se fera à votre retour en ligne.",
+    queueFull:
+      "Trop de matchs attendent d'être synchronisés. Reconnectez-vous avant d'en ajouter d'autres.",
     error: {
       opponentName: "L'adversaire {{number}} doit avoir un nom",
       nameLength: "Les noms ne doivent pas dépasser {{max}} caractères",
