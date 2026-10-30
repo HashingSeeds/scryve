@@ -1057,6 +1057,7 @@ describe("DeckDetailScreen", () => {
     expect(request).not.toHaveBeenCalled()
 
     fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-action-details"))
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Offline rename")
     const saveSettings = view.getByTestId("deck-settings-save")
     act(() => {
@@ -2009,13 +2010,21 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByTestId("delete-version-button")).toBeNull()
   })
 
-  it("archives the deck from deck settings behind a confirmation", async () => {
-    const view = renderDetail()
+  it("lists deck actions in order and archives the deck behind a confirmation", async () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} onMovedToDevice={jest.fn()} />
+      </ThemeProvider>,
+    )
     fireEvent.press(view.getByTestId("deck-settings-button"))
-    expect(view.getByText("Save changes")).toBeTruthy()
-    expect(view.getByTestId("deck-format-picker")).toBeTruthy()
-    expect(view.queryByText("Cancel")).toBeNull()
-    fireEvent.press(view.getByTestId("delete-deck-button"))
+    const sheet = within(view.getByTestId("deck-actions-sheet"))
+    expect(sheet.getAllByRole("button").map((row) => row.props.testID)).toEqual([
+      "deck-action-details",
+      "deck-action-move",
+      "deck-action-delete",
+    ])
+    expect(view.queryByTestId("deck-name-input")).toBeNull()
+    fireEvent.press(view.getByTestId("deck-action-delete"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
   })
@@ -2048,7 +2057,7 @@ describe("DeckDetailScreen", () => {
       const onBack = jest.fn()
       const view = renderOffline(onBack)
       fireEvent.press(view.getByTestId("deck-settings-button"))
-      fireEvent.press(view.getByTestId("delete-deck-button"))
+      fireEvent.press(view.getByTestId("deck-action-delete"))
       fireEvent.press(view.getByTestId("delete-deck-confirm"))
 
       expect(mockRemoveDeck).toHaveBeenCalledWith("deck-1")
@@ -2056,27 +2065,26 @@ describe("DeckDetailScreen", () => {
       expect(onBack).toHaveBeenCalledTimes(1)
     })
 
-    it("says why the delete can't run when the deck isn't cached for offline writes", async () => {
-      const view = renderOffline()
+    it("blocks rows that need the server and says why, when the deck isn't cached for offline writes", () => {
+      const view = renderOffline(jest.fn(), jest.fn())
       fireEvent.press(view.getByTestId("deck-settings-button"))
-      fireEvent.press(view.getByTestId("delete-deck-button"))
-      fireEvent.press(view.getByTestId("delete-deck-confirm"))
 
-      expect(
-        await within(view.getByTestId("delete-deck-dialog")).findByText(reconnect),
-      ).toBeTruthy()
-      expect(mockArchiveDeck).not.toHaveBeenCalled()
+      for (const id of ["details", "move", "delete"]) {
+        const row = view.getByTestId(`deck-action-${id}`)
+        expect(row).toBeDisabled()
+        expect(within(row).getByText(reconnect)).toBeTruthy()
+      }
     })
 
-    it("says why keep on device needs a connection", async () => {
-      const onMovedToDevice = jest.fn()
-      const view = renderOffline(jest.fn(), onMovedToDevice)
+    it("keeps queued rows usable and blocks only the move", () => {
+      mockMetadataWriteState.metadata = [cachedMetadata]
+      const view = renderOffline(jest.fn(), jest.fn())
       fireEvent.press(view.getByTestId("deck-settings-button"))
-      fireEvent.press(view.getByTestId("move-deck-button"))
-      fireEvent.press(view.getByTestId("move-deck-confirm"))
 
-      expect(await within(view.getByTestId("move-deck-dialog")).findByText(reconnect)).toBeTruthy()
-      expect(onMovedToDevice).not.toHaveBeenCalled()
+      expect(view.getByTestId("deck-action-details")).toBeEnabled()
+      expect(view.getByTestId("deck-action-delete")).toBeEnabled()
+      expect(view.getByTestId("deck-action-move")).toBeDisabled()
+      expect(within(view.getByTestId("deck-action-move")).getByText(reconnect)).toBeTruthy()
     })
   })
 

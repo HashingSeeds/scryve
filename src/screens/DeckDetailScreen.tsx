@@ -7,6 +7,7 @@ import { useConvex, useMutation, useQuery, useConvexConnectionState } from "conv
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
@@ -76,6 +77,7 @@ type DeckDialog =
   | "versions"
   | "renameVersion"
   | "deleteVersion"
+  | "actions"
   | "settings"
   | "deleteDeck"
   | "moveDeck"
@@ -772,15 +774,43 @@ function DeckDetailContent({
     }, translate("decks:detail.updateFailed"))
   }
 
-  function confirmKeepOnDevice() {
-    setError(undefined)
-    setDialog("moveDeck")
-  }
-
-  function confirmDeleteDeck() {
-    setError(undefined)
-    setDialog("deleteDeck")
-  }
+  // why: these rows fall back to server calls, so offline they say why instead of failing on press.
+  const needsConnection =
+    (access && !access.ready) || offline
+      ? (access?.message ?? translate("account:cloud.reconnect"))
+      : undefined
+  const queuedOrOnline = view.canQueueMetadata ? undefined : needsConnection
+  const deckActions: DeckAction[] = [
+    {
+      id: "details",
+      label: translate("decks:actions.nameAndFormat"),
+      blocked: queuedOrOnline,
+      onPress: () => {
+        settingsSaveStarted.current = false
+        setSettingsMetadataRevision(view.currentMetadataRevision)
+        setDialog("settings")
+      },
+    },
+    ...(onMovedToDevice
+      ? [
+          {
+            id: "move",
+            label: translate("decks:actions.moveToDevice"),
+            blocked:
+              needsConnection ??
+              (hasQueuedEdits ? translate("decks:actions.editsSyncing") : undefined),
+            onPress: () => setDialog("moveDeck"),
+          },
+        ]
+      : []),
+    {
+      id: "delete",
+      label: translate("decks:actions.delete"),
+      destructive: true,
+      blocked: queuedOrOnline,
+      onPress: () => setDialog("deleteDeck"),
+    },
+  ]
 
   async function keepOnDevice() {
     if (!onMovedToDevice) return
@@ -894,9 +924,8 @@ function DeckDetailContent({
         }
         onDetails={() => {
           if (knownDeleted) return
-          settingsSaveStarted.current = false
-          setSettingsMetadataRevision(view.currentMetadataRevision)
-          setDialog("settings")
+          setError(undefined)
+          setDialog("actions")
         }}
         cardSearch={{ offlineCandidates, onAdd: addCard, onRemove: removeCard }}
         canChooseCommander={view.singleCommander && !cardsUnavailable && !editableCached}
@@ -1223,6 +1252,10 @@ function DeckDetailContent({
         />
       ) : null}
 
+      {dialog === "actions" ? (
+        <DeckActionsSheet actions={deckActions} onClose={() => setDialog("none")} />
+      ) : null}
+
       {dialog === "settings" ? (
         <DeckSettingsDialog
           game={deck.game}
@@ -1233,8 +1266,6 @@ function DeckDetailContent({
           busy={busy}
           error={error}
           onSubmit={submitSettings}
-          onDelete={confirmDeleteDeck}
-          {...(onMovedToDevice && !hasQueuedEdits ? { onKeepOnDevice: confirmKeepOnDevice } : {})}
           onClose={() => setDialog("none")}
         />
       ) : null}

@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { router } from "expo-router"
+import { useConvexConnectionState } from "convex/react"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
@@ -31,10 +33,10 @@ import {
   type GuestDeckPayload,
 } from "@/features/decks/guestDeck"
 import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
-import { LocalDeckSyncAction } from "@/features/decks/LocalDeckSyncAction"
 import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckKeyStats } from "@/features/decks/useDeckKeyStats"
+import { useLocalDeckSyncAction } from "@/features/decks/useLocalDeckSyncAction"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -83,10 +85,17 @@ export function GuestDeckDetailScreen({
   const [conflict, setConflict] = useState(false)
   const [mode, setMode] = useState<DeckMode>(restored ? "build" : "play")
   const building = mode === "build"
-  const [settings, setSettings] = useState(false)
+  const [sheet, setSheet] = useState<"actions" | "settings">()
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingElsewhere = useLocalDeckSyncing(localId)
+  const deckSync = useLocalDeckSyncAction({
+    access,
+    localId,
+    onSynced: (deckId) => onSynced?.(deckId),
+    onSyncingChange: setSyncing,
+  })
+  const offline = useConvexConnectionState()?.isWebSocketConnected === false
   const [leaving, setLeaving] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
   // why: Play lists the saved deck, so a card focused there may already be gone from the draft.
@@ -242,6 +251,43 @@ export function GuestDeckDetailScreen({
     : 0
   const savedDeck = stored?.deck ?? current
   const shown = building ? current : savedDeck
+  const canSync = (access?.signedIn ?? Boolean(access?.ownerId)) && Boolean(onSynced)
+  const deckActions: DeckAction[] = [
+    {
+      id: "details",
+      label: translate("decks:actions.nameAndFormat"),
+      onPress: () => setSheet("settings"),
+    },
+    ...(canSync
+      ? [
+          {
+            id: "sync",
+            label: translate("decks:actions.sync"),
+            detail: deckSync.capacityLabel,
+            blocked:
+              !access?.ready || offline
+                ? (access?.message ?? translate("account:cloud.reconnect"))
+                : dirty
+                  ? translate("decks:actions.saveFirst")
+                  : undefined,
+            onPress: () => {
+              setSheet(undefined)
+              deckSync.sync()
+            },
+          },
+        ]
+      : []),
+    {
+      id: "delete",
+      label: translate("decks:actions.delete"),
+      destructive: true,
+      onPress: () => {
+        setSheet(undefined)
+        setDeleteRevision(revisionRef.current)
+        setDeleting(true)
+      },
+    },
+  ]
 
   return (
     <Screen
@@ -290,7 +336,7 @@ export function GuestDeckDetailScreen({
         onBack={onBack}
         onSave={save}
         onDiscard={discard}
-        onDetails={() => setSettings(true)}
+        onDetails={() => setSheet("actions")}
         cardSearch={{ onAdd: addCard, onRemove: removeCard }}
         canChooseCommander={singleCommander}
         commanderWarnings={commanderWarnings}
@@ -306,14 +352,9 @@ export function GuestDeckDetailScreen({
         }
         error={
           <>
-            {(access?.signedIn ?? Boolean(access?.ownerId)) && onSynced ? (
-              <LocalDeckSyncAction
-                access={access}
-                localId={localId}
-                disabled={dirty}
-                onSynced={onSynced}
-                onSyncingChange={setSyncing}
-              />
+            {deckSync.busy ? <Text size="xs" tone="dim" tx="decks:localSync.syncing" /> : null}
+            {deckSync.error ? (
+              <Text accessibilityRole="alert" size="xs" text={deckSync.error} />
             ) : null}
             {error ? <Text testID="guest-deck-error" style={themed($error)} text={error} /> : null}
             {conflict ? (
@@ -334,23 +375,22 @@ export function GuestDeckDetailScreen({
           </>
         }
       />
-      {settings ? (
+      {sheet === "actions" ? (
+        <DeckActionsSheet actions={deckActions} onClose={() => setSheet(undefined)} />
+      ) : null}
+      {sheet === "settings" ? (
         <DeckSettingsDialog
           game={game}
           initial={{ name: current.name, format: current.format }}
-          onClose={() => setSettings(false)}
+          onClose={() => setSheet(undefined)}
           onSubmit={(settingsChange) => {
             update(settingsChange)
-            setSettings(false)
+            setSheet(undefined)
             setMode("build")
-          }}
-          onDelete={() => {
-            setSettings(false)
-            setDeleteRevision(revisionRef.current)
-            setDeleting(true)
           }}
         />
       ) : null}
+      {deckSync.dialogs}
       {focusedCard ? (
         <CardFocusDialog
           key={printingKey(focusedCard)}

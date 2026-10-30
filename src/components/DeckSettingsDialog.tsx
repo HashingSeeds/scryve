@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import { ScrollView } from "react-native"
 import type { ViewStyle } from "react-native"
 
@@ -18,26 +18,20 @@ import { deckNameWarning } from "../features/decks/deckCopy"
 export type DeckSettingsDraft = { name: string; format: string }
 
 export interface DeckSettingsDialogProps {
-  children?: ReactNode
   game: string
   initial: DeckSettingsDraft
   busy?: boolean
   error?: string
   onSubmit: (draft: DeckSettingsDraft) => void
-  onDelete: () => void
-  onKeepOnDevice?: () => void
   onClose: () => void
 }
 
 export function DeckSettingsDialog({
-  children,
   game,
   initial,
   busy,
   error,
   onSubmit,
-  onDelete,
-  onKeepOnDevice,
   onClose,
 }: DeckSettingsDialogProps) {
   const { themed } = useAppTheme()
@@ -79,7 +73,6 @@ export function DeckSettingsDialog({
             if (next) setFormat(next)
           }}
         />
-        {children}
         {error ? <AlertNote text={error} /> : null}
         <Button
           testID="deck-settings-save"
@@ -87,21 +80,6 @@ export function DeckSettingsDialog({
           preset="primary"
           disabled={busy || !name.trim()}
           onPress={() => onSubmit({ name, format })}
-        />
-        {onKeepOnDevice ? (
-          <Button
-            testID="move-deck-button"
-            tx="decks:settings.unsync"
-            disabled={busy}
-            onPress={onKeepOnDevice}
-          />
-        ) : null}
-        <Button
-          testID="delete-deck-button"
-          tx="decks:settings.delete"
-          preset="destructive"
-          disabled={busy}
-          onPress={onDelete}
         />
       </ScrollView>
     </DialogCard>
