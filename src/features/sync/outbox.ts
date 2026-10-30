@@ -104,7 +104,7 @@ export function createOutbox<
 
   // why: a change to the queue may let the write that hit the failure cap through, so it lifts the pause.
   const queueChanged = (next: Partial<OutboxState<Pending, Failed>>) => {
-    update({ ...next, capacityBlocked: false })
+    update({ ...next, ...(canDrain() ? { capacityBlocked: false } : {}) })
     requestDrain()
   }
 
@@ -225,7 +225,7 @@ export function createOutbox<
       })
     },
     resume: () => {
-      if (current().capacityBlocked) queueChanged({})
+      if (current().capacityBlocked && canDrain()) queueChanged({})
     },
     clear: () => {
       store.clear()

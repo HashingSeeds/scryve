@@ -832,6 +832,17 @@ describe("outbox sync controller", () => {
       expect(controller.getSnapshot().changeError).toBeUndefined()
       expect(sent.filter((operationId) => operationId === blocked).length).toBeLessThanOrEqual(2)
     })
+
+    it("keeps asking for review while offline", async () => {
+      const { controller } = await blockedGame()
+      controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+      controller.onRemoteProjection(projection(1, 20))
+      controller.changeLife("player-2", 1)
+      await settle()
+
+      expect(controller.getSnapshot().changeError).toMatch(/need review/i)
+    })
   })
 
   it("reruns a drain after authentication refresh invalidates the active drain", async () => {
