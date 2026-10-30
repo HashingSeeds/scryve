@@ -51,6 +51,7 @@ import {
 } from "@/features/decks/deckVersionsCache"
 import { DECK_MODES, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
+import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import {
   deckQueryVersionId,
   isDeckKnownDeleted,
@@ -61,8 +62,11 @@ import {
   keepAccountDraft,
   loadAccountDraft,
 } from "@/features/decks/savedDeckDrafts"
+import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -88,6 +92,7 @@ type DeckDialog =
   | "deleteDeck"
   | "moveDeck"
   | "syncConflict"
+  | "sideboard"
 
 const NEW_LIST_NOTICE_MS = 8_000
 
@@ -345,6 +350,18 @@ function DeckDetailContent({
   const { deck, cards, cardsUnavailable, cardsCached, version, versionTarget } = view
   const { activeVersionId, activeVersionSummary, failedEdit, failedCardEdit } = view
   const { matchVersionId } = view
+  const [activeGame, setActiveGame] = useState<LocalGame | null>(null)
+  useFocusEffect(useCallback(() => setActiveGame(new LocalGameRepository().loadActiveGame()), []))
+  const brought = activeGame?.account
+  const bringsThisDeck =
+    brought !== undefined &&
+    brought.ownerId === access?.ownerId &&
+    ((statsDeckKey !== undefined && brought.deckKey === statsDeckKey) ||
+      view.versionRows.some((row) => row._id === brought.deckVersionId))
+  const sideboard = useMatchSideboard(bringsThisDeck ? activeGame : undefined, {
+    game: deck?.game,
+    format: deck?.format,
+  })
   // why: Build opens its draft on the first change, so controls follow what that draft would allow.
   const editableCached = draft.editing ? cardsCached : detail === undefined && !versionTarget
   const changes = view.changes.any
@@ -807,6 +824,15 @@ function DeckDetailContent({
           },
         ]
       : []),
+    ...(sideboard?.canSwap
+      ? [
+          {
+            id: "sideboard",
+            label: translate("decks:sideboard.open"),
+            onPress: () => setDialog("sideboard"),
+          },
+        ]
+      : []),
     {
       id: "delete",
       label: translate("decks:actions.delete"),
@@ -940,6 +966,18 @@ function DeckDetailContent({
             tracked={tracksResults(deck.game)}
             deckKey={statsDeckKey}
             ready={access?.ready ?? true}
+            match={
+              sideboard && {
+                pool: sideboard.pool,
+                swaps: sideboard.swaps,
+                ...(sideboard.canSwap
+                  ? {
+                      onSideboard: () => setDialog("sideboard"),
+                      onReset: () => sideboard.apply({ in: [], out: [] }),
+                    }
+                  : {}),
+              }
+            }
             onStats={() =>
               router.push({
                 pathname: "/connected/decks/stats",
@@ -1293,6 +1331,18 @@ function DeckDetailContent({
 
       {dialog === "actions" ? (
         <DeckActionsSheet actions={deckActions} onClose={() => setDialog("none")} />
+      ) : null}
+
+      {dialog === "sideboard" && sideboard ? (
+        <SideboardSwapSheet
+          pool={sideboard.pool}
+          swaps={sideboard.swaps}
+          onApply={(swaps) => {
+            sideboard.apply(swaps)
+            setDialog("none")
+          }}
+          onClose={() => setDialog("none")}
+        />
       ) : null}
 
       {dialog === "settings" ? (

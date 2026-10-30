@@ -14,6 +14,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { recordText, type DeckRecord } from "./deckCopy"
 import { allRecord } from "./deckStatLines"
+import { swapCount, type MatchSwaps, type SwapPool } from "./matchSideboard"
 import { useDeckKeyStats } from "./useDeckKeyStats"
 import { api } from "../../../convex/_generated/api"
 
@@ -26,6 +27,12 @@ export type PlayVersion<VersionId extends string = string> = {
   record?: DeckRecord
 }
 type Result = FunctionReturnType<typeof api.deckStats.games>["page"][number]
+export type PlayMatch = {
+  pool: SwapPool
+  swaps: MatchSwaps
+  onSideboard?: () => void
+  onReset?: () => void
+}
 
 export function DeckPlay<VersionId extends string>({
   versions,
@@ -36,6 +43,7 @@ export function DeckPlay<VersionId extends string>({
   deckKey,
   ready,
   onStats,
+  match,
 }: {
   versions?: readonly PlayVersion<VersionId>[]
   bringingId?: VersionId
@@ -45,10 +53,12 @@ export function DeckPlay<VersionId extends string>({
   deckKey?: string
   ready: boolean
   onStats?: () => void
+  match?: PlayMatch
 }) {
   const { themed } = useAppTheme()
   return (
     <View testID="deck-play">
+      {match ? <ThisMatch {...match} /> : null}
       {versions?.length ? (
         <View accessibilityRole="radiogroup">
           <PlaySection tx="decks:play.bringing" />
@@ -96,6 +106,72 @@ export function DeckPlay<VersionId extends string>({
       ) : (
         <Results results={[]} />
       )}
+    </View>
+  )
+}
+
+function ThisMatch({ pool, swaps, onSideboard, onReset }: PlayMatch) {
+  const { themed } = useAppTheme()
+  const swapped = swaps.in.length > 0 || swaps.out.length > 0
+  return (
+    <View testID="deck-play-match">
+      <PlaySection
+        tx="decks:play.thisMatch"
+        action={
+          swapped && onReset ? (
+            <TextAction
+              testID="sideboard-reset"
+              tx="decks:play.reset"
+              size="xs"
+              onPress={onReset}
+            />
+          ) : undefined
+        }
+      />
+      {swapped ? (
+        <View style={themed($swaps)}>
+          {swaps.in.map((line) => (
+            <Text
+              key={`in-${line.key}`}
+              style={themed($swappedIn)}
+              text={translate("decks:play.swappedIn", { count: line.quantity, card: line.name })}
+            />
+          ))}
+          {swaps.out.map((line) => (
+            <Text
+              key={`out-${line.key}`}
+              tone="dim"
+              text={translate("decks:play.swappedOut", { count: line.quantity, card: line.name })}
+            />
+          ))}
+          <Text size="xs" tone="dim" tx="decks:play.resetsNote" style={themed($note)} />
+        </View>
+      ) : (
+        <View style={themed($option)}>
+          <View style={$flex}>
+            <Text weight="medium" tx="decks:play.asBuilt" numberOfLines={1} />
+            <Text
+              size="xs"
+              tone="dim"
+              text={translate("decks:play.asBuiltDetail", {
+                cards: translate("decks:cardCount", { count: swapCount(pool.main) }),
+                side: swapCount(pool.side),
+              })}
+            />
+          </View>
+          {onSideboard ? (
+            <TextAction testID="play-sideboard" tx="decks:sideboard.open" onPress={onSideboard} />
+          ) : null}
+        </View>
+      )}
+      {swapped && onSideboard ? (
+        <TextAction
+          testID="play-sideboard"
+          tx="decks:sideboard.open"
+          style={$alignStart}
+          onPress={onSideboard}
+        />
+      ) : null}
     </View>
   )
 }
@@ -196,7 +272,7 @@ function PlaySection({
   text,
   action,
 }: {
-  tx?: "decks:play.bringing"
+  tx?: "decks:play.bringing" | "decks:play.thisMatch"
   text?: string
   action?: ReactNode
 }) {
@@ -289,4 +365,13 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $win: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
+const $alignStart: ViewStyle = { alignSelf: "flex-start" }
+const $swaps: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xxxs,
+  paddingBottom: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $swappedIn: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
+const $note: ThemedStyle<TextStyle> = ({ spacing }) => ({ paddingTop: spacing.xs })
 const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingVertical: spacing.sm })

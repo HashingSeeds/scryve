@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { TouchableOpacity, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -12,6 +12,8 @@ import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
+import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
+import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import type { AttackChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, systemDice, type DiceSeatChip } from "@/features/game/dice"
@@ -101,6 +103,7 @@ export function CurrentGameScreen({
   )
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
+  const [sideboardOpen, setSideboardOpen] = useState(false)
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
@@ -115,6 +118,8 @@ export function CurrentGameScreen({
   const commanderLethal = playCommanderLethal(system, runtime.game.format)
   const commanderDamageEnabled = commanderLethal !== undefined
   const outState = useMemo(() => localOutState(runtime.game), [runtime.game])
+  const sideboard = useMatchSideboard(runtime.game, { game: system, format: runtime.game.format })
+  const sideboardFirst = sideboard?.canSwap ? sideboard : undefined
   const seatDeck = (playerId: PlayerId) => {
     const account = runtime.game.account
     if (!account || playerId !== account.mePlayerId) return undefined
@@ -454,7 +459,7 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {matchPrompt?.match ? (
+      {matchPrompt?.match && !sideboardOpen ? (
         <DialogCard
           visible
           onClose={() => setMatchPrompt(undefined)}
@@ -490,6 +495,34 @@ export function CurrentGameScreen({
               style={themed($dialogText)}
             />
           ) : null}
+          {sideboardFirst ? (
+            <TouchableOpacity
+              testID="sideboard-first"
+              accessibilityRole="button"
+              style={themed($sideboardFirst)}
+              onPress={() => setSideboardOpen(true)}
+            >
+              <View style={$flex}>
+                <Text weight="medium" tx="decks:sideboard.first" />
+                <Text
+                  size="xs"
+                  tone="dim"
+                  numberOfLines={1}
+                  text={translate("decks:sideboard.firstDetail", {
+                    deck:
+                      runtime.game.account?.deckName ?? translate("play:newGame.deckFallbackName"),
+                    side: swapCount(sideboardFirst.pool.side),
+                  })}
+                />
+              </View>
+              <Text
+                size="sm"
+                weight="medium"
+                tx="decks:sideboard.openAction"
+                style={themed($link)}
+              />
+            </TouchableOpacity>
+          ) : null}
           <View style={themed($dialogActions)}>
             <Button
               testID="match-prompt-end-button"
@@ -511,6 +544,18 @@ export function CurrentGameScreen({
             ) : null}
           </View>
         </DialogCard>
+      ) : null}
+
+      {sideboardOpen && sideboardFirst ? (
+        <SideboardSwapSheet
+          pool={sideboardFirst.pool}
+          swaps={sideboardFirst.swaps}
+          onApply={(swaps) => {
+            sideboardFirst.apply(swaps)
+            setSideboardOpen(false)
+          }}
+          onClose={() => setSideboardOpen(false)}
+        />
       ) : null}
 
       {matchEnding ? (
@@ -535,6 +580,17 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $flex: ViewStyle = { flex: 1, minWidth: 0 }
+const $sideboardFirst: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  minHeight: 52,
+  borderTopWidth: 1,
+  borderBottomWidth: 1,
+  borderColor: colors.separator,
+})
+const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
