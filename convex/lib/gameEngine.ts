@@ -184,7 +184,7 @@ export type Read<T> = T | Promise<T>
 /**
  * why: reads only see this game, and `pendingClaims` may stop after
  * MAX_PENDING_COMMANDER_CLAIMS + 1. `beforeNewWrite` runs once a write is known not to be a
- * retry and before the game is checked active, so a retry never spends the rate limit.
+ * retry, so a retry never spends the rate limit.
  */
 export interface GameStore {
   readonly game: EngineGame
@@ -207,7 +207,11 @@ function* read<T>(answer: Read<T>): Generator<Read<T>, T, T> {
 export function runSync<Result>(steps: GameSteps<Result>): Result {
   let step = steps.next()
   // why: each answer goes back to the read that yielded it, a pairing TypeScript can't follow.
-  while (!step.done) step = steps.next(step.value as never)
+  while (!step.done) {
+    if (step.value instanceof Promise)
+      throw new Error("A synchronous game store returned a promise")
+    step = steps.next(step.value as never)
+  }
   return step.value
 }
 

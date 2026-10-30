@@ -341,9 +341,6 @@ function replacePokemon(board: PokemonBoard, next: PokemonInPlay): PokemonBoard 
     : { ...board, bench: board.bench.map((pokemon) => (pokemon.id === next.id ? next : pokemon)) }
 }
 
-/**
- * why: one reducer for local games, the connected optimistic overlay, and the Convex mutation, so every device lands on the same table. Returns null for an action the table rejects, and the same table for a no-op.
- */
 export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
   if (
     action.kind === "pokemon.knockedOut" ||
@@ -355,6 +352,9 @@ export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
   return undefined
 }
 
+/**
+ * why: one reducer for local games, the connected optimistic overlay, and the Convex mutation, so every device lands on the same table. Returns null for an action the table rejects, and the same table for a no-op.
+ */
 export function applyTableAction(
   table: TableState,
   action: TableAction,

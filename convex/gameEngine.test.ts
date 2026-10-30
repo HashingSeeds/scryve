@@ -5,7 +5,9 @@ import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import {
   engineGameOf,
+  runSync,
   type EngineError,
+  type GameSteps,
   type GameAck as MemoryAck,
   type GameWrite as MemoryWrite,
 } from "./lib/gameEngine"
@@ -253,6 +255,15 @@ const sent = (operationId: string, deviceId = HOST_DEVICE) => ({
 })
 
 const commander = { system: "mtg", format: "commander", startingLife: 40 }
+
+describe("runSync", () => {
+  it("refuses a store read that returns a promise instead of reading it as missing", () => {
+    function* steps(): GameSteps<boolean> {
+      return (yield Promise.resolve(1)) === undefined
+    }
+    expect(() => runSync(steps())).toThrow("A synchronous game store returned a promise")
+  })
+})
 
 describe("engine parity: changeLife", () => {
   it("applies, replays, and rejects the same writes Convex does", async () => {
