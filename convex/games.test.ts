@@ -613,6 +613,12 @@ describe("Convex realtime life writes", () => {
       },
       {
         actor: game.host,
+        args: { ...args, publicId: "missing-game-id-123456", operationId: "short" },
+        code: "invalid_operation_id",
+        message: "Invalid operation identifier",
+      },
+      {
+        actor: game.host,
         args: { ...args, deviceId: "short" },
         code: "invalid_device_id",
         message: "Invalid device identifier",
@@ -2826,6 +2832,29 @@ describe("connected table actions", () => {
     await expect(status(changed[1])).resolves.toMatchObject({
       operationStatus: { status: "conflict" },
     })
+  })
+
+  it("matches a retry by the action as sent when the name gate hid the stored name", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const args = tableArgs(game.publicId, "table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId: "gated-000001",
+      slot: "bench",
+      card: { name: "Sh1T", hp: 60, prizes: 1 },
+    })
+    await game.host.mutation(api.games.tableAction, args)
+    await expect(game.host.mutation(api.games.tableAction, args)).resolves.toMatchObject({
+      deduplicated: true,
+    })
+    const { publicId, ...operation } = args
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId,
+      operation: { kind: "table.action", ...operation },
+    })
+    expect(projection.table?.players[game.hostPlayerId].pokemon?.bench[0]?.name).toBeUndefined()
+    expect(projection.operationStatus).toMatchObject({ status: "acknowledged" })
   })
 
   it("knocks out on damage that is lethal against the stored damage, even when each device saw a safe total", async () => {

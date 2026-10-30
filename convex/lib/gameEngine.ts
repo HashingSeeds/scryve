@@ -197,7 +197,6 @@ export interface GameStore {
   apply(changes: readonly GameChange[]): Read<void>
 }
 
-/** why: the nearby host writes synchronously while Convex awaits, so the engine yields each store read and a driver answers it. */
 export type GameSteps<Result> = Generator<Read<unknown>, Result, never>
 
 function* read<T>(answer: Read<T>): Generator<Read<T>, T, T> {
@@ -244,7 +243,6 @@ const checkWrite = ({ operationId, deviceId, clientCreatedAt }: WriteRequest) =>
 const checkActive = (game: Pick<EngineGame, "status">) =>
   game.status === "active" ? null : writeError("game_not_active", "Game is not active")
 
-/** why: Convex runs this before it loads the game, so a malformed write fails the same way whether or not its game exists. */
 export function rejectRequest(write: GameWrite): EngineError | null {
   if (write.kind === "life")
     return (
@@ -323,7 +321,6 @@ export function matchLifeRetry(
   request: LifeChangeRequest,
 ): RetryMatch {
   if (!previous) return "new"
-  // why: a floored change stores the delta the client sent in `actionIdentity`; matching on the stored delta would turn its retries and status checks into conflicts.
   const delta =
     previous.actionIdentity === undefined ? previous.delta : Number(previous.actionIdentity)
   return previous.kind === "life.changed" && isSameLifeChange({ ...previous, delta }, request)
@@ -525,7 +522,6 @@ function* writeTable(
     ...write,
     action,
     actorUserId: actor.userId,
-    // why: identity comes from the action as sent, so a retry matches even when the name gate trimmed what was stored.
     actionIdentity: tableActionIdentity(write.action),
   }
   const retry = matchTableRetry(yield* read(store.event(operationId)), seat.id, request)
