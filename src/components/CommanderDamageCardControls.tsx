@@ -164,7 +164,7 @@ export function CommanderDamageCardControls({
   )
 }
 
-type CommanderFlood = NonNullable<CommanderTakeover["flood"]>
+export type CommanderFlood = NonNullable<CommanderTakeover["flood"]>
 
 // why: the shadow is the attacker's card grown on every side, from just inside its own edges until it covers the farthest seat. Its blur fades over twice FLOOD_BLUR past those edges, so it arrives with a soft edge.
 function shadowGrown(flood: CommanderFlood, wave: number) {
@@ -172,13 +172,16 @@ function shadowGrown(flood: CommanderFlood, wave: number) {
   return -FLOOD_BLUR * 2 + wave * (flood.distance + FLOOD_BLUR * 2)
 }
 
-/** why: 0 until the shadow's soft edge reaches a point `gap` away, 1 once its solid core covers it. */
-export function shadowReached(flood: CommanderFlood, wave: number, gap: number) {
+/** why: 0 until the shadow's soft edge reaches a point `gap` away, 1 once its solid core covers it, or once the shadow has grown `span` past that, if it still has that far to go. */
+export function shadowReached(flood: CommanderFlood, wave: number, gap: number, span?: number) {
   "worklet"
-  return Math.min(
-    1,
-    Math.max(0, (shadowGrown(flood, wave) + FLOOD_BLUR * 2 - gap) / (FLOOD_BLUR * 2)),
+  // why: a worklet captures only what its body uses, so the default lives here rather than in the signature.
+  const edge = shadowGrown(flood, wave) + FLOOD_BLUR * 2 - gap
+  const room = Math.max(
+    FLOOD_BLUR * 2,
+    Math.min(span ?? FLOOD_BLUR * 2, flood.distance + FLOOD_BLUR * 2 - gap),
   )
+  return Math.min(1, Math.max(0, edge / room))
 }
 
 function takeoverExit(duration: number, source: boolean): EntryExitAnimationFunction {
@@ -195,17 +198,17 @@ function takeoverExit(duration: number, source: boolean): EntryExitAnimationFunc
   }
 }
 
-/** why: a defender's flood grows over the card's own controls before they go, and drains back off them when the attack ends, so the card keeps the last takeover until the flood has drained. `covered` turns true once the flood fills the card. */
-export function useCommanderTakeover(
+/** why: a defender's flood grows over the card's own controls before they go, and drains back off them when the attack ends, so the card keeps the last takeover and its attacker until the flood has drained. `covered` turns true once the flood fills the card. */
+export function useCommanderTakeover<Attacker>(
   takeover: CommanderTakeover | undefined,
-  attackerColor: string | undefined,
+  attacker: Attacker,
 ) {
   const reducedMotion = useReducedMotion()
   const active = !!takeover
   const duration = motionDuration(reducedMotion, active ? TAKEOVER_MS : DRAIN_MS)
-  const last = useRef({ takeover, attackerColor })
+  const last = useRef({ takeover, attacker })
   useEffect(() => {
-    if (takeover) last.current = { takeover, attackerColor }
+    if (takeover) last.current = { takeover, attacker }
   })
   const [draining, setDraining] = useState(false)
   const [covered, setCovered] = useState(active && !duration)
@@ -240,13 +243,13 @@ export function useCommanderTakeover(
 
   // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame. A flood with no reach is a still fill with nothing to drain.
   const shown = takeover
-    ? { takeover, attackerColor }
+    ? { takeover, attacker }
     : (draining || wasActive.current) && last.current.takeover?.flood
       ? last.current
       : undefined
   return {
     takeover: shown?.takeover,
-    attackerColor: shown?.attackerColor,
+    attacker: shown?.attacker,
     wave,
     covered: active && covered,
   }

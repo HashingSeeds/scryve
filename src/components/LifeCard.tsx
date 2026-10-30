@@ -419,7 +419,10 @@ export const LifeCard = memo(function LifeCard({
           reach: commanderDamage?.reach,
         })
       : undefined
-  const floodedBy = useCommanderTakeover(takeover, commanderDamage?.attacker?.color)
+  const floodedBy = useCommanderTakeover(takeover, {
+    id: armedCommanderId,
+    color: commanderDamage?.attacker?.color,
+  })
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -456,6 +459,15 @@ export const LifeCard = memo(function LifeCard({
   // why: a defender's own controls stay until the attacker's flood has covered them.
   const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
   const shownFlood = floodedBy.takeover?.flood
+  // why: the strip keeps the attack's look until the flood has drained off it.
+  const stripAttackerId = defending ? armedCommanderId : floodedBy.attacker?.id
+  const stripAttack = stripAttackerId
+    ? {
+        attackerId: stripAttackerId,
+        wave: floodedBy.takeover ? floodedBy.wave : undefined,
+        flood: shownFlood,
+      }
+    : undefined
   // why: a connected game holds hits until the attacker sends them, so the lit total reads the attack's own running totals, the stronger partner's, to move with each tap.
   const stripIncoming =
     defending && armedCommanderId && commanderDamage
@@ -640,7 +652,7 @@ export const LifeCard = memo(function LifeCard({
           takeover={floodedBy.takeover}
           wave={floodedBy.wave}
           cardSize={cardSize}
-          floodColor={floodedBy.attackerColor ? deepShade(color) : foreground}
+          floodColor={floodedBy.attacker?.color ? deepShade(color) : foreground}
           defenderColor={color}
         />
       ) : null}
@@ -892,13 +904,13 @@ export const LifeCard = memo(function LifeCard({
           seats={commanderDamage.seats}
           incoming={stripIncoming ?? commanderDamage.incoming}
           lethal={commanderDamage.lethal}
-          foreground={defending ? SHADOW_INK : foreground}
+          foreground={stripAttack ? SHADOW_INK : foreground}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
           open={overviewShown}
-          attackerId={defending ? armedCommanderId : undefined}
+          attack={stripAttack}
           inspectDisabled={inspectDisabled || sittingOut}
           closeIconStyle={overviewCloseStyle}
           onToggle={commanderDamage.inspection.onToggle}

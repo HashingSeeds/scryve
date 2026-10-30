@@ -535,7 +535,7 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-own-seat-2")).toHaveStyle({ opacity: 0.3 })
   })
 
-  it("keeps a defender's own controls under the flood until it covers them, and drains it off them after", () => {
+  it("keeps a defender's own controls under the flood until it covers them, and drains it and the strip's attack look off them after", () => {
     const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     const timing = jest
       .spyOn(Reanimated, "withTiming")
@@ -556,8 +556,11 @@ describe("LifeCard", () => {
       view.rerender(defendingCard({}, false))
       expect(view.getByTestId("life-corner-layer-seat-2")).toBeTruthy()
       expect(view.getByTestId("commander-flood-seat-2")).toBeTruthy()
+      // why: the strip stays over the draining shadow instead of dropping under it.
+      expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "none")
       act(() => jest.advanceTimersByTime(TAKEOVER_MS))
       expect(view.queryByTestId("commander-takeover-seat-2")).toBeNull()
+      expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "auto")
     } finally {
       timing.mockRestore()
       motion.mockRestore()

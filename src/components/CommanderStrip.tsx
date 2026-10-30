@@ -2,10 +2,12 @@ import { memo, useEffect, useRef, useState, type ComponentProps, type ReactNode 
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated"
 
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
@@ -18,8 +20,8 @@ import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { TAKEOVER_LAYERS } from "./CommanderDamageCardControls"
-import type { CommanderBoardSeat } from "./commanderDamageLayout"
+import { shadowReached, TAKEOVER_LAYERS, type CommanderFlood } from "./CommanderDamageCardControls"
+import { floodGap, type CommanderBoardSeat } from "./commanderDamageLayout"
 import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
 import {
@@ -51,10 +53,16 @@ export interface CommanderStripProps {
   open: boolean
   inspectDisabled?: boolean
   closeIconStyle?: ComponentProps<typeof Animated.View>["style"]
-  // why: while a commander attacks this seat, the strip stays over the shadow with that attacker's total lit and the rest faded, and taps fall through to the hit target.
-  attackerId?: PlayerId
+  attack?: CommanderStripAttack
   onBoundsChange?: (bounds: LayoutRectangle) => void
   onToggle: () => void
+}
+
+/** why: while a commander attacks this seat, the strip stays over the shadow with that attacker's total lit and the rest faded, and taps fall through to the hit target. The look eases in as the shadow's edge reaches the strip and back out as it drains, so the card passes the attack on until its flood has drained. With no `wave` the look is fully on. */
+export type CommanderStripAttack = {
+  attackerId: PlayerId
+  wave?: SharedValue<number>
+  flood?: CommanderFlood
 }
 
 export function commanderDamageDealers(
@@ -81,7 +89,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   open,
   inspectDisabled,
   closeIconStyle,
-  attackerId,
+  attack,
   onToggle,
   onBoundsChange,
 }: CommanderStripProps) {
@@ -114,11 +122,29 @@ export const CommanderStrip = memo(function CommanderStrip({
     justifyContent: vertical === "top" ? "flex-start" : "flex-end",
     padding: spacing.xxs,
   }
-  if (dealt.length === 0 && !attackerId) return null
+  const attackerId = attack?.attackerId
+  const flood = attack?.flood
+  // why: the grid is measured from its own center; until it lays out, it changes with the disc.
+  const lit: Lit = {
+    attacked: !!attackerId,
+    wave: attack?.wave,
+    flood,
+    gap:
+      flood && stripBounds && mapBounds
+        ? floodGap(flood, {
+            x: stripBounds.x + mapBounds.x + mapBounds.width / 2,
+            y: stripBounds.y + mapBounds.y + mapBounds.height / 2,
+          })
+        : (flood?.discGap ?? 0),
+  }
+  // why: a seat no one has damaged shows its strip only for the attack.
+  const attackOnly = dealt.length === 0
+  const stripStyle = useAnimatedStyle(() => ({ opacity: attackOnly ? litAt(lit) : 1 }))
+  if (attackOnly && !attackerId) return null
   const attackerName = players.find(({ id }) => id === attackerId)?.name
 
   return (
-    <View
+    <Animated.View
       testID={`commander-strip-seat-${seatNumber}`}
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
       pointerEvents={attackerId ? "none" : "auto"}
@@ -129,6 +155,7 @@ export const CommanderStrip = memo(function CommanderStrip({
           flexDirection: stripDirection(contentRotation),
         },
         attackerId && $aboveShadow,
+        stripStyle,
       ]}
     >
       <BoardPressable
@@ -172,10 +199,13 @@ export const CommanderStrip = memo(function CommanderStrip({
               const size = { width: disc, height: disc }
               if (playerId === ownerPlayerId)
                 return (
-                  <View
+                  <Eased
                     key={playerId}
                     testID={`commander-own-seat-${seatNumber}`}
-                    style={[themed($ownSeat), size, attackerId && $faded]}
+                    lit={lit}
+                    rest={OWN_OPACITY}
+                    attacked={attackerId ? FADED_OPACITY : OWN_OPACITY}
+                    style={[themed($ownSeat), size]}
                   >
                     <PlayerMark
                       seatNumber={playerIndex + 1}
@@ -184,13 +214,33 @@ export const CommanderStrip = memo(function CommanderStrip({
                       rotation={contentRotation}
                       size={Math.round(disc * 0.6)}
                     />
-                  </View>
+                  </Eased>
                 )
               const total = incoming[playerId] ?? 0
               const ink = accessibleForeground(player.color)
               const attacking = playerId === attackerId
+              const restOpacity = total === 0 ? IDLE_OPACITY : 1
+              const restBorder = total >= lethal ? foreground : overlayTint(foreground, 0.5)
+              const count = (
+                <Text
+                  testID={attacking ? `commander-total-seat-${seatNumber}` : undefined}
+                  text={String(total)}
+                  weight="bold"
+                  maxFontSizeMultiplier={1}
+                  style={[themed(compact ? $compactCount : $count), { color: ink }, glyphRotation]}
+                />
+              )
+              const mark = (
+                <PlayerMark
+                  seatNumber={playerIndex + 1}
+                  shape={player.shape}
+                  color={ink}
+                  rotation={contentRotation}
+                  size={Math.round(disc * 0.5)}
+                />
+              )
               const pip = (
-                <View
+                <Pip
                   key={playerId}
                   testID={`commander-pip-seat-${seatNumber}-${playerId}`}
                   accessible={attacking}
@@ -202,38 +252,38 @@ export const CommanderStrip = memo(function CommanderStrip({
                         })
                       : undefined
                   }
+                  lit={lit}
+                  rest={{ opacity: restOpacity, border: restBorder }}
+                  attacked={
+                    attacking
+                      ? { opacity: 1, border: foreground }
+                      : attackerId
+                        ? { opacity: FADED_OPACITY, border: restBorder }
+                        : { opacity: restOpacity, border: restBorder }
+                  }
                   style={[
                     themed($disc),
                     size,
-                    { backgroundColor: player.color, borderColor: overlayTint(foreground, 0.5) },
-                    total === 0 && !attacking && themed($idleDisc),
-                    total >= lethal && [themed($lethalDisc), { borderColor: foreground }],
-                    attacking && { borderColor: foreground },
-                    attackerId && !attacking && $faded,
+                    { backgroundColor: player.color },
+                    total >= lethal && themed($lethalDisc),
                   ]}
                 >
-                  {total > 0 || attacking ? (
-                    <Text
-                      testID={attacking ? `commander-total-seat-${seatNumber}` : undefined}
-                      text={String(total)}
-                      weight="bold"
-                      maxFontSizeMultiplier={1}
-                      style={[
-                        themed(compact ? $compactCount : $count),
-                        { color: ink },
-                        glyphRotation,
-                      ]}
-                    />
+                  {total > 0 ? (
+                    count
+                  ) : attacking ? (
+                    // why: an attacker that has dealt nothing yet turns its mark into its 0 as the shadow reaches the strip.
+                    <>
+                      <Eased lit={lit} rest={1} attacked={0}>
+                        {mark}
+                      </Eased>
+                      <Eased lit={lit} rest={0} attacked={1} style={$overlaid}>
+                        {count}
+                      </Eased>
+                    </>
                   ) : (
-                    <PlayerMark
-                      seatNumber={playerIndex + 1}
-                      shape={player.shape}
-                      color={ink}
-                      rotation={contentRotation}
-                      size={Math.round(disc * 0.5)}
-                    />
+                    mark
                   )}
-                </View>
+                </Pip>
               )
               return attacking ? (
                 <Pop key={playerId} value={total}>
@@ -253,9 +303,60 @@ export const CommanderStrip = memo(function CommanderStrip({
           <Icon icon="x" color={foreground} size={18} />
         </Animated.View>
       </BoardPressable>
-    </View>
+    </Animated.View>
   )
 }, structurallyEqual)
+
+// why: the grid is small, so it eases over a longer stretch of the shadow's travel than its edge takes to cross it; a quick edge would flip it in a frame.
+const LIT_SPAN = 192
+
+/** why: how far the strip has eased into its attack look, from 0 to 1: as the shadow's edge passes the grid, or at once with no `wave`. */
+type Lit = { attacked: boolean; wave?: SharedValue<number>; flood?: CommanderFlood; gap: number }
+
+function litAt({ attacked, wave, flood, gap }: Lit) {
+  "worklet"
+  if (!wave) return attacked ? 1 : 0
+  return flood ? shadowReached(flood, wave.value, gap, LIT_SPAN) : wave.value
+}
+
+type PipLook = { opacity: number; border: string }
+
+/** why: a pip eases from its resting look to its attack look as `lit` runs from 0 to 1, so the attacker's brightens and outlines and the rest fade with the passing shadow. */
+function Pip({
+  lit,
+  rest,
+  attacked,
+  style,
+  ...props
+}: ComponentProps<typeof Animated.View> & {
+  lit: Lit
+  rest: PipLook
+  attacked: PipLook
+}) {
+  const look = useAnimatedStyle(() => {
+    const amount = litAt(lit)
+    return {
+      opacity: rest.opacity + (attacked.opacity - rest.opacity) * amount,
+      borderColor: interpolateColor(amount, [0, 1], [rest.border, attacked.border]),
+    }
+  })
+  return <Animated.View {...props} style={[style, look]} />
+}
+
+function Eased({
+  lit,
+  rest,
+  attacked,
+  style,
+  ...props
+}: ComponentProps<typeof Animated.View> & {
+  lit: Lit
+  rest: number
+  attacked: number
+}) {
+  const fade = useAnimatedStyle(() => ({ opacity: rest + (attacked - rest) * litAt(lit) }))
+  return <Animated.View {...props} style={[style, fade]} />
+}
 
 /** why: the attacker's total pops as each hit lands, so a tap reads on the strip the defender is watching. */
 function Pop({ value, children }: { value: number; children: ReactNode }) {
@@ -355,8 +456,6 @@ const $disc: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $idleDisc: ThemedStyle<ViewStyle> = () => ({ opacity: 0.45 })
-
 const $lethalDisc: ThemedStyle<ViewStyle> = () => ({ borderWidth: 2 })
 
 const $count: ThemedStyle<TextStyle> = () => ({
@@ -374,9 +473,15 @@ const $compactCount: ThemedStyle<TextStyle> = () => ({
 const $ownSeat: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
-  opacity: 0.35,
 })
 
 const $hidden: ViewStyle = { opacity: 0 }
-const $faded: ViewStyle = { opacity: 0.3 }
+const $overlaid: ViewStyle = {
+  ...StyleSheet.absoluteFill,
+  alignItems: "center",
+  justifyContent: "center",
+}
+const IDLE_OPACITY = 0.45
+const OWN_OPACITY = 0.35
+const FADED_OPACITY = 0.3
 const $aboveShadow: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }

@@ -234,6 +234,17 @@ function rotate(x: number, y: number, degrees: number) {
   }
 }
 
+/** why: how far the attacker's card, centered at `x`, `y` in a seat's own space, must grow to cover `point` there. */
+export function floodGap(
+  flood: { x: number; y: number; card: { width: number; height: number } },
+  point: { x: number; y: number },
+) {
+  return Math.max(
+    Math.abs(point.x - flood.x) - flood.card.width / 2,
+    Math.abs(point.y - flood.y) - flood.card.height / 2,
+  )
+}
+
 export function commanderTakeover(input: {
   card: { width: number; height: number }
   rotation: number
@@ -272,9 +283,9 @@ export function commanderTakeover(input: {
         ...floodAt,
         card: reach.card,
         distance: reach.distance,
-        discGap: Math.max(
-          Math.abs(card.width / 2 + cardDiscOffset.x - floodAt.x) - reach.card.width / 2,
-          Math.abs(card.height / 2 + cardDiscOffset.y - floodAt.y) - reach.card.height / 2,
+        discGap: floodGap(
+          { ...floodAt, card: reach.card },
+          { x: card.width / 2 + cardDiscOffset.x, y: card.height / 2 + cardDiscOffset.y },
         ),
       },
   }
