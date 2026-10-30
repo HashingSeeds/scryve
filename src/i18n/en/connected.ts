@@ -299,7 +299,6 @@ const connected = {
     loading: "Loading connected board…",
     notCached: "This board is not saved on this device. Reconnect so the game can be loaded here.",
     anotherSeat: "Another seat",
-    closeLayout: "Close layout chooser",
     failedAction: {
       life: {
         none: "A {{delta}} life change could not sync",
@@ -316,15 +315,10 @@ const connected = {
       declineCommanderDamage: "Declining commander damage could not sync",
     },
     menu: {
-      layout: "Layout",
-      dice: "Dice",
       players: "Players",
       history: "History",
-      rules: "Rules",
       end: "End",
       leave: "Leave",
-      closeDice: "Close dice",
-      exitCommanderDamage: "Exit commander damage",
     },
     status: {
       close: "Close connected-game status",

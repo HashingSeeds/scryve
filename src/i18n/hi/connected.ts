@@ -294,7 +294,6 @@ export default {
     notCached:
       "यह बोर्ड इस डिवाइस पर सहेजा नहीं गया है। दोबारा कनेक्ट करें ताकि गेम यहाँ लोड हो सके।",
     anotherSeat: "दूसरी सीट",
-    closeLayout: "लेआउट चुनने वाला बंद करें",
     failedAction: {
       life: {
         none: "{{delta}} लाइफ़ बदलाव सिंक नहीं हो सका",
@@ -311,15 +310,10 @@ export default {
       declineCommanderDamage: "कमांडर डैमेज अस्वीकार करना सिंक नहीं हो सका",
     },
     menu: {
-      layout: "लेआउट",
-      dice: "पासा",
       players: "खिलाड़ी",
       history: "इतिहास",
-      rules: "नियम",
       end: "समाप्त",
       leave: "बाहर निकलें",
-      closeDice: "पासा बंद करें",
-      exitCommanderDamage: "कमांडर डैमेज से बाहर निकलें",
     },
     status: {
       close: "कनेक्टेड गेम की स्थिति बंद करें",

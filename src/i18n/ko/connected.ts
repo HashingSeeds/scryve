@@ -279,7 +279,6 @@ export default {
     loading: "연결 보드 불러오는 중…",
     notCached: "이 보드가 이 기기에 저장되어 있지 않습니다. 게임을 불러오려면 다시 연결하세요.",
     anotherSeat: "다른 자리",
-    closeLayout: "레이아웃 선택 닫기",
     failedAction: {
       life: {
         none: "생명점 {{delta}} 변경을 동기화하지 못했습니다",
@@ -296,15 +295,10 @@ export default {
       declineCommanderDamage: "커맨더 피해 거절을 동기화하지 못했습니다",
     },
     menu: {
-      layout: "레이아웃",
-      dice: "주사위",
       players: "플레이어",
       history: "기록",
-      rules: "규칙",
       end: "종료",
       leave: "나가기",
-      closeDice: "주사위 닫기",
-      exitCommanderDamage: "커맨더 피해 나가기",
     },
     status: {
       close: "연결 게임 상태 닫기",

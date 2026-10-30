@@ -284,7 +284,6 @@ export default {
     notCached:
       "このボードはこのデバイスに保存されていません。ゲームを読み込めるよう、再接続してください。",
     anotherSeat: "別の席",
-    closeLayout: "レイアウト選択を閉じる",
     failedAction: {
       life: {
         none: "{{delta}}のライフの変更を同期できませんでした",
@@ -301,15 +300,10 @@ export default {
       declineCommanderDamage: "統率者ダメージの拒否を同期できませんでした",
     },
     menu: {
-      layout: "レイアウト",
-      dice: "ダイス",
       players: "プレイヤー",
       history: "履歴",
-      rules: "ルール",
       end: "終了",
       leave: "退出",
-      closeDice: "ダイスを閉じる",
-      exitCommanderDamage: "統率者ダメージを閉じる",
     },
     status: {
       close: "通信対戦のステータスを閉じる",

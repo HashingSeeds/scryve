@@ -1,24 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
-import { useKeepAwake } from "expo-keep-awake"
+import type { TextStyle, ViewStyle } from "react-native"
+import { View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
-import {
-  $dialogActions,
-  $dialogButton,
-  $dialogText,
-  DialogCard,
-  type DialogOrigin,
-} from "@/components/DialogCard"
+import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
-import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import type { GameMenuActions } from "@/components/GameRadialMenu"
-import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
-import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
-import { ResultLiveRegion } from "@/components/ResultAnnouncer"
+import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
@@ -36,7 +25,8 @@ import {
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
-import { type BoardSize, GameBoardStage } from "@/features/game/GameBoardStage"
+import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
+import type { BoardSize } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
@@ -53,10 +43,7 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
-import { closingMenu, useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
-import { gameRules, openRules } from "@/features/rules/gameRules"
-import { prefetchRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -101,17 +88,11 @@ export function CurrentGameScreen({
   repository,
   ownerId,
 }: CurrentGameScreenProps) {
-  useKeepAwake(undefined, { suppressDeactivateWarnings: true })
   const { themed } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const { isFoil } = useRevenueCat()
   const system = runtime.game.system
-  const rules = gameRules(system)
-  useEffect(() => {
-    if (rules?.kind === "text") prefetchRules(rules)
-  }, [rules])
-  const [menuOpen, setMenuOpen] = useState(false)
   const [boardSize, setBoardSize] = useState<BoardSize>()
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
@@ -130,8 +111,88 @@ export function CurrentGameScreen({
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
-  const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
-  const dice = useDice(runtime.game.players, runtime.game.id, system)
+  const markFirstPlayerUsed = runtime.markFirstPlayerUsed
+  const commanderLethal = playCommanderLethal(system, runtime.game.format)
+  const commanderDamageEnabled = commanderLethal !== undefined
+  const outState = useMemo(() => localOutState(runtime.game), [runtime.game])
+  const seatDeck = (playerId: PlayerId) => {
+    const account = runtime.game.account
+    if (!account || playerId !== account.mePlayerId) return undefined
+    if (account.deckVersionId) return { ownerId: account.ownerId, versionId: account.deckVersionId }
+    return account.deckKey && account.deckFingerprint
+      ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
+      : undefined
+  }
+  const commanderPort = {
+    incoming: (to: PlayerId, commander?: CommanderSlot) =>
+      incomingCommanderDamage(runtime.game, to, commander),
+    commit: (from: PlayerId, changes: readonly AttackChange[]) =>
+      changes.forEach(({ toPlayerId, commander, delta }) =>
+        runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
+      ),
+  }
+  const attack = useCommanderAttack(commanderPort, { seatDeck })
+  const attackDispatch = attack.dispatch
+  const layoutVariant = runtime.game.layout ?? "auto"
+  const chrome = useBoardChrome({
+    gameId: runtime.game.id,
+    system,
+    players: runtime.game.players,
+    layout: {
+      value: layoutVariant,
+      onChange: runtime.changeLayout,
+      seats: (
+        <SeatArrangement
+          players={runtime.game.players}
+          layoutVariant={layoutVariant}
+          board={boardSize}
+          seatOrder={runtime.game.seatOrder}
+          onChange={runtime.changeSeatOrder}
+        />
+      ),
+    },
+    petals: [
+      {
+        kind: "setup",
+        label: translate("board:menu.game"),
+        disabled: !onSetup,
+        onPress: () => onSetup?.(),
+      },
+      isFresh
+        ? {
+            kind: "connect",
+            label: translate("board:menu.connect"),
+            disabled: !onConnect,
+            onPress: () => onConnect?.(),
+          }
+        : {
+            kind: "end-game",
+            label: translate("board:menu.end"),
+            onPress: () => setEndSource("game_menu"),
+          },
+    ],
+    attack,
+    // why: rolling by hand means the players skipped the first-player offer.
+    onDiceTool: markFirstPlayerUsed,
+    statusLine: match
+      ? {
+          text: translate("board:match.statusLine", {
+            context: matchContextLabel(runtime.game),
+            bestOf: match.bestOf,
+          }),
+          tone: "caughtUp",
+          onPress: () => setMatchOpen(true),
+        }
+      : undefined,
+    accountEntry,
+    onRules,
+    onDecks,
+    onHistory,
+    onSettings,
+    onSupport,
+    onAccount,
+  })
+  const { menuOpen, dice } = chrome
   const { firstPlayerId } = dice
   const { setFirstPlayer } = runtime
   const settledFirstPlayer = useRef(firstPlayerId)
@@ -141,7 +202,6 @@ export function CurrentGameScreen({
   }, [firstPlayerId, setFirstPlayer])
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
-  const markFirstPlayerUsed = runtime.markFirstPlayerUsed
   useEffect(() => {
     if (playBegun) diceGameStarted()
   }, [playBegun, diceGameStarted])
@@ -199,37 +259,6 @@ export function CurrentGameScreen({
         },
       }
     : dice.grid
-  // why: rolling by hand means the players skipped the first-player offer.
-  const diceTools = useMemo(
-    () =>
-      closingMenu(dice.tools, () => {
-        setMenuOpen(false)
-        markFirstPlayerUsed()
-      }),
-    [dice.tools, markFirstPlayerUsed],
-  )
-  const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
-  const commanderLethal = playCommanderLethal(system, runtime.game.format)
-  const commanderDamageEnabled = commanderLethal !== undefined
-  const outState = useMemo(() => localOutState(runtime.game), [runtime.game])
-  const seatDeck = (playerId: PlayerId) => {
-    const account = runtime.game.account
-    if (!account || playerId !== account.mePlayerId) return undefined
-    if (account.deckVersionId) return { ownerId: account.ownerId, versionId: account.deckVersionId }
-    return account.deckKey && account.deckFingerprint
-      ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
-      : undefined
-  }
-  const commanderPort = {
-    incoming: (to: PlayerId, commander?: CommanderSlot) =>
-      incomingCommanderDamage(runtime.game, to, commander),
-    commit: (from: PlayerId, changes: readonly AttackChange[]) =>
-      changes.forEach(({ toPlayerId, commander, delta }) =>
-        runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
-      ),
-  }
-  const attack = useCommanderAttack(commanderPort, { seatDeck })
-  const attackDispatch = attack.dispatch
 
   function toggleSword(player: GamePlayer) {
     markFirstPlayerUsed()
@@ -240,14 +269,6 @@ export function CurrentGameScreen({
     if (playerId) markFirstPlayerUsed()
     attackDispatch({ type: "inspect", playerId })
   }
-
-  const captureMenuDialogOrigin = useCallback((event?: GestureResponderEvent) => {
-    setMenuDialogOrigin(
-      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
-    )
-  }, [])
-  const layoutVariant = runtime.game.layout ?? "auto"
-  const layoutOptions = getPlayerGridLayoutOptions(playerCount)
 
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
@@ -306,123 +327,6 @@ export function CurrentGameScreen({
     setTimeout(onGameAbandoned, 0)
   }
 
-  const openMatchScore = useCallback(() => {
-    setMenuOpen(false)
-    setMatchOpen(true)
-  }, [])
-
-  const showEndConfirmation = useCallback(() => {
-    setMenuOpen(false)
-    setEndSource("game_menu")
-  }, [])
-
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false)
-  }, [])
-
-  const toggleMenu = useCallback(() => {
-    attackDispatch({ type: "send" })
-    setMenuOpen((current) => !current)
-  }, [attackDispatch])
-
-  const exitCommanderMode = useCallback(() => attackDispatch({ type: "send" }), [attackDispatch])
-
-  function closePanel() {
-    setLayoutPickerOpen(false)
-  }
-
-  const openGameRules = useMemo(
-    () =>
-      rules && (rules.kind === "link" || onRules)
-        ? () => {
-            closeMenu()
-            openRules(rules, () => system && onRules?.(system))
-          }
-        : undefined,
-    [closeMenu, onRules, rules, system],
-  )
-  const radialActions: GameMenuActions = useMemo(
-    () => [
-      {
-        kind: "layout",
-        label: translate("board:menu.layout"),
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
-          setMenuOpen(false)
-          setLayoutPickerOpen(true)
-        },
-      },
-      { kind: "dice", label: translate("board:menu.dice"), tools: diceTools },
-      {
-        kind: "setup",
-        label: translate("board:menu.game"),
-        disabled: !onSetup,
-        onPress: () => {
-          closeMenu()
-          onSetup?.()
-        },
-      },
-      openGameRules
-        ? { kind: "rules", label: translate("board:menu.rules"), onPress: openGameRules }
-        : {
-            kind: "decks",
-            label: translate("common:appNavigation.decks"),
-            disabled: !onDecks,
-            onPress: () => {
-              closeMenu()
-              onDecks?.()
-            },
-          },
-      isFresh
-        ? {
-            kind: "connect",
-            label: translate("board:menu.connect"),
-            disabled: !onConnect,
-            onPress: () => {
-              closeMenu()
-              onConnect?.()
-            },
-          }
-        : {
-            kind: "end-game",
-            label: translate("board:menu.end"),
-            onPress: (event) => {
-              captureMenuDialogOrigin(event)
-              showEndConfirmation()
-            },
-          },
-    ],
-    [
-      captureMenuDialogOrigin,
-      closeMenu,
-      diceTools,
-      isFresh,
-      onConnect,
-      onDecks,
-      onSetup,
-      openGameRules,
-      showEndConfirmation,
-    ],
-  )
-
-  const diceOpen = dice.open
-  const closeDice = dice.close
-  const diceArmed = dice.grid.armed
-  const inspectedPlayerId = attack.inspectedPlayerId
-  const exitAction = useMemo(
-    () =>
-      diceOpen
-        ? {
-            label: translate("board:menu.closeDice"),
-            onPress: closeDice,
-            ...(diceArmed ? { heldTool: diceArmed } : {}),
-          }
-        : inspectedPlayerId
-          ? { label: translate("board:menu.exitCommander"), onPress: exitCommanderMode }
-          : undefined,
-    [closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderMode],
-  )
-
   return (
     <Screen
       preset="fixed"
@@ -432,9 +336,8 @@ export function CurrentGameScreen({
       contentContainerStyle={themed($screen)}
     >
       <LifeLogContext.Provider value={lifeLog}>
-        <GameBoardStage
-          playerCount={playerCount}
-          layoutVariant={layoutVariant}
+        <GameBoard
+          chrome={chrome}
           onBoardSizeChange={setBoardSize}
           firstPlayer={firstPlayer}
           renderGrid={(boardOrientation) => (
@@ -470,83 +373,8 @@ export function CurrentGameScreen({
               onChange={runtime.changeLife}
             />
           )}
-          menu={{
-            open: menuOpen,
-            actions: radialActions,
-            exitAction,
-            ...(match
-              ? {
-                  statusLine: {
-                    text: translate("board:match.statusLine", {
-                      context: matchContextLabel(runtime.game),
-                      bestOf: match.bestOf,
-                    }),
-                    tone: "caughtUp" as const,
-                    onPress: openMatchScore,
-                  },
-                }
-              : {}),
-            onToggle: toggleMenu,
-            onClose: closeMenu,
-          }}
-          windowOverlay={
-            menuOpen && onHistory && onSettings && onSupport && onAccount ? (
-              <FloatingAppNavigation
-                accountEntry={accountEntry}
-                onDecks={openGameRules ? onDecks : undefined}
-                onHistory={onHistory}
-                onSettings={onSettings}
-                onSupport={onSupport}
-                onAccount={onAccount}
-              />
-            ) : null
-          }
         />
       </LifeLogContext.Provider>
-      <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
-
-      {layoutPickerOpen ? (
-        <DialogCard
-          visible
-          onClose={closePanel}
-          origin={menuDialogOrigin}
-          backdropTestID="layout-picker-backdrop"
-          backdropAccessibilityLabel={translate("board:menu.closeLayoutChooser")}
-          dialogTestID="layout-picker-dialog"
-          accessibilityViewIsModal
-          wide
-        >
-          {/* why: layouts plus the seat map outgrow a small phone, so they scroll and Done stays put. */}
-          <ScrollView
-            testID="layout-picker-scroll"
-            style={$layoutScroll}
-            contentContainerStyle={themed($layoutContent)}
-          >
-            <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
-            {layoutOptions.length > 1 ? (
-              <PlayerLayoutPicker
-                playerCount={playerCount}
-                value={layoutVariant}
-                testID="layout"
-                onChange={(layout) => {
-                  runtime.changeLayout(layout)
-                  closePanel()
-                }}
-              />
-            ) : null}
-            <Text tx="board:seats.title" preset="subheading" style={themed($dialogText)} />
-            <SeatArrangement
-              players={runtime.game.players}
-              layoutVariant={layoutVariant}
-              board={boardSize}
-              seatOrder={runtime.game.seatOrder}
-              onChange={runtime.changeSeatOrder}
-            />
-          </ScrollView>
-          <Button tx="common:done" style={themed($menuItem)} onPress={closePanel} />
-        </DialogCard>
-      ) : null}
-
       {(match || clock) && !menuOpen ? (
         <BoardContextLabels
           match={
@@ -581,7 +409,7 @@ export function CurrentGameScreen({
       {endSource ? (
         <LocalGameEndDialog
           game={runtime.game}
-          origin={menuDialogOrigin}
+          origin={chrome.dialogOrigin}
           singleWinner={Boolean(match)}
           onClose={() => setEndSource(undefined)}
           onEnd={confirmEnd}
@@ -707,8 +535,6 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
-const $layoutScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
-const $layoutContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
 const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

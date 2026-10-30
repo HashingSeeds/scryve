@@ -309,7 +309,6 @@ export default {
     notCached:
       "Ce plateau n'est pas enregistré sur cet appareil. Reconnectez-vous pour y charger la partie.",
     anotherSeat: "Autre place",
-    closeLayout: "Fermer le choix de disposition",
     failedAction: {
       life: {
         none: "Un changement de {{delta}} point de vie n'a pas pu être synchronisé",
@@ -328,15 +327,10 @@ export default {
       declineCommanderDamage: "Le refus des blessures de commandant n'a pas pu être synchronisé",
     },
     menu: {
-      layout: "Disposition",
-      dice: "Dés",
       players: "Joueurs",
       history: "Historique",
-      rules: "Règles",
       end: "Fin",
       leave: "Quitter",
-      closeDice: "Fermer les dés",
-      exitCommanderDamage: "Quitter les blessures de commandant",
     },
     status: {
       close: "Fermer le statut de la partie connectée",

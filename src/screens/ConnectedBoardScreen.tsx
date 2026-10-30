@@ -9,9 +9,8 @@ import {
   useRef,
   useState,
 } from "react"
-import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, AppState, ScrollView, Share, View } from "react-native"
-import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
 
@@ -20,17 +19,9 @@ import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
-import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import type { GameMenuActions } from "@/components/GameRadialMenu"
-import {
-  getPlayerGridLayoutOptions,
-  PlayerGrid,
-  type PlayerGridProps,
-} from "@/components/PlayerGrid"
-import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
+import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
+import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
-import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
 import { Text, type TextProps } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -53,6 +44,7 @@ import {
 } from "@/features/connected/boardView"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
+import { loadLayoutChoice, saveLayoutChoice } from "@/features/connected/layoutChoice"
 import type { PendingLifeAction } from "@/features/connected/model"
 import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
@@ -65,14 +57,10 @@ import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/Tr
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { asPlayerId } from "@/features/game/domain"
-import { GameBoardStage } from "@/features/game/GameBoardStage"
+import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
-import {
-  defaultConnectedLayout,
-  playerGridLayoutForCount,
-  type PlayerGridLayoutVariant,
-} from "@/features/game/playerLayouts"
+import { defaultConnectedLayout, playerGridLayoutForCount } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
   counterValueLabel,
@@ -84,10 +72,7 @@ import {
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
-import { closingMenu, useDice } from "@/features/game/useDice"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
-import { gameRules, openRules } from "@/features/rules/gameRules"
-import { prefetchRules } from "@/features/rules/rulesSource"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -432,7 +417,6 @@ export function ConnectedBoardWithRuntime({
   runtime: ConnectedGameRuntime
   peerLatency?: () => PeerLatency[]
 }) {
-  useKeepAwake(undefined, { suppressDeactivateWarnings: true })
   usePaintTiming(runtime)
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
     connectionStatus: runtime.connectionStatus,
@@ -627,9 +611,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
-  const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -640,11 +622,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
-  const [layoutSelection, setLayoutSelection] = useState<{
-    playerCount: number
-    layout: PlayerGridLayoutVariant
-  }>()
-  const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
+  const [layoutChoice, setLayoutChoice] = useState(() => loadLayoutChoice(publicId))
   const finishSubmitInFlight = useRef(false)
   const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
@@ -662,15 +640,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       setAbandonedOpen(true)
     }
   }, [terminalStatus, rematchPublicId, onRematch, onGameEnded, publicId])
-  useStoreReview(
-    game.status === "finished" &&
-      !menuOpen &&
-      !statusOpen &&
-      !layoutPickerOpen &&
-      !confirmingFinish &&
-      !playerActionsOpen,
-  )
-
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
     setWinnerPlayerIds((current) =>
@@ -683,20 +652,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     setDrawSelected((current) => !current)
   }
 
-  const captureMenuDialogOrigin = useCallback((event?: GestureResponderEvent) => {
-    setMenuDialogOrigin(
-      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
-    )
-  }, [])
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false)
-  }, [])
-
   const system = game.system
-  const rules = gameRules(system)
-  useEffect(() => {
-    if (rules?.kind === "text") prefetchRules(rules)
-  }, [rules])
   const active = game.status === "active"
   const finished = game.status === "finished"
 
@@ -714,12 +670,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ],
     [controlled, game.players],
   )
-  // why: dice stay on this device; other seats never see these rolls.
-  const dice = useDice(players, publicId, system)
-  const diceTools = useMemo(() => closingMenu(dice.tools, () => setMenuOpen(false)), [dice.tools])
   const layoutVariant =
-    layoutSelection?.playerCount === players.length
-      ? layoutSelection.layout
+    layoutChoice?.playerCount === players.length
+      ? layoutChoice.layout
       : playerGridLayoutForCount(
           players.length,
           game.layout,
@@ -777,11 +730,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     buffered: true,
   })
   const attackDispatch = attack.dispatch
-  const toggleMenu = () => {
-    attackDispatch({ type: "send" })
-    setMenuOpen((current) => !current)
-  }
-  const exitCommanderDamage = useCallback(() => attackDispatch({ type: "send" }), [attackDispatch])
   function toggleCommanderSword(player: GamePlayer) {
     if (
       !active ||
@@ -794,11 +742,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
   const syncStatusText = boardSyncStatusText(syncSignal)
-  const openSyncStatus = useCallback(() => {
-    setMenuOpen(false)
-    setStatusOpen(true)
-  }, [])
-  const layoutOptions = getPlayerGridLayoutOptions(players.length)
 
   /**
    * Only the host is served an invitation, and only while seats are still open, so the
@@ -859,59 +802,30 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
-  const openGameRules = useMemo(
-    () =>
-      rules && (rules.kind === "link" || onRules)
-        ? () => {
-            setMenuOpen(false)
-            openRules(rules, () => system && onRules?.(system))
-          }
-        : undefined,
-    [onRules, rules, system],
-  )
-  const radialActions: GameMenuActions = useMemo(
-    () => [
-      {
-        kind: "layout",
-        label: translate("connected:board.menu.layout"),
-        disabled: layoutOptions.length < 2,
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
-          setMenuOpen(false)
-          setLayoutPickerOpen(true)
-        },
+  const chrome = useBoardChrome({
+    // why: dice stay on this device; other seats never see these rolls.
+    gameId: publicId,
+    system,
+    players,
+    layout: {
+      value: layoutVariant,
+      onChange: (layout) => {
+        const choice = { playerCount: players.length, layout }
+        setLayoutChoice(choice)
+        saveLayoutChoice(publicId, choice)
       },
-      { kind: "dice", label: translate("connected:board.menu.dice"), tools: diceTools },
+    },
+    petals: [
       {
         kind: "players",
         label: translate("connected:board.menu.players"),
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
-          setMenuOpen(false)
-          setPlayerActionsOpen(true)
-        },
+        onPress: () => setPlayerActionsOpen(true),
       },
-      openGameRules
-        ? {
-            kind: "rules",
-            label: translate("connected:board.menu.rules"),
-            onPress: openGameRules,
-          }
-        : {
-            kind: "decks",
-            label: translate("common:appNavigation.decks"),
-            disabled: !onDecks,
-            onPress: () => {
-              setMenuOpen(false)
-              onDecks?.()
-            },
-          },
       leave
         ? {
             kind: "end-game",
             label: translate("connected:board.menu.leave"),
             onPress: () => {
-              setMenuOpen(false)
               setLeaveError(undefined)
               setConfirmingLeave(true)
             },
@@ -922,9 +836,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             detail: canEnd && finishBlocker ? translate(finishBlocker.petal) : undefined,
             blocked: canEnd && Boolean(finishBlocker),
             disabled: !canEnd,
-            onPress: (event) => {
-              captureMenuDialogOrigin(event)
-              setMenuOpen(false)
+            onPress: () => {
               const runtime = controls.current()
               if (finishBlockerFor(runtime)) {
                 setStatusOpen(true)
@@ -942,44 +854,35 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             },
           },
     ],
-    [
-      canEnd,
-      captureMenuDialogOrigin,
-      controls,
-      diceTools,
-      finishBlocker,
-      layoutOptions.length,
-      leave,
-      onDecks,
-      openGameRules,
-    ],
-  )
-  const diceOpen = dice.open
-  const closeDice = dice.close
-  const diceArmed = dice.grid.armed
-  const inspectedPlayerId = attack.inspectedPlayerId
-  const exitAction = useMemo(
-    () =>
-      diceOpen
-        ? {
-            label: translate("connected:board.menu.closeDice"),
-            onPress: closeDice,
-            ...(diceArmed ? { heldTool: diceArmed } : {}),
-          }
-        : inspectedPlayerId
-          ? {
-              label: translate("connected:board.menu.exitCommanderDamage"),
-              onPress: exitCommanderDamage,
-            }
-          : undefined,
-    [closeDice, diceArmed, diceOpen, inspectedPlayerId, exitCommanderDamage],
+    attack,
+    signal: boardSyncMenuSignal(syncSignal),
+    statusLine:
+      syncStatusText && syncSignal.kind !== "live"
+        ? { text: syncStatusText, tone: syncSignal.kind, onPress: () => setStatusOpen(true) }
+        : undefined,
+    accountEntry,
+    onRules,
+    onDecks,
+    onHistory,
+    onSettings,
+    onSupport,
+    onAccount,
+  })
+  const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  useStoreReview(
+    game.status === "finished" &&
+      !menuOpen &&
+      !statusOpen &&
+      !chrome.layoutOpen &&
+      !confirmingFinish &&
+      !playerActionsOpen,
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
   const overlayOpen =
     menuOpen ||
     statusOpen ||
-    layoutPickerOpen ||
+    chrome.layoutOpen ||
     confirmingFinish ||
     playerActionsOpen ||
     roleOpen ||
@@ -1002,10 +905,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <GameBoardStage
+      <GameBoard
         testID="connected-game-board"
-        playerCount={players.length}
-        layoutVariant={layoutVariant}
+        chrome={chrome}
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
             boardOrientation={boardOrientation}
@@ -1030,7 +932,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     lethal: commanderLethal,
                     attack,
                     inspection: {
-                      playerId: inspectedPlayerId,
+                      playerId: attack.inspectedPlayerId,
                       onChange: (playerId) => attackDispatch({ type: "inspect", playerId }),
                     },
                     pendingFor: (player) =>
@@ -1053,32 +955,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onChange={controls.changeLife}
           />
         )}
-        menu={{
-          open: menuOpen,
-          actions: radialActions,
-          exitAction,
-          signal: boardSyncMenuSignal(syncSignal),
-          statusLine:
-            syncStatusText && syncSignal.kind !== "live"
-              ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
-              : undefined,
-          onToggle: toggleMenu,
-          onClose: closeMenu,
-        }}
-        windowOverlay={
-          menuOpen && onHistory && onSettings && onSupport && onAccount ? (
-            <FloatingAppNavigation
-              accountEntry={accountEntry}
-              onDecks={openGameRules ? onDecks : undefined}
-              onHistory={onHistory}
-              onSettings={onSettings}
-              onSupport={onSupport}
-              onAccount={onAccount}
-            />
-          ) : null
-        }
       />
-      <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
 
       {inviteDialogOpen && invitation ? (
         <DialogCard
@@ -1100,32 +977,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           />
           {inviteError ? <AlertNote text={inviteError} /> : null}
           <Button tx="common:close" onPress={() => setInviteOpen(false)} />
-        </DialogCard>
-      ) : null}
-
-      {layoutPickerOpen ? (
-        <DialogCard
-          visible
-          onClose={() => setLayoutPickerOpen(false)}
-          origin={menuDialogOrigin}
-          backdropTestID="connected-layout-backdrop"
-          backdropAccessibilityLabel={translate("connected:board.closeLayout")}
-          dialogTestID="connected-layout-dialog"
-          accessibilityViewIsModal
-          wide
-          style={themed($boardDialog)}
-        >
-          <Text tx="connected:board.menu.layout" preset="subheading" style={themed($dialogText)} />
-          <PlayerLayoutPicker
-            playerCount={players.length}
-            value={layoutVariant}
-            testID="connected-layout"
-            onChange={(layout) => {
-              setLayoutSelection({ playerCount: players.length, layout })
-              setLayoutPickerOpen(false)
-            }}
-          />
-          <Button tx="common:cancel" onPress={() => setLayoutPickerOpen(false)} />
         </DialogCard>
       ) : null}
 

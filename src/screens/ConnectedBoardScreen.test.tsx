@@ -1,4 +1,4 @@
-import { Dimensions, Linking, StyleSheet } from "react-native"
+import { Dimensions, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
@@ -163,8 +163,7 @@ describe("ConnectedBoardScreen", () => {
       openConnectedMenu()
       fireEvent.press(screen.getByTestId("layout-button"))
       const selected = ["auto", "tabletop"].find(
-        (variant) =>
-          screen.getByTestId(`connected-layout-${variant}`).props.accessibilityState.selected,
+        (variant) => screen.getByTestId(`layout-${variant}`).props.accessibilityState.selected,
       )
       screen.unmount()
       return selected
@@ -172,6 +171,37 @@ describe("ConnectedBoardScreen", () => {
 
     expect(selectedLayout("auto")).toBe("auto")
     expect(selectedLayout("featured-last")).toBe("tabletop")
+  })
+
+  it("keeps this device's layout when the board comes back", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        playerCount: 4,
+        layout: "auto",
+        players: Array.from({ length: 4 }, (_, index) => ({
+          playerId: `player-${index + 1}`,
+          seat: index + 1,
+          displayName: `Player ${index + 1}`,
+          color: "#7C3AED",
+          currentLife: 40,
+          pendingDelta: 0,
+          controlledByMe: index === 0,
+        })),
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="layout-kept" />))
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("layout-button"))
+    fireEvent.press(screen.getByTestId("layout-tabletop"))
+    screen.unmount()
+
+    render(themed(<ConnectedBoardScreen publicId="layout-kept" />))
+    expect(screen.getByTestId("player-grid-row-2")).toBeTruthy()
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("layout-button"))
+    expect(screen.getByTestId("layout-tabletop").props.accessibilityState.selected).toBe(true)
   })
 
   it("sends staged commander damage when the menu opens", async () => {
@@ -378,41 +408,6 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-status-seat-1")).toHaveTextContent(/Updated 0:0\d ago/)
     expect(screen.getByTestId("life-status-seat-2")).not.toHaveTextContent(/Updated/)
     jest.useRealTimers()
-  })
-
-  it("puts Rules in the game menu and Decks in More", () => {
-    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: { ...connectedHarness.runtime.projection, system: "pokemon" },
-    }
-    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} />))
-    openConnectedMenu()
-    expect(screen.queryByTestId("decks-button")).toBeNull()
-    fireEvent.press(screen.getByTestId("rules-button"))
-    expect(openURL).toHaveBeenCalledTimes(1)
-
-    const onDecks = jest.fn()
-    view.rerender(
-      themed(
-        <ConnectedBoardScreen
-          publicId="game-public"
-          onBack={jest.fn()}
-          onDecks={onDecks}
-          onHistory={jest.fn()}
-          onSettings={jest.fn()}
-          onSupport={jest.fn()}
-          onAccount={jest.fn()}
-        />,
-      ),
-    )
-    openConnectedMenu()
-    expect(screen.queryByTestId("decks-button")).toBeNull()
-    expect(screen.getByTestId("rules-button")).toBeTruthy()
-    fireEvent.press(screen.getByTestId("utility-menu-button"))
-    fireEvent.press(screen.getByTestId("utility-decks-button"))
-    expect(onDecks).toHaveBeenCalledTimes(1)
-    openURL.mockRestore()
   })
 
   it("renders a resumed finished summary read-only with the shared menu actions disabled", () => {

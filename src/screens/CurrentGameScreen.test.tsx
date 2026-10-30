@@ -6,7 +6,6 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { prefetchRules } from "@/features/rules/rulesSource"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
@@ -170,46 +169,6 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("decks-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
-  })
-
-  it("puts Magic rules in the game menu, moving Decks to More", () => {
-    jest.mocked(prefetchRules).mockClear()
-    const onRules = jest.fn()
-    const onDecks = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={createLocalGame({
-            players: [
-              { name: "Ada", color: "#41476E" },
-              { name: "Grace", color: "#39755C" },
-            ],
-            startingLife: 20,
-            system: "mtg",
-            now: 1,
-          })}
-          repository={new LocalGameRepository(new MemoryStorage())}
-          onDecks={onDecks}
-          onHistory={jest.fn()}
-          onRules={onRules}
-          onSettings={jest.fn()}
-          onSupport={jest.fn()}
-          onAccount={jest.fn()}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(prefetchRules).toHaveBeenCalledTimes(1)
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("decks-button")).toBeNull()
-    fireEvent.press(view.getByTestId("rules-button"))
-    expect(onRules).toHaveBeenCalledTimes(1)
-
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("utility-menu-button"))
-    fireEvent.press(view.getByTestId("utility-decks-button"))
-    expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
   it("opens the dice bag over the menu, which its pentagon returns to", () => {
