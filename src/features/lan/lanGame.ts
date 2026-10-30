@@ -11,7 +11,11 @@ import {
   writeMemoryGame,
   type MemoryGame,
 } from "../../../convex/lib/gameEngineMemory"
-import { commanderLethalDamage } from "../../../convex/lib/gameRules"
+import {
+  commanderField,
+  commanderLethalDamage,
+  isCommanderSlot,
+} from "../../../convex/lib/gameRules"
 import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
@@ -132,7 +136,8 @@ export type LanGuestMessage =
   | { type: "stats"; stats: SyncLatencySummary }
 
 export type LanHostMessage =
-  | { type: "welcome"; pass: LanSeatPass }
+  // why: a host from before partners drops the slot and lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag keeps mixed tables playing where a LAN_PROTOCOL bump would split them.
+  | { type: "welcome"; pass: LanSeatPass; partners?: boolean }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
   | { type: "state"; lobby: LanLobby; projection: ConnectedProjection }
@@ -359,6 +364,7 @@ function memoryWriteOf(event: ConnectedActionEvent): MemoryWrite {
       kind: "commander.claim",
       fromPlayerId: event.fromPlayerId,
       toPlayerId: event.toPlayerId,
+      ...commanderField(event.commander),
       delta: event.delta,
       ...sent,
     }
@@ -427,6 +433,7 @@ function commanderProjection(memory: MemoryGame, viewerKey: string, lethal: numb
         operationId: claim.operationId,
         fromPlayerId: claim.fromPlayerId,
         toPlayerId: claim.toPlayerId,
+        ...commanderField(claim.commander),
         delta: claim.delta,
         clientCreatedAt: claim.clientCreatedAt,
         createdAt: claim.createdAt,
@@ -612,6 +619,7 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
     value.type === "commanderDamage.submitted" &&
     isId(value.fromPlayerId) &&
     isId(value.toPlayerId) &&
+    isCommanderSlot(value.commander) &&
     isWhole(value.delta)
   )
     return {
@@ -619,6 +627,7 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
       ...base,
       fromPlayerId: asPlayerId(value.fromPlayerId),
       toPlayerId: asPlayerId(value.toPlayerId),
+      ...commanderField(value.commander),
       delta: value.delta,
     }
   if (
@@ -706,7 +715,11 @@ export function parseHostMessage(line: string): LanHostMessage | null {
   if (value.type === "rejected" && typeof value.reason === "string")
     return { type: "rejected", reason: value.reason }
   if (value.type === "welcome" && isPass(value.pass))
-    return { type: "welcome", pass: { key: value.pass.key, token: value.pass.token } }
+    return {
+      type: "welcome",
+      pass: { key: value.pass.key, token: value.pass.token },
+      ...(value.partners === true ? { partners: true } : {}),
+    }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {
     const lobby = parseLobby(value.lobby)

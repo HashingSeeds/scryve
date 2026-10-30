@@ -70,6 +70,27 @@ function finishedRound(hostDeck?: Parameters<typeof setLanDeck>[2]) {
         accepted: true,
       },
     ],
+    [
+      "host",
+      {
+        type: "commanderDamage.submitted",
+        operationId: "claim-operation-0002",
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        commander: 1,
+        delta: 3,
+      },
+    ],
+    [
+      "guest",
+      {
+        type: "commanderDamage.resolved",
+        operationId: "resolve-operation-0002",
+        claimOperationId: "claim-operation-0002",
+        toPlayerId: "guest",
+        accepted: true,
+      },
+    ],
   ]
   const game = writes.reduce(
     (current, [sender, event]) =>
@@ -104,7 +125,7 @@ describe("lanLocalGame", () => {
     })
     expect(game.players.map(({ id, life, seat }) => ({ id, life, seat }))).toEqual([
       { id: "host", life: 40, seat: 0 },
-      { id: "guest", life: 28, seat: 1 },
+      { id: "guest", life: 25, seat: 1 },
     ])
     expect(game.events).toEqual([
       expect.objectContaining({ type: "life.changed", playerId: "guest", delta: -7 }),
@@ -114,8 +135,15 @@ describe("lanLocalGame", () => {
         toPlayerId: "guest",
         delta: 5,
       }),
+      expect.objectContaining({
+        type: "commanderDamage.assigned",
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        commander: 1,
+        delta: 3,
+      }),
     ])
-    expect(game.commanderDamage).toEqual({ "host>guest": 5 })
+    expect(game.commanderDamage).toEqual({ "host>guest": 5, "host#1>guest": 3 })
 
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(game)

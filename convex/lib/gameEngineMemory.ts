@@ -11,7 +11,7 @@ import {
   type GameWrite,
   type GameWriteResult,
 } from "./gameEngine"
-import type { SeatActor } from "./gameRules"
+import { commanderField, PARTNER_COMMANDER, type SeatActor } from "./gameRules"
 
 export interface MemoryGame extends EngineGame {
   seats: Map<string, EngineSeat & { lastEventAt?: number }>
@@ -25,8 +25,13 @@ const pairKey = ({ fromPlayerId, toPlayerId, commander }: CommanderPair) =>
 
 export const commanderTotals = (game: MemoryGame) =>
   [...game.pairs].map(([key, { total }]) => {
-    const [fromPlayerId, toPlayerId] = key.split("\u0000")
-    return { fromPlayerId, toPlayerId, total }
+    const [fromPlayerId, toPlayerId, commander] = key.split("\u0000")
+    return {
+      fromPlayerId,
+      toPlayerId,
+      ...commanderField(commander ? PARTNER_COMMANDER : undefined),
+      total,
+    }
   })
 
 export function applyGameChanges(game: MemoryGame, changes: readonly GameChange[]) {

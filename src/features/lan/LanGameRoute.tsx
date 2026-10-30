@@ -15,7 +15,7 @@ export default function LanGameRoute() {
   // why: resuming before useLanGame reads the session puts the saved game on the first render instead of leaving the route.
   useState(() => lanPlayAvailable() && lanSession.resumeHostedGame())
   const runtime = useLanGame()
-  const { projection, lobby, role, status, error } = useLanSession()
+  const { projection, lobby, role, status, error, partners } = useLanSession()
   // why: with no game and no error, the lobby has nothing to show and would say "Connecting…" forever.
   const gameGone = lanPlayAvailable() && !projection && !error
   useEffect(() => {
@@ -34,6 +34,7 @@ export default function LanGameRoute() {
       ownerId={lanSession.getState().seatKey ?? "nearby"}
       runtime={runtime}
       cloud={false}
+      partners={partners}
       awayPlayerIds={awayPlayerIds}
       onRevealRole={lanSession.revealRole}
       roleRevealOnline={role === "host" || status === "connected"}

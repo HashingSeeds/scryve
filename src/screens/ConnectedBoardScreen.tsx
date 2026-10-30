@@ -261,6 +261,7 @@ type ConnectedBoardReadyProps = {
   controls: ConnectedBoardControls
   ownerId: string
   cloud: boolean
+  partners: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline: boolean
@@ -341,6 +342,7 @@ interface ConnectedBoardRuntimeProps {
   ownerId: string
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
+  partners?: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline?: boolean
@@ -408,6 +410,7 @@ export function ConnectedBoardWithRuntime({
   accountEntry,
   ownerId,
   cloud = true,
+  partners = cloud,
   awayPlayerIds,
   onRevealRole,
   roleRevealOnline = false,
@@ -572,6 +575,7 @@ export function ConnectedBoardWithRuntime({
               controls={controls}
               ownerId={ownerId}
               cloud={cloud}
+              partners={partners}
               awayPlayerIds={awayPlayerIds}
               onRevealRole={onRevealRole}
               roleRevealOnline={roleRevealOnline}
@@ -603,6 +607,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   controls,
   ownerId,
   cloud,
+  partners,
   awayPlayerIds = [],
   onRevealRole,
   roleRevealOnline,
@@ -725,8 +730,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }
   const attack = useCommanderAttack(commanderPort, {
     seatDeck,
-    // why: nearby games drop the partner slot on the wire, so a partner's damage would land on the first commander there.
-    singleCommander: !cloud,
+    singleCommander: !partners,
     buffered: true,
   })
   const attackDispatch = attack.dispatch
