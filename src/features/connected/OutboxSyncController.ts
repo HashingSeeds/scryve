@@ -15,13 +15,12 @@ import {
   type TableSource,
 } from "@/features/game/tableRuntime"
 import type { DeviceId, LifeDelta } from "@/features/game/types"
-import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
+import type { OutboxAcknowledgement } from "@/features/sync/outbox"
+import { createSnapshotStore, type SnapshotStore } from "@/features/sync/snapshotStore"
 import { translate } from "@/i18n/translate"
 import { convexErrorMessage } from "@/utils/convexError"
-import { emitTelemetry } from "@/utils/telemetry"
+import { emitTelemetry, type TelemetryWriteKind } from "@/utils/telemetry"
 
-import type { DrainOutboxSnapshot, OutboxAcknowledgement } from "./drainOutbox"
-import { drainConnectedOutbox } from "./drainOutbox"
 import type {
   ConnectionStatus,
   ConnectedCommanderDamageChange,
@@ -33,8 +32,12 @@ import type {
   ConnectedOperationStatus,
 } from "./model"
 import { toConnectedProjection } from "./model"
-import type { ConnectedGameRepository } from "./persistence"
-import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./reconciliation"
+import type { ConnectedGameRepository, ConnectedOutbox } from "./persistence"
+import {
+  classifyWriteFailure,
+  mergeConfirmedProjection,
+  overlayPendingDeltas,
+} from "./reconciliation"
 import { SyncLatency } from "./syncLatency"
 import { flooredLifeDelta } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
@@ -78,22 +81,24 @@ export interface OutboxSyncControllerOptions {
 export type ConnectedGameResult =
   { kind: "win"; winnerPlayerIds: string[] } | { kind: "draw" } | { kind: "unknown" }
 
-export function mergeDrainSnapshot(
-  currentPending: readonly PendingLifeAction[],
-  drainingOperationIds: ReadonlySet<string>,
-  snapshotPending: readonly PendingLifeAction[],
-  snapshotFailures: readonly FailedLifeAction[],
-  dismissedFailureIds: ReadonlySet<string>,
-): { pending: PendingLifeAction[]; failures: FailedLifeAction[] } {
-  const newlyQueued = currentPending.filter(
-    (action) => !drainingOperationIds.has(action.event.operationId),
-  )
-  return {
-    pending: oldestFirst([...snapshotPending, ...newlyQueued]),
-    failures: snapshotFailures.filter(
-      (failure) => !dismissedFailureIds.has(failure.action.event.operationId),
-    ),
-  }
+const WRITE_KINDS: Record<PendingLifeAction["event"]["type"], TelemetryWriteKind> = {
+  "life.changed": "life",
+  "table.action": "table",
+  "commanderDamage.submitted": "commander.claim",
+  "commanderDamage.resolved": "commander.resolve",
+}
+
+function rejectReason(cause: unknown): string | undefined {
+  if (classifyWriteFailure(cause) !== "permanent") return undefined
+  return convexErrorMessage(cause, cause instanceof Error ? cause.message : "Action was rejected")
+}
+
+function addToLifeChange(action: PendingLifeAction, delta: number): PendingLifeAction | null {
+  const { event } = action
+  if (event.type !== "life.changed" || event.compensatesOperationId) return null
+  const sum = event.delta + delta
+  if (Math.sign(event.delta) !== Math.sign(delta) || !isLifeDelta(sum)) return null
+  return { ...action, event: { ...event, delta: sum } }
 }
 
 const mountedWhileDisconnected = (environment: OutboxSyncEnvironment) =>
@@ -110,8 +115,6 @@ export class OutboxSyncController {
 
   private readonly observeResumeProjection: (projection: ConnectedProjection) => void
   private confirmed: ConnectedProjection | null
-  private pending: PendingLifeAction[]
-  private failed: FailedLifeAction[]
   private overlay: {
     confirmed: ConnectedProjection
     pending: PendingLifeAction[]
@@ -130,10 +133,7 @@ export class OutboxSyncController {
   private reconnectPending = true
   private timingLive = false
   private environmentInitialized = false
-  private readonly inFlight = new Set<string>()
-  private drainingIds: ReadonlySet<string> = new Set()
   private lastQueuedLifeChange: { playerId: string; operationId: string } | undefined
-  private readonly dismissedFailureIds = new Set<string>()
   private operationStatus: ConnectedOperationStatus | null = null
   private readonly projectionWaiters = new Map<
     string,
@@ -144,9 +144,11 @@ export class OutboxSyncController {
       timeout?: ReturnType<typeof setTimeout>
     }
   >()
-  private drainScheduled = false
   private stopped = false
-  private readonly outbox: OutboxController<OutboxSyncSnapshot>
+  private readonly outbox: ConnectedOutbox
+  private readonly store: SnapshotStore<OutboxSyncSnapshot>
+  private readonly stopOutbox: () => void
+  private readonly unsubscribeOutbox: () => void
   readonly table: TableActions
   readonly latency: SyncLatency
 
@@ -158,21 +160,27 @@ export class OutboxSyncController {
     this.clearTimeoutFn = options.clearTimeoutFn ?? ((handle) => clearTimeout(handle))
     this.latency = options.latency ?? new SyncLatency({ transport: "cloud" }, this.now)
     this.confirmed = options.repository.loadProjection(options.publicId)
-    this.pending = options.repository.loadOutbox(options.publicId)
-    this.failed = options.repository.loadFailed(options.publicId)
-    this.outbox = createOutboxController({
-      snapshot: () => this.buildSnapshot(),
-      drain: (shouldContinue) => this.drainOnce(shouldContinue),
-      retryDelay: () =>
-        this.environment.isWebSocketConnected
-          ? Math.min(250 * 2 ** Math.min(this.pending[0]?.attempts ?? 0, 5), 8_000)
-          : undefined,
+    this.outbox = options.repository.outbox(options.publicId, {
+      send: (action) => this.timedSend(action),
+      rejectReason,
+      backoff: { baseMs: 250, maxMs: 8_000 },
       canDrain: () => this.canSync() && this.pending.length > 0,
-      hasPending: () => this.pending.length > 0,
+      onDrained: ({ acknowledged, failed, outcome }) =>
+        emitTelemetry("outbox.drain", {
+          acknowledgedCount: acknowledged,
+          failedCount: failed,
+          outcome,
+        }),
+      now: this.now,
       setTimeoutFn: this.setTimeoutFn,
       clearTimeoutFn: this.clearTimeoutFn,
     })
-    this.outbox.start()
+    this.store = createSnapshotStore(this.buildSnapshot())
+    this.unsubscribeOutbox = this.outbox.state$.onChange(() => {
+      this.publish()
+      this.resolveProjectionWaiter()
+    })
+    this.stopOutbox = this.outbox.start()
     this.table = createTableActions(
       () => this.tableSource(),
       (action, operationId) => this.enqueueTableAction(action, operationId),
@@ -180,15 +188,19 @@ export class OutboxSyncController {
   }
 
   get state$() {
-    return this.outbox.state$
+    return this.store.state$
   }
 
   get subscribe() {
-    return this.outbox.subscribe
+    return this.store.subscribe
   }
 
   get getSnapshot() {
-    return this.outbox.getSnapshot
+    return this.store.getSnapshot
+  }
+
+  private get pending(): PendingLifeAction[] {
+    return this.outbox.getState().pending
   }
 
   setEnvironment(environment: OutboxSyncEnvironment): void {
@@ -204,19 +216,21 @@ export class OutboxSyncController {
       previous.isWebSocketConnected !== environment.isWebSocketConnected ||
       previous.remoteReady !== environment.remoteReady
     this.environment = environment
-    if (changed) this.outbox.invalidate()
     if (!environment.isWebSocketConnected) {
       this.reconnectPending = true
       this.timingLive = false
     }
-    if (!this.canSync()) this.outbox.cancelRetry()
     this.publish()
+    if (!changed || !this.canSync()) return
+    this.outbox.resume()
+    void this.outbox.drain()
   }
 
   onRemoteProjection(remote: unknown, status?: ConnectedOperationStatus): void {
     let incoming = toConnectedProjection(remote)
     if (!incoming) return
-    const head = this.pending[0]?.event
+    const { pending } = this
+    const head = pending[0]?.event
     if (status?.operationId === head?.operationId) {
       this.operationStatus = status ?? null
       if (status?.status === "acknowledged") {
@@ -241,7 +255,7 @@ export class OutboxSyncController {
     // why: the first fresh projection after mounting or reconnecting is a catch-up that measures time away (a replay of the cached one is not fresh), and one carrying this device's own write was painted before it was sent.
     if (
       this.timingLive &&
-      this.pending.length === 0 &&
+      pending.length === 0 &&
       this.confirmed &&
       incoming.eventSequence > this.confirmed.eventSequence
     )
@@ -251,19 +265,12 @@ export class OutboxSyncController {
     this.options.repository.saveProjection(merged)
     this.confirmed = merged
     this.observeResumeProjection(merged)
-    const observed = new Set(incoming.recentOperationIds)
-    const remaining: PendingLifeAction[] = []
-    for (const action of this.pending) {
-      const operationId = action.event.operationId
-      if (observed.has(operationId) && !this.inFlight.has(operationId))
-        this.options.repository.acknowledge(this.options.publicId, operationId)
-      else remaining.push(action)
-    }
     if (this.environment.isWebSocketConnected && this.reconnectPending) {
       this.reconnectPending = false
-      emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: this.pending.length })
+      emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: pending.length })
     }
-    this.pending = remaining
+    this.outbox.acknowledge(incoming.recentOperationIds)
+    this.outbox.resume()
     this.publish()
     this.resolveProjectionWaiter()
   }
@@ -304,13 +311,11 @@ export class OutboxSyncController {
       queuedAt: now,
       attempts: 0,
     }
-    const result = this.options.repository.enqueue(action, this.pending)
-    if (!result.accepted) {
+    if (!this.outbox.enqueue(action)) {
       this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return
     }
-    this.pending = result.pending
     this.lastQueuedLifeChange = { playerId, operationId: action.event.operationId }
     this.changeError = undefined
     this.publish()
@@ -318,16 +323,11 @@ export class OutboxSyncController {
 
   private addToLastQueuedLifeChange(playerId: string, delta: LifeDelta): boolean {
     const last = this.lastQueuedLifeChange
-    if (last?.playerId !== playerId || this.drainingIds.has(last.operationId)) return false
-    const merged = this.options.repository.addToUnsentLifeChange(
-      this.options.publicId,
-      last.operationId,
-      delta,
+    if (last?.playerId !== playerId) return false
+    const merged = this.outbox.rewriteUnattempted(last.operationId, (action) =>
+      addToLifeChange(action, delta),
     )
     if (!merged) return false
-    this.pending = this.pending.map((queued) =>
-      queued.event.operationId === last.operationId ? merged : queued,
-    )
     this.changeError = undefined
     this.publish()
     return true
@@ -368,13 +368,11 @@ export class OutboxSyncController {
         queuedAt: now,
         attempts: 0,
       }
-      const result = this.options.repository.enqueue(action, this.pending)
-      if (!result.accepted) {
+      if (!this.outbox.enqueue(action)) {
         this.changeError = translate("connected:outbox.queueFull")
         this.publish()
         continue
       }
-      this.pending = result.pending
       this.lastQueuedLifeChange = undefined
       this.changeError = undefined
       this.publish()
@@ -411,13 +409,11 @@ export class OutboxSyncController {
       queuedAt: now,
       attempts: 0,
     }
-    const result = this.options.repository.enqueue(action, this.pending)
-    if (!result.accepted) {
+    if (!this.outbox.enqueue(action)) {
       this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return
     }
-    this.pending = result.pending
     this.lastQueuedLifeChange = undefined
     this.changeError = undefined
     this.publish()
@@ -439,29 +435,25 @@ export class OutboxSyncController {
 
   private enqueueTableAction(action: TableAction, operationId: string): boolean {
     const now = this.now()
-    const result = this.options.repository.enqueue(
-      {
-        schemaVersion: 1,
-        event: {
-          type: "table.action",
-          operationId: asOperationId(operationId),
-          gameId: asGameId(this.options.publicId),
-          action,
-          actorId: asActorId(this.options.ownerId),
-          deviceId: this.options.deviceId,
-          clientCreatedAt: now,
-        },
-        queuedAt: now,
-        attempts: 0,
+    const accepted = this.outbox.enqueue({
+      schemaVersion: 1,
+      event: {
+        type: "table.action",
+        operationId: asOperationId(operationId),
+        gameId: asGameId(this.options.publicId),
+        action,
+        actorId: asActorId(this.options.ownerId),
+        deviceId: this.options.deviceId,
+        clientCreatedAt: now,
       },
-      this.pending,
-    )
-    if (!result.accepted) {
+      queuedAt: now,
+      attempts: 0,
+    })
+    if (!accepted) {
       this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return false
     }
-    this.pending = result.pending
     this.lastQueuedLifeChange = undefined
     this.changeError = undefined
     this.publish()
@@ -479,12 +471,12 @@ export class OutboxSyncController {
       this.publish()
       return false
     }
-    if (this.options.repository.loadOutbox(this.options.publicId).length > 0) {
+    if (this.pending.length > 0) {
       this.finishError = translate(`connected:outbox.${action}.pendingChanges`)
       this.publish()
       return false
     }
-    if (this.failed.length > 0) {
+    if (this.outbox.getState().failures.length > 0) {
       this.finishError = translate(`connected:outbox.${action}.failedChanges`)
       this.publish()
       return false
@@ -512,16 +504,15 @@ export class OutboxSyncController {
   abandon = async (): Promise<boolean> => this.endGame("abandon", () => this.options.abandonGame())
 
   dismissFailed = (operationId: string): void => {
-    this.dismissedFailureIds.add(operationId)
-    this.options.repository.dismissFailed(this.options.publicId, operationId)
-    this.failed = this.failed.filter((failure) => failure.action.event.operationId !== operationId)
+    this.outbox.dismiss(operationId)
     this.changeError = undefined
     this.publish()
   }
 
   dispose(): void {
     this.stopped = true
-    this.outbox.stop()
+    this.unsubscribeOutbox()
+    this.stopOutbox()
     for (const waiter of this.projectionWaiters.values()) {
       if (waiter.timeout) this.clearTimeoutFn(waiter.timeout)
       waiter.reject(new Error("Connected game sync stopped"))
@@ -546,96 +537,41 @@ export class OutboxSyncController {
 
   private buildSnapshot(): OutboxSyncSnapshot {
     const { isAuthenticated, isLoading, isWebSocketConnected } = this.environment
+    const { pending, failures, capacityBlocked } = this.outbox.getState()
     return {
       projection: this.displayProjection(),
-      pending: this.pending,
-      failed: this.failed,
+      pending,
+      failed: failures,
       connectionStatus:
         !isAuthenticated || !isWebSocketConnected
           ? "offline"
-          : this.pending.length > 0 || isLoading
+          : pending.length > 0 || isLoading
             ? "syncing"
             : "connected",
-      changeError: this.changeError,
+      changeError:
+        this.changeError ??
+        (capacityBlocked ? translate("connected:outbox.failureCapacity") : undefined),
       finishError: this.finishError,
       finishing: this.finishing,
     }
   }
 
   private publish(): void {
-    if (this.confirmed)
-      this.options.repository.cleanupTerminalGame(this.confirmed, this.pending, this.failed)
-    this.outbox.publish()
-    this.scheduleDrain()
-  }
-
-  private scheduleDrain(): void {
-    if (this.stopped || this.drainScheduled || this.outbox.draining) return
-    if (!this.canSync() || this.pending.length === 0) return
-    this.drainScheduled = true
-    void Promise.resolve().then(() => {
-      this.drainScheduled = false
-      this.outbox.unblock()
-      void this.outbox.drain()
-    })
-  }
-
-  private async drainOnce(shouldContinue: () => boolean) {
-    const drainStartPending = [...this.pending]
-    const drainingOperationIds = new Set(
-      drainStartPending.map((action) => action.event.operationId),
-    )
-    this.drainingIds = drainingOperationIds
-    const applyDrainSnapshot = (snapshot: DrainOutboxSnapshot) => {
-      if (this.stopped) return
-      const next = mergeDrainSnapshot(
-        this.pending,
-        drainingOperationIds,
-        snapshot.pending,
-        snapshot.failures,
-        this.dismissedFailureIds,
-      )
-      this.pending = next.pending
-      this.failed = next.failures
-      this.publish()
-    }
-    try {
-      const result = await drainConnectedOutbox({
-        repository: this.options.repository,
-        publicId: this.options.publicId,
-        failed: this.failed,
-        currentFailures: () => this.failed,
-        send: (action) => this.timedSend(action),
-        onAttempt: (operationId) => this.inFlight.add(operationId),
-        onSettled: (operationId) => {
-          this.inFlight.delete(operationId)
-          this.resolveProjectionWaiter()
-        },
-        onChange: applyDrainSnapshot,
-        shouldContinue: () => !this.stopped && shouldContinue(),
-      })
-      if (this.stopped) return result
-      const settledIds = new Set([...result.acknowledged, ...result.failed])
-      applyDrainSnapshot({
-        pending:
-          result.pending ??
-          drainStartPending.filter((action) => !settledIds.has(action.event.operationId)),
-        failures: result.failures ?? this.failed,
-      })
-      if (result.blockedByFailureCapacity)
-        this.changeError = translate("connected:outbox.failureCapacity")
-      this.publish()
-      return result
-    } finally {
-      this.drainingIds = new Set()
-      this.resolveProjectionWaiter()
-    }
+    if (this.confirmed) this.options.repository.cleanupTerminalGame(this.confirmed, this.outbox)
+    this.store.set(this.buildSnapshot())
   }
 
   private async timedSend(action: PendingLifeAction): Promise<OutboxAcknowledgement> {
     const sentAt = this.now()
     const acknowledgement = await this.sendAndAwaitProjection(action, sentAt)
     this.latency.acknowledged(this.now() - sentAt)
+    if (acknowledgement.operationId === action.event.operationId)
+      emitTelemetry("mutation.ack", {
+        durationMs: Math.max(0, this.now() - action.queuedAt),
+        attemptCount: action.attempts,
+        outcome: "success",
+        writeKind: WRITE_KINDS[action.event.type],
+      })
     return acknowledgement
   }
 

@@ -1,22 +1,21 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
+import { clear } from "@/utils/storage"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
-import {
-  CONNECTED_GAME_UNAVAILABLE_MS,
-  mergeDrainSnapshot,
-  useConnectedGame,
-} from "./useConnectedGame"
+import type { PendingLifeAction } from "./model"
+import { toConnectedProjection } from "./model"
+import { connectedDeploymentScope, ConnectedGameRepository } from "./persistence"
+import { CONNECTED_GAME_UNAVAILABLE_MS, useConnectedGame } from "./useConnectedGame"
+import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
 jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: jest.fn() }))
 
 const mockFinishMutation = jest.fn(async () => undefined)
-const mockDrain = jest.fn()
 const mockEmitTelemetry = jest.fn()
 let mockSocketConnected = false
 let mockConvexAuthenticated = true
 let mockConvexRefreshing = false
-let mockPending: any[] = []
 const mockRemoteProjection = {
   schemaVersion: 1,
   publicId: "game-public",
@@ -52,32 +51,43 @@ const mockChangeMutation = jest.fn(async (args: any) => args)
 const mockUseQuery = jest.fn((_query: string, args: unknown) =>
   args === "skip" ? undefined : mockRemote,
 )
-const mockRepository = {
-  loadProjection: jest.fn((): any => null),
-  saveProjection: jest.fn(),
-  loadOutbox: jest.fn(() => mockPending),
-  loadFailed: jest.fn(() => []),
-  enqueue: jest.fn((_action, current): any => ({ accepted: true, pending: current ?? [] })),
-  acknowledge: jest.fn(),
-  updateAttempt: jest.fn(),
-  fail: jest.fn(),
-  dismissFailed: jest.fn(),
-  cleanupTerminalGame: jest.fn(),
-  createResumeObserver: jest.fn(() => jest.fn()),
+function repository() {
+  return new ConnectedGameRepository(undefined, "user-1", {}, connectedDeploymentScope())
 }
 
-jest.mock("./drainOutbox", () => ({
-  drainConnectedOutbox: (...args: any[]) => mockDrain(...args),
-}))
+function cacheProjection(overrides: object = {}) {
+  repository().saveProjection(toConnectedProjection({ ...mockRemoteProjection, ...overrides })!)
+}
+
+function queued(operationId: string, event: object = {}): PendingLifeAction {
+  return {
+    schemaVersion: 1,
+    queuedAt: 2,
+    attempts: 0,
+    event: {
+      type: "life.changed",
+      operationId: asOperationId(operationId),
+      gameId: asGameId("game-public"),
+      playerId: asPlayerId("player-1"),
+      delta: 5,
+      actorId: asActorId("user-1"),
+      deviceId: asDeviceId("device-test-0001"),
+      clientCreatedAt: 2,
+      ...event,
+    } as PendingLifeAction["event"],
+  }
+}
+
+function queue(...actions: PendingLifeAction[]) {
+  const outbox = repository().outbox("game-public")
+  for (const action of actions) outbox.enqueue(action)
+}
+
 jest.mock("@/utils/telemetry", () => ({
   emitTelemetry: (...args: any[]) => mockEmitTelemetry(...args),
 }))
 jest.mock("@/features/game/localPersistence", () => ({
   LocalGameRepository: jest.fn(() => ({ getDeviceId: () => "device-test-0001" })),
-}))
-jest.mock("./persistence", () => ({
-  ConnectedGameRepository: jest.fn(() => mockRepository),
-  connectedDeploymentScope: () => "test.convex.cloud",
 }))
 jest.mock("../../../convex/_generated/api", () => ({
   api: {
@@ -109,13 +119,7 @@ describe("useConnectedGame connection readiness", () => {
     mockConvexAuthenticated = true
     mockConvexRefreshing = false
     mockRemote = mockRemoteProjection
-    mockPending = []
-    mockRepository.loadProjection.mockReturnValue(null)
-    mockRepository.enqueue.mockImplementation((_action, current) => ({
-      accepted: true,
-      pending: [...(current ?? []), _action],
-    }))
-    mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: false })
+    clear()
   })
 
   it.each(["finished", "abandoned"])(
@@ -161,7 +165,7 @@ describe("useConnectedGame connection readiness", () => {
   it("skips the projection while auth is down and keeps showing the cached board", () => {
     mockSocketConnected = true
     mockConvexAuthenticated = false
-    mockRepository.loadProjection.mockReturnValueOnce({ ...mockRemoteProjection })
+    cacheProjection()
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
     expect(mockUseQuery).toHaveBeenLastCalledWith("lobbyProjection", "skip")
     expect(result.current.status).toBe("ready")
@@ -172,28 +176,8 @@ describe("useConnectedGame connection readiness", () => {
 
   it("recovers owner-scoped cached projection and pending overlay on an offline cold mount", () => {
     mockRemote = undefined
-    mockRepository.loadProjection.mockReturnValueOnce({
-      ...mockRemoteProjection,
-      eventSequence: 2,
-      serverUpdatedAt: 2,
-    })
-    mockPending = [
-      {
-        schemaVersion: 1,
-        queuedAt: 2,
-        attempts: 0,
-        event: {
-          type: "life.changed",
-          operationId: "operation-cold-offline",
-          gameId: "game-public",
-          playerId: "player-1",
-          delta: 5,
-          actorId: "user-1",
-          deviceId: "device-test-0001",
-          clientCreatedAt: 2,
-        },
-      },
-    ]
+    cacheProjection({ eventSequence: 2, serverUpdatedAt: 2 })
+    queue(queued("operation-cold-offline"))
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
     expect(result.current.status).toBe("ready")
     if (result.current.status !== "ready") throw new Error("Expected a ready projection")
@@ -201,18 +185,18 @@ describe("useConnectedGame connection readiness", () => {
     expect(result.current.projection?.players[0].currentLife).toBe(25)
     expect(result.current.pending).toHaveLength(1)
     expect(result.current.connectionStatus).toBe("offline")
-    expect(mockDrain).not.toHaveBeenCalled()
+    expect(mockChangeMutation).not.toHaveBeenCalled()
   })
 
   it("does not drain the outbox while Convex refreshes authentication", async () => {
     mockSocketConnected = true
     mockConvexRefreshing = true
-    mockPending = [{ attempts: 0, event: { operationId: "operation-refreshing" } }]
+    queue(queued("operation-refreshing"))
 
     renderHook(() => useConnectedGame("game-public", "user-1"))
     await act(async () => Promise.resolve())
 
-    expect(mockDrain).not.toHaveBeenCalled()
+    expect(mockChangeMutation).not.toHaveBeenCalled()
   })
 
   it("keeps one optimistic delta until the projection includes its operation status", () => {
@@ -242,125 +226,83 @@ describe("useConnectedGame connection readiness", () => {
   })
 
   it("surfaces outbox backpressure without mutating the displayed projection", () => {
-    mockRepository.enqueue.mockReturnValueOnce({
-      accepted: false,
-      reason: "record_limit",
-      pending: [],
-    })
+    queue(
+      ...Array.from({ length: 128 }, (_, index) =>
+        queued(`operation-backlog-${String(index).padStart(4, "0")}`, {
+          playerId: asPlayerId("player-2"),
+          delta: 1,
+        }),
+      ),
+    )
+    mockRemote = {
+      ...mockRemoteProjection,
+      operationStatus: { status: "not_found", operationId: "operation-backlog-0000" },
+    }
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
 
     act(() => result.current.changeLife("player-1", 5))
 
     expect(result.current.projection?.players[0].currentLife).toBe(20)
-    expect(result.current.pending).toEqual([])
+    expect(result.current.pending).toHaveLength(128)
     expect(result.current.changeError).toMatch(/pending changes is full/i)
   })
 
   it("retries a transient drain failure on backoff without unrelated state changes", async () => {
     jest.useFakeTimers()
     mockSocketConnected = true
-    mockPending = [{ attempts: 0, event: { operationId: "operation-retry" } }]
+    queue(queued("operation-retry-000001"))
     mockRemote = {
       ...mockRemoteProjection,
-      operationStatus: { status: "not_found", operationId: "operation-retry" },
+      operationStatus: { status: "not_found", operationId: "operation-retry-000001" },
     }
-    mockDrain
-      .mockResolvedValueOnce({ acknowledged: [], failed: [], stoppedForRetry: true })
-      .mockResolvedValueOnce({
-        acknowledged: ["operation-retry"],
-        failed: [],
-        stoppedForRetry: false,
-      })
+    mockChangeMutation.mockRejectedValueOnce(new Error("Network request failed"))
     const view = renderHook(() => useConnectedGame("game-public", "user-1"))
-    await waitFor(() => expect(mockDrain).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mockChangeMutation).toHaveBeenCalledTimes(1))
     await act(async () => {
       jest.advanceTimersByTime(500)
       await Promise.resolve()
     })
-    await waitFor(() => expect(mockDrain).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mockChangeMutation).toHaveBeenCalledTimes(2))
     view.unmount()
     jest.useRealTimers()
   })
 
   it("acknowledges a queued claim resolution under its own operation id", async () => {
-    jest.useFakeTimers()
     mockSocketConnected = true
-    mockPending = [{ attempts: 0, event: { operationId: "resolution-1" } }]
+    queue(
+      queued("resolution-op-000001", {
+        type: "commanderDamage.resolved",
+        claimOperationId: asOperationId("commander-claim-000001"),
+        toPlayerId: asPlayerId("player-1"),
+        accepted: true,
+        playerId: undefined,
+        delta: undefined,
+      }),
+    )
     mockRemote = {
       ...mockRemoteProjection,
-      operationStatus: {
-        status: "not_found",
-        operationId: "resolution-1",
-      },
+      operationStatus: { status: "not_found", operationId: "resolution-op-000001" },
     }
-    mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: true })
     const view = renderHook(() => useConnectedGame("game-public", "user-1"))
-    await waitFor(() => expect(mockDrain).toHaveBeenCalled())
-    const { send } = mockDrain.mock.calls[0][0]
+    await waitFor(() =>
+      expect(mockChangeMutation).toHaveBeenCalledWith(
+        expect.objectContaining({ operationId: "commander-claim-000001" }),
+      ),
+    )
+
     mockRemote = {
       ...mockRemoteProjection,
       operationStatus: {
         status: "acknowledged",
-        operationId: "resolution-1",
+        operationId: "resolution-op-000001",
         projectionEventSequence: 0,
       },
     }
     view.rerender({})
 
-    const acknowledgement = await send({
-      attempts: 0,
-      event: {
-        type: "commanderDamage.resolved",
-        operationId: "resolution-1",
-        claimOperationId: "claim-1",
-        gameId: "game-public",
-        toPlayerId: "player-1",
-        accepted: true,
-        actorId: "user-1",
-        deviceId: "device-test-0001",
-        clientCreatedAt: 1,
-      },
-    })
-
-    expect(acknowledgement.operationId).toBe("resolution-1")
-    expect(mockChangeMutation).toHaveBeenCalledWith(
-      expect.objectContaining({ operationId: "claim-1" }),
-    )
+    await waitFor(() => expect(view.result.current.pending).toEqual([]))
+    expect(view.result.current.failed).toEqual([])
     view.unmount()
-    jest.useRealTimers()
-  })
-
-  it("does not overwrite a tap queued while an in-flight drain settles", () => {
-    const draining = {
-      schemaVersion: 1,
-      queuedAt: 1,
-      attempts: 0,
-      event: {
-        type: "life.changed",
-        operationId: "operation-already-draining",
-        gameId: "game-public",
-        playerId: "player-1",
-        delta: 1,
-        actorId: "user-1",
-        deviceId: "device-test-0001",
-        clientCreatedAt: 1,
-      },
-    } as any
-    const queuedDuringDrain = {
-      ...draining,
-      queuedAt: 2,
-      event: { ...draining.event, operationId: "operation-queued-during-drain", delta: 5 },
-    }
-    const merged = mergeDrainSnapshot(
-      [draining, queuedDuringDrain],
-      new Set([draining.event.operationId]),
-      [],
-      [],
-      new Set(),
-    )
-    expect(merged.pending.map((action) => action.event.operationId)).toEqual([
-      "operation-queued-during-drain",
-    ])
   })
 
   it("emits reconnect readiness once after a disconnected to confirmed-ready transition", async () => {
@@ -383,7 +325,7 @@ describe("useConnectedGame connection readiness", () => {
     mockRemote = undefined
     const hook = renderHook(() => useConnectedGame("game-public", "user-1"))
     expect(hook.result.current).toMatchObject({ status: "loading", projection: null })
-    expect(mockDrain).not.toHaveBeenCalled()
+    expect(mockChangeMutation).not.toHaveBeenCalled()
     act(() => jest.advanceTimersByTime(CONNECTED_GAME_UNAVAILABLE_MS - 1))
     expect(hook.result.current.status).toBe("loading")
     act(() => jest.advanceTimersByTime(1))

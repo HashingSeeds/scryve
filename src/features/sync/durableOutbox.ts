@@ -20,7 +20,6 @@ export interface DurableOutboxCodec<
   parseFailed(value: unknown): Failed | null
   createFailure(action: Pending, reason: string, failedAt: number): Failed
   operationId(action: Pending): string
-  belongsToScope(action: Pending, ownerId: string, scopeId: string): boolean
   compare?(left: Pending, right: Pending): number
   /** why: a report names only these kinds, so a corrupt record can't pass a value off as its type. */
   operationTypes?: readonly string[]
@@ -32,10 +31,10 @@ export interface DurableOutboxCodec<
 export type FieldName<T> = T extends unknown ? Extract<keyof T, string> : never
 
 export interface DurableOutboxKeys {
-  pendingIndex(scopeId: string, ownerId: string): string
-  pendingRecord(scopeId: string, operationId: string, ownerId: string): string
-  failedIndex(scopeId: string, ownerId: string): string
-  failedRecord(scopeId: string, operationId: string, ownerId: string): string
+  pendingIndex: string
+  pendingRecordPrefix: string
+  failedIndex: string
+  failedRecordPrefix: string
 }
 
 export interface DurableStringStorage {
@@ -67,6 +66,17 @@ export type DurableFailResult<Pending, Failed> =
       failed: Failed[]
       pending: Pending[]
     }
+
+export interface DurableOutboxOptions<
+  Pending extends DurablePendingRecord,
+  Failed extends DurableFailedRecord<Pending>,
+> {
+  storage: DurableStringStorage
+  keys: DurableOutboxKeys
+  codec: DurableOutboxCodec<Pending, Failed>
+  owns(action: Pending): boolean
+  limits?: Partial<DurableOutboxLimits>
+}
 
 export const DURABLE_OUTBOX_LIMITS: DurableOutboxLimits = {
   maxPendingRecords: 128,
@@ -287,16 +297,26 @@ export class DurableOutbox<
   Pending extends DurablePendingRecord,
   Failed extends DurableFailedRecord<Pending>,
 > {
+  private readonly storage: DurableStringStorage
+  private readonly keys: DurableOutboxKeys
+  private readonly codec: DurableOutboxCodec<Pending, Failed>
+  private readonly owns: (action: Pending) => boolean
   private readonly limits: DurableOutboxLimits
 
-  constructor(
-    private readonly storage: DurableStringStorage,
-    private readonly ownerId: string,
-    private readonly keys: DurableOutboxKeys,
-    private readonly codec: DurableOutboxCodec<Pending, Failed>,
-    limits: Partial<DurableOutboxLimits> = {},
-  ) {
-    this.limits = { ...DURABLE_OUTBOX_LIMITS, ...limits }
+  constructor(options: DurableOutboxOptions<Pending, Failed>) {
+    this.storage = options.storage
+    this.keys = options.keys
+    this.codec = options.codec
+    this.owns = options.owns
+    this.limits = { ...DURABLE_OUTBOX_LIMITS, ...options.limits }
+  }
+
+  private pendingKey(operationId: string): string {
+    return this.keys.pendingRecordPrefix + operationId
+  }
+
+  private failedKey(operationId: string): string {
+    return this.keys.failedRecordPrefix + operationId
   }
 
   /** why: provenance goes first so a record cut short mid-write still names its writer. */
@@ -313,16 +333,23 @@ export class DurableOutbox<
     return utf8ByteLength(this.storage.getString(key) ?? this.serialize(record))
   }
 
+  private index(key: string, discovered: readonly string[] = []): string[] {
+    return stringIndex([...stringIndex(parsedJson(this.storage.getString(key))), ...discovered])
+  }
+
+  private discovered(allKeys: readonly string[], prefix: string): string[] {
+    return allKeys.filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length))
+  }
+
+  order(actions: readonly Pending[]): Pending[] {
+    return oldestFirst(actions, this.codec.operationId, this.codec.compare)
+  }
+
   enqueue(
     action: Pending,
-    scopeId: string,
-    currentPending?: readonly Pending[],
+    currentPending: readonly Pending[] = this.loadPending(),
   ): DurableEnqueueResult<Pending> {
-    const pending = oldestFirst(
-      currentPending ?? this.loadPending(scopeId),
-      this.codec.operationId,
-      this.codec.compare,
-    )
+    const pending = this.order(currentPending)
     const operationId = this.codec.operationId(action)
     if (pending.some((candidate) => this.codec.operationId(candidate) === operationId))
       return { accepted: true, pending }
@@ -331,77 +358,67 @@ export class DurableOutbox<
     const serialized = this.serialize(action)
     const pendingBytes = pending.reduce(
       (total, candidate) =>
-        total +
-        this.storedBytes(
-          this.keys.pendingRecord(scopeId, this.codec.operationId(candidate), this.ownerId),
-          candidate,
-        ),
+        total + this.storedBytes(this.pendingKey(this.codec.operationId(candidate)), candidate),
       0,
     )
     if (pendingBytes + utf8ByteLength(serialized) > this.limits.maxPendingBytes)
       return { accepted: false, reason: "byte_limit", pending }
-    this.storage.set(this.keys.pendingRecord(scopeId, operationId, this.ownerId), serialized)
-    const index = stringIndex(
-      parsedJson(this.storage.getString(this.keys.pendingIndex(scopeId, this.ownerId))),
-    )
+    this.storage.set(this.pendingKey(operationId), serialized)
+    const index = this.index(this.keys.pendingIndex)
     if (!index.includes(operationId)) {
       index.push(operationId)
-      this.storage.set(this.keys.pendingIndex(scopeId, this.ownerId), JSON.stringify(index))
+      this.storage.set(this.keys.pendingIndex, JSON.stringify(index))
     }
-    return {
-      accepted: true,
-      pending: oldestFirst([...pending, action], this.codec.operationId, this.codec.compare),
-    }
+    return { accepted: true, pending: this.order([...pending, action]) }
   }
 
-  loadPending(scopeId: string): Pending[] {
-    const recordPrefix = `${this.keys.pendingRecord(scopeId, "", this.ownerId)}`
-    const discovered = this.storage
-      .getAllKeys()
-      .filter((key) => key.startsWith(recordPrefix))
-      .map((key) => key.slice(recordPrefix.length))
-    const index = stringIndex([
-      ...stringIndex(
-        parsedJson(this.storage.getString(this.keys.pendingIndex(scopeId, this.ownerId))),
-      ),
-      ...discovered,
-    ])
+  load(): { pending: Pending[]; failures: Failed[] } {
+    const allKeys = this.storage.getAllKeys()
+    return { pending: this.readPending(allKeys), failures: this.readFailed(allKeys) }
+  }
+
+  loadPending(): Pending[] {
+    return this.readPending(this.storage.getAllKeys())
+  }
+
+  loadFailed(): Failed[] {
+    return this.readFailed(this.storage.getAllKeys())
+  }
+
+  private readPending(allKeys: readonly string[]): Pending[] {
+    const index = this.index(
+      this.keys.pendingIndex,
+      this.discovered(allKeys, this.keys.pendingRecordPrefix),
+    )
     const pending: Pending[] = []
     const validIds: string[] = []
     const quarantined: QuarantinedRecord[] = []
     for (const operationId of index) {
-      const pendingKey = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
-      const failedKey = this.keys.failedRecord(scopeId, operationId, this.ownerId)
+      const pendingKey = this.pendingKey(operationId)
+      const failedKey = this.failedKey(operationId)
       const action = this.codec.parsePending(this.read(pendingKey))
       const failedValue = this.storage.getString(failedKey)
       const failed = this.codec.parseFailed(withoutProvenance(parsedJson(failedValue)))
       if (failedValue && failed) {
-        if (
-          this.codec.operationId(failed.action) === operationId &&
-          this.codec.belongsToScope(failed.action, this.ownerId, scopeId)
-        ) {
+        if (this.codec.operationId(failed.action) === operationId && this.owns(failed.action)) {
           if (action) this.storage.delete(pendingKey)
           else this.quarantine(pendingKey, "pending", quarantined)
           continue
         }
         this.quarantine(failedKey, "failed", quarantined)
       } else if (failedValue) this.quarantine(failedKey, "failed", quarantined)
-      if (
-        action &&
-        this.codec.operationId(action) === operationId &&
-        this.codec.belongsToScope(action, this.ownerId, scopeId)
-      ) {
+      if (action && this.codec.operationId(action) === operationId && this.owns(action)) {
         pending.push(action)
         validIds.push(operationId)
       } else this.quarantine(pendingKey, "pending", quarantined)
     }
-    this.storage.set(this.keys.pendingIndex(scopeId, this.ownerId), JSON.stringify(validIds))
-    this.reportQuarantined(scopeId, quarantined)
-    return oldestFirst(pending, this.codec.operationId, this.codec.compare)
+    this.storage.set(this.keys.pendingIndex, JSON.stringify(validIds))
+    this.reportQuarantined(quarantined)
+    return this.order(pending)
   }
 
-  updateAttempt(scopeId: string, operationId: string, attemptedAt: number): Pending | null {
-    const key = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
+  updateAttempt(operationId: string, attemptedAt: number): Pending | null {
+    const key = this.pendingKey(operationId)
     const action = this.codec.parsePending(this.read(key))
     if (!action) return null
     const updated = { ...action, attempts: action.attempts + 1, lastAttemptAt: attemptedAt }
@@ -410,11 +427,10 @@ export class DurableOutbox<
   }
 
   rewriteUnattempted(
-    scopeId: string,
     operationId: string,
     rewrite: (action: Pending) => Pending | null,
   ): Pending | null {
-    const key = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
+    const key = this.pendingKey(operationId)
     const action = this.codec.parsePending(this.read(key))
     if (!action || action.attempts > 0 || action.lastAttemptAt !== undefined) return null
     const rewritten = rewrite(action)
@@ -422,36 +438,16 @@ export class DurableOutbox<
     return rewritten
   }
 
-  replacePending(scopeId: string, action: Pending): void {
-    this.storage.set(
-      this.keys.pendingRecord(scopeId, this.codec.operationId(action), this.ownerId),
-      this.serialize(action),
+  acknowledge(operationId: string): void {
+    this.storage.delete(this.pendingKey(operationId))
+    const index = this.index(this.keys.pendingIndex).filter(
+      (candidate) => candidate !== operationId,
     )
-  }
-
-  acknowledge(scopeId: string, operationId: string): void {
-    this.storage.delete(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
-    const index = stringIndex(
-      parsedJson(this.storage.getString(this.keys.pendingIndex(scopeId, this.ownerId))),
-    ).filter((candidate) => candidate !== operationId)
-    this.storage.set(this.keys.pendingIndex(scopeId, this.ownerId), JSON.stringify(index))
-  }
-
-  fail(
-    scopeId: string,
-    operationId: string,
-    reason: string,
-    failedAt = Date.now(),
-  ): DurableFailResult<Pending, Failed> | null {
-    const pending = this.loadPending(scopeId)
-    const action = pending.find((candidate) => this.codec.operationId(candidate) === operationId)
-    if (!action) return null
-    return this.failAction(action, scopeId, reason, failedAt, this.loadFailed(scopeId), pending)
+    this.storage.set(this.keys.pendingIndex, JSON.stringify(index))
   }
 
   failAction(
     action: Pending,
-    scopeId: string,
     reason: string,
     failedAt: number,
     currentFailed: readonly Failed[],
@@ -459,12 +455,11 @@ export class DurableOutbox<
   ): DurableFailResult<Pending, Failed> {
     const operationId = this.codec.operationId(action)
     const failed = [...currentFailed]
-    const pending = oldestFirst(currentPending, this.codec.operationId, this.codec.compare)
+    const pending = this.order(currentPending)
     if (
       failed.some((candidate) => this.codec.operationId(candidate.action) === operationId) ||
       // why: another tab settled it after this list was loaded; failing it now would bring back a dismissed failure.
-      this.storage.getString(this.keys.pendingRecord(scopeId, operationId, this.ownerId)) ===
-        undefined
+      this.storage.getString(this.pendingKey(operationId)) === undefined
     )
       return {
         accepted: true,
@@ -481,61 +476,51 @@ export class DurableOutbox<
     const failedBytes = failed.reduce(
       (total, candidate) =>
         total +
-        this.storedBytes(
-          this.keys.failedRecord(scopeId, this.codec.operationId(candidate.action), this.ownerId),
-          candidate,
-        ),
+        this.storedBytes(this.failedKey(this.codec.operationId(candidate.action)), candidate),
       0,
     )
     const serialized = this.serialize(record)
     if (failedBytes + utf8ByteLength(serialized) > this.limits.maxFailedBytes)
       return { accepted: false, reason: "byte_limit", failed, pending }
-    this.storage.set(this.keys.failedRecord(scopeId, operationId, this.ownerId), serialized)
+    this.storage.set(this.failedKey(operationId), serialized)
     const nextFailed = [...failed, record].sort((left, right) => left.failedAt - right.failedAt)
     this.storage.set(
-      this.keys.failedIndex(scopeId, this.ownerId),
+      this.keys.failedIndex,
       JSON.stringify(nextFailed.map((candidate) => this.codec.operationId(candidate.action))),
     )
     const nextPending = pending.filter(
       (candidate) => this.codec.operationId(candidate) !== operationId,
     )
-    this.storage.delete(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
+    this.storage.delete(this.pendingKey(operationId))
     this.storage.set(
-      this.keys.pendingIndex(scopeId, this.ownerId),
+      this.keys.pendingIndex,
       JSON.stringify(nextPending.map((candidate) => this.codec.operationId(candidate))),
     )
     return { accepted: true, failed: nextFailed, pending: nextPending }
   }
 
-  loadFailed(scopeId: string): Failed[] {
-    const recordPrefix = `${this.keys.failedRecord(scopeId, "", this.ownerId)}`
-    const discovered = this.storage
-      .getAllKeys()
-      .filter((key) => key.startsWith(recordPrefix))
-      .map((key) => key.slice(recordPrefix.length))
-    const index = stringIndex([
-      ...stringIndex(
-        parsedJson(this.storage.getString(this.keys.failedIndex(scopeId, this.ownerId))),
-      ),
-      ...discovered,
-    ])
+  private readFailed(allKeys: readonly string[]): Failed[] {
+    const index = this.index(
+      this.keys.failedIndex,
+      this.discovered(allKeys, this.keys.failedRecordPrefix),
+    )
     const failures: Failed[] = []
     const quarantined: QuarantinedRecord[] = []
     for (const operationId of index) {
-      const key = this.keys.failedRecord(scopeId, operationId, this.ownerId)
+      const key = this.failedKey(operationId)
       const failure = this.codec.parseFailed(this.read(key))
       if (
         failure &&
         this.codec.operationId(failure.action) === operationId &&
-        this.codec.belongsToScope(failure.action, this.ownerId, scopeId)
+        this.owns(failure.action)
       )
         failures.push(failure)
       else this.quarantine(key, "failed", quarantined)
     }
-    this.reportQuarantined(scopeId, quarantined)
+    this.reportQuarantined(quarantined)
     failures.sort((left, right) => left.failedAt - right.failedAt)
     this.storage.set(
-      this.keys.failedIndex(scopeId, this.ownerId),
+      this.keys.failedIndex,
       JSON.stringify(failures.map((failure) => this.codec.operationId(failure.action))),
     )
     return failures
@@ -572,21 +557,30 @@ export class DurableOutbox<
   }
 
   /** why: quarantine is otherwise silent; one report per load pass carries enough structure to write a recovering codec, never record values. */
-  private reportQuarantined(scopeId: string, quarantined: readonly QuarantinedRecord[]): void {
+  private reportQuarantined(quarantined: readonly QuarantinedRecord[]): void {
     if (!quarantined.length) return
     reportQuarantine({
-      outbox: outboxLabel(this.keys.pendingRecord(scopeId, "", this.ownerId)),
+      outbox: outboxLabel(this.keys.pendingRecordPrefix),
       count: quarantined.length,
       reasons: [...new Set(quarantined.map((record) => record.reason))],
       records: quarantined.slice(0, MAX_REPORTED_RECORDS),
     })
   }
 
-  dismissFailed(scopeId: string, operationId: string): void {
-    this.storage.delete(this.keys.failedRecord(scopeId, operationId, this.ownerId))
-    const index = stringIndex(
-      parsedJson(this.storage.getString(this.keys.failedIndex(scopeId, this.ownerId))),
-    ).filter((candidate) => candidate !== operationId)
-    this.storage.set(this.keys.failedIndex(scopeId, this.ownerId), JSON.stringify(index))
+  dismissFailed(operationId: string): void {
+    this.storage.delete(this.failedKey(operationId))
+    const index = this.index(this.keys.failedIndex).filter((candidate) => candidate !== operationId)
+    this.storage.set(this.keys.failedIndex, JSON.stringify(index))
+  }
+
+  clear(): void {
+    for (const key of this.storage.getAllKeys())
+      if (
+        key.startsWith(this.keys.pendingRecordPrefix) ||
+        key.startsWith(this.keys.failedRecordPrefix)
+      )
+        this.storage.delete(key)
+    this.storage.delete(this.keys.pendingIndex)
+    this.storage.delete(this.keys.failedIndex)
   }
 }

@@ -1,4 +1,3 @@
-import { drainConnectedOutbox } from "./drainOutbox"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
 import { overlayPendingDeltas } from "./reconciliation"
@@ -37,7 +36,7 @@ describe("connected acknowledgement recovery", () => {
   it("recovers a committed acknowledgement after its operation ages out of recent IDs", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-a")
-    repository.enqueue(pending, [])
+    repository.outbox("game-public").enqueue(pending)
     const terminal = {
       ...committed,
       status: "finished" as const,
@@ -49,17 +48,24 @@ describe("connected acknowledgement recovery", () => {
     repository.saveProjection(terminal)
 
     const restarted = new ConnectedGameRepository(storage, "user-a")
-    expect(
-      overlayPendingDeltas(terminal, restarted.loadOutbox("game-public")).players[0],
-    ).toMatchObject({ currentLife: 25, pendingDelta: 0 })
-    const result = await drainConnectedOutbox({
-      repository: restarted,
-      publicId: "game-public",
-      failed: [],
-      send: async (queued) => ({ operationId: queued.event.operationId }),
+    const sent: string[] = []
+    const outbox = restarted.outbox("game-public", {
+      send: async (queued) => {
+        sent.push(queued.event.operationId)
+        return { operationId: queued.event.operationId }
+      },
+      rejectReason: () => undefined,
+      backoff: { baseMs: 250, maxMs: 8_000 },
     })
-    expect(result.acknowledged).toEqual([operationId])
-    expect(restarted.cleanupTerminalGame(terminal, result.pending, result.failures)).toBe(true)
+    expect(overlayPendingDeltas(terminal, outbox.getState().pending).players[0]).toMatchObject({
+      currentLife: 25,
+      pendingDelta: 0,
+    })
+    const stop = outbox.start()
+    await new Promise(setImmediate)
+    stop()
+    expect(sent).toEqual([operationId])
+    expect(restarted.cleanupTerminalGame(terminal, outbox)).toBe(true)
     expect(restarted.loadProjection("game-public")).toBeNull()
   })
 
@@ -71,7 +77,7 @@ describe("connected acknowledgement recovery", () => {
     (_scenario, terminalLife, recentOperationIds) => {
       const storage = new MemoryStorage()
       const repository = new ConnectedGameRepository(storage, "user-a")
-      repository.enqueue(pending)
+      repository.outbox("game-public").enqueue(pending)
       const terminal: ConnectedProjection = {
         ...base,
         status: "finished",
@@ -86,10 +92,12 @@ describe("connected acknowledgement recovery", () => {
 
       const restarted = new ConnectedGameRepository(storage, "user-a")
       const cached = restarted.loadProjection("game-public")!
-      expect(
-        overlayPendingDeltas(cached, restarted.loadOutbox("game-public")).players[0],
-      ).toMatchObject({ currentLife: terminalLife, pendingDelta: 0 })
-      expect(restarted.loadOutbox("game-public")).toEqual([pending])
+      const queued = restarted.outbox("game-public").getState().pending
+      expect(overlayPendingDeltas(cached, queued).players[0]).toMatchObject({
+        currentLife: terminalLife,
+        pendingDelta: 0,
+      })
+      expect(queued).toEqual([pending])
     },
   )
 })

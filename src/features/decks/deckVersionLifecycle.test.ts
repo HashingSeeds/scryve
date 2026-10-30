@@ -1,12 +1,8 @@
 import type { ConvexReactClient } from "convex/react"
 import { ConvexError } from "convex/values"
 
-import {
-  DeckVersionWriteRepository,
-  DECK_VERSION_LAST_REASON,
-  DeckVersionWriteController,
-} from "./decksVersionWrites"
-import { DeckVersionCacheController } from "./deckVersionsCache"
+import { DECK_VERSION_LAST_REASON, DeckVersionWriteController } from "./decksVersionWrites"
+import { DeckVersionCacheController, DeckVersionCacheRepository } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { makeConvexTest } from "../../../test/convexTest"
@@ -48,7 +44,7 @@ const flush = () => new Promise(setImmediate)
 describe("deck version lifecycle", () => {
   it("queues a create, keeps the provisional identity for later edits, and maps their transport", async () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
+    const cache = new DeckVersionCacheRepository("owner", local)
     const calls: Array<{ args: Record<string, unknown> }> = []
     const client = {
       mutation: jest.fn(async (_reference: unknown, args: Record<string, unknown>) => {
@@ -56,7 +52,10 @@ describe("deck version lifecycle", () => {
         return acceptedCreate
       }),
     } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const controller = new DeckVersionWriteController(client, "owner", {
+      storage: local,
+      now: () => 1,
+    })
     const stop = controller.start()
 
     const provisionalId = controller.createVersion(deckId, "Offline Draft", "kept", [card])
@@ -80,12 +79,10 @@ describe("deck version lifecycle", () => {
       cards: [{ name: "Sol Ring", quantity: 2 }],
     })
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
-    expect(repository.cache.loadCards("server-version-1" as Id<"deckVersions">)).toMatchObject({
+    expect(cache.loadCards("server-version-1" as Id<"deckVersions">)).toMatchObject({
       revision: 1,
     })
-    expect(repository.cache.resolveMapped(deckId, provisionalId)?.versionId).toBe(
-      "server-version-1",
-    )
+    expect(cache.resolveMapped(deckId, provisionalId)?.versionId).toBe("server-version-1")
   })
 
   it("keeps the provisional draft across a lost create acknowledgement and replays after restart", async () => {
@@ -131,10 +128,7 @@ describe("deck version lifecycle", () => {
         return result
       },
     } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(
-      client,
-      new DeckVersionWriteRepository("owner", local),
-    )
+    const controller = new DeckVersionWriteController(client, "owner", { storage: local })
     const stop = controller.start()
     const provisionalId = controller.createVersion(id as string, "Offline Draft", "", [
       {
@@ -149,11 +143,11 @@ describe("deck version lifecycle", () => {
     expect(operationId).toBeTruthy()
     stop()
 
-    const repository = new DeckVersionWriteRepository("owner", local)
-    expect(repository.cache.loadVersions(id as string)).toMatchObject([
+    const cache = new DeckVersionCacheRepository("owner", local)
+    expect(cache.loadVersions(id as string)).toMatchObject([
       { versionId: provisionalId, local: true, name: "Offline Draft" },
     ])
-    const restarted = new DeckVersionWriteController(client, repository)
+    const restarted = new DeckVersionWriteController(client, "owner", { storage: local })
     expect(restarted.getSnapshot().pending[0]).toMatchObject({ operationId, op: "create" })
     const stopRestarted = restarted.start()
     await flush()
@@ -163,16 +157,14 @@ describe("deck version lifecycle", () => {
     const stored = await t.run(async (ctx) => ctx.db.query("deckVersions").take(10))
     const created = stored.find((version) => version.name === "Offline Draft")
     expect(created).toMatchObject({ cardCount: 1, syncRevision: 1 })
-    expect(repository.cache.mappedVersionId(provisionalId)).toBe(created?._id as string)
-    expect(repository.cache.resolveMapped(id as string, provisionalId)?.versionId).toBe(
-      created?._id,
-    )
+    expect(cache.mappedVersionId(provisionalId)).toBe(created?._id as string)
+    expect(cache.resolveMapped(id as string, provisionalId)?.versionId).toBe(created?._id)
   })
 
   it("parks a cards/rename/delete chain on one conflict and keeps later tails guarded", async () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [
+    const cache = new DeckVersionCacheRepository("owner", local)
+    cache.mergeVersions(deckId, [
       versionSnapshot(1),
       { ...versionSnapshot(2), versionId: "version-2" as Id<"deckVersions">, versionNumber: 2 },
     ])
@@ -182,7 +174,10 @@ describe("deck version lifecycle", () => {
         .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
         .mockResolvedValue({ ...versionSnapshot(2), revision: 2 }),
     } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const controller = new DeckVersionWriteController(client, "owner", {
+      storage: local,
+      now: () => 1,
+    })
     const stop = controller.start()
     controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
     controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1)
@@ -212,7 +207,7 @@ describe("deck version lifecycle", () => {
     await flush()
     stop()
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
-    expect(repository.cache.loadVersions(deckId)).toHaveLength(2)
+    expect(cache.loadVersions(deckId)).toHaveLength(2)
   })
 
   it.each([
@@ -233,8 +228,8 @@ describe("deck version lifecycle", () => {
     "replays a conflicted %s as its own op instead of an empty card replace",
     async (_op, edit, reference, args) => {
       const local = new MemoryStorage()
-      const repository = new DeckVersionWriteRepository("owner", local)
-      repository.cache.mergeVersions(deckId, [
+      const cache = new DeckVersionCacheRepository("owner", local)
+      cache.mergeVersions(deckId, [
         versionSnapshot(1),
         { ...versionSnapshot(2), versionId: "version-2" as Id<"deckVersions"> },
       ])
@@ -244,7 +239,10 @@ describe("deck version lifecycle", () => {
           .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
           .mockResolvedValue(versionSnapshot(2)),
       } as unknown as ConvexReactClient
-      const controller = new DeckVersionWriteController(client, repository, () => 1)
+      const controller = new DeckVersionWriteController(client, "owner", {
+        storage: local,
+        now: () => 1,
+      })
       const stop = controller.start()
       edit(controller)
       await flush()
@@ -265,15 +263,18 @@ describe("deck version lifecycle", () => {
 
   it("replays a mixed conflicts chain preserving the card payload and both intents", async () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const cache = new DeckVersionCacheRepository("owner", local)
+    cache.mergeVersions(deckId, [versionSnapshot(1)])
     const client = {
       mutation: jest
         .fn()
         .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
         .mockResolvedValue(versionSnapshot(2)),
     } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const controller = new DeckVersionWriteController(client, "owner", {
+      storage: local,
+      now: () => 1,
+    })
     const stop = controller.start()
     controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
     controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1)
@@ -298,8 +299,8 @@ describe("deck version lifecycle", () => {
 
   it("keeps local intent when a create hits the version limit and discarding removes the draft", async () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const cache = new DeckVersionCacheRepository("owner", local)
+    cache.mergeVersions(deckId, [versionSnapshot(1)])
     const client = {
       mutation: jest.fn().mockRejectedValue(
         new ConvexError({
@@ -308,32 +309,36 @@ describe("deck version lifecycle", () => {
         }),
       ),
     } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const controller = new DeckVersionWriteController(client, "owner", {
+      storage: local,
+      now: () => 1,
+    })
     const stop = controller.start()
     const provisionalId = controller.createVersion(deckId, "Too Many", "", [card])
     await flush()
     expect(controller.getSnapshot()).toMatchObject({
       failures: [{ action: { op: "create", versionId: provisionalId } }],
     })
-    expect(repository.cache.loadVersions(deckId)).toHaveLength(2)
-    expect(repository.cache.loadVersions(deckId)).toMatchObject([
+    expect(cache.loadVersions(deckId)).toHaveLength(2)
+    expect(cache.loadVersions(deckId)).toMatchObject([
       { name: "Main" },
       { local: true, name: "Too Many", versionNumber: 2 },
     ])
     controller.discardFailure(controller.getSnapshot().failures[0].action.operationId)
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
-    expect(repository.cache.loadVersions(deckId)).toHaveLength(1)
-    expect(repository.cache.loadVersions(deckId)[0]?.versionId).toBe(versionId)
+    expect(cache.loadVersions(deckId)).toHaveLength(1)
+    expect(cache.loadVersions(deckId)[0]?.versionId).toBe(versionId)
     stop()
   })
 
   it("refuses to delete the last visible version locally without any server round trip", () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const cache = new DeckVersionCacheRepository("owner", local)
+    cache.mergeVersions(deckId, [versionSnapshot(1)])
     const controller = new DeckVersionWriteController(
       { mutation: jest.fn() } as unknown as ConvexReactClient,
-      repository,
+      "owner",
+      { storage: local },
     )
     expect(() => controller.deleteVersion(deckId, versionId, 1)).toThrow(DECK_VERSION_LAST_REASON)
     expect(controller.getSnapshot().pending).toHaveLength(0)
@@ -341,19 +346,19 @@ describe("deck version lifecycle", () => {
 
   it("resolves a selected provisional version to its mapped server row in the cache snapshot", () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [{ ...versionSnapshot(1), versionNumber: 1 }])
-    repository.cache.saveDraft(deckId, {
+    const versions = new DeckVersionCacheRepository("owner", local)
+    versions.mergeVersions(deckId, [{ ...versionSnapshot(1), versionNumber: 1 }])
+    versions.saveDraft(deckId, {
       ...versionSnapshot(0),
       versionId: "draft-1" as Id<"deckVersions">,
       versionNumber: 2,
       name: "Offline Draft",
       local: true,
     })
-    repository.cache.recordMapping("draft-1", versionId)
+    versions.recordMapping("draft-1", versionId)
     const cache = new DeckVersionCacheController(
       { query: jest.fn() } as unknown as ConvexReactClient,
-      repository.cache,
+      versions,
     )
     const stopCache = cache.start()
     cache.ensure(deckId, "draft-1")
@@ -365,18 +370,16 @@ describe("deck version lifecycle", () => {
 
   it("keeps draft rows through tombstone and authoritative refreshes", () => {
     const local = new MemoryStorage()
-    const repository = new DeckVersionWriteRepository("owner", local)
-    repository.cache.mergeVersions(deckId, [
-      { ...versionSnapshot(1), versionNumber: 1, deleted: false },
-    ])
-    repository.cache.saveDraft(deckId, {
+    const cache = new DeckVersionCacheRepository("owner", local)
+    cache.mergeVersions(deckId, [{ ...versionSnapshot(1), versionNumber: 1, deleted: false }])
+    cache.saveDraft(deckId, {
       ...versionSnapshot(0),
       versionId: "draft-1" as Id<"deckVersions">,
       versionNumber: 2,
       name: "Offline Draft",
       local: true,
     })
-    repository.cache.mergeVersions(
+    cache.mergeVersions(
       deckId,
       [
         { ...versionSnapshot(1), versionNumber: 1 },
@@ -388,7 +391,7 @@ describe("deck version lifecycle", () => {
       ],
       true,
     )
-    expect(repository.cache.loadVersions(deckId).map((version) => version.versionId)).toEqual([
+    expect(cache.loadVersions(deckId).map((version) => version.versionId)).toEqual([
       versionId,
       "draft-1",
       "server-version-1",

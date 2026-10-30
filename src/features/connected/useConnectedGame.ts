@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 import type { FunctionArgs } from "convex/server"
 
-import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
+import type { OutboxAcknowledgement } from "@/features/sync/outbox"
 
 import { createLobbyIdentifiers } from "./identifiers"
 import type { ConnectedActionEvent, PendingLifeAction } from "./model"
@@ -18,7 +18,6 @@ import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { TABLE_VERSION } from "../../../convex/lib/table"
 
-export { mergeDrainSnapshot } from "./OutboxSyncController"
 export { CONNECTED_GAME_UNAVAILABLE_MS, type ConnectedGameRuntime } from "./useConnectedRuntime"
 
 function operationCheckFor(event: ConnectedActionEvent) {

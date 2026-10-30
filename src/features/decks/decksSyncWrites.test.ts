@@ -9,7 +9,7 @@ import {
   DECK_CONFLICT_REASON,
   DECK_REJECTED_REASON,
   DeckMetadataWriteController,
-  DeckSyncWriteRepository,
+  deckWriteOutbox,
   getDeckMetadataWriteController,
   type PendingDeckWrite,
 } from "./decksSyncWrites"
@@ -53,75 +53,73 @@ const pendingWrite = (): PendingDeckWrite => ({
 
 const flush = () => new Promise(setImmediate)
 
+async function parkFailure(
+  action: PendingDeckWrite,
+  reason: string,
+  local: MemoryStorage,
+  deploymentUrl?: string,
+) {
+  const outbox = deckWriteOutbox("owner", local, deploymentUrl, {
+    send: () => Promise.reject(new Error(reason)),
+    rejectReason: () => reason,
+  })
+  outbox.enqueue(action)
+  const stop = outbox.start()
+  await flush()
+  stop()
+}
+
 describe("deck metadata writes", () => {
   it("keeps pending and failed writes inside their Convex deployment", async () => {
     const local = new MemoryStorage()
-    const oldDeployment = new DeckSyncWriteRepository(
-      "owner",
-      local,
-      "https://old-deployment.convex.cloud",
-    )
+    const oldUrl = "https://old-deployment.convex.cloud"
+    const newUrl = "https://new-deployment.convex.cloud"
     const action = pendingWrite()
-    oldDeployment.enqueue(action)
-    oldDeployment.failAction(action, "Rejected", 2, [], oldDeployment.loadPending())
-    oldDeployment.enqueue({
+    await parkFailure(action, "Rejected", local, oldUrl)
+    deckWriteOutbox("owner", local, oldUrl).enqueue({
       ...action,
       operationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       note: "Still pending",
     })
 
-    const reopened = new DeckSyncWriteRepository(
-      "owner",
-      local,
-      "https://old-deployment.convex.cloud",
-    )
-    expect(reopened.loadFailed()).toHaveLength(1)
-    expect(reopened.loadPending()).toMatchObject([{ note: "Still pending" }])
-    const newDeployment = new DeckSyncWriteRepository(
-      "owner",
-      local,
-      "https://new-deployment.convex.cloud",
-    )
+    const reopened = () => deckWriteOutbox("owner", local, oldUrl).getState()
+    expect(reopened().failures).toHaveLength(1)
+    expect(reopened().pending).toMatchObject([{ note: "Still pending" }])
     const mutation = jest.fn()
     const controller = new DeckMetadataWriteController(
       { mutation } as unknown as ConvexReactClient,
-      newDeployment,
+      "owner",
+      { storage: local, deploymentUrl: newUrl },
     )
     const stop = controller.start()
     await flush()
-    expect(newDeployment.loadPending()).toEqual([])
-    expect(newDeployment.loadFailed()).toEqual([])
+    expect(deckWriteOutbox("owner", local, newUrl).getState()).toMatchObject({
+      pending: [],
+      failures: [],
+    })
     expect(mutation).not.toHaveBeenCalled()
-    expect(reopened.loadFailed()).toHaveLength(1)
-    expect(reopened.loadPending()).toMatchObject([{ note: "Still pending" }])
+    expect(reopened().failures).toHaveLength(1)
+    expect(reopened().pending).toMatchObject([{ note: "Still pending" }])
     stop()
   })
 
   it("leaves legacy unscoped writes untouched", () => {
     const local = new MemoryStorage()
-    const legacy = new DeckSyncWriteRepository("owner", local)
-    legacy.enqueue(pendingWrite())
+    deckWriteOutbox("owner", local).enqueue(pendingWrite())
 
-    const scoped = new DeckSyncWriteRepository(
-      "owner",
-      local,
-      "https://new-deployment.convex.cloud",
-    )
-    expect(scoped.loadPending()).toEqual([])
-    expect(legacy.loadPending()).toHaveLength(1)
+    const scoped = deckWriteOutbox("owner", local, "https://new-deployment.convex.cloud")
+    expect(scoped.getState().pending).toEqual([])
+    expect(deckWriteOutbox("owner", local).getState().pending).toHaveLength(1)
   })
 
   it.each([
     "Deck changed on another device",
     "An earlier edit conflicted. Choose which version to keep.",
-  ])("normalizes a persisted conflict reason: %s", (reason) => {
+  ])("normalizes a persisted conflict reason: %s", async (reason) => {
     const local = new MemoryStorage()
-    const repository = new DeckSyncWriteRepository("owner", local)
-    const action = pendingWrite()
-    repository.enqueue(action)
-    repository.failAction(action, reason, 2, [], repository.loadPending())
+    await parkFailure(pendingWrite(), reason, local)
 
-    expect(repository.loadFailed()[0].reason).toBe(DECK_CONFLICT_REASON)
+    expect(deckWriteOutbox("owner", local).getState().failures[0].reason).toBe(DECK_CONFLICT_REASON)
   })
 
   it("scopes default write controllers to the client's URL", () => {
@@ -158,8 +156,8 @@ describe("deck metadata writes", () => {
       .mockRejectedValue(new ConvexError({ code: "sync_conflict", message: "changed elsewhere" }))
     const controller = new DeckMetadataWriteController(
       { mutation } as unknown as ConvexReactClient,
-      new DeckSyncWriteRepository("owner", local),
-      () => 1,
+      "owner",
+      { storage: local, now: () => 1 },
     )
     controller.update(deckId, { name: "First edit" })
     controller.update(deckId, { note: "Second edit" })
@@ -191,28 +189,29 @@ describe("deck metadata writes", () => {
   it("recovers when reapply is interrupted after persisting the replacement", async () => {
     const local = new MemoryStorage()
     new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
-    const repository = new DeckSyncWriteRepository("owner", local)
     const mutation = jest
       .fn()
       .mockRejectedValue(new ConvexError({ code: "sync_conflict", message: "changed" }))
     const controller = new DeckMetadataWriteController(
       { mutation } as unknown as ConvexReactClient,
-      repository,
+      "owner",
+      { storage: local },
     )
     controller.update(deckId, { note: "Keep me" })
     const stop = controller.start()
     await flush()
     stop()
     const failedId = controller.getSnapshot().failures[0].action.operationId
-    jest.spyOn(repository, "dismissFailed").mockImplementationOnce(() => {
+    jest.spyOn(local, "delete").mockImplementationOnce(() => {
       throw new Error("process interrupted")
     })
     expect(() => controller.reapplyFailure(failedId)).toThrow("process interrupted")
-    expect(repository.loadPending()[0].supersedes).toContain(failedId)
+    expect(deckWriteOutbox("owner", local).getState().pending[0].supersedes).toContain(failedId)
     mutation.mockResolvedValue({ ...metadata(1), note: "Keep me" })
     const restarted = new DeckMetadataWriteController(
       { mutation } as unknown as ConvexReactClient,
-      new DeckSyncWriteRepository("owner", local),
+      "owner",
+      { storage: local },
     )
     const stopRestarted = restarted.start()
     await flush()
@@ -237,10 +236,7 @@ describe("deck metadata writes", () => {
         .fn()
         .mockRejectedValue(new ConvexError({ code: "sync_conflict", message: "changed" })),
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     for (const deck of decks.slice(0, 32)) controller.update(deck.deckId, { note: "Keep" })
     const stop = controller.start()
     await flush()
@@ -275,10 +271,7 @@ describe("deck metadata writes", () => {
         .fn()
         .mockRejectedValue(new ConvexError({ code: "temporary_overload", message: "Try later" })),
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     expect(() => controller.update(deckId, { note: "x".repeat(1001) })).toThrow()
     expect(controller.getSnapshot().pending).toEqual([])
     controller.update(deckId, { note: "Valid" })
@@ -298,7 +291,8 @@ describe("deck metadata writes", () => {
       )
     const controller = new DeckMetadataWriteController(
       { mutation } as unknown as ConvexReactClient,
-      new DeckSyncWriteRepository("owner", local),
+      "owner",
+      { storage: local },
     )
     controller.update(deckId, { note: "Private note" })
     const stop = controller.start()
@@ -310,7 +304,7 @@ describe("deck metadata writes", () => {
       pending: [{ note: "Private note" }],
       failures: [],
     })
-    expect(new DeckSyncWriteRepository("other-owner", local).loadPending()).toEqual([])
+    expect(deckWriteOutbox("other-owner", local).getState().pending).toEqual([])
   })
 
   it("keeps fixed revisions and stable operations through an uncertain retry", async () => {
@@ -324,10 +318,7 @@ describe("deck metadata writes", () => {
         return { ...metadata(1), name: "Renamed" }
       }),
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     const stop = controller.start()
 
     controller.update(deckId, { name: "Renamed" })
@@ -360,7 +351,8 @@ describe("deck metadata writes", () => {
     new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
     const controller = new DeckMetadataWriteController(
       { mutation: jest.fn().mockRejectedValue(error) } as unknown as ConvexReactClient,
-      new DeckSyncWriteRepository("owner", local),
+      "owner",
+      { storage: local },
     )
     controller.update(deckId, { name: "Offline rename" })
     const stop = controller.start()
@@ -379,10 +371,7 @@ describe("deck metadata writes", () => {
         deck: { ...metadata(1), name: "Other device" },
       })),
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     controller.update(deckId, { name: "Offline rename" })
     const stop = controller.start()
     await flush()
@@ -405,9 +394,8 @@ describe("deck metadata writes", () => {
     const local = new MemoryStorage()
     const readRepository = new DeckSyncRepository("owner", local)
     readRepository.mergeMetadata([metadata(1)])
-    const writes = new DeckSyncWriteRepository("owner", local)
     const operationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-    writes.enqueue({
+    deckWriteOutbox("owner", local).enqueue({
       schemaVersion: 1,
       ownerId: "owner",
       deckId,
@@ -426,7 +414,7 @@ describe("deck metadata writes", () => {
     const client = {
       mutation: jest.fn(async () => ({ ...metadata(2), name: "Old receipt" })),
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(client, writes)
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     const stop = controller.start()
     await flush()
 
@@ -459,20 +447,14 @@ describe("deck metadata writes", () => {
         return result
       },
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     const stop = controller.start()
 
     controller.update(id, { name: "Renamed once" })
     await flush()
     const operationId = controller.getSnapshot().pending[0].operationId
     stop()
-    const restarted = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const restarted = new DeckMetadataWriteController(client, "owner", { storage: local })
     expect(restarted.getSnapshot().pending[0].operationId).toBe(operationId)
     const stopRestarted = restarted.start()
     await flush()
@@ -500,10 +482,7 @@ describe("deck metadata writes", () => {
       mutation: (reference: typeof api.decks.syncWrite, args: SyncWriteArgs) =>
         actor.mutation(reference, args),
     } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     return { t, actor, id, controller }
   }
 
@@ -572,10 +551,7 @@ describe("deck metadata writes", () => {
       },
     } as unknown as ConvexReactClient
     setOutboxWriter(writer)
-    const controller = new DeckMetadataWriteController(
-      client,
-      new DeckSyncWriteRepository("owner", local),
-    )
+    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     controller.update(id, { name: "Renamed" })
     setOutboxWriter(undefined)
     expect([...local.values.values()].some((value) => value.includes('"writtenBy"'))).toBe(true)
