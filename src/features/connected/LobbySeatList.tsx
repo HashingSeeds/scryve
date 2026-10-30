@@ -226,7 +226,11 @@ export function LobbySeatList({
           : []
         const noDecks = usableDecks.length === 0 && usableDeviceDecks.length === 0
         const hasCards = (deck: { cardQuantity?: number }) => deck.cardQuantity !== 0
-        const choosable = usableDecks.some(hasCards) || usableDeviceDecks.some(hasCards)
+        const choosable =
+          usableDecks.some(hasCards) ||
+          usableDeviceDecks.some((deck) => hasCards(deck) && !deck.syncBlocked)
+        // why: the nearby lobby has no Add deck route yet, so its seats fall back to the Decks list.
+        const addDeck = onAddDeck ?? onManageDecks
         const chosenDeck = usableDecks.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
@@ -248,14 +252,14 @@ export function LobbySeatList({
           deckState?.status === "ready" &&
           !choosable &&
           seat.controlledByMe &&
-          onAddDeck &&
+          addDeck &&
           system !== NO_PLAY_SYSTEM,
         )
         const newDeckAction = offerNewDeck ? (
           <TextAction
             testID={`new-deck-seat-${seat.seat}`}
             tx="connected:seats.newDeck"
-            onPress={onAddDeck}
+            onPress={addDeck}
           />
         ) : null
         return (
@@ -451,7 +455,7 @@ export function LobbySeatList({
                         }
                       />
                     ))}
-                    {chosenDeck && chosenDeck.versions.length > 1 ? (
+                    {chosenDeck && hasCards(chosenDeck) && chosenDeck.versions.length > 1 ? (
                       <FilterChips
                         testID={`seat-${seat.seat}-version`}
                         accessibilityLabel={translate("connected:seats.deckVersion")}

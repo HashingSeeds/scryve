@@ -135,6 +135,9 @@ describe("ConnectedLobbyScreen", () => {
         controlledByMe: index === 0,
       })),
     }
+    connectedHarness.decks = [
+      { _id: "deck-1", name: "Atraxa", versions: [{ _id: "deck-version-1", versionNumber: 1 }] },
+    ]
     const onManageDecks = jest.fn()
     render(
       themed(

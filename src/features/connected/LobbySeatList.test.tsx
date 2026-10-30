@@ -386,3 +386,85 @@ it("offers Free a slot on a device deck when the account is full", () => {
   fireEvent.press(screen.getByText("Free a slot"))
   expect(onManageDecks).toHaveBeenCalledTimes(1)
 })
+
+it("hides version choices for a chosen deck whose list is now empty", () => {
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[
+          {
+            seat: 1,
+            displayName: "Ada",
+            color: "#7C3AED",
+            controlledByMe: true,
+            deckVersionId: "v1",
+          },
+        ]}
+        openSeats={0}
+        system="mtg"
+        deckState={{
+          status: "ready",
+          value: [
+            {
+              _id: "deck",
+              name: "Atraxa",
+              cardQuantity: 0,
+              versions: [
+                { _id: "v1", versionNumber: 1 },
+                { _id: "v2", versionNumber: 2 },
+              ],
+            },
+          ],
+        }}
+        versionLabel={deckVersionLabel}
+        onSelectVersion={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.queryByTestId("seat-1-version")).toBeNull()
+})
+
+it("still offers a new deck when the only device deck can't sync", () => {
+  const onAddDeck = jest.fn()
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        deckRequired
+        system="mtg"
+        deckState={{ status: "ready", value: [] }}
+        deviceDecks={{
+          decks: [deviceDeck({ syncBlocked: "accountFull" })],
+          onSyncAndUse: jest.fn(),
+        }}
+        versionLabel={() => "Current"}
+        onSelectVersion={jest.fn()}
+        onManageDecks={jest.fn()}
+        onAddDeck={onAddDeck}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByText("Free a slot")).toBeTruthy()
+  fireEvent.press(screen.getByText("+ New deck"))
+  expect(onAddDeck).toHaveBeenCalledTimes(1)
+})
+
+it("falls back to deck management for + New deck when there's no Add deck route", () => {
+  const onManageDecks = jest.fn()
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        system="mtg"
+        deckState={{ status: "ready", value: [] }}
+        versionLabel={() => "Current"}
+        onSelectVersion={jest.fn()}
+        onManageDecks={onManageDecks}
+      />
+    </ThemeProvider>,
+  )
+  fireEvent.press(screen.getByText("+ New deck"))
+  expect(onManageDecks).toHaveBeenCalledTimes(1)
+})
