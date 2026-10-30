@@ -57,7 +57,11 @@ type AssignmentTarget = {
   // why: while the chips fly out of the strip, the badges they land as stay hidden.
   arriving?: boolean
   acted: boolean
-  onChange: (step: number, index: number) => void
+  dealt: number
+  takeBack: number
+  onHit: () => void
+  onUndo: () => void
+  onAdjust: (step: number, index: number) => void
 }
 
 type AssignmentSource = {
@@ -488,7 +492,6 @@ function DefenderControls({
 }) {
   const { themed, theme } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const [hits, setHits] = useState<number[][]>([])
   const [editing, setEditing] = useState<number | null>(null)
   const ram = useSharedValue(0)
   const flash = useSharedValue(0)
@@ -496,10 +499,7 @@ function DefenderControls({
   const totals = commanders.map(({ total }) => total)
   const struck = totals.reduce((sum, total) => sum + total, 0)
   const previousStruck = useRef(struck)
-  const steps = commanders.map(({ power, total, benched }) =>
-    benched ? 0 : Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
-  )
-  const dealt = steps.reduce((sum, step) => sum + step, 0)
+  const { dealt, takeBack } = mode
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
   const badges = takeover?.badges ?? []
   const partners = commanders.length > 1
@@ -519,27 +519,12 @@ function DefenderControls({
   function hit() {
     if (editing !== null) return setEditing(null)
     if (dealt <= 0) return
-    setHits((current) => [...current, steps])
-    steps.forEach((step, index) => {
-      if (step > 0) mode.onChange(step, index)
-    })
+    mode.onHit()
     if (reducedMotion !== false || !takeover) return
     ram.value = withSequence(
       withTiming(1, { duration: RAM_MS, easing: Easing.in(Easing.quad) }),
       withTiming(0, { duration: RAM_RETURN_MS, easing: Easing.out(Easing.cubic) }),
     )
-  }
-
-  const lastHit = hits.at(-1) ?? commanders.map(({ power, benched }) => (benched ? 0 : power))
-  const takeBacks = totals.map((total, index) => Math.min(lastHit[index] ?? 0, total))
-  const takeBack = takeBacks.reduce((sum, amount) => sum + amount, 0)
-
-  function undo() {
-    if (takeBack <= 0) return
-    setHits((current) => current.slice(0, -1))
-    takeBacks.forEach((amount, index) => {
-      if (amount > 0) mode.onChange(-amount, index)
-    })
   }
 
   const undoCorner = freeCorner(menuCorner, facing)
@@ -662,7 +647,7 @@ function DefenderControls({
                 glyph="−"
                 color={SHADOW_INK}
                 disabled={total <= 0}
-                onPress={() => mode.onChange(-1, index)}
+                onPress={() => mode.onAdjust(-1, index)}
               />
               <CommanderChip
                 testID={`commander-total-seat-${suffix}`}
@@ -677,7 +662,7 @@ function DefenderControls({
                 glyph="+"
                 color={SHADOW_INK}
                 disabled={total >= MAX_COMMANDER_DAMAGE}
-                onPress={() => mode.onChange(1, index)}
+                onPress={() => mode.onAdjust(1, index)}
               />
             </View>
           ) : (
@@ -713,7 +698,7 @@ function DefenderControls({
           testID={`commander-undo-seat-${seatNumber}`}
           accessibilityRole="button"
           accessibilityLabel={translate("board:commander.undoHit", { damage: takeBack })}
-          onPress={undo}
+          onPress={mode.onUndo}
           style={[
             themed($undo),
             {

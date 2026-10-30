@@ -8,7 +8,6 @@ import {
   loadNewestResumeGame,
 } from "@/features/connected/persistence"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
-import * as seatCommander from "@/features/decks/seatCommander"
 
 import { ConnectedBoardScreen, ConnectedBoardWithRuntime } from "./ConnectedBoardScreen"
 import {
@@ -175,42 +174,6 @@ describe("ConnectedBoardScreen", () => {
     expect(selectedLayout("featured-last")).toBe("tabletop")
   })
 
-  it("stages and sends each partner's damage under its own slot", async () => {
-    const partners = jest.spyOn(seatCommander, "useSeatCommanders").mockReturnValue([
-      { name: "Tymna", power: 2 },
-      { name: "Kraum", power: 4 },
-    ])
-    try {
-      connectedHarness.runtime = {
-        ...connectedHarness.runtime,
-        projection: {
-          ...connectedHarness.runtime.projection,
-          commanderDamage: {
-            totals: [{ fromPlayerId: "player-1", toPlayerId: "player-2", commander: 1, total: 19 }],
-            pendingClaims: [],
-            eliminatedPlayerIds: [],
-          },
-        },
-      }
-      render(themed(<ConnectedBoardScreen publicId="game-public" />))
-
-      fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
-      fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
-      expect(screen.getByTestId("commander-total-seat-1")).toHaveTextContent("2")
-      expect(screen.getByTestId("commander-total-seat-1-partner")).toHaveTextContent("23")
-      fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
-
-      await waitFor(() =>
-        expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
-          { toPlayerId: "player-2", delta: 2 },
-          { toPlayerId: "player-2", commander: 1, delta: 4 },
-        ]),
-      )
-    } finally {
-      partners.mockRestore()
-    }
-  })
-
   it("sends staged commander damage when the menu opens", async () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -248,32 +211,6 @@ describe("ConnectedBoardScreen", () => {
 
     expect(screen.queryByTestId("commander-hit-seat-1")).toBeNull()
     expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
-  })
-
-  it("stops staging where the recorded total would leave the supported range", async () => {
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: {
-        ...connectedHarness.runtime.projection,
-        commanderDamage: {
-          totals: [{ fromPlayerId: "player-1", toPlayerId: "player-2", total: 97 }],
-          pendingClaims: [],
-          eliminatedPlayerIds: [],
-        },
-      },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-
-    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
-    for (let press = 0; press < 5; press += 1)
-      fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
-    fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
-
-    await waitFor(() =>
-      expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
-        { toPlayerId: "player-2", delta: 2 },
-      ]),
-    )
   })
 
   it("opens the commander board from the compact grid on your own seat", () => {

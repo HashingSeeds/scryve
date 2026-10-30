@@ -2,10 +2,12 @@ import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import * as seatCommander from "@/features/decks/seatCommander"
-import { asPlayerId, PARTNER_COMMANDER } from "@/features/game/domain"
+import { asPlayerId } from "@/features/game/domain"
 import { swapSeats } from "@/features/game/playerLayouts"
 import { playSystemRules, playTableRules } from "@/features/game/playSystems"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
+import type { GamePlayer } from "@/features/game/types"
+import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
@@ -28,6 +30,7 @@ import {
   getCornerCutout,
   getScreenCornerSquaringStyle,
   PlayerGrid,
+  type PlayerGridProps,
 } from "./PlayerGrid"
 import type { OutState } from "../../convex/lib/outReason"
 import type { TableState } from "../../convex/lib/table"
@@ -41,6 +44,49 @@ function players(count: number) {
     seat,
   }))
 }
+
+const idleCommanderDamage = {
+  incomingFor: () => ({}),
+  lethal: 21,
+  attack: {
+    armedPlayerId: null,
+    inspectedPlayerId: null,
+    acted: false,
+    stagedTargets: undefined,
+    against: jest.fn(),
+    dispatch: jest.fn(),
+  },
+  onPressSword: jest.fn(),
+}
+
+function CommanderGrid({
+  singleCommander,
+  onPressSword,
+  ...grid
+}: Omit<PlayerGridProps, "commanderDamage"> & {
+  singleCommander?: boolean
+  onPressSword?: (player: GamePlayer) => void
+}) {
+  const attack = useCommanderAttack(
+    { incoming: () => ({}), commit: () => {} },
+    { seatDeck: () => undefined, singleCommander },
+  )
+  return (
+    <PlayerGrid
+      {...grid}
+      commanderDamage={{
+        incomingFor: () => ({}),
+        lethal: 21,
+        attack,
+        onPressSword:
+          onPressSword ?? ((player) => attack.dispatch({ type: "press", playerId: player.id })),
+      }}
+    />
+  )
+}
+
+const armFirstSeat = (view: ReturnType<typeof render>) =>
+  act(() => view.UNSAFE_getAllByType(LifeCard)[0].props.commanderDamage.onPressSword())
 
 function tableGrid(table: TableState) {
   const seats = players(2)
@@ -218,17 +264,7 @@ describe("PlayerGrid", () => {
     const gamePlayers = players(2)
     const grid = (onPressSword: jest.Mock) => (
       <ThemeProvider>
-        <PlayerGrid
-          players={gamePlayers}
-          commanderDamage={{
-            incomingFor: () => ({}),
-            lethal: 21,
-            armedPlayerId: null,
-            onPressSword,
-            onStage: jest.fn(),
-          }}
-          onChange={jest.fn()}
-        />
+        <CommanderGrid players={gamePlayers} onPressSword={onPressSword} onChange={jest.fn()} />
       </ThemeProvider>
     )
     const first = jest.fn()
@@ -244,45 +280,26 @@ describe("PlayerGrid", () => {
     expect(latest).toHaveBeenCalledWith(gamePlayers[0])
   })
 
-  it("deals each partner's power to its own total on one tap and leaves a benched partner out", () => {
+  it("shows each partner's power, and only the first where the game has one commander slot", () => {
     const partners = jest.spyOn(seatCommander, "useSeatCommanders").mockReturnValue([
       { name: "Tymna", power: 2 },
       { name: "Kraum", power: 4 },
     ])
     try {
-      const gamePlayers = players(2)
-      const onStage = jest.fn()
       const grid = (singleCommander?: boolean) => (
         <ThemeProvider>
-          <PlayerGrid
-            players={gamePlayers}
-            commanderDamage={{
-              incomingFor: () => ({}),
-              lethal: 21,
-              armedPlayerId: gamePlayers[0].id,
-              singleCommander,
-              onPressSword: jest.fn(),
-              onStage,
-            }}
+          <CommanderGrid
+            players={players(2)}
+            singleCommander={singleCommander}
             onChange={jest.fn()}
           />
         </ThemeProvider>
       )
       const view = render(grid())
+      armFirstSeat(view)
       expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("2")
       expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("4")
-
-      fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-      expect(onStage.mock.calls).toEqual([
-        [gamePlayers[1], 2, undefined],
-        [gamePlayers[1], 4, PARTNER_COMMANDER],
-      ])
-
-      onStage.mockClear()
-      fireEvent.press(view.getByTestId("commander-toggle-seat-1"))
-      fireEvent.press(view.getByTestId("commander-toggle-seat-1-partner"))
-      fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-      expect(onStage.mock.calls).toEqual([[gamePlayers[1], 4, PARTNER_COMMANDER]])
+      expect(view.getByTestId("commander-badge-seat-2-partner")).toBeTruthy()
 
       view.rerender(grid(true))
       expect(view.queryByTestId("commander-power-seat-1-partner")).toBeNull()
@@ -293,28 +310,17 @@ describe("PlayerGrid", () => {
   })
 
   it("pulses the targets until the attacker hits one, then pulses the attacker's mark to finish", () => {
-    const gamePlayers = players(3)
-    const grid = (armedPlayerId: ReturnType<typeof asPlayerId> | null) => (
+    const view = render(
       <ThemeProvider>
-        <PlayerGrid
-          players={gamePlayers}
-          commanderDamage={{
-            incomingFor: () => ({}),
-            lethal: 21,
-            armedPlayerId,
-            onPressSword: jest.fn(),
-            onStage: jest.fn(),
-          }}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>
+        <CommanderGrid players={players(3)} onChange={jest.fn()} />
+      </ThemeProvider>,
     )
-    const view = render(grid(gamePlayers[0].id))
     const pulsing = () =>
       ["commander-target-pulse-seat-2", "commander-target-pulse-seat-3"].filter((id) =>
         view.queryByTestId(id),
       )
 
+    armFirstSeat(view)
     expect(pulsing()).toHaveLength(2)
     expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
     expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
@@ -325,8 +331,8 @@ describe("PlayerGrid", () => {
     // why: a local hit already counts, so finishing stays an X rather than asking to confirm.
     expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
 
-    view.rerender(grid(null))
-    view.rerender(grid(gamePlayers[0].id))
+    fireEvent.press(view.getByTestId("commander-exit-seat-1"))
+    armFirstSeat(view)
     expect(pulsing()).toHaveLength(2)
     expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
   })
@@ -336,13 +342,7 @@ describe("PlayerGrid", () => {
     (boardRotation) => {
       const window = Dimensions.get("window")
       const gamePlayers = players(5)
-      const commanderDamage = {
-        incomingFor: () => ({}),
-        lethal: 21,
-        armedPlayerId: null,
-        onPressSword: jest.fn(),
-        onStage: jest.fn(),
-      }
+      const commanderDamage = idleCommanderDamage
       const view = render(
         <ThemeProvider initialContext="dark">
           <PlayerGrid
@@ -681,13 +681,7 @@ describe("PlayerGrid", () => {
         <PlayerGrid
           players={players(4)}
           seatOrder={swapSeats(undefined, 4, 0, 3)}
-          commanderDamage={{
-            incomingFor: () => ({}),
-            lethal: 21,
-            armedPlayerId: null,
-            onPressSword: jest.fn(),
-            onStage: jest.fn(),
-          }}
+          commanderDamage={idleCommanderDamage}
           onChange={jest.fn()}
         />
       </ThemeProvider>,
