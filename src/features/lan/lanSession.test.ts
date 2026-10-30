@@ -201,7 +201,7 @@ describe("nearby host", () => {
     expect(resumed.getState()).toMatchObject({ role: "host", status: "connected" })
     expect(roundOf(resumed)).toBe(roundOf(session))
     expect(lifeOf(resumed, pass.key)).toBe(35)
-    expect(back.sent[0]).toEqual({ type: "welcome", pass })
+    expect(back.sent[0]).toEqual({ type: "welcome", pass, partners: true })
   })
 
   it("saves a foreground host's game as the round starts, then once for a burst of taps", async () => {
@@ -372,6 +372,50 @@ describe("nearby host", () => {
       operationId: "claim-operation-0004",
       status: "declined",
     })
+  })
+
+  it("keeps partners apart beside a guest that never sends a slot, which lands on the first commander", async () => {
+    const { session, alice, bob } = await startedGame()
+    const defender = alice.pass().key
+    const attacker = bob.pass().key
+    const hostKey = session.getState().seatKey ?? ""
+    const event = (type: string, operationId: string, fields: object) =>
+      ({
+        ...lifeEvent(operationId, "", 0, roundOf(session)),
+        type,
+        ...fields,
+      }) as PendingLifeAction["event"]
+    const claim = (operationId: string, fromPlayerId: string, fields: object = {}) =>
+      event("commanderDamage.submitted", operationId, {
+        fromPlayerId,
+        toPlayerId: defender,
+        delta: 4,
+        ...fields,
+      })
+    const confirm = (operationId: string, claimOperationId: string) =>
+      alice.send({
+        type: "op",
+        event: event("commanderDamage.resolved", operationId, {
+          claimOperationId,
+          toPlayerId: defender,
+          accepted: true,
+        }),
+      })
+
+    expect(session.getState().partners).toBe(true)
+    expect(bob.sent[0]).toEqual({ type: "welcome", pass: bob.pass(), partners: true })
+    bob.send({ type: "op", event: claim("claim-operation-0001", attacker) })
+    void session.writes.send({
+      event: claim("claim-operation-0002", hostKey, { commander: 1, delta: 6 }),
+    } as PendingLifeAction)
+    confirm("resolve-operation-0001", "claim-operation-0001")
+    confirm("resolve-operation-0002", "claim-operation-0002")
+    jest.advanceTimersByTime(100)
+
+    expect(session.getState().projection?.commanderDamage?.totals).toEqual([
+      { fromPlayerId: attacker, toPlayerId: defender, total: 4 },
+      { fromPlayerId: hostKey, toPlayerId: defender, commander: 1, total: 6 },
+    ])
   })
 
   it("caps how fast one socket can write", async () => {
@@ -592,6 +636,15 @@ describe("nearby guest", () => {
 
     expect(lobbyReader).toHaveBeenCalledTimes(2)
     act(() => lanSession.leave())
+  })
+
+  it("offers partners only when its host's welcome says it keeps them apart", async () => {
+    const { session, host } = await guest()
+    expect(session.getState().partners).toBe(false)
+
+    host()?.onMessage({ type: "welcome", pass: { key: "guest", token: "token" }, partners: true })
+    expect(session.getState().partners).toBe(true)
+    session.leave()
   })
 
   it("reports its own sync times with each ping once it has any", async () => {

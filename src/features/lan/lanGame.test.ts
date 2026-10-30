@@ -322,6 +322,54 @@ describe("nearby rounds on the shared engine", () => {
     ])
   })
 
+  it("keeps a partner's damage on its own total, apart from the first commander's", () => {
+    const claim = (operationId: string, delta: number, partner = {}) =>
+      op({
+        type: "commanderDamage.submitted",
+        operationId,
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta,
+        ...partner,
+      })
+    const confirm = (operationId: string, claimOperationId: string) =>
+      op({
+        type: "commanderDamage.resolved",
+        operationId,
+        claimOperationId,
+        toPlayerId: "guest",
+        accepted: true,
+      })
+    const claimed = [
+      claim("claim-operation-001", 7),
+      claim("claim-operation-002", 14, { commander: 1 }),
+    ].reduce((game, event) => write(game, "host", event).next, started())
+
+    expect(
+      lanProjection(claimed, "guest").commanderDamage?.pendingClaims.map(
+        ({ operationId, commander }) => [operationId, commander],
+      ),
+    ).toEqual([
+      ["claim-operation-001", undefined],
+      ["claim-operation-002", 1],
+    ])
+
+    const confirmed = [
+      confirm("resolve-operation-1", "claim-operation-002"),
+      confirm("resolve-operation-2", "claim-operation-001"),
+    ].reduce((game, event) => write(game, "guest", event).next, claimed)
+    const projection = lanProjection(confirmed, "host")
+
+    expect(lifeOf(confirmed, "host", "guest")).toBe(19)
+    expect(projection.commanderDamage).toMatchObject({
+      totals: [
+        { fromPlayerId: "host", toPlayerId: "guest", commander: 1, total: 14 },
+        { fromPlayerId: "host", toPlayerId: "guest", total: 7 },
+      ],
+      eliminatedPlayerIds: [],
+    })
+  })
+
   it("moves Pokémon prizes to the taker when the owner records a knockout", () => {
     const pokemon = {
       ...commander,
@@ -419,6 +467,23 @@ describe("nearby messages", () => {
     expect(parseHostMessage(JSON.stringify({ type: "game", game: {} }))).toEqual({
       type: "outdated",
     })
+  })
+
+  it("carries a partner's slot and the host's partner flag, and drops a slot it doesn't know", () => {
+    const claim = {
+      type: "commanderDamage.submitted",
+      operationId: "claim-operation-001",
+      fromPlayerId: "host",
+      toPlayerId: "guest",
+      delta: 3,
+    }
+    const welcome = (fields: object) =>
+      parseHostMessage(JSON.stringify({ type: "welcome", pass: unused, ...fields }))
+
+    expect(op({ ...claim, commander: 1 })).toMatchObject({ commander: 1 })
+    expect(() => op({ ...claim, commander: 2 })).toThrow("not an op")
+    expect(welcome({ partners: true })).toEqual({ type: "welcome", pass: unused, partners: true })
+    expect(welcome({})).toEqual({ type: "welcome", pass: unused })
   })
 
   it("reads an ack's claim status when the host sends one, and an older host's ack without it", () => {

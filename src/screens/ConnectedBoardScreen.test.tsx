@@ -8,6 +8,7 @@ import {
   loadNewestResumeGame,
 } from "@/features/connected/persistence"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
+import * as seatCommander from "@/features/decks/seatCommander"
 
 import { ConnectedBoardScreen, ConnectedBoardWithRuntime } from "./ConnectedBoardScreen"
 import {
@@ -595,6 +596,43 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("end-game-button"))
     fireEvent.press(screen.getByTestId("confirm-connected-leave"))
     expect(onLeave).toHaveBeenCalledTimes(1)
+  })
+
+  it("offers a nearby attacker's partner only when the host keeps partners apart", () => {
+    const commanders = jest.spyOn(seatCommander, "useSeatCommanders").mockReturnValue([
+      { name: "Tymna", power: 2 },
+      { name: "Kraum", power: 4 },
+    ])
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+      },
+    }
+    function NearbyBoard({ partners }: { partners: boolean }) {
+      const runtime = useConnectedGame("game-public", "owner")
+      return (
+        <ConnectedBoardWithRuntime
+          publicId="game-public"
+          ownerId="owner"
+          cloud={false}
+          partners={partners}
+          runtime={runtime}
+        />
+      )
+    }
+    try {
+      render(themed(<NearbyBoard partners={false} />))
+      fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
+      expect(screen.getByTestId("commander-power-seat-2")).toHaveTextContent("2")
+      expect(screen.queryByTestId("commander-power-seat-2-partner")).toBeNull()
+
+      screen.rerender(themed(<NearbyBoard partners />))
+      expect(screen.getByTestId("commander-power-seat-2-partner")).toHaveTextContent("4")
+    } finally {
+      commanders.mockRestore()
+    }
   })
 
   it("preselects the last seat standing as the winner", async () => {

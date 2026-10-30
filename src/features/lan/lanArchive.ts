@@ -1,7 +1,14 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto"
 
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
-import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "@/features/game/domain"
+import {
+  asActorId,
+  asDeviceId,
+  asGameId,
+  asOperationId,
+  asPlayerId,
+  commanderDamageKey,
+} from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { GameEvent, LocalGame, SeatPassHashes } from "@/features/game/types"
 
@@ -13,6 +20,7 @@ import {
   type LanGame,
 } from "./lanGame"
 import { commanderTotals } from "../../../convex/lib/gameEngineMemory"
+import { commanderField } from "../../../convex/lib/gameRules"
 
 /** why: must match `convex/lib/seatPass.ts`, which checks each guest's claim; no test runs both sides. */
 export const hashSeatPassToken = async (token: string) =>
@@ -47,6 +55,7 @@ export function lanLocalGame(
           ...base,
           fromPlayerId: asPlayerId(fromPlayerId),
           toPlayerId: asPlayerId(toPlayerId),
+          ...commanderField(event.commander),
           delta,
         },
       ]
@@ -55,7 +64,10 @@ export function lanLocalGame(
   const commanderDamage = Object.fromEntries(
     (memory ? commanderTotals(memory) : [])
       .filter(({ total }) => total > 0)
-      .map(({ fromPlayerId, toPlayerId, total }) => [`${fromPlayerId}>${toPlayerId}`, total]),
+      .map(({ fromPlayerId, toPlayerId, commander, total }) => [
+        commanderDamageKey(asPlayerId(fromPlayerId), asPlayerId(toPlayerId), commander),
+        total,
+      ]),
   )
   const { table } = lanProjection(game, game.hostKey)
   const hostDeck = game.seats.find((seat) => seat.key === game.hostKey)?.deck

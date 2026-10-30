@@ -77,6 +77,7 @@ export interface LanSessionState {
   projection?: ConnectedProjection
   seatKey?: string
   serviceName?: string
+  partners?: boolean
   error?: string
 }
 
@@ -253,6 +254,7 @@ export class LanSession {
       status: "connecting",
       seatKey,
       serviceName: nearbyServiceName(name, nearbyCodeFor(game.id)),
+      partners: true,
       lobby: lanLobbyOf(game),
       projection: lanProjection(game, seatKey),
     })
@@ -349,6 +351,7 @@ export class LanSession {
       status: "connecting",
       seatKey,
       serviceName,
+      partners: true,
       lobby: lanLobbyOf(game),
       projection: lanProjection(game, seatKey),
     })
@@ -379,7 +382,7 @@ export class LanSession {
           const previous = this.peers.get(seatKey)
           this.peers.set(seatKey, peer)
           previous?.close()
-          peer.send({ type: "welcome", pass: admitted.pass })
+          peer.send({ type: "welcome", pass: admitted.pass, partners: true })
           return this.publish(admitted.game)
         }
         if (!seatKey) return
@@ -583,7 +586,7 @@ export class LanSession {
     if (message.type === "welcome") {
       this.pass = message.pass
       save(PASS_KEY, { service: this.state.serviceName, ...message.pass })
-      return this.set({ seatKey: message.pass.key })
+      return this.set({ seatKey: message.pass.key, partners: message.partners === true })
     }
     if (message.type === "pong")
       return this.latency.clockSample(message.at, Date.now(), message.hostAt)
