@@ -361,6 +361,7 @@ export function AddDeckScreen({
   const destination = useSaveDestination(access)
   const saveNewDeck = useSaveNewDeck(destination.access?.ownerId)
   const [saving, setSaving] = useState(false)
+  const savingNow = useRef(false)
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
@@ -451,13 +452,15 @@ export function AddDeckScreen({
   }
 
   async function saveGuest(payload: GuestDeckPayload) {
-    if (saving) return
+    if (savingNow.current) return
+    savingNow.current = true
     setSaving(true)
     try {
       onCreated(await saveNewDeck(payload, destination.value))
     } catch (cause) {
       fail(cause, translate("decks:addDeck.saveLocalFailed"))
     } finally {
+      savingNow.current = false
       setSaving(false)
     }
   }
