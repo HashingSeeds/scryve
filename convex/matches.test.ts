@@ -1,6 +1,7 @@
 import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
+import { pinnedDeck } from "./lib/deckKeys"
 
 const FINISHED_AT = Date.UTC(2026, 9, 3)
 
@@ -114,6 +115,39 @@ describe("recordManualMatch", () => {
     }
     expect(deck).toMatchObject(expected)
     expect(version).toMatchObject({ ...expected, deckVersionId })
+  })
+
+  it("pins the attached list the way picking a seat deck does", async () => {
+    const t = makeConvexTest()
+    const { actor, deckVersionId } = await owner(t)
+    await t.run((ctx) =>
+      ctx.db.insert("deckCards", { deckVersionId, name: "Shivan Dragon", quantity: 4 }),
+    )
+    const { matchId } = await actor.mutation(api.matches.recordManualMatch, {
+      ...twoPlayer(deckVersionId),
+      finishedAt: Date.now(),
+    })
+    const { deckFingerprint } = await t.run((ctx) => pinnedDeck(ctx, deckVersionId))
+    expect(deckFingerprint).toMatch(/^v1:/)
+    expect((await t.run((ctx) => ctx.db.get(matchId)))?.seats[0].deckFingerprint).toBe(
+      deckFingerprint,
+    )
+    expect(await t.run((ctx) => ctx.db.query("deckResults").unique())).toMatchObject({
+      fingerprint: deckFingerprint,
+    })
+  })
+
+  it("leaves the list unknown when it changed after the match day", async () => {
+    const t = makeConvexTest()
+    const { actor, deckVersionId } = await owner(t)
+    await t.run((ctx) =>
+      ctx.db.patch(deckVersionId, { updatedAt: FINISHED_AT + 2 * 24 * 60 * 60 * 1000 }),
+    )
+    const { matchId } = await actor.mutation(
+      api.matches.recordManualMatch,
+      twoPlayer(deckVersionId),
+    )
+    expect((await t.run((ctx) => ctx.db.get(matchId)))?.seats[0].deckFingerprint).toBeUndefined()
   })
 
   it("counts matches but not games when no score is given", async () => {
