@@ -189,17 +189,6 @@ export function useBoardChrome({
     setMenuOpen(false)
     statusLine?.onPress()
   })
-  const leave = (key: string, go: (() => void) | undefined) =>
-    go &&
-    stable(`leave:${key}`, () => {
-      finishAttack()
-      go()
-    })
-  const leaveToDecks = leave("decks", onDecks)
-  const leaveToHistory = leave("history", onHistory)
-  const leaveToSettings = leave("settings", onSettings)
-  const leaveToSupport = leave("support", onSupport)
-  const leaveToAccount = leave("account", onAccount)
   const statusText = statusLine?.text
   const statusTone = statusLine?.tone
   const shownStatusLine = useMemo(
@@ -228,14 +217,16 @@ export function useBoardChrome({
       onClose: closeMenu,
     },
     navigation:
-      menuOpen && leaveToHistory && leaveToSettings && leaveToSupport && leaveToAccount
+      menuOpen && onHistory && onSettings && onSupport && onAccount
         ? {
             accountEntry,
-            onDecks: hasRules ? leaveToDecks : undefined,
-            onHistory: leaveToHistory,
-            onSettings: leaveToSettings,
-            onSupport: leaveToSupport,
-            onAccount: leaveToAccount,
+            onDecks: hasRules ? onDecks : undefined,
+            onHistory,
+            onSettings,
+            onSupport,
+            onAccount,
+            // why: every app destination leaves the board, Update app and Events included.
+            onChoose: finishAttack,
           }
         : undefined,
   }

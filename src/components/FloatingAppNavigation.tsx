@@ -19,6 +19,7 @@ export function FloatingAppNavigation({
   onSettings,
   onSupport,
   onAccount,
+  onChoose,
   accountEntry = "account",
 }: {
   destination?: { kind: AppDestination; onPress: () => void }
@@ -27,6 +28,7 @@ export function FloatingAppNavigation({
   onSettings: () => void
   onSupport: () => void
   onAccount: () => void
+  onChoose?: () => void
   accountEntry?: AccountEntry
 }) {
   const { themed, theme } = useAppTheme()
@@ -53,6 +55,7 @@ export function FloatingAppNavigation({
           onSettings={onSettings}
           onSupport={onSupport}
           onAccount={onAccount}
+          onChoose={onChoose}
           onOpenHeightChange={setUtilityHeight}
         />
       </View>

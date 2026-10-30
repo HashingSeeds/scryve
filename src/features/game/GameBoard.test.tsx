@@ -68,6 +68,22 @@ describe("GameBoard chrome", () => {
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
+  it("finishes an attack before an app destination leaves the board", () => {
+    const dispatch = jest.fn()
+    const onHistory = jest.fn(() => expect(dispatch).toHaveBeenCalledWith({ type: "send" }))
+    renderBoard({
+      attack: { dispatch, inspectedPlayerId: null },
+      onHistory,
+      onSettings: jest.fn(),
+      onSupport: jest.fn(),
+      onAccount: jest.fn(),
+    })
+    openMenu()
+    fireEvent.press(screen.getByTestId("utility-menu-button"))
+    fireEvent.press(screen.getByTestId("utility-history-button"))
+    expect(onHistory).toHaveBeenCalledTimes(1)
+  })
+
   it("gives Decks the rules petal when the game has no rules", () => {
     const onDecks = jest.fn()
     renderBoard({ onDecks })
