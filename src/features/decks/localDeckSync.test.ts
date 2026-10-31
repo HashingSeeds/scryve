@@ -5,7 +5,15 @@ import { captureAnalytics } from "@/utils/analytics"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 
 import type { DeckSyncSnapshot } from "./decksSync"
-import { clearGuestDecks, loadGuestDecks, saveGuestDeck } from "./guestDeck"
+import {
+  addGuestDeckVersion,
+  clearGuestDecks,
+  guestDeckBringing,
+  guestDeckVersions,
+  loadGuestDecks,
+  saveGuestDeck,
+  setGuestDeckBringing,
+} from "./guestDeck"
 import { useLocalDeckLeftovers, useLocalDeckSync } from "./localDeckSync"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -17,6 +25,7 @@ jest.mock("@/utils/crashReporting", () => ({
 
 const mockImportGuest = jest.fn()
 const mockMove = jest.fn()
+const mockSetBringing = jest.fn()
 const mockQuery = jest.fn()
 const mockAcceptMetadata = jest.fn()
 const mockClient = { query: mockQuery }
@@ -25,12 +34,22 @@ jest.mock("./decksSync", () => ({
   getDeckSyncController: () => ({ acceptMetadata: mockAcceptMetadata }),
 }))
 jest.mock("../../../convex/_generated/api", () => ({
-  api: { decks: { importGuest: "importGuest", moveToDevice: "moveToDevice", detail: "detail" } },
+  api: {
+    decks: {
+      importGuest: "importGuest",
+      moveToDevice: "moveToDevice",
+      detail: "detail",
+      readVersion: "readVersion",
+      setBringingVersion: "setBringingVersion",
+    },
+  },
 }))
 jest.mock("convex/react", () => ({
   useConvex: () => mockClient,
   useMutation: (reference: string) =>
-    ({ importGuest: mockImportGuest, moveToDevice: mockMove })[reference],
+    ({ importGuest: mockImportGuest, moveToDevice: mockMove, setBringingVersion: mockSetBringing })[
+      reference
+    ],
 }))
 
 const deck = { name: "Elves", format: "commander", game: "mtg", cards: [] }
@@ -63,6 +82,7 @@ beforeEach(() => {
   mockQuery.mockResolvedValue({
     deck: { ...deck, _id: deckId, deckKey: "stable-key", syncRevision: 2 },
     cards: [],
+    versions: [],
   })
   mockMove.mockResolvedValue({ ...metadata[0], deleted: true, revision: 3 })
 })
@@ -100,6 +120,7 @@ test("saves server content and its key before moving the exact revision", async 
   mockQuery.mockResolvedValue({
     deck: { ...deck, _id: deckId, deckKey: "stable-key", syncRevision: 2 },
     cards: [{ _id: "card-1", _creationTime: 1, deckVersionId: "version-1", ...card }],
+    versions: [],
   })
   mockMove.mockImplementation(async () => {
     expect(loadGuestDecks()).toMatchObject([
@@ -109,7 +130,12 @@ test("saves server content and its key before moving the exact revision", async 
   })
   const localId = await renderSync().keepOnDevice(deckId)
   expect(loadGuestDecks()[0].localId).toBe(localId)
-  expect(mockMove).toHaveBeenCalledWith({ deckId, expectedRevision: 2, expectedVersion: null })
+  expect(mockMove).toHaveBeenCalledWith({
+    deckId,
+    expectedRevision: 2,
+    expectedVersion: null,
+    expectedVersions: [],
+  })
   expect(mockAcceptMetadata).toHaveBeenCalledWith([{ ...metadata[0], deleted: true, revision: 3 }])
   expect(captureAnalytics).toHaveBeenCalledTimes(1)
   expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", {
@@ -184,6 +210,7 @@ test("preserves the original guest alias through sync, move, edit, and sync agai
       syncRevision: 2,
     },
     cards: [],
+    versions: [],
   })
   let copyId = ""
   await act(async () => {
@@ -321,12 +348,16 @@ test.each([200, undefined])(
       deck: { ...deck, _id: deckId, syncRevision: 2 },
       version,
       cards: [],
+      versions: [
+        { _id: version._id, versionNumber: 1, name: "Current", updatedAt: updatedAt ?? 100 },
+      ],
     })
     await renderSync().keepOnDevice(deckId)
     expect(mockMove).toHaveBeenCalledWith({
       deckId,
       expectedRevision: 2,
       expectedVersion: { id: version._id, updatedAt: updatedAt ?? 100 },
+      expectedVersions: [{ id: version._id, updatedAt: updatedAt ?? 100 }],
     })
   },
 )
@@ -364,6 +395,7 @@ test.each([0, 100, undefined])(
       },
       version: null,
       cards: [],
+      versions: [],
     })
     mockMove.mockRejectedValue(new Error("interrupted"))
     await expect(renderSync().keepOnDevice(deckId)).rejects.toThrow("interrupted")
@@ -519,4 +551,115 @@ test("reports a stuck automatic reconcile once across retries without a usage ev
     },
   )
   expect(captureAnalytics).not.toHaveBeenCalled()
+})
+
+describe("versions", () => {
+  const bolt = [{ name: "Lightning Bolt", quantity: 4 }]
+  const shock = [{ name: "Shock", quantity: 4 }]
+
+  function versioned() {
+    const local = saveGuestDeck({ ...deck, cards: bolt }, { deckKey: "stable-key" })
+    addGuestDeckVersion(local.localId, { name: "Tuned", note: "More reach", cards: shock }, 5)
+    return loadGuestDecks()[0]
+  }
+
+  test("sync sends every version in order", async () => {
+    const local = versioned()
+    mockImportGuest.mockResolvedValue({
+      status: "imported",
+      deckId,
+      localUpdatedAt: local.updatedAt,
+    })
+    await expect(renderSync().sync(local.localId)).resolves.toEqual({ status: "synced", deckId })
+    expect(mockImportGuest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cards: shock,
+        versions: [
+          { name: "Current", cards: bolt },
+          { name: "Tuned", note: "More reach", cards: shock },
+        ],
+      }),
+    )
+    expect(mockSetBringing).not.toHaveBeenCalled()
+  })
+
+  test("over the account's version limit, sync keeps the deck and reports the counts", async () => {
+    const local = versioned()
+    mockImportGuest.mockResolvedValue({
+      status: "version_limit",
+      capacity: { used: 2, limit: 1, premium: false, canCreate: false },
+    })
+    await expect(renderSync().sync(local.localId)).resolves.toEqual({
+      status: "version_limit",
+      versions: 2,
+      limit: 1,
+      premium: false,
+    })
+    expect(loadGuestDecks()).toEqual([local])
+    expect(captureAnalytics).toHaveBeenCalledWith("deck_sync", { action: "sync", outcome: "limit" })
+  })
+
+  test("sync points the account deck at the version this device brings", async () => {
+    const local = versioned()
+    setGuestDeckBringing(local.localId, 1)
+    mockImportGuest.mockResolvedValue({
+      status: "imported",
+      deckId,
+      localUpdatedAt: local.updatedAt,
+    })
+    mockQuery.mockResolvedValue({ versions: [{ _id: "account-1" }, { _id: "account-2" }] })
+    await renderSync().sync(local.localId)
+    expect(mockSetBringing).toHaveBeenCalledWith({ deckId, versionId: "account-1" })
+  })
+
+  test("move keeps every version and its pick, and checks each one", async () => {
+    const older = { _id: "version-1", versionNumber: 1, name: "Current", updatedAt: 10 }
+    const latest = {
+      _id: "version-3",
+      versionNumber: 3,
+      name: "Tuned",
+      note: "More reach",
+      updatedAt: 30,
+    }
+    mockQuery.mockImplementation(async (reference: string) =>
+      reference === "readVersion"
+        ? { cards: [{ _id: "card-1", _creationTime: 1, deckVersionId: older._id, ...bolt[0] }] }
+        : {
+            deck: {
+              ...deck,
+              _id: deckId,
+              deckKey: "stable-key",
+              syncRevision: 2,
+              bringingVersionId: older._id,
+            },
+            version: { ...latest, createdAt: 30 },
+            versions: [older, latest],
+            cards: [{ _id: "card-2", _creationTime: 1, deckVersionId: latest._id, ...shock[0] }],
+          },
+    )
+    await renderSync().keepOnDevice(deckId)
+    expect(mockQuery).toHaveBeenCalledWith("readVersion", { deckId, versionId: older._id })
+    expect(mockMove).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedVersions: [
+          { id: older._id, updatedAt: 10 },
+          { id: latest._id, updatedAt: 30 },
+        ],
+      }),
+    )
+    const [moved] = loadGuestDecks()
+    expect(moved.deck.cards).toEqual(shock)
+    expect(guestDeckBringing(moved)).toBe(1)
+    expect(
+      guestDeckVersions(moved).map(({ number, name, note, cards }) => ({
+        number,
+        name,
+        note,
+        cards,
+      })),
+    ).toEqual([
+      { number: 1, name: "Current", note: undefined, cards: bolt },
+      { number: 3, name: "Tuned", note: "More reach", cards: shock },
+    ])
+  })
 })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { randomUUID } from "expo-crypto"
-import { useConvex, useMutation } from "convex/react"
+import { type ConvexReactClient, useConvex, useMutation } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import { ConvexError } from "convex/values"
 
@@ -9,17 +9,22 @@ import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorCode } from "@/utils/convexError"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 
+import { deckVersionLabel } from "./deckCopy"
 import { getDeckSyncController, isDeckSyncEnabled, type DeckSyncSnapshot } from "./decksSync"
 import { useDeckMetadataWrites } from "./decksSyncWrites"
 import { useDeckVersionWrites } from "./decksVersionWrites"
 import {
   acknowledgeGuestDeckImport,
   deleteGuestDeck,
+  guestDeckBringing,
   guestDeckRouteId,
+  guestDeckVersions,
   loadGuestDeck,
   saveGuestDeck,
   useGuestDecks,
+  type GuestDeck,
   type GuestDeckPayload,
+  type NewGuestDeckVersion,
 } from "./guestDeck"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
@@ -31,6 +36,7 @@ const SAVE_TO_ACCOUNT_WAIT_MS = 5000
 export type LocalDeckSyncResult =
   | { status: "synced"; deckId: Id<"decks"> }
   | { status: "limit_reached" }
+  | { status: "version_limit"; versions: number; limit: number; premium: boolean }
   | { status: "conflict" }
   | { status: "other_account"; addAsNew: () => Promise<LocalDeckSyncResult> }
   | { status: "kept_newer_edits" }
@@ -41,6 +47,7 @@ const syncOutcomes = {
   synced: "ok",
   conflict: "conflict",
   limit_reached: "limit",
+  version_limit: "limit",
   other_account: "other_account",
   kept_newer_edits: "kept_newer_edits",
 } as const
@@ -90,14 +97,77 @@ async function observeDeckSync<Result extends LocalDeckSyncResult | string>(
   }
 }
 
+type AccountCards = FunctionReturnType<typeof api.decks.readVersion>["cards"]
+
+function deviceCards(cards: AccountCards) {
+  return cards.map(({ _id, _creationTime, deckVersionId: _version, ...card }) => card)
+}
+
 function deviceDeckPayload({ deck, cards }: FunctionReturnType<typeof api.decks.detail>) {
   return {
     name: deck.name,
     format: deck.format,
     game: deck.game,
     ...(deck.note ? { note: deck.note } : {}),
-    cards: cards.map(({ _id, _creationTime, deckVersionId: _version, ...card }) => card),
+    cards: deviceCards(cards),
   }
+}
+
+// why: one detail read lists the versions, and moveToDevice checks each against it, so a version edited mid-read fails the move instead of arriving stale.
+async function accountCopy(convex: ConvexReactClient, deckId: Id<"decks">) {
+  const detail = await convex.query(api.decks.detail, { deckId })
+  const latestId = detail.version?._id
+  const versions: NewGuestDeckVersion[] = await Promise.all(
+    detail.versions.map(async (version) => ({
+      number: version.versionNumber,
+      name: deckVersionLabel(version, version.versionNumber),
+      ...(version.note ? { note: version.note } : {}),
+      cards:
+        version._id === latestId
+          ? deviceCards(detail.cards)
+          : deviceCards(
+              (await convex.query(api.decks.readVersion, { deckId, versionId: version._id })).cards,
+            ),
+    })),
+  )
+  const bringing = detail.versions.find(
+    (version) => version._id === detail.deck.bringingVersionId,
+  )?.versionNumber
+  return { detail, payload: deviceDeckPayload(detail), versions, bringing }
+}
+
+function listsOf(versions: readonly NewGuestDeckVersion[]) {
+  return JSON.stringify(versions.map(({ name, note, cards }) => ({ name, note, cards })))
+}
+
+function sameAsAccount(local: GuestDeck, account: Awaited<ReturnType<typeof accountCopy>>) {
+  return (
+    JSON.stringify(local.deck) === JSON.stringify(account.payload) &&
+    (account.versions.length === 0 ||
+      listsOf(guestDeckVersions(local)) === listsOf(account.versions))
+  )
+}
+
+function importedVersions(local: GuestDeck) {
+  return local.versions
+    ? {
+        versions: guestDeckVersions(local).map(({ name, note, cards }) => ({
+          name,
+          ...(note ? { note } : {}),
+          cards,
+        })),
+      }
+    : {}
+}
+
+export function versionLimitMessage({
+  versions,
+  limit,
+  premium,
+}: Omit<Extract<LocalDeckSyncResult, { status: "version_limit" }>, "status">) {
+  return premium
+    ? translate("decks:localSync.version_limit")
+    : translate("decks:localSync.versionLimit", { versions, limit, remove: versions - limit })
 }
 
 let syncingLocalIds: ReadonlySet<string> = new Set()
@@ -130,6 +200,20 @@ export function useLocalDeckSync(ownerId: string | undefined) {
   const localDecks = useGuestDecks()
   const importGuest = useMutation(api.decks.importGuest)
   const moveToDevice = useMutation(api.decks.moveToDevice)
+  const setBringing = useMutation(api.decks.setBringingVersion)
+  // why: importGuest has no pick, so a device deck bringing an older version points the new account deck at the same position.
+  const carryBringing = useCallback(
+    async (deckId: Id<"decks">, local: GuestDeck) => {
+      const position = guestDeckVersions(local).findIndex(
+        (version) => version.number === guestDeckBringing(local),
+      )
+      if (!local.versions || position === local.versions.length - 1) return
+      const { versions } = await convex.query(api.decks.detail, { deckId })
+      const versionId = versions[position]?._id
+      if (versionId) await setBringing({ deckId, versionId })
+    },
+    [convex, setBringing],
+  )
   const sync = useCallback(
     (localId: string, { automatic = false }: { automatic?: boolean } = {}) =>
       observeDeckSync<LocalDeckSyncResult>(
@@ -145,13 +229,20 @@ export function useLocalDeckSync(ownerId: string | undefined) {
               game: local.deck.game,
               note: local.deck.note,
               cards: local.deck.cards,
+              ...importedVersions(local),
               ...(local.movedFromAccount ? { movedFromAccount: true } : {}),
               deckKey: local.deckKey ?? local.localId,
               localId: local.guestLocalId ?? localId,
               localUpdatedAt: local.updatedAt,
             })
-            if (response.status === "limit_reached" || response.status === "version_limit")
-              return { status: "limit_reached" }
+            if (response.status === "limit_reached") return { status: "limit_reached" }
+            if (response.status === "version_limit")
+              return {
+                status: "version_limit",
+                versions: response.capacity.used,
+                limit: response.capacity.limit,
+                premium: response.capacity.premium,
+              }
             if (response.status === "other_account") {
               const newId = randomUUID()
               return {
@@ -164,12 +255,19 @@ export function useLocalDeckSync(ownerId: string | undefined) {
                       game: local.deck.game,
                       note: local.deck.note,
                       cards: local.deck.cards,
+                      ...importedVersions(local),
                       deckKey: newId,
                       localId: newId,
                       localUpdatedAt: local.updatedAt,
                     })
-                    if (imported.status === "limit_reached" || imported.status === "version_limit")
-                      return { status: "limit_reached" }
+                    if (imported.status === "limit_reached") return { status: "limit_reached" }
+                    if (imported.status === "version_limit")
+                      return {
+                        status: "version_limit",
+                        versions: imported.capacity.used,
+                        limit: imported.capacity.limit,
+                        premium: imported.capacity.premium,
+                      }
                     if (imported.status === "other_account") return { status: "conflict" }
                     return { status: "synced", deckId: imported.deckId }
                   }),
@@ -177,12 +275,14 @@ export function useLocalDeckSync(ownerId: string | undefined) {
             }
             let receipt = response.localUpdatedAt
             if (local.movedFromAccount && receipt === null) {
-              const detail = await convex.query(api.decks.detail, { deckId: response.deckId })
-              if (JSON.stringify(deviceDeckPayload(detail)) === JSON.stringify(local.deck))
+              if (sameAsAccount(local, await accountCopy(convex, response.deckId)))
                 receipt = local.updatedAt
             }
-            if (acknowledgeGuestDeckImport(localId, receipt) || !loadGuestDeck(localId))
+            if (acknowledgeGuestDeckImport(localId, receipt) || !loadGuestDeck(localId)) {
+              if (response.status === "imported")
+                await carryBringing(response.deckId, local).catch(() => undefined)
               return { status: "synced", deckId: response.deckId }
+            }
             return { status: "kept_newer_edits" }
           } catch (cause) {
             const code = convexErrorCode(cause)
@@ -202,30 +302,32 @@ export function useLocalDeckSync(ownerId: string | undefined) {
         },
         automatic,
       ),
-    [convex, importGuest],
+    [carryBringing, convex, importGuest],
   )
 
   const keepOnDevice = useCallback(
     (deckId: Id<"decks">) =>
       observeDeckSync("move_to_device", async () => {
         if (!ownerId) throw new Error("Sign in to move a synced deck to this device")
-        const detail = await convex.query(api.decks.detail, { deckId })
+        const account = await accountCopy(convex, deckId)
+        const { detail } = account
         const { deck: server } = detail
         const deckKey = server.deckKey
         const existing = localDecks.find((local) => (local.deckKey ?? local.localId) === deckKey)
-        const copy = deviceDeckPayload(detail)
-        if (existing && JSON.stringify(existing.deck) !== JSON.stringify(copy))
+        if (existing && !sameAsAccount(existing, account))
           throw new ConvexError({
             code: "sync_conflict",
             message: "Deck changed on another device",
           })
         const draft =
           existing ??
-          saveGuestDeck(copy, {
+          saveGuestDeck(account.payload, {
             deckKey,
             guestLocalId: server.guestLocalId,
             movedFromAccount: true,
             now: server.guestUpdatedAt,
+            versions: account.versions,
+            bringing: account.bringing,
           })
         setSyncing(draft.localId, true)
         try {
@@ -238,6 +340,10 @@ export function useLocalDeckSync(ownerId: string | undefined) {
                   updatedAt: detail.version.updatedAt ?? detail.version.createdAt,
                 }
               : null,
+            expectedVersions: detail.versions.map((version) => ({
+              id: version._id,
+              updatedAt: version.updatedAt,
+            })),
           })
           getDeckSyncController(convex, ownerId).acceptMetadata([removed])
         } catch (cause) {
