@@ -15,28 +15,24 @@ describe("pastedLines", () => {
     ])
   })
 
-  it("reads the block after the only blank line as the sideboard, like the importer", () => {
-    const list = "4 Lightning Bolt\n4 Lightnig Helix\n\n2 Pyroblsat"
-    expect(pastedLines(list, "Lightnig Helix")).toEqual([{ quantity: 4, board: "main" }])
-    expect(pastedLines(list, "Pyroblsat")).toEqual([{ quantity: 2, board: "sideboard" }])
-  })
-
-  it("reads a trailing block that completes 100 cards as the commander", () => {
-    expect(pastedLines("98 Plains\n1 Sol Ring\n\n1 Captian America", "Captian America")).toEqual([
-      { quantity: 1, board: "commander" },
-    ])
-  })
-
-  it("skips sections the importer skips", () => {
-    expect(pastedLines("Maybeboard\n3 Swrods\n\nDeck\n1 Swrods", "Swrods")).toEqual([
-      { quantity: 1, board: "main" },
-    ])
-  })
-
   it("finds printed lines by their full reference", () => {
     expect(
       pastedLines("Commander\n1 Captian America (SLD) 12 *F*", "Captian America (SLD) 12 *F*"),
     ).toEqual([{ quantity: 1, board: "commander" }])
+  })
+
+  it("counts a companion that is also in the sideboard once, like the importer", () => {
+    const list =
+      "Companion\n1 Lurus of the Dream-Den\n\nDeck\n4 Lightning Bolt\n\nSideboard\n1 Lurus of the Dream-Den"
+    expect(pastedLines(list, "Lurus of the Dream-Den")).toEqual([
+      { quantity: 1, board: "sideboard" },
+    ])
+  })
+
+  it("skips zero-copy lines the importer reports as invalid", () => {
+    expect(pastedLines("4 Lightnig Bolt\nSideboard\n0 Lightnig Bolt", "Lightnig Bolt")).toEqual([
+      { quantity: 4, board: "main" },
+    ])
   })
 
   it("adds one copy to the main deck when the line is not in the text", () => {

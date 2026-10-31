@@ -25,6 +25,13 @@ import {
 } from "./lib/games/decks"
 import { GAME_PROVIDERS, type ProviderGame } from "./lib/games/providers"
 import { assertGameSystem, integrationFor, type GameSystemId } from "./lib/integrations"
+import {
+  lookupKey,
+  type PastedDeckBoard,
+  type PastedDeckEntry,
+  printingKey,
+  readPastedDeckList,
+} from "./lib/pastedDeckList"
 import { MAX_DECK_CARDS } from "./lib/policy"
 import {
   type CardReference,
@@ -33,21 +40,9 @@ import {
   objectRecord,
 } from "./lib/scryfall"
 
-type DeckBoard = "main" | "sideboard" | "commander"
-
-type ParsedEntry = {
-  name: string
-  quantity: number
-  board: DeckBoard
-  scryfallId?: string
-  setCode?: string
-  collectorNumber?: string
-  originalReference?: string
-}
-
 export type ResolvedDeckCard = CardReference & {
   quantity: number
-  board: DeckBoard
+  board: PastedDeckBoard
 }
 
 type PreconstructedDeck = {
@@ -71,7 +66,7 @@ type ResolvedPreconstructedDeck = {
 
 type PreconstructedDeckOutline = {
   name: string
-  cards: ParsedEntry[]
+  cards: PastedDeckEntry[]
 }
 
 const MTGJSON_BASE_URL = "https://mtgjson.com/api/v5"
@@ -357,116 +352,10 @@ async function resolveGenericEntries(
   return { cards, unresolved: unresolved.sort() }
 }
 
-type PastedSection = DeckBoard | "companion" | "about" | "ignore"
-
-const PASTED_ENTRY = /^(\d{1,3})\s*x?\s+(.+)$/i
-
-function sectionBoard(line: string): PastedSection | undefined {
-  const heading = line
-    .replace(/[:\s]+$/g, "")
-    .trim()
-    .toLowerCase()
-  if (["commander", "commanders"].includes(heading)) return "commander"
-  if (["main", "mainboard", "deck"].includes(heading)) return "main"
-  if (["side", "sideboard"].includes(heading)) return "sideboard"
-  if (heading === "companion") return "companion"
-  if (heading === "about") return "about"
-  if (["maybeboard", "considering", "tokens"].includes(heading)) return "ignore"
-  return undefined
-}
-
-function isPastedComment(line: string) {
-  return line.startsWith("#") || line.startsWith("//")
-}
-
-function headinglessSecondBlock(lines: string[]) {
-  const blocks: Array<{ start: number; cards: number }> = []
-  let block: (typeof blocks)[number] | undefined
-  for (const [index, sourceLine] of lines.entries()) {
-    const line = sourceLine.trim()
-    if (!line) {
-      block = undefined
-      continue
-    }
-    const match = line.match(PASTED_ENTRY)
-    if (!match) return undefined
-    if (!block) {
-      block = { start: index, cards: 0 }
-      blocks.push(block)
-    }
-    block.cards += Number(match[1])
-  }
-  const [main, trailing] = blocks
-  if (blocks.length !== 2 || !main || !trailing) return undefined
-  const board: DeckBoard =
-    trailing.cards <= 2 && main.cards + trailing.cards === 100 ? "commander" : "sideboard"
-  return { start: trailing.start, board }
-}
-
-function parsePrintingReference(reference: string) {
-  const withoutFinish = reference.replace(/\s+\*[A-Z0-9-]+\*\s*$/i, "").trim()
-  const printing = withoutFinish.match(/^(.+?)\s+\(([A-Z0-9]{2,8})\)(?:\s+([A-Za-z0-9-]+))?$/i)
-  return printing
-    ? {
-        name: printing[1].trim(),
-        setCode: printing[2].toLowerCase(),
-        ...(printing[3] ? { collectorNumber: printing[3] } : {}),
-        originalReference: reference.trim(),
-      }
-    : { name: withoutFinish }
-}
-
 export function parsePastedDeckList(list: string) {
   if (list.length > MAX_PASTED_LIST_LENGTH)
     throw new ConvexError({ code: "deck_list_too_large", message: "Deck list is too large" })
-  const lines = list.split(/\r?\n/)
-  const trailing = headinglessSecondBlock(lines)
-  let board: PastedSection = "main"
-  const entries = new Map<string, ParsedEntry>()
-  const companions: ParsedEntry[] = []
-  const invalidLines: string[] = []
-  const add = (entry: ParsedEntry) => {
-    const key = printingKey(entry)
-    const current = entries.get(key)
-    entries.set(key, { ...entry, quantity: (current?.quantity ?? 0) + entry.quantity })
-  }
-
-  for (const [index, sourceLine] of lines.entries()) {
-    const line = sourceLine.trim()
-    if (index === trailing?.start) board = trailing.board
-    if (!line && board === "about") board = "main"
-    if (!line || isPastedComment(line)) continue
-    const nextBoard = sectionBoard(line)
-    if (nextBoard) {
-      board = nextBoard
-      continue
-    }
-    if (board === "ignore" || board === "about") continue
-    const sideboardPrefix = /^SB:\s*/i.test(line)
-    const match = line.replace(/^SB:\s*/i, "").match(PASTED_ENTRY)
-    const quantity = match ? Number(match[1]) : 0
-    const reference = parsePrintingReference(match?.[2] ?? "")
-    if (!match || !reference.name || quantity < 1 || quantity > 999) {
-      invalidLines.push(sourceLine)
-      continue
-    }
-    const entry: ParsedEntry = {
-      ...reference,
-      board: sideboardPrefix || board === "companion" ? "sideboard" : board,
-      quantity,
-    }
-    if (board === "companion") companions.push(entry)
-    else add(entry)
-  }
-  const sideboardNames = new Set(
-    [...entries.values()]
-      .filter((entry) => entry.board === "sideboard")
-      .map((entry) => normalizeCardName(entry.name)),
-  )
-  companions
-    .filter((companion) => !sideboardNames.has(normalizeCardName(companion.name)))
-    .forEach(add)
-  return { entries: [...entries.values()], invalidLines }
+  return readPastedDeckList(list)
 }
 
 function preconFromValue(value: unknown): PreconstructedDeck | null {
@@ -481,19 +370,6 @@ function preconFromValue(value: unknown): PreconstructedDeck | null {
   }
 }
 
-function lookupKey(
-  entry: Pick<ParsedEntry, "name" | "scryfallId" | "setCode" | "collectorNumber">,
-) {
-  if (entry.scryfallId) return `id:${entry.scryfallId.toLowerCase()}`
-  if (entry.setCode && entry.collectorNumber)
-    return `printing:${entry.setCode.toLowerCase()}:${entry.collectorNumber.toLowerCase()}`
-  return `name:${entry.name.toLocaleLowerCase()}${entry.setCode ? `:set:${entry.setCode.toLowerCase()}` : ""}`
-}
-
-function printingKey(entry: ParsedEntry) {
-  return `${entry.board}:${lookupKey(entry)}`
-}
-
 function mtgJsonEntries(payload: unknown) {
   const envelope = objectRecord(payload)
   const deck = objectRecord(envelope?.data)
@@ -502,19 +378,19 @@ function mtgJsonEntries(payload: unknown) {
       code: "precon_invalid_response",
       message: "The official deck service returned an invalid response",
     })
-  const groups: Array<[DeckBoard, unknown]> = [
+  const groups: Array<[PastedDeckBoard, unknown]> = [
     ["commander", deck.commander],
     ["main", deck.mainBoard],
     ["sideboard", deck.sideBoard],
   ]
-  const entries = new Map<string, ParsedEntry>()
+  const entries = new Map<string, PastedDeckEntry>()
   for (const [board, value] of groups) {
     if (!Array.isArray(value)) continue
     for (const item of value) {
       const card = objectRecord(item)
       const identifiers = objectRecord(card?.identifiers)
       if (!card || typeof card.name !== "string" || typeof card.count !== "number") continue
-      const entry: ParsedEntry = {
+      const entry: PastedDeckEntry = {
         name: card.name,
         quantity: card.count,
         board,
@@ -533,7 +409,7 @@ function mtgJsonEntries(payload: unknown) {
   }
 }
 
-async function resolveEntries(ctx: ActionCtx, entries: ParsedEntry[]) {
+async function resolveEntries(ctx: ActionCtx, entries: PastedDeckEntry[]) {
   if (entries.length === 0)
     throw new ConvexError({
       code: "empty_deck_list",
@@ -546,7 +422,7 @@ async function resolveEntries(ctx: ActionCtx, entries: ParsedEntry[]) {
     })
   const resolved = new Map<string, CardReference>()
   const unresolved = new Set<string>()
-  const lookupGroups = new Map<string, ParsedEntry[]>()
+  const lookupGroups = new Map<string, PastedDeckEntry[]>()
   for (const entry of entries) {
     const scope =
       entry.scryfallId || entry.collectorNumber ? "exact" : entry.setCode ? "set" : "name"

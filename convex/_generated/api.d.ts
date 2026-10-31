@@ -80,6 +80,7 @@ import type * as lib_notifications from "../lib/notifications.js";
 import type * as lib_opponentDecks from "../lib/opponentDecks.js";
 import type * as lib_outReason from "../lib/outReason.js";
 import type * as lib_pagination from "../lib/pagination.js";
+import type * as lib_pastedDeckList from "../lib/pastedDeckList.js";
 import type * as lib_policy from "../lib/policy.js";
 import type * as lib_results from "../lib/results.js";
 import type * as lib_revenueCat from "../lib/revenueCat.js";
@@ -178,6 +179,7 @@ declare const fullApi: ApiFromModules<{
   "lib/opponentDecks": typeof lib_opponentDecks;
   "lib/outReason": typeof lib_outReason;
   "lib/pagination": typeof lib_pagination;
+  "lib/pastedDeckList": typeof lib_pastedDeckList;
   "lib/policy": typeof lib_policy;
   "lib/results": typeof lib_results;
   "lib/revenueCat": typeof lib_revenueCat;
