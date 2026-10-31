@@ -68,7 +68,7 @@ function deckDraftStore<Key, Draft extends DeckEdits | undefined>(
 
     // why: `latest` reads the store directly, so taps that land before a re-render still edit the newest draft.
     const latest: { readonly current: Draft } = entry
-    return { draft, latest, setDraft: entry.set, edit }
+    return { draft, latest, setDraft: entry.set, edit, subscribe: entry.subscribe }
   }
 }
 

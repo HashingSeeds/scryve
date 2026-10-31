@@ -30,6 +30,7 @@ import {
 import {
   closeDeckDraft,
   closedDeckDraft,
+  draftChanges,
   isCommanderPick,
   openDeckDraft,
   planDeckSave,
@@ -60,6 +61,7 @@ import {
   forgetAccountDraft,
   keepAccountDraft,
   loadAccountDraft,
+  type SavedAccountDraft,
 } from "@/features/decks/savedDeckDrafts"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
@@ -93,6 +95,16 @@ type DeckDialog =
   | "sideboard"
 
 const NEW_LIST_NOTICE_MS = 8_000
+
+function keepDraft(
+  ownerId: string | undefined,
+  deckId: string,
+  saved: SavedAccountDraft,
+  savedNote: string | undefined,
+) {
+  if (draftChanges(saved.draft, savedNote).any) keepAccountDraft(ownerId, deckId, saved)
+  else forgetAccountDraft(ownerId, deckId)
+}
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -319,6 +331,7 @@ function DeckDetailContent({
     latest: latestDraft,
     setDraft,
     edit,
+    subscribe: subscribeDraft,
   } = useAccountDeckDraft({ ownerId: access?.ownerId, deckId })
   // why: an unsaved draft brought back from storage reopens where it can be finished.
   const [mode, setMode] = useState<DeckMode>(draft.editing ? "build" : "play")
@@ -463,15 +476,30 @@ function DeckDetailContent({
   const ownerId = access?.ownerId
   const draftVersionId =
     pinnedVersionTarget.current?.versionId ?? selectedVersionId ?? view.version?._id
+  const savedNote = deck?.note
   useEffect(() => {
-    if (view.changes.any)
-      keepAccountDraft(ownerId, deckId, {
-        draft,
-        versionId: draftVersionId,
+    keepDraft(
+      ownerId,
+      deckId,
+      { draft, versionId: draftVersionId, pinned: pinnedVersionTarget.current },
+      savedNote,
+    )
+  }, [deckId, draft, draftVersionId, ownerId, savedNote])
+
+  // why: /cards edits the draft while this screen is frozen, and the effect above waits until it shows again.
+  function keepSearchEdit<Result>(result: Result) {
+    keepDraft(
+      ownerId,
+      deckId,
+      {
+        draft: latestDraft.current,
+        versionId: pinnedVersionTarget.current?.versionId ?? draftVersionId,
         pinned: pinnedVersionTarget.current,
-      })
-    else forgetAccountDraft(ownerId, deckId)
-  }, [deckId, draft, draftVersionId, ownerId, view.changes.any])
+      },
+      savedNote,
+    )
+    return result
+  }
 
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
@@ -541,7 +569,9 @@ function DeckDetailContent({
     const alreadyInDraft = latestDraft.current.cards.some(
       (candidate) => printingKey(candidate) === printingKey(card),
     )
-    if (!alreadyInDraft && offline && !isCommanderPick(deck, card)) {
+    // why: /cards calls this while the screen is frozen, so the rendered `offline` can be stale.
+    const offlineNow = client ? !client.connectionState().isWebSocketConnected : offline
+    if (!alreadyInDraft && offlineNow && !isCommanderPick(deck, card)) {
       const entry = offlineCardEntry(card)
       if (!entry) {
         const offlineError = translate("decks:detail.offlineCard")
@@ -615,7 +645,22 @@ function DeckDetailContent({
     const finish = () => {
       captureAnalytics("deck_used", { feature: "saved" })
       setNewListNotice(newList)
-      setDraft(closeDeckDraft(latestDraft.current))
+      const after = latestDraft.current
+      if (after.cards === draft.cards && after.note === draft.note) {
+        setDraft(closeDeckDraft(after))
+        return
+      }
+      // why: /cards adds and note edits can land while the save is in flight; they stay as changes on top of what was saved.
+      pinnedVersionTarget.current = undefined
+      metadataSaveStarted.current = false
+      // why: the note write just moved the deck's revision, so the old one would read as a conflict next save.
+      const metadataRevision =
+        plan.note === "queue" && noteRevision !== undefined
+          ? noteRevision + 1
+          : plan.note === "mutation"
+            ? undefined
+            : after.metadataRevision
+      setDraft({ ...after, base: draft.cards, metadataRevision })
     }
     if (plan.immediate) {
       try {
@@ -1002,7 +1047,14 @@ function DeckDetailContent({
           setError(undefined)
           setDialog("actions")
         }}
-        cardSearch={{ offlineCandidates, onAdd: addCard, onRemove: removeCard }}
+        cardSearch={{
+          deckId,
+          offlineCandidates,
+          onAdd: (card) => keepSearchEdit(addCard(card)),
+          onRemove: (card) => keepSearchEdit(removeCard(card)),
+          cards: () => (latestDraft.current.editing ? latestDraft.current.cards : displayCards),
+          subscribe: subscribeDraft,
+        }}
         canChooseCommander={view.singleCommander && !cardsUnavailable && !editableCached}
         commanderWarnings={view.commanderWarnings}
         onNoteChange={(note) => {

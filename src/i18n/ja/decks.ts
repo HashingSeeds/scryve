@@ -326,6 +326,10 @@ export default {
     fromCache: "キャッシュ済みデッキから · {{game}}",
     add: "+ 追加",
     addCard: "{{card}}をデッキに追加",
+    side: "サイド",
+    addToSection: "{{card}}を{{section}}に追加",
+    inSection: "{{section}}に{{count}}枚",
+    addAnother: "{{card}}をもう1枚追加",
     added: "{{card}}を追加しました。",
     noCached:
       "一致するキャッシュ済みカードはありません。オンラインで追加したカードがここに表示されます。",

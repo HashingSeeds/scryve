@@ -350,6 +350,12 @@ const decks = {
     fromCache: "From your cached decks · {{game}}",
     add: "+ Add",
     addCard: "Add {{card}} to deck",
+    // Link beside "+ Add" on a search result that adds one copy to the sideboard instead of the main deck.
+    side: "Side",
+    addToSection: "Add {{card}} to {{section}}",
+    // Under "In this deck": how many copies of a card the deck holds, and in which part, e.g. "2 in Main deck".
+    inSection: "{{count}} in {{section}}",
+    addAnother: "Add another {{card}}",
     added: "Added {{card}}.",
     noCached: "No cached cards match. Cards appear here after you add them online.",
     noResults: "No cards found.",

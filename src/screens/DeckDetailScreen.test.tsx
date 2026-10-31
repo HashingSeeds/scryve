@@ -1,7 +1,8 @@
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
+import CardsRoute from "@/app/cards"
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
-import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import { CardSearch } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
 import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
@@ -261,7 +262,12 @@ jest.mock("convex/react", () => ({
 
 const mockStatsPush = jest.fn()
 jest.mock("expo-router", () => ({
-  router: { push: (...args: unknown[]) => mockStatsPush(...args) },
+  router: {
+    push: (...args: unknown[]) => mockStatsPush(...args),
+    back: jest.fn(),
+    canGoBack: () => true,
+  },
+  useLocalSearchParams: () => ({ deckId: "deck-1", game: "mtg" }),
   useFocusEffect: (callback: () => void) =>
     require("react").useEffect(() => {
       if (mockFocused) return callback()
@@ -295,6 +301,15 @@ function renderDetail(access?: Parameters<typeof DeckDetailScreen>[0]["access"])
   return render(
     <ThemeProvider initialContext="light">
       <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={access} />
+    </ThemeProvider>,
+  )
+}
+
+function renderDetailWithCards(access?: Parameters<typeof DeckDetailScreen>[0]["access"]) {
+  return render(
+    <ThemeProvider initialContext="light">
+      <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={access} />
+      <CardsRoute />
     </ThemeProvider>,
   )
 }
@@ -821,6 +836,7 @@ describe("DeckDetailScreen", () => {
           onBack={jest.fn()}
           access={{ ready, loading: false, signedIn: true, ownerId: "owner-a", request: jest.fn() }}
         />
+        <CardsRoute />
       </ThemeProvider>
     )
     const view = render(screen(false))
@@ -834,8 +850,7 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByTestId("deck-draft-bar")).toBeNull()
     expect(mockSaveVersion).not.toHaveBeenCalled()
 
-    fireEvent.press(view.getByTestId("deck-add-cards"))
-    const add = view.UNSAFE_getByType(CardSearchScreen).props.onAdd
+    const add = view.UNSAFE_getByType(CardSearch).props.onAdd
     act(() => {
       expect(
         add({ name: "Arcane Signet", scryfallId: "arcane-signet", quantity: 1, board: "main" }),
@@ -844,7 +859,6 @@ describe("DeckDetailScreen", () => {
         add({ name: "Mind Stone", scryfallId: "mind-stone", quantity: 1, board: "main" }),
       ).toBeUndefined()
     })
-    fireEvent.press(view.getByText("Done"))
     fireEvent.press(view.getByTestId("save-version-button"))
 
     const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
@@ -887,7 +901,7 @@ describe("DeckDetailScreen", () => {
     mockVersionCacheState.knownCards = {
       "printing-333": { game: "mtg", card: mindStone },
     }
-    const view = renderDetail(offlineAccess)
+    const view = renderDetailWithCards(offlineAccess)
 
     fireEvent.press(view.getByTestId("deck-mode-build"))
     expect(view.getByTestId("deck-add-cards")).toBeEnabled()
@@ -988,13 +1002,40 @@ describe("DeckDetailScreen", () => {
         },
       },
     }
-    const view = renderDetail(offlineAccess)
+    const view = renderDetailWithCards(offlineAccess)
 
     fireEvent.press(view.getByTestId("deck-mode-build"))
     fireEvent.press(view.getByTestId("deck-add-cards"))
     expect(view.getByText("You’re offline. Searching cards already in your decks.")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("card-search-input"), "Mind")
     expect(view.getByLabelText("Add Mind Stone to deck")).toBeTruthy()
+  })
+
+  it("keeps a /cards add that lands while a save is in flight as one new change", async () => {
+    let finishSave = () => {}
+    mockSaveVersion.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSave = () => resolve("version-main"))),
+    )
+    const saved = (quantity: number) => ({
+      deckId: "deck-1",
+      versionId: "version-main",
+      cards: [expect.objectContaining({ name: "Sol Ring", quantity })],
+    })
+    const view = renderDetailWithCards()
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Sol")
+    fireEvent.press(view.getByLabelText("Add another Sol Ring"))
+    expect(view.getByText("1 change")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("save-version-button"))
+    fireEvent.press(view.getByLabelText("Add another Sol Ring"))
+    await act(async () => finishSave())
+
+    expect(mockSaveVersion).toHaveBeenCalledWith(saved(2))
+    expect(view.getByText("1 change")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-version-button"))
+    await waitFor(() => expect(mockSaveVersion).toHaveBeenCalledTimes(2))
+    expect(mockSaveVersion).toHaveBeenLastCalledWith(saved(3))
   })
 
   it("records stats again when the screen regains focus", () => {

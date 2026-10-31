@@ -347,6 +347,10 @@ export default {
     fromCache: "De tus mazos en caché · {{game}}",
     add: "+ Añadir",
     addCard: "Añadir {{card}} al mazo",
+    side: "Side",
+    addToSection: "Añadir {{card}} a {{section}}",
+    inSection: "{{count}} en {{section}}",
+    addAnother: "Añadir otra copia de {{card}}",
     added: "Se añadió {{card}}.",
     noCached:
       "Ninguna carta en caché coincide. Las cartas aparecen aquí después de añadirlas con conexión.",
