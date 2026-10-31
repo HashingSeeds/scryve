@@ -28,6 +28,8 @@ type ShelfState = {
     lastPlayedAt?: number
     record?: { games: number; wins: number; losses: number; draws: number; unknown: number }
     keyRecord?: { games: number; wins: number; losses: number; draws: number; unknown: number }
+    identityColors?: string[]
+    commanderNames?: string[]
   }>
   capacity: { used: number; limit: number; premium: boolean; canCreate: boolean }
   analyticsLocked: boolean
@@ -842,5 +844,99 @@ describe("DecksScreen", () => {
     const header = within(view.getByTestId("local-deck-sync-header"))
     expect(header.getByText("On this device")).toBeTruthy()
     expect(header.getByTestId("local-deck-sync-choose")).toBeTruthy()
+  })
+
+  describe("deck colors", () => {
+    const deck = (name: string, identityColors?: string[], commanderNames?: string[]) => ({
+      ...standardDeck,
+      _id: name,
+      name,
+      ...(identityColors ? { identityColors } : {}),
+      ...(commanderNames ? { commanderNames } : {}),
+    })
+
+    function shelfWithColors() {
+      saveGuestDeck({ name: "Device deck", format: "standard", game: "mtg", cards: [] })
+      mockListMine.value = {
+        decks: [
+          deck("Atraxa Counters", ["W", "U", "B", "G"], ["Atraxa, Praetors' Voice"]),
+          deck("Azorius Flyers", ["W", "U"]),
+          deck("Mono White", ["W"]),
+          deck("Artifacts", []),
+          deck("Unknown Pile"),
+          pokemonDeck,
+        ],
+        capacity: { used: 6, limit: 100, premium: true, canCreate: true },
+        analyticsLocked: false,
+      }
+      const view = renderShelf()
+      fireEvent.press(view.getByTestId("deck-filters-button"))
+      return view
+    }
+
+    const shown = (view: ReturnType<typeof render>) =>
+      [
+        "Atraxa Counters",
+        "Azorius Flyers",
+        "Mono White",
+        "Artifacts",
+        "Unknown Pile",
+        "Device deck",
+        "Lucario Hariyama",
+      ].filter((name) => view.queryByText(name))
+
+    it.each([
+      ["within", ["Azorius Flyers", "Mono White", "Artifacts"]],
+      ["additional", ["Atraxa Counters", "Azorius Flyers"]],
+      ["exact", ["Azorius Flyers"]],
+    ] as const)("filters %s the picked colors and leaves out unknown decks", (match, names) => {
+      const view = shelfWithColors()
+      fireEvent.press(view.getByTestId("deck-color-W"))
+      fireEvent.press(view.getByTestId("deck-color-U"))
+      fireEvent.press(view.getByTestId(`deck-color-match-${match}`))
+
+      expect(shown(view)).toEqual(names)
+      expect(view.getByLabelText("Filters (2)")).toBeTruthy()
+    })
+
+    it("finds colorless decks and clears the colors with the other filters", () => {
+      const view = shelfWithColors()
+      fireEvent.press(view.getByTestId("deck-color-C"))
+      expect(shown(view)).toEqual(["Artifacts"])
+
+      fireEvent.press(view.getByText("Clear filters"))
+      expect(shown(view)).toHaveLength(7)
+    })
+
+    it("hides the color group and its picks for other systems", () => {
+      const view = shelfWithColors()
+      fireEvent.press(view.getByTestId("deck-color-G"))
+      chooseOption(view, "system-filter", "pokemon")
+
+      expect(view.queryByTestId("deck-color-G")).toBeNull()
+      expect(shown(view)).toEqual(["Lucario Hariyama"])
+      expect(view.getByLabelText("Filters (1)")).toBeTruthy()
+    })
+
+    it("shows color pips only for known identities, and C for colorless", () => {
+      const view = shelfWithColors()
+      fireEvent.press(view.getByTestId("deck-filters-done"))
+
+      expect(view.getByTestId("deck-colors-Azorius Flyers").props.accessibilityLabel).toBe(
+        "white mana blue mana",
+      )
+      expect(view.getByTestId("deck-colors-Artifacts").props.accessibilityLabel).toBe(
+        "colorless mana",
+      )
+      expect(view.queryByTestId("deck-colors-Unknown Pile")).toBeNull()
+    })
+
+    it("finds a deck by its commander", () => {
+      const view = shelfWithColors()
+      fireEvent.press(view.getByTestId("deck-filters-done"))
+      fireEvent.changeText(view.getByTestId("deck-search-input"), "atraxa, praetors")
+
+      expect(shown(view)).toEqual(["Atraxa Counters"])
+    })
   })
 })
