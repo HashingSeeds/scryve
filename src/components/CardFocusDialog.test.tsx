@@ -185,6 +185,13 @@ describe("CardFocusDialog", () => {
       'Other players will see "Commander" instead.',
     )
     blocked.unmount()
+    const ineligible = renderDialog({
+      card: { ...card, name: "Hitler" },
+      details: { ...commander, commanderEligibility: "ineligible" },
+      onSetCommander: jest.fn(),
+    })
+    expect(ineligible.queryByTestId("commander-name-warning")).toBeNull()
+    ineligible.unmount()
     const fine = renderDialog({ details: commander, onSetCommander: jest.fn() })
     expect(fine.queryByTestId("commander-name-warning")).toBeNull()
   })

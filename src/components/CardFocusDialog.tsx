@@ -137,7 +137,8 @@ export function CardFocusDialog({
         : details.commanderLegality !== "legal"
           ? translate("decks:cardFocus.notLegal")
           : undefined
-  const nameWarning = onSetCommander ? commanderNameWarning(card.name) : undefined
+  const nameWarning =
+    onSetCommander && !commanderProblem ? commanderNameWarning(card.name) : undefined
   const printing = details ? printingLine(details) : ""
   const imageCredit = systemDefinition(card.game)?.integration.rights.imageCredit
   const colorIdentity = cardColorIdentityLabel(details, card.name)
