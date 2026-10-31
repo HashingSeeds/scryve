@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
@@ -5,7 +6,11 @@ import { Button } from "@/components/Button"
 import { FilterChips } from "@/components/FilterChips"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import type { RemoteValue } from "@/features/async/remoteState"
+import { CloudGlyph } from "@/features/decks/CloudGlyph"
+import { cardCountLabel } from "@/features/decks/deckCopy"
+import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -32,19 +37,115 @@ export type SeatDeck = {
   game?: string
   format?: string
   _id: string
+  deckKey?: string
   name: string
+  cardQuantity?: number
   versions: { _id: string; versionNumber: number; name?: string }[]
 }
 
 export type LobbyDeckState = RemoteValue<SeatDeck[]> | { status: "error"; retry: () => void }
 
+export type LobbyDeviceDeck = {
+  localId: string
+  deckKey: string
+  game?: string
+  format?: string
+  name: string
+  cardQuantity: number
+  syncBlocked?: "offline" | "accountFull"
+  error?: string
+}
+
+export type LobbyDeviceDecks = {
+  decks: readonly LobbyDeviceDeck[]
+  syncingLocalId?: string
+  onSyncAndUse: (seat: number, localId: string) => void
+}
+
 const NO_DECK_ID = "no-deck"
+
+const cardsLabel = (quantity?: number) =>
+  quantity === undefined
+    ? undefined
+    : quantity > 0
+      ? cardCountLabel(quantity)
+      : translate("decks:shelf.emptyList")
+
+function DeckOption({
+  testID,
+  name,
+  detail,
+  glyph,
+  accessibilityLabel,
+  selected = false,
+  disabled = false,
+  dimmed = false,
+  action,
+  onPress,
+}: {
+  testID: string
+  name: string
+  detail?: string
+  glyph?: ReactNode
+  accessibilityLabel?: string
+  selected?: boolean
+  disabled?: boolean
+  dimmed?: boolean
+  action?: ReactNode
+  onPress?: () => void
+}) {
+  const { themed } = useAppTheme()
+  const radio = (
+    <View style={themed([$radio, selected && $radioOn])}>
+      {selected ? <View style={themed($radioDot)} /> : null}
+    </View>
+  )
+  const copy = (accessible: boolean) => (
+    <View
+      accessible={accessible}
+      accessibilityLabel={accessible ? [accessibilityLabel ?? name, detail].join(", ") : undefined}
+      style={$optionCopy}
+    >
+      <View style={$optionName}>
+        <Text size="sm" weight="medium" numberOfLines={1} style={$shrink} text={name} />
+        {glyph}
+      </View>
+      {detail ? <Text size="xxs" tone="dim" numberOfLines={2} text={detail} /> : null}
+    </View>
+  )
+  if (!onPress)
+    return (
+      <View testID={testID} style={[themed($option), dimmed && $dimmed]}>
+        {radio}
+        {copy(true)}
+        {action}
+      </View>
+    )
+  return (
+    <TouchableOpacity
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? name}
+      // why: react-native-web ignores accessibilityState, and only button roles keep Space activation.
+      {...{ "aria-pressed": selected }}
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
+      activeOpacity={0.75}
+      style={[themed($option), disabled && $dimmed]}
+      onPress={onPress}
+    >
+      {radio}
+      {copy(false)}
+    </TouchableOpacity>
+  )
+}
 
 export function LobbySeatList({
   seats,
   openSeats,
   totalSeats,
   deckState,
+  deviceDecks,
   versionLabel,
   selectingDeckSeats,
   deckRequired,
@@ -54,11 +155,13 @@ export function LobbySeatList({
   onReport,
   onEditAppearance,
   onManageDecks,
+  onAddDeck,
 }: {
   seats: LobbySeat[]
   openSeats: number
   totalSeats?: number
   deckState?: LobbyDeckState
+  deviceDecks?: LobbyDeviceDecks
   versionLabel: (
     version: { versionNumber: number; name?: string },
     latestVersionNumber: number,
@@ -70,6 +173,7 @@ export function LobbySeatList({
   onSelectVersion?: (seat: number, deckVersionId?: string) => void
   onReport?: (seat: LobbySeat) => void
   onManageDecks?: () => void
+  onAddDeck?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
   const { themed, theme } = useAppTheme()
@@ -108,13 +212,25 @@ export function LobbySeatList({
             </View>
           )
         const decks = deckState?.status === "ready" ? deckState.value : undefined
+        const fitsLobby = (deck: { game?: string; format?: string }) =>
+          (!system || (deck.game ?? DEFAULT_DECK_GAME) === system) &&
+          (!format || deck.format === format)
         const usableDecks =
-          decks?.filter(
-            (deck) =>
-              deck.versions.length > 0 &&
-              (!system || (deck.game ?? DEFAULT_DECK_GAME) === system) &&
-              (!format || deck.format === format),
-          ) ?? []
+          decks?.filter((deck) => deck.versions.length > 0 && fitsLobby(deck)) ?? []
+        // why: a device deck whose sync already landed is listed once, as the account deck.
+        const syncedKeys = new Set(decks?.map((deck) => deck.deckKey))
+        const usableDeviceDecks = decks
+          ? (deviceDecks?.decks.filter(
+              (deck) => fitsLobby(deck) && !syncedKeys.has(deck.deckKey),
+            ) ?? [])
+          : []
+        const noDecks = usableDecks.length === 0 && usableDeviceDecks.length === 0
+        const hasCards = (deck: { cardQuantity?: number }) => deck.cardQuantity !== 0
+        const choosable =
+          usableDecks.some(hasCards) ||
+          usableDeviceDecks.some((deck) => hasCards(deck) && !deck.syncBlocked)
+        // why: the nearby lobby has no Add deck route yet, so its seats fall back to the Decks list.
+        const addDeck = onAddDeck ?? onManageDecks
         const chosenDeck = usableDecks.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
@@ -127,16 +243,25 @@ export function LobbySeatList({
         const deckReady = Boolean(seat.deckVersionId)
         const ready = !seat.away && (!deckRequired || deckReady)
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
+        // why: a device sync that lands later would replace any deck picked while it ran.
+        const choicesLocked = selectingDeck || deviceDecks?.syncingLocalId !== undefined
         const showManageDecks = Boolean(
           seat.controlledByMe && onManageDecks && system !== NO_PLAY_SYSTEM,
         )
-        const onlyAddDeckAction =
+        const offerNewDeck = Boolean(
           deckState?.status === "ready" &&
-          system !== NO_PLAY_SYSTEM &&
-          usableDecks.length === 0 &&
-          showManageDecks &&
-          (deckRequired || !seat.deckVersionId) &&
-          !selectingDeck
+          !choosable &&
+          seat.controlledByMe &&
+          addDeck &&
+          system !== NO_PLAY_SYSTEM,
+        )
+        const newDeckAction = offerNewDeck ? (
+          <TextAction
+            testID={`new-deck-seat-${seat.seat}`}
+            tx="connected:seats.newDeck"
+            onPress={addDeck}
+          />
+        ) : null
         return (
           <View key={seat.playerId ?? `seat-${seat.seat}`} style={themed($seat)}>
             <View style={themed($seatRow)}>
@@ -207,14 +332,10 @@ export function LobbySeatList({
                   }
                 />
               </View>
-              {showManageDecks ? (
+              {showManageDecks && !(noDecks && offerNewDeck) ? (
                 <Button
                   testID={`manage-seat-${seat.seat}-decks`}
-                  tx={
-                    usableDecks.length === 0
-                      ? "connected:seats.addDeck"
-                      : "connected:seats.manageDecks"
-                  }
+                  tx="connected:seats.manageDecks"
                   style={themed($rowAction)}
                   textStyle={themed($rowActionText)}
                   onPress={onManageDecks}
@@ -233,7 +354,7 @@ export function LobbySeatList({
                 />
               ) : null}
             </View>
-            {deckState && onSelectVersion && seat.controlledByMe && !onlyAddDeckAction ? (
+            {deckState && onSelectVersion && seat.controlledByMe ? (
               <View style={themed($deckChoices)}>
                 {system === NO_PLAY_SYSTEM ? (
                   <Text size="xxs" style={themed($seatPending)} tx="connected:seats.decksNotUsed" />
@@ -274,71 +395,139 @@ export function LobbySeatList({
                       onPress={deckState.retry}
                     />
                   </View>
-                ) : usableDecks.length === 0 ? (
-                  onManageDecks ? null : (
-                    <View testID={`seat-${seat.seat}-no-decks`} style={themed($deckMessage)}>
+                ) : noDecks ? (
+                  <View testID={`seat-${seat.seat}-no-decks`} style={themed($deckMessage)}>
+                    {newDeckAction ?? (
                       <Text
                         size="xxs"
-                        style={themed($seatPending)}
+                        tone="dim"
                         tx={
                           deckRequired
                             ? "connected:seats.addDeckToJoin"
                             : "connected:seats.noDecksYet"
                         }
                       />
-                    </View>
-                  )
+                    )}
+                  </View>
                 ) : (
-                  <>
-                    <FilterChips
-                      testID={`seat-${seat.seat}-deck`}
-                      accessibilityLabel={translate("connected:seats.deck")}
-                      chips={[
-                        ...(deckRequired
-                          ? []
-                          : [
-                              {
-                                id: NO_DECK_ID,
-                                label: translate("connected:seats.noDeck"),
-                                disabled: selectingDeck,
-                              },
-                            ]),
-                        ...usableDecks.map((deck) => ({
-                          id: deck._id,
-                          label: deck.name,
-                          disabled: selectingDeck,
-                        })),
-                      ]}
-                      selectedId={chosenDeck?._id ?? NO_DECK_ID}
-                      onSelect={(deckId) => {
-                        if (deckId === NO_DECK_ID) {
-                          onSelectVersion(seat.seat)
-                          return
+                  <View
+                    testID={`seat-${seat.seat}-deck`}
+                    accessibilityLabel={translate("connected:seats.deck")}
+                  >
+                    {deckRequired ? null : (
+                      <DeckOption
+                        testID={`seat-${seat.seat}-deck-${NO_DECK_ID}`}
+                        name={translate("connected:seats.noDeck")}
+                        selected={!chosenDeck}
+                        disabled={choicesLocked}
+                        onPress={() => onSelectVersion(seat.seat)}
+                      />
+                    )}
+                    {usableDecks.length > 0 ? (
+                      <Text
+                        size="xxs"
+                        weight="medium"
+                        tone="dim"
+                        style={themed($section)}
+                        tx="connected:seats.account"
+                      />
+                    ) : null}
+                    {usableDecks.map((deck) => (
+                      <DeckOption
+                        key={deck._id}
+                        testID={`seat-${seat.seat}-deck-${deck._id}`}
+                        name={deck.name}
+                        detail={cardsLabel(deck.cardQuantity)}
+                        glyph={<CloudGlyph />}
+                        accessibilityLabel={translate("connected:seats.accountDeckLabel", {
+                          name: deck.name,
+                        })}
+                        selected={chosenDeck?._id === deck._id}
+                        disabled={choicesLocked}
+                        dimmed={!hasCards(deck)}
+                        onPress={
+                          hasCards(deck)
+                            ? () => {
+                                const version = deck.versions[deck.versions.length - 1]
+                                if (version) onSelectVersion(seat.seat, version._id)
+                              }
+                            : undefined
                         }
-                        const deck = usableDecks.find((candidate) => candidate._id === deckId)
-                        const version = deck?.versions[deck.versions.length - 1]
-                        if (version) onSelectVersion(seat.seat, version._id)
-                      }}
-                    />
-                    {chosenDeck && chosenDeck.versions.length > 1 ? (
+                      />
+                    ))}
+                    {chosenDeck && hasCards(chosenDeck) && chosenDeck.versions.length > 1 ? (
                       <FilterChips
                         testID={`seat-${seat.seat}-version`}
                         accessibilityLabel={translate("connected:seats.deckVersion")}
                         chips={chosenDeck.versions.map((version) => ({
                           id: version._id,
                           label: versionLabel(version, latestVersionNumber),
-                          disabled: selectingDeck,
+                          disabled: choicesLocked,
                         }))}
                         selectedId={seat.deckVersionId ?? ""}
                         onSelect={(versionId) => onSelectVersion(seat.seat, versionId)}
                       />
                     ) : null}
-                  </>
+                    {usableDeviceDecks.length > 0 ? (
+                      <Text
+                        size="xxs"
+                        weight="medium"
+                        tone="dim"
+                        style={themed($section)}
+                        tx="connected:seats.onDevice"
+                      />
+                    ) : null}
+                    {usableDeviceDecks.map((deck) => {
+                      const syncing = deviceDecks?.syncingLocalId === deck.localId
+                      const freeSlot = deck.syncBlocked === "accountFull" && onManageDecks
+                      return (
+                        <DeckOption
+                          key={deck.localId}
+                          testID={`seat-${seat.seat}-device-deck-${deck.localId}`}
+                          name={deck.name}
+                          detail={
+                            deck.syncBlocked === "offline"
+                              ? translate("connected:seats.reconnectToSync")
+                              : deck.syncBlocked === "accountFull"
+                                ? translate("connected:seats.accountFull")
+                                : (deck.error ?? cardsLabel(deck.cardQuantity))
+                          }
+                          glyph={<DeviceGlyph />}
+                          accessibilityLabel={translate("decks:stats.onDeviceLabel", {
+                            name: deck.name,
+                          })}
+                          dimmed={!hasCards(deck)}
+                          action={
+                            !hasCards(deck) ? undefined : freeSlot ? (
+                              <TextAction
+                                testID={`seat-${seat.seat}-free-slot-${deck.localId}`}
+                                tx="connected:seats.freeSlot"
+                                onPress={onManageDecks}
+                              />
+                            ) : (
+                              <TextAction
+                                testID={`seat-${seat.seat}-sync-and-use-${deck.localId}`}
+                                tx={
+                                  syncing ? "connected:seats.syncing" : "connected:seats.syncAndUse"
+                                }
+                                accessibilityLabel={translate("connected:seats.syncAndUseLabel", {
+                                  name: deck.name,
+                                })}
+                                disabled={Boolean(deck.syncBlocked) || choicesLocked}
+                                onPress={() => deviceDecks?.onSyncAndUse(seat.seat, deck.localId)}
+                              />
+                            )
+                          }
+                        />
+                      )
+                    })}
+                    {newDeckAction}
+                  </View>
                 )}
-                {!deckRequired && seat.deckVersionId && usableDecks.length === 0 ? (
+                {!deckRequired && seat.deckVersionId && noDecks ? (
                   <Button
                     tx="connected:seats.noDeck"
-                    disabled={selectingDeck}
+                    disabled={choicesLocked}
                     onPress={() => onSelectVersion(seat.seat)}
                   />
                 ) : null}
@@ -362,6 +551,37 @@ export function LobbySeatList({
 }
 
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $section: ThemedStyle<TextStyle> = ({ spacing }) => ({
+  paddingTop: spacing.xs,
+  textTransform: "uppercase",
+  letterSpacing: 0.8,
+})
+const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 48,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+})
+const $radio: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
+  width: 20,
+  height: 20,
+  borderRadius: radius.full,
+  borderWidth: 1.6,
+  borderColor: colors.border,
+  alignItems: "center",
+  justifyContent: "center",
+})
+const $radioOn: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
+const $radioDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
+  width: 10,
+  height: 10,
+  borderRadius: radius.full,
+  backgroundColor: colors.tint,
+})
+const $optionCopy: ViewStyle = { flex: 1, minWidth: 0 }
+const $optionName: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
+const $shrink: TextStyle = { flexShrink: 1 }
+const $dimmed: ViewStyle = { opacity: 0.5 }
 const $deckChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 72,
   gap: spacing.xxs,

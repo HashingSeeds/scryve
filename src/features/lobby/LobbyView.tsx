@@ -29,6 +29,7 @@ import { InviteCard } from "@/features/connected/InviteCard"
 import {
   LobbySeatList,
   type LobbyDeckState,
+  type LobbyDeviceDecks,
   type LobbySeat,
 } from "@/features/connected/LobbySeatList"
 import { deckVersionLabel } from "@/features/decks/deckCopy"
@@ -78,10 +79,11 @@ export interface LobbyViewProps {
   onChangeDeckRequired?: (deckRequired: boolean) => void
   invite?: { qrPayload: string | null; manualCode?: string; onShare?: () => void }
   decks?: {
-    source: (render: (state: LobbyDeckState) => ReactNode) => ReactNode
+    source: (render: (state: LobbyDeckState, device?: LobbyDeviceDecks) => ReactNode) => ReactNode
     selectingSeats: ReadonlySet<number>
     onSelect: (seat: number, deckVersionId?: string) => void
     onManage?: () => void
+    onAddDeck?: () => void
   }
   appearance?: {
     saving: boolean
@@ -186,16 +188,18 @@ export function LobbyView({
     if (leaveAction && (await onExit(leaveAction))) setLeaveAction(undefined)
   }
 
-  function seatList(deckState?: LobbyDeckState) {
+  function seatList(deckState?: LobbyDeckState, deviceDecks?: LobbyDeviceDecks) {
     return (
       <LobbySeatList
         seats={lobby.players}
         openSeats={openSeats}
         totalSeats={lobby.playerCount}
         deckState={deckState}
+        deviceDecks={deviceDecks}
         system={lobby.system}
         format={lobby.format}
         onManageDecks={decks?.onManage}
+        onAddDeck={decks?.onAddDeck}
         versionLabel={deckVersionLabel}
         selectingDeckSeats={decks?.selectingSeats}
         deckRequired={Boolean(lobby.deckRequired)}
