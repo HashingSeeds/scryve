@@ -127,6 +127,16 @@ jest.mock("@/features/decks/guestDeck", () => {
 })
 const mockSaveDeck = jest.mocked(saveGuestDeck)
 
+// why: these tests render outside a navigator; this records what a swipe back or Android Back would run.
+type PreventRemove = typeof import("expo-router/react-navigation").usePreventRemove
+const mockPreventRemove = jest.fn<ReturnType<PreventRemove>, Parameters<PreventRemove>>(
+  () => () => {},
+)
+jest.mock("expo-router/react-navigation", () => ({
+  ...jest.requireActual("expo-router/react-navigation"),
+  usePreventRemove: (...args: Parameters<PreventRemove>) => mockPreventRemove(...args),
+}))
+
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
 jest.mock("@/features/billing/RevenueCatContext", () => ({
@@ -1817,6 +1827,31 @@ describe("AddDeckScreen", () => {
       cardId: "14558127",
       deviceId: expect.any(String),
     })
+  })
+
+  it("returns from a Top Deck preview to the search on swipe back but lets a save leave", async () => {
+    mockSearchTopDecks.mockResolvedValueOnce([
+      { _id: "catalog-mtg", game: "mtg", name: "Sample Modern deck", kind: "tournament" },
+    ])
+    const view = renderAddDeck()
+
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Sample Modern deck")).toBeTruthy())
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function))
+    fireEvent.press(view.getByText("Sample Modern deck"))
+    expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
+
+    const [preventing, removePrevented] = mockPreventRemove.mock.lastCall!
+    expect(preventing).toBe(true)
+    const repeat = jest.fn()
+    act(() => removePrevented!({ data: { action: { type: "REPLACE" } }, repeat }))
+    expect(repeat).toHaveBeenCalled()
+    expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
+
+    act(() => removePrevented!({ data: { action: { type: "POP" } }, repeat: jest.fn() }))
+
+    expect(view.getByText("Sample Modern deck")).toBeTruthy()
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function))
   })
 
   it("resolves a Pokemon Top Deck card from its provider reference", async () => {
