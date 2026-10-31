@@ -127,6 +127,14 @@ jest.mock("@/features/decks/guestDeck", () => {
 })
 const mockSaveDeck = jest.mocked(saveGuestDeck)
 
+// why: these tests render outside a navigator; this records what a swipe back or Android Back would run.
+const mockPreventRemove = jest.fn<void, [boolean, () => void]>()
+jest.mock("expo-router/react-navigation", () => ({
+  ...jest.requireActual("expo-router/react-navigation"),
+  usePreventRemove: (prevent: boolean, callback: () => void) =>
+    mockPreventRemove(prevent, callback),
+}))
+
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
 jest.mock("@/features/billing/RevenueCatContext", () => ({
@@ -1817,6 +1825,26 @@ describe("AddDeckScreen", () => {
       cardId: "14558127",
       deviceId: expect.any(String),
     })
+  })
+
+  it("returns from a Top Deck preview to the search on swipe back", async () => {
+    mockSearchTopDecks.mockResolvedValueOnce([
+      { _id: "catalog-mtg", game: "mtg", name: "Sample Modern deck", kind: "tournament" },
+    ])
+    const view = renderAddDeck()
+
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Sample Modern deck")).toBeTruthy())
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function))
+    fireEvent.press(view.getByText("Sample Modern deck"))
+    expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
+
+    const [preventing, swipeBack] = mockPreventRemove.mock.lastCall!
+    expect(preventing).toBe(true)
+    act(() => swipeBack())
+
+    expect(view.getByText("Sample Modern deck")).toBeTruthy()
+    expect(mockPreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function))
   })
 
   it("resolves a Pokemon Top Deck card from its provider reference", async () => {
