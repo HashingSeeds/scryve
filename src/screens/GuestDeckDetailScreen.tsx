@@ -566,7 +566,9 @@ export function GuestDeckDetailScreen({
         }}
         onNew={startNewVersion}
         onCreate={createVersion}
-        onManage={syncing || syncingElsewhere ? undefined : () => setSheet("renameVersion")}
+        onManage={
+          dirty || syncing || syncingElsewhere ? undefined : () => setSheet("renameVersion")
+        }
         onRename={renameVersion}
         onDelete={versions.length > 1 ? () => setSheet("deleteVersion") : undefined}
         onConfirmDelete={deleteVersion}

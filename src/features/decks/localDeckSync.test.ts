@@ -612,6 +612,42 @@ describe("versions", () => {
     expect(mockSetBringing).toHaveBeenCalledWith({ deckId, versionId: "account-1" })
   })
 
+  test("a failed pick keeps the device copy, and a retry applies it before dropping the copy", async () => {
+    const local = versioned()
+    setGuestDeckBringing(local.localId, 1)
+    mockImportGuest.mockResolvedValueOnce({
+      status: "imported",
+      deckId,
+      localUpdatedAt: local.updatedAt,
+    })
+    mockQuery.mockResolvedValue({ versions: [{ _id: "account-1" }, { _id: "account-2" }] })
+    mockSetBringing.mockRejectedValueOnce(new Error("offline"))
+    await expect(renderSync().sync(local.localId)).rejects.toThrow("offline")
+    expect(loadGuestDecks()).toHaveLength(1)
+
+    mockImportGuest.mockResolvedValueOnce({
+      status: "already_imported",
+      deckId,
+      localUpdatedAt: local.updatedAt,
+    })
+    await expect(renderSync().sync(local.localId)).resolves.toEqual({ status: "synced", deckId })
+    expect(mockSetBringing).toHaveBeenLastCalledWith({ deckId, versionId: "account-1" })
+    expect(loadGuestDecks()).toEqual([])
+  })
+
+  test("adding as a new deck carries the pick", async () => {
+    const local = versioned()
+    setGuestDeckBringing(local.localId, 1)
+    mockImportGuest
+      .mockResolvedValueOnce({ status: "other_account" })
+      .mockResolvedValueOnce({ status: "imported", deckId, localUpdatedAt: local.updatedAt })
+    mockQuery.mockResolvedValue({ versions: [{ _id: "account-1" }, { _id: "account-2" }] })
+    const result = await renderSync().sync(local.localId)
+    if (result.status !== "other_account") throw new Error(`Expected other_account`)
+    await expect(result.addAsNew()).resolves.toEqual({ status: "synced", deckId })
+    expect(mockSetBringing).toHaveBeenCalledWith({ deckId, versionId: "account-1" })
+  })
+
   test("move keeps every version and its pick, and checks each one", async () => {
     const older = { _id: "version-1", versionNumber: 1, name: "Current", updatedAt: 10 }
     const latest = {

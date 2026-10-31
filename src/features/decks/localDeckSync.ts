@@ -269,6 +269,8 @@ export function useLocalDeckSync(ownerId: string | undefined) {
                         premium: imported.capacity.premium,
                       }
                     if (imported.status === "other_account") return { status: "conflict" }
+                    // why: a retry would add a second copy, so a failed pick leaves the new deck bringing its latest version.
+                    await carryBringing(imported.deckId, local).catch(() => undefined)
                     return { status: "synced", deckId: imported.deckId }
                   }),
               }
@@ -278,11 +280,10 @@ export function useLocalDeckSync(ownerId: string | undefined) {
               if (sameAsAccount(local, await accountCopy(convex, response.deckId)))
                 receipt = local.updatedAt
             }
-            if (acknowledgeGuestDeckImport(localId, receipt) || !loadGuestDeck(localId)) {
-              if (response.status === "imported")
-                await carryBringing(response.deckId, local).catch(() => undefined)
+            // why: the device copy is the only record of the pick, so it is applied before the copy is dropped and a failure leaves the copy to retry.
+            if (receipt === local.updatedAt) await carryBringing(response.deckId, local)
+            if (acknowledgeGuestDeckImport(localId, receipt) || !loadGuestDeck(localId))
               return { status: "synced", deckId: response.deckId }
-            }
             return { status: "kept_newer_edits" }
           } catch (cause) {
             const code = convexErrorCode(cause)
