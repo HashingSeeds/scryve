@@ -12,8 +12,9 @@ export async function deckStartingValue(
   if (!section?.startingValueFacet) return undefined
   const identity = await ctx.db
     .query("deckCards")
-    .withIndex("by_deck_version", (query) => query.eq("deckVersionId", deckVersionId))
-    .filter((query) => query.eq(query.field("section"), section.id))
+    .withIndex("by_deck_version_and_section", (query) =>
+      query.eq("deckVersionId", deckVersionId).eq("section", section.id),
+    )
     .first()
   if (!identity?.cardId || !identity.identityNamespace) return undefined
   const { cardId, identityNamespace } = identity

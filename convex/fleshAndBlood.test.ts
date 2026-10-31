@@ -112,7 +112,7 @@ describe("Flesh and Blood", () => {
     const joiner = await signedIn(t, "fab-joiner")
     const imported = await host.action(api.deckImports.resolvePasted, {
       game: "fab",
-      list: "Hero: Aurora, Shooting Star\n3x Snatch (red)",
+      list: "3x Snatch (red)\nHero: Aurora, Shooting Star",
     })
     const deckId = await host.mutation(api.decks.importResolved, {
       name: "Aurora",

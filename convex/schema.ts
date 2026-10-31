@@ -433,10 +433,7 @@ export default defineSchema({
     board: v.optional(v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))),
   })
     .index("by_deck_version", ["deckVersionId"])
-    .index("by_deck_version_and_section", {
-      fields: ["deckVersionId", "section"],
-      staged: true,
-    }),
+    .index("by_deck_version_and_section", ["deckVersionId", "section"]),
 
   gameCards: defineTable({
     game: v.string(),
