@@ -101,3 +101,4 @@ export function describeUsernameMatches(username: string) {
 
 export const HIDDEN_DECK_NAME = "Deck"
 export const HIDDEN_PLAYER_NAME = "Player"
+export const HIDDEN_COMMANDER_NAME = "Commander"

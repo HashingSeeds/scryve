@@ -173,4 +173,26 @@ describe("CardFocusDialog", () => {
     fireEvent.press(view.getByTestId("set-commander"))
     expect(onSetCommander).toHaveBeenCalledWith("U")
   })
+
+  it("tells the owner other players see a blocked commander name as Commander", () => {
+    const commander = { ...details, commanderEligibility: "eligible", commanderLegality: "legal" }
+    const blocked = renderDialog({
+      card: { ...card, name: "Hitler" },
+      details: commander,
+      onSetCommander: jest.fn(),
+    })
+    expect(blocked.getByTestId("commander-name-warning")).toHaveTextContent(
+      'Other players will see "Commander" instead.',
+    )
+    blocked.unmount()
+    const ineligible = renderDialog({
+      card: { ...card, name: "Hitler" },
+      details: { ...commander, commanderEligibility: "ineligible" },
+      onSetCommander: jest.fn(),
+    })
+    expect(ineligible.queryByTestId("commander-name-warning")).toBeNull()
+    ineligible.unmount()
+    const fine = renderDialog({ details: commander, onSetCommander: jest.fn() })
+    expect(fine.queryByTestId("commander-name-warning")).toBeNull()
+  })
 })

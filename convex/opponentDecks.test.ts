@@ -111,7 +111,7 @@ describe("local games", () => {
     expect(unlabeled.opponents).toEqual([{ displayName: "Bob", outcome: "win" }])
   })
 
-  it("store each commander under its catalog name, and drop an unknown card's gated name", async () => {
+  it("store each commander under its catalog name, and keep an unknown card's own name", async () => {
     const t = makeConvexTest()
     const actor = await signedIn(t, "host")
     await t.run((ctx) =>
@@ -139,7 +139,7 @@ describe("local games", () => {
     const [result] = await resultsOf(t, actor.userId)
     expect(result.opponents?.map((opponent) => opponent.deck)).toEqual([
       { identity: [{ cardId: "atraxa", name: "Atraxa, Praetors' Voice" }] },
-      { name: "Bob's deck" },
+      { name: "Bob's deck", identity: [{ cardId: "made-up", name: "Nazi Lord" }] },
     ])
   })
 
@@ -207,6 +207,33 @@ describe("nearby games", () => {
     expect((await resultsOf(t, guest.userId))[0].opponents).toEqual([
       { displayName: "Me", userId: host.userId, outcome: "loss" },
     ])
+  })
+})
+
+describe("game summaries", () => {
+  it("show a commander name the gate blocks only to its owner", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host")
+    const guest = await signedIn(t, "guest")
+    const { versionId } = await commanderDeck(t, guest, "Partners", [
+      { cardId: "kenrith", name: "Kenrith, the Returned King" },
+      { cardId: "slur", name: "Hitler" },
+    ])
+    const publicId = "lan_0123456789abcdef0123456789abcdef-3"
+    const token = "guest-seat-token"
+    await host.mutation(
+      api.games.publishFinishedLocalGame,
+      localGame([me, { ...them, seatPassHash: await hashSeatPassToken(token) }], publicId),
+    )
+    await guest.mutation(api.games.claimNearbySeat, { publicId, token, deckVersionId: versionId })
+    const commandersFor = async (viewer: typeof host) =>
+      (await viewer.query(api.games.connectedSummary, { publicId }))?.players.find(
+        (player) => player.userId === guest.userId,
+      )?.deckLabel?.identity
+    const kenrith = { cardId: "kenrith", name: "Kenrith, the Returned King" }
+
+    expect(await commandersFor(guest)).toEqual([kenrith, { cardId: "slur", name: "Hitler" }])
+    expect(await commandersFor(host)).toEqual([{ cardId: "hidden", name: "Commander" }, kenrith])
   })
 })
 

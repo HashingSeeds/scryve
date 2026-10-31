@@ -1,7 +1,11 @@
 import { translate } from "@/i18n/translate"
 
 import { versionLabel } from "../../../convex/lib/deckVersions"
-import { HIDDEN_DECK_NAME, nameFailsGate } from "../../../convex/lib/nameFilter"
+import {
+  HIDDEN_COMMANDER_NAME,
+  HIDDEN_DECK_NAME,
+  nameFailsGate,
+} from "../../../convex/lib/nameFilter"
 
 export const MIN_RATED_GAMES = 10
 
@@ -45,6 +49,12 @@ export function versionTitle(
 export function deckNameWarning(name: string) {
   return nameFailsGate(name)
     ? translate("decks:hiddenNameWarning", { hiddenName: HIDDEN_DECK_NAME })
+    : undefined
+}
+
+export function commanderNameWarning(name: string) {
+  return nameFailsGate(name)
+    ? translate("decks:hiddenNameWarning", { hiddenName: HIDDEN_COMMANDER_NAME })
     : undefined
 }
 

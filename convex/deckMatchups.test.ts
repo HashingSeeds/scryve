@@ -165,12 +165,13 @@ describe("deckStats.matchups", () => {
     const matchups = await actor.query(api.deckStats.matchups, { deckKey: "burn" })
 
     expect(JSON.stringify(matchups)).not.toMatch(/hitler|nazi|pedo|kkk/i)
-    expect(matchups.byDeck.map((row) => [row.key, row.name, row.games])).toEqual([
-      ["hidden", "Deck", 2],
-      ["deck:bobs", "Deck", 1],
+    const hidden = [{ cardId: "hidden", name: "Commander" }]
+    expect(matchups.byDeck.map((row) => [row.key, row.name, row.identity, row.games])).toEqual([
+      ["hidden", "Deck", null, 2],
+      ["deck:bobs", "Deck", null, 1],
+      ["identity:hidden", null, hidden, 1],
     ])
-    expect(matchups.byDeck.every((row) => row.identity === null)).toBe(true)
-    expect(matchups.byIdentity).toEqual([])
+    expect(matchups.byIdentity.map((row) => [row.key, row.identity])).toEqual([["hidden", hidden]])
     expect(matchups.byPlayer.map((row) => [row.key, row.displayName, row.games])).toEqual([
       ["hidden", "Player", 2],
       ["name:bob", "Bob", 1],

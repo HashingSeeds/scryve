@@ -2,7 +2,7 @@ import { ConvexError, v, type Infer } from "convex/values"
 
 import { assertDeckFingerprint, assertDeckKey } from "./deckKeys"
 import { integration } from "./integrations"
-import { nameFailsGate } from "./nameFilter"
+import { HIDDEN_COMMANDER_NAME, nameFailsGate } from "./nameFilter"
 import { assertDeckName } from "./policy"
 import { identitySection } from "./systems"
 import type { Doc, Id } from "../_generated/dataModel"
@@ -72,7 +72,7 @@ async function catalogIdentity(
   ctx: QueryCtx,
   game: string | undefined,
   identity: DeckIdentity,
-): Promise<DeckIdentity | undefined> {
+): Promise<DeckIdentity> {
   const namespace = game ? integration(game)?.identityNamespace : undefined
   const cards = await Promise.all(
     identity.map(async (card) => {
@@ -88,11 +88,19 @@ async function catalogIdentity(
       return known ? { ...card, name: known.name } : card
     }),
   )
-  return gatedIdentity(cards)
+  return cards
 }
 
-export function gatedIdentity(identity: DeckIdentity | undefined) {
-  return identity?.every(({ name }) => !nameFailsGate(name)) ? identity : undefined
+const HIDDEN_CARD_ID = "hidden"
+
+export function publicIdentity(identity: DeckIdentity): DeckIdentity {
+  // why: some games derive card ids from names (Riftbound), so a hidden card loses its id too.
+  const cards = identity.map((card) =>
+    nameFailsGate(card.name) ? { cardId: HIDDEN_CARD_ID, name: HIDDEN_COMMANDER_NAME } : card,
+  )
+  return cards
+    .filter((card, index) => cards.findIndex(({ cardId }) => cardId === card.cardId) === index)
+    .sort((left, right) => left.cardId.localeCompare(right.cardId))
 }
 
 export async function assertDeckLabel(

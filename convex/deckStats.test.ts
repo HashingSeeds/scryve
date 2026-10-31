@@ -319,7 +319,7 @@ it("hides an opponent's commanders behind a deck name that fails the name filter
   ])
 })
 
-it("drops a stored commander name that fails the name filter", async () => {
+it("shows a commander name that fails the name filter as Commander", async () => {
   const t = makeConvexTest()
   const actor = await signedIn(t, "owner")
   const args = game("local-game-000000011", { win: true, finishedAt: T })
@@ -330,7 +330,10 @@ it("drops a stored commander name that fails the name filter", async () => {
     await ctx.db.patch(summary._id, {
       players: summary.players.map((player, index) =>
         index === 1
-          ? { ...player, deckLabel: { identity: [{ cardId: "atraxa", name: "Hitler" }] } }
+          ? {
+              ...player,
+              deckLabel: { identity: [...krenko, { cardId: "slur", name: "Hitler" }] },
+            }
           : player,
       ),
     })
@@ -341,7 +344,9 @@ it("drops a stored commander name that fails the name filter", async () => {
     paginationOpts: { numItems: 10, cursor: null },
   })
 
-  expect(page.page[0].opponents.map((opponent) => opponent.identity)).toEqual([undefined])
+  expect(page.page[0].opponents.map((opponent) => opponent.identity)).toEqual([
+    [{ cardId: "hidden", name: "Commander" }, ...krenko],
+  ])
 })
 
 it("counts a connected match through its games only", async () => {

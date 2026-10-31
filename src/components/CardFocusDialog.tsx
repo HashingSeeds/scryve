@@ -15,6 +15,7 @@ import { Text } from "@/components/Text"
 import { readCardFaces } from "@/features/decks/cardFaces"
 import { isBackground } from "@/features/decks/commanderSelection"
 import type { CommanderColor } from "@/features/decks/deckCards"
+import { commanderNameWarning } from "@/features/decks/deckCopy"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -136,6 +137,8 @@ export function CardFocusDialog({
         : details.commanderLegality !== "legal"
           ? translate("decks:cardFocus.notLegal")
           : undefined
+  const nameWarning =
+    onSetCommander && !commanderProblem ? commanderNameWarning(card.name) : undefined
   const printing = details ? printingLine(details) : ""
   const imageCredit = systemDefinition(card.game)?.integration.rights.imageCredit
   const colorIdentity = cardColorIdentityLabel(details, card.name)
@@ -253,6 +256,9 @@ export function CardFocusDialog({
             />
           ) : null}
           {commanderProblem ? <Text size="xs" text={commanderProblem} /> : null}
+          {nameWarning ? (
+            <Text size="xs" tone="dim" testID="commander-name-warning" text={nameWarning} />
+          ) : null}
           <Button
             testID="set-commander"
             tx="decks:cardFocus.setCommander"
