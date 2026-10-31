@@ -54,7 +54,10 @@ const mockPreviewPrecon = jest.fn(async () => ({
     },
   ],
 }))
-const mockConvexClient = { action: jest.fn() }
+const mockConvexClient = {
+  action: jest.fn(),
+  query: jest.fn(async (_reference: unknown, _args: unknown) => []),
+}
 const mockConnection = { isWebSocketConnected: true }
 const mockConvexState: { client: typeof mockConvexClient | undefined } = { client: undefined }
 const mockResolvePasted = jest.fn()
@@ -1548,6 +1551,33 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("import-build")).toBeTruthy()
     expect(view.getByTestId("deck-name-title")).toHaveTextContent("Explorers of the Deep")
     expect(view.getByTestId("precon-loading-progress")).toBeTruthy()
+  })
+
+  it("asks for card details only after the precon hydrates", async () => {
+    let hydrate = () => {}
+    const resolvePrecon = mockResolvePrecon.getMockImplementation()!
+    mockResolvePrecon.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          hydrate = () => resolve(resolvePrecon())
+        }),
+    )
+    mockConvexState.client = mockConvexClient
+    const view = renderAddDeck()
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
+
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+    await waitFor(() => expect(view.getByText("Commander · 1 card · LCC")).toBeTruthy())
+    expect(mockConvexClient.query).not.toHaveBeenCalled()
+
+    await act(async () => hydrate())
+    await waitFor(() => expect(mockConvexClient.query).toHaveBeenCalledTimes(1))
+    expect(mockConvexClient.query.mock.calls[0]?.[1]).toEqual({
+      game: "mtg",
+      items: [expect.objectContaining({ scryfallId: "22222222-2222-2222-2222-222222222222" })],
+    })
   })
 
   it("keeps the deck skeleton until Scryfall hydration finishes", async () => {

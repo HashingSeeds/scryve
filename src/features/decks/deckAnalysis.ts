@@ -170,6 +170,7 @@ export type DeckAnalysis = {
   incomplete?: { count: number; size: number }
   needsCommander: boolean
   missing: number
+  detailed: number
   curve: number[]
   averageManaValue: number
   lands: number
@@ -282,6 +283,7 @@ export function analyzeDeck({
       (formatDefinition("mtg", format)?.sections.some((section) => section.id === "commander") ??
         false),
     missing,
+    detailed: known.reduce((total, entry) => total + entry.quantity, 0),
     curve,
     averageManaValue,
     lands,

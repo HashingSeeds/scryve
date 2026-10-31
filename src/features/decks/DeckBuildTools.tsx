@@ -28,13 +28,14 @@ export function DeckBuildTools({
   onAnalysis: () => void
 }) {
   const { themed, theme } = useAppTheme()
-  const tallest = Math.max(1, ...(analysis?.curve ?? []))
+  const stats = analysis && analysis.detailed >= analysis.missing ? analysis : undefined
+  const tallest = Math.max(1, ...(stats?.curve ?? []))
   return (
     <View style={themed($tools)}>
       {analysis || analysisPending ? (
         <View style={themed($summary)} testID="deck-curve-strip">
           <View style={themed($curve)}>
-            {(analysis?.curve ?? PENDING_CURVE).map((count, value) => (
+            {(stats?.curve ?? PENDING_CURVE).map((count, value) => (
               <View
                 key={value}
                 style={[themed($bar), { height: Math.max(2, (count / tallest) * CURVE_HEIGHT) }]}
@@ -44,10 +45,10 @@ export function DeckBuildTools({
           <View style={themed($stats)}>
             <Stat
               label={translate("decks:build.average")}
-              value={analysis?.averageManaValue.toFixed(1)}
+              value={stats?.averageManaValue.toFixed(1)}
             />
-            <Stat label={translate("decks:analysis.lands")} value={analysis?.lands} />
-            <Stat label={translate("decks:analysis.ramp")} value={analysis?.ramp} />
+            <Stat label={translate("decks:analysis.lands")} value={stats?.lands} />
+            <Stat label={translate("decks:analysis.ramp")} value={stats?.ramp} />
           </View>
           <TextAction
             testID="open-deck-analysis"
