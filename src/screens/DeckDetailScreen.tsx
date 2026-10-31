@@ -653,7 +653,14 @@ function DeckDetailContent({
       // why: /cards adds and note edits can land while the save is in flight; they stay as changes on top of what was saved.
       pinnedVersionTarget.current = undefined
       metadataSaveStarted.current = false
-      setDraft({ ...after, base: draft.cards })
+      // why: the note write just moved the deck's revision, so the old one would read as a conflict next save.
+      const metadataRevision =
+        plan.note === "queue" && noteRevision !== undefined
+          ? noteRevision + 1
+          : plan.note === "mutation"
+            ? undefined
+            : after.metadataRevision
+      setDraft({ ...after, base: draft.cards, metadataRevision })
     }
     if (plan.immediate) {
       try {
