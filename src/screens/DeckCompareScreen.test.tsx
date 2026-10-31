@@ -52,28 +52,27 @@ beforeEach(() => {
 
 it("defaults to current versus previous with exact records and card changes", async () => {
   const view = render(screen())
-  expect(view.getByText("Current ▾")).toBeTruthy()
-  expect(within(view.getByTestId("compare-pick-right")).getByText(/▾$/)).not.toHaveTextContent(
-    "Current",
-  )
+  expect(within(view.getByTestId("compare-pick-left")).getByText("Current")).toBeTruthy()
+  expect(within(view.getByTestId("compare-pick-right")).queryByText("Current")).toBeNull()
   expect(view.getByText("4-4")).toBeTruthy()
   expect(view.getByText("8-4")).toBeTruthy()
   expect(view.getByText("50%")).toBeTruthy()
   expect(view.getAllByText("Under 10 results is a small sample.")).toHaveLength(1)
   expect(view.queryByText("too few")).toBeNull()
   expect(view.getAllByText(/Likely/)).toHaveLength(2)
-  await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
-  expect(view.getByText("−2 Land")).toBeTruthy()
+  await waitFor(() => expect(view.getByLabelText("+4 Bolt")).toBeTruthy())
+  expect(within(view.getByTestId("compare-change-1")).getByText("−2")).toBeTruthy()
+  expect(within(view.getByTestId("compare-change-1")).getByText("Land")).toBeTruthy()
   fireEvent.press(view.getByTestId("compare-pick-left"))
-  fireEvent.press(view.getByTestId("compare-option-previous"))
+  fireEvent.press(view.getByTestId("compare-pick-left-option-previous"))
   await waitFor(() => expect(view.getByText("No card changes.")).toBeTruthy())
 })
 
 it("shows a short missing contents message for untracked lists", async () => {
   const view = render(screen())
-  await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
+  await waitFor(() => expect(view.getByLabelText("+4 Bolt")).toBeTruthy())
   fireEvent.press(view.getByTestId("compare-pick-right"))
-  fireEvent.press(view.getByTestId("compare-option-untracked"))
+  fireEvent.press(view.getByTestId("compare-pick-right-option-untracked"))
   await waitFor(() =>
     expect(view.getByText("One or both lists are not on this device.")).toBeTruthy(),
   )
@@ -97,12 +96,12 @@ it("reports a device read failure without stale card changes", async () => {
   mockLookup.mockRejectedValueOnce(new Error("storage unavailable"))
   const view = render(screen())
   await waitFor(() => expect(view.getByText("Could not load lists on this device.")).toBeTruthy())
-  expect(view.queryByText("+4 Bolt")).toBeNull()
+  expect(view.queryByLabelText("+4 Bolt")).toBeNull()
 })
 
 it("captures compare once per open, including returning to a mounted screen", async () => {
   const view = render(screen())
-  await waitFor(() => expect(view.getByText("+4 Bolt")).toBeTruthy())
+  await waitFor(() => expect(view.getByLabelText("+4 Bolt")).toBeTruthy())
   view.rerender(screen())
   expect(captureAnalytics).toHaveBeenCalledTimes(1)
   expect(captureAnalytics).toHaveBeenCalledWith("stats_viewed", { surface: "compare" })

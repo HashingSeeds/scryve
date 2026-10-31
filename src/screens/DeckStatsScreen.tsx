@@ -8,6 +8,7 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { EmptyState } from "@/components/EmptyState"
 import { Header } from "@/components/Header"
+import { SectionHeader } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
@@ -29,13 +30,15 @@ import {
   $dim,
   $flex,
   $numbers,
+  $section,
   $statsRow,
+  ChevronSlot,
   DeckComparePrompt,
+  HeaderBackAction,
   listDetail,
   listLabel,
   statsDate,
   StatsRow,
-  StatsSection,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
 import { fingerprintsToRead, labelLists } from "@/features/stats/listLabels"
@@ -58,7 +61,10 @@ export function DeckStatsScreen(props: Props) {
   )
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
-      <Header title={props.deckName} leftTx="common:back" onLeftPress={props.onBack} />
+      <Header
+        title={props.deckName}
+        LeftActionComponent={<HeaderBackAction onPress={props.onBack} />}
+      />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
         fallback={({ retry }) => (
@@ -236,15 +242,16 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 ) : null}
                 {lists.length ? (
                   <>
-                    <StatsSection
-                      title={translate("decks:stats.lists")}
+                    <SectionHeader
+                      label={translate("decks:stats.lists")}
+                      style={themed($section)}
                       action={
                         lists.filter((list) => list.fingerprint !== null).length < 2 ? undefined : (
                           <TextAction
                             testID="stats-compare"
                             tx="decks:stats.compare"
                             disabled={!capacity}
-                            style={$actionTouch}
+                            style={$laneAction}
                             onPress={() =>
                               capacity?.premium
                                 ? router.push({
@@ -273,7 +280,10 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 ) : null}
                 {podRows.length ? (
                   <>
-                    <StatsSection title={translate("decks:stats.podSize")} />
+                    <SectionHeader
+                      label={translate("decks:stats.podSize")}
+                      style={themed($section)}
+                    />
                     {podRows.map(({ podSize, record: podRecord }) => (
                       <StatsRow
                         key={podSize ?? "unknown"}
@@ -298,7 +308,10 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 ) : null}
                 {turnOrderRows.length ? (
                   <>
-                    <StatsSection title={translate("decks:stats.turnOrder")} />
+                    <SectionHeader
+                      label={translate("decks:stats.turnOrder")}
+                      style={themed($section)}
+                    />
                     {turnOrderRows.map(({ wentFirst, record: turnRecord }) => {
                       const label = translate(
                         wentFirst === null
@@ -321,7 +334,10 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 ) : null}
                 {showSources ? (
                   <>
-                    <StatsSection title={translate("decks:stats.sources")} />
+                    <SectionHeader
+                      label={translate("decks:stats.sources")}
+                      style={themed($section)}
+                    />
                     {sourceRows.map(({ value, record: sourceRecord }) => (
                       <StatsRow
                         key={value}
@@ -336,15 +352,20 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
               </>
             ) : null}
             {empty ? null : (
-              <StatsSection
-                title={
+              <SectionHeader
+                style={themed($section)}
+                label={
                   filter
                     ? `${translate("decks:stats.games")} · ${filter.label}`
                     : translate("decks:stats.games")
                 }
                 action={
                   filter ? (
-                    <Button tx="decks:stats.all" onPress={() => setFilter(undefined)} />
+                    <TextAction
+                      tx="decks:stats.all"
+                      style={$laneAction}
+                      onPress={() => setFilter(undefined)}
+                    />
                   ) : undefined
                 }
               />
@@ -407,6 +428,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
               <View style={$flex}>
                 <Text
                   size="sm"
+                  weight="medium"
                   text={[
                     statsDate(item.finishedAt),
                     item.podSize === null
@@ -415,7 +437,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                   ].join(" · ")}
                 />
                 <Text
-                  size="xs"
+                  size="meta"
                   tone="dim"
                   text={
                     item.opponents.length
@@ -428,7 +450,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                   }
                 />
               </View>
-              {item.gamePublicId || item.matchPublicId ? <Text text="›" tone="dim" /> : null}
+              <ChevronSlot shown={Boolean(item.gamePublicId || item.matchPublicId)} />
             </TouchableOpacity>
           )
         }}
@@ -452,7 +474,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
 
 const $hero: ViewStyle = { paddingVertical: 24, gap: 4 }
 const $headline: TextStyle = { fontSize: 64, lineHeight: 76, fontWeight: "700" }
-const $actionTouch: ViewStyle = { minHeight: 44, justifyContent: "center", paddingLeft: 12 }
+const $laneAction: ViewStyle = { alignItems: "flex-end" }
 const $win: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
 const $loss: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
