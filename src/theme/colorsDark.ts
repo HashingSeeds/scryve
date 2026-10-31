@@ -51,6 +51,7 @@ export const colors = {
   error: palette.angry500,
   errorBackground: palette.angry100,
   surface: palette.neutral100,
+  field: palette.neutral200,
   surfaceRaised: palette.neutral300,
   overlay: palette.overlay50,
   shadow: palette.neutral100,

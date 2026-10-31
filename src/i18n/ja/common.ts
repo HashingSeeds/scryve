@@ -9,6 +9,7 @@ export default {
   delete: "削除",
   done: "完了",
   edit: "編集",
+  optional: "任意",
   remove: "外す",
   retry: "再試行",
   save: "保存",

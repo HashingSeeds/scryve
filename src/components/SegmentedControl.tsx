@@ -199,7 +199,7 @@ export function SegmentedControl({
                 selected &&
                   segmentWidth <= 0 && {
                     backgroundColor: accent,
-                    borderRadius: radius.xl - TRACK_INSET,
+                    borderRadius: radius.lg - TRACK_INSET,
                   },
               ]}
               onPress={() => tap(segment.id)}
@@ -219,22 +219,23 @@ export function SegmentedControl({
 const $track: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   flexDirection: "row",
   padding: TRACK_INSET,
-  borderRadius: radius.xl,
+  borderRadius: radius.lg,
   borderWidth: TRACK_BORDER_WIDTH,
   borderColor: colors.border,
-  backgroundColor: colors.palette.neutral100,
+  backgroundColor: colors.field,
 })
 const $thumbShape: ThemedStyle<ViewStyle> = ({ radius }) => ({
   position: "absolute",
   top: TRACK_INSET,
   bottom: TRACK_INSET,
   left: TRACK_INSET,
-  borderRadius: radius.xl - TRACK_INSET,
+  borderRadius: radius.lg - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
 const $fill: ViewStyle = { flex: 1 }
+// why: with the inset and border, the track comes to 44px, the same as inputs and selects.
 const $segment: ViewStyle = {
-  minHeight: 46,
+  minHeight: 44 - (TRACK_INSET + TRACK_BORDER_WIDTH) * 2,
   alignItems: "center",
   justifyContent: "center",
   paddingHorizontal: SEGMENT_PADDING,

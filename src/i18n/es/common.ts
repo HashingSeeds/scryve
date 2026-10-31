@@ -9,6 +9,7 @@ export default {
   delete: "Eliminar",
   done: "Listo",
   edit: "Editar",
+  optional: "opcional",
   remove: "Quitar",
   retry: "Reintentar",
   save: "Guardar",

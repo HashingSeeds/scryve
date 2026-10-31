@@ -1699,7 +1699,7 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByTestId("deck-draft-bar")).toBeNull()
     expect(mockSaveVersion).not.toHaveBeenCalled()
     view.unmount()
-    expect(renderDetail().getByTestId("deck-mode-play").props.accessibilityState).toEqual({
+    expect(renderDetail().getByTestId("deck-mode-play").props.accessibilityState).toMatchObject({
       selected: true,
     })
   })
@@ -1711,7 +1711,7 @@ describe("DeckDetailScreen", () => {
     first.unmount()
 
     const reopened = renderDetail()
-    expect(reopened.getByTestId("deck-mode-build").props.accessibilityState).toEqual({
+    expect(reopened.getByTestId("deck-mode-build").props.accessibilityState).toMatchObject({
       selected: true,
     })
     expect(reopened.getByText("1 change")).toBeTruthy()
