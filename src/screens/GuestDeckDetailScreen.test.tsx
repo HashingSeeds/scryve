@@ -2,6 +2,10 @@ import { fireEvent, render, waitFor, within } from "@testing-library/react-nativ
 
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
+import { loadMatchSwaps } from "@/features/decks/matchSideboard"
+import { createLocalGame, createNextMatchGame } from "@/features/game/domain"
+import { LocalGameRepository } from "@/features/game/localPersistence"
+import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
 
@@ -43,6 +47,7 @@ jest.mock("@/features/decks/localDeckSync", () => ({
 const mockStatsPush = jest.fn()
 jest.mock("expo-router", () => ({
   router: { push: (...args: unknown[]) => mockStatsPush(...args) },
+  useFocusEffect: (callback: () => void) => require("react").useEffect(callback, [callback]),
 }))
 
 const mockStored = {
@@ -63,8 +68,11 @@ let mockSaveFailure = false
 jest.mock("@/features/decks/guestDeck", () => ({
   isGuestDeckPayload: jest.requireActual("@/features/decks/guestDeck").isGuestDeckPayload,
   guestDeckRouteId: jest.requireActual("@/features/decks/guestDeck").guestDeckRouteId,
+  guestDeckVersions: jest.requireActual("@/features/decks/guestDeck").guestDeckVersions,
+  guestDeckBringing: jest.requireActual("@/features/decks/guestDeck").guestDeckBringing,
   useGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
   loadGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
+  loadGuestDecks: () => (mockCurrent ? [mockCurrent] : []),
   saveGuestDeck: jest.fn((deck: typeof mockStored.deck) => {
     if (mockSaveFailure) throw new Error("Unable to save guest deck.")
     mockCurrent = { ...mockStored, updatedAt: 2, deck }
@@ -73,9 +81,14 @@ jest.mock("@/features/decks/guestDeck", () => ({
   deleteGuestDeck: jest.fn(() => {
     mockCurrent = undefined
   }),
+  addGuestDeckVersion: jest.fn(),
+  updateGuestDeckVersion: jest.fn(),
+  deleteGuestDeckVersion: jest.fn(),
+  setGuestDeckBringing: jest.fn(),
 }))
 
-const mockSaveGuestDeck = jest.requireMock("@/features/decks/guestDeck").saveGuestDeck as jest.Mock
+const mockGuestDeck = jest.requireMock("@/features/decks/guestDeck")
+const mockSaveGuestDeck = mockGuestDeck.saveGuestDeck as jest.Mock
 const mockDeleteGuestDeck = jest.requireMock("@/features/decks/guestDeck")
   .deleteGuestDeck as jest.Mock
 
@@ -218,6 +231,7 @@ test("opens in Play, edits notes in Build, and saves locally", () => {
   fireEvent.press(view.getByTestId("save-version-button"))
   expect(mockSaveGuestDeck).toHaveBeenCalledWith(expect.objectContaining({ note: "New notes" }), {
     localId: mockStored.localId,
+    version: 1,
   })
   view.unmount()
   const reloaded = renderScreen()
@@ -442,10 +456,10 @@ test("shows lookup errors and retries when the saved card is reopened", async ()
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
 })
 
-test("Play has no versions to bring yet and starts a game with this deck", () => {
+test("Play brings the only version and starts a game with this deck", () => {
   const view = renderScreen()
   expect(view.getByTestId("deck-play")).toBeTruthy()
-  expect(view.queryByText("Bringing")).toBeNull()
+  expect(view.getByTestId("bring-version-1")).toBeChecked()
   expect(view.getByTestId("deck-play-no-results")).toHaveTextContent("No games yet")
   fireEvent.press(view.getByText("Start a game"))
   expect(mockStatsPush).toHaveBeenCalledWith({
@@ -511,4 +525,139 @@ test("moving a card to the sideboard and back leaves nothing to save", () => {
   fireEvent.press(view.getByLabelText("Move one Bolt to Main deck"))
 
   expect(view.queryByTestId("deck-draft-bar")).toBeNull()
+})
+
+describe("versions", () => {
+  const bolt = { name: "Lightning Bolt", quantity: 4, board: "main" as const }
+  const versioned = (count: number): GuestDeck => ({
+    ...mockStored,
+    versions: Array.from({ length: count }, (_, index) => ({
+      number: index + 1,
+      name: index === 0 ? "Current" : `Tuned ${index}`,
+      createdAt: 1,
+      updatedAt: 1,
+      ...(index === count - 1 ? {} : { cards: [bolt] }),
+    })),
+  })
+
+  test("Play lists every version and stores the pick on the device deck", () => {
+    mockCurrent = versioned(2)
+    const view = renderScreen()
+    expect(view.getByTestId("bring-version-2")).toBeChecked()
+    expect(view.getByText("Version 1")).toBeTruthy()
+    fireEvent.press(view.getByTestId("bring-version-1"))
+    expect(mockGuestDeck.setGuestDeckBringing).toHaveBeenCalledWith(mockStored.localId, 1)
+  })
+
+  test("saves into the version picked in Build", () => {
+    mockCurrent = versioned(2)
+    const view = renderScreen()
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
+    fireEvent.press(view.getByTestId("version-picker-1"))
+    expect(view.getByLabelText("4× Lightning Bolt")).toBeTruthy()
+    editNote(view, "Older list")
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockSaveGuestDeck).toHaveBeenCalledWith(
+      expect.objectContaining({ cards: [bolt], note: "Older list" }),
+      { localId: mockStored.localId, version: 1 },
+    )
+  })
+
+  test("New version copies the cards below the limit and explains the limit at it", () => {
+    const view = renderScreen()
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.press(view.getByTestId("deck-version-button"))
+    fireEvent.press(view.getByTestId("version-picker-__new__"))
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Tuned")
+    fireEvent.press(view.getByText("Create version"))
+    expect(mockGuestDeck.addGuestDeckVersion).toHaveBeenCalledWith(
+      mockStored.localId,
+      { name: "Tuned", note: "", cards: mockStored.deck.cards },
+      2,
+    )
+    view.unmount()
+
+    mockCurrent = versioned(2)
+    const full = renderScreen()
+    fireEvent.press(full.getByTestId("deck-mode-build"))
+    fireEvent.press(full.getByTestId("deck-version-button"))
+    fireEvent.press(full.getByTestId("version-picker-__new__"))
+    expect(
+      within(full.getByTestId("deck-versions-dialog")).getByText(
+        "This deck holds up to 2 versions. Delete one to add another.",
+      ),
+    ).toBeTruthy()
+    fireEvent.press(full.getByTestId("deck-versions-backdrop"))
+    expect(
+      full.queryByText("This deck holds up to 2 versions. Delete one to add another."),
+    ).toBeNull()
+  })
+
+  test("sync explains when the deck has more versions than the account keeps", () => {
+    mockCurrent = versioned(3)
+    const view = renderSignedIn()
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    const sync = view.getByTestId("deck-action-sync")
+    expect(sync).toBeDisabled()
+    expect(
+      within(sync).getByText("This deck has 3 versions. Free accounts keep 2. Delete 1 to sync."),
+    ).toBeTruthy()
+  })
+})
+
+test("sideboards a device deck between games of its local match", () => {
+  const side = { name: "Negate", quantity: 1, scryfallId: "negate", board: "sideboard" as const }
+  const main = { name: "Bolt", quantity: 1, scryfallId: "bolt", board: "main" as const }
+  mockCurrent = {
+    ...mockStored,
+    deckKey: "device-key",
+    deck: { ...mockStored.deck, format: "modern", cards: [main, side] },
+  }
+  const listFingerprint = `v1:${"a".repeat(64)}`
+  saveListSnapshot("device-key", listFingerprint, [main, side])
+  const first = createLocalGame({
+    players: [
+      { name: "Ada", color: "#41476E" },
+      { name: "Grace", color: "#39755C" },
+    ],
+    startingLife: 20,
+    system: "mtg",
+    format: "modern",
+    account: {
+      ownerId: "owner-a",
+      meSeat: 0,
+      deckKey: "device-key",
+      deckFingerprint: listFingerprint,
+    },
+    match: { bestOf: 3 },
+  })
+  new LocalGameRepository().saveActiveGame(
+    createNextMatchGame({
+      ...first,
+      status: "finished",
+      result: { kind: "win", winnerPlayerIds: [first.players[1].id] },
+    }),
+  )
+  const view = renderSignedIn()
+  expect(within(view.getByTestId("deck-play-match")).getByText("Main deck as built")).toBeTruthy()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  expect(
+    within(view.getByTestId("deck-actions-sheet"))
+      .getAllByRole("button")
+      .map((row) => row.props.testID),
+  ).toEqual([
+    "deck-action-details",
+    "deck-action-sync",
+    "deck-action-sideboard",
+    "deck-action-delete",
+  ])
+  fireEvent.press(view.getByTestId("deck-action-sideboard"))
+  fireEvent.press(view.getByLabelText("Swap one more Negate"))
+  fireEvent.press(view.getByLabelText("Swap one more Bolt"))
+  fireEvent.press(view.getByTestId("sideboard-apply"))
+  expect(within(view.getByTestId("deck-play-match")).getByText("+1 Negate")).toBeTruthy()
+  expect(mockSaveGuestDeck).not.toHaveBeenCalled()
+  fireEvent.press(view.getByTestId("sideboard-reset"))
+  expect(loadMatchSwaps(first.match?.id)).toEqual({ in: [], out: [] })
 })

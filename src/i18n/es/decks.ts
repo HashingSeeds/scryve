@@ -208,6 +208,10 @@ export default {
     failed: "No se pudo sincronizar este mazo. Sigue guardado en este dispositivo.",
     limit_reached:
       "Tus mazos sincronizados están llenos. El mazo sigue guardado en este dispositivo.",
+    version_limit:
+      "Este mazo tiene más versiones de las que conserva tu cuenta. Elimina algunas en este dispositivo para sincronizar.",
+    versionLimit:
+      "Este mazo tiene {{versions}} versiones. Las cuentas gratuitas conservan {{limit}}. Elimina {{remove}} para sincronizar.",
     conflict: "Este mazo cambió en otro dispositivo. Sigue guardado en este dispositivo.",
     kept_newer_edits:
       "Este mazo tiene ediciones más recientes. Sigue guardado en este dispositivo.",

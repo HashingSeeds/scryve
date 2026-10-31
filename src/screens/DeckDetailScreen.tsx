@@ -11,13 +11,11 @@ import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
-import { DeckVersionDialog } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
@@ -49,6 +47,7 @@ import {
   useDeckVersionCache,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
+import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
 import { DECK_MODES, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
@@ -70,7 +69,6 @@ import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
-import { radius } from "@/theme/radius"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
@@ -1300,35 +1298,6 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {dialog === "newVersion" && (detail || view.canQueueVersions) ? (
-        <DeckVersionDialog
-          title={translate("decks:detail.newVersion")}
-          submitLabel={translate("decks:detail.createVersion")}
-          copyFromLabel={
-            copyFromVersion ? deckVersionLabel(copyFromVersion, latestVersionNumber) : undefined
-          }
-          busy={busy}
-          error={error}
-          onSubmit={submitNewVersion}
-          onClose={() => setDialog("none")}
-        />
-      ) : null}
-
-      {dialog === "renameVersion" && activeVersionSummary ? (
-        <DeckVersionDialog
-          title={translate("decks:detail.versionDetails")}
-          submitLabel={translate("common:save")}
-          initialName={deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber)}
-          initialNote={activeVersionSummary.note ?? ""}
-          notesLocked={!view.premium}
-          busy={busy}
-          error={error}
-          onSubmit={submitRenameVersion}
-          {...(view.canDeleteVersion ? { onDelete: startDeleteVersion } : {})}
-          onClose={() => setDialog("none")}
-        />
-      ) : null}
-
       {dialog === "actions" ? (
         <DeckActionsSheet actions={deckActions} onClose={() => setDialog("none")} />
       ) : null}
@@ -1359,130 +1328,57 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {dialog === "versions" ? (
-        <DialogCard
-          visible
-          onClose={() => setDialog("none")}
-          closeDisabled={busy}
-          backdropTestID="deck-versions-backdrop"
-          backdropAccessibilityLabel={translate("common:close")}
-          dialogTestID="deck-versions-dialog"
-          accessibilityViewIsModal
-          placement="bottom"
-          wide
-        >
-          <ScrollView contentContainerStyle={themed($versions)}>
-            <View style={themed($versionHeading)}>
-              <Text preset="subheading" tx="decks:detail.versions" />
-              {detail || view.canQueueVersions ? (
-                <TextAction
-                  testID="version-picker-__new__"
-                  tx="decks:detail.newVersion"
-                  disabled={view.changes.any}
-                  onPress={startNewVersion}
-                />
-              ) : null}
-            </View>
-            {view.versionRows.map((candidate) => {
-              const selected = candidate._id === activeVersionId
-              // Live records only; cached rows must not present unknown stats as fresh.
-              const candidateCounts = candidate.record ? allRecord(candidate.record) : undefined
-              const candidateRecord = candidateCounts?.games
-                ? [recordText(candidateCounts)]
-                : detail
-                  ? [translate("decks:detail.unplayed")]
-                  : []
-              return (
-                <View key={candidate._id} style={themed($versionRow)}>
-                  <TouchableOpacity
-                    testID={`version-picker-${candidate._id}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    style={themed($versionSelect)}
-                    disabled={view.changes.any}
-                    onPress={() => {
-                      chooseVersion(candidate._id)
-                      setDialog("none")
-                    }}
-                  >
-                    <View
-                      testID={`version-marker-${candidate._id}`}
-                      style={[themed($versionMark), selected && themed($versionMarkSelected)]}
-                    />
-                    <View style={themed($versionCopy)}>
-                      <Text
-                        weight="medium"
-                        text={deckVersionLabel(candidate, latestVersionNumber)}
-                      />
-                      {candidate.note ? (
-                        <Text size="xxs" tone="dim" text={candidate.note} numberOfLines={2} />
-                      ) : null}
-                    </View>
-                    <View style={themed($versionContext)}>
-                      {candidateRecord.map((text) => (
-                        <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
-                      ))}
-                      <Text size="xxs" tone="dim" text={cardCountLabel(candidate.cardQuantity)} />
-                    </View>
-                  </TouchableOpacity>
-                  {selected && view.canManageVersion ? (
-                    <TouchableOpacity
-                      testID="rename-version-button"
-                      accessibilityRole="button"
-                      accessibilityLabel={translate("decks:detail.versionDetails")}
-                      style={$versionMore}
-                      onPress={() => {
-                        if (!draft.editing) pinVersionTarget()
-                        setDialog("renameVersion")
-                      }}
-                    >
-                      <Text size="lg" text="•••" />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              )
-            })}
-            {error ? <AlertNote text={error} /> : null}
-          </ScrollView>
-        </DialogCard>
-      ) : null}
-
-      {dialog === "deleteVersion" ? (
-        <DialogCard
-          visible
-          onClose={() => setDialog("none")}
-          closeDisabled={busy}
-          backdropTestID="delete-version-backdrop"
-          backdropAccessibilityLabel={translate("decks:detail.keepVersion")}
-          dialogTestID="delete-version-dialog"
-          dialogAccessibilityRole="alert"
-          accessibilityViewIsModal
-        >
-          <Text
-            preset="subheading"
-            tx="decks:detail.deleteVersionTitle"
-            style={themed($dialogText)}
-          />
-          <Text size="sm" tx="decks:detail.deleteVersionBody" style={themed($dialogText)} />
-          {error ? <AlertNote text={error} /> : null}
-          <View style={themed($dialogActions)}>
-            <Button
-              tx="common:cancel"
-              style={themed($dialogButton)}
-              disabled={busy}
-              onPress={() => setDialog("none")}
-            />
-            <Button
-              tx="common:delete"
-              testID="delete-version-confirm"
-              preset="destructive"
-              style={themed($dialogButton)}
-              disabled={busy}
-              onPress={confirmDeleteVersion}
-            />
-          </View>
-        </DialogCard>
-      ) : null}
+      <DeckVersionsDialogs
+        dialog={dialog}
+        rows={view.versionRows.map((row) => {
+          // Live records only; cached rows must not present unknown stats as fresh.
+          const counts = row.record ? allRecord(row.record) : undefined
+          return {
+            id: row._id,
+            label: deckVersionLabel(row, latestVersionNumber),
+            note: row.note,
+            record: counts?.games
+              ? recordText(counts)
+              : detail
+                ? translate("decks:detail.unplayed")
+                : undefined,
+            cardQuantity: row.cardQuantity,
+          }
+        })}
+        activeId={activeVersionId}
+        busy={busy}
+        error={error}
+        chooseDisabled={view.changes.any}
+        newDisabled={view.changes.any}
+        copyFromLabel={
+          copyFromVersion ? deckVersionLabel(copyFromVersion, latestVersionNumber) : undefined
+        }
+        rename={
+          activeVersionSummary && {
+            name: deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber),
+            note: activeVersionSummary.note ?? "",
+            notesLocked: !view.premium,
+          }
+        }
+        onChoose={(versionId) => {
+          chooseVersion(versionId)
+          setDialog("none")
+        }}
+        onNew={detail || view.canQueueVersions ? startNewVersion : undefined}
+        onCreate={submitNewVersion}
+        onManage={
+          view.canManageVersion
+            ? () => {
+                if (!draft.editing) pinVersionTarget()
+                setDialog("renameVersion")
+              }
+            : undefined
+        }
+        onRename={submitRenameVersion}
+        onDelete={view.canDeleteVersion ? startDeleteVersion : undefined}
+        onConfirmDelete={confirmDeleteVersion}
+        onClose={() => setDialog("none")}
+      />
 
       {dialog === "moveDeck" ? (
         <DialogCard
@@ -1556,8 +1452,6 @@ function DeckDetailContent({
   )
 }
 
-const $tabularNumbers: TextStyle = { fontVariant: ["tabular-nums"] }
-
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 
 const $loadingContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -1589,50 +1483,6 @@ const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderBottomColor: "transparent",
 })
 const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
-const $versions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $versionHeading: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 36,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: spacing.sm,
-})
-const $versionRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 72,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  paddingVertical: spacing.xxs,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $versionSelect: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
-  flexDirection: "row",
-  alignItems: "center",
-  alignSelf: "stretch",
-  gap: spacing.sm,
-})
-const $versionMore: ViewStyle = {
-  minWidth: 44,
-  minHeight: 44,
-  alignItems: "center",
-  justifyContent: "center",
-}
-const $versionMark: ThemedStyle<ViewStyle> = () => ({
-  width: 5,
-  height: 34,
-  borderRadius: radius.full,
-})
-const $versionMarkSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.gameMenu.actions.history,
-})
-const $versionCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
-const $versionContext: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minWidth: 64,
-  alignItems: "flex-end",
-  gap: spacing.xxxs,
-})
 const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   height: 56,
   minWidth: 56,

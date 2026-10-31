@@ -8,7 +8,13 @@ import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { saveString, storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
-import { MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
+import { DEFAULT_VERSION_NAME } from "../../../convex/lib/deckVersions"
+import {
+  MAX_DECK_CARDS,
+  MAX_DECK_NOTE_LENGTH,
+  MAX_DECK_VERSIONS,
+  MAX_VERSION_NAME_LENGTH,
+} from "../../../convex/lib/policy"
 
 const GUEST_DECKS_KEY = "decks.guest.v2"
 const LEGACY_GUEST_DECK_KEY = "decks.guest.v1"
@@ -30,6 +36,17 @@ const CARD_STRING_FIELDS = [
 ] as const
 
 export type GuestDeckPayload = Omit<FunctionArgs<typeof api.decks.importResolved>, "deckKey">
+type GuestCards = GuestDeckPayload["cards"]
+export type GuestDeckVersion = {
+  number: number
+  name: string
+  note?: string
+  createdAt: number
+  updatedAt: number
+  cards: GuestCards
+}
+// why: the latest version keeps its cards in `deck`, so builds that predate versions still read the current list.
+type StoredGuestVersion = Omit<GuestDeckVersion, "cards"> & { cards?: GuestCards }
 export type GuestDeck = {
   schemaVersion: 1
   localId: string
@@ -39,6 +56,14 @@ export type GuestDeck = {
   deckKey?: string
   guestLocalId?: string
   movedFromAccount?: boolean
+  versions?: StoredGuestVersion[]
+  bringing?: number
+}
+export type NewGuestDeckVersion = {
+  number?: number
+  name: string
+  note?: string
+  cards: GuestCards
 }
 
 export class GuestDeckStorageError extends Error {
@@ -91,8 +116,12 @@ export function isGuestDeckPayload(value: unknown): value is GuestDeckPayload {
     (typeof value.note !== "string" || value.note.length > MAX_DECK_NOTE_LENGTH)
   )
     return false
-  if (!Array.isArray(value.cards) || value.cards.length > MAX_DECK_CARDS) return false
-  return value.cards.every((card) => {
+  return isCardList(value.cards)
+}
+
+function isCardList(value: unknown): value is GuestCards {
+  if (!Array.isArray(value) || value.length > MAX_DECK_CARDS) return false
+  return value.every((card) => {
     if (
       !isRecord(card) ||
       typeof card.name !== "string" ||
@@ -116,6 +145,31 @@ export function isGuestDeckPayload(value: unknown): value is GuestDeckPayload {
   })
 }
 
+function isStoredVersions(value: unknown): value is StoredGuestVersion[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_DECK_VERSIONS) return false
+  let previous = 0
+  return value.every((version, index) => {
+    if (
+      !isRecord(version) ||
+      typeof version.number !== "number" ||
+      !Number.isSafeInteger(version.number) ||
+      version.number <= previous ||
+      typeof version.name !== "string" ||
+      version.name.trim().length < 1 ||
+      version.name.length > MAX_VERSION_NAME_LENGTH ||
+      (version.note !== undefined &&
+        (typeof version.note !== "string" || version.note.length > MAX_DECK_NOTE_LENGTH)) ||
+      typeof version.createdAt !== "number" ||
+      !Number.isSafeInteger(version.createdAt) ||
+      typeof version.updatedAt !== "number" ||
+      !Number.isSafeInteger(version.updatedAt)
+    )
+      return false
+    previous = version.number
+    return index === value.length - 1 ? version.cards === undefined : isCardList(version.cards)
+  })
+}
+
 function isGuestDeck(value: unknown): value is GuestDeck {
   return (
     isRecord(value) &&
@@ -130,6 +184,9 @@ function isGuestDeck(value: unknown): value is GuestDeck {
     value.updatedAt >= value.createdAt &&
     isGuestDeckPayload(value.deck) &&
     (value.movedFromAccount === undefined || typeof value.movedFromAccount === "boolean") &&
+    (value.versions === undefined || isStoredVersions(value.versions)) &&
+    (value.bringing === undefined ||
+      (typeof value.bringing === "number" && Number.isSafeInteger(value.bringing))) &&
     (value.deckKey === undefined ||
       (typeof value.deckKey === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.deckKey))) &&
     (value.guestLocalId === undefined ||
@@ -269,6 +326,9 @@ export function saveGuestDeck(
     deckKey?: string
     guestLocalId?: string
     movedFromAccount?: boolean
+    version?: number
+    versions?: readonly NewGuestDeckVersion[]
+    bringing?: number
   } = {},
 ): GuestDeck {
   if (!isGuestDeckPayload(deck))
@@ -289,16 +349,39 @@ export function saveGuestDeck(
     (previous && options.deckKey !== undefined && options.deckKey !== deckKey)
   )
     throw new GuestDeckStorageError("Deck key cannot change.")
-  const next: GuestDeck = {
-    schemaVersion: 1,
-    localId,
-    deckKey,
-    guestLocalId: previous?.guestLocalId ?? options.guestLocalId,
-    movedFromAccount: previous?.movedFromAccount ?? options.movedFromAccount,
-    createdAt: previous?.createdAt ?? updatedAt,
-    updatedAt,
-    deck,
-  }
+  const versions = previous?.versions
+    ? guestDeckVersions(previous).map((version) =>
+        version.number === (options.version ?? latestNumber(previous))
+          ? { ...version, cards: deck.cards, updatedAt }
+          : version,
+      )
+    : options.versions?.map((version, index) => ({
+        ...version,
+        number: version.number ?? index + 1,
+        createdAt: updatedAt,
+        updatedAt,
+      }))
+  if (
+    options.version !== undefined &&
+    !versions?.some((version) => version.number === options.version) &&
+    !(options.version === 1 && !previous?.versions)
+  )
+    throw new GuestDeckStorageError("Guest deck version does not exist.")
+  const next = withVersions(
+    {
+      schemaVersion: 1,
+      localId,
+      deckKey,
+      guestLocalId: previous?.guestLocalId ?? options.guestLocalId,
+      movedFromAccount: previous?.movedFromAccount ?? options.movedFromAccount,
+      createdAt: previous?.createdAt ?? updatedAt,
+      updatedAt,
+      deck,
+      bringing: previous?.bringing ?? options.bringing,
+    },
+    versions,
+  )
+  if (!isGuestDeck(next)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
   commit(
     previous
       ? decks.map((candidate) => (candidate.localId === previous.localId ? next : candidate))
@@ -306,6 +389,138 @@ export function saveGuestDeck(
     translate("decks:guestStorage.saveFailed"),
   )
   return next
+}
+
+export function guestDeckVersions(stored: GuestDeck): GuestDeckVersion[] {
+  const versions = stored.versions ?? [
+    {
+      number: 1,
+      name: DEFAULT_VERSION_NAME,
+      createdAt: stored.createdAt,
+      updatedAt: stored.updatedAt,
+    },
+  ]
+  return versions.map((version, index) => ({
+    ...version,
+    cards: index === versions.length - 1 ? stored.deck.cards : (version.cards ?? []),
+  }))
+}
+
+function latestNumber(stored: GuestDeck) {
+  return stored.versions?.at(-1)?.number ?? 1
+}
+
+export function guestDeckBringing(stored: GuestDeck) {
+  return stored.versions?.some((version) => version.number === stored.bringing)
+    ? (stored.bringing ?? latestNumber(stored))
+    : latestNumber(stored)
+}
+
+export function guestDeckPlayCards(stored: GuestDeck) {
+  const bringing = guestDeckBringing(stored)
+  return (
+    guestDeckVersions(stored).find((version) => version.number === bringing)?.cards ??
+    stored.deck.cards
+  )
+}
+
+function withVersions(stored: GuestDeck, versions: readonly GuestDeckVersion[] | undefined) {
+  const latest = versions?.at(-1)
+  if (!versions || !latest) return stored
+  return {
+    ...stored,
+    deck: { ...stored.deck, cards: latest.cards },
+    versions: versions.map(({ cards, ...version }) =>
+      version.number === latest.number ? version : { ...version, cards },
+    ),
+  }
+}
+
+function changeVersions(
+  localId: string,
+  change: (versions: GuestDeckVersion[], updatedAt: number) => GuestDeckVersion[],
+  bringing?: (stored: GuestDeck) => number | undefined,
+) {
+  const decks = writableDecks()
+  const stored = decks.find((candidate) => candidate.localId === localId)
+  if (!stored) throw new GuestDeckStorageError("Guest deck localId does not match a saved deck.")
+  const updatedAt = Math.max(Date.now(), stored.updatedAt + 1)
+  const next = withVersions({ ...stored, updatedAt }, change(guestDeckVersions(stored), updatedAt))
+  const settled = bringing ? { ...next, bringing: bringing(next) } : next
+  if (!isGuestDeck(settled))
+    throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
+  commit(
+    decks.map((candidate) => (candidate.localId === localId ? settled : candidate)),
+    translate("decks:guestStorage.saveFailed"),
+  )
+  return settled
+}
+
+export function addGuestDeckVersion(
+  localId: string,
+  version: Omit<NewGuestDeckVersion, "number">,
+  limit: number,
+) {
+  return changeVersions(localId, (versions, updatedAt) => {
+    if (versions.length >= limit)
+      throw new GuestDeckStorageError(translate("decks:detail.versionLimit", { count: limit }))
+    return [
+      ...versions,
+      {
+        number: Math.max(...versions.map((existing) => existing.number)) + 1,
+        name: version.name.trim(),
+        ...(version.note?.trim() ? { note: version.note.trim() } : {}),
+        createdAt: updatedAt,
+        updatedAt,
+        cards: version.cards,
+      },
+    ]
+  })
+}
+
+export function updateGuestDeckVersion(
+  localId: string,
+  number: number,
+  { name, note }: { name: string; note: string },
+) {
+  return changeVersions(localId, (versions, updatedAt) =>
+    versions.map((version) => {
+      if (version.number !== number) return version
+      const { note: _previous, ...rest } = version
+      return {
+        ...rest,
+        name: name.trim(),
+        ...(note.trim() ? { note: note.trim() } : {}),
+        updatedAt,
+      }
+    }),
+  )
+}
+
+export function deleteGuestDeckVersion(localId: string, number: number) {
+  return changeVersions(
+    localId,
+    (versions) => {
+      if (versions.length <= 1)
+        throw new GuestDeckStorageError(translate("decks:detail.deleteVersionFailed"))
+      return versions.filter((version) => version.number !== number)
+    },
+    (next) => (next.bringing === number ? undefined : next.bringing),
+  )
+}
+
+// why: the pick is not part of the list the account copy is compared against, so it leaves updatedAt alone and a sync in flight still acknowledges.
+export function setGuestDeckBringing(localId: string, number: number) {
+  const decks = writableDecks()
+  const stored = decks.find((candidate) => candidate.localId === localId)
+  if (!stored || !guestDeckVersions(stored).some((version) => version.number === number))
+    throw new GuestDeckStorageError("Guest deck version does not exist.")
+  commit(
+    decks.map((candidate) =>
+      candidate.localId === localId ? { ...candidate, bringing: number } : candidate,
+    ),
+    translate("decks:guestStorage.saveFailed"),
+  )
 }
 
 export function deleteGuestDeck(localId: string) {

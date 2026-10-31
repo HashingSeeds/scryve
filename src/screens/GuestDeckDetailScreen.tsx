@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import { router } from "expo-router"
-import { useConvexConnectionState } from "convex/react"
+import { router, useFocusEffect } from "expo-router"
+import { useConvexConnectionState, useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
+import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -17,32 +18,48 @@ import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
+import { cardCountLabel, deckVersionLabel, versionTitle } from "@/features/decks/deckCopy"
 import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import {
   useLocalDeckDraft,
   type LocalDeckDraft as GuestDraft,
 } from "@/features/decks/deckDraftStore"
 import { DeckPlay } from "@/features/decks/DeckPlay"
+import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
 import { DeckView, type DeckMode } from "@/features/decks/DeckView"
 import {
+  addGuestDeckVersion,
   deleteGuestDeck,
+  deleteGuestDeckVersion,
+  guestDeckBringing,
   guestDeckRouteId,
+  guestDeckVersions,
   loadGuestDeck,
   saveGuestDeck,
+  setGuestDeckBringing,
+  updateGuestDeckVersion,
   useGuestDeck,
+  type GuestDeck,
   type GuestDeckPayload,
 } from "@/features/decks/guestDeck"
-import { useLocalDeckSyncing } from "@/features/decks/localDeckSync"
+import { useLocalDeckSyncing, versionLimitMessage } from "@/features/decks/localDeckSync"
+import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
+import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useLocalDeckSyncAction } from "@/features/decks/useLocalDeckSyncAction"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import type { LocalGame } from "@/features/game/types"
+import { statsDate } from "@/features/stats/DeckStatsParts"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
+import { FREE_DECK_VERSIONS, MAX_DECK_VERSIONS } from "../../convex/lib/policy"
 import { picksCommander, tracksResults } from "../../convex/lib/systems"
 
 type GuestDeckDetailScreenProps = {
@@ -56,6 +73,15 @@ type GuestCard = GuestDeckPayload["cards"][number]
 
 function deckOf({ undo: _undo, commanderSelected: _selected, ...deck }: GuestDraft) {
   return deck
+}
+
+function versionList(stored: GuestDeck, number: number): GuestDeckPayload {
+  const version = guestDeckVersions(stored).find((candidate) => candidate.number === number)
+  return { ...stored.deck, cards: version?.cards ?? stored.deck.cards }
+}
+
+function cardQuantity(cards: GuestDeckPayload["cards"]) {
+  return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
 function sameDraft(a: GuestDraft | undefined, b: GuestDraft | undefined) {
@@ -75,16 +101,33 @@ export function GuestDeckDetailScreen({
   const stored = useGuestDeck(localId)
   const [restored] = useState(() => (stored ? loadLocalDraft(localId) : undefined))
   const { draft, latest: draftRef, setDraft, edit } = useLocalDeckDraft({ localId })
+  const versions = useMemo(() => (stored ? guestDeckVersions(stored) : []), [stored])
+  const latestNumber = versions.at(-1)?.number ?? 1
+  const [chosen, setChosen] = useState(restored?.version)
+  const active = versions.find((version) => version.number === chosen) ?? versions.at(-1)
+  const activeNumber = active?.number ?? latestNumber
+  const saved = useMemo(
+    () => (stored ? versionList(stored, activeNumber) : undefined),
+    [stored, activeNumber],
+  )
   const revisionRef = useRef(
     restored?.revision ??
       (stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined),
   )
-  const baseRef = useRef(restored?.base ?? stored?.deck)
+  const baseRef = useRef(restored?.base ?? saved)
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
   const [mode, setMode] = useState<DeckMode>(restored ? "build" : "play")
   const building = mode === "build"
-  const [sheet, setSheet] = useState<"actions" | "settings">()
+  const [sheet, setSheet] = useState<
+    | "actions"
+    | "settings"
+    | "sideboard"
+    | "versions"
+    | "newVersion"
+    | "renameVersion"
+    | "deleteVersion"
+  >()
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingElsewhere = useLocalDeckSyncing(localId)
@@ -95,6 +138,16 @@ export function GuestDeckDetailScreen({
     onSyncingChange: setSyncing,
   })
   const offline = useConvexConnectionState()?.isWebSocketConnected === false
+  const entitlements = useQuery(api.entitlements.current, access?.ready ? {} : "skip")
+  const pro = entitlements?.deckVersions === true
+  const versionLimit = pro ? MAX_DECK_VERSIONS : FREE_DECK_VERSIONS
+  const [activeGame, setActiveGame] = useState<LocalGame | null>(null)
+  useFocusEffect(useCallback(() => setActiveGame(new LocalGameRepository().loadActiveGame()), []))
+  const deckKey = stored && (stored.deckKey ?? stored.localId)
+  const sideboard = useMatchSideboard(
+    deckKey !== undefined && activeGame?.account?.deckKey === deckKey ? activeGame : undefined,
+    { game: (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME, format: saved?.format },
+  )
   const [leaving, setLeaving] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
   const focusedCard = (draft ?? stored?.deck)?.cards.find(
@@ -132,24 +185,24 @@ export function GuestDeckDetailScreen({
   )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   useEffect(() => {
-    if (stored && sameDraft(draftRef.current, baseRef.current)) {
-      setDraft({ ...stored.deck, commanderSelected: draftRef.current?.commanderSelected })
-      baseRef.current = stored.deck
+    if (stored && saved && sameDraft(draftRef.current, baseRef.current)) {
+      setDraft({ ...saved, commanderSelected: draftRef.current?.commanderSelected })
+      baseRef.current = saved
       revisionRef.current = { localId: stored.localId, updatedAt: stored.updatedAt }
     } else if (!stored && sameDraft(draftRef.current, baseRef.current)) {
       setDraft(undefined)
       baseRef.current = undefined
       revisionRef.current = undefined
     }
-  }, [draftRef, setDraft, stored])
+  }, [draftRef, setDraft, saved, stored])
 
   useEffect(() => {
     const base = baseRef.current
     const revision = revisionRef.current
     if (draft && base && revision && !sameDraft(draft, base))
-      keepLocalDraft(localId, { deck: deckOf(draft), base, revision })
+      keepLocalDraft(localId, { deck: deckOf(draft), base, revision, version: activeNumber })
     else forgetLocalDraft(localId)
-  }, [draft, localId])
+  }, [activeNumber, draft, localId])
 
   useEffect(() => {
     if (leaving) onBack()
@@ -216,26 +269,60 @@ export function GuestDeckDetailScreen({
       return
     }
     try {
-      const saved = saveGuestDeck(
-        { ...deckOf(current), name: current.name.trim() },
-        { localId: revision.localId },
-      )
-      setDraft({ ...saved.deck, commanderSelected: current.commanderSelected })
-      baseRef.current = saved.deck
-      revisionRef.current = { localId: saved.localId, updatedAt: saved.updatedAt }
+      const list = { ...deckOf(current), name: current.name.trim() }
+      const written = saveGuestDeck(list, { localId: revision.localId, version: activeNumber })
+      setDraft({ ...list, commanderSelected: current.commanderSelected })
+      baseRef.current = list
+      revisionRef.current = { localId: written.localId, updatedAt: written.updatedAt }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : translate("decks:guestStorage.saveFailed"))
     }
   }
 
   const discard = () => {
-    baseRef.current = stored?.deck
+    baseRef.current = saved
     revisionRef.current = stored
       ? { localId: stored.localId, updatedAt: stored.updatedAt }
       : undefined
-    setDraft(stored?.deck)
+    setDraft(saved)
     setError(undefined)
   }
+  const versionAction = (run: () => void, failure: string) => {
+    setError(undefined)
+    try {
+      run()
+      setSheet(undefined)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : failure)
+    }
+  }
+  const startNewVersion = () => {
+    setError(undefined)
+    if (versions.length >= versionLimit) {
+      setError(translate("decks:detail.versionLimit", { count: versionLimit }))
+      return
+    }
+    setSheet("newVersion")
+  }
+  const createVersion = ({ name, note, copyCards }: DeckVersionDraft) =>
+    versionAction(() => {
+      const next = addGuestDeckVersion(
+        localId,
+        { name, note, cards: copyCards ? (saved?.cards ?? []) : [] },
+        versionLimit,
+      )
+      setChosen(next.versions?.at(-1)?.number)
+    }, translate("decks:detail.createVersionFailed"))
+  const renameVersion = (details: DeckVersionDraft) =>
+    versionAction(
+      () => updateGuestDeckVersion(localId, activeNumber, details),
+      translate("decks:detail.updateVersionFailed"),
+    )
+  const deleteVersion = () =>
+    versionAction(() => {
+      deleteGuestDeckVersion(localId, activeNumber)
+      setChosen(undefined)
+    }, translate("decks:detail.deleteVersionFailed"))
   const base = baseRef.current
   const dirty = !sameDraft(current, base)
   const changes = dirty
@@ -247,7 +334,7 @@ export function GuestDeckDetailScreen({
           ).length,
       )
     : 0
-  const savedDeck = stored?.deck ?? current
+  const savedDeck = saved ?? current
   const shown = building ? current : savedDeck
   const canSync = (access?.signedIn ?? Boolean(access?.ownerId)) && Boolean(onSynced)
   const deckActions: DeckAction[] = [
@@ -267,11 +354,26 @@ export function GuestDeckDetailScreen({
                 ? (access?.message ?? translate("account:cloud.reconnect"))
                 : dirty
                   ? translate("decks:actions.saveFirst")
-                  : undefined,
+                  : entitlements && stored?.versions && versions.length > versionLimit
+                    ? versionLimitMessage({
+                        versions: versions.length,
+                        limit: versionLimit,
+                        premium: pro,
+                      })
+                    : undefined,
             onPress: () => {
               setSheet(undefined)
               deckSync.sync()
             },
+          },
+        ]
+      : []),
+    ...(sideboard?.canSwap
+      ? [
+          {
+            id: "sideboard",
+            label: translate("decks:sideboard.open"),
+            onPress: () => setSheet("sideboard"),
           },
         ]
       : []),
@@ -306,8 +408,48 @@ export function GuestDeckDetailScreen({
         note={current.note ?? ""}
         changes={changes}
         editingDisabled={syncing || syncingElsewhere}
+        version={
+          active && {
+            label: versionTitle({ ...active, versionNumber: active.number }, latestNumber),
+            latest: active.number === latestNumber,
+          }
+        }
+        onVersions={() => {
+          setError(undefined)
+          setSheet("versions")
+        }}
         play={
           <DeckPlay
+            versions={versions.map((version) => ({
+              id: String(version.number),
+              label: versionTitle({ ...version, versionNumber: version.number }, latestNumber),
+              detail: [statsDate(version.updatedAt), cardCountLabel(cardQuantity(version.cards))]
+                .filter(Boolean)
+                .join(" · "),
+            }))}
+            bringingId={stored ? String(guestDeckBringing(stored)) : undefined}
+            bringDisabled={syncing || syncingElsewhere}
+            onBring={(number) => {
+              try {
+                setGuestDeckBringing(localId, Number(number))
+              } catch (cause) {
+                setError(
+                  cause instanceof Error ? cause.message : translate("decks:play.bringFailed"),
+                )
+              }
+            }}
+            match={
+              sideboard && {
+                pool: sideboard.pool,
+                swaps: sideboard.swaps,
+                ...(sideboard.canSwap
+                  ? {
+                      onSideboard: () => setSheet("sideboard"),
+                      onReset: () => sideboard.apply({ in: [], out: [] }),
+                    }
+                  : {}),
+              }
+            }
             tracked={tracksResults(game)}
             deckKey={stored && (stored.deckKey ?? stored.localId)}
             ready={Boolean(access?.ready)}
@@ -370,8 +512,9 @@ export function GuestDeckDetailScreen({
                 onPress={() => {
                   const latest = loadGuestDeck(localId)
                   if (!latest) return
-                  setDraft(latest.deck)
-                  baseRef.current = latest.deck
+                  const list = versionList(latest, activeNumber)
+                  setDraft(list)
+                  baseRef.current = list
                   revisionRef.current = { localId: latest.localId, updatedAt: latest.updatedAt }
                   setError(undefined)
                   setConflict(false)
@@ -384,6 +527,56 @@ export function GuestDeckDetailScreen({
       {sheet === "actions" ? (
         <DeckActionsSheet actions={deckActions} onClose={() => setSheet(undefined)} />
       ) : null}
+      {sheet === "sideboard" && sideboard ? (
+        <SideboardSwapSheet
+          pool={sideboard.pool}
+          swaps={sideboard.swaps}
+          onApply={(swaps) => {
+            sideboard.apply(swaps)
+            setSheet(undefined)
+          }}
+          onClose={() => setSheet(undefined)}
+        />
+      ) : null}
+      <DeckVersionsDialogs
+        dialog={sheet}
+        rows={versions.map((version) => ({
+          id: String(version.number),
+          label: deckVersionLabel({ ...version, versionNumber: version.number }, latestNumber),
+          note: version.note,
+          cardQuantity: cardQuantity(version.cards),
+        }))}
+        activeId={String(activeNumber)}
+        error={error}
+        chooseDisabled={dirty}
+        newDisabled={dirty || syncing || syncingElsewhere}
+        copyFromLabel={
+          active && deckVersionLabel({ ...active, versionNumber: active.number }, latestNumber)
+        }
+        rename={
+          active && {
+            name: deckVersionLabel({ ...active, versionNumber: active.number }, active.number),
+            note: active.note ?? "",
+            notesLocked: !pro,
+          }
+        }
+        onChoose={(number) => {
+          setChosen(Number(number))
+          setSheet(undefined)
+        }}
+        onNew={startNewVersion}
+        onCreate={createVersion}
+        onManage={
+          dirty || syncing || syncingElsewhere ? undefined : () => setSheet("renameVersion")
+        }
+        onRename={renameVersion}
+        onDelete={versions.length > 1 ? () => setSheet("deleteVersion") : undefined}
+        onConfirmDelete={deleteVersion}
+        onClose={() => {
+          setSheet(undefined)
+          setError(undefined)
+        }}
+      />
       {sheet === "settings" ? (
         <DeckSettingsDialog
           game={game}

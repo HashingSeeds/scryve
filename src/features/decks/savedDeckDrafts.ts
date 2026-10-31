@@ -16,6 +16,7 @@ export type SavedLocalDraft = {
   deck: GuestDeckPayload
   base: GuestDeckPayload
   revision: { localId: string; updatedAt: number }
+  version?: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,7 +95,8 @@ function isSavedLocalDraft(value: unknown, localId: string): value is SavedLocal
     isGuestDeckPayload(value.base) &&
     isRecord(value.revision) &&
     value.revision.localId === localId &&
-    Number.isSafeInteger(value.revision.updatedAt)
+    Number.isSafeInteger(value.revision.updatedAt) &&
+    (value.version === undefined || Number.isSafeInteger(value.version))
   )
 }
 

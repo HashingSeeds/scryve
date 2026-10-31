@@ -4,13 +4,19 @@ import { storage } from "@/utils/storage"
 
 import {
   acknowledgeGuestDeckImport,
+  addGuestDeckVersion,
   clearGuestDecks,
   deleteGuestDeck,
+  deleteGuestDeckVersion,
+  guestDeckBringing,
+  guestDeckVersions,
   guestDeckLocalId,
   guestDeckRouteId,
   loadGuestDeck,
   loadGuestDecks,
   saveGuestDeck,
+  setGuestDeckBringing,
+  updateGuestDeckVersion,
 } from "./guestDeck"
 import { FREE_DECK_LIMIT } from "../../../convex/lib/policy"
 
@@ -203,6 +209,99 @@ describe("guest deck storage", () => {
     expect(loadGuestDecks()[0].movedFromAccount).toBe(true)
     storage.set("decks.guest.v2", JSON.stringify([{ ...saved, movedFromAccount: "yes" }]))
     expect(loadGuestDecks()).toEqual([])
+  })
+
+  describe("versions", () => {
+    const bolt = [{ name: "Lightning Bolt", quantity: 4 }]
+    const shock = [{ name: "Shock", quantity: 4 }]
+    const stored = () => JSON.parse(storage.getString("decks.guest.v2") ?? "[]")[0]
+
+    it("reads a deck stored before versions as its only version, and saves it in that format", () => {
+      storage.set("decks.guest.v2", JSON.stringify([{ ...legacy, deck: { ...deck, cards: bolt } }]))
+      const [old] = loadGuestDecks()
+      expect(guestDeckVersions(old)).toEqual([
+        { number: 1, name: "Current", createdAt: 1, updatedAt: 2, cards: bolt },
+      ])
+      expect(guestDeckBringing(old)).toBe(1)
+      saveGuestDeck({ ...deck, cards: shock }, { localId: old.localId, version: 1 })
+      expect(stored()).not.toHaveProperty("versions")
+      expect(stored().deck.cards).toEqual(shock)
+    })
+
+    it("adds a version that becomes the list older builds read", () => {
+      const saved = saveGuestDeck({ ...deck, cards: bolt })
+      addGuestDeckVersion(saved.localId, { name: "Tuned", note: "More reach", cards: shock }, 2)
+      expect(stored().deck.cards).toEqual(shock)
+      expect(stored().versions).toEqual([
+        expect.objectContaining({ number: 1, name: "Current", cards: bolt }),
+        expect.not.objectContaining({ cards: expect.anything() }),
+      ])
+      expect(guestDeckVersions(loadGuestDecks()[0])).toEqual([
+        expect.objectContaining({ number: 1, cards: bolt }),
+        expect.objectContaining({ number: 2, name: "Tuned", note: "More reach", cards: shock }),
+      ])
+    })
+
+    it("refuses a version past the limit and keeps the deck as it was", () => {
+      const saved = saveGuestDeck({ ...deck, cards: bolt })
+      addGuestDeckVersion(saved.localId, { name: "Tuned", cards: shock }, 2)
+      const before = storage.getString("decks.guest.v2")
+      expect(() => addGuestDeckVersion(saved.localId, { name: "Third", cards: [] }, 2)).toThrow(
+        "This deck holds up to 2 versions. Delete one to add another.",
+      )
+      expect(storage.getString("decks.guest.v2")).toBe(before)
+      expect(() =>
+        addGuestDeckVersion(saved.localId, { name: "Third", cards: [] }, 5),
+      ).not.toThrow()
+    })
+
+    it("saves into the chosen version and leaves the others alone", () => {
+      const saved = saveGuestDeck({ ...deck, cards: bolt })
+      addGuestDeckVersion(saved.localId, { name: "Tuned", cards: shock }, 2)
+      saveGuestDeck({ ...deck, name: "Renamed", cards: [] }, { localId: saved.localId, version: 1 })
+      const [edited] = loadGuestDecks()
+      expect(edited.deck).toMatchObject({ name: "Renamed", cards: shock })
+      expect(guestDeckVersions(edited).map((version) => version.cards)).toEqual([[], shock])
+      expect(() => saveGuestDeck(deck, { localId: saved.localId, version: 7 })).toThrow(
+        "does not exist",
+      )
+    })
+
+    it("renames, picks, and deletes versions", () => {
+      const saved = saveGuestDeck({ ...deck, cards: bolt })
+      addGuestDeckVersion(saved.localId, { name: "Tuned", cards: shock }, 2)
+      const renamed = updateGuestDeckVersion(saved.localId, 1, { name: "Stock", note: "" })
+      setGuestDeckBringing(saved.localId, 2)
+      expect(loadGuestDecks()[0]).toMatchObject({ bringing: 2, updatedAt: renamed.updatedAt })
+
+      deleteGuestDeckVersion(saved.localId, 2)
+      const [left] = loadGuestDecks()
+      expect(left.deck.cards).toEqual(bolt)
+      expect(guestDeckVersions(left)).toEqual([
+        expect.objectContaining({ number: 1, name: "Stock", cards: bolt }),
+      ])
+      expect(left.bringing).toBeUndefined()
+      expect(() => deleteGuestDeckVersion(saved.localId, 1)).toThrow()
+    })
+
+    it("creates a moved deck with every version in order", () => {
+      const moved = saveGuestDeck(
+        { ...deck, cards: shock },
+        {
+          movedFromAccount: true,
+          bringing: 3,
+          versions: [
+            { number: 1, name: "Current", cards: bolt },
+            { number: 3, name: "Tuned", cards: shock },
+          ],
+        },
+      )
+      expect(guestDeckVersions(moved).map(({ number, cards }) => ({ number, cards }))).toEqual([
+        { number: 1, cards: bolt },
+        { number: 3, cards: shock },
+      ])
+      expect(guestDeckBringing(moved)).toBe(3)
+    })
   })
 
   it("round-trips guest route ids", () => {

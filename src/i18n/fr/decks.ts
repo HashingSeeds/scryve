@@ -214,6 +214,10 @@ export default {
     failed: "Impossible de synchroniser ce deck. Il reste enregistré sur cet appareil.",
     limit_reached:
       "Vos decks synchronisés sont au complet. Le deck reste enregistré sur cet appareil.",
+    version_limit:
+      "Ce deck a plus de versions que votre compte n'en conserve. Supprimez-en sur cet appareil pour synchroniser.",
+    versionLimit:
+      "Ce deck a {{versions}} versions. Les comptes gratuits en conservent {{limit}}. Supprimez-en {{remove}} pour synchroniser.",
     conflict: "Ce deck a été modifié sur un autre appareil. Il reste enregistré sur cet appareil.",
     kept_newer_edits:
       "Ce deck contient des modifications plus récentes. Il reste enregistré sur cet appareil.",

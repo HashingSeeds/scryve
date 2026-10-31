@@ -192,6 +192,10 @@ const decks = {
       "This deck came from another account. Add a new deck with empty stats? You'll see it twice: synced and on this device.",
     failed: "Could not sync this deck. It is still saved on this device.",
     limit_reached: "Your synced decks are full. The deck is still saved on this device.",
+    version_limit:
+      "This deck has more versions than your account keeps. Delete some on this device to sync.",
+    versionLimit:
+      "This deck has {{versions}} versions. Free accounts keep {{limit}}. Delete {{remove}} to sync.",
     conflict: "This deck changed on another device. It is still saved on this device.",
     kept_newer_edits: "This deck has newer edits. It is still saved on this device.",
   },

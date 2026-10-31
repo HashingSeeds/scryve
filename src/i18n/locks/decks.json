@@ -158,6 +158,8 @@
   "localSync.otherAccount": "08375b7cd523",
   "localSync.failed": "3402ea701b54",
   "localSync.limit_reached": "06cf196c0f05",
+  "localSync.version_limit": "178c7c6603dc",
+  "localSync.versionLimit": "3c3ac3a5b8ed",
   "localSync.conflict": "630236cc33df",
   "localSync.kept_newer_edits": "506e8610ff93",
   "cardDetails.offline": "edecfcc217c1",

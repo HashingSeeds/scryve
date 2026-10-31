@@ -13,7 +13,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { loadGuestDeck } from "@/features/decks/guestDeck"
+import { guestDeckPlayCards, loadGuestDeck } from "@/features/decks/guestDeck"
 import { createClientId } from "@/features/game/domain"
 import {
   BEST_OF_OPTIONS,
@@ -322,8 +322,9 @@ async function localDeckIds(localId: string) {
   const stored = loadGuestDeck(localId)
   if (!stored) throw new Error(translate("decks:detail.maybeDeleted"))
   const [choice] = localDeckChoices([stored])
-  const fingerprint = await deckFingerprint(stored.deck.cards)
-  if (choice.deckKey) saveListSnapshot(choice.deckKey, fingerprint, stored.deck.cards)
+  const cards = guestDeckPlayCards(stored)
+  const fingerprint = await deckFingerprint(cards)
+  if (choice.deckKey) saveListSnapshot(choice.deckKey, fingerprint, cards)
   return {
     deckKey: choice.deckKey,
     deckFingerprint: fingerprint,

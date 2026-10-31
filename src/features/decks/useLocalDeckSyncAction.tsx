@@ -7,7 +7,7 @@ import { convexErrorMessage } from "@/utils/convexError"
 
 import { DeckLimitDialog } from "./DeckLimit"
 import { LocalDeckAccountDialog } from "./LocalDeckAccountDialog"
-import { useLocalDeckSync, type LocalDeckSyncResult } from "./localDeckSync"
+import { useLocalDeckSync, versionLimitMessage, type LocalDeckSyncResult } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -40,6 +40,7 @@ export function useLocalDeckSyncAction({
       if (result.status === "synced") onSynced(result.deckId)
       else if (result.status === "other_account") setOtherAccount(result)
       else if (result.status === "limit_reached") setMakingRoom(true)
+      else if (result.status === "version_limit") setError(versionLimitMessage(result))
       else setError(translate(`decks:localSync.${result.status}`))
     } catch (cause) {
       setError(convexErrorMessage(cause, translate("decks:localSync.failed")))
