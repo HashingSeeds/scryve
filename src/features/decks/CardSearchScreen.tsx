@@ -147,7 +147,12 @@ export function CardSearch({
   const side = deckCards ? sideboardSection({ game, format }) : undefined
   const picksSection =
     !deckCards ||
-    sections.some((item) => item.id !== "main" && item.id !== "commander" && item.id !== side?.id)
+    sections.some(
+      (item) =>
+        item.id !== "main" &&
+        item.id !== side?.id &&
+        !(item.id === "commander" && picksCommander(game, format)),
+    )
   const filtersCards =
     systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit

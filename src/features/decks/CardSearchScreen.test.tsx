@@ -697,4 +697,14 @@ describe("adding into a deck's draft", () => {
     fireEvent.press(view.getByLabelText("Add Isolde to Side Deck"))
     expect(onAdd.mock.calls.map(([card]) => card.section)).toEqual(["extra", "side"])
   })
+
+  it("keeps the picker for Brawl, whose Commander has no commander flow", async () => {
+    mockAction.mockResolvedValue([])
+    const { view } = await searchDeck({ game: "mtg", format: "brawl", deckCards: [] })
+
+    fireEvent.press(view.getByTestId("card-search-section"))
+    await waitFor(() =>
+      expect(view.getByTestId("card-search-section-option-commander")).toBeTruthy(),
+    )
+  })
 })

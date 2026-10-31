@@ -44,7 +44,12 @@ import {
 } from "@/features/decks/guestDeck"
 import { useLocalDeckSyncing, versionLimitMessage } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
-import { forgetLocalDraft, keepLocalDraft, loadLocalDraft } from "@/features/decks/savedDeckDrafts"
+import {
+  forgetLocalDraft,
+  keepLocalDraft,
+  loadLocalDraft,
+  type SavedLocalDraft,
+} from "@/features/decks/savedDeckDrafts"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useLocalDeckSyncAction } from "@/features/decks/useLocalDeckSyncAction"
@@ -82,6 +87,18 @@ function versionList(stored: GuestDeck, number: number): GuestDeckPayload {
 
 function cardQuantity(cards: GuestDeckPayload["cards"]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
+}
+
+function keepDraft(
+  localId: string,
+  draft: GuestDraft | undefined,
+  base: GuestDeckPayload | undefined,
+  revision: SavedLocalDraft["revision"] | undefined,
+  version: number,
+) {
+  if (draft && base && revision && !sameDraft(draft, base))
+    keepLocalDraft(localId, { deck: deckOf(draft), base, revision, version })
+  else forgetLocalDraft(localId)
 }
 
 function sameDraft(a: GuestDraft | undefined, b: GuestDraft | undefined) {
@@ -203,11 +220,7 @@ export function GuestDeckDetailScreen({
   }, [draftRef, setDraft, saved, stored])
 
   useEffect(() => {
-    const base = baseRef.current
-    const revision = revisionRef.current
-    if (draft && base && revision && !sameDraft(draft, base))
-      keepLocalDraft(localId, { deck: deckOf(draft), base, revision, version: activeNumber })
-    else forgetLocalDraft(localId)
+    keepDraft(localId, draft, baseRef.current, revisionRef.current, activeNumber)
   }, [activeNumber, draft, localId])
 
   useEffect(() => {
@@ -249,6 +262,11 @@ export function GuestDeckDetailScreen({
   const update = (changes: Partial<GuestDeckPayload>) =>
     setDraft({ ...(draftRef.current ?? current), ...changes })
   const addCard = (card: GuestCard) => edit({ type: "add", card }, rules)
+  // why: /cards edits the draft while this screen is frozen, and the persist effect waits until it shows again.
+  const keepSearchEdit = <Result,>(result: Result) => {
+    keepDraft(localId, draftRef.current, baseRef.current, revisionRef.current, activeNumber)
+    return result
+  }
   const removeCard = (card: GuestCard) => edit({ type: "remove", card }, rules)
   const chooseCommander = (color?: GuestCard["commanderColor"]) => {
     if (!focusedCard) return
@@ -493,8 +511,8 @@ export function GuestDeckDetailScreen({
         onDetails={() => setSheet("actions")}
         cardSearch={{
           deckId: guestDeckRouteId(localId),
-          onAdd: addCard,
-          onRemove: removeCard,
+          onAdd: (card) => keepSearchEdit(addCard(card)),
+          onRemove: (card) => keepSearchEdit(removeCard(card)),
           cards: () => (draftRef.current ?? current).cards,
           subscribe: subscribeDraft,
         }}
