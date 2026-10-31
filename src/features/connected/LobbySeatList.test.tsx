@@ -481,22 +481,3 @@ it("still offers a new deck when the only device deck can't sync", () => {
   fireEvent.press(screen.getByText("+ New deck"))
   expect(onAddDeck).toHaveBeenCalledTimes(1)
 })
-
-it("falls back to deck management for + New deck when there's no Add deck route", () => {
-  const onManageDecks = jest.fn()
-  render(
-    <ThemeProvider initialContext="dark">
-      <LobbySeatList
-        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
-        openSeats={0}
-        system="mtg"
-        deckState={{ status: "ready", value: [] }}
-        versionLabel={() => "Current"}
-        onSelectVersion={jest.fn()}
-        onManageDecks={onManageDecks}
-      />
-    </ThemeProvider>,
-  )
-  fireEvent.press(screen.getByText("+ New deck"))
-  expect(onManageDecks).toHaveBeenCalledTimes(1)
-})

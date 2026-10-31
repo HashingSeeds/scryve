@@ -14,7 +14,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { LAN_NAME_MAX_LENGTH, lanPlayAvailable, loadLanName, saveLanName } from "./lanAvailability"
 import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
 import { nearbyGameCode } from "./nearbyCode"
-import { OpenSettingsButton } from "./NearbyLobbyScreen"
+import { OpenSettingsButton } from "./NearbyStatusScreen"
 import { useNearbyGames } from "./useNearbyGames"
 
 const selectTable = ({ role, lobby }: LanSessionState) =>
