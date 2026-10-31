@@ -101,7 +101,7 @@ export function ImportBuild({
   const [useError, setUseError] = useState<string>()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const shown = cards ?? []
-  const analysis = useDeckAnalysis(game, format, shown)
+  const analysis = useDeckAnalysis(game, format, editable ? shown : [])
   const [listFinal, setListFinal] = useState(false)
   if (!listFinal && cards && editable && !analysis?.detailsPending) setListFinal(true)
   const nameIndex = useCardNameIndex(
