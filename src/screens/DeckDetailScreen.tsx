@@ -646,11 +646,11 @@ function DeckDetailContent({
       captureAnalytics("deck_used", { feature: "saved" })
       setNewListNotice(newList)
       const after = latestDraft.current
-      if (after.cards === draft.cards) {
+      if (after.cards === draft.cards && after.note === draft.note) {
         setDraft(closeDeckDraft(after))
         return
       }
-      // why: /cards can add while the save is in flight; those adds stay as changes on top of what was saved.
+      // why: /cards adds and note edits can land while the save is in flight; they stay as changes on top of what was saved.
       pinnedVersionTarget.current = undefined
       metadataSaveStarted.current = false
       setDraft({ ...after, base: draft.cards })

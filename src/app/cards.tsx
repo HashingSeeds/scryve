@@ -13,7 +13,6 @@ export default function CardsRoute() {
   const [system] = useState(() =>
     playSystemId(game ?? localGameRepository.loadActiveGame()?.system),
   )
-  // why: a cold open has no deck screen in Build, so there is no loaded draft to add to.
   const host = useDeckSearchHost(deckId)
   if (host) return <DeckCardsRoute key={host.game} host={host} />
   return (
