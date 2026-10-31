@@ -505,7 +505,7 @@ test("renders signed-in local deck stats by key as one record", () => {
     </ThemeProvider>,
   )
   expect(mockStatsQuery).toHaveBeenCalledWith(expect.anything(), { deckKey: "stable-deck-key" })
-  expect(view.getByText("Results · 4-2")).toBeTruthy()
+  expect(view.getByTestId("deck-play-record")).toHaveTextContent("4-2")
   fireEvent.press(view.getByTestId("open-deck-stats"))
   expect(mockStatsPush).toHaveBeenCalledWith({
     pathname: "/connected/decks/stats",

@@ -5,13 +5,14 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { DeckVersionDialog, type DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
+import { PressableIcon } from "@/components/Icon"
 import { Text } from "@/components/Text"
-import { TextAction } from "@/components/TextAction"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { cardCountLabel } from "./deckCopy"
+import { PlusAccessory } from "./DeckView"
 
 export type VersionsRow<Id extends string = string> = {
   id: Id
@@ -100,17 +101,7 @@ export function DeckVersionsDialogs<Id extends string>({
         wide
       >
         <ScrollView contentContainerStyle={themed($versions)}>
-          <View style={themed($versionHeading)}>
-            <Text preset="subheading" tx="decks:detail.versions" />
-            {onNew ? (
-              <TextAction
-                testID="version-picker-__new__"
-                tx="decks:detail.newVersion"
-                disabled={newDisabled}
-                onPress={onNew}
-              />
-            ) : null}
-          </View>
+          <Text preset="subheading" tx="decks:detail.versions" />
           {rows.map((row) => {
             const selected = row.id === activeId
             return (
@@ -130,30 +121,38 @@ export function DeckVersionsDialogs<Id extends string>({
                   <View style={themed($versionCopy)}>
                     <Text weight="medium" text={row.label} />
                     {row.note ? (
-                      <Text size="xxs" tone="dim" text={row.note} numberOfLines={2} />
+                      <Text size="meta" tone="dim" text={row.note} numberOfLines={2} />
                     ) : null}
                   </View>
                   <View style={themed($versionContext)}>
                     {row.record ? (
                       <Text weight="medium" style={$tabularNumbers} text={row.record} />
                     ) : null}
-                    <Text size="xxs" tone="dim" text={cardCountLabel(row.cardQuantity)} />
+                    <Text size="meta" tone="dim" text={cardCountLabel(row.cardQuantity)} />
                   </View>
                 </TouchableOpacity>
                 {selected && onManage ? (
-                  <TouchableOpacity
+                  <PressableIcon
+                    icon="more"
                     testID="rename-version-button"
                     accessibilityRole="button"
                     accessibilityLabel={translate("decks:detail.versionDetails")}
-                    style={$versionMore}
+                    containerStyle={$versionMore}
                     onPress={onManage}
-                  >
-                    <Text size="lg" text="•••" />
-                  </TouchableOpacity>
+                  />
                 ) : null}
               </View>
             )
           })}
+          {onNew ? (
+            <Button
+              testID="version-picker-__new__"
+              tx="decks:detail.newVersion"
+              LeftAccessory={PlusAccessory}
+              disabled={newDisabled}
+              onPress={onNew}
+            />
+          ) : null}
           {error ? <AlertNote text={error} /> : null}
         </ScrollView>
       </DialogCard>
@@ -200,13 +199,6 @@ export function DeckVersionsDialogs<Id extends string>({
 
 const $tabularNumbers: TextStyle = { fontVariant: ["tabular-nums"] }
 const $versions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $versionHeading: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 36,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: spacing.sm,
-})
 const $versionRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 72,
   flexDirection: "row",
@@ -235,7 +227,7 @@ const $versionMark: ThemedStyle<ViewStyle> = ({ radius }) => ({
   borderRadius: radius.full,
 })
 const $versionMarkSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.gameMenu.actions.history,
+  backgroundColor: colors.tint,
 })
 const $versionCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
 const $versionContext: ThemedStyle<ViewStyle> = ({ spacing }) => ({

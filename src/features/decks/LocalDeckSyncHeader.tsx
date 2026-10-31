@@ -4,7 +4,7 @@ import { ScrollView, View } from "react-native"
 import { useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
-import { ChoiceButton } from "@/components/ChoiceButton"
+import { CheckboxRow } from "@/components/CheckboxRow"
 import { DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
@@ -139,18 +139,16 @@ function LocalDeckSyncPicker({
     >
       <Text preset="subheading" tx="decks:localSync.pickTitle" txOptions={{ count: free }} />
       <ScrollView style={$choices}>
-        <View style={themed($stack)}>
-          {localDecks.map((local) => (
-            <ChoiceButton
-              key={local.localId}
-              testID={`local-deck-sync-choice-${local.localId}`}
-              selected={selected.includes(local.localId)}
-              disabled={busy || (!selected.includes(local.localId) && selected.length >= free)}
-              text={local.deck.name}
-              onPress={() => toggle(local.localId)}
-            />
-          ))}
-        </View>
+        {localDecks.map((local) => (
+          <CheckboxRow
+            key={local.localId}
+            testID={`local-deck-sync-choice-${local.localId}`}
+            checked={selected.includes(local.localId)}
+            disabled={busy || (!selected.includes(local.localId) && selected.length >= free)}
+            label={local.deck.name}
+            onToggle={() => toggle(local.localId)}
+          />
+        ))}
       </ScrollView>
       {premium ? null : (
         <View style={themed($row)}>
@@ -188,7 +186,6 @@ function LocalDeckSyncPicker({
 }
 
 const $dialog: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
-const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

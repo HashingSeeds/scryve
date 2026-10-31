@@ -26,7 +26,7 @@ import {
 } from "@/features/decks/deckDraftStore"
 import { DeckPlay } from "@/features/decks/DeckPlay"
 import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
-import { DeckView, type DeckMode } from "@/features/decks/DeckView"
+import { DeckHeaderIcon, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import {
   addGuestDeckVersion,
   deleteGuestDeck,
@@ -234,7 +234,12 @@ export function GuestDeckDetailScreen({
         backgroundColor={theme.colors.surface}
         contentContainerStyle={themed($screen)}
       >
-        <Header titleTx="decks:deckView.guestTitle" leftTx="common:back" onLeftPress={onBack} />
+        <Header
+          titleTx="decks:deckView.guestTitle"
+          LeftActionComponent={
+            <DeckHeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+          }
+        />
         <View style={themed($empty)}>
           <Text preset="subheading" tx="decks:guestDetail.unavailable" />
           <Text tx="decks:guestDetail.unavailableDetail" />

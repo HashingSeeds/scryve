@@ -111,9 +111,9 @@ const $find: ThemedStyle<ViewStyle> = ({ colors, radius, spacing }) => ({
   gap: spacing.xs,
   paddingHorizontal: spacing.sm,
   borderWidth: 1,
-  borderRadius: radius.sm,
+  borderRadius: radius.lg,
   borderColor: colors.border,
-  backgroundColor: colors.background,
+  backgroundColor: colors.field,
 })
 const $summary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
