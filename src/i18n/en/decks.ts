@@ -677,7 +677,6 @@ const decks = {
     linkFailed: "Could not load this deck. Try again or paste its text export.",
     resolveFailed: "Could not resolve deck list. Try again.",
     notes: "Notes",
-    optional: "Optional",
     noMatches: "No matching decks",
     noDecksHere: "No decks here yet",
     noMatchesDetail: "Try another search, paste a list, or start an empty deck.",
@@ -699,7 +698,6 @@ const decks = {
     loadingImages: "Loading card images",
     loadingOfficial: "Loading official card list",
     previewUnavailable: "Preview unavailable",
-    startingPoint: "Starting point",
     browseOffline: "You're offline. Decks will load when you reconnect.",
     rateLimited_one: "Refresh available in {{count}} seconds. Saved results remain available.",
     rateLimited_other: "Refresh available in {{count}} seconds. Saved results remain available.",
@@ -711,7 +709,6 @@ const decks = {
     importSource: "Import source",
     pasteText: "Paste text",
     sourceLink: "{{source}} link",
-    pasteInstead: "Paste text instead",
     deckList: "Deck list",
     // Card names, quoted examples and section headings are parser input; keep them in English exactly.
     listHelperYgo:
@@ -747,8 +744,7 @@ const decks = {
     search: "Search",
     searchLabel: "Search for a card to replace {{line}}",
     removeLabel: "Remove {{line}}",
-    linesToFix_one: "{{count}} line to fix",
-    linesToFix_other: "{{count}} lines to fix",
+    linesToFix: "Lines to fix",
     removeAll: "Remove all",
     useFailed: "Could not add {{card}}. Try again.",
   },

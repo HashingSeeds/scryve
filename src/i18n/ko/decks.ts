@@ -599,7 +599,6 @@ export default {
     linkFailed: "이 덱을 불러올 수 없습니다. 다시 시도하거나 텍스트 내보내기를 붙여넣으세요.",
     resolveFailed: "덱 리스트를 확인할 수 없습니다. 다시 시도하세요.",
     notes: "메모",
-    optional: "선택 사항",
     noMatches: "일치하는 덱 없음",
     noDecksHere: "아직 덱이 없습니다",
     noMatchesDetail: "다른 검색어를 입력하거나, 리스트를 붙여넣거나, 빈 덱을 시작하세요.",
@@ -621,7 +620,6 @@ export default {
     loadingImages: "카드 이미지 불러오는 중",
     loadingOfficial: "공식 카드 목록 불러오는 중",
     previewUnavailable: "미리보기를 사용할 수 없음",
-    startingPoint: "시작점",
     browseOffline: "오프라인 상태입니다. 다시 연결되면 덱을 불러옵니다.",
     rateLimited_other:
       "{{count}}초 후 새로고침할 수 있습니다. 저장된 결과는 계속 사용할 수 있습니다.",
@@ -633,7 +631,6 @@ export default {
     importSource: "가져오기 소스",
     pasteText: "텍스트 붙여넣기",
     sourceLink: "{{source}} 링크",
-    pasteInstead: "대신 텍스트 붙여넣기",
     deckList: "덱 리스트",
     listHelperYgo:
       "YDK 카드 ID 또는 3 Ash Blossom 같은 줄을 붙여넣으세요. Main, Extra, Side 제목을 지원합니다.",
@@ -662,7 +659,7 @@ export default {
     search: "검색",
     searchLabel: "{{line}}을(를) 대체할 카드 검색",
     removeLabel: "{{line}} 삭제",
-    linesToFix_other: "수정할 줄 {{count}}개",
+    linesToFix: "수정할 줄",
     removeAll: "모두 삭제",
     useFailed: "{{card}}을(를) 추가하지 못했습니다. 다시 시도하세요.",
   },

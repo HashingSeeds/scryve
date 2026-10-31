@@ -369,7 +369,9 @@ describe("AddDeckScreen", () => {
     expect(
       within(view.getByTestId("import-problem-1")).getByText("Couldn't read this line"),
     ).toBeTruthy()
-    expect(view.getByText("2 lines to fix")).toBeTruthy()
+    const problemsHeader = within(view.getByTestId("import-problems-header"))
+    expect(problemsHeader.getByText("Lines to fix")).toBeTruthy()
+    expect(problemsHeader.getByText("2")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeDisabled()
     fireEvent.press(view.getByLabelText("Remove 0 Mountain"))
     expect(view.queryByText('"0 Mountain"')).toBeNull()
@@ -1268,7 +1270,7 @@ describe("AddDeckScreen", () => {
       expect(view.getByText("Use a public Archidekt deck or paste its text export.")).toBeTruthy(),
     )
     expect(view.getByTestId("deck-link-input").props.value).toBe(resolvedArchidekt.sourceUrl)
-    fireEvent.press(view.getByText("Paste text instead"))
+    fireEvent.press(view.getByTestId("import-source-text"))
     expect(view.getByLabelText("Deck list")).toBeTruthy()
     expect(mockSaveDeck).not.toHaveBeenCalled()
   })

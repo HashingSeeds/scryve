@@ -9,7 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { Keyboard, Linking, TouchableOpacity, View } from "react-native"
 import { useAction, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -21,7 +21,9 @@ import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
+import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
+import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
@@ -34,7 +36,7 @@ import { deckNameWarning } from "@/features/decks/deckCopy"
 import { isCommanderPick, MAX_CARD_COPIES, type DeckEdits } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { type GuestDeckPayload } from "@/features/decks/guestDeck"
-import { ImportBuild } from "@/features/decks/ImportBuild"
+import { HeaderBackIcon, ImportBuild } from "@/features/decks/ImportBuild"
 import { pastedLines, type ImportProblem } from "@/features/decks/importLines"
 import { useSaveNewDeck } from "@/features/decks/localDeckSync"
 import { SaveDestination, useSaveDestination } from "@/features/decks/SaveDestination"
@@ -621,6 +623,11 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     onPreview()
   }
 
+  function openCatalogDeck(deck: CatalogDeck) {
+    setSelectedCatalogDeck(deck)
+    onPreview()
+  }
+
   function closeExample() {
     previewToken.current += 1
     setPreviewLoading(false)
@@ -861,7 +868,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     <TextField
       testID="deck-note-input"
       labelTx="decks:addDeck.notes"
-      placeholderTx="decks:addDeck.optional"
+      optional
       value={note}
       multiline
       numberOfLines={3}
@@ -917,7 +924,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     )
     const attribution = importDraft?.attribution
     const details = attribution ? (
-      <TouchableOpacity
+      <TextAction
         accessibilityRole="link"
         accessibilityLabel={
           attribution.author
@@ -927,15 +934,15 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               })
             : translate("decks:addDeck.viewOn", { source: attribution.sourceName })
         }
+        text={attributionLabel(attribution, " · ")}
+        size="xs"
         style={$importAttribution}
         onPress={() =>
           void Linking.openURL(attribution.sourceUrl).catch(() =>
             setError(translate("decks:addDeck.openFailed", { source: attribution.sourceName })),
           )
         }
-      >
-        <Text text={attributionLabel(attribution, " · ")} size="xs" tone="dim" />
-      </TouchableOpacity>
+      />
     ) : selectedCatalogDeck ? (
       <>
         <Text size="xs" tone="dim" text={catalogDeckDetail(selectedCatalogDeck)} />
@@ -1085,9 +1092,11 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
 
   const browse = (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
-      <Header titleTx="decks:shelf.addDeck" leftTx="common:back" onLeftPress={onBack} />
+      <Header
+        titleTx="decks:shelf.addDeck"
+        LeftActionComponent={<HeaderBackIcon onPress={onBack} />}
+      />
       <View style={themed($stack)}>
-        <Text preset="subheading" tx="decks:settings.title" accessibilityRole="header" />
         <View style={themed($configRow)}>
           <View style={$flex1}>
             <SelectField
@@ -1122,28 +1131,18 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
             />
           </View>
         </View>
-        <View
+        <Tabs
           testID="mode-picker-options"
-          accessibilityRole="tablist"
-          accessibilityLabel={translate("decks:addDeck.startingPoint")}
-          style={themed($tabs)}
-        >
-          {MODES.filter(({ id }) => id !== "precon" || browsable).map((candidate) => (
-            <TouchableOpacity
-              key={candidate.id}
-              testID={`mode-picker-options-${candidate.id}`}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: mode === candidate.id }}
-              style={[themed($tab), mode === candidate.id && themed($selectedTab)]}
-              onPress={() => {
-                invalidatePasted()
-                setMode(candidate.id)
-              }}
-            >
-              <Text tx={candidate.labelTx} weight={mode === candidate.id ? "bold" : "normal"} />
-            </TouchableOpacity>
-          ))}
-        </View>
+          tabs={MODES.filter(({ id }) => id !== "precon" || browsable).map(({ id, labelTx }) => ({
+            id,
+            label: translate(labelTx),
+          }))}
+          selectedId={mode}
+          onSelect={(next) => {
+            invalidatePasted()
+            setMode(next)
+          }}
+        />
         {mode === "precon" ? (
           <View style={themed($stack)}>
             <TextField
@@ -1209,10 +1208,15 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
                   {preconDetail(deck) ? (
-                    <Text size="xs" tone="dim" text={preconDetail(deck)} />
+                    <Text size="meta" tone="dim" text={preconDetail(deck)} />
                   ) : null}
                 </View>
-                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.open" />
+                <TextAction
+                  tx="decks:addDeck.open"
+                  accessible={false}
+                  disabled={previewLoading}
+                  onPress={() => openPrecon(deck)}
+                />
               </TouchableOpacity>
             ))}
             {catalogDecks.map((deck) => (
@@ -1222,16 +1226,17 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
                 accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
-                onPress={() => {
-                  setSelectedCatalogDeck(deck)
-                  onPreview()
-                }}
+                onPress={() => openCatalogDeck(deck)}
               >
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
-                  <Text size="xs" tone="dim" text={catalogDeckDetail(deck)} />
+                  <Text size="meta" tone="dim" text={catalogDeckDetail(deck)} />
                 </View>
-                <Text weight="medium" style={themed($textAction)} tx="decks:addDeck.open" />
+                <TextAction
+                  tx="decks:addDeck.open"
+                  accessible={false}
+                  onPress={() => openCatalogDeck(deck)}
+                />
               </TouchableOpacity>
             ))}
             {catalogCursor ? (
@@ -1247,33 +1252,24 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
         {mode === "paste" ? (
           <View style={themed($stack)}>
             {linkSource ? (
-              <View
-                accessibilityRole="tablist"
+              <SegmentedControl
+                testID="import-source"
                 accessibilityLabel={translate("decks:addDeck.importSource")}
-                style={themed($tabs)}
-              >
-                {IMPORT_KINDS.map((kind) => (
-                  <TouchableOpacity
-                    key={kind}
-                    testID={`import-source-${kind}`}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: importKind === kind }}
-                    style={[themed($tab), importKind === kind && themed($selectedTab)]}
-                    onPress={() => {
-                      invalidatePasted()
-                      setImportKind(kind)
-                    }}
-                  >
-                    <Text
-                      text={
-                        kind === "text"
-                          ? translate("decks:addDeck.pasteText")
-                          : translate("decks:addDeck.sourceLink", { source: linkSource.name })
-                      }
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
+                segments={IMPORT_KINDS.map((kind) => ({
+                  id: kind,
+                  label:
+                    kind === "text"
+                      ? translate("decks:addDeck.pasteText")
+                      : translate("decks:addDeck.sourceLink", { source: linkSource.name }),
+                }))}
+                selectedId={importKind}
+                onSelect={(id) => {
+                  const kind = IMPORT_KINDS.find((candidate) => candidate === id)
+                  if (!kind) return
+                  invalidatePasted()
+                  setImportKind(kind)
+                }}
+              />
             ) : null}
             <TextField
               testID="deck-name-input"
@@ -1284,30 +1280,21 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               onChangeText={setName}
             />
             {importKind === "link" && linkSource ? (
-              <>
-                <TextField
-                  testID="deck-link-input"
-                  label={translate("decks:addDeck.sourceLink", { source: linkSource.name })}
-                  placeholder={linkSource.placeholder}
-                  helperTx={linkSource.helperTx}
-                  value={deckLink}
-                  maxLength={2048}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={(next) => {
-                    invalidatePasted()
-                    setDeckLink(next)
-                  }}
-                />
-                <Button
-                  tx="decks:addDeck.pasteInstead"
-                  onPress={() => {
-                    invalidatePasted()
-                    setImportKind("text")
-                  }}
-                />
-              </>
+              <TextField
+                testID="deck-link-input"
+                label={translate("decks:addDeck.sourceLink", { source: linkSource.name })}
+                placeholder={linkSource.placeholder}
+                helperTx={linkSource.helperTx}
+                value={deckLink}
+                maxLength={2048}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={(next) => {
+                  invalidatePasted()
+                  setDeckLink(next)
+                }}
+              />
             ) : (
               <TextField
                 labelTx="decks:addDeck.deckList"
@@ -1398,7 +1385,6 @@ const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   alignItems: "flex-start",
 })
-const $textAction: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $resultRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 68,
   flexDirection: "row",
@@ -1408,20 +1394,6 @@ const $resultRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.md,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  justifyContent: "center",
-  paddingVertical: spacing.xs,
-  borderBottomWidth: 2,
-  borderBottomColor: "transparent",
-})
-const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.text })
 const $importAttribution: ViewStyle = {
   minHeight: 44,
   maxWidth: "100%",
