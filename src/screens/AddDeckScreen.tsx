@@ -388,8 +388,11 @@ export function AddDeckScreen({
   const editor = buildingPasted ? pasted : example
   const importDraft = buildingPasted ? pastedDraft : exampleDraft
   const reviewing = Boolean((buildingPasted && pastedDraft) || exampleOrigin)
-  // why: the deck preview is state inside this route, so swipe back and Android Back would pop Add Deck; send them to the preview's Back. Web keeps browser Back and skips the leave-page prompt.
-  usePreventRemove(reviewing && Platform.OS !== "web", leaveImport)
+  // why: the deck preview is state inside this route, so swipe back (POP) and Android Back (GO_BACK) would pop Add Deck; send them to the preview's Back. Other removals, like opening the saved deck, go through. Web keeps browser Back and skips the leave-page prompt.
+  usePreventRemove(reviewing && Platform.OS !== "web", ({ data, repeat }) => {
+    if (data.action.type === "POP" || data.action.type === "GO_BACK") leaveImport()
+    else repeat()
+  })
 
   useEffect(() => {
     if (!selectedCatalogDeck || catalogDetail?.deck._id !== selectedCatalogDeck._id) return
