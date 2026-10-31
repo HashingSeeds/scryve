@@ -361,10 +361,15 @@ const decks = {
     noCached: "No cached cards match. Cards appear here after you add them online.",
     noResults: "No cards found.",
     dismissFilters: "Dismiss commander filters",
+    // Heading in card search filters over the color buttons.
+    colors: "Colors",
     colorMatch: "Color match",
-    withinColors: "Within these colors",
-    allowAdditional: "Allow additional colors",
-    exactColors: "Exactly these colors",
+    // Segment under "Color match": cards use only the picked colors, or fewer.
+    withinColors: "Within",
+    // Segment under "Color match": cards use all the picked colors and may add more.
+    allowAdditional: "At least",
+    // Segment under "Color match": cards use exactly the picked colors.
+    exactColors: "Exactly",
     searchKeywords: "Search keywords",
     keywords: "Keywords",
     keywordsOffline: "Open filters online to save keyword choices.",
