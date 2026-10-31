@@ -8,18 +8,14 @@ import type { ThemedStyle } from "@/theme/types"
 
 export function DeckListSkeleton({
   sections,
-  density = "compact",
 }: {
   sections: readonly { id: string; label: string }[]
-  density?: "compact" | "comfortable"
 }) {
   const { themed } = useAppTheme()
   const visibleSections =
     sections.length > 0
       ? sections.slice(0, 2)
       : [{ id: "cards", label: translate("decks:loading.cards") }]
-  const rowStyle = density === "comfortable" ? $comfortableRow : $compactRow
-  const thumbnailStyle = density === "comfortable" ? $comfortableThumbnail : $compactThumbnail
 
   return visibleSections.map((section, sectionIndex) => (
     <View key={section.id}>
@@ -27,8 +23,8 @@ export function DeckListSkeleton({
         <Text weight="bold" text={section.label} />
       </View>
       {Array.from({ length: sectionIndex === 0 ? 1 : 3 }).map((_, index) => (
-        <View key={index} style={[themed($row), rowStyle]}>
-          <View style={[themed($thumbnail), thumbnailStyle]} />
+        <View key={index} style={themed($row)}>
+          <View style={themed($thumbnail)} />
           <View style={themed($line)} />
         </View>
       ))}
@@ -45,20 +41,19 @@ const $sectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 84,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $compactRow = { minHeight: 68 } as const
-const $comfortableRow = { minHeight: 84 } as const
 const $thumbnail: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
+  width: 48,
+  height: 68,
   borderRadius: radius.xxs,
   backgroundColor: colors.separator,
 })
-const $compactThumbnail = { width: 36, height: 50 } as const
-const $comfortableThumbnail = { width: 48, height: 68 } as const
 const $line: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: "64%",
   height: 14,

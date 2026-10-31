@@ -600,8 +600,6 @@ export default {
     linkFailed:
       "このデッキを読み込めませんでした。もう一度試すか、テキストをエクスポートして貼り付けてください。",
     resolveFailed: "デッキリストを解決できませんでした。もう一度お試しください。",
-    overflowOnFormat:
-      "{{card}}が999枚を超えてしまいます。フォーマットを変更する前に枚数を減らしてください。",
     notes: "メモ",
     optional: "任意",
     noMatches: "一致するデッキがありません",
@@ -658,7 +656,6 @@ export default {
   },
   importBuild: {
     title: "新規デッキ",
-    notSaved: "未保存",
     didYouMean: "{{card}}ですか?",
     useIt: "これを使う",
     useItLabel: "{{line}}に{{card}}を使う",

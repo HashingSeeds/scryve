@@ -632,8 +632,6 @@ export default {
       "{{card}} dépasse 999 exemplaires après la correspondance. Corrigez la source et réessayez.",
     linkFailed: "Impossible de charger ce deck. Réessayez ou collez son export texte.",
     resolveFailed: "Impossible de résoudre la liste du deck. Réessayez.",
-    overflowOnFormat:
-      "{{card}} dépasserait 999 exemplaires. Réduisez sa quantité avant de changer de format.",
     notes: "Notes",
     optional: "Facultatif",
     noMatches: "Aucun deck correspondant",
@@ -696,7 +694,6 @@ export default {
   },
   importBuild: {
     title: "Nouveau deck",
-    notSaved: "Non enregistré",
     didYouMean: "Vouliez-vous dire {{card}} ?",
     useIt: "Utiliser",
     useItLabel: "Utiliser {{card}} pour {{line}}",

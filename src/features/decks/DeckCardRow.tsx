@@ -169,6 +169,32 @@ export function DeckCardSectionHeader({
   )
 }
 
+export function DeckCardListSkeleton({
+  sections,
+  commanderAction,
+}: {
+  sections: readonly { id: string; label: string }[]
+  commanderAction: boolean
+}) {
+  const { themed } = useAppTheme()
+  return sections.slice(0, 2).map((section, sectionIndex) => (
+    <View key={section.id}>
+      <View style={themed($section)}>
+        <Text size="sm" weight="semiBold" text={section.label} style={$flex} />
+        {commanderAction && section.id === "commander" ? <View style={$touch} /> : null}
+      </View>
+      {Array.from({ length: sectionIndex === 0 ? 1 : 3 }).map((_, index) => (
+        <View key={index} style={themed($card)}>
+          <View style={themed($cardLink)}>
+            <View style={[$image, themed($placeholder)]} />
+            <View style={[themed($placeholder), $placeholderLine]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  ))
+}
+
 const $flex: ViewStyle = { flex: 1 }
 const $row: ViewStyle = { flexDirection: "row", alignItems: "center" }
 const $touch: ViewStyle = {
@@ -178,7 +204,9 @@ const $touch: ViewStyle = {
   justifyContent: "center",
 }
 const $quantity: TextStyle = { minWidth: 18, textAlign: "center", fontVariant: ["tabular-nums"] }
-const $image: ImageStyle = { width: 32, height: 45 }
+const $image: ImageStyle & ViewStyle = { width: 32, height: 45 }
+const $placeholderLine: ViewStyle = { width: "64%", height: 14 }
+const $placeholder: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.separator })
 const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
