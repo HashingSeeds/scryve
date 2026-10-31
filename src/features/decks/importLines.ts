@@ -1,9 +1,5 @@
 import type { DeckCard } from "./deckCards"
-import {
-  lookupKey,
-  parsePrintingReference,
-  readPastedDeckList,
-} from "../../../convex/lib/pastedDeckList"
+import { parsePrintingReference, readPastedDeckList } from "../../../convex/lib/pastedDeckList"
 
 export type ImportProblem = { line: string; kind: "unmatched" | "invalid" }
 
@@ -14,10 +10,10 @@ export function lineCardName(line: string) {
 }
 
 export function pastedLines(list: string, reference: string) {
-  const wanted = lookupKey(parsePrintingReference(reference))
+  const wanted = reference.trim()
   const copies = new Map<Board, number>()
   for (const entry of readPastedDeckList(list).entries) {
-    if (lookupKey(entry) !== wanted) continue
+    if ((entry.originalReference ?? entry.name) !== wanted) continue
     copies.set(entry.board, (copies.get(entry.board) ?? 0) + entry.quantity)
   }
   return copies.size

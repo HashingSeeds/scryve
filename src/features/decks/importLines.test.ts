@@ -35,6 +35,27 @@ describe("pastedLines", () => {
     ])
   })
 
+  it("keeps an invalid printed line apart from the valid line it resembles", () => {
+    const list = "4 Island (M21) 265\nSideboard\n0 Island (M21) 265"
+    expect(pastedLines(list, "0 Island (M21) 265")).toEqual([{ quantity: 1, board: "main" }])
+  })
+
+  it("keeps different lines that share a printing apart", () => {
+    const list = "Deck\n2 Delver of Secrets (ISD) 999\nSideboard\n3 Insectile Aberration (ISD) 999"
+    expect(pastedLines(list, "Delver of Secrets (ISD) 999")).toEqual([
+      { quantity: 2, board: "main" },
+    ])
+    expect(pastedLines(list, "Insectile Aberration (ISD) 999")).toEqual([
+      { quantity: 3, board: "sideboard" },
+    ])
+  })
+
+  it("counts every line the importer merged into the reported printing", () => {
+    expect(pastedLines("1 Island (M21) 265 *F*\n1 Island (m21) 265", "Island (m21) 265")).toEqual([
+      { quantity: 2, board: "main" },
+    ])
+  })
+
   it("adds one copy to the main deck when the line is not in the text", () => {
     expect(pastedLines("1 Sol Ring", "Swrods to Plowshare")).toEqual([
       { quantity: 1, board: "main" },
