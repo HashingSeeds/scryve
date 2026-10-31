@@ -6,6 +6,7 @@ const common = {
   delete: "Delete",
   done: "Done",
   edit: "Edit",
+  optional: "optional",
   remove: "Remove",
   retry: "Retry",
   save: "Save",

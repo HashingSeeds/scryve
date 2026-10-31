@@ -9,6 +9,7 @@ export default {
   delete: "हटाएँ",
   done: "हो गया",
   edit: "संपादित करें",
+  optional: "वैकल्पिक",
   remove: "निकालें",
   retry: "फिर कोशिश करें",
   save: "सहेजें",

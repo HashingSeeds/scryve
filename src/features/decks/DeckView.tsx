@@ -8,6 +8,7 @@ import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
+import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
@@ -34,6 +35,27 @@ export const DECK_MODES = [
   { mode: "play", tx: "decks:deckView.play" },
   { mode: "build", tx: "decks:deckView.build" },
 ] as const
+
+/** why: the loading screen draws this same bar; a second hand-built copy made the tabs jump when the deck arrived. */
+export function DeckModeTabs({
+  mode,
+  onModeChange,
+  disabled,
+}: {
+  mode: DeckMode
+  onModeChange?: (mode: DeckMode) => void
+  disabled?: boolean
+}) {
+  return (
+    <Tabs
+      testID="deck-mode"
+      tabs={DECK_MODES.map((option) => ({ id: option.mode, label: translate(option.tx) }))}
+      selectedId={mode}
+      disabled={disabled}
+      onSelect={(next) => onModeChange?.(next)}
+    />
+  )
+}
 
 type CardSearch = Omit<DeckSearchHost, "game" | "format"> & { deckId: string }
 
@@ -231,20 +253,7 @@ export function DeckView({
                 </View>
               ) : null}
             </View>
-            <View style={themed($modes)} accessibilityRole="tablist">
-              {DECK_MODES.map((option) => (
-                <TouchableOpacity
-                  key={option.mode}
-                  accessibilityRole="tab"
-                  testID={`deck-mode-${option.mode}`}
-                  accessibilityState={{ selected: mode === option.mode }}
-                  style={[themed($mode), mode === option.mode && themed($selectedMode)]}
-                  onPress={() => onModeChange(option.mode)}
-                >
-                  <Text size="sm" tx={option.tx} tone={mode === option.mode ? undefined : "dim"} />
-                </TouchableOpacity>
-              ))}
-            </View>
+            <DeckModeTabs mode={mode} onModeChange={onModeChange} />
             {building ? (
               <DeckBuildTools
                 analysis={cardsUnavailable || cards.length === 0 ? undefined : analysis?.analysis}
@@ -476,20 +485,6 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.md,
 })
 const $notLatest: ThemedStyle<TextStyle> = ({ spacing }) => ({ marginLeft: spacing.sm })
-const $modes: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.lg,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $mode: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  justifyContent: "center",
-  paddingHorizontal: spacing.xxs,
-  borderBottomWidth: 2,
-  borderBottomColor: "transparent",
-})
-const $selectedMode: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
 const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.lg,
   gap: spacing.sm,

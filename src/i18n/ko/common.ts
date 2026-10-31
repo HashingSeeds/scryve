@@ -9,6 +9,7 @@ export default {
   delete: "삭제",
   done: "완료",
   edit: "편집",
+  optional: "선택 사항",
   remove: "제거",
   retry: "재시도",
   save: "저장",
