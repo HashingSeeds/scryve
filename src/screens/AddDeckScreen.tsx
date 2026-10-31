@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react"
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Keyboard, Linking, Platform, TouchableOpacity, View } from "react-native"
+import { Keyboard, Linking, TouchableOpacity, View } from "react-native"
 import { useAction, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
-import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
@@ -297,15 +306,27 @@ function catalogDeckDetail(deck: CatalogDeck) {
     .join(" · ")
 }
 
-export function AddDeckScreen({
-  onBack,
-  onCreated,
-  access,
-}: {
+export type AddDeckProps = {
   onBack: () => void
   onCreated: (deckId: string) => void
+  onPreview: () => void
+  onClosePreview: () => void
   access?: CloudAccess
-}) {
+}
+
+const AddDeckContext = createContext<ReturnType<typeof useAddDeck> | undefined>(undefined)
+
+export function AddDeckProvider({ children, ...props }: AddDeckProps & { children: ReactNode }) {
+  return <AddDeckContext value={useAddDeck(props)}>{children}</AddDeckContext>
+}
+
+export function useAddDeckFlow() {
+  const flow = use(AddDeckContext)
+  if (!flow) throw new Error("useAddDeckFlow must be used inside AddDeckProvider")
+  return flow
+}
+
+function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: AddDeckProps) {
   const { themed } = useAppTheme()
   const destination = useSaveDestination(access)
   const saveNewDeck = useSaveNewDeck(destination.access?.ownerId)
@@ -394,11 +415,6 @@ export function AddDeckScreen({
   const editor = buildingPasted ? pasted : example
   const importDraft = buildingPasted ? pastedDraft : exampleDraft
   const reviewing = Boolean((buildingPasted && pastedDraft) || exampleOrigin)
-  // why: the deck preview is state inside this route, so swipe back (POP) and Android Back (GO_BACK) would pop Add Deck; send them to the preview's Back. Other removals, like opening the saved deck, go through. Web keeps browser Back and skips the leave-page prompt.
-  usePreventRemove(reviewing && Platform.OS !== "web", ({ data, repeat }) => {
-    if (data.action.type === "POP" || data.action.type === "GO_BACK") leaveImport()
-    else repeat()
-  })
 
   useEffect(() => {
     if (!selectedCatalogDeck || catalogDetail?.deck._id !== selectedCatalogDeck._id) return
@@ -602,6 +618,7 @@ export function AddDeckScreen({
     if (sameOrigin(latestExample.current, { kind: "precon", source: deck.fileName }))
       setSelectedPrecon(deck)
     else void previewPrecon(deck)
+    onPreview()
   }
 
   function closeExample() {
@@ -668,6 +685,7 @@ export function AddDeckScreen({
       })
       Keyboard.dismiss()
       setBuildingPasted(true)
+      onPreview()
     } catch (cause) {
       if (pastedToken.current === token)
         fail(
@@ -682,12 +700,8 @@ export function AddDeckScreen({
   }
 
   function leaveImport() {
-    if (!buildingPasted) {
-      closeExample()
-      return
-    }
+    closeExample()
     invalidatePasted()
-    setFocusedPreviewCard(undefined)
     setBuildingPasted(false)
   }
 
@@ -877,6 +891,7 @@ export function AddDeckScreen({
     </View>
   )
 
+  let review: ReactElement | undefined
   if (reviewing) {
     const draftGame = importDraft?.game ?? selectedCatalogDeck?.game ?? game
     const draftFormat =
@@ -976,7 +991,7 @@ export function AddDeckScreen({
         }
       />
     ) : undefined
-    return (
+    review = (
       <Screen
         key="import-build"
         preset="fixed"
@@ -1024,7 +1039,7 @@ export function AddDeckScreen({
             !importName.trim()
           }
           onSave={saveImport}
-          onBack={leaveImport}
+          onBack={onClosePreview}
           onFocus={focusImportCard}
           onAdd={addImportCard}
           onRemove={removeImportCard}
@@ -1068,7 +1083,7 @@ export function AddDeckScreen({
     )
   }
 
-  return (
+  const browse = (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header titleTx="decks:shelf.addDeck" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($stack)}>
@@ -1207,7 +1222,10 @@ export function AddDeckScreen({
                 accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
                 activeOpacity={0.75}
                 style={themed($resultRow)}
-                onPress={() => setSelectedCatalogDeck(deck)}
+                onPress={() => {
+                  setSelectedCatalogDeck(deck)
+                  onPreview()
+                }}
               >
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
@@ -1315,6 +1333,7 @@ export function AddDeckScreen({
                   if (resolvingPasted) return
                   Keyboard.dismiss()
                   setBuildingPasted(true)
+                  onPreview()
                 }}
               />
             ) : null}
@@ -1361,6 +1380,8 @@ export function AddDeckScreen({
       </View>
     </Screen>
   )
+
+  return { browse, review, leavePreview: leaveImport }
 }
 
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({

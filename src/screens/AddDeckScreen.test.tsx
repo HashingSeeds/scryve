@@ -1,3 +1,4 @@
+import { useEffect, useRef, type RefObject } from "react"
 import { Linking } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
@@ -15,7 +16,7 @@ import { ThemeProvider } from "@/theme/context"
 import { captureAnalytics } from "@/utils/analytics"
 import { clear } from "@/utils/storage"
 
-import { AddDeckScreen } from "./AddDeckScreen"
+import { AddDeckProvider, useAddDeckFlow, type AddDeckProps } from "./AddDeckScreen"
 import { integrationFor } from "../../convex/lib/integrations"
 
 const mockPresentPaywall = jest.fn()
@@ -129,15 +130,28 @@ jest.mock("@/features/decks/guestDeck", () => {
 })
 const mockSaveDeck = jest.mocked(saveGuestDeck)
 
-// why: these tests render outside a navigator; this records what a swipe back or Android Back would run.
-type PreventRemove = typeof import("expo-router/react-navigation").usePreventRemove
-const mockPreventRemove = jest.fn<ReturnType<PreventRemove>, Parameters<PreventRemove>>(
-  () => () => {},
-)
-jest.mock("expo-router/react-navigation", () => ({
-  ...jest.requireActual("expo-router/react-navigation"),
-  usePreventRemove: (...args: Parameters<PreventRemove>) => mockPreventRemove(...args),
-}))
+const mockShowPreview = jest.fn()
+
+function AddDeckInPlace(props: Pick<AddDeckProps, "onBack" | "onCreated" | "access">) {
+  const leaveRef = useRef<() => void>(undefined)
+  return (
+    <AddDeckProvider
+      {...props}
+      onPreview={mockShowPreview}
+      onClosePreview={() => leaveRef.current?.()}
+    >
+      <InPlaceRoutes leaveRef={leaveRef} />
+    </AddDeckProvider>
+  )
+}
+
+function InPlaceRoutes({ leaveRef }: { leaveRef: RefObject<(() => void) | undefined> }) {
+  const { browse, review, leavePreview } = useAddDeckFlow()
+  useEffect(() => {
+    leaveRef.current = leavePreview
+  })
+  return review ?? browse
+}
 
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 
@@ -209,7 +223,7 @@ jest.mock("../../convex/_generated/api", () => ({
 function renderAddDeck(onCreated = jest.fn()) {
   return render(
     <ThemeProvider initialContext="light">
-      <AddDeckScreen onBack={jest.fn()} onCreated={onCreated} />
+      <AddDeckInPlace onBack={jest.fn()} onCreated={onCreated} />
     </ThemeProvider>,
   )
 }
@@ -259,7 +273,7 @@ describe("AddDeckScreen", () => {
     ]
     view.rerender(
       <ThemeProvider initialContext="light">
-        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+        <AddDeckInPlace onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
     expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
@@ -271,7 +285,7 @@ describe("AddDeckScreen", () => {
   it("warns when other players would see a neutral label instead of the deck name", () => {
     const view = render(
       <ThemeProvider initialContext="light">
-        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+        <AddDeckInPlace onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
     chooseMode(view, "paste")
@@ -299,7 +313,7 @@ describe("AddDeckScreen", () => {
     })
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AddDeckScreen onBack={jest.fn()} onCreated={onCreated} />
+        <AddDeckInPlace onBack={jest.fn()} onCreated={onCreated} />
       </ThemeProvider>,
     )
     chooseFormat(view, "standard")
@@ -1424,7 +1438,7 @@ describe("AddDeckScreen", () => {
     mockConnection.isWebSocketConnected = true
     view.rerender(
       <ThemeProvider initialContext="light">
-        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+        <AddDeckInPlace onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
     await waitFor(() => expect(view.getByText("Back online deck")).toBeTruthy())
@@ -1464,7 +1478,7 @@ describe("AddDeckScreen", () => {
     const onCreated = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
-        <AddDeckScreen onBack={jest.fn()} onCreated={onCreated} />
+        <AddDeckInPlace onBack={jest.fn()} onCreated={onCreated} />
       </ThemeProvider>,
     )
     chooseMode(view, "blank")
@@ -1601,7 +1615,7 @@ describe("AddDeckScreen", () => {
   it("loads descriptions in a signed-out card preview", async () => {
     const view = render(
       <ThemeProvider initialContext="dark">
-        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+        <AddDeckInPlace onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
     continueSetup(view)
@@ -1755,7 +1769,7 @@ describe("AddDeckScreen", () => {
     })
   })
 
-  it("returns from a Top Deck preview to the search on swipe back but lets a save leave", async () => {
+  it("opens a Top Deck preview on its own route so swipe back lands on the search", async () => {
     mockSearchTopDecks.mockResolvedValueOnce([
       { _id: "catalog-mtg", game: "mtg", name: "Sample Modern deck", kind: "tournament" },
     ])
@@ -1763,21 +1777,11 @@ describe("AddDeckScreen", () => {
 
     await act(async () => jest.advanceTimersByTime(400))
     await waitFor(() => expect(view.getByText("Sample Modern deck")).toBeTruthy())
-    expect(mockPreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function))
+    mockShowPreview.mockClear()
     fireEvent.press(view.getByText("Sample Modern deck"))
+
+    expect(mockShowPreview).toHaveBeenCalledTimes(1)
     expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
-
-    const [preventing, removePrevented] = mockPreventRemove.mock.lastCall!
-    expect(preventing).toBe(true)
-    const repeat = jest.fn()
-    act(() => removePrevented!({ data: { action: { type: "REPLACE" } }, repeat }))
-    expect(repeat).toHaveBeenCalled()
-    expect(view.queryByTestId("mode-picker-options-precon")).toBeNull()
-
-    act(() => removePrevented!({ data: { action: { type: "POP" } }, repeat: jest.fn() }))
-
-    expect(view.getByText("Sample Modern deck")).toBeTruthy()
-    expect(mockPreventRemove).toHaveBeenLastCalledWith(false, expect.any(Function))
   })
 
   it("resolves a Pokemon Top Deck card from its provider reference", async () => {
@@ -1872,7 +1876,7 @@ describe("AddDeckScreen", () => {
     function renderSignedIn(onCreated = jest.fn()) {
       const view = render(
         <ThemeProvider initialContext="light">
-          <AddDeckScreen access={access} onBack={jest.fn()} onCreated={onCreated} />
+          <AddDeckInPlace access={access} onBack={jest.fn()} onCreated={onCreated} />
         </ThemeProvider>,
       )
       chooseMode(view, "blank")
