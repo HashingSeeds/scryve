@@ -31,6 +31,7 @@ export function useDeckAnalysis(game: string, format: string, cards: DeckCard[])
   const client = useConvex()
   const online = useConvexOnline()
   const [details, setDetails] = useState(loadCardDetails)
+  const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set())
   const requested = useRef(new Set<string>())
   useEffect(() => {
     if (!enabled || !online) return
@@ -41,17 +42,25 @@ export function useDeckAnalysis(game: string, format: string, cards: DeckCard[])
       return true
     })
     if (pending.length === 0) return
+    const keys = pending.map((card) => cardDetailsKey(card, game))
     fetchCardDetails(client, game, pending)
       .then(() => setDetails(loadCardDetails()))
       .catch(() => {
-        for (const card of pending) requested.current.delete(cardDetailsKey(card, game))
+        for (const key of keys) requested.current.delete(key)
       })
+      .finally(() => setSettled((previous) => new Set([...previous, ...keys])))
   }, [client, enabled, game, cards, online])
   return useMemo(() => {
     if (!enabled) return undefined
     const detailsFor = (card: DeckCard) => details[cardDetailsKey(card, game)]
-    return { detailsFor, analysis: analyzeDeck({ cards, format, details: detailsFor }) }
-  }, [enabled, cards, format, details, game])
+    const detailsPending =
+      online && cards.some((card) => !detailsFor(card) && !settled.has(cardDetailsKey(card, game)))
+    return {
+      detailsFor,
+      detailsPending,
+      analysis: analyzeDeck({ cards, format, details: detailsFor }),
+    }
+  }, [enabled, cards, format, details, game, online, settled])
 }
 
 export function DeckAnalysisPanel({

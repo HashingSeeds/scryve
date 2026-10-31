@@ -710,22 +710,6 @@ export function AddDeckScreen({
     editor.edit({ type: "remove", card }, draft)
   }
 
-  function changeImportFormat(next: string) {
-    const draft = editor.latest.current
-    if (!draft) return
-    const normalized = normalizeImportedCards(draft.cards, draft.game, next)
-    if ("overflow" in normalized) {
-      setError(translate("decks:addDeck.overflowOnFormat", { card: normalized.overflow }))
-      return
-    }
-    if (buildingPasted) {
-      setDeckFormat(next)
-      setFormat(next)
-    }
-    editor.setDraft({ ...draft, format: next, cards: normalized.cards })
-    setError(undefined)
-  }
-
   function withoutProblem(draft: ImportDraft, problem: ImportProblem): ImportDraft {
     return {
       ...draft,
@@ -950,12 +934,6 @@ export function AddDeckScreen({
             }
           />
         ) : null}
-        {importDraft ? null : (
-          <LoadingProgress
-            state="loading"
-            accessibilityText={translate("decks:addDeck.loadingTopDeck")}
-          />
-        )}
       </>
     ) : selectedPrecon ? (
       <>
@@ -965,19 +943,6 @@ export function AddDeckScreen({
         {["standard", "pioneer", "modern"].includes(draftFormat) ? (
           <Text size="xs" tone="dim" tx="decks:addDeck.originalPrecon" />
         ) : null}
-        {importDraft ? null : (
-          <LoadingProgress
-            testID="precon-loading-progress"
-            state={previewLoading ? "loading" : "unavailable"}
-            accessibilityText={
-              previewLoading
-                ? preconOutline
-                  ? translate("decks:addDeck.loadingImages")
-                  : translate("decks:addDeck.loadingOfficial")
-                : translate("decks:addDeck.previewUnavailable")
-            }
-          />
-        )}
         {previewError ? (
           <RetryableError
             message={previewError}
@@ -988,6 +953,24 @@ export function AddDeckScreen({
         ) : null}
       </>
     ) : null
+    const progress = selectedCatalogDeck ? (
+      <LoadingProgress
+        state="loading"
+        accessibilityText={translate("decks:addDeck.loadingTopDeck")}
+      />
+    ) : selectedPrecon ? (
+      <LoadingProgress
+        testID="precon-loading-progress"
+        state={importDraft || previewLoading ? "loading" : "unavailable"}
+        accessibilityText={
+          !importDraft && !previewLoading
+            ? translate("decks:addDeck.previewUnavailable")
+            : importDraft || preconOutline
+              ? translate("decks:addDeck.loadingImages")
+              : translate("decks:addDeck.loadingOfficial")
+        }
+      />
+    ) : undefined
     return (
       <Screen
         key="import-build"
@@ -1000,10 +983,10 @@ export function AddDeckScreen({
           onNameChange={renameImport}
           game={draftGame}
           format={draftFormat}
-          onFormatChange={changeImportFormat}
           cards={cards}
           editable={Boolean(importDraft)}
           details={details}
+          progress={progress}
           problems={importDraft?.problems ?? []}
           onApplyGuess={applyGuess}
           onRemoveProblem={removeProblem}

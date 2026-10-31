@@ -591,7 +591,6 @@ export default {
       "매칭 후 {{card}}의 수량이 999장을 초과합니다. 원본을 수정한 후 다시 시도하세요.",
     linkFailed: "이 덱을 불러올 수 없습니다. 다시 시도하거나 텍스트 내보내기를 붙여넣으세요.",
     resolveFailed: "덱 리스트를 확인할 수 없습니다. 다시 시도하세요.",
-    overflowOnFormat: "{{card}}이(가) 999장을 초과합니다. 포맷을 변경하기 전에 수량을 줄이세요.",
     notes: "메모",
     optional: "선택 사항",
     noMatches: "일치하는 덱 없음",

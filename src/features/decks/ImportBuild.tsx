@@ -8,7 +8,6 @@ import { Button } from "@/components/Button"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
-import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
@@ -32,7 +31,7 @@ import type { GuestDeckPayload } from "./guestDeck"
 import { lineCardName, type ImportProblem } from "./importLines"
 import { SaveDestination, type SaveDestinationState } from "./SaveDestination"
 import { useCardNameIndex } from "./useCardNameIndex"
-import { deckFormats, deckGame } from "../../../convex/lib/deckGames"
+import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 
 type Card = GuestDeckPayload["cards"][number]
 
@@ -41,10 +40,10 @@ export function ImportBuild({
   onNameChange,
   game,
   format,
-  onFormatChange,
   cards,
   editable,
   details,
+  progress,
   problems,
   onApplyGuess,
   onRemoveProblem,
@@ -69,10 +68,10 @@ export function ImportBuild({
   onNameChange: (name: string) => void
   game: string
   format: string
-  onFormatChange: (format: string) => void
   cards?: DeckCard[]
   editable: boolean
   details?: ReactNode
+  progress?: ReactNode
   problems: readonly ImportProblem[]
   onApplyGuess: (problem: ImportProblem, card: string) => Promise<string | undefined>
   onRemoveProblem: (problem: ImportProblem) => void
@@ -101,6 +100,8 @@ export function ImportBuild({
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const shown = cards ?? []
   const analysis = useDeckAnalysis(game, format, shown)
+  const [listFinal, setListFinal] = useState(false)
+  if (!listFinal && cards && editable && !analysis?.detailsPending) setListFinal(true)
   const nameIndex = useCardNameIndex(
     game,
     deviceId,
@@ -125,11 +126,11 @@ export function ImportBuild({
       ? () => setSearch({ commander: true })
       : undefined
   const sections = buildSections(
-    shown,
+    listFinal ? shown : [],
     deckSections,
     analysis && ((card) => analysis.detailsFor(card)?.typeLine),
   )
-  if (chooseCommander && !sections.some((section) => section.board === "commander")) {
+  if (listFinal && chooseCommander && !sections.some((section) => section.board === "commander")) {
     sections.unshift({
       board: "commander",
       label: translate("systems:section.commander"),
@@ -183,23 +184,13 @@ export function ImportBuild({
                 editable={editable}
                 onChangeText={onNameChange}
               />
-              <SelectField
-                testID="format-picker-options"
-                label={translate("decks:settings.format")}
-                field="format"
-                value={format}
-                options={deckFormats(game)}
-                disabled={!editable}
-                onSelect={(next) => {
-                  if (next) onFormatChange(next)
-                }}
-              />
               <Text
                 size="xs"
                 tone="dim"
                 testID="import-build-summary"
                 text={[
                   deckGame(game)?.shortLabel ?? game,
+                  deckFormatLabel(game, format),
                   cards ? cardCountLabel(totalQuantity(cards)) : undefined,
                   translate("decks:importBuild.notSaved"),
                 ]
@@ -208,13 +199,18 @@ export function ImportBuild({
               />
               {details}
             </View>
-            {editable ? (
+            {listFinal ? (
               <DeckBuildTools
                 analysis={shown.length === 0 ? undefined : analysis?.analysis}
                 onFind={() => setSearch({})}
                 onAnalysis={() => setAnalysisOpen(true)}
               />
-            ) : null}
+            ) : (
+              <>
+                {progress}
+                <DeckListSkeleton sections={deckSections} />
+              </>
+            )}
             {error ? <AlertNote text={error} /> : null}
             {useError ? <AlertNote text={useError} /> : null}
             {!name.trim() ? <AlertNote text={translate("decks:addDeck.nameRequired")} /> : null}
@@ -291,7 +287,6 @@ export function ImportBuild({
                 </View>
               )
             })}
-            {cards ? null : <DeckListSkeleton sections={deckSections} />}
           </>
         }
         renderSectionHeader={({ section }) => (

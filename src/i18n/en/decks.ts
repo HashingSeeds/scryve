@@ -667,8 +667,6 @@ const decks = {
       "{{card}} has more than 999 copies after matching. Correct the source and try again.",
     linkFailed: "Could not load this deck. Try again or paste its text export.",
     resolveFailed: "Could not resolve deck list. Try again.",
-    overflowOnFormat:
-      "{{card}} would exceed 999 copies. Reduce its quantity before changing format.",
     notes: "Notes",
     optional: "Optional",
     noMatches: "No matching decks",

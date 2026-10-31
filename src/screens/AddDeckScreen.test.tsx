@@ -5,7 +5,6 @@ import { ConvexError } from "convex/values"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { cardDetailsKey } from "@/features/decks/deckCards"
 import {
   clearGuestDecks,
   guestDeckRouteId,
@@ -542,8 +541,7 @@ describe("AddDeckScreen", () => {
     enterPasted(view)
     await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
     expect(view.getByTestId("deck-name-input").props.value).toBe("Reviewed deck")
-    expect(view.getByText("Magic · 2 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Commander")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 2 cards · Not saved")).toBeTruthy()
     expect(view.queryByTestId("game-picker-options")).toBeNull()
     expect(view.queryByTestId("mode-picker-options")).toBeNull()
     expect(view.queryByTestId("deck-note-input")).toBeNull()
@@ -715,7 +713,7 @@ describe("AddDeckScreen", () => {
         "Some card details are missing. Deck color identity has not been fully checked.",
       ),
     ).toBeNull()
-    expect(view.getByText("Magic · 5 cards · Not saved")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 5 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Change commander"))
     expect(view.UNSAFE_getByType(CardSearchScreen).props.initialSection).toBe("commander")
     fireEvent.press(view.getByLabelText("Preview The Prismatic Piper as commander"))
@@ -725,14 +723,13 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByTestId("commander-color-option-G"))
     fireEvent.press(view.getByTestId("set-commander"))
     expect(view.queryByTestId("card-search-input")).toBeNull()
-    expect(view.getByText("Magic · 5 cards · Not saved")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 5 cards · Not saved")).toBeTruthy()
     expect(view.getByText("Another copy of this commander remains in the deck.")).toBeTruthy()
     expect(view.getByText("Outside this commander's color identity: Old commander.")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeEnabled()
     expect(view.getByLabelText("3× Old commander")).toBeTruthy()
     expect(view.getAllByLabelText("1× The Prismatic Piper")).toHaveLength(2)
-    expect(view.getByText("Magic · 5 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Commander")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 5 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockSaveDeck).toHaveBeenCalledWith(
@@ -746,100 +743,6 @@ describe("AddDeckScreen", () => {
               section: "commander",
               commanderColor: "G",
             }),
-          ]),
-        }),
-      ),
-    )
-  })
-
-  async function editColorCommander(quantity: number) {
-    const card = { ...resolvedForest.cards[0], board: "main" as const, quantity }
-    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards: [card] })
-    saveCardDetails({
-      [cardDetailsKey(card, "mtg")]: {
-        commanderEligibility: "color-choice",
-        commanderLegality: "legal",
-        colorIdentity: "",
-      },
-    })
-    const view = renderAddDeck()
-    enterPasted(view)
-    await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
-    fireEvent.press(view.getByTestId("deck-add-cards"))
-    act(() => {
-      expect(
-        view.UNSAFE_getByType(CardSearchScreen).props.onAdd({
-          ...card,
-          quantity: 1,
-          section: "commander",
-          board: "commander",
-          commanderColor: "U",
-        }),
-      ).toBeUndefined()
-    })
-    fireEvent.press(
-      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
-    )
-    return view
-  }
-
-  it("moves unsupported commanders to main and merges the same printing when changing format", async () => {
-    const view = await editColorCommander(4)
-    chooseFormat(view, "modern")
-    expect(view.getByText("Magic · 4 cards · Not saved")).toBeTruthy()
-    expect(view.queryByTestId("import-card-commander-0")).toBeNull()
-    fireEvent.press(view.getByTestId("save-import-button"))
-    await waitFor(() =>
-      expect(mockSaveDeck).toHaveBeenCalledWith(
-        expect.objectContaining({
-          format: "modern",
-          cards: [expect.objectContaining({ quantity: 4, section: "main", board: "main" })],
-        }),
-      ),
-    )
-    expect(mockSaveDeck).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        cards: expect.arrayContaining([
-          expect.objectContaining({ commanderColor: expect.anything() }),
-        ]),
-      }),
-    )
-  })
-
-  it("preserves commanders and their chosen color in formats with a commander section", async () => {
-    const view = await editColorCommander(4)
-    chooseFormat(view, "brawl")
-    expect(view.getByTestId("import-card-commander-0")).toBeTruthy()
-    fireEvent.press(view.getByTestId("save-import-button"))
-    await waitFor(() =>
-      expect(mockSaveDeck).toHaveBeenCalledWith(
-        expect.objectContaining({
-          format: "brawl",
-          cards: expect.arrayContaining([
-            expect.objectContaining({ quantity: 1, section: "commander", commanderColor: "U" }),
-          ]),
-        }),
-      ),
-    )
-  })
-
-  it("keeps the format and every card when moving a commander would exceed 999 copies", async () => {
-    const view = await editColorCommander(999)
-    fireEvent.press(view.getAllByLabelText("Increase Forest")[1])
-    chooseFormat(view, "modern")
-    expect(
-      view.getByText("Forest would exceed 999 copies. Reduce its quantity before changing format."),
-    ).toBeTruthy()
-    expect(view.getByText("Magic · 1000 cards · Not saved")).toBeTruthy()
-    expect(view.getByTestId("import-card-commander-0")).toBeTruthy()
-    fireEvent.press(view.getByTestId("save-import-button"))
-    await waitFor(() =>
-      expect(mockSaveDeck).toHaveBeenCalledWith(
-        expect.objectContaining({
-          format: "commander",
-          cards: expect.arrayContaining([
-            expect.objectContaining({ quantity: 999, section: "main" }),
-            expect.objectContaining({ quantity: 1, section: "commander", commanderColor: "U" }),
           ]),
         }),
       ),
@@ -870,15 +773,15 @@ describe("AddDeckScreen", () => {
       reference === "cards.search" ? [solRing] : { urls: [] },
     )
     const view = renderAddDeck()
+    chooseFormat(view, "modern")
     enterPasted(view, "2 Island (M21) 265\n1 Island (DMU) 278")
     await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
     fireEvent.press(view.getAllByLabelText("Increase Island")[0])
-    expect(view.getByText("Magic · 4 cards · Not saved")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 4 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getAllByLabelText("Decrease Island")[0])
     fireEvent.press(view.getByLabelText("Remove Island"))
-    expect(view.getByText("Magic · 2 cards · Not saved")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 2 cards · Not saved")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Edited islands")
-    chooseFormat(view, "modern")
     fireEvent.press(view.getByTestId("deck-add-cards"))
     fireEvent.changeText(view.getByTestId("card-search-input"), "Sol Ring")
     await act(async () => jest.advanceTimersByTime(400))
@@ -902,7 +805,7 @@ describe("AddDeckScreen", () => {
       "2 Island (M21) 265\n1 Island (DMU) 278",
     )
     fireEvent.press(view.getByTestId("return-import-review-button"))
-    expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
+    await waitFor(() => expect(view.getByLabelText("2× Sol Ring")).toBeTruthy())
     expect(mockResolvePasted).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
@@ -975,10 +878,9 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterPasted(view)
     await waitFor(() => expect(view.getByLabelText("3× Forest")).toBeTruthy())
-    expect(view.getByText("Magic · 5 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Commander")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 5 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getAllByLabelText("Increase Forest")[0])
-    expect(view.getByText("Magic · 6 cards · Not saved")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 6 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockSaveDeck).toHaveBeenCalledWith(
@@ -1186,8 +1088,7 @@ describe("AddDeckScreen", () => {
     enterLink(view)
     await waitFor(() => expect(view.getByLabelText("2× Forest")).toBeTruthy())
     expect(view.getByTestId("deck-name-input").props.value).toBe("Public Forests")
-    expect(view.getByText("Magic · 2 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Modern")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 2 cards · Not saved")).toBeTruthy()
     expect(view.queryByTestId("deck-link-input")).toBeNull()
     expect(view.queryByTestId("mode-picker-options")).toBeNull()
     expect(view.getByText("Archidekt · ForestPlayer")).toBeTruthy()
@@ -1254,8 +1155,7 @@ describe("AddDeckScreen", () => {
       url: "https://ygoprodeck.com/deck/x-312866",
       game: "ygo",
     })
-    expect(view.getByText("Yu-Gi-Oh! · 3 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Advanced")).toBeTruthy()
+    expect(view.getByText("Yu-Gi-Oh! · Advanced · 3 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockSaveDeck).toHaveBeenCalledWith(
@@ -1274,15 +1174,13 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterLink(view)
     await waitFor(() => expect(view.getByLabelText("2× Forest")).toBeTruthy())
-    expect(view.getByText("Magic · 2 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Modern")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 2 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getByRole("button", { name: "Back" }))
     chooseFormat(view, "standard")
     expect(view.queryByTestId("save-import-button")).toBeNull()
     fireEvent.press(view.getByTestId("review-import-button"))
     await waitFor(() => expect(view.getByTestId("save-import-button")).toBeEnabled())
-    expect(view.getByText("Magic · 2 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Standard")).toBeTruthy()
+    expect(view.getByText("Magic · Standard · 2 cards · Not saved")).toBeTruthy()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockSaveDeck).toHaveBeenCalledWith(expect.objectContaining({ format: "standard" })),
@@ -1301,13 +1199,12 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterLink(view)
     await waitFor(() => expect(view.getByTestId("import-card-commander-0")).toBeTruthy())
-    chooseFormat(view, "modern")
     fireEvent.press(view.getByRole("button", { name: "Back" }))
+    chooseFormat(view, "modern")
     fireEvent.press(view.getByTestId("review-import-button"))
     await waitFor(() => expect(mockResolveLink).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(view.getByTestId("save-import-button")).toBeEnabled())
-    expect(view.getByText("Magic · 3 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Modern")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 3 cards · Not saved")).toBeTruthy()
     expect(view.getByLabelText("3× Forest")).toBeTruthy()
     expect(view.queryByTestId("import-card-commander-0")).toBeNull()
     fireEvent.press(view.getByTestId("save-import-button"))
@@ -1367,8 +1264,7 @@ describe("AddDeckScreen", () => {
     enterLink(view)
     await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
     expect(view.getByTestId("deck-name-input").props.value).toBe("My forests")
-    expect(view.getByText("Magic · 2 cards · Not saved")).toBeTruthy()
-    expect(view.getByLabelText("Format, Modern")).toBeTruthy()
+    expect(view.getByText("Magic · Modern · 2 cards · Not saved")).toBeTruthy()
     expect(view.queryByTestId("game-picker-options")).toBeNull()
     expect(view.queryByTestId("deck-link-input")).toBeNull()
     expect(view.queryByTestId("deck-note-input")).toBeNull()
@@ -1607,9 +1503,10 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
     expect(mockResolvePrecon).toHaveBeenCalledWith({ fileName: "ExplorersOfTheDeep_LCC" })
     expect(mockSaveDeck).not.toHaveBeenCalled()
-    await waitFor(() => expect(view.getByText("Magic · 1 card · Not saved")).toBeTruthy())
-    expect(view.getByLabelText("Format, Commander")).toBeTruthy()
-    expect(view.getByLabelText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    await waitFor(() =>
+      expect(view.getByText("Magic · Commander · 1 card · Not saved")).toBeTruthy(),
+    )
+    await waitFor(() => expect(view.getByLabelText("1× Hakbal of the Surging Soul")).toBeTruthy())
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() => expect(mockSaveDeck).toHaveBeenCalledTimes(1))
@@ -1655,7 +1552,7 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("precon-loading-progress")).toBeTruthy()
   })
 
-  it("shows the official card outline before Scryfall hydration finishes", async () => {
+  it("keeps the deck skeleton until Scryfall hydration finishes", async () => {
     mockResolvePrecon.mockImplementationOnce(() => new Promise(() => undefined))
     const view = renderAddDeck()
     continueSetup(view)
@@ -1668,7 +1565,7 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByText("Explorers of the Deep"))
 
     await waitFor(() => expect(mockPreviewPrecon).toHaveBeenCalledTimes(1))
-    expect(view.getByLabelText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    expect(view.queryByLabelText("1× Hakbal of the Surging Soul")).toBeNull()
     expect(view.getByTestId("precon-loading-progress")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeDisabled()
   })
@@ -1688,7 +1585,10 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByText("Explorers of the Deep"))
     await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
 
-    await waitFor(() => expect(view.getByText("Magic · 1 card · Not saved")).toBeTruthy())
+    await waitFor(() =>
+      expect(view.getByText("Magic · Commander · 1 card · Not saved")).toBeTruthy(),
+    )
+    await waitFor(() => expect(view.getByTestId("import-card-commander-0")).toBeTruthy())
     fireEvent.press(view.getByTestId("import-card-commander-0"))
 
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
@@ -2016,7 +1916,7 @@ describe("AddDeckScreen", () => {
     })
   })
 
-  it("counts down a Scryfall cooldown and retries while keeping the outline", async () => {
+  it("counts down a Scryfall cooldown and retries", async () => {
     mockResolvePrecon.mockRejectedValueOnce(
       new ConvexError({
         code: "scryfall_rate_limited",
@@ -2031,7 +1931,7 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByText("Explorers of the Deep"))
     await waitFor(() => expect(view.getByText("Retrying in 3s")).toBeTruthy())
     expect(view.getByTestId("retry-precon-preview")).toBeDisabled()
-    expect(view.getByLabelText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    expect(view.queryByLabelText("1× Hakbal of the Surging Soul")).toBeNull()
     fireEvent.press(view.getByTestId("retry-precon-preview"))
     expect(mockResolvePrecon).toHaveBeenCalledTimes(1)
     await act(async () => jest.advanceTimersByTime(1000))
@@ -2040,7 +1940,7 @@ describe("AddDeckScreen", () => {
     await act(async () => jest.advanceTimersByTime(1000))
     expect(mockResolvePrecon).toHaveBeenCalledTimes(2)
     expect(view.queryByTestId("retry-precon-preview")).toBeNull()
-    expect(view.getByLabelText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    await waitFor(() => expect(view.getByLabelText("1× Hakbal of the Surging Soul")).toBeTruthy())
   })
 
   it.each(["close", "unmount"])("cancels a preview cooldown on %s", async (exit) => {

@@ -28,29 +28,6 @@ export function DeckBuildTools({
   const tallest = Math.max(1, ...(analysis?.curve ?? []))
   return (
     <View style={themed($tools)}>
-      <TouchableOpacity
-        testID="deck-add-cards"
-        accessibilityRole="button"
-        accessibilityLabel={translate("decks:build.find")}
-        accessibilityState={{ disabled: findDisabled }}
-        disabled={findDisabled}
-        style={[themed($find), findDisabled && $disabled]}
-        onPress={onFind}
-      >
-        <Svg
-          width={18}
-          height={18}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={theme.colors.textDim}
-          strokeWidth={2}
-          {...decorativeSvgProps({ accessibilityElementsHidden: true })}
-        >
-          <Circle cx={11} cy={11} r={7} />
-          <Path d="m20 20-3.5-3.5" strokeLinecap="round" />
-        </Svg>
-        <Text tone="dim" tx="decks:build.find" />
-      </TouchableOpacity>
       {analysis ? (
         <View style={themed($summary)} testID="deck-curve-strip">
           <View style={themed($curve)}>
@@ -78,6 +55,29 @@ export function DeckBuildTools({
           />
         </View>
       ) : null}
+      <TouchableOpacity
+        testID="deck-add-cards"
+        accessibilityRole="button"
+        accessibilityLabel={translate("decks:build.find")}
+        accessibilityState={{ disabled: findDisabled }}
+        disabled={findDisabled}
+        style={[themed($find), findDisabled && $disabled]}
+        onPress={onFind}
+      >
+        <Svg
+          width={18}
+          height={18}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={theme.colors.textDim}
+          strokeWidth={2}
+          {...decorativeSvgProps({ accessibilityElementsHidden: true })}
+        >
+          <Circle cx={11} cy={11} r={7} />
+          <Path d="m20 20-3.5-3.5" strokeLinecap="round" />
+        </Svg>
+        <Text tone="dim" tx="decks:build.find" />
+      </TouchableOpacity>
     </View>
   )
 }
@@ -106,7 +106,7 @@ const $find: ThemedStyle<ViewStyle> = ({ colors, radius, spacing }) => ({
   gap: spacing.xs,
   paddingHorizontal: spacing.sm,
   borderWidth: 1,
-  borderRadius: radius.md,
+  borderRadius: radius.sm,
   borderColor: colors.border,
   backgroundColor: colors.background,
 })

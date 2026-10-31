@@ -626,8 +626,6 @@ export default {
       "{{card}} tiene más de 999 copias tras la coincidencia. Corrige el origen e inténtalo de nuevo.",
     linkFailed: "No se pudo cargar este mazo. Inténtalo de nuevo o pega su exportación de texto.",
     resolveFailed: "No se pudo resolver la lista del mazo. Inténtalo de nuevo.",
-    overflowOnFormat:
-      "{{card}} superaría las 999 copias. Reduce su cantidad antes de cambiar de formato.",
     notes: "Notas",
     optional: "Opcional",
     noMatches: "No hay mazos que coincidan",
