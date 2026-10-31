@@ -536,7 +536,6 @@ export default {
     backToLobby: "ロビーに戻る",
     addDeck: "デッキを追加",
     cards: "カード",
-    collection: "デッキコレクション",
     collectionAll: "すべて",
     collectionFavorites: "お気に入り",
     collectionRecent: "最近",

@@ -568,7 +568,6 @@ export default {
     backToLobby: "Retour au salon",
     addDeck: "Ajouter un deck",
     cards: "Cartes",
-    collection: "Collection de decks",
     collectionAll: "Tous",
     collectionFavorites: "Favoris",
     collectionRecent: "Récents",
