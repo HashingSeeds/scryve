@@ -109,7 +109,7 @@ describe("CardFocusDialog", () => {
     const view = renderDialog()
     fireEvent.press(view.getByTestId("card-focus-increment"))
     fireEvent.press(view.getByTestId("card-focus-decrement"))
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     expect(view.onIncrement).toHaveBeenCalledTimes(1)
     expect(view.onDecrement).toHaveBeenCalledTimes(1)
     expect(view.onClose).toHaveBeenCalledTimes(1)

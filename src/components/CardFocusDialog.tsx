@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { ScrollView, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -8,8 +8,9 @@ import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { CardSymbolText, spokenCardText } from "@/components/CardSymbolText"
 import { DialogCard } from "@/components/DialogCard"
-import { FilterPill } from "@/components/FilterPill"
+import { PressableIcon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
+import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { readCardFaces } from "@/features/decks/cardFaces"
@@ -170,28 +171,27 @@ export function CardFocusDialog({
     >
       <View style={themed($header)}>
         <Text preset="subheading" style={themed($name)} text={visibleName} />
-        <TouchableOpacity
+        <PressableIcon
+          testID="card-focus-close"
+          icon="x"
+          size={24}
           accessibilityRole="button"
           accessibilityLabel={closeLabel}
-          style={themed($closeButton)}
+          containerStyle={themed($closeButton)}
           onPress={onClose}
-        >
-          <Text tx="common:close" weight="bold" style={themed($closeText)} />
-        </TouchableOpacity>
+        />
       </View>
       {faces.length === 2 ? (
         <View style={themed($faceControls)}>
-          {faces.map((entry, index) => (
-            <FilterPill
-              key={entry.name}
-              testID={`card-face-${index}`}
-              label={
-                index === 0 ? translate("decks:cardFocus.front") : translate("decks:cardFocus.back")
-              }
-              selected={faceIndex === index}
-              onPress={() => setFaceIndex(index)}
-            />
-          ))}
+          <SegmentedControl
+            testID="card-face"
+            segments={[
+              { id: "0", label: translate("decks:cardFocus.front") },
+              { id: "1", label: translate("decks:cardFocus.back") },
+            ]}
+            selectedId={String(faceIndex)}
+            onSelect={(id) => setFaceIndex(Number(id))}
+          />
         </View>
       ) : null}
       <ScrollView
@@ -318,21 +318,17 @@ const $cardImage: ThemedStyle<ImageStyle> = ({ radius }) => ({
   aspectRatio: CARD_ASPECT_RATIO,
   borderRadius: radius.md,
 })
-const $faceControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "center",
-  gap: spacing.xs,
-  paddingVertical: spacing.xs,
-})
+const $faceControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingVertical: spacing.xs })
 const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
 const $closeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
+  minWidth: 44,
   flexShrink: 0,
+  alignItems: "flex-end",
   justifyContent: "center",
   paddingStart: spacing.sm,
 })
-const $closeText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $dimText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $quantityRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
