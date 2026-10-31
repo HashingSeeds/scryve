@@ -132,7 +132,6 @@ const mockSaveDeck = jest.mocked(saveGuestDeck)
 
 const mockShowPreview = jest.fn()
 
-// why: these tests render outside a navigator; this stands in for the browse and preview routes, where closing the preview leaves its route.
 function AddDeckInPlace(props: Pick<AddDeckProps, "onBack" | "onCreated" | "access">) {
   const leaveRef = useRef<() => void>(undefined)
   return (
