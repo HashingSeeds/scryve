@@ -31,6 +31,7 @@ import {
 import { getManualMatchController } from "@/features/matches/matchOutbox"
 import { localDeckChoices } from "@/features/stats/deckChoices"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
+import { HeaderBackAction } from "@/features/stats/DeckStatsParts"
 import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -123,8 +124,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       <Header
         titleTx="play:recordMatch.title"
         backgroundColor={theme.colors.surface}
-        leftIcon="back"
-        onLeftPress={onBack}
+        LeftActionComponent={<HeaderBackAction onPress={onBack} />}
       />
       <ScrollView
         contentContainerStyle={themed($content)}

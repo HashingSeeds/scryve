@@ -34,6 +34,7 @@ import {
   $statsRow,
   ChevronSlot,
   DeckComparePrompt,
+  HeaderBackAction,
   listDetail,
   listLabel,
   statsDate,
@@ -60,7 +61,10 @@ export function DeckStatsScreen(props: Props) {
   )
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
-      <Header title={props.deckName} leftIcon="back" onLeftPress={props.onBack} />
+      <Header
+        title={props.deckName}
+        LeftActionComponent={<HeaderBackAction onPress={props.onBack} />}
+      />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
         fallback={({ retry }) => (

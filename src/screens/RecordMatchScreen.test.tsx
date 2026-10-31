@@ -80,7 +80,7 @@ it("saves on this device while the account is unreachable, without blocking Back
 
   await waitFor(() => expect(view.getByTestId("match-saved-offline")).toBeTruthy())
   expect(getManualMatchController(mockClient, "owner-a").getSnapshot().pending).toHaveLength(1)
-  fireEvent.press(view.UNSAFE_getByProps({ icon: "back" }))
+  fireEvent.press(view.getByLabelText("Back"))
   expect(onBack).toHaveBeenCalled()
   fireEvent.press(view.getByTestId("match-done"))
   expect(onSaved).toHaveBeenCalled()

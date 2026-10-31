@@ -30,6 +30,7 @@ import {
   $section,
   $statsRow,
   DeckComparePrompt,
+  HeaderBackAction,
   listLabel,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
@@ -53,7 +54,10 @@ export function DeckCompareScreen(props: Props) {
   )
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
-      <Header titleTx="decks:stats.compare" leftIcon="back" onLeftPress={props.onBack} />
+      <Header
+        titleTx="decks:stats.compare"
+        LeftActionComponent={<HeaderBackAction onPress={props.onBack} />}
+      />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
         fallback={({ retry }) => (
