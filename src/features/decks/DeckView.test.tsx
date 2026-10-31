@@ -251,12 +251,14 @@ describe("sideboard", () => {
 })
 
 describe("analysis sheet", () => {
-  it("opens from the curve strip and its commander nudge opens the chooser", () => {
+  it("opens from the curve strip, closes from its header, and its commander nudge opens the chooser", () => {
     const view = renderDeckView({ canChooseCommander: true })
 
     expect(view.queryByTestId("deck-analysis")).toBeNull()
     fireEvent.press(view.getByTestId("open-deck-analysis"))
-    expect(view.getByTestId("deck-analysis")).toBeTruthy()
+    fireEvent.press(view.getByTestId("close-deck-analysis"))
+    expect(view.queryByTestId("deck-analysis")).toBeNull()
+    fireEvent.press(view.getByTestId("open-deck-analysis"))
     fireEvent.press(view.getByTestId("deck-analysis-choose-commander"))
     expect(view.getByTestId("card-search")).toHaveTextContent("commander")
   })

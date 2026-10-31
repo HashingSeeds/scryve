@@ -3,15 +3,6 @@
   "version": "0.2.1",
   "private": true,
   "main": "expo-router/entry",
-  "expo": {
-    "autolinking": {
-      "android": {
-        "exclude": [
-          "@expo/ui"
-        ]
-      }
-    }
-  },
   "packageManager": "pnpm@10.34.5",
   "config": {
     "easCli": "24.12.1"
@@ -78,6 +69,7 @@
     "@convex-dev/rate-limiter": "^0.3.2",
     "@expo/dom-webview": "~58.0.2",
     "@expo/metro-runtime": "~58.0.15",
+    "@expo/ui": "~58.0.26",
     "@legendapp/state": "3.0.0-beta.48",
     "@sentry/react-native": "~8.28.0",
     "buffer": "5.7.1",

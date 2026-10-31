@@ -62,6 +62,13 @@ jest.doMock("react-native", () => {
   )
 })
 
+// why: the native sheet has no Jest renderer; show its children only while it is presented.
+jest.mock("@expo/ui", () => ({
+  BottomSheet: ({ isPresented, children }: { isPresented: boolean; children: ReactNode }) =>
+    isPresented ? children : null,
+  RNHostView: ({ children }: { children: ReactNode }) => children,
+}))
+
 jest.mock("react-native-keyboard-controller", () => ({
   KeyboardAwareScrollView: jest.requireActual("react-native").ScrollView,
   KeyboardProvider: ({ children }: { children: ReactNode }) => children,

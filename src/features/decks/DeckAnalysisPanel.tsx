@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { View } from "react-native"
+import { ScrollView, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useConvex } from "convex/react"
 
+import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
@@ -61,6 +62,40 @@ export function useDeckAnalysis(game: string, format: string, cards: DeckCard[])
       analysis: analyzeDeck({ cards, format, details: detailsFor }),
     }
   }, [enabled, cards, format, details, game, online, settled])
+}
+
+export function DeckAnalysisSheet({
+  visible,
+  analysis,
+  onClose,
+  onChooseCommander,
+}: {
+  visible: boolean
+  analysis: DeckAnalysis
+  onClose: () => void
+  onChooseCommander?: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <Sheet visible={visible} onClose={onClose} testID="deck-analysis-sheet">
+      <View style={themed($sheetHeader)}>
+        <Text preset="subheading" tx="decks:build.analysis" />
+        <TextAction testID="close-deck-analysis" tx="common:close" onPress={onClose} />
+      </View>
+      <ScrollView nestedScrollEnabled contentContainerStyle={themed($sheetContent)}>
+        <DeckAnalysisPanel
+          analysis={analysis}
+          onChooseCommander={
+            onChooseCommander &&
+            (() => {
+              onClose()
+              onChooseCommander()
+            })
+          }
+        />
+      </ScrollView>
+    </Sheet>
+  )
 }
 
 export function DeckAnalysisPanel({
@@ -303,3 +338,15 @@ const $bar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
 })
 const $colorRow: ViewStyle = { flexDirection: "row", alignItems: "center" }
 const $cell: TextStyle = { width: 64, textAlign: "right" }
+const $sheetHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  marginHorizontal: spacing.lg,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $sheetContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingHorizontal: spacing.lg,
+  paddingBottom: spacing.xl,
+})
