@@ -588,6 +588,10 @@ describe("versions", () => {
         "This deck holds up to 2 versions. Delete one to add another.",
       ),
     ).toBeTruthy()
+    fireEvent.press(full.getByTestId("deck-versions-backdrop"))
+    expect(
+      full.queryByText("This deck holds up to 2 versions. Delete one to add another."),
+    ).toBeNull()
   })
 
   test("sync explains when the deck has more versions than the account keeps", () => {

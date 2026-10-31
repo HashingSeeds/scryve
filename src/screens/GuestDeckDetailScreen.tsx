@@ -570,7 +570,10 @@ export function GuestDeckDetailScreen({
         onRename={renameVersion}
         onDelete={versions.length > 1 ? () => setSheet("deleteVersion") : undefined}
         onConfirmDelete={deleteVersion}
-        onClose={() => setSheet(undefined)}
+        onClose={() => {
+          setSheet(undefined)
+          setError(undefined)
+        }}
       />
       {sheet === "settings" ? (
         <DeckSettingsDialog
