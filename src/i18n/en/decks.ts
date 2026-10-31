@@ -728,7 +728,6 @@ const decks = {
   },
   importBuild: {
     title: "New deck",
-    notSaved: "Not saved",
     // {{card}} is our best guess for a card name the player misspelled in a pasted list.
     didYouMean: "Did you mean {{card}}?",
     // Swaps the misspelled line for the suggested card.

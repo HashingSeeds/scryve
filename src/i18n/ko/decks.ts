@@ -647,7 +647,6 @@ export default {
   },
   importBuild: {
     title: "새 덱",
-    notSaved: "저장되지 않음",
     didYouMean: "{{card}}을(를) 찾으시나요?",
     useIt: "사용",
     useItLabel: "{{line}} 대신 {{card}} 사용",

@@ -687,7 +687,6 @@ export default {
   },
   importBuild: {
     title: "Nuevo mazo",
-    notSaved: "Sin guardar",
     didYouMean: "¿Quisiste decir {{card}}?",
     useIt: "Usar",
     useItLabel: "Usar {{card}} en lugar de {{line}}",

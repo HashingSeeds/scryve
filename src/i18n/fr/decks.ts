@@ -694,7 +694,6 @@ export default {
   },
   importBuild: {
     title: "Nouveau deck",
-    notSaved: "Non enregistré",
     didYouMean: "Vouliez-vous dire {{card}} ?",
     useIt: "Utiliser",
     useItLabel: "Utiliser {{card}} pour {{line}}",

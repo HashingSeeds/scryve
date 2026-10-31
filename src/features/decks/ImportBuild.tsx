@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { ScrollView, SectionList, View } from "react-native"
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -16,6 +16,7 @@ import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { typography } from "@/theme/typography"
 
 import { firstUnambiguousCardName } from "./cardNameMatch"
 import { CardSearchScreen } from "./CardSearchScreen"
@@ -30,7 +31,7 @@ import type { GuestDeckPayload } from "./guestDeck"
 import { lineCardName, type ImportProblem } from "./importLines"
 import { SaveDestination, type SaveDestinationState } from "./SaveDestination"
 import { useCardNameIndex } from "./useCardNameIndex"
-import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
+import { deckFormatLabel } from "../../../convex/lib/deckGames"
 
 type Card = GuestDeckPayload["cards"][number]
 
@@ -41,6 +42,7 @@ export function ImportBuild({
   format,
   cards,
   editable,
+  source,
   details,
   progress,
   problems,
@@ -69,6 +71,7 @@ export function ImportBuild({
   format: string
   cards?: DeckCard[]
   editable: boolean
+  source?: string
   details?: ReactNode
   progress?: ReactNode
   problems: readonly ImportProblem[]
@@ -156,12 +159,15 @@ export function ImportBuild({
 
   return (
     <>
-      <Header
-        titleTx="decks:importBuild.title"
-        backgroundColor={theme.colors.surface}
-        leftTx="common:back"
-        onLeftPress={onBack}
-      />
+      <View>
+        <Header
+          titleTx="decks:importBuild.title"
+          backgroundColor={theme.colors.surface}
+          leftTx="common:back"
+          onLeftPress={onBack}
+        />
+        {listFinal ? null : progress}
+      </View>
       <SectionList
         testID="import-build"
         style={$flex}
@@ -173,25 +179,29 @@ export function ImportBuild({
         ListHeaderComponent={
           <>
             <View style={themed($title)}>
-              <TextField
-                testID="deck-name-input"
-                accessibilityLabel={translate("decks:settings.name")}
-                placeholderTx="decks:settings.name"
-                value={name}
-                maxLength={80}
-                helper={deckNameWarning(name)}
-                editable={editable}
-                onChangeText={onNameChange}
-              />
+              {editable ? (
+                <TextField
+                  testID="deck-name-input"
+                  accessibilityLabel={translate("decks:settings.name")}
+                  placeholderTx="decks:settings.name"
+                  value={name}
+                  maxLength={80}
+                  helper={deckNameWarning(name)}
+                  onChangeText={onNameChange}
+                  inputWrapperStyle={$nameWrapper}
+                  style={$name}
+                />
+              ) : (
+                <Text testID="deck-name-title" preset="heading" size="xl" text={name} />
+              )}
               <Text
                 size="xs"
                 tone="dim"
                 testID="import-build-summary"
                 text={[
-                  deckGame(game)?.shortLabel ?? game,
                   deckFormatLabel(game, format),
                   cards ? cardCountLabel(totalQuantity(cards)) : undefined,
-                  translate("decks:importBuild.notSaved"),
+                  source,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -287,7 +297,6 @@ export function ImportBuild({
                   sections={deckSections}
                   commanderAction={canChooseCommander({ game, format }, shown)}
                 />
-                {progress}
               </View>
             )}
           </>
@@ -405,6 +414,18 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 720,
   alignSelf: "center",
 })
+const $nameWrapper: ViewStyle = {
+  borderWidth: 0,
+  backgroundColor: "transparent",
+}
+const $name: TextStyle = {
+  height: 34,
+  marginVertical: 0,
+  marginHorizontal: 0,
+  fontFamily: typography.primary.bold,
+  fontSize: 24,
+  lineHeight: 34,
+}
 const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingTop: spacing.sm,

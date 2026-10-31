@@ -656,7 +656,6 @@ export default {
   },
   importBuild: {
     title: "新規デッキ",
-    notSaved: "未保存",
     didYouMean: "{{card}}ですか?",
     useIt: "これを使う",
     useItLabel: "{{line}}に{{card}}を使う",

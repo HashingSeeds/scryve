@@ -659,7 +659,6 @@ export default {
   },
   importBuild: {
     title: "नया डेक",
-    notSaved: "सेव नहीं हुआ",
     didYouMean: "क्या आपका मतलब {{card}} था?",
     useIt: "यही इस्तेमाल करें",
     useItLabel: "{{line}} के लिए {{card}} इस्तेमाल करें",

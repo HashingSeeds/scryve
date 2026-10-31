@@ -9,9 +9,10 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
 
-import type { DeckAnalysis } from "./deckAnalysis"
+import { CURVE_BUCKETS, type DeckAnalysis } from "./deckAnalysis"
 
 const CURVE_HEIGHT = 30
+const PENDING_CURVE = Array.from({ length: CURVE_BUCKETS }, () => 0)
 
 export function DeckBuildTools({
   analysis,
@@ -30,10 +31,10 @@ export function DeckBuildTools({
   const tallest = Math.max(1, ...(analysis?.curve ?? []))
   return (
     <View style={themed($tools)}>
-      {analysis ? (
+      {analysis || analysisPending ? (
         <View style={themed($summary)} testID="deck-curve-strip">
           <View style={themed($curve)}>
-            {analysis.curve.map((count, value) => (
+            {(analysis?.curve ?? PENDING_CURVE).map((count, value) => (
               <View
                 key={value}
                 style={[themed($bar), { height: Math.max(2, (count / tallest) * CURVE_HEIGHT) }]}
@@ -43,21 +44,20 @@ export function DeckBuildTools({
           <View style={themed($stats)}>
             <Stat
               label={translate("decks:build.average")}
-              value={analysis.averageManaValue.toFixed(1)}
+              value={analysis?.averageManaValue.toFixed(1)}
             />
-            <Stat label={translate("decks:analysis.lands")} value={String(analysis.lands)} />
-            <Stat label={translate("decks:analysis.ramp")} value={String(analysis.ramp)} />
+            <Stat label={translate("decks:analysis.lands")} value={analysis?.lands} />
+            <Stat label={translate("decks:analysis.ramp")} value={analysis?.ramp} />
           </View>
           <TextAction
             testID="open-deck-analysis"
             tx="decks:build.analysis"
             size="xs"
+            disabled={!analysis}
             style={$touch}
             onPress={onAnalysis}
           />
         </View>
-      ) : analysisPending ? (
-        <View style={[themed($summary), $touch]} />
       ) : null}
       <TouchableOpacity
         testID="deck-add-cards"
@@ -86,11 +86,11 @@ export function DeckBuildTools({
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value = "–" }: { label: string; value?: string | number }) {
   return (
     <View style={$stat} accessible accessibilityLabel={`${label} ${value}`}>
       <Text size="xxs" tone="dim" text={label} />
-      <Text size="xxs" weight="semiBold" style={$tabular} text={value} />
+      <Text size="xxs" weight="semiBold" style={$tabular} text={String(value)} />
     </View>
   )
 }
