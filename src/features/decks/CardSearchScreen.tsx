@@ -40,6 +40,7 @@ import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { searchCardNames } from "./cardNameMatch"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
   cardDetailsKey,
@@ -62,6 +63,8 @@ const SCRYFALL = "Scryfall"
 const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 const COLOR_MATCH_OPERATOR = { exact: "=", additional: ">=", within: "<=" } as const
+const NAME_MATCHES = 20
+const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 type ColorMatch = keyof typeof COLOR_MATCH_OPERATOR
 
 export function scryfallQuery({
@@ -138,8 +141,9 @@ export function CardSearchScreen({
   const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
-  const nameIndex = useCardNameIndex(game, deviceId, scanning)
+  const nameIndex = useCardNameIndex(game, deviceId, scanning || query.trim().length > 0)
   const [results, setResults] = useState<SearchCard[]>()
+  const [nameResults, setNameResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
@@ -344,6 +348,7 @@ export function CardSearchScreen({
     setBusy(searchRequested && !offline)
     if (!searchRequested || offline) {
       setResults(undefined)
+      setNameResults(undefined)
       setOfflineResults(undefined)
     }
     if (!searchRequested) return
@@ -368,24 +373,45 @@ export function CardSearchScreen({
       return
     }
     setOfflineResults(undefined)
+    const text = query.trim()
     const timer = setTimeout(async () => {
       try {
         if (!convex) throw new Error("Card search unavailable")
-        const found = await convex.action(api.cards.search, {
-          game,
-          deviceId,
-          query: scryfallQuery({
-            text: query.trim(),
-            commander: choosingCommander,
-            colors: colorFilters,
-            colorMatch,
-            keywords,
+        const names =
+          nameIndex && !SCRYFALL_SYNTAX.test(text)
+            ? searchCardNames(
+                nameIndex,
+                choosingCommander ? text.slice(0, 80).replace(/[()"]/g, " ") : text,
+                NAME_MATCHES,
+              )
+            : []
+        const [found, named] = await Promise.all([
+          convex.action(api.cards.search, {
+            game,
+            deviceId,
+            query: scryfallQuery({
+              text,
+              commander: choosingCommander,
+              colors: colorFilters,
+              colorMatch,
+              keywords,
+            }),
           }),
-        })
-        if (active) setResults(found)
+          names.length
+            ? convex.action(api.cards.byNames, { names, deviceId }).then(
+                ({ cards }) => cards,
+                () => [],
+              )
+            : [],
+        ])
+        if (!active) return
+        const byName = new Map(named.map((card) => [card.name, card]))
+        setNameResults(names.flatMap((name) => byName.get(name) ?? []))
+        setResults(found)
       } catch (cause) {
         if (!active) return
         setResults(undefined)
+        setNameResults(undefined)
         setSearchError({
           message: convexErrorMessage(cause, translate("decks:cardSearch.searchFailed")),
           retryAfterMs: convexRetryAfterMs(cause),
@@ -412,6 +438,7 @@ export function CardSearchScreen({
     searchAttempt,
     searchError?.retryAfterMs,
     deviceId,
+    nameIndex,
   ])
 
   function searchEntry(card: SearchCard) {
@@ -509,11 +536,17 @@ export function CardSearchScreen({
     setCandidate(undefined)
   }
 
-  const catalogResults = results?.filter(
-    (card) =>
-      !choosingCommander ||
-      ("scryfallId" in card && eligible(card) && matchesFilters(card) && !inDeck(card)),
+  const rankedResults = (nameResults ?? []).filter(
+    (card) => "scryfallId" in card && matchesFilters(card),
   )
+  const rankedNames = new Set(rankedResults.map((card) => card.name))
+  const catalogResults = results
+    ? [...rankedResults, ...results.filter((card) => !rankedNames.has(card.name))].filter(
+        (card) =>
+          !choosingCommander ||
+          ("scryfallId" in card && eligible(card) && matchesFilters(card) && !inDeck(card)),
+      )
+    : undefined
   const cachedCandidates = offlineResults?.filter(
     (entry) =>
       (!choosingCommander || !inDeck(entry.card)) &&

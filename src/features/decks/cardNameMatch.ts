@@ -3,6 +3,9 @@ import { cardTextLinesTopFirst, NAME_LINES_FROM_CARD_TOP } from "./cardScan"
 const SHORTLIST_SIZE = 40
 const MIN_SIMILARITY = 0.85
 const MIN_LEAD_OVER_RUNNER_UP = 0.05
+const TYPED_SHORTLIST_SIZE = 300
+const MIN_TYPED_SIMILARITY = 0.6
+const WORD_START_WEIGHT = 0.95
 
 export type CardNameIndex = {
   names: string[]
@@ -78,7 +81,18 @@ export function cardNameIndex(
   return { names, faces, facesByTrigram }
 }
 
-function rankedNames(index: CardNameIndex, line: string) {
+function typedSimilarity(query: string, face: string) {
+  let best = similarity(query, face)
+  for (let start = 0; start < face.length; start++) {
+    if (start > 0 && face[start - 1] !== " ") continue
+    const score =
+      similarity(query, face.slice(start, start + query.length)) * (start ? WORD_START_WEIGHT : 1)
+    if (score > best) best = score
+  }
+  return best
+}
+
+function rankedNames(index: CardNameIndex, line: string, typed = false) {
   const key = matchKey(line)
   if (key.length < 3) return []
   const lineTrigrams = trigrams(key)
@@ -87,17 +101,19 @@ function rankedNames(index: CardNameIndex, line: string) {
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
       sharedTrigrams.set(faceIndex, (sharedTrigrams.get(faceIndex) ?? 0) + 1)
   const overlap = (faceIndex: number, shared: number) =>
-    shared / (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared)
+    typed
+      ? shared / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
+      : shared / (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared)
   const bestByName = new Map<
     number,
     { similarity: number; wholeName: boolean; face: string; printedName?: string }
   >()
   for (const [faceIndex] of [...sharedTrigrams]
     .sort((a, b) => overlap(b[0], b[1]) - overlap(a[0], a[1]))
-    .slice(0, SHORTLIST_SIZE)) {
+    .slice(0, typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE)) {
     const face = index.faces[faceIndex]
     const score = {
-      similarity: similarity(key, face.key),
+      similarity: typed ? typedSimilarity(key, face.key) : similarity(key, face.key),
       wholeName: face.wholeName,
       face: face.key,
       printedName: face.printedName,
@@ -153,4 +169,16 @@ export function closestNamesFromCardTop(
     .sort((a, b) => b[1] - a[1])
     .slice(0, count)
     .map(([nameIndex]) => index.names[nameIndex])
+}
+
+export function searchCardNames(index: CardNameIndex, query: string, limit: number) {
+  return rankedNames(index, query, true)
+    .filter((match) => match.similarity >= MIN_TYPED_SIMILARITY)
+    .sort(
+      (a, b) =>
+        b.similarity - a.similarity ||
+        index.names[a.nameIndex].length - index.names[b.nameIndex].length,
+    )
+    .slice(0, limit)
+    .map(({ nameIndex }) => index.names[nameIndex])
 }

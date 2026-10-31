@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/theme/context"
 import { remove } from "@/utils/storage"
 
 import { clearCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
 import { CardSearchScreen, scryfallQuery } from "./CardSearchScreen"
 import type { KnownCardEntry } from "./deckVersionsCache"
 
@@ -18,6 +19,9 @@ jest.mock("convex/react", () => ({
   useAction: () => mockDetailsAction,
   useConvexConnectionState: () => mockConnection,
 }))
+
+let mockNameIndex: CardNameIndex | undefined
+jest.mock("./useCardNameIndex", () => ({ useCardNameIndex: () => mockNameIndex }))
 
 const eligible = {
   commanderEligibility: "eligible",
@@ -55,6 +59,7 @@ function chooser(cards = deck, onAdd = jest.fn()) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockNameIndex = undefined
   clearCardDetails()
   remove("scryve.cards.keyword-abilities.v1")
   mockDetailsAction.mockResolvedValue({
@@ -562,4 +567,61 @@ it.each<[string, Partial<typeof filters>, string]>([
   ["a one-letter commander name", { text: "a", commander: true }, "is:commander f:commander"],
 ])("builds the Scryfall query for %s", (_name, input, expected) => {
   expect(scryfallQuery({ ...filters, ...input })).toBe(expected)
+})
+
+describe("with the device's card name list", () => {
+  const bolt = { ...searchCard, name: "Lightning Bolt", scryfallId: "bolt", colorIdentity: "R" }
+  const blow = { ...searchCard, name: "Lightning Blow", scryfallId: "blow", colorIdentity: "W" }
+  const axe = { ...searchCard, name: "Lightning Axe", scryfallId: "axe", colorIdentity: "R" }
+
+  function adder() {
+    mockNameIndex = cardNameIndex(["Lightning Axe", "Lightning Blow", "Lightning Bolt"])
+    mockAction.mockImplementation(async (_action, args: { names?: string[] }) =>
+      args.names ? { cards: [blow, bolt], lookupFailed: false } : [axe, bolt],
+    )
+    return render(
+      <ThemeProvider initialContext="dark">
+        <CardSearchScreen game="mtg" format="modern" onAdd={jest.fn()} onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+  }
+
+  async function search(view: ReturnType<typeof adder>, text: string) {
+    jest.useFakeTimers()
+    fireEvent.changeText(view.getByTestId("card-search-input"), text)
+    await act(async () => jest.advanceTimersByTime(400))
+    jest.useRealTimers()
+    return view.getAllByLabelText(/^Add .* to deck$/).map((row) => row.props.accessibilityLabel)
+  }
+
+  it("leads with the closest names to a misspelled query, then Scryfall's results", async () => {
+    const view = adder()
+    expect(await search(view, "lightnig bolt")).toEqual([
+      "Add Lightning Bolt to deck",
+      "Add Lightning Blow to deck",
+      "Add Lightning Axe to deck",
+    ])
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+      names: ["Lightning Bolt", "Lightning Blow", "Lightning Axe"],
+      deviceId: expect.any(String),
+    })
+  })
+
+  it("keeps name matches to the picked colors", async () => {
+    const view = adder()
+    fireEvent.press(view.getByTestId("card-color-R"))
+    expect(await search(view, "lightnig bolt")).toEqual([
+      "Add Lightning Bolt to deck",
+      "Add Lightning Axe to deck",
+    ])
+  })
+
+  it.each(["t:instant lightning", "lightning bolt and zzzz", "lightning OR bolt"])(
+    "leaves Scryfall syntax like %s to Scryfall",
+    async (text) => {
+      const view = adder()
+      await search(view, text)
+      expect(mockAction).toHaveBeenCalledTimes(1)
+    },
+  )
 })
