@@ -1,18 +1,22 @@
 import { useEffect, useRef } from "react"
-import { Linking } from "react-native"
 
-import { Button } from "@/components/Button"
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { buildInviteQrPayload } from "@/features/connected/inviteLinks"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
+import type { LanSeatDeck } from "./lanGame"
 import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
 import { nearbyGameCode, nearbyGameHost } from "./nearbyCode"
 import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
-import { NearbyStatusScreen } from "./NearbyStatusScreen"
+import { NearbyDeviceDeckSource } from "./NearbyDeviceDeckSource"
+import { NearbyStatusScreen, OpenSettingsButton } from "./NearbyStatusScreen"
 
 const NO_SEATS_SELECTING: ReadonlySet<number> = new Set()
+
+const selectDeck = (deck: LanSeatDeck | null) =>
+  void lanSession.selectDeck(deck).catch(() => undefined)
 
 // why: the lobby shows no life totals, so leaving them out keeps every life change from re-rendering it under the board.
 const selectLobbyScreen = ({
@@ -40,6 +44,7 @@ export function NearbyLobbyScreen({
   onPlay,
   onLeft,
   onManageDecks,
+  onAddDeck,
 }: {
   accessDenied?: boolean
   hosting?: boolean
@@ -49,6 +54,7 @@ export function NearbyLobbyScreen({
   onPlay: () => void
   onLeft: () => void
   onManageDecks?: () => void
+  onAddDeck?: () => void
 }) {
   const { lobby, players, role, status, error, serviceName } = useLanSessionSlice(selectLobbyScreen)
 
@@ -144,26 +150,31 @@ export function NearbyLobbyScreen({
       decks={
         lobby.setup.system && lobby.status !== "active"
           ? {
-              source: (render) => render(nearbyDeckState(myDecks, signedIn, lobby.setup)),
+              source: (render) => {
+                const state = nearbyDeckState(myDecks, signedIn, lobby.setup)
+                // why: Sync and use needs an account, so a signed-out player sees no device decks here.
+                if (!signedIn) return render(state)
+                return (
+                  <ConvexQueryBoundary fallback={() => render(state)}>
+                    <NearbyDeviceDeckSource
+                      myDecks={myDecks}
+                      setup={lobby.setup}
+                      onSelect={selectDeck}
+                    >
+                      {(device) => render(state, device)}
+                    </NearbyDeviceDeckSource>
+                  </ConvexQueryBoundary>
+                )
+              },
               selectingSeats: NO_SEATS_SELECTING,
               onSelect: (_seat, versionId) => {
                 const deck = versionId ? nearbySeatDeck(myDecks, versionId, lobby.setup) : null
-                if (deck !== undefined) void lanSession.selectDeck(deck).catch(() => undefined)
+                if (deck !== undefined) selectDeck(deck)
               },
-              ...(signedIn && onManageDecks ? { onManage: onManageDecks } : {}),
+              ...(signedIn ? { onManage: onManageDecks, onAddDeck } : {}),
             }
           : undefined
       }
-    />
-  )
-}
-
-export function OpenSettingsButton() {
-  return (
-    <Button
-      tx="connected:nearby.openSettings"
-      preset="primary"
-      onPress={() => void Linking.openSettings()}
     />
   )
 }

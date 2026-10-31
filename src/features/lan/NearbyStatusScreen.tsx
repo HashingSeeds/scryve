@@ -1,12 +1,23 @@
 import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, View } from "react-native"
+import { ActivityIndicator, Linking, View } from "react-native"
 
+import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+
+export function OpenSettingsButton() {
+  return (
+    <Button
+      tx="connected:nearby.openSettings"
+      preset="primary"
+      onPress={() => void Linking.openSettings()}
+    />
+  )
+}
 
 export function NearbyStatusScreen({
   title,

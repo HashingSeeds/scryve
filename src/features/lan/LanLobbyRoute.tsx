@@ -100,6 +100,7 @@ function LanLobby() {
         onLeft={backToPlay}
         onPlay={onPlay}
         onManageDecks={() => router.push("/connected/decks")}
+        onAddDeck={() => router.push("/connected/decks/add")}
       />
     </>
   )
