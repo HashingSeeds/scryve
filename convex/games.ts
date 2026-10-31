@@ -62,6 +62,7 @@ import {
   assertDeckLabel,
   deckIdentityOf,
   deckLabelValidator,
+  publicIdentity,
   type DeckLabel,
 } from "./lib/opponentDecks"
 import { commanderOutState, outReason, type CommanderTotal, type OutState } from "./lib/outReason"
@@ -354,12 +355,19 @@ export function maskSummaryPlayersForViewer(
   options: { localGame?: boolean } = {},
 ) {
   return players.map((rawPlayer) => {
+    const { deckNameAtFinish, deckLabel } = rawPlayer
     const player =
-      rawPlayer.deckNameAtFinish !== undefined &&
-      rawPlayer.userId !== viewerUserId &&
-      nameFailsGate(rawPlayer.deckNameAtFinish)
-        ? { ...rawPlayer, deckNameAtFinish: HIDDEN_DECK_NAME }
-        : rawPlayer
+      rawPlayer.userId === viewerUserId
+        ? rawPlayer
+        : {
+            ...rawPlayer,
+            ...(deckNameAtFinish !== undefined && nameFailsGate(deckNameAtFinish)
+              ? { deckNameAtFinish: HIDDEN_DECK_NAME }
+              : {}),
+            ...(deckLabel?.identity
+              ? { deckLabel: { ...deckLabel, identity: publicIdentity(deckLabel.identity) } }
+              : {}),
+          }
     if (player.userId && blocked.has(player.userId)) {
       const { usernameAtFinish: _, ...masked } = player
       return { ...masked, displayName: seatLabelFor(player) }

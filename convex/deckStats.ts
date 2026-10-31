@@ -9,7 +9,7 @@ import { assertDeckKey } from "./lib/deckKeys"
 import { blockedUserIdsFor, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, HIDDEN_PLAYER_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
-  gatedIdentity,
+  publicIdentity,
   summarySeats,
   type DeckIdentity,
   type DeckLabel,
@@ -132,7 +132,8 @@ function shownIdentity(
   if (seat.userId && blocked.has(seat.userId)) return undefined
   const deckName = seat.deckName ?? seat.deckLabel?.name
   if (deckName !== undefined && nameFailsGate(deckName)) return undefined
-  return gatedIdentity(seat.deckLabel?.identity)
+  const identity = seat.deckLabel?.identity
+  return identity && publicIdentity(identity)
 }
 
 export const games = query({
