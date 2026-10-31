@@ -9,6 +9,7 @@ import { assertDeckKey } from "./lib/deckKeys"
 import { blockedUserIdsFor, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, HIDDEN_PLAYER_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
+  gatedIdentity,
   summarySeats,
   type DeckIdentity,
   type DeckLabel,
@@ -131,7 +132,7 @@ function shownIdentity(
   if (seat.userId && blocked.has(seat.userId)) return undefined
   const deckName = seat.deckName ?? seat.deckLabel?.name
   if (deckName !== undefined && nameFailsGate(deckName)) return undefined
-  return seat.deckLabel?.identity
+  return gatedIdentity(seat.deckLabel?.identity)
 }
 
 export const games = query({
@@ -248,18 +249,18 @@ const normalized = (text: string) =>
 const identityKey = (identity: DeckIdentity) => identity.map(({ cardId }) => cardId).join("+")
 const HIDDEN_KEY = "hidden"
 
-function opponentDeckGroup(deck: ResultOpponent["deck"]) {
+function opponentDeckGroup(deck: ResultOpponent["deck"], identity: DeckIdentity | undefined) {
   if (!deck) return undefined
   const hidden = deck.name !== undefined && nameFailsGate(deck.name)
   const shown = {
     opponentDeckKey: deck.deckKey ?? null,
     name: deck.name === undefined ? null : hidden ? HIDDEN_DECK_NAME : deck.name,
-    identity: deck.identity ?? null,
+    identity: identity ?? null,
   }
   if (deck.deckKey) return { key: `deck:${deck.deckKey}`, shown }
-  if (hidden) return { key: HIDDEN_KEY, shown: { ...shown, identity: null } }
+  if (hidden) return { key: HIDDEN_KEY, shown }
   if (deck.name) return { key: `name:${normalized(deck.name)}`, shown }
-  if (deck.identity) return { key: `identity:${identityKey(deck.identity)}`, shown }
+  if (identity) return { key: `identity:${identityKey(identity)}`, shown }
   return undefined
 }
 
@@ -340,19 +341,18 @@ export const matchups = query({
         ...opponent,
         won: opponent.outcome === "win",
         visible: !opponent.userId || !blocked.has(opponent.userId),
+        identity: shownIdentity({ userId: opponent.userId, deckLabel: opponent.deck }, blocked),
       }))
       byIdentity.add(
         mine,
-        opponents.flatMap(({ deck, won }) =>
-          deck?.identity
-            ? [{ key: identityKey(deck.identity), won, shown: { identity: deck.identity } }]
-            : [],
+        opponents.flatMap(({ identity, won }) =>
+          identity ? [{ key: identityKey(identity), won, shown: { identity } }] : [],
         ),
       )
       byDeck.add(
         mine,
-        opponents.flatMap(({ deck, won, visible }) => {
-          const group = visible ? opponentDeckGroup(deck) : undefined
+        opponents.flatMap(({ deck, identity, won, visible }) => {
+          const group = visible ? opponentDeckGroup(deck, identity) : undefined
           return group ? [{ ...group, won }] : []
         }),
       )

@@ -1344,3 +1344,62 @@ it("imports Magic catalog examples into the existing deck and version model", as
   ).toBe(15)
   expect(detail.cards.every((card) => card.oracleId && card.scryfallId)).toBe(true)
 })
+
+async function heroVersions(t: ConvexTestHarness, heroes: { cardId: string; health: string }[]) {
+  const clerkUserId = "fab-owner"
+  const actor = await signedIn(t, clerkUserId)
+  await t.mutation(internal.entitlements.setUserFeature, {
+    clerkUserId,
+    feature: "deck_versions",
+    enabled: true,
+    source: "test",
+  })
+  const deckId = await actor.mutation(api.decks.create, {
+    name: "Heroes",
+    game: "fab",
+    format: "cc",
+  })
+  const versionIds = [await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })]
+  for (const { cardId } of heroes.slice(1))
+    versionIds.push(await actor.mutation(api.decks.createVersion, { deckId, name: cardId }))
+  await t.run(async (ctx) => {
+    for (const [index, { cardId, health }] of heroes.entries()) {
+      await ctx.db.insert("gameCards", {
+        game: "fab",
+        identityNamespace: "fab-cube-card",
+        cardId,
+        name: cardId,
+        nameNormalized: cardId,
+        facets: [{ key: "health", value: health }],
+        updatedAt: 0,
+      })
+      await ctx.db.insert("deckCards", {
+        deckVersionId: versionIds[index],
+        game: "fab",
+        identityNamespace: "fab-cube-card",
+        cardId,
+        name: cardId,
+        section: "hero",
+        quantity: 1,
+      })
+    }
+  })
+  return { actor, deckId, versionIds }
+}
+
+it("gives each version its own hero's life, and listMine reads only the brought and latest", async () => {
+  const t = makeConvexTest()
+  const { actor, deckId, versionIds } = await heroVersions(t, [
+    { cardId: "dorinthea", health: "40" },
+    { cardId: "katsu", health: "38" },
+    { cardId: "rhinar", health: "36" },
+  ])
+  await actor.mutation(api.decks.setBringingVersion, { deckId, versionId: versionIds[0] })
+
+  const [deck] = (await actor.query(api.decks.listMine)).decks
+  const { versions } = await actor.query(api.decks.detail, { deckId })
+
+  expect(deck.versions.map((version) => version.startingValue)).toEqual([40, undefined, 36])
+  expect(deck.startingValue).toBe(36)
+  expect(versions.map((version) => version.startingValue)).toEqual([40, 38, 36])
+})
