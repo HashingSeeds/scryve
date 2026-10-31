@@ -150,7 +150,8 @@ export function useLocalDeckSync(ownerId: string | undefined) {
               localId: local.guestLocalId ?? localId,
               localUpdatedAt: local.updatedAt,
             })
-            if (response.status === "limit_reached") return { status: "limit_reached" }
+            if (response.status === "limit_reached" || response.status === "version_limit")
+              return { status: "limit_reached" }
             if (response.status === "other_account") {
               const newId = randomUUID()
               return {
@@ -167,7 +168,8 @@ export function useLocalDeckSync(ownerId: string | undefined) {
                       localId: newId,
                       localUpdatedAt: local.updatedAt,
                     })
-                    if (imported.status === "limit_reached") return { status: "limit_reached" }
+                    if (imported.status === "limit_reached" || imported.status === "version_limit")
+                      return { status: "limit_reached" }
                     if (imported.status === "other_account") return { status: "conflict" }
                     return { status: "synced", deckId: imported.deckId }
                   }),

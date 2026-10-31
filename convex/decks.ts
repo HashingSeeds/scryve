@@ -227,6 +227,13 @@ function canonicalCards(cards: readonly Record<string, unknown>[]) {
   )
 }
 
+function sameCards(game: string, left: DeckCardInput[], right: DeckCardInput[]) {
+  return (
+    canonicalCards(left.map((card) => cardFields(game, card))) ===
+    canonicalCards(right.map((card) => cardFields(game, card)))
+  )
+}
+
 function cardTotals(cards: DeckCardInput[]) {
   return {
     fingerprint: fingerprint(cards),
@@ -293,6 +300,83 @@ async function writeInitialVersion(
     syncRevision: (latest.syncRevision ?? 0) + 1,
   })
   return latest._id
+}
+
+const importedVersionValidator = v.object({
+  name: v.string(),
+  note: v.optional(v.string()),
+  cards: v.array(cardValidator),
+})
+type ImportedVersion = Infer<typeof importedVersionValidator>
+
+async function storedCanonicalCards(ctx: MutationCtx, game: string, versionId: Id<"deckVersions">) {
+  const cards = await ctx.db
+    .query("deckCards")
+    .withIndex("by_deck_version", (q) => q.eq("deckVersionId", versionId))
+    .take(MAX_DECK_CARDS + 1)
+  return canonicalCards(cards.map((card) => canonicalCardFieldsWithDefaults(game, card)))
+}
+
+async function replaceDeckVersions(
+  ctx: MutationCtx,
+  deckId: Id<"decks">,
+  game: string,
+  versions: readonly ImportedVersion[],
+  now: number,
+) {
+  const previous = await activeVersions(ctx, deckId)
+  const previousCards = await Promise.all(
+    previous.map((version) => storedCanonicalCards(ctx, game, version._id)),
+  )
+  const highest = await ctx.db
+    .query("deckVersions")
+    .withIndex("by_deck_and_version_number", (q) => q.eq("deckId", deckId))
+    .order("desc")
+    .first()
+  let nextNumber = (highest?.versionNumber ?? 0) + 1
+  let lastNumber = 0
+  const kept = new Set<Id<"deckVersions">>()
+  for (const version of versions) {
+    const cards = canonicalCards(version.cards.map((card) => cardFields(game, card)))
+    const reusable = previous.findIndex(
+      (candidate, index) =>
+        !kept.has(candidate._id) &&
+        candidate.versionNumber > lastNumber &&
+        previousCards[index] === cards,
+    )
+    const reused = previous[reusable]
+    if (!reused) {
+      lastNumber = nextNumber
+      nextNumber += 1
+      await insertDeckVersion(
+        ctx,
+        deckId,
+        game,
+        { versionNumber: lastNumber, name: version.name, note: version.note },
+        version.cards,
+        now,
+      )
+      continue
+    }
+    kept.add(reused._id)
+    lastNumber = reused.versionNumber
+    const name = assertVersionName(version.name)
+    const note = version.note ? assertDeckNote(version.note) : undefined
+    if (reused.name !== name || reused.note !== note)
+      await ctx.db.patch(reused._id, {
+        name,
+        note,
+        syncRevision: (reused.syncRevision ?? 0) + 1,
+        updatedAt: now,
+      })
+  }
+  for (const version of previous)
+    if (!kept.has(version._id))
+      await ctx.db.patch(version._id, {
+        archivedAt: now,
+        syncRevision: (version.syncRevision ?? 0) + 1,
+        updatedAt: now,
+      })
 }
 
 async function replaceVersionCards(
@@ -568,10 +652,22 @@ export const importGuest = mutation({
     game: v.optional(v.string()),
     note: v.optional(v.string()),
     cards: v.array(cardValidator),
+    versions: v.optional(v.array(importedVersionValidator)),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     if (args.deckKey !== undefined) assertDeckKey(args.deckKey)
+    const versions = args.versions
+    if (
+      versions !== undefined &&
+      (versions.length < 1 ||
+        versions.length > MAX_DECK_VERSIONS ||
+        !sameCards(args.game ?? DEFAULT_DECK_GAME, versions[versions.length - 1].cards, args.cards))
+    )
+      throw new ConvexError({
+        code: "invalid_versions",
+        message: `Send 1–${MAX_DECK_VERSIONS} versions ending with the current cards`,
+      })
     if (
       !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(args.localId)
     )
@@ -605,13 +701,30 @@ export const importGuest = mutation({
     const live = args.deckKey ? await findDeckByKey(ctx, user._id, args.deckKey) : null
     if (args.movedFromAccount && !live && !existing) return { status: "other_account" as const }
     if (live && live.archivedAt === undefined && !existing) {
-      const latest = (await activeVersions(ctx, live._id)).at(-1)
+      const stored = await activeVersions(ctx, live._id)
       const game = args.game ?? DEFAULT_DECK_GAME
+      const sent = versions?.map((version) => version.cards) ?? [args.cards]
+      const compared = versions ? stored : stored.slice(-1)
       const sameDeck =
-        latest !== undefined &&
+        compared.length === sent.length &&
         live.name === args.name.trim() &&
-        (await pinnedDeck(ctx, latest._id)).deckFingerprint ===
-          (await deckFingerprint(args.cards.map((card) => ({ ...card, game: card.game ?? game }))))
+        (versions?.every(
+          (version, index) =>
+            compared[index].name === version.name.trim() &&
+            (compared[index].note ?? "") === (version.note ?? "").trim(),
+        ) ??
+          true) &&
+        (
+          await Promise.all(
+            compared.map(
+              async (version, index) =>
+                (await pinnedDeck(ctx, version._id)).deckFingerprint ===
+                (await deckFingerprint(
+                  sent[index].map((card) => ({ ...card, game: card.game ?? game })),
+                )),
+            ),
+          )
+        ).every(Boolean)
       return {
         status: "already_imported" as const,
         deckId: live._id,
@@ -619,11 +732,17 @@ export const importGuest = mutation({
       }
     }
     await deckForKey(ctx, user._id, existing ? existing.deckKey : (args.deckKey ?? args.localId))
+    if (versions) {
+      const versionLimit = await deckVersionCapacity(ctx, user, versions.length)
+      if (versions.length > versionLimit.limit)
+        return { status: "version_limit" as const, capacity: versionLimit }
+    }
     const capacity = await deckCapacity(ctx, user)
     if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
     const game = assertDeckGame(args.game ?? DEFAULT_DECK_GAME)
     await requireReleasedCapability(ctx, game, "deckImport")
     assertDeckSize(args.cards, game)
+    for (const version of versions ?? []) assertDeckSize(version.cards, game)
     const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
     const note = args.note ? assertDeckNote(args.note) : ""
     const now = Date.now()
@@ -642,7 +761,8 @@ export const importGuest = mutation({
       },
       existing ? existing.deckKey : (args.deckKey ?? args.localId),
     )
-    await writeInitialVersion(ctx, deckId, game, args.cards, now)
+    if (versions) await replaceDeckVersions(ctx, deckId, game, versions, now)
+    else await writeInitialVersion(ctx, deckId, game, args.cards, now)
     return { status: "imported" as const, deckId, localUpdatedAt: args.localUpdatedAt }
   },
 })
@@ -1599,16 +1719,28 @@ export const moveToDevice = mutation({
       v.null(),
       v.object({ id: v.id("deckVersions"), updatedAt: v.number() }),
     ),
+    expectedVersions: v.optional(
+      v.array(v.object({ id: v.id("deckVersions"), updatedAt: v.number() })),
+    ),
   },
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
     if (deck.movedToDeviceAt !== undefined) return syncedDeck(deck)
     if ((deck.syncRevision ?? 0) !== args.expectedRevision)
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
-    const current = (await activeVersions(ctx, deck._id)).at(-1)
+    const stored = await activeVersions(ctx, deck._id)
+    const current = stored.at(-1)
+    const expectedVersions = args.expectedVersions
     if (
       (current?._id ?? null) !== (args.expectedVersion?.id ?? null) ||
-      (current && (current.updatedAt ?? current.createdAt) !== args.expectedVersion?.updatedAt)
+      (current && (current.updatedAt ?? current.createdAt) !== args.expectedVersion?.updatedAt) ||
+      (expectedVersions !== undefined &&
+        (stored.length !== expectedVersions.length ||
+          stored.some(
+            (version, index) =>
+              version._id !== expectedVersions[index].id ||
+              (version.updatedAt ?? version.createdAt) !== expectedVersions[index].updatedAt,
+          )))
     )
       throw new ConvexError({
         code: "sync_conflict",
