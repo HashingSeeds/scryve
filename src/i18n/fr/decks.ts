@@ -332,6 +332,8 @@ export default {
   },
   cardSearch: {
     title: "Ajouter des cartes",
+    lookupTitle: "Cartes",
+    showCard: "Afficher {{card}}",
     searchLabel: "Rechercher des cartes",
     placeholder: "Rechercher par nom de carte",
     addTo: "Ajouter à",
@@ -557,6 +559,7 @@ export default {
     title: "Decks",
     backToLobby: "Retour au salon",
     addDeck: "Ajouter un deck",
+    cards: "Cartes",
     collection: "Collection de decks",
     collectionAll: "Tous",
     collectionFavorites: "Favoris",

@@ -310,6 +310,8 @@ export default {
   },
   cardSearch: {
     title: "कार्ड जोड़ें",
+    lookupTitle: "कार्ड",
+    showCard: "{{card}} दिखाएँ",
     searchLabel: "कार्ड खोजें",
     placeholder: "कार्ड के नाम से खोजें",
     addTo: "इसमें जोड़ें",
@@ -530,6 +532,7 @@ export default {
     title: "डेक",
     backToLobby: "लॉबी पर वापस जाएँ",
     addDeck: "डेक जोड़ें",
+    cards: "कार्ड",
     collection: "डेक संग्रह",
     collectionAll: "सभी",
     collectionFavorites: "पसंदीदा",

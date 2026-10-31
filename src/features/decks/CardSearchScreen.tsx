@@ -97,19 +97,12 @@ export function scryfallQuery({
   return [words.length >= 2 ? `(${words})` : "", ...filters].filter(Boolean).join(" ")
 }
 
-export function CardSearchScreen({
-  game,
-  format,
-  onAdd,
-  onRemove,
-  onClose,
-  offlineCandidates,
-  initialSection,
-  commanderCards,
-}: {
+type AddCard = (card: GuestDeckPayload["cards"][number]) => string | undefined
+
+type CardSearchProps = {
   game: string
   format: string
-  onAdd: (card: GuestDeckPayload["cards"][number]) => string | undefined
+  onAdd?: AddCard
   onRemove?: (card: GuestDeckPayload["cards"][number]) => void
   onClose: () => void
   /**
@@ -119,7 +112,25 @@ export function CardSearchScreen({
   offlineCandidates?: KnownCardEntry[]
   initialSection?: string
   commanderCards?: DeckCard[]
-}) {
+  presentation?: "modal" | "screen"
+}
+
+// why: DeckView and ImportBuild type their search props from this component and always add cards.
+export function CardSearchScreen(props: CardSearchProps & { onAdd: AddCard }) {
+  return <CardSearch {...props} />
+}
+
+export function CardSearch({
+  game,
+  format,
+  onAdd,
+  onRemove,
+  onClose,
+  offlineCandidates,
+  initialSection,
+  commanderCards,
+  presentation = "modal",
+}: CardSearchProps) {
   const convex = useConvex()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const connection = useConvexConnectionState()
@@ -129,14 +140,22 @@ export function CardSearchScreen({
     initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
   const choosingCommander = section === "commander" && picksCommander(game, format)
+  const lookup = !onAdd
   const filtersCards =
     systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
   const [candidateError, setCandidateError] = useState<string>()
   const candidateDetails = useCardDetails(
-    candidate ? { ...candidate, detailKey: cardDetailsKey(candidate, game), game } : undefined,
-    true,
+    candidate
+      ? {
+          ...candidate,
+          detailKey: cardDetailsKey(candidate, game),
+          game,
+          catalogCardId: candidate.cardId ?? candidate.printingId ?? candidate.providerCardId,
+        }
+      : undefined,
+    choosingCommander,
   )
   const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
@@ -461,12 +480,15 @@ export function CardSearchScreen({
     }
   }
 
+  function remember(card: SearchCard) {
+    if (!("scryfallId" in card)) return
+    saveCardDetails({ [card.scryfallId]: card })
+    setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
+  }
+
   function add(card: SearchCard) {
-    if ("scryfallId" in card) {
-      saveCardDetails({ [card.scryfallId]: card })
-      setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
-    }
-    if (choosingCommander) {
+    remember(card)
+    if (choosingCommander || !onAdd) {
       preview(searchEntry(card))
       return undefined
     }
@@ -512,7 +534,7 @@ export function CardSearchScreen({
   }
 
   function addOffline(entry: KnownCardEntry) {
-    if (choosingCommander) {
+    if (choosingCommander || !onAdd) {
       preview(entry.card)
       return
     }
@@ -521,7 +543,7 @@ export function CardSearchScreen({
   }
 
   function setCommander(commanderColor?: CommanderColor) {
-    if (!candidate) return
+    if (!candidate || !onAdd) return
     const error = onAdd({
       ...candidate,
       quantity: 1,
@@ -553,10 +575,17 @@ export function CardSearchScreen({
       (!filtersCards || matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
-  const ResultRow = choosingCommander ? TouchableOpacity : View
+  const tapsRows = choosingCommander || lookup
+  const ResultRow = tapsRows ? TouchableOpacity : View
+  const rowLabel = (card: { name: string }) =>
+    choosingCommander
+      ? translate("decks:cardSearch.preview", { card: card.name })
+      : lookup
+        ? translate("decks:cardSearch.showCard", { card: card.name })
+        : undefined
 
-  return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
+  const content = (
+    <>
       <Screen
         preset="fixed"
         safeAreaEdges={["bottom"]}
@@ -565,12 +594,16 @@ export function CardSearchScreen({
       >
         <Header
           title={translate(
-            choosingCommander ? "systems:section.commander" : "decks:cardSearch.title",
+            choosingCommander
+              ? "systems:section.commander"
+              : lookup
+                ? "decks:cardSearch.lookupTitle"
+                : "decks:cardSearch.title",
           )}
           leftTx="common:back"
           onLeftPress={onClose}
-          rightTx="common:done"
-          onRightPress={onClose}
+          rightTx={lookup ? undefined : "common:done"}
+          onRightPress={lookup ? undefined : onClose}
           backgroundColor={theme.colors.surface}
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
@@ -588,7 +621,11 @@ export function CardSearchScreen({
               containerStyle={$queryField}
               RightAccessory={busy ? SearchBusy : undefined}
             />
-            {CAN_READ_CARDS && prereleaseBuild() && filtersCards && !choosingCommander ? (
+            {CAN_READ_CARDS &&
+            prereleaseBuild() &&
+            filtersCards &&
+            !choosingCommander &&
+            !lookup ? (
               <Button
                 testID="card-scan-button"
                 tx="decks:cardSearch.scan"
@@ -597,7 +634,7 @@ export function CardSearchScreen({
               />
             ) : null}
           </View>
-          {initialSection !== "commander" ? (
+          {initialSection !== "commander" && !lookup ? (
             <SelectField
               label={translate("decks:cardSearch.addTo")}
               field="addTo"
@@ -722,13 +759,9 @@ export function CardSearchScreen({
             <ResultRow
               key={index}
               style={themed($result)}
-              accessibilityRole={choosingCommander ? "button" : undefined}
-              accessibilityLabel={
-                choosingCommander
-                  ? translate("decks:cardSearch.preview", { card: entry.card.name })
-                  : undefined
-              }
-              onPress={choosingCommander ? () => addOffline(entry) : undefined}
+              accessibilityRole={tapsRows ? "button" : undefined}
+              accessibilityLabel={rowLabel(entry.card)}
+              onPress={tapsRows ? () => addOffline(entry) : undefined}
             >
               <View style={$name}>
                 <Text size="sm" weight="medium" text={entry.card.name} />
@@ -747,7 +780,7 @@ export function CardSearchScreen({
                   />
                 ) : null}
               </View>
-              {!choosingCommander ? (
+              {!tapsRows ? (
                 <TextAction
                   style={$add}
                   accessibilityLabel={translate("decks:cardSearch.addCard", {
@@ -766,13 +799,9 @@ export function CardSearchScreen({
             <ResultRow
               key={index}
               style={themed($result)}
-              accessibilityRole={choosingCommander ? "button" : undefined}
-              accessibilityLabel={
-                choosingCommander
-                  ? translate("decks:cardSearch.preview", { card: card.name })
-                  : undefined
-              }
-              onPress={choosingCommander ? () => add(card) : undefined}
+              accessibilityRole={tapsRows ? "button" : undefined}
+              accessibilityLabel={rowLabel(card)}
+              onPress={tapsRows ? () => add(card) : undefined}
             >
               <CardImage
                 game={game}
@@ -788,7 +817,7 @@ export function CardSearchScreen({
                   <Text size="xxs" text={cardColorIdentityLabel(card, card.name)} />
                 ) : null}
               </View>
-              {!choosingCommander ? (
+              {!tapsRows ? (
                 <TextAction
                   style={$add}
                   accessibilityLabel={translate("decks:cardSearch.addCard", { card: card.name })}
@@ -935,9 +964,16 @@ export function CardSearchScreen({
           onRetryDetails={candidateDetails.retryDetails}
           onClose={() => setCandidate(undefined)}
           showQuantity={false}
-          onSetCommander={setCommander}
+          onSetCommander={choosingCommander ? setCommander : undefined}
         />
       ) : null}
+    </>
+  )
+  return presentation === "screen" ? (
+    content
+  ) : (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      {content}
     </Modal>
   )
 }

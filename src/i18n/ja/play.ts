@@ -361,6 +361,7 @@ export default {
   },
   rules: {
     title: "ルール",
+    cards: "カード",
     search: "ルールを検索",
     glossary: "用語集",
     effective: "総合ルール、{{date}}施行",

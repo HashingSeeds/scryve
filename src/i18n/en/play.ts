@@ -375,6 +375,8 @@ const play = {
   },
   rules: {
     title: "Rules",
+    // Header button that opens card lookup.
+    cards: "Cards",
     search: "Search rules",
     glossary: "Glossary",
     effective: "Comprehensive Rules, effective {{date}}",

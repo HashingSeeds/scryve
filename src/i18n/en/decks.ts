@@ -328,6 +328,9 @@ const decks = {
   },
   cardSearch: {
     title: "Add cards",
+    // Title of the card lookup screen, opened without a deck.
+    lookupTitle: "Cards",
+    showCard: "Show {{card}}",
     searchLabel: "Search cards",
     placeholder: "Search by card name",
     addTo: "Add to",
@@ -593,6 +596,8 @@ const decks = {
     title: "Decks",
     backToLobby: "Back to lobby",
     addDeck: "Add deck",
+    // Header button that opens card lookup.
+    cards: "Cards",
     collection: "Deck collection",
     collectionAll: "All",
     collectionFavorites: "Favorites",

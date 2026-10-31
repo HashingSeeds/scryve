@@ -38,6 +38,7 @@ export default function DecksRoute() {
       accountEntry={account.accountEntry}
       onAccount={account.onAccount}
       onAddDeck={() => router.push("/connected/decks/add")}
+      onCards={(game) => router.push({ pathname: "/cards", params: game ? { game } : {} })}
       onSelect={(deck) =>
         router.push({
           pathname: "/connected/decks/[deckId]",

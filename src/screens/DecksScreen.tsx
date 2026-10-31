@@ -513,6 +513,7 @@ export function DecksScreen({
   hasCurrentGame = false,
   onSelect,
   onAddDeck,
+  onCards,
   onHistory,
   onSettings,
   onSupport,
@@ -527,6 +528,7 @@ export function DecksScreen({
   hasCurrentGame?: boolean
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
+  onCards?: (game?: string) => void
   onHistory: () => void
   onSettings: () => void
   onSupport: () => void
@@ -625,8 +627,10 @@ export function DecksScreen({
         titleAccessory={
           (access?.ready ?? true) && !unavailableMessage ? <DeckCount access={access} /> : undefined
         }
-        leftTx={onBack ? "decks:shelf.backToLobby" : undefined}
-        onLeftPress={onBack}
+        leftTx={onBack ? "decks:shelf.backToLobby" : onCards ? "decks:shelf.cards" : undefined}
+        onLeftPress={
+          onBack ?? (onCards && (() => onCards(system === ALL_SYSTEMS ? undefined : system)))
+        }
         backgroundColor={theme.colors.surface}
         rightTx="decks:shelf.addDeck"
         onRightPress={onAddDeck}

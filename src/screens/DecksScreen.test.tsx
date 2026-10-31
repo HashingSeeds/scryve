@@ -683,6 +683,17 @@ describe("DecksScreen", () => {
     expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
+  it("opens card lookup for the picked game, or with no game when showing all", () => {
+    const onCards = jest.fn()
+    const all = renderShelf({ onCards })
+    fireEvent.press(all.getByText("Cards"))
+    expect(onCards).toHaveBeenLastCalledWith(undefined)
+    all.unmount()
+    const pokemon = renderShelf({ onCards, initialSystem: "pokemon" })
+    fireEvent.press(pokemon.getByText("Cards"))
+    expect(onCards).toHaveBeenLastCalledWith("pokemon")
+  })
+
   it("shows synced favorites and toggles them without opening the deck", () => {
     const onSelect = jest.fn()
     mockListMine.value = {

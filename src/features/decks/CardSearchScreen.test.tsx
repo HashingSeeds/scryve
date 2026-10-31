@@ -6,7 +6,7 @@ import { remove } from "@/utils/storage"
 
 import { clearCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
-import { CardSearchScreen, scryfallQuery } from "./CardSearchScreen"
+import { CardSearch, CardSearchScreen, scryfallQuery } from "./CardSearchScreen"
 import type { KnownCardEntry } from "./deckVersionsCache"
 
 const mockDetailsAction = jest.fn()
@@ -624,4 +624,24 @@ describe("with the device's card name list", () => {
       expect(mockAction).toHaveBeenCalledTimes(1)
     },
   )
+})
+
+it("looks cards up without a deck: no adding, and a tapped card opens its sheet", async () => {
+  jest.useFakeTimers()
+  mockAction.mockResolvedValue([{ ...searchCard, oracleText: "Counterspells cost less." }])
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardSearch game="mtg" format="commander" presentation="screen" onClose={jest.fn()} />
+    </ThemeProvider>,
+  )
+  expect(view.getByText("Cards")).toBeTruthy()
+  expect(view.queryByText("Add to")).toBeNull()
+  fireEvent.changeText(view.getByTestId("card-search-input"), "baral")
+  await act(async () => jest.advanceTimersByTime(400))
+  jest.useRealTimers()
+  expect(view.queryByLabelText("Add Baral to deck")).toBeNull()
+  fireEvent.press(view.getByLabelText("Show Baral"))
+  await waitFor(() => expect(view.getByTestId("card-focus-image")).toBeTruthy())
+  expect(view.queryByTestId("set-commander")).toBeNull()
+  expect(view.queryByTestId("card-focus-quantity")).toBeNull()
 })
