@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react"
 
-import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { buildInviteQrPayload } from "@/features/connected/inviteLinks"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
 import { LobbyClosedScreen, LobbyView } from "@/features/lobby/LobbyView"
@@ -155,15 +154,13 @@ export function NearbyLobbyScreen({
                 // why: Sync and use needs an account, so a signed-out player sees no device decks here.
                 if (!signedIn) return render(state)
                 return (
-                  <ConvexQueryBoundary fallback={() => render(state)}>
-                    <NearbyDeviceDeckSource
-                      myDecks={myDecks}
-                      setup={lobby.setup}
-                      onSelect={selectDeck}
-                    >
-                      {(device) => render(state, device)}
-                    </NearbyDeviceDeckSource>
-                  </ConvexQueryBoundary>
+                  <NearbyDeviceDeckSource
+                    myDecks={myDecks}
+                    setup={lobby.setup}
+                    onSelect={selectDeck}
+                  >
+                    {(device) => render(state, device)}
+                  </NearbyDeviceDeckSource>
                 )
               },
               selectingSeats: NO_SEATS_SELECTING,

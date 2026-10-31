@@ -141,12 +141,15 @@ describe("the nearby lobby's deck picker", () => {
     await act(async () => fireEvent.press(screen.getByTestId("seat-1-sync-and-use-local-angels")))
     expect(mockSync).toHaveBeenCalledWith("local-angels")
     expect(lanSession.selectDeck).not.toHaveBeenCalled()
+    // why: a pick made before the synced deck lands would be replaced by it.
+    expect(screen.getByTestId("seat-1-deck-no-deck")).toBeDisabled()
 
-    view.rerender(lobby([syncedAngels]))
+    await act(async () => view.rerender(lobby([syncedAngels])))
     expect(lanSession.selectDeck).toHaveBeenCalledWith({
       versionId: "version-1",
       name: "Calling All Angels",
     })
+    expect(screen.getByTestId("seat-1-deck-no-deck")).toBeEnabled()
   })
 
   it("opens Add deck from + New deck", () => {
