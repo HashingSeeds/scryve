@@ -100,7 +100,13 @@ export function GuestDeckDetailScreen({
   const { themed, theme } = useAppTheme()
   const stored = useGuestDeck(localId)
   const [restored] = useState(() => (stored ? loadLocalDraft(localId) : undefined))
-  const { draft, latest: draftRef, setDraft, edit } = useLocalDeckDraft({ localId })
+  const {
+    draft,
+    latest: draftRef,
+    setDraft,
+    edit,
+    subscribe: subscribeDraft,
+  } = useLocalDeckDraft({ localId })
   const versions = useMemo(() => (stored ? guestDeckVersions(stored) : []), [stored])
   const latestNumber = versions.at(-1)?.number ?? 1
   const [chosen, setChosen] = useState(restored?.version)
@@ -485,7 +491,13 @@ export function GuestDeckDetailScreen({
         onSave={save}
         onDiscard={discard}
         onDetails={() => setSheet("actions")}
-        cardSearch={{ onAdd: addCard, onRemove: removeCard }}
+        cardSearch={{
+          deckId: guestDeckRouteId(localId),
+          onAdd: addCard,
+          onRemove: removeCard,
+          cards: () => (draftRef.current ?? current).cards,
+          subscribe: subscribeDraft,
+        }}
         canChooseCommander={singleCommander}
         commanderWarnings={commanderWarnings}
         onNoteChange={(note) => edit({ type: "note", note }, rules)}

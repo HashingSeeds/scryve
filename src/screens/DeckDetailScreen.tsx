@@ -319,6 +319,7 @@ function DeckDetailContent({
     latest: latestDraft,
     setDraft,
     edit,
+    subscribe: subscribeDraft,
   } = useAccountDeckDraft({ ownerId: access?.ownerId, deckId })
   // why: an unsaved draft brought back from storage reopens where it can be finished.
   const [mode, setMode] = useState<DeckMode>(draft.editing ? "build" : "play")
@@ -615,7 +616,15 @@ function DeckDetailContent({
     const finish = () => {
       captureAnalytics("deck_used", { feature: "saved" })
       setNewListNotice(newList)
-      setDraft(closeDeckDraft(latestDraft.current))
+      const after = latestDraft.current
+      if (after.cards === draft.cards) {
+        setDraft(closeDeckDraft(after))
+        return
+      }
+      // why: /cards can add while the save is in flight; those adds stay as changes on top of what was saved.
+      pinnedVersionTarget.current = undefined
+      metadataSaveStarted.current = false
+      setDraft({ ...after, base: draft.cards })
     }
     if (plan.immediate) {
       try {
@@ -1002,7 +1011,14 @@ function DeckDetailContent({
           setError(undefined)
           setDialog("actions")
         }}
-        cardSearch={{ offlineCandidates, onAdd: addCard, onRemove: removeCard }}
+        cardSearch={{
+          deckId,
+          offlineCandidates,
+          onAdd: addCard,
+          onRemove: removeCard,
+          cards: () => (latestDraft.current.editing ? latestDraft.current.cards : displayCards),
+          subscribe: subscribeDraft,
+        }}
         canChooseCommander={view.singleCommander && !cardsUnavailable && !editableCached}
         commanderWarnings={view.commanderWarnings}
         onNoteChange={(note) => {

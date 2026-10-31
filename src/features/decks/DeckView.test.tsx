@@ -1,9 +1,14 @@
 import type { ComponentProps } from "react"
 import { fireEvent, render } from "@testing-library/react-native"
 
+import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
 
+import { useDeckSearchHost } from "./deckSearchHost"
 import { DeckView } from "./DeckView"
+
+const mockPush = jest.fn()
+jest.mock("expo-router", () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }))
 
 jest.mock("convex/react", () => ({
   useConvex: () => ({ query: jest.fn() }),
@@ -39,7 +44,13 @@ function deckView(overrides: Partial<ComponentProps<typeof DeckView>> = {}) {
         onSave={noop}
         onDiscard={noop}
         onDetails={noop}
-        cardSearch={{ onAdd: () => undefined, onRemove: noop }}
+        cardSearch={{
+          deckId: "deck-1",
+          onAdd: () => undefined,
+          onRemove: noop,
+          cards: () => [forest],
+          subscribe: () => noop,
+        }}
         onNoteChange={noop}
         onFocus={noop}
         onIncrement={noop}
@@ -178,11 +189,37 @@ describe("draft bar", () => {
   })
 })
 
-it("opens card search from the find field", () => {
+it("opens /cards for this deck from the find field", () => {
   const view = renderDeckView()
 
   fireEvent.press(view.getByLabelText("Find or add a card"))
-  expect(view.getByTestId("card-search")).toHaveTextContent("cards")
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/cards",
+    params: { deckId: "deck-1", game: "mtg" },
+  })
+  expect(view.queryByTestId("card-search")).toBeNull()
+})
+
+it("lends /cards its search only while Build can add cards", () => {
+  function Host(props: Partial<ComponentProps<typeof DeckView>>) {
+    const host = useDeckSearchHost("deck-1")
+    return (
+      <ThemeProvider initialContext="dark">
+        {deckView(props)}
+        <Text testID="host" text={host ? `${host.game}:${host.format}` : "none"} />
+      </ThemeProvider>
+    )
+  }
+  const view = render(<Host />)
+  expect(view.getByTestId("host")).toHaveTextContent("mtg:commander")
+
+  view.rerender(<Host mode="play" />)
+  expect(view.getByTestId("host")).toHaveTextContent("none")
+  view.rerender(<Host editingDisabled />)
+  expect(view.getByTestId("host")).toHaveTextContent("none")
+  view.rerender(<Host />)
+  view.unmount()
+  expect(render(<Host mode="play" />).getByTestId("host")).toHaveTextContent("none")
 })
 
 describe("sideboard", () => {

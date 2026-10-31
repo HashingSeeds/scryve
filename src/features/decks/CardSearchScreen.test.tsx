@@ -7,6 +7,7 @@ import { remove } from "@/utils/storage"
 import { clearCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
 import { CardSearch, CardSearchScreen, scryfallQuery } from "./CardSearchScreen"
+import type { DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 
 const mockDetailsAction = jest.fn()
@@ -644,4 +645,56 @@ it("looks cards up without a deck: no adding, and a tapped card opens its sheet"
   await waitFor(() => expect(view.getByTestId("card-focus-image")).toBeTruthy())
   expect(view.queryByTestId("set-commander")).toBeNull()
   expect(view.queryByTestId("card-focus-quantity")).toBeNull()
+})
+
+describe("adding into a deck's draft", () => {
+  async function searchDeck(props: { game: string; format: string; deckCards: DeckCard[] }) {
+    const onAdd = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearch {...props} presentation="screen" onAdd={onAdd} onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+    jest.useFakeTimers()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "is")
+    await act(async () => jest.advanceTimersByTime(400))
+    jest.useRealTimers()
+    return { view, onAdd }
+  }
+
+  it("adds a Magic result to Main or Side without a section picker, and lists deck matches", async () => {
+    mockAction.mockResolvedValue([{ ...searchCard, name: "Isochron Scepter", scryfallId: "iso" }])
+    const island = { name: "Island", quantity: 2, scryfallId: "island", section: "main" }
+    const { view, onAdd } = await searchDeck({
+      game: "mtg",
+      format: "modern",
+      deckCards: [island],
+    })
+
+    expect(view.queryByTestId("card-search-section")).toBeNull()
+    fireEvent.press(view.getByLabelText("Add Isochron Scepter to deck"))
+    fireEvent.press(view.getByLabelText("Add Isochron Scepter to Sideboard"))
+    expect(view.getByText("In this deck")).toBeTruthy()
+    expect(view.getByText("2 in Main deck")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Add another Island"))
+    expect(onAdd.mock.calls.map(([card]) => [card.name, card.section, card.quantity])).toEqual([
+      ["Isochron Scepter", "main", 1],
+      ["Isochron Scepter", "sideboard", 1],
+      ["Island", "main", 1],
+    ])
+  })
+
+  it("keeps the section picker where Main and Side do not reach every section", async () => {
+    mockAction.mockResolvedValue([
+      { game: "ygo", cardId: "dragon", name: "Isolde", typeLabel: "Fusion Monster" },
+    ])
+    const { view, onAdd } = await searchDeck({ game: "ygo", format: "advanced", deckCards: [] })
+
+    fireEvent.press(view.getByTestId("card-search-section"))
+    await waitFor(() => expect(view.getByTestId("card-search-section-option-extra")).toBeTruthy())
+    fireEvent.press(view.getByTestId("card-search-section-option-extra"))
+    fireEvent.press(view.getByLabelText("Add Isolde to deck"))
+    fireEvent.press(view.getByLabelText("Add Isolde to Side Deck"))
+    expect(onAdd.mock.calls.map(([card]) => card.section)).toEqual(["extra", "side"])
+  })
 })

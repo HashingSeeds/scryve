@@ -1,6 +1,7 @@
-import { useState, type ComponentProps, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
+import { router } from "expo-router"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
@@ -23,6 +24,7 @@ import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { cardSection, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
 import { isCommanderPick, moveTarget, sideboardSection } from "./deckDraft"
+import { useHostDeckSearch, type DeckSearchHost } from "./deckSearchHost"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 import { tracksResults } from "../../../convex/lib/systems"
 
@@ -33,10 +35,7 @@ export const DECK_MODES = [
   { mode: "build", tx: "decks:deckView.build" },
 ] as const
 
-type CardSearch = Pick<
-  ComponentProps<typeof CardSearchScreen>,
-  "onAdd" | "onRemove" | "offlineCandidates"
->
+type CardSearch = Omit<DeckSearchHost, "game" | "format"> & { deckId: string }
 
 export function DeckView({
   mode,
@@ -116,7 +115,7 @@ export function DeckView({
   undo?: { name: string; restore: () => void }
 }) {
   const { themed, theme } = useAppTheme()
-  const [search, setSearch] = useState<"cards" | "commander">()
+  const [choosingCommander, setChoosingCommander] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   if (discarding && changes === 0) setDiscarding(false)
@@ -124,7 +123,10 @@ export function DeckView({
   const analysis = useDeckAnalysis(game, format, building ? cards : savedCards)
   const tracked = tracksResults(game)
   const deckSections = localizedDeckSections(game, format)
-  const chooseCommander = canChooseCommander ? () => setSearch("commander") : undefined
+  const chooseCommander = canChooseCommander ? () => setChoosingCommander(true) : undefined
+  const { deckId, ...search } = cardSearch
+  const addsCards = building && !cardsUnavailable && !editingDisabled && !addUnavailable
+  useHostDeckSearch(deckId, addsCards ? { ...search, game, format } : undefined)
   const sections = building
     ? buildSections(
         cards,
@@ -246,10 +248,8 @@ export function DeckView({
             {building ? (
               <DeckBuildTools
                 analysis={cardsUnavailable || cards.length === 0 ? undefined : analysis?.analysis}
-                findDisabled={
-                  busy || cardsUnavailable || editingDisabled || Boolean(addUnavailable)
-                }
-                onFind={() => setSearch("cards")}
+                findDisabled={busy || !addsCards}
+                onFind={() => router.push({ pathname: "/cards", params: { deckId, game } })}
                 onAnalysis={() => setAnalysisOpen(true)}
               />
             ) : (
@@ -389,19 +389,18 @@ export function DeckView({
           </View>
         )}
       </BottomActionBar>
-      {search ? (
+      {choosingCommander ? (
         <CardSearchScreen
           game={game}
           format={format}
-          offlineCandidates={cardSearch.offlineCandidates}
-          initialSection={search === "commander" ? "commander" : undefined}
+          offlineCandidates={search.offlineCandidates}
+          initialSection="commander"
           commanderCards={cards}
-          onClose={() => setSearch(undefined)}
-          onRemove={cardSearch.onRemove}
+          onClose={() => setChoosingCommander(false)}
+          onRemove={search.onRemove}
           onAdd={(card) => {
-            const addError = cardSearch.onAdd(card)
-            if (!addError && search === "commander" && isCommanderPick({ game, format }, card))
-              setSearch(undefined)
+            const addError = search.onAdd(card)
+            if (!addError && isCommanderPick({ game, format }, card)) setChoosingCommander(false)
             return addError
           }}
         />

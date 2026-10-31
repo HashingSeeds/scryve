@@ -353,6 +353,10 @@ export default {
     fromCache: "De vos decks en cache · {{game}}",
     add: "+ Ajouter",
     addCard: "Ajouter {{card}} au deck",
+    side: "Side",
+    addToSection: "Ajouter {{card}} à {{section}}",
+    inSection: "{{count}} dans {{section}}",
+    addAnother: "Ajouter un autre exemplaire de {{card}}",
     added: "{{card}} ajoutée.",
     noCached:
       "Aucune carte en cache ne correspond. Les cartes apparaissent ici après leur ajout en ligne.",

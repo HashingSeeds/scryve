@@ -49,6 +49,7 @@ import {
   type CommanderColor,
   type DeckCard,
 } from "./deckCards"
+import { isCommanderPick, sideboardSection } from "./deckDraft"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
@@ -112,6 +113,7 @@ type CardSearchProps = {
   offlineCandidates?: KnownCardEntry[]
   initialSection?: string
   commanderCards?: DeckCard[]
+  deckCards?: DeckCard[]
   presentation?: "modal" | "screen"
 }
 
@@ -129,6 +131,7 @@ export function CardSearch({
   offlineCandidates,
   initialSection,
   commanderCards,
+  deckCards,
   presentation = "modal",
 }: CardSearchProps) {
   const convex = useConvex()
@@ -141,6 +144,10 @@ export function CardSearch({
   )
   const choosingCommander = section === "commander" && picksCommander(game, format)
   const lookup = !onAdd
+  const side = deckCards ? sideboardSection({ game, format }) : undefined
+  const picksSection =
+    !deckCards ||
+    sections.some((item) => item.id !== "main" && item.id !== "commander" && item.id !== side?.id)
   const filtersCards =
     systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
@@ -460,11 +467,11 @@ export function CardSearch({
     nameIndex,
   ])
 
-  function searchEntry(card: SearchCard) {
+  function searchEntry(card: SearchCard, to = section) {
     return {
       name: card.name,
       quantity: 1,
-      section,
+      section: to,
       imageUrl: card.imageUrl,
       smallImageUrl: card.smallImageUrl,
       ...("scryfallId" in card
@@ -486,13 +493,13 @@ export function CardSearch({
     setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
   }
 
-  function add(card: SearchCard) {
+  function add(card: SearchCard, to = section) {
     remember(card)
     if (choosingCommander || !onAdd) {
       preview(searchEntry(card))
       return undefined
     }
-    const error = onAdd(searchEntry(card))
+    const error = onAdd(searchEntry(card, to))
     setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
     return error
   }
@@ -533,13 +540,18 @@ export function CardSearch({
     console.log(`SCANREAD ${JSON.stringify({ photo: scan.photo, framing: scan.framing, match })}`)
   }
 
-  function addOffline(entry: KnownCardEntry) {
+  function addOffline(entry: KnownCardEntry, to = section) {
     if (choosingCommander || !onAdd) {
       preview(entry.card)
       return
     }
-    const error = onAdd({ ...entry.card, quantity: 1, section })
+    const error = onAdd({ ...entry.card, quantity: 1, section: to })
     setMessage(error ?? translate("decks:cardSearch.added", { card: entry.card.name }))
+  }
+
+  function addCopy(card: DeckCard) {
+    const error = onAdd?.({ ...card, quantity: 1 })
+    setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
   }
 
   function setCommander(commanderColor?: CommanderColor) {
@@ -574,6 +586,24 @@ export function CardSearch({
       (!choosingCommander || !inDeck(entry.card)) &&
       (!filtersCards || matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
   )
+
+  const needle = query.trim().toLocaleLowerCase()
+  const inDeckMatches = needle
+    ? deckCards?.filter((card) => card.name.toLocaleLowerCase().includes(needle))
+    : undefined
+  const sectionLabel = (id: string) => sections.find((item) => item.id === id)?.label ?? id
+  const sideAction = (card: { name: string }, addTo: (section: string) => void) =>
+    side ? (
+      <TextAction
+        style={$add}
+        accessibilityLabel={translate("decks:cardSearch.addToSection", {
+          card: card.name,
+          section: sectionLabel(side.id),
+        })}
+        tx="decks:cardSearch.side"
+        onPress={() => addTo(side.id)}
+      />
+    ) : null
 
   const tapsRows = choosingCommander || lookup
   const ResultRow = tapsRows ? TouchableOpacity : View
@@ -634,8 +664,9 @@ export function CardSearch({
               />
             ) : null}
           </View>
-          {initialSection !== "commander" && !lookup ? (
+          {initialSection !== "commander" && !lookup && picksSection ? (
             <SelectField
+              testID="card-search-section"
               label={translate("decks:cardSearch.addTo")}
               field="addTo"
               options={sections}
@@ -686,6 +717,34 @@ export function CardSearch({
           contentContainerStyle={[themed($search), choosingCommander ? $searchResults : undefined]}
           keyboardShouldPersistTaps="handled"
         >
+          {inDeckMatches?.length ? <Text weight="medium" tx="decks:cardSearch.inDeck" /> : null}
+          {inDeckMatches?.map((card) => (
+            <View key={printingKey(card)} style={themed($result)}>
+              <CardImage
+                game={game}
+                source={card.smallImageUrl ?? card.imageUrl}
+                compact
+                style={$image}
+                accessibilityLabel={card.name}
+              />
+              <View style={$name}>
+                <Text size="sm" weight="medium" text={card.name} />
+                <Text
+                  size="xxs"
+                  tx="decks:cardSearch.inSection"
+                  txOptions={{ count: card.quantity, section: sectionLabel(cardSection(card)) }}
+                />
+              </View>
+              {isCommanderPick({ game, format }, card) ? null : (
+                <TextAction
+                  style={$add}
+                  accessibilityLabel={translate("decks:cardSearch.addAnother", { card: card.name })}
+                  tx="decks:cardSearch.add"
+                  onPress={() => addCopy(card)}
+                />
+              )}
+            </View>
+          ))}
           {choosingCommander ? <Text weight="medium" tx="decks:cardSearch.inDeck" /> : null}
           {checkingDeck ? <Text size="sm" tx="decks:cardSearch.checking" /> : null}
           {rulesError ? (
@@ -790,6 +849,7 @@ export function CardSearch({
                   onPress={() => addOffline(entry)}
                 />
               ) : null}
+              {!tapsRows ? sideAction(entry.card, (to) => addOffline(entry, to)) : null}
             </ResultRow>
           ))}
           {offline && cachedCandidates?.length === 0 ? (
@@ -825,6 +885,7 @@ export function CardSearch({
                   onPress={() => add(card)}
                 />
               ) : null}
+              {!tapsRows ? sideAction(card, (to) => add(card, to)) : null}
             </ResultRow>
           ))}
           {!busy && catalogResults?.length === 0 ? <Text tx="decks:cardSearch.noResults" /> : null}

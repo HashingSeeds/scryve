@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
+import CardsRoute from "@/app/cards"
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { loadMatchSwaps } from "@/features/decks/matchSideboard"
@@ -46,7 +47,15 @@ jest.mock("@/features/decks/localDeckSync", () => ({
 
 const mockStatsPush = jest.fn()
 jest.mock("expo-router", () => ({
-  router: { push: (...args: unknown[]) => mockStatsPush(...args) },
+  router: {
+    push: (...args: unknown[]) => mockStatsPush(...args),
+    back: jest.fn(),
+    canGoBack: () => true,
+  },
+  useLocalSearchParams: () => ({
+    deckId: "guest-11111111-1111-4111-8111-111111111111",
+    game: "mtg",
+  }),
   useFocusEffect: (callback: () => void) => require("react").useEffect(callback, [callback]),
 }))
 
@@ -382,7 +391,7 @@ test("keeps an unsaved edit after leaving and saves it from the reopened deck", 
   expect(renderScreen().queryByTestId("deck-draft-bar")).toBeNull()
 })
 
-test("searches new cards into Main deck by default and saves merged copies", async () => {
+test("adds from /cards into Main and Side, and the deck counts the changes", async () => {
   jest.useFakeTimers()
   try {
     mockSearchCards.mockResolvedValue([
@@ -394,23 +403,33 @@ test("searches new cards into Main deck by default and saves merged copies", asy
         manaCost: "",
       },
     ])
-    const view = renderScreen()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <GuestDeckDetailScreen localId={mockStored.localId} onBack={jest.fn()} />
+        <CardsRoute />
+      </ThemeProvider>,
+    )
     fireEvent.press(view.getByTestId("deck-mode-build"))
     fireEvent.press(view.getByTestId("deck-add-cards"))
+    expect(mockStatsPush).toHaveBeenCalledWith({
+      pathname: "/cards",
+      params: { deckId: `guest-${mockStored.localId}`, game: "mtg" },
+    })
     fireEvent.changeText(view.getByTestId("card-search-input"), "Island")
     await waitFor(() => expect(view.getByLabelText("Add Island to deck")).toBeTruthy())
     fireEvent.press(view.getByLabelText("Add Island to deck"))
     fireEvent.press(view.getByLabelText("Add Island to deck"))
-    fireEvent.press(view.getByText("Done"))
+    fireEvent.press(view.getByLabelText("Add Island to Sideboard"))
+    expect(view.getByText("2 in Main deck")).toBeTruthy()
+    expect(view.getByText("1 in Sideboard")).toBeTruthy()
+    expect(within(view.getByTestId("deck-draft-bar")).getByText("1 change")).toBeTruthy()
+
     fireEvent.press(view.getByTestId("save-version-button"))
-    expect(mockSaveGuestDeck).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cards: expect.arrayContaining([
-          expect.objectContaining({ name: "Island", quantity: 2, section: "main" }),
-        ]),
-      }),
-      expect.anything(),
-    )
+    expect(mockSaveGuestDeck.mock.calls[0][0].cards).toEqual([
+      expect.objectContaining({ name: "Sol Ring", quantity: 2 }),
+      expect.objectContaining({ name: "Island", quantity: 2, section: "main" }),
+      expect.objectContaining({ name: "Island", quantity: 1, section: "sideboard" }),
+    ])
     expect(mockSaveGuestDeck.mock.calls[0][0].cards[1]).not.toHaveProperty("manaCost")
   } finally {
     jest.useRealTimers()
