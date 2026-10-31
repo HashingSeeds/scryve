@@ -100,7 +100,6 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
   for (const gram of lineTrigrams)
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
       sharedTrigrams.set(faceIndex, (sharedTrigrams.get(faceIndex) ?? 0) + 1)
-  // why: a typed query is a prefix, so ranking by whole-name overlap would bury "Lightning Bolt" under short names for "lightning bo".
   const overlap = (faceIndex: number, shared: number) =>
     typed
       ? shared / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4

@@ -374,18 +374,17 @@ export function CardSearchScreen({
     }
     setOfflineResults(undefined)
     const text = query.trim()
-    // why: Scryfall's search misses typos and sorts A to Z, so the device's name list leads with the closest names.
-    const names =
-      nameIndex && !SCRYFALL_SYNTAX.test(text)
-        ? searchCardNames(
-            nameIndex,
-            choosingCommander ? text.slice(0, 80).replace(/[()"]/g, " ") : text,
-            NAME_MATCHES,
-          )
-        : []
     const timer = setTimeout(async () => {
       try {
         if (!convex) throw new Error("Card search unavailable")
+        const names =
+          nameIndex && !SCRYFALL_SYNTAX.test(text)
+            ? searchCardNames(
+                nameIndex,
+                choosingCommander ? text.slice(0, 80).replace(/[()"]/g, " ") : text,
+                NAME_MATCHES,
+              )
+            : []
         const [found, named] = await Promise.all([
           convex.action(api.cards.search, {
             game,
@@ -537,7 +536,6 @@ export function CardSearchScreen({
     setCandidate(undefined)
   }
 
-  // why: Scryfall applies the filters to its own results, but name matches arrive unfiltered.
   const rankedResults = (nameResults ?? []).filter(
     (card) => "scryfallId" in card && matchesFilters(card),
   )
