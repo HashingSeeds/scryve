@@ -646,7 +646,7 @@ describe("DecksScreen", () => {
       chooseOption(view, "system-filter", system)
       expect(StyleSheet.flatten(view.getByTestId("deck-filters-dialog").props.style)).toMatchObject(
         {
-          height: 480,
+          height: 560,
           maxHeight: "100%",
         },
       )

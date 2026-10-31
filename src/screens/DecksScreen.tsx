@@ -970,7 +970,7 @@ const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xs,
 })
 const $flex1: ViewStyle = { flex: 1 }
-const $filtersDialog: ViewStyle = { height: 480 }
+const $filtersDialog: ViewStyle = { height: 560 }
 const $filtersScroll: ViewStyle = { flex: 1 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
