@@ -416,6 +416,14 @@ export function guestDeckBringing(stored: GuestDeck) {
     : latestNumber(stored)
 }
 
+export function guestDeckPlayCards(stored: GuestDeck) {
+  const bringing = guestDeckBringing(stored)
+  return (
+    guestDeckVersions(stored).find((version) => version.number === bringing)?.cards ??
+    stored.deck.cards
+  )
+}
+
 function withVersions(stored: GuestDeck, versions: readonly GuestDeckVersion[] | undefined) {
   const latest = versions?.at(-1)
   if (!versions || !latest) return stored

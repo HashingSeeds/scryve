@@ -32,6 +32,7 @@ jest.mock("@/features/decks/decksSync", () => ({
 }))
 jest.mock("@/features/decks/guestDeck", () => ({
   loadGuestDeck: (...args: unknown[]) => mockLoadGuestDeck(...args),
+  guestDeckPlayCards: jest.requireActual("@/features/decks/guestDeck").guestDeckPlayCards,
 }))
 jest.mock("./deckFingerprint", () => ({
   deckFingerprint: jest.fn(async () => `v1:${"a".repeat(64)}`),
@@ -110,6 +111,23 @@ it("loads only the selected local deck and never sends its local id as a server 
     cards.map((card) => ({ ...card, game: "mtg" })),
   )
   expect(mockLoadCards).not.toHaveBeenCalled()
+})
+
+it("starts a device deck with the version it brings", () => {
+  const older = [{ name: "Shock", quantity: 4 }]
+  mockLoadGuestDeck.mockReturnValue({
+    createdAt: 1,
+    updatedAt: 1,
+    bringing: 1,
+    deck: { game: "mtg", cards: [{ name: "Bolt", quantity: 4 }] },
+    versions: [
+      { number: 1, name: "Current", createdAt: 1, updatedAt: 1, cards: older },
+      { number: 2, name: "Tuned", createdAt: 1, updatedAt: 1 },
+    ],
+  })
+  expect(chosenDeckCards({ localId: "local", name: "Burn" }, "owner")).toEqual([
+    { ...older[0], game: "mtg" },
+  ])
 })
 
 it("keeps a game's pin when its list is no longer cached", async () => {

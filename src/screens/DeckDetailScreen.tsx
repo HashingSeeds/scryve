@@ -16,7 +16,6 @@ import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
@@ -48,8 +47,8 @@ import {
   useDeckVersionCache,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
-import { DECK_MODES, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
+import { DECK_MODES, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import {

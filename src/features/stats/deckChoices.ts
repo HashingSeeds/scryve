@@ -1,7 +1,7 @@
 import { DeckSyncRepository } from "@/features/decks/decksSync"
 import { newestPendingCardWrite, versionWriteOutbox } from "@/features/decks/decksVersionWrites"
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
-import { loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
+import { guestDeckPlayCards, loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
 import { translate } from "@/i18n/translate"
 
 import { deckFingerprint } from "./deckFingerprint"
@@ -54,7 +54,7 @@ export function chosenDeckCards(
   if (deck.localId) {
     const local = loadGuestDeck(deck.localId)
     if (!local) throw new Error(translate("decks:detail.maybeDeleted"))
-    return local.deck.cards.map((card) => ({
+    return guestDeckPlayCards(local).map((card) => ({
       ...card,
       game: card.game ?? local.deck.game ?? "mtg",
     }))
