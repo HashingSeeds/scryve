@@ -371,6 +371,7 @@ export default {
   },
   rules: {
     title: "नियम",
+    cards: "कार्ड",
     search: "नियम खोजें",
     glossary: "शब्दावली",
     effective: "Comprehensive Rules, {{date}} से प्रभावी",

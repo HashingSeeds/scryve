@@ -32,6 +32,7 @@ export default function RulesRoute() {
       onOpenGlossary={() =>
         router.push({ pathname: "/rules", params: { ...params, glossary: "1" } })
       }
+      onCards={() => router.push({ pathname: "/cards", params: { game: rules ? system : "mtg" } })}
     />
   )
 }

@@ -358,6 +358,7 @@ export default {
   },
   rules: {
     title: "규칙",
+    cards: "카드",
     search: "규칙 검색",
     glossary: "용어집",
     effective: "종합 규칙, {{date}} 시행",

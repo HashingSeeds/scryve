@@ -301,6 +301,8 @@ export default {
   },
   cardSearch: {
     title: "카드 추가",
+    lookupTitle: "카드",
+    showCard: "{{card}} 보기",
     searchLabel: "카드 검색",
     placeholder: "카드 이름으로 검색",
     addTo: "추가할 위치",
@@ -518,6 +520,7 @@ export default {
     title: "덱",
     backToLobby: "로비로 돌아가기",
     addDeck: "덱 추가",
+    cards: "카드",
     collection: "덱 컬렉션",
     collectionAll: "전체",
     collectionFavorites: "즐겨찾기",

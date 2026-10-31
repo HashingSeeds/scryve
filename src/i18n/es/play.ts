@@ -382,6 +382,7 @@ export default {
   },
   rules: {
     title: "Reglas",
+    cards: "Cartas",
     search: "Buscar reglas",
     glossary: "Glosario",
     effective: "Reglas completas, en vigor desde el {{date}}",

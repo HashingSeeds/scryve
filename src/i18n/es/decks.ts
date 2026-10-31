@@ -326,6 +326,8 @@ export default {
   },
   cardSearch: {
     title: "Añadir cartas",
+    lookupTitle: "Cartas",
+    showCard: "Mostrar {{card}}",
     searchLabel: "Buscar cartas",
     placeholder: "Buscar por nombre de carta",
     addTo: "Añadir a",
@@ -551,6 +553,7 @@ export default {
     title: "Mazos",
     backToLobby: "Volver a la sala",
     addDeck: "Añadir mazo",
+    cards: "Cartas",
     collection: "Colección de mazos",
     collectionAll: "Todos",
     collectionFavorites: "Favoritos",

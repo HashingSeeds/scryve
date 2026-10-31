@@ -37,6 +37,7 @@ export interface RulesScreenProps {
   onBack: () => void
   onOpenRule: (id: string) => void
   onOpenGlossary: () => void
+  onCards?: () => void
 }
 
 function rowsFor(
@@ -84,6 +85,7 @@ export function RulesScreen({
   onBack,
   onOpenRule,
   onOpenGlossary,
+  onCards,
 }: RulesScreenProps) {
   const { theme, themed } = useAppTheme()
   const { rules, failed, retry } = useComprehensiveRules(source)
@@ -195,7 +197,13 @@ export function RulesScreen({
       backgroundColor={theme.colors.background}
       contentContainerStyle={$flex}
     >
-      <Header title={title} leftTx="common:back" onLeftPress={onBack} />
+      <Header
+        title={title}
+        leftTx="common:back"
+        onLeftPress={onBack}
+        rightTx={onCards ? "play:rules.cards" : undefined}
+        onRightPress={onCards}
+      />
       {!RULES_TEXT_IN_APP ? (
         <View style={themed($message)}>
           <Text size="sm" tx="play:rules.webOnly" txOptions={{ publisher: source.publisher }} />

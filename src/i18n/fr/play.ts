@@ -384,6 +384,7 @@ export default {
   },
   rules: {
     title: "Règles",
+    cards: "Cartes",
     search: "Rechercher dans les règles",
     glossary: "Glossaire",
     effective: "Règles complètes, en vigueur le {{date}}",

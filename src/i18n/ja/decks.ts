@@ -305,6 +305,8 @@ export default {
   },
   cardSearch: {
     title: "カードを追加",
+    lookupTitle: "カード",
+    showCard: "{{card}}を表示",
     searchLabel: "カードを検索",
     placeholder: "カード名で検索",
     addTo: "追加先",
@@ -525,6 +527,7 @@ export default {
     title: "デッキ",
     backToLobby: "ロビーに戻る",
     addDeck: "デッキを追加",
+    cards: "カード",
     collection: "デッキコレクション",
     collectionAll: "すべて",
     collectionFavorites: "お気に入り",
