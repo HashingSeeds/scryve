@@ -125,7 +125,6 @@ export const summary = query({
   },
 })
 
-/** why: Results and Matchups show an opponent's commanders only when their player and deck name would show. */
 function shownIdentity(
   seat: { userId?: Id<"users">; deckName?: string; deckLabel?: DeckLabel },
   blocked: Set<Id<"users">>,

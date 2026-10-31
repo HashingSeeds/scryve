@@ -68,7 +68,6 @@ function assertIdentity(identity: DeckIdentity) {
   return normalized
 }
 
-/** why: identity names come from clients, so a card the catalog knows takes the catalog's name, and every name then passes the read gate before it is stored. */
 async function catalogIdentity(
   ctx: QueryCtx,
   game: string | undefined,
@@ -92,7 +91,6 @@ async function catalogIdentity(
   return gatedIdentity(cards)
 }
 
-/** why: names stored before the catalog check can fail the gate. A missing identity reads as the deck name, so one bad name drops the whole identity. */
 export function gatedIdentity(identity: DeckIdentity | undefined) {
   return identity?.every(({ name }) => !nameFailsGate(name)) ? identity : undefined
 }

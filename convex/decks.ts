@@ -490,7 +490,6 @@ async function lastPlayedAt(ctx: QueryCtx, deck: Doc<"decks">) {
   return result?.finishedAt
 }
 
-/** why: a player can bring an older version, and a Flesh and Blood hero sets that version's starting life. Each lookup scans the version's cards, so callers over many decks look up only the versions they need. */
 async function versionStartingValues(
   ctx: QueryCtx,
   deck: Doc<"decks">,
