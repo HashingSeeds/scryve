@@ -431,7 +431,12 @@ export default defineSchema({
     smallImageUrl: v.optional(v.string()),
     quantity: v.number(),
     board: v.optional(v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))),
-  }).index("by_deck_version", ["deckVersionId"]),
+  })
+    .index("by_deck_version", ["deckVersionId"])
+    .index("by_deck_version_and_section", {
+      fields: ["deckVersionId", "section"],
+      staged: true,
+    }),
 
   gameCards: defineTable({
     game: v.string(),
