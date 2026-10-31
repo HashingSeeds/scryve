@@ -15,11 +15,13 @@ const CURVE_HEIGHT = 30
 
 export function DeckBuildTools({
   analysis,
+  analysisPending,
   findDisabled,
   onFind,
   onAnalysis,
 }: {
   analysis?: DeckAnalysis
+  analysisPending?: boolean
   findDisabled?: boolean
   onFind: () => void
   onAnalysis: () => void
@@ -54,6 +56,8 @@ export function DeckBuildTools({
             onPress={onAnalysis}
           />
         </View>
+      ) : analysisPending ? (
+        <View style={[themed($summary), $touch]} />
       ) : null}
       <TouchableOpacity
         testID="deck-add-cards"

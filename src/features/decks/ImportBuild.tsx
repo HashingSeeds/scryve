@@ -5,7 +5,6 @@ import type { ViewStyle } from "react-native"
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
@@ -23,7 +22,7 @@ import { CardSearchScreen } from "./CardSearchScreen"
 import { DeckAnalysisPanel, useDeckAnalysis } from "./DeckAnalysisPanel"
 import { buildSections } from "./deckBuild"
 import { DeckBuildTools } from "./DeckBuildTools"
-import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
+import { DeckCardListSkeleton, DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel, deckNameWarning } from "./deckCopy"
 import { canChooseCommander, isCommanderPick } from "./deckDraft"
@@ -199,18 +198,13 @@ export function ImportBuild({
               />
               {details}
             </View>
-            {listFinal ? (
-              <DeckBuildTools
-                analysis={shown.length === 0 ? undefined : analysis?.analysis}
-                onFind={() => setSearch({})}
-                onAnalysis={() => setAnalysisOpen(true)}
-              />
-            ) : (
-              <>
-                {progress}
-                <DeckListSkeleton sections={deckSections} />
-              </>
-            )}
+            <DeckBuildTools
+              analysis={listFinal && shown.length > 0 ? analysis?.analysis : undefined}
+              analysisPending={!listFinal && analysis !== undefined && (!cards || cards.length > 0)}
+              findDisabled={!listFinal}
+              onFind={() => setSearch({})}
+              onAnalysis={() => setAnalysisOpen(true)}
+            />
             {error ? <AlertNote text={error} /> : null}
             {useError ? <AlertNote text={useError} /> : null}
             {!name.trim() ? <AlertNote text={translate("decks:addDeck.nameRequired")} /> : null}
@@ -287,6 +281,15 @@ export function ImportBuild({
                 </View>
               )
             })}
+            {listFinal ? null : (
+              <View>
+                <DeckCardListSkeleton
+                  sections={deckSections}
+                  commanderAction={canChooseCommander({ game, format }, shown)}
+                />
+                {progress}
+              </View>
+            )}
           </>
         }
         renderSectionHeader={({ section }) => (

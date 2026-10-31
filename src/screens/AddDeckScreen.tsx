@@ -956,11 +956,13 @@ export function AddDeckScreen({
     const progress = selectedCatalogDeck ? (
       <LoadingProgress
         state="loading"
+        edge="top"
         accessibilityText={translate("decks:addDeck.loadingTopDeck")}
       />
     ) : selectedPrecon ? (
       <LoadingProgress
         testID="precon-loading-progress"
+        edge="top"
         state={importDraft || previewLoading ? "loading" : "unavailable"}
         accessibilityText={
           !importDraft && !previewLoading

@@ -217,7 +217,7 @@ function DeckDetailPlaceholder({
             </View>
           ) : null}
         </View>
-        <DeckListSkeleton sections={loadingSections} density="comfortable" />
+        <DeckListSkeleton sections={loadingSections} />
       </ScrollView>
     </Screen>
   )
