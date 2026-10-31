@@ -192,6 +192,38 @@ it("reads an older default-named version by number in the seat and version picke
   expect(screen.queryByText("Current")).toBeNull()
 })
 
+it("starts a picked deck on the version you bring", () => {
+  const onSelectVersion = jest.fn()
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        system="mtg"
+        deckState={{
+          status: "ready",
+          value: [
+            {
+              _id: "deck",
+              name: "Atraxa",
+              cardQuantity: 100,
+              bringingVersionId: "v1",
+              versions: [
+                { _id: "v1", versionNumber: 1 },
+                { _id: "v2", versionNumber: 2 },
+              ],
+            },
+          ],
+        }}
+        versionLabel={deckVersionLabel}
+        onSelectVersion={onSelectVersion}
+      />
+    </ThemeProvider>,
+  )
+  fireEvent.press(screen.getByTestId("seat-1-deck-deck"))
+  expect(onSelectVersion).toHaveBeenCalledWith(1, "v1")
+})
+
 const deviceDeck = (overrides: Partial<LobbyDeviceDeck> = {}): LobbyDeviceDeck => ({
   localId: "local-angels",
   deckKey: "key-angels",
