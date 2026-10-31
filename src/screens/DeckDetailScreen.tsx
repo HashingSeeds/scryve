@@ -493,7 +493,7 @@ function DeckDetailContent({
       deckId,
       {
         draft: latestDraft.current,
-        versionId: draftVersionId,
+        versionId: pinnedVersionTarget.current?.versionId ?? draftVersionId,
         pinned: pinnedVersionTarget.current,
       },
       savedNote,
