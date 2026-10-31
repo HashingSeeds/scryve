@@ -75,7 +75,7 @@ export function SaveDestination({ destination }: { destination: SaveDestinationS
         : translate("decks:saveTo.left", { left: room.left, limit: room.limit })
   return (
     <View testID="save-destination">
-      <Text size="xs" tone="dim" tx="decks:saveTo.label" style={themed($label)} />
+      <Text size="xs" weight="medium" tx="decks:saveTo.label" style={themed($label)} />
       <View accessibilityRole="radiogroup" accessibilityLabel={translate("decks:saveTo.label")}>
         <Option
           testID="save-destination-account"

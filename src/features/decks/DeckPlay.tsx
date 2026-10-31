@@ -4,6 +4,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
+import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -81,14 +82,13 @@ export function DeckPlay<VersionId extends string>({
                 <View style={$flex}>
                   <Text weight="medium" text={version.label} numberOfLines={1} />
                   {version.detail ? (
-                    <Text size="xs" tone="dim" text={version.detail} numberOfLines={1} />
+                    <Text size="meta" tone="dim" text={version.detail} numberOfLines={1} />
                   ) : null}
                 </View>
                 {version.record ? (
-                  <Text
-                    style={$tabular}
+                  <TrailingNumber
                     tone={version.record.games ? undefined : "dim"}
-                    text={recordText(version.record)}
+                    value={recordText(version.record)}
                   />
                 ) : null}
               </TouchableOpacity>
@@ -161,7 +161,7 @@ function ThisMatch({ pool, swaps, onSideboard, onReset }: PlayMatch) {
           <View style={$flex}>
             <Text weight="medium" tx="decks:play.asBuilt" numberOfLines={1} />
             <Text
-              size="xs"
+              size="meta"
               tone="dim"
               text={translate("decks:play.asBuiltDetail", {
                 cards: translate("decks:cardCount", { count: swapCount(pool.main) }),
@@ -211,19 +211,24 @@ function Results({
   return (
     <>
       <PlaySection
-        text={
-          record?.games
-            ? translate("decks:play.resultsRecord", { record: recordText(record) })
-            : translate("decks:play.results")
-        }
+        tx="decks:play.results"
         action={
-          onStats && record?.games ? (
-            <TextAction
-              testID="open-deck-stats"
-              tx="decks:stats.viewStats"
-              size="xs"
-              onPress={onStats}
-            />
+          record?.games ? (
+            <>
+              {onStats ? (
+                <TextAction
+                  testID="open-deck-stats"
+                  tx="decks:stats.viewStats"
+                  size="xs"
+                  onPress={onStats}
+                />
+              ) : null}
+              <TrailingNumber
+                testID="deck-play-record"
+                preset="sectionLabel"
+                value={recordText(record)}
+              />
+            </>
           ) : undefined
         }
       />
@@ -255,9 +260,9 @@ function Results({
               text={outcomeLetter(result.outcome)}
             />
             <View style={$flex}>
-              <Text text={opponentsText(result.opponents)} numberOfLines={1} />
+              <Text weight="medium" text={opponentsText(result.opponents)} numberOfLines={1} />
               <Text
-                size="xs"
+                size="meta"
                 tone="dim"
                 text={[statsDate(result.finishedAt), sourceLabel(result.source)].join(" · ")}
               />
@@ -271,20 +276,13 @@ function Results({
 
 function PlaySection({
   tx,
-  text,
   action,
 }: {
-  tx?: "decks:play.bringing" | "decks:play.thisMatch"
-  text?: string
+  tx: "decks:play.bringing" | "decks:play.thisMatch" | "decks:play.results"
   action?: ReactNode
 }) {
   const { themed } = useAppTheme()
-  return (
-    <View style={themed($section)}>
-      <Text size="xxs" weight="semiBold" tone="dim" style={$sectionText} tx={tx} text={text} />
-      {action}
-    </View>
-  )
+  return <SectionHeader label={translate(tx)} action={action} style={themed($section)} />
 }
 
 function outcomeLetter(outcome: Result["outcome"]) {
@@ -322,13 +320,8 @@ function sourceLabel(source: Result["source"]) {
 }
 
 const $flex: ViewStyle = { flex: 1, minWidth: 0 }
-const $tabular: TextStyle = { fontVariant: ["tabular-nums"] }
 const $letter: TextStyle = { width: 16 }
-const $sectionText: TextStyle = { flex: 1, textTransform: "uppercase", letterSpacing: 0.8 }
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
   minHeight: 44,
   paddingTop: spacing.sm,
 })

@@ -49,7 +49,7 @@ import {
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
-import { DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
+import { DeckHeaderIcon, DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import {
@@ -165,12 +165,11 @@ function DeckDetailPlaceholder({
       <Header
         title=""
         backgroundColor={theme.colors.surface}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        LeftActionComponent={
+          <DeckHeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+        }
         RightActionComponent={
-          <View style={themed($headerAction)}>
-            <Text size="lg" text="•••" />
-          </View>
+          <DeckHeaderIcon icon="more" label={translate("decks:deckView.details")} disabled />
         }
       />
       <ScrollView
@@ -1508,14 +1507,6 @@ const $queryFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $titleBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-
-const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: 56,
-  minWidth: 56,
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
 
 const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 

@@ -8,8 +8,8 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
-import { ChoiceButton } from "./ChoiceButton"
 import { DialogCard } from "./DialogCard"
+import { SegmentedControl } from "./SegmentedControl"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 
@@ -77,6 +77,7 @@ export function DeckVersionDialog({
           <TextField
             testID="version-note-input"
             labelTx="decks:versionDialog.notes"
+            optional
             helperTx="decks:versionDialog.notesHelper"
             value={note}
             multiline
@@ -88,19 +89,22 @@ export function DeckVersionDialog({
         )}
         {copyFromLabel ? (
           <View style={themed($choices)}>
-            <ChoiceButton
-              testID="version-copy-cards"
-              text={translate("decks:versionDialog.copyFrom", { version: copyFromLabel })}
-              detail={translate("decks:versionDialog.copyDetail")}
-              selected={copyCards}
-              onPress={() => setCopyCards(true)}
+            <SegmentedControl
+              testID="version-cards"
+              segments={[
+                {
+                  id: "copy",
+                  label: translate("decks:versionDialog.copyFrom", { version: copyFromLabel }),
+                },
+                { id: "empty", label: translate("decks:versionDialog.empty") },
+              ]}
+              selectedId={copyCards ? "copy" : "empty"}
+              onSelect={(id) => setCopyCards(id === "copy")}
             />
-            <ChoiceButton
-              testID="version-empty-cards"
-              tx="decks:versionDialog.empty"
-              detail={translate("decks:versionDialog.emptyDetail")}
-              selected={!copyCards}
-              onPress={() => setCopyCards(false)}
+            <Text
+              size="meta"
+              tone="dim"
+              tx={copyCards ? "decks:versionDialog.copyDetail" : "decks:versionDialog.emptyDetail"}
             />
           </View>
         ) : null}

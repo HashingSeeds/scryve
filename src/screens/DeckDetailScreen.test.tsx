@@ -1543,7 +1543,7 @@ describe("DeckDetailScreen", () => {
         ],
       }
       const view = renderDetail()
-      expect(view.getByText("Results · 4-4")).toBeTruthy()
+      expect(view.getByTestId("deck-play-record")).toHaveTextContent("4-4")
       expect(
         within(view.getByTestId("play-result-r1")).getByText("vs Atraxa, Praetors' Voice, Goblins"),
       ).toBeTruthy()

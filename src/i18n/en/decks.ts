@@ -487,7 +487,7 @@ const decks = {
     version: "Version {{number}} · {{name}}",
     // Shown beside the version name when a newer version of this deck exists.
     notLatest: "Not the latest",
-    addMatch: "Add match result",
+    addMatch: "Add result",
     // The deck screen's two views: using the deck at the table, and changing its list.
     play: "Play",
     build: "Build",
@@ -505,8 +505,6 @@ const decks = {
     // Heading over the deck's versions. The player picks the one they bring to their next games.
     bringing: "Bringing",
     results: "Results",
-    // Heading over recent games with the deck's win-loss record, e.g. "Results · 2-1".
-    resultsRecord: "Results · {{record}}",
     // A recent game's opponents, named by their commanders or decks, e.g. "vs Atraxa, Krenko".
     versus: "vs {{opponents}}",
     startGame: "Start a game",
@@ -536,8 +534,6 @@ const decks = {
     open: "Sideboard",
     title: "Sideboard for this match",
     close: "Close sideboard",
-    // Running totals, e.g. "In 2 · Out 2 · Main 60".
-    counts: "In {{in}} · Out {{out}} · Main {{main}}",
     inFromSide: "In from sideboard",
     outOfMain: "Out of main",
     // Under a sideboard card, e.g. "1 of 2 in side".

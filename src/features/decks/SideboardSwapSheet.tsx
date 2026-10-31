@@ -4,6 +4,7 @@ import { ScrollView, TouchableOpacity, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
+import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -76,20 +77,11 @@ export function SideboardSwapSheet({
       wide
       style={themed($sheet)}
     >
-      <View>
-        <Text preset="subheading" tx="decks:sideboard.title" />
-        <Text
-          testID="sideboard-counts"
-          size="xs"
-          tone="dim"
-          style={$tabular}
-          text={translate("decks:sideboard.counts", { in: inCount, out: outCount, main })}
-        />
-      </View>
+      <Text preset="subheading" tx="decks:sideboard.title" />
       <ScrollView style={$flexShrink}>
-        <Section tx="decks:sideboard.inFromSide" />
+        <Section tx="decks:sideboard.inFromSide" count={inCount} />
         {inRows}
-        <Section tx="decks:sideboard.outOfMain" />
+        <Section tx="decks:sideboard.outOfMain" count={outCount} />
         {outRows}
       </ScrollView>
       {short ? (
@@ -115,9 +107,15 @@ export function SideboardSwapSheet({
   )
 }
 
-function Section({ tx }: { tx: "decks:sideboard.inFromSide" | "decks:sideboard.outOfMain" }) {
+function Section({
+  tx,
+  count,
+}: {
+  tx: "decks:sideboard.inFromSide" | "decks:sideboard.outOfMain"
+  count: number
+}) {
   const { themed } = useAppTheme()
-  return <Text size="xxs" weight="semiBold" tone="dim" tx={tx} style={themed($section)} />
+  return <SectionHeader label={translate(tx)} count={count} style={themed($section)} />
 }
 
 function SwapRow({
@@ -137,8 +135,8 @@ function SwapRow({
   return (
     <View testID={`sideboard-row-${line.key}`} style={themed($row)}>
       <View style={$flex}>
-        <Text size="sm" text={line.name} numberOfLines={1} />
-        <Text size="xs" tone="dim" text={detail} />
+        <Text weight="medium" text={line.name} numberOfLines={1} />
+        <Text size="meta" tone="dim" text={detail} />
       </View>
       <TouchableOpacity
         accessibilityRole="button"
@@ -170,13 +168,10 @@ function SwapRow({
 
 const $flex: ViewStyle = { flex: 1, minWidth: 0 }
 const $flexShrink: ViewStyle = { flexShrink: 1 }
-const $tabular: TextStyle = { fontVariant: ["tabular-nums"] }
 const $disabled: ViewStyle = { opacity: 0.35 }
 const $quantity: TextStyle = { minWidth: 28, textAlign: "center", fontVariant: ["tabular-nums"] }
 const $sheet: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm, maxHeight: "90%" })
-const $section: ThemedStyle<TextStyle> = ({ spacing }) => ({
-  textTransform: "uppercase",
-  letterSpacing: 0.8,
+const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.sm,
   paddingBottom: spacing.xxs,
 })

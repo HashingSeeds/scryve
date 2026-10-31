@@ -113,7 +113,7 @@ describe("Play bar", () => {
     const onStartGame = jest.fn()
     const view = renderDeckView({ mode: "play", onAddMatch, onStartGame })
 
-    fireEvent.press(view.getByText("Add match result"))
+    fireEvent.press(view.getByText("Add result"))
     fireEvent.press(view.getByText("Start a game"))
     expect(onAddMatch).toHaveBeenCalledTimes(1)
     expect(onStartGame).toHaveBeenCalledTimes(1)
@@ -127,7 +127,7 @@ describe("Play bar", () => {
       onAddMatch: jest.fn(),
     })
 
-    expect(view.queryByText("Add match result")).toBeNull()
+    expect(view.queryByText("Add result")).toBeNull()
     expect(view.getByText("Start a game")).toBeTruthy()
   })
 

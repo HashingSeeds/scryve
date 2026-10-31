@@ -3,6 +3,7 @@ import { View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useConvex } from "convex/react"
 
+import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
@@ -110,16 +111,18 @@ export function DeckAnalysisPanel({
       ) : null}
 
       <View style={themed($group)}>
-        <View style={$between}>
-          <Text size="sm" weight="medium" tx="decks:analysis.curve" />
-          <Text
-            size="xs"
-            tone="dim"
-            style={$tabular}
-            tx="decks:analysis.average"
-            txOptions={{ value: analysis.averageManaValue.toFixed(2) }}
-          />
-        </View>
+        <SectionHeader
+          label={translate("decks:analysis.curve")}
+          action={
+            <Text
+              size="meta"
+              tone="dim"
+              style={$tabular}
+              tx="decks:analysis.average"
+              txOptions={{ value: analysis.averageManaValue.toFixed(2) }}
+            />
+          }
+        />
         <View style={themed($curve)} testID="deck-analysis-curve">
           {analysis.curve.map((count, value) => (
             <View key={value} style={themed($column)}>
@@ -176,9 +179,9 @@ export function DeckAnalysisPanel({
       {analysis.colors.length > 0 ? (
         <View style={themed($group)} testID="deck-analysis-colors">
           <View style={$colorRow}>
-            <Text size="sm" weight="medium" tx="decks:analysis.colors" style={$flex} />
-            <Text size="xs" tone="dim" style={$cell} tx="decks:analysis.pips" />
-            <Text size="xs" tone="dim" style={$cell} tx="decks:analysis.sources" />
+            <Text preset="sectionLabel" tx="decks:analysis.colors" style={$flex} />
+            <Text preset="sectionLabel" style={$cell} tx="decks:analysis.pips" />
+            <Text preset="sectionLabel" style={$cell} tx="decks:analysis.sources" />
           </View>
           {analysis.colors.map(({ color, pips, sources }) => (
             <View key={color} style={$colorRow} testID={`deck-analysis-color-${color}`}>
@@ -195,10 +198,10 @@ export function DeckAnalysisPanel({
 
       {analysis.landDrops.length > 0 ? (
         <View style={themed($group)} testID="deck-analysis-land-drops">
-          <Text
-            size="sm"
-            weight="medium"
-            tx={analysis.onThePlay ? "decks:analysis.landDropsOnPlay" : "decks:analysis.landDrops"}
+          <SectionHeader
+            label={translate(
+              analysis.onThePlay ? "decks:analysis.landDropsOnPlay" : "decks:analysis.landDrops",
+            )}
           />
           <Odds
             cells={analysis.landDrops.map(({ turn, chance }) => ({
@@ -211,7 +214,7 @@ export function DeckAnalysisPanel({
 
       {analysis.mulligans ? (
         <View style={themed($group)} testID="deck-analysis-mulligans">
-          <Text size="sm" weight="medium" tx="decks:analysis.openingHand" />
+          <SectionHeader label={translate("decks:analysis.openingHand")} />
           <Odds
             cells={[
               { label: translate("decks:analysis.keepSeven"), chance: analysis.mulligans.keep },
