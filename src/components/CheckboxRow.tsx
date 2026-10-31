@@ -1,5 +1,5 @@
 import type { ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { Platform, Pressable, View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -36,6 +36,16 @@ export function CheckboxRow({
       disabled={disabled}
       style={({ pressed }) => [themed($row), pressed && $pressed, disabled && $disabled]}
       onPress={onToggle}
+      // why: react-native-web only presses buttons on Space, so a web checkbox ignored it and the page scrolled instead.
+      {...(Platform.OS === "web" && !disabled
+        ? {
+            onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+              if (event.key !== " ") return
+              event.preventDefault()
+              onToggle()
+            },
+          }
+        : {})}
     >
       <View style={[themed($box), checked && themed($checkedBox)]}>
         {checked ? <Icon icon="check" size={16} color={accessibleForeground(colors.tint)} /> : null}
