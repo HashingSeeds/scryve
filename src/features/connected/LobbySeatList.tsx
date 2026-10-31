@@ -41,6 +41,7 @@ export type SeatDeck = {
   name: string
   cardQuantity?: number
   versions: { _id: string; versionNumber: number; name?: string }[]
+  bringingVersionId?: string
 }
 
 export type LobbyDeckState = RemoteValue<SeatDeck[]> | { status: "error"; retry: () => void }
@@ -448,7 +449,9 @@ export function LobbySeatList({
                         onPress={
                           hasCards(deck)
                             ? () => {
-                                const version = deck.versions[deck.versions.length - 1]
+                                const version =
+                                  deck.versions.find(({ _id }) => _id === deck.bringingVersionId) ??
+                                  deck.versions[deck.versions.length - 1]
                                 if (version) onSelectVersion(seat.seat, version._id)
                               }
                             : undefined
