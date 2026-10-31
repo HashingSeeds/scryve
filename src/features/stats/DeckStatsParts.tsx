@@ -1,10 +1,12 @@
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import { Platform, TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { DialogCard } from "@/components/DialogCard"
+import { Icon } from "@/components/Icon"
+import { TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { i18n } from "@/i18n"
@@ -88,18 +90,28 @@ function ComparePreview({ lists }: { lists: ComparePreviewLists }) {
   )
 }
 
-export function HonestRate({ record }: { record: RecordCounts }) {
+function HonestRate({ record }: { record: RecordCounts }) {
   const rate = honestRate(record)
   return (
-    <View style={rate.tooFew ? $fewRate : $rate}>
-      <Text weight="medium" text={rate.text} style={$numbers} />
+    <View style={rate.tooFew && $fewRate}>
+      <TrailingNumber weight="medium" value={rate.text} />
       {rate.tooFew ? null : (
-        <Text
+        <TrailingNumber
           size="xxs"
           tone="dim"
-          text={translate("decks:stats.ofGames", { count: rate.games })}
+          value={translate("decks:stats.ofGames", { count: rate.games })}
         />
       )}
+    </View>
+  )
+}
+
+/** why: rows with and without a chevron keep their numbers in the same lane. */
+export function ChevronSlot({ shown }: { shown: boolean }) {
+  const { theme } = useAppTheme()
+  return (
+    <View style={$chevron}>
+      {shown ? <Icon icon="caretRight" size={16} color={theme.colors.textDim} /> : null}
     </View>
   )
 }
@@ -121,11 +133,11 @@ export function StatsRow({
   const contents = (
     <>
       <View style={$flex}>
-        <Text text={label} size="sm" />
-        {detail ? <Text text={detail} size="xs" tone="dim" /> : null}
+        <Text text={label} size="sm" weight="medium" />
+        {detail ? <Text text={detail} size="meta" tone="dim" /> : null}
       </View>
       <HonestRate record={record} />
-      {onPress ? <Text text="›" tone="dim" /> : null}
+      <ChevronSlot shown={Boolean(onPress)} />
     </>
   )
   return onPress ? (
@@ -139,16 +151,6 @@ export function StatsRow({
     </TouchableOpacity>
   ) : (
     <View style={themed($statsRow)}>{contents}</View>
-  )
-}
-
-export function StatsSection({ title, action }: { title: string; action?: ReactNode }) {
-  const { themed } = useAppTheme()
-  return (
-    <View style={themed($section)}>
-      <Text text={title} weight="medium" size="sm" />
-      {action}
-    </View>
   )
 }
 
@@ -182,6 +184,7 @@ export function DeckComparePrompt({
       {billing.error ? <AlertNote text={billing.error} /> : null}
       <Button
         tx="decks:localSync.seePro"
+        preset="primary"
         disabled={!billing.configured || billing.isLoading}
         onPress={() => (Platform.OS === "ios" ? setState("dismiss") : void paywall())}
       />
@@ -210,15 +213,9 @@ export const $statsRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $rate: ViewStyle = { alignItems: "flex-end" }
-const $fewRate: ViewStyle = { alignItems: "flex-end", opacity: 0.55 }
-const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginTop: spacing.lg,
-  minHeight: 44,
-})
+export const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginTop: spacing.lg })
+const $fewRate: ViewStyle = { opacity: 0.55 }
+const $chevron: ViewStyle = { width: 16, alignItems: "center" }
 const PREVIEW_CHANGE_WIDTHS = [70, 45, 60]
 const $preview: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs, width: "100%" })
 const $previewRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

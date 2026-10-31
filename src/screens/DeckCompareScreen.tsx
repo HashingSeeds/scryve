@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { ScrollView, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useFocusEffect } from "expo-router"
 import { useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
+import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
+import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
@@ -24,14 +25,15 @@ import {
 } from "@/features/stats/deckStatsMath"
 import {
   $content,
+  $flex,
   $numbers,
+  $section,
   $statsRow,
   DeckComparePrompt,
   listLabel,
-  StatsSection,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
-import { fingerprintsToRead, labelLists, type LabeledList } from "@/features/stats/listLabels"
+import { fingerprintsToRead, labelLists } from "@/features/stats/listLabels"
 import { lookupListSnapshot } from "@/features/stats/listSnapshots"
 import { useListCards } from "@/features/stats/useListCards"
 import { translate } from "@/i18n/translate"
@@ -51,7 +53,7 @@ export function DeckCompareScreen(props: Props) {
   )
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
-      <Header titleTx="decks:stats.compare" leftTx="common:back" onLeftPress={props.onBack} />
+      <Header titleTx="decks:stats.compare" leftIcon="back" onLeftPress={props.onBack} />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
         fallback={({ retry }) => (
@@ -91,7 +93,6 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
   )
   const [leftId, setLeftId] = useState<string | null | undefined>()
   const [rightId, setRightId] = useState<string | null | undefined>()
-  const [picking, setPicking] = useState<"left" | "right">()
   const tracked = lists.filter((list) => list.fingerprint !== null)
   const left = lists.find((list) => list.fingerprint === leftId) ?? tracked[0] ?? lists[0]
   const right =
@@ -125,24 +126,42 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
     }
   }, [deckKey, leftFingerprint, rightFingerprint, access.ownerId])
   const changes = cards.left && cards.right ? cardChanges(cards.left, cards.right) : undefined
+  const listOptions = lists.map((list) => ({
+    id: optionId(list.fingerprint),
+    label: listLabel(list),
+  }))
+  const pickers = [
+    { side: "left", labelTx: "decks:stats.compareList", list: left, choose: setLeftId },
+    { side: "right", labelTx: "decks:stats.compareWith", list: right, choose: setRightId },
+  ] as const
   return (
     <ScrollView contentContainerStyle={themed($content)}>
       <Text text={deckName} preset="heading" />
       {!summary.scannedAll ? <Text size="xs" tone="dim" tx="decks:stats.limited" /> : null}
       {left && right ? (
         <>
+          <View style={themed($pickers)}>
+            {pickers.map(({ side, labelTx, list, choose }) => (
+              <View key={side} style={$flex}>
+                <SelectField
+                  testID={`compare-pick-${side}`}
+                  label={translate(labelTx)}
+                  field="list"
+                  options={listOptions}
+                  value={optionId(list.fingerprint)}
+                  onSelect={(id) => {
+                    if (id) choose(fingerprintOf(id))
+                  }}
+                />
+              </View>
+            ))}
+          </View>
           <View style={themed($statsRow)}>
             <View style={$labelColumn} />
-            {PICKER_SIDES.map((side) => (
-              <TouchableOpacity
-                key={side}
-                testID={`compare-pick-${side}`}
-                accessibilityRole="button"
-                style={$valueColumn}
-                onPress={() => setPicking(side)}
-              >
-                <Text size="sm" text={pickerLabel(side === PICKER_SIDES[0] ? left : right)} />
-              </TouchableOpacity>
+            {[left, right].map((list, index) => (
+              <View key={index} style={$valueColumn}>
+                <Text size="meta" tone="dim" text={listLabel(list)} style={$columnLabel} />
+              </View>
             ))}
           </View>
           <CompareRow
@@ -168,7 +187,11 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
               txOptions={{ count: MIN_RATED_GAMES }}
             />
           ) : null}
-          <StatsSection title={translate("decks:stats.cardChanges")} />
+          <SectionHeader
+            label={translate("decks:stats.cardChanges")}
+            count={changes?.length || undefined}
+            style={themed($section)}
+          />
           {cards.loading ? (
             <Text size="xs" tone="dim" tx="decks:stats.loading" />
           ) : cards.error ? (
@@ -176,12 +199,25 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
           ) : changes ? (
             changes.length ? (
               changes.map((change, index) => (
-                <Text
+                <View
                   key={`${change.name}:${index}`}
-                  size="sm"
-                  style={themed(change.quantity > 0 ? $added : $removed)}
-                  text={formatCardChange(change)}
-                />
+                  testID={`compare-change-${index}`}
+                  accessible
+                  accessibilityLabel={formatCardChange(change)}
+                  style={themed($changeRow)}
+                >
+                  <Text
+                    size="sm"
+                    weight="medium"
+                    numberOfLines={1}
+                    text={change.name}
+                    style={$flex}
+                  />
+                  <TrailingNumber
+                    value={`${change.quantity > 0 ? "+" : "−"}${Math.abs(change.quantity)}`}
+                    style={themed(change.quantity > 0 ? $added : $removed)}
+                  />
+                </View>
               ))
             ) : (
               <Text size="sm" tx="decks:stats.noChanges" />
@@ -193,34 +229,6 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
       ) : (
         <Text tx="decks:stats.noResults" />
       )}
-      {picking ? (
-        <DialogCard
-          visible
-          onClose={() => setPicking(undefined)}
-          backdropAccessibilityLabel={translate("common:close")}
-          accessibilityViewIsModal
-          dialogTestID="compare-list-picker"
-        >
-          <Text tx="decks:stats.chooseList" preset="subheading" />
-          <ScrollView style={$picker}>
-            {lists.map((list) => (
-              <TouchableOpacity
-                key={list.fingerprint ?? "untracked"}
-                accessibilityRole="button"
-                testID={`compare-option-${list.fingerprint ?? "untracked"}`}
-                style={themed($statsRow)}
-                onPress={() => {
-                  if (picking === "left") setLeftId(list.fingerprint)
-                  else setRightId(list.fingerprint)
-                  setPicking(undefined)
-                }}
-              >
-                <Text text={listLabel(list)} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </DialogCard>
-      ) : null}
     </ScrollView>
   )
 }
@@ -258,13 +266,29 @@ const $valueColumn: ViewStyle = {
   justifyContent: "center",
 }
 const $few: ViewStyle = { opacity: 0.55, alignItems: "flex-end" }
-const $picker: ViewStyle = { maxHeight: 360 }
+const $columnLabel: TextStyle = { textAlign: "right" }
+const $pickers: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.sm,
+  marginTop: spacing.md,
+})
+const $changeRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 44,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
 const $added: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
 const $removed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
-const PICKER_SIDES = ["left", "right"] as const
-function pickerLabel(list: LabeledList) {
-  return `${listLabel(list)} ▾`
+const UNTRACKED_OPTION = "untracked"
+function optionId(fingerprint: string | null) {
+  return fingerprint ?? UNTRACKED_OPTION
+}
+function fingerprintOf(id: string) {
+  return id === UNTRACKED_OPTION ? null : id
 }
 
 const $screen: ViewStyle = { flex: 1 }

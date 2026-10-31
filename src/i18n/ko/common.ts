@@ -59,6 +59,7 @@ export default {
       thisIsMe: "나예요 선택지를 엽니다",
       yourDeck: "내 덱 선택지를 엽니다",
       system: "시스템 선택지를 엽니다",
+      list: "목록 선택지를 엽니다",
     },
     closeLabel: {
       format: "포맷 선택지 닫기",
@@ -68,6 +69,7 @@ export default {
       thisIsMe: "나예요 선택지 닫기",
       yourDeck: "내 덱 선택지 닫기",
       system: "시스템 선택지 닫기",
+      list: "목록 선택지 닫기",
     },
   },
   valueField: {

@@ -59,6 +59,7 @@ export default {
       thisIsMe: "Ouvre les choix de « C'est moi »",
       yourDeck: "Ouvre les choix de votre deck",
       system: "Ouvre les choix de système",
+      list: "Ouvre les choix de la liste",
     },
     closeLabel: {
       format: "Fermer les choix de format",
@@ -68,6 +69,7 @@ export default {
       thisIsMe: "Fermer les choix de « C'est moi »",
       yourDeck: "Fermer les choix de votre deck",
       system: "Fermer les choix de système",
+      list: "Fermer les choix de la liste",
     },
   },
   valueField: {

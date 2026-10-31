@@ -59,6 +59,7 @@ export default {
       thisIsMe: "Abre las opciones de «Este soy yo»",
       yourDeck: "Abre las opciones de «Tu mazo»",
       system: "Abre las opciones de sistema",
+      list: "Abre las opciones de la lista",
     },
     closeLabel: {
       format: "Cerrar opciones de formato",
@@ -68,6 +69,7 @@ export default {
       thisIsMe: "Cerrar opciones de «Este soy yo»",
       yourDeck: "Cerrar opciones de «Tu mazo»",
       system: "Cerrar opciones de sistema",
+      list: "Cerrar opciones de la lista",
     },
   },
   valueField: {

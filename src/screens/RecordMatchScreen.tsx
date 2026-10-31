@@ -5,11 +5,12 @@ import { useConvex } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
-import { Button } from "@/components/Button"
+import { Button, type ButtonAccessoryProps } from "@/components/Button"
 import { Header } from "@/components/Header"
+import { Icon } from "@/components/Icon"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
-import { Text } from "@/components/Text"
+import { Text, type TextProps } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
@@ -31,6 +32,7 @@ import { getManualMatchController } from "@/features/matches/matchOutbox"
 import { localDeckChoices } from "@/features/stats/deckChoices"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { saveListSnapshot } from "@/features/stats/listSnapshots"
+import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -121,7 +123,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       <Header
         titleTx="play:recordMatch.title"
         backgroundColor={theme.colors.surface}
-        leftTx="common:back"
+        leftIcon="back"
         onLeftPress={onBack}
       />
       <ScrollView
@@ -134,16 +136,19 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         ) : (
           <Text weight="medium" tx="play:newGame.noDeck" />
         )}
-        <SegmentedControl
-          testID="match-best-of"
-          accessibilityLabel={translate("play:newGame.bestOf")}
-          segments={bestOfSegments}
-          selectedId={String(draft.bestOf)}
-          disabled={busy}
-          onSelect={(id) => setDraft({ ...draft, bestOf: Number(id) as BestOf })}
-        />
         <View style={themed($field)}>
-          <Text size="sm" tx="play:recordMatch.myResult" />
+          <FieldLabel tx="play:newGame.bestOf" />
+          <SegmentedControl
+            testID="match-best-of"
+            accessibilityLabel={translate("play:newGame.bestOf")}
+            segments={bestOfSegments}
+            selectedId={String(draft.bestOf)}
+            disabled={busy}
+            onSelect={(id) => setDraft({ ...draft, bestOf: Number(id) as BestOf })}
+          />
+        </View>
+        <View style={themed($field)}>
+          <FieldLabel tx="play:recordMatch.myResult" />
           <SegmentedControl
             testID="match-my-result"
             accessibilityLabel={translate("play:recordMatch.myResult")}
@@ -155,7 +160,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         </View>
         {twoPlayer ? (
           <View style={themed($field)}>
-            <Text size="sm" tx="play:recordMatch.gameScore" />
+            <FieldLabel tx="play:recordMatch.gameScore" optional />
             <View style={themed($row)}>
               {SCORE_FIELDS.map(({ key, labelTx }) => (
                 <TextField
@@ -178,8 +183,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         {draft.opponents.map((opponent, index) => (
           <View key={index} style={themed($opponent)}>
             <View style={themed($row)}>
-              <Text
-                size="sm"
+              <FieldLabel
                 style={$flex}
                 tx="play:recordMatch.opponent"
                 txOptions={{ number: index + 1 }}
@@ -200,7 +204,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
             </View>
             <TextField
               testID={`match-opponent-name-${index}`}
-              placeholder={translate("play:recordMatch.name")}
+              labelTx="play:recordMatch.name"
               value={opponent.name}
               maxLength={MAX_DISPLAY_NAME_LENGTH}
               editable={!busy}
@@ -208,7 +212,8 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
             />
             <TextField
               testID={`match-opponent-deck-${index}`}
-              placeholder={translate("play:recordMatch.deckOptional")}
+              labelTx="play:recordMatch.deck"
+              optional
               value={opponent.deckName}
               maxLength={80}
               editable={!busy}
@@ -229,10 +234,10 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
           </View>
         ))}
         {draft.opponents.length < MAX_OPPONENTS ? (
-          <TextAction
+          <Button
             testID="match-add-opponent"
             tx="play:recordMatch.addOpponent"
-            style={$touch}
+            LeftAccessory={PlusAccessory}
             disabled={busy}
             onPress={() => setDraft(withOpponentAdded(draft))}
           />
@@ -240,7 +245,8 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         <View style={themed($row)}>
           <TextField
             testID="match-event-name"
-            label={translate("play:recordMatch.eventOptional")}
+            labelTx="play:recordMatch.event"
+            optional
             value={draft.eventName}
             maxLength={MAX_EVENT_NAME_LENGTH}
             editable={!busy}
@@ -249,7 +255,8 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
           />
           <TextField
             testID="match-round"
-            label={translate("play:recordMatch.roundOptional")}
+            labelTx="play:recordMatch.round"
+            optional
             value={draft.round}
             keyboardType="number-pad"
             maxLength={2}
@@ -260,7 +267,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         </View>
         <TextField
           testID="match-date"
-          label={translate("play:recordMatch.date")}
+          labelTx="play:recordMatch.date"
           value={draft.date}
           placeholder={ISO_DATE_PLACEHOLDER}
           maxLength={10}
@@ -300,7 +307,6 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
 const $screen: ViewStyle = { flex: 1 }
 const $flex: ViewStyle = { flex: 1 }
 const $flex2: ViewStyle = { flex: 2 }
-const $touch: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
   paddingHorizontal: spacing.md,
@@ -317,6 +323,32 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   alignItems: "flex-end",
 })
+
+function FieldLabel({
+  tx,
+  txOptions,
+  optional,
+  style,
+}: { tx: TxKeyPath; optional?: boolean } & Pick<TextProps, "txOptions" | "style">) {
+  return (
+    <Text preset="formLabel" size="xs" style={style}>
+      {translate(tx, txOptions)}
+      {optional ? <Text size="xs" tone="dim" text={` ${translate("common:optional")}`} /> : null}
+    </Text>
+  )
+}
+
+function PlusAccessory({ style, disabled }: ButtonAccessoryProps) {
+  const { theme } = useAppTheme()
+  return (
+    <Icon
+      icon="plus"
+      size={20}
+      color={disabled ? theme.colors.textDim : theme.colors.text}
+      containerStyle={style}
+    />
+  )
+}
 
 async function localDeckIds(localId: string) {
   const stored = loadGuestDeck(localId)
