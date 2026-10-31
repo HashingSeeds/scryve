@@ -529,7 +529,6 @@ export default {
     backToLobby: "로비로 돌아가기",
     addDeck: "덱 추가",
     cards: "카드",
-    collection: "덱 컬렉션",
     collectionAll: "전체",
     collectionFavorites: "즐겨찾기",
     collectionRecent: "최근",

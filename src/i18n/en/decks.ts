@@ -608,7 +608,6 @@ const decks = {
     addDeck: "Add deck",
     // Header button that opens card lookup.
     cards: "Cards",
-    collection: "Deck collection",
     collectionAll: "All",
     collectionFavorites: "Favorites",
     collectionRecent: "Recent",

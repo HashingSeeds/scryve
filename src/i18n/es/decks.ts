@@ -562,7 +562,6 @@ export default {
     backToLobby: "Volver a la sala",
     addDeck: "Añadir mazo",
     cards: "Cartas",
-    collection: "Colección de mazos",
     collectionAll: "Todos",
     collectionFavorites: "Favoritos",
     collectionRecent: "Recientes",

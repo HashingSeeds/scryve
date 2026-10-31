@@ -541,7 +541,6 @@ export default {
     backToLobby: "लॉबी पर वापस जाएँ",
     addDeck: "डेक जोड़ें",
     cards: "कार्ड",
-    collection: "डेक संग्रह",
     collectionAll: "सभी",
     collectionFavorites: "पसंदीदा",
     collectionRecent: "हाल के",
