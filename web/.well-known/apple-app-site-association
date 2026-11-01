@@ -7,7 +7,7 @@
           "69V3522FCX.com.sowinghope.count.preview",
           "69V3522FCX.com.sowinghope.count.dev"
         ],
-        "components": [{ "/": "/join/*" }]
+        "components": [{ "/": "/join/*" }, { "/": "/deck/*" }]
       }
     ]
   },

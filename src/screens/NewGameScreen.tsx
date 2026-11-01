@@ -32,6 +32,7 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
+import { loadSharedDecks, sharedDeckChoices } from "@/features/decks/sharedDecks"
 import {
   createLocalGame,
   hasLocalGameStarted,
@@ -299,6 +300,7 @@ function NewGameForm({
       : account?.defaultMeSeat,
   )
   const guestDecks = useGuestDecks()
+  const [sharedDecks] = useState(loadSharedDecks)
   const [pinning, setPinning] = useState(false)
   const pinningRef = useRef<symbol | undefined>(undefined)
   const [deck, setDeck] = useState<SelectedDeck | undefined>(() => {
@@ -418,9 +420,11 @@ function NewGameForm({
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
   )
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
-  const deckChoices = [...(deckList ?? []), ...localDeckChoices(guestDecks)].filter(
-    (choice) => choice.system === system && choice.format === format,
-  )
+  const deckChoices = [
+    ...(deckList ?? []),
+    ...localDeckChoices(guestDecks),
+    ...sharedDeckChoices(sharedDecks),
+  ].filter((choice) => choice.system === system && choice.format === format)
   const deckSetsLife = Boolean(deck && identitySection(system, format)?.startingValueFacet)
   const deckLife = deckSetsLife
     ? (deck?.startingValue ??
@@ -428,7 +432,11 @@ function NewGameForm({
         ?.startingValue)
     : undefined
   const deckLifeLoading =
-    deckSetsLife && !deck?.localId && deckLife === undefined && account?.decks === undefined
+    deckSetsLife &&
+    !deck?.localId &&
+    !deck?.sharedToken &&
+    deckLife === undefined &&
+    account?.decks === undefined
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account
@@ -452,9 +460,14 @@ function NewGameForm({
   useEffect(() => {
     const wanted = wantedDeckId.current
     if (!wanted || localGame || pinning) return
-    const choice = [...(deckList ?? []), ...localDeckChoices(guestDecks)].find(
+    const choice = [
+      ...(deckList ?? []),
+      ...localDeckChoices(guestDecks),
+      ...sharedDeckChoices(sharedDecks),
+    ].find(
       (candidate) =>
         candidate.deckId === wanted ||
+        (candidate.sharedToken !== undefined && candidate.deckKey === wanted) ||
         (candidate.localId !== undefined && guestDeckRouteId(candidate.localId) === wanted),
     )
     if (!choice || !isSystemId(choice.system)) {
@@ -670,7 +683,7 @@ function NewGameForm({
     const choice = deckChoices.find((candidate) => deckChoiceId(candidate) === id)
     const selected = choice && {
       ...choice,
-      startingValue: choice.localId ? choice.startingValue : undefined,
+      startingValue: choice.localId || choice.sharedToken ? choice.startingValue : undefined,
     }
     setDeck(selected)
     setPlayerSaveError(undefined)
@@ -958,7 +971,13 @@ function NewGameForm({
                           : []),
                         ...deckChoices.map((choice) => ({
                           id: deckChoiceId(choice)!,
-                          label: [choice.name, choice.versionLabel].filter(Boolean).join(" · "),
+                          label: [
+                            choice.name,
+                            choice.versionLabel,
+                            choice.sharedToken ? translate("decks:shared.tag") : undefined,
+                          ]
+                            .filter(Boolean)
+                            .join(" · "),
                           accessory: choice.localId ? <DeviceGlyph /> : undefined,
                           accessibilityLabel: choice.localId
                             ? translate("decks:stats.onDeviceLabel", { name: choice.name })

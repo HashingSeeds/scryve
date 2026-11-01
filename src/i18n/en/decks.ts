@@ -212,6 +212,8 @@ const decks = {
     nameAndFormat: "Name and format",
     moveToDevice: "Move to this device",
     sync: "Sync to account",
+    share: "Share deck",
+    stopSharing: "Stop sharing",
     delete: "Delete deck",
     // Shown under a blocked action while unsaved deck edits are open.
     saveFirst: "Save or discard your changes first.",
@@ -768,6 +770,20 @@ const decks = {
     paused: "Sync paused. Resolve a saved local edit to continue.",
     pending: "Saved locally · Pending sync",
     synced: "Synced",
+  },
+  shared: {
+    // Follows a deck name in the game setup deck picker: someone else's deck you opened from a link.
+    tag: "Shared",
+    // Text sent with the link in the system share sheet.
+    message: "{{name}} on Scryve: {{url}}",
+    shareFailed: "Could not share this deck",
+    stopFailed: "Could not stop sharing this deck",
+    // Shown after sharing on a browser with no share sheet: the deck link is on the clipboard.
+    linkCopied: "Link copied",
+    title: "Shared deck",
+    play: "Play this deck",
+    addToMine: "Add to my decks",
+    unavailable: "This deck is no longer shared.",
   },
 }
 

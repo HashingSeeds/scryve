@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { Platform, ScrollView, Share, View } from "react-native"
+import * as Clipboard from "expo-clipboard"
 import { router, useFocusEffect } from "expo-router"
 import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
 
@@ -21,6 +22,7 @@ import { Text } from "@/components/Text"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { readPublicCloudConfig } from "@/features/auth/config"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
@@ -66,6 +68,7 @@ import {
   loadAccountDraft,
   type SavedAccountDraft,
 } from "@/features/decks/savedDeckDrafts"
+import { shareUrl } from "@/features/decks/shareLinks"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -325,6 +328,8 @@ function DeckDetailContent({
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
   const setBringingVersion = useMutation(api.decks.setBringingVersion)
+  const shareDeck = useMutation(api.decks.share)
+  const unshareDeck = useMutation(api.decks.unshare)
   const { keepOnDevice: moveToDevice } = useLocalDeckSync(access?.ownerId)
   const {
     draft,
@@ -340,6 +345,7 @@ function DeckDetailContent({
   const dialogs = useSheetPresence(dialog === "none" ? undefined : dialog, isSheetDialog)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
   const [error, setError] = useState<string>()
+  const [linkCopied, setLinkCopied] = useState(false)
   const [newListNotice, setNewListNotice] = useState(false)
   const [busy, setBusy] = useState(false)
   const [bringingPending, setBringingPending] = useState<Id<"deckVersions">>()
@@ -883,6 +889,46 @@ function DeckDetailContent({
         ]
       : []),
     {
+      id: "share",
+      label: translate("decks:actions.share"),
+      blocked: needsConnection,
+      onPress: () => {
+        setDialog("none")
+        void run(async () => {
+          const { token } = await shareDeck({ deckId: deckId as Id<"decks"> })
+          const config = readPublicCloudConfig()
+          const url = config.configured ? shareUrl(config.value.inviteOrigin, token) : undefined
+          if (!url) throw new Error(translate("decks:shared.shareFailed"))
+          setLinkCopied(false)
+          // why: browsers without a share sheet (desktop Firefox) reject Share.share, so the link is copied instead.
+          if (Platform.OS === "web" && typeof navigator.share !== "function") {
+            await Clipboard.setStringAsync(url)
+            setLinkCopied(true)
+            return
+          }
+          const name = deck?.name ?? ""
+          await Share.share({ message: translate("decks:shared.message", { name, url }), url })
+        }, translate("decks:shared.shareFailed"))
+      },
+    },
+    ...(detail?.shared
+      ? [
+          {
+            id: "unshare",
+            label: translate("decks:actions.stopSharing"),
+            blocked: needsConnection,
+            onPress: () => {
+              setDialog("none")
+              setLinkCopied(false)
+              void run(
+                () => unshareDeck({ deckId: deckId as Id<"decks"> }),
+                translate("decks:shared.stopFailed"),
+              )
+            },
+          },
+        ]
+      : []),
+    {
       id: "delete",
       label: translate("decks:actions.delete"),
       destructive: true,
@@ -1084,9 +1130,12 @@ function DeckDetailContent({
             : undefined
         }
         error={
-          dialog === "none" && (error || syncError || newListNotice) ? (
+          dialog === "none" && (error || syncError || newListNotice || linkCopied) ? (
             <View style={themed($syncFailure)}>
               {error ? <AlertNote text={error} /> : null}
+              {linkCopied ? (
+                <AlertNote tone="info" text={translate("decks:shared.linkCopied")} />
+              ) : null}
               {newListNotice ? (
                 <AlertNote tone="info" text={translate("decks:detail.newList")} />
               ) : null}

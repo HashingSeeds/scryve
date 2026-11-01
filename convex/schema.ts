@@ -396,6 +396,15 @@ export default defineSchema({
     .index("by_owner_and_sync_id", ["ownerUserId", "syncId"])
     .index("by_owner_and_deck_key", ["ownerUserId", "deckKey"]),
 
+  // why: a share link names a deck by an unguessable token, so a deck's id never leaves its owner.
+  deckShares: defineTable({
+    deckId: v.id("decks"),
+    token: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_deck", ["deckId"]),
+
   deckSyncReceipts: defineTable({
     ownerUserId: v.id("users"),
     operationId: v.string(),

@@ -1,3 +1,4 @@
+import { Share } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import CardsRoute from "@/app/cards"
@@ -111,6 +112,15 @@ const mockUpdateVersion = jest.fn(async () => null)
 const mockDeleteVersion = jest.fn(async () => null)
 const mockUpdateDeck = jest.fn(async () => null)
 const mockArchiveDeck = jest.fn(async () => null)
+const mockShareDeck = jest.fn(async () => ({ token: "t".repeat(43) }))
+const mockUnshareDeck = jest.fn(async () => null)
+jest.mock("@/features/auth/config", () => ({
+  ...jest.requireActual("@/features/auth/config"),
+  readPublicCloudConfig: () => ({
+    configured: true,
+    value: { inviteOrigin: "https://scryve.example" },
+  }),
+}))
 const mockSearchCards = jest.fn(async () => [])
 const mockCardById = jest.fn(async () => ({}))
 const mockCatalogCardById = jest.fn(async () => ({
@@ -250,6 +260,8 @@ jest.mock("convex/react", () => ({
     if (reference === "decks.deleteVersion") return mockDeleteVersion
     if (reference === "decks.update") return mockUpdateDeck
     if (reference === "decks.setBringingVersion") return mockSetBringingVersion
+    if (reference === "decks.share") return mockShareDeck
+    if (reference === "decks.unshare") return mockUnshareDeck
     return mockArchiveDeck
   },
   useAction: (reference: string) => {
@@ -286,6 +298,8 @@ jest.mock("../../convex/_generated/api", () => ({
       update: "decks.update",
       archive: "decks.archive",
       setBringingVersion: "decks.setBringingVersion",
+      share: "decks.share",
+      unshare: "decks.unshare",
     },
     deckStats: { games: "deckStats.games" },
     cards: {
@@ -2169,12 +2183,39 @@ describe("DeckDetailScreen", () => {
     expect(sheet.getAllByRole("button").map((row) => row.props.testID)).toEqual([
       "deck-action-details",
       "deck-action-move",
+      "deck-action-share",
       "deck-action-delete",
     ])
     expect(view.queryByTestId("deck-name-input")).toBeNull()
     fireEvent.press(view.getByTestId("deck-action-delete"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
+  })
+
+  it("shares the deck's link through the system share sheet", async () => {
+    const share = jest.spyOn(Share, "share").mockResolvedValue({ action: Share.sharedAction })
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-action-share"))
+    const url = `https://scryve.example/deck/${"t".repeat(43)}`
+    await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({ url })))
+    expect(mockShareDeck).toHaveBeenCalledWith({ deckId: "deck-1" })
+  })
+
+  it("stops sharing a shared deck", async () => {
+    mockDetail.value = { ...loadedDetail, shared: true }
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("deck-action-unshare"))
+    await waitFor(() => expect(mockUnshareDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
   })
 
   it("sideboards between games of a local match without touching the deck", () => {
@@ -2217,6 +2258,7 @@ describe("DeckDetailScreen", () => {
       "deck-action-details",
       "deck-action-move",
       "deck-action-sideboard",
+      "deck-action-share",
       "deck-action-delete",
     ])
     fireEvent.press(view.getByTestId("deck-action-sideboard"))
