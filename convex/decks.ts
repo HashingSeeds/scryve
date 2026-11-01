@@ -970,6 +970,11 @@ export const detail = query({
       version: selected ?? null,
       cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
       capacity: await deckVersionCapacity(ctx, user, stored.length),
+      shared:
+        (await ctx.db
+          .query("deckShares")
+          .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
+          .first()) !== null,
       record: await keyRecord(ctx, deck),
       // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Deck stats are free; installed clients still read the retired lock flag.
       analyticsLocked: false,
@@ -1131,6 +1136,7 @@ export const archive = mutation({
       updatedAt: now,
       syncRevision: (deck.syncRevision ?? 0) + 1,
     })
+    await endShares(ctx, deck._id)
     return null
   },
 })
@@ -1789,6 +1795,7 @@ export const moveToDevice = mutation({
       updatedAt: now,
       syncRevision: (deck.syncRevision ?? 0) + 1,
     })
+    await endShares(ctx, deck._id)
     return syncedDeck((await ctx.db.get(deck._id))!)
   },
 })
@@ -1814,6 +1821,101 @@ export const statsForKey = query({
     return {
       all,
       fingerprints: (await rows.take(51)).filter((row) => row.fingerprint !== "all").slice(0, 50),
+    }
+  },
+})
+
+const SHARE_TOKEN = /^[A-Za-z0-9_-]{43}$/
+
+function shareToken() {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "")
+}
+
+async function endShares(ctx: MutationCtx, deckId: Id<"decks">) {
+  for (const link of await ctx.db
+    .query("deckShares")
+    .withIndex("by_deck", (q) => q.eq("deckId", deckId))
+    .take(10))
+    await ctx.db.delete(link._id)
+}
+
+/** why: results travel to opponents with the deck key, so the key is a hash that cannot open the link. */
+async function sharedDeckKey(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0"))
+  return `shared-${hex.join("").slice(0, 32)}`
+}
+
+/** why: one link per deck, so sharing again hands back the link already sent. */
+export const share = mutation({
+  args: { deckId: v.id("decks") },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    assertNotArchived(deck)
+    const existing = await ctx.db
+      .query("deckShares")
+      .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
+      .first()
+    if (existing) return { token: existing.token }
+    const token = shareToken()
+    await ctx.db.insert("deckShares", { deckId: deck._id, token, createdAt: Date.now() })
+    return { token }
+  },
+})
+
+/** why: the old link stops working, and sharing again makes a new one. */
+export const unshare = mutation({
+  args: { deckId: v.id("decks") },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    await endShares(ctx, deck._id)
+    return null
+  },
+})
+
+/** why: anyone with the link may read the deck, signed in or not; the link shows the version its owner brings. */
+export const shared = query({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    if (!SHARE_TOKEN.test(args.token)) return null
+    const link = await ctx.db
+      .query("deckShares")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .unique()
+    const deck = link ? await ctx.db.get(link.deckId) : null
+    if (!deck || deck.archivedAt !== undefined) return null
+    const versions = await activeVersions(ctx, deck._id)
+    const version =
+      versions.find((candidate) => candidate._id === deck.bringingVersionId) ?? versions.at(-1)
+    if (!version) return null
+    const game = deck.game ?? DEFAULT_DECK_GAME
+    const cards = await ctx.db
+      .query("deckCards")
+      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
+      .take(MAX_DECK_CARDS)
+    const includeImages = await capabilityReleased(ctx, game, "images")
+    const startingValue = await deckStartingValue(ctx, version._id, game, deck.format)
+    return {
+      deckKey: await sharedDeckKey(args.token),
+      name: deck.name,
+      game,
+      format: deck.format,
+      ...(deck.commanderNames ? { commanderNames: deck.commanderNames } : {}),
+      ...(startingValue === undefined ? {} : { startingValue }),
+      cards: cards.map((card) => {
+        const {
+          _id: _cardId,
+          _creationTime: _created,
+          deckVersionId: _versionId,
+          ...shown
+        } = projectCard(deck, includeImages, card)
+        return shown
+      }),
     }
   },
 })

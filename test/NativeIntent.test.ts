@@ -23,6 +23,18 @@ describe("connected invite native intent", () => {
       redirectSystemPath({ path: `https://count.example/join/${token}?leak=1`, initial: true }),
     ).toBe("/")
   })
+  it("opens shared deck links only from the trusted origin", () => {
+    const token = "d".repeat(43)
+    expect(redirectSystemPath({ path: `https://count.example/deck/${token}`, initial: true })).toBe(
+      `/deck/${token}`,
+    )
+    expect(redirectSystemPath({ path: `https://evil.example/deck/${token}`, initial: true })).toBe(
+      "/",
+    )
+    expect(redirectSystemPath({ path: "https://count.example/deck/short", initial: true })).toBe(
+      "/",
+    )
+  })
   it("fails closed for malformed initial URLs", () =>
     expect(redirectSystemPath({ path: "%%%", initial: true })).toBe("/"))
 

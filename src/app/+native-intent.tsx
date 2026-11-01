@@ -1,4 +1,5 @@
 import { normalizeInvitePayload } from "@/features/connected/inviteLinks"
+import { sharedDeckToken } from "@/features/decks/shareLinks"
 import { isPreviewBuild } from "@/features/lan/lanAvailability"
 
 function isSafeInternalPath(path: string): boolean {
@@ -29,6 +30,8 @@ function devSeedPath(path: string): string | null {
 
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
   const trustedOrigin = process.env.EXPO_PUBLIC_INVITE_ORIGIN
+  const sharedDeck = sharedDeckToken(path, trustedOrigin)
+  if (sharedDeck) return `/deck/${sharedDeck}`
   const invite = normalizeInvitePayload(path, trustedOrigin)
   if (invite?.kind === "token") return `/join/${encodeURIComponent(invite.token)}`
   if (invite?.kind === "code") return `/connected/join?code=${encodeURIComponent(invite.code)}`

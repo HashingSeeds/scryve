@@ -746,6 +746,11 @@ export const processDecks = internalMutation({
         .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
         .unique()
       if (stats) await ctx.db.delete(stats._id)
+      const share = await ctx.db
+        .query("deckShares")
+        .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
+        .first()
+      if (share) await ctx.db.delete(share._id)
       await ctx.db.delete(deck._id)
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
     } catch (cause) {

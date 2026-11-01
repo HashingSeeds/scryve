@@ -2,6 +2,7 @@ import { DeckSyncRepository } from "@/features/decks/decksSync"
 import { newestPendingCardWrite, versionWriteOutbox } from "@/features/decks/decksVersionWrites"
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { guestDeckPlayCards, loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
+import { loadSharedDeck, type SharedDeck } from "@/features/decks/sharedDecks"
 import { translate } from "@/i18n/translate"
 
 import { deckFingerprint } from "./deckFingerprint"
@@ -13,6 +14,7 @@ export type DeckChoice = {
   deckId?: string
   deckKey?: string
   localId?: string
+  sharedToken?: string
   name: string
   system: string
   format: string
@@ -21,7 +23,7 @@ export type DeckChoice = {
 
 export type SelectedDeck = Pick<
   DeckChoice,
-  "versionId" | "deckKey" | "localId" | "name" | "startingValue"
+  "versionId" | "deckKey" | "localId" | "sharedToken" | "name" | "startingValue"
 > & {
   system?: string
   deckFingerprint?: string
@@ -46,6 +48,17 @@ export function localDeckChoices(decks: readonly GuestDeck[]): DeckChoice[] {
   }))
 }
 
+export function sharedDeckChoices(decks: readonly SharedDeck[]): DeckChoice[] {
+  return decks.map(({ token, deckKey, deck, startingValue }) => ({
+    sharedToken: token,
+    deckKey,
+    name: deck.name,
+    system: deck.game ?? "mtg",
+    format: deck.format,
+    startingValue,
+  }))
+}
+
 export function chosenDeckCards(
   deck: SelectedDeck,
   ownerId: string,
@@ -57,6 +70,13 @@ export function chosenDeckCards(
     return guestDeckPlayCards(local).map((card) => ({
       ...card,
       game: card.game ?? local.deck.game ?? "mtg",
+    }))
+  }
+  if (deck.sharedToken) {
+    const shared = loadSharedDeck(deck.sharedToken)
+    return shared?.deck.cards.map((card) => ({
+      ...card,
+      game: card.game ?? shared.deck.game ?? "mtg",
     }))
   }
   if (!deck.versionId) return undefined

@@ -10,6 +10,8 @@
 
 # Invite links stay public at /join/<token> (native app links claim /join); the web app lives at /play.
 /join/:token /play/join/:token  302
+# Shared deck links stay public at /deck/<token> (iOS app links claim /deck).
+/deck/:token /play/deck/:token  302
 
 # Old web app URLs (also linked from store listings and legal text)
 /history /play/history  301
@@ -42,6 +44,7 @@
 
 # SPA deep links: serve the app shell for each app route
 /play/join/* /play/  200
+/play/deck/* /play/  200
 /play/history /play/  200
 /play/history/* /play/  200
 /play/game/* /play/  200

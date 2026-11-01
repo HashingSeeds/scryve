@@ -128,6 +128,7 @@ function detail(cards = [row("Island", 2)]): NonNullable<DeckViewInput["detail"]
     cards,
     capacity: { used: 1, limit: 1, premium: false, canCreate: false },
     record: noGames,
+    shared: false,
     analyticsLocked: false,
   }
 }

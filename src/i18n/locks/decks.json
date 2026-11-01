@@ -172,6 +172,8 @@
   "actions.nameAndFormat": "57ec81a27f17",
   "actions.moveToDevice": "941f6c537940",
   "actions.sync": "eabc3ef54d14",
+  "actions.share": "f8e11e03d693",
+  "actions.stopSharing": "664f91ab8297",
   "actions.delete": "32bf58fd38b9",
   "actions.saveFirst": "7aaaa23ce2de",
   "actions.editsSyncing": "b0b87892236f",
@@ -574,5 +576,14 @@
   "saveStatus.notSynced": "9d098c6c4f72",
   "saveStatus.paused": "b661a818ca08",
   "saveStatus.pending": "54be6c0cc573",
-  "saveStatus.synced": "bbb3b87ea115"
+  "saveStatus.synced": "bbb3b87ea115",
+  "shared.tag": "7297c377a581",
+  "shared.message": "93057ed2b704",
+  "shared.shareFailed": "ca3b288a2a16",
+  "shared.stopFailed": "33da2e48b475",
+  "shared.linkCopied": "aa0d1877ea34",
+  "shared.title": "35f10c5fdc83",
+  "shared.play": "13b839cfccc9",
+  "shared.addToMine": "dc65fb54c4d0",
+  "shared.unavailable": "99d87f469801"
 }

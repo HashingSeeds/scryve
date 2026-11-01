@@ -1,6 +1,13 @@
+import { keepSharedDeck, loadSharedDecks } from "@/features/decks/sharedDecks"
 import { clear } from "@/utils/storage"
 
-import { chosenDeckCards, chosenDeckKey, localDeckChoices, pinDeckChoice } from "./deckChoices"
+import {
+  chosenDeckCards,
+  chosenDeckKey,
+  localDeckChoices,
+  pinDeckChoice,
+  sharedDeckChoices,
+} from "./deckChoices"
 import { deckFingerprint } from "./deckFingerprint"
 import { lookupListSnapshot } from "./listSnapshots"
 
@@ -33,6 +40,7 @@ jest.mock("@/features/decks/decksSync", () => ({
 jest.mock("@/features/decks/guestDeck", () => ({
   loadGuestDeck: (...args: unknown[]) => mockLoadGuestDeck(...args),
   guestDeckPlayCards: jest.requireActual("@/features/decks/guestDeck").guestDeckPlayCards,
+  isGuestDeckPayload: jest.requireActual("@/features/decks/guestDeck").isGuestDeckPayload,
 }))
 jest.mock("./deckFingerprint", () => ({
   deckFingerprint: jest.fn(async () => `v1:${"a".repeat(64)}`),
@@ -69,6 +77,32 @@ it("uses a local deck's explicit key and defaults older decks to localId without
     { deckKey: "portable-key", localId: "local" },
   ])
   expect(deckFingerprint).not.toHaveBeenCalled()
+})
+
+it("pins a shared deck from the copy kept on this device, under its own key", async () => {
+  const token = "s".repeat(43)
+  const deckKey = `shared-${"b".repeat(32)}`
+  keepSharedDeck(
+    {
+      deckKey,
+      name: "Borrowed",
+      game: "mtg",
+      format: "commander",
+      cards: [{ name: "Sol Ring", quantity: 1 }],
+    },
+    token,
+  )
+  const [choice] = sharedDeckChoices(loadSharedDecks())
+  const fingerprint = `v1:${"a".repeat(64)}`
+  expect(await pinDeckChoice(choice, "owner")).toEqual({
+    deckKey,
+    deckVersionId: undefined,
+    deckName: "Borrowed",
+    deckFingerprint: fingerprint,
+  })
+  expect(await lookupListSnapshot(deckKey, fingerprint, "owner")).toEqual([
+    { name: "Sol Ring", quantity: 1, game: "mtg" },
+  ])
 })
 
 it("hashes only the selected synced version's cached cards and resolves its shelf key", async () => {
