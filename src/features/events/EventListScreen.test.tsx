@@ -26,4 +26,5 @@ it("tells a signed-in player who lost connection to reconnect, not to sign in", 
   )
   expect(screen.getByText("Reconnect to continue.")).toBeTruthy()
   expect(screen.queryByText("Sign in to run or join events")).toBeNull()
+  expect(screen.queryByText(/No data found/)).toBeNull()
 })

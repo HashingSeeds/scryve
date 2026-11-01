@@ -51,7 +51,7 @@ export function EventFrame({
           <EmptyState
             imageSource={null}
             heading={access.signedIn ? access.message : translate("events:signIn")}
-            content={access.signedIn ? undefined : access.message}
+            content={access.signedIn ? "" : access.message}
             button={access.actionLabel ?? translate("account:signIn")}
             buttonOnPress={access.request}
           />
