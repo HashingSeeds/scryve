@@ -7,24 +7,34 @@ import Svg, { Path } from "react-native-svg"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
+import { colorLabel } from "@/components/CardFocusDialog"
+import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
-import { FilterButton } from "@/components/FilterPill"
+import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { Header } from "@/components/Header"
 import { PressableIcon, type IconTypes } from "@/components/Icon"
 import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
+import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import {
+  COLOR_MATCHES,
+  matchesColors,
+  SEARCH_COLORS,
+  toggleColor,
+  type ColorMatch,
+} from "@/features/decks/colorMatch"
 import { cardCountLabel, honestRate } from "@/features/decks/deckCopy"
-import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
+import { ALL_FORMATS, DEFAULT_COLOR_MATCH, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckHomeGlyph } from "@/features/decks/DeckHomeGlyph"
 import { DeckCount } from "@/features/decks/DeckLimit"
-import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
+import { isDeckSyncEnabled, useDeckSync, type MineDeck } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { allRecord, keyStatsRecord, type DeckStatsRecord } from "@/features/decks/deckStatLines"
 import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
@@ -61,7 +71,7 @@ type ShelfDeck = {
   updatedAt?: number
   record?: DeckStatsRecord
   keyRecord?: DeckStatsRecord
-}
+} & Partial<Pick<MineDeck, "identityColors" | "commanderNames">>
 
 export type DeckSelection = {
   reviewChanges?: boolean
@@ -117,9 +127,12 @@ function matchesSearch(deck: ShelfDeck, search: string) {
   if (!term) return true
   const game = deck.game ?? DEFAULT_DECK_GAME
   const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
-  return [deck.name, gameLabel, deckFormatLabel(game, deck.format)].some((value) =>
-    value.toLocaleLowerCase().includes(term),
-  )
+  return [
+    deck.name,
+    gameLabel,
+    deckFormatLabel(game, deck.format),
+    ...(deck.commanderNames ?? []),
+  ].some((value) => value.toLocaleLowerCase().includes(term))
 }
 
 function DeckRow({
@@ -144,6 +157,7 @@ function DeckRow({
   const favorite = deck.favoritedAt !== undefined
   const allResults = deck.keyRecord ?? deck.record
   const rate = tracksResults(game) && allResults ? honestRate(allRecord(allResults)) : undefined
+  const identity = game === DEFAULT_DECK_GAME ? deck.identityColors : undefined
 
   return (
     <View testID={`deck-card-${deck._id}`} style={themed($row)}>
@@ -165,7 +179,17 @@ function DeckRow({
         onPress={() => onPress()}
       >
         <View style={themed($rowCopy)}>
-          <Text weight="medium" numberOfLines={1} text={deck.name} />
+          <View style={themed($nameLine)}>
+            <Text weight="medium" numberOfLines={1} text={deck.name} style={$name} />
+            {identity ? (
+              <CardSymbolText
+                testID={`deck-colors-${deck._id}`}
+                game={DEFAULT_DECK_GAME}
+                size="xs"
+                text={(identity.length ? identity : ["C"]).map((color) => `{${color}}`).join("")}
+              />
+            ) : null}
+          </View>
           <Text
             size="meta"
             numberOfLines={1}
@@ -365,6 +389,8 @@ function LocalDeckList({
 function DeckShelf({
   system,
   format,
+  colors,
+  colorMatch,
   search,
   collection,
   recentDeckIds,
@@ -378,6 +404,8 @@ function DeckShelf({
   hasLocalDecks: boolean
   system: string
   format: string
+  colors: readonly string[]
+  colorMatch: ColorMatch
   search: string
   collection: DeckCollection
   recentDeckIds: string[]
@@ -437,8 +465,9 @@ function DeckShelf({
       collectionDecks
         .filter((deck) => system === ALL_SYSTEMS || (deck.game ?? DEFAULT_DECK_GAME) === system)
         .filter((deck) => format === ALL_FORMATS || deck.format === format)
+        .filter((deck) => matchesColors(deck.identityColors?.join(""), colors, colorMatch))
         .filter((deck) => matchesSearch(deck, search)),
-    [collectionDecks, format, search, system],
+    [collectionDecks, colorMatch, colors, format, search, system],
   )
   const rows = (() => {
     const merged = [
@@ -586,7 +615,8 @@ export function DecksScreen({
   access?: CloudAccess
 }) {
   const { theme, themed } = useAppTheme()
-  const { format, setGame, setFormat } = useDeckFilters()
+  const { format, setGame, setFormat, colors, setColors, colorMatch, setColorMatch } =
+    useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
   const guestDecks = useGuestDecks()
   const [totals, setTotals] = useState<OwnerTotals>()
@@ -625,7 +655,10 @@ export function DecksScreen({
     })),
   ]
   const activeFormat = system === ALL_SYSTEMS ? ALL_FORMATS : format
-  const filterCount = Number(system !== ALL_SYSTEMS) + Number(activeFormat !== ALL_FORMATS)
+  const showsColors = system === ALL_SYSTEMS || system === DEFAULT_DECK_GAME
+  const activeColors = showsColors ? colors : []
+  const filterCount =
+    Number(system !== ALL_SYSTEMS) + Number(activeFormat !== ALL_FORMATS) + activeColors.length
   const guestRows: ShelfDeck[] = guestDecks.map((guest) => ({
     _id: guestDeckRouteId(guest.localId),
     updatedAt: guest.updatedAt,
@@ -644,6 +677,7 @@ export function DecksScreen({
     (guestRow) =>
       (system === ALL_SYSTEMS || guestRow.game === system) &&
       (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
+      matchesColors(guestRow.identityColors?.join(""), activeColors, colorMatch) &&
       matchesSearch(guestRow, search),
   )
   const guestOnly = Boolean(
@@ -661,6 +695,8 @@ export function DecksScreen({
   function clearFilters() {
     setSystem(ALL_SYSTEMS)
     setFormat(ALL_FORMATS)
+    setColors([])
+    setColorMatch(DEFAULT_COLOR_MATCH)
   }
 
   function clearVisibleFilters() {
@@ -805,6 +841,8 @@ export function DecksScreen({
             <DeckShelf
               system={system}
               format={activeFormat}
+              colors={activeColors}
+              colorMatch={colorMatch}
               search={search}
               collection={collection}
               recentDeckIds={recentDeckIds}
@@ -863,6 +901,34 @@ export function DecksScreen({
           ) : system === ALL_SYSTEMS ? (
             <Text size="xs" tone="dim" tx="decks:shelf.chooseSystem" />
           ) : null}
+          {showsColors ? (
+            <>
+              <FilterGroup heading={translate("decks:cardSearch.colors")}>
+                {SEARCH_COLORS.map((color) => (
+                  <FilterPill
+                    key={color}
+                    testID={`deck-color-${color}`}
+                    label={colorLabel(color)}
+                    selected={colors.includes(color)}
+                    onPress={() => setColors(toggleColor(colors, color))}
+                  />
+                ))}
+              </FilterGroup>
+              <View style={themed($filterSection)}>
+                <Text preset="sectionLabel" tx="decks:cardSearch.colorMatch" />
+                <SegmentedControl
+                  testID="deck-color-match"
+                  accessibilityLabel={translate("decks:cardSearch.colorMatch")}
+                  segments={COLOR_MATCHES.map(({ id, tx }) => ({ id, label: translate(tx) }))}
+                  selectedId={colorMatch}
+                  onSelect={(id) => {
+                    const match = COLOR_MATCHES.find((option) => option.id === id)
+                    if (match) setColorMatch(match.id)
+                  }}
+                />
+              </View>
+            </>
+          ) : null}
         </ScrollView>
         <View style={themed($dialogActions)}>
           <Button
@@ -904,7 +970,7 @@ const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xs,
 })
 const $flex1: ViewStyle = { flex: 1 }
-const $filtersDialog: ViewStyle = { height: 480 }
+const $filtersDialog: ViewStyle = { height: 560 }
 const $filtersScroll: ViewStyle = { flex: 1 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -932,6 +998,13 @@ const $systemMarker: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   marginRight: spacing.sm,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
+const $nameLine: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+const $name: TextStyle = { flexShrink: 1 }
+const $filterSection: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $recordLane: ViewStyle = { width: NUMBER_LANE_WIDTH }
 const $reviewIndicator: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $favoriteButton: ThemedStyle<ViewStyle> = () => ({

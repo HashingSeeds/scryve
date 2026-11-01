@@ -32,6 +32,16 @@ describe("useDeckFilters", () => {
     expect(hook.result.current.format).toBe("traditional")
   })
 
+  it("restores picked colors and their match mode", () => {
+    const first = renderHook(() => useDeckFilters())
+    act(() => first.result.current.setColors(["G", "W"]))
+    act(() => first.result.current.setColorMatch("additional"))
+
+    const next = renderHook(() => useDeckFilters())
+    expect(next.result.current.colors).toEqual(["W", "G"])
+    expect(next.result.current.colorMatch).toBe("additional")
+  })
+
   it("falls back to all formats when the next game has no saved format", () => {
     const hook = renderHook(() => useDeckFilters())
 

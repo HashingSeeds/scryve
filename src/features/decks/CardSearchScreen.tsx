@@ -47,6 +47,13 @@ import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { searchCardNames } from "./cardNameMatch"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
+  COLOR_MATCHES,
+  matchesColors,
+  SEARCH_COLORS,
+  toggleColor,
+  type ColorMatch,
+} from "./colorMatch"
+import {
   cardDetailsKey,
   cardSection,
   printingKey,
@@ -65,17 +72,14 @@ import { canReadCardText } from "../../../modules/card-text-reader"
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
-const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
-const COLOR_MATCH_OPERATOR = { exact: "=", additional: ">=", within: "<=" } as const
-const COLOR_MATCHES = [
-  { id: "within", tx: "decks:cardSearch.withinColors" },
-  { id: "additional", tx: "decks:cardSearch.allowAdditional" },
-  { id: "exact", tx: "decks:cardSearch.exactColors" },
-] as const
+const COLOR_MATCH_OPERATOR = {
+  exact: "=",
+  additional: ">=",
+  within: "<=",
+} as const satisfies Record<ColorMatch, string>
 const NAME_MATCHES = 20
 const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
-type ColorMatch = keyof typeof COLOR_MATCH_OPERATOR
 
 export function scryfallQuery({
   text,
@@ -269,30 +273,8 @@ export function CardSearch({
 
   function matchesFilters(details?: FocusedCardDetails) {
     if (!keywords.every((keyword) => details?.keywords?.split("\n").includes(keyword))) return false
-    if (!colorFilters.length) return true
     const canChooseColor = choosingCommander && details?.commanderEligibility === "color-choice"
-    if (colorFilters.includes("C")) return details?.colorIdentity === "" && !canChooseColor
-    const identity = details?.colorIdentity
-    if (identity === undefined) return false
-    const within = [...identity].every((color) => colorFilters.includes(color))
-    if (colorMatch === "within") return within
-    const missing = colorFilters.filter((color) => !identity.includes(color))
-    return (
-      (missing.length === 0 || (canChooseColor && missing.length === 1)) &&
-      (colorMatch === "additional" || within)
-    )
-  }
-
-  function toggleColor(color: string) {
-    setColorFilters((current) =>
-      color === "C"
-        ? current.includes("C")
-          ? []
-          : ["C"]
-        : current.includes(color)
-          ? current.filter((value) => value !== color)
-          : [...current.filter((value) => value !== "C"), color],
-    )
+    return matchesColors(details?.colorIdentity, colorFilters, colorMatch, canChooseColor)
   }
 
   function preview(card: DeckCard) {
@@ -935,7 +917,7 @@ export function CardSearch({
                   testID={`card-color-${color}`}
                   label={colorLabel(color)}
                   selected={colorFilters.includes(color)}
-                  onPress={() => toggleColor(color)}
+                  onPress={() => setColorFilters((current) => toggleColor(current, color))}
                 />
               ))}
             </FilterGroup>
