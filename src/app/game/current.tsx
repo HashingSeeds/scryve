@@ -15,7 +15,7 @@ export default function CurrentLocalGameRoute() {
   useFocusEffect(useCallback(() => setGame(localGameRepository.loadActiveGame()), []))
   if (!game) {
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentInset="standard">
         <EmptyState
           headingTx="play:currentGame.emptyHeading"
           contentTx="play:currentGame.emptyContent"

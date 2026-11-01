@@ -493,7 +493,7 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 680,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.md,
 })
 const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -587,7 +587,7 @@ const $helpBar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   width: "100%",
   maxWidth: 680,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingVertical: spacing.xs,
   borderTopWidth: 1,
   borderTopColor: colors.separator,

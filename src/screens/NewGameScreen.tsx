@@ -1554,7 +1554,7 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: CONTENT_MAX_WIDTH,
   alignSelf: "center",
   gap: spacing.xs,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -1600,7 +1600,7 @@ const $setupHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: CONTENT_MAX_WIDTH,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.md,
   gap: spacing.md,
 })

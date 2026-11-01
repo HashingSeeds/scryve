@@ -75,7 +75,7 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 680,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.lg,
   gap: spacing.md,
 })
@@ -84,7 +84,7 @@ const $inlineFooter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.md,
 })
 const $offline: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingVertical: spacing.xs,
   backgroundColor: colors.surfaceRaised,
 })

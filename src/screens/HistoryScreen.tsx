@@ -705,7 +705,7 @@ const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 720,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.md,
 })
 const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({

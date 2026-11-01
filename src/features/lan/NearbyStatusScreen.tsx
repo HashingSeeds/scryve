@@ -74,7 +74,8 @@ const $center: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   justifyContent: "center",
   gap: spacing.sm,
-  padding: spacing.lg,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.xxxl,
 })
 const $centered: TextStyle = { textAlign: "center", maxWidth: 360 }

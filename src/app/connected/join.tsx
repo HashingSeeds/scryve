@@ -58,4 +58,7 @@ function NearbyOnlyJoin({ code }: { code?: string }) {
   )
 }
 
-const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({ padding: spacing.lg })
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
+})

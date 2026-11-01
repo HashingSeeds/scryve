@@ -112,7 +112,7 @@ const $tabsTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginHorizontal: -spacing.lg })
 const $tabs: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $tab: ThemedStyle<ViewStyle> = () => ({
   minHeight: 44,

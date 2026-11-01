@@ -92,7 +92,7 @@ function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
 
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.md,
 })
 

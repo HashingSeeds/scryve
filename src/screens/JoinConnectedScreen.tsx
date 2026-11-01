@@ -330,7 +330,8 @@ const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,
   gap: spacing.lg,
-  padding: spacing.lg,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
 })
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
@@ -348,7 +349,7 @@ const $embeddedContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $embeddedFooter: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.surface,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingTop: spacing.sm,
 })
 const $footerSpace: ViewStyle = { height: 44 }

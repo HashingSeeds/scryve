@@ -154,6 +154,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
       />
       {!access.ready && !access.loading ? (
         <EmptyState
+          style={themed($notice)}
           imageSource={null}
           headingTx="play:manualMatch.signInHeading"
           content={access.message}
@@ -162,6 +163,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
         />
       ) : match.status === "unavailable" ? (
         <EmptyState
+          style={themed($notice)}
           imageSource={null}
           headingTx="play:manualMatch.unavailableHeading"
           contentTx="play:summary.unavailableContent"
@@ -179,6 +181,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
         </View>
       ) : !value ? (
         <EmptyState
+          style={themed($notice)}
           imageSource={null}
           headingTx="play:manualMatch.notFoundHeading"
           contentTx="play:manualMatch.notFoundContent"
@@ -237,6 +240,7 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 720,
   alignSelf: "center",
 })
+const $notice: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingHorizontal: spacing.md })
 const $seatRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

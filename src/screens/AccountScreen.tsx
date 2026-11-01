@@ -150,7 +150,7 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 580,
   alignSelf: "center",
   gap: spacing.xl,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingTop: spacing.lg,
   paddingBottom: spacing.xl,
 })

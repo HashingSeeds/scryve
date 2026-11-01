@@ -68,7 +68,7 @@ export function SettingsRow({ tx, onPress, value, testID, topSeparator }: Settin
 
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.md,
 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({

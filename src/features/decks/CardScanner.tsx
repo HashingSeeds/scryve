@@ -547,7 +547,11 @@ const $frame: ViewStyle = {
   borderRadius: radius.xl,
 }
 const $hint: TextStyle = { color: "#FFFFFF", textAlign: "center", paddingHorizontal: 24 }
-const $permission: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, padding: spacing.lg })
+const $permission: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
+})
 const $added: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
