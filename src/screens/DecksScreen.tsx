@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -7,13 +7,12 @@ import Svg, { Path } from "react-native-svg"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
-import { colorLabel } from "@/components/CardFocusDialog"
+import { COMMANDER_COLORS, colorLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { Header } from "@/components/Header"
-import { PressableIcon, type IconTypes } from "@/components/Icon"
+import { Header, HeaderIcon } from "@/components/Header"
 import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
@@ -42,7 +41,6 @@ import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { isSystemVisible } from "@/features/game/systemVisibility"
-import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
@@ -122,6 +120,14 @@ function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"
   return markers[isSystemId(game) ? game : DEFAULT_DECK_GAME]
 }
 
+/** why: the color pips sit inside the row's button, so VoiceOver only hears them through its label. */
+function identityLabel(identity: readonly string[]) {
+  const names = identity.length
+    ? COMMANDER_COLORS.filter((color) => identity.includes(color)).map(colorLabel)
+    : [colorLabel("C")]
+  return translate("decks:colors.identity", { identity: names.join(", ") })
+}
+
 function matchesSearch(deck: ShelfDeck, search: string) {
   const term = search.trim().toLocaleLowerCase()
   if (!term) return true
@@ -168,13 +174,16 @@ function DeckRow({
       <TouchableOpacity
         style={themed($openButton)}
         accessibilityRole="button"
-        accessibilityLabel={
+        accessibilityLabel={[
           local
             ? translate("decks:stats.onDeviceLabel", { name: deck.name })
             : needsReview
               ? translate("decks:shelf.needsReview", { name: deck.name })
-              : translate("decks:shelf.inAccountLabel", { name: deck.name })
-        }
+              : translate("decks:shelf.inAccountLabel", { name: deck.name }),
+          identity ? identityLabel(identity) : undefined,
+        ]
+          .filter(Boolean)
+          .join(". ")}
         activeOpacity={0.75}
         onPress={() => onPress()}
       >
@@ -269,34 +278,6 @@ function StarIcon({ selected, color }: { selected: boolean; color: string }) {
         strokeLinejoin="round"
       />
     </Svg>
-  )
-}
-
-/** why: Header's built-in icon action has no accessibility label, and every icon-only control needs one. */
-function HeaderIconAction({
-  icon,
-  label,
-  testID,
-  onPress,
-}: {
-  icon: IconTypes
-  label: string
-  testID: string
-  onPress: () => void
-}) {
-  const { theme, themed } = useAppTheme()
-  return (
-    <PressableIcon
-      testID={testID}
-      icon={icon}
-      size={24}
-      color={theme.colors.tint}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      containerStyle={themed($headerIcon)}
-      style={icon === "back" && isRTL ? $flipped : undefined}
-    />
   )
 }
 
@@ -718,7 +699,7 @@ export function DecksScreen({
         }
         LeftActionComponent={
           onBack ? (
-            <HeaderIconAction
+            <HeaderIcon
               testID="decks-back"
               icon="back"
               label={translate("decks:shelf.backToLobby")}
@@ -730,7 +711,7 @@ export function DecksScreen({
         onLeftPress={onCards && (() => onCards(system === ALL_SYSTEMS ? undefined : system))}
         backgroundColor={theme.colors.surface}
         RightActionComponent={
-          <HeaderIconAction
+          <HeaderIcon
             testID="decks-add-deck"
             icon="plus"
             label={translate("decks:shelf.addDeck")}
@@ -965,8 +946,7 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  // why: FilterButton pulls itself spacing.md left to overlap scrolling pills, so this leaves spacing.xs beside the field.
-  gap: spacing.md + spacing.xs,
+  gap: spacing.xs,
   paddingVertical: spacing.xs,
 })
 const $flex1: ViewStyle = { flex: 1 }
@@ -1045,9 +1025,3 @@ const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $homeLane: ViewStyle = { width: 22, alignItems: "center" }
-const $headerIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: "100%",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
-const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }

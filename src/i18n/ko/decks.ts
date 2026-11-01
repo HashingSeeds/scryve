@@ -628,6 +628,7 @@ export default {
     checkAgain: "다시 확인",
     open: "열기",
     loadMore: "더 보기",
+    startingPoint: "시작점",
     importSource: "가져오기 소스",
     pasteText: "텍스트 붙여넣기",
     sourceLink: "{{source}} 링크",

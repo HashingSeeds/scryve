@@ -50,10 +50,13 @@ export function FilterPill({
 
 export function FilterButton({
   count = 0,
+  overlap = false,
   onPress,
   testID,
 }: {
   count?: number
+  /** why: beside a row of scrolling pills, the button tucks over the last one; beside a field it must not. */
+  overlap?: boolean
   onPress: () => void
   testID?: string
 }) {
@@ -63,7 +66,7 @@ export function FilterButton({
     ? translate("decks:filters.withCount", { count })
     : translate("decks:filters.label")
   return (
-    <View style={themed($filterOverlap)}>
+    <View style={[themed($filterSlot), overlap && themed($filterOverlap)]}>
       <TouchableOpacity
         testID={testID}
         accessibilityRole="button"
@@ -137,12 +140,12 @@ const $chipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
-const $filterOverlap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $filterSlot: ThemedStyle<ViewStyle> = () => ({
   flexShrink: 0,
-  marginLeft: -spacing.md,
   minHeight: 44,
   justifyContent: "center",
 })
+const $filterOverlap: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginLeft: -spacing.md })
 const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 32,
   minWidth: 44,

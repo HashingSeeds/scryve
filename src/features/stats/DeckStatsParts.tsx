@@ -1,15 +1,15 @@
 import { useState } from "react"
 import { Platform, TouchableOpacity, View } from "react-native"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { DialogCard } from "@/components/DialogCard"
-import { Icon, PressableIcon } from "@/components/Icon"
+import { Icon } from "@/components/Icon"
 import { TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
-import { i18n, isRTL } from "@/i18n"
+import { i18n } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -17,24 +17,6 @@ import type { ThemedStyle } from "@/theme/types"
 import { formatCardChange } from "./cardChanges"
 import { honestRate, recordText, type listStats, type RecordCounts } from "./deckStatsMath"
 import type { LabeledList } from "./listLabels"
-
-/** why: Header's built-in leftIcon has no screen reader label, so Back passes its own. */
-export function HeaderBackAction({ onPress }: { onPress: () => void }) {
-  const { theme, themed } = useAppTheme()
-  return (
-    <PressableIcon
-      testID="header-back"
-      icon="back"
-      size={24}
-      color={theme.colors.tint}
-      accessibilityRole="button"
-      accessibilityLabel={translate("common:back")}
-      onPress={onPress}
-      containerStyle={themed($headerIcon)}
-      style={isRTL ? $flipped : undefined}
-    />
-  )
-}
 
 export type DeckStatsParams = { deckKey: string; deckName: string; game: string; format: string }
 
@@ -233,12 +215,6 @@ export const $statsRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 export const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginTop: spacing.lg })
 const $fewRate: ViewStyle = { opacity: 0.55 }
-const $headerIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: "100%",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
-const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
 const $chevron: ViewStyle = { width: 16, alignItems: "center" }
 const PREVIEW_CHANGE_WIDTHS = [70, 45, 60]
 const $preview: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs, width: "100%" })

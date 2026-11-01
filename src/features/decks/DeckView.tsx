@@ -1,19 +1,17 @@
 import { useState, type ReactNode } from "react"
 import { SectionList, View } from "react-native"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
-import { Button, type ButtonAccessoryProps } from "@/components/Button"
+import { Button, PlusAccessory } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { Header } from "@/components/Header"
-import { Icon, PressableIcon } from "@/components/Icon"
+import { Header, HeaderIcon } from "@/components/Header"
 import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { localizedDeckSections } from "@/features/game/playSystems"
-import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -56,44 +54,6 @@ export function DeckModeTabs({
       onSelect={(next) => onModeChange?.(next)}
     />
   )
-}
-
-/** why: Header's own icon slot can't carry an accessibility label, so deck headers hand it a whole labelled button. */
-export function DeckHeaderIcon({
-  icon,
-  label,
-  disabled,
-  testID,
-  onPress,
-}: {
-  icon: "back" | "more"
-  label: string
-  disabled?: boolean
-  testID?: string
-  onPress?: () => void
-}) {
-  const { themed, theme } = useAppTheme()
-  return (
-    <PressableIcon
-      icon={icon}
-      size={24}
-      color={theme.colors.text}
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: Boolean(disabled) }}
-      disabled={disabled}
-      onPress={onPress}
-      containerStyle={[themed($headerIcon), disabled && $disabled]}
-      style={icon === "back" && isRTL ? $flipped : undefined}
-    />
-  )
-}
-
-/** why: actions that start something are outline buttons led by a plus. */
-export function PlusAccessory({ style }: ButtonAccessoryProps) {
-  const { theme } = useAppTheme()
-  return <Icon icon="plus" size={18} color={theme.colors.text} containerStyle={style} />
 }
 
 type CardSearch = Omit<DeckSearchHost, "game" | "format"> & { deckId: string }
@@ -225,10 +185,10 @@ export function DeckView({
         titleTx={guest ? "decks:deckView.guestTitle" : "decks:deckView.title"}
         backgroundColor={theme.colors.surface}
         LeftActionComponent={
-          <DeckHeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+          <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
         }
         RightActionComponent={
-          <DeckHeaderIcon
+          <HeaderIcon
             icon="more"
             label={translate("decks:deckView.details")}
             testID="deck-settings-button"
@@ -488,15 +448,6 @@ const $touch: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
 }
-const $disabled: ViewStyle = { opacity: 0.4 }
-const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
-const $headerIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: "100%",
-  minWidth: 44,
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
 const $noteInput: TextStyle = { minHeight: 120, textAlignVertical: "top" }
 const $barButton: ViewStyle = { minHeight: 44 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({

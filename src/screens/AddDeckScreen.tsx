@@ -17,7 +17,7 @@ import type { FunctionReturnType } from "convex/server"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { Header } from "@/components/Header"
+import { Header, HeaderIcon } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -37,7 +37,7 @@ import { deckNameWarning } from "@/features/decks/deckCopy"
 import { isCommanderPick, MAX_CARD_COPIES, type DeckEdits } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { type GuestDeckPayload } from "@/features/decks/guestDeck"
-import { HeaderBackIcon, ImportBuild } from "@/features/decks/ImportBuild"
+import { ImportBuild } from "@/features/decks/ImportBuild"
 import { pastedLines, type ImportProblem } from "@/features/decks/importLines"
 import { useSaveNewDeck } from "@/features/decks/localDeckSync"
 import { SaveDestination, useSaveDestination } from "@/features/decks/SaveDestination"
@@ -1099,7 +1099,9 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header
         titleTx="decks:shelf.addDeck"
-        LeftActionComponent={<HeaderBackIcon onPress={onBack} />}
+        LeftActionComponent={
+          <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+        }
       />
       <View style={themed($stack)}>
         <View style={themed($configRow)}>
@@ -1138,6 +1140,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
         </View>
         <Tabs
           testID="mode-picker-options"
+          accessibilityLabel={translate("decks:addDeck.startingPoint")}
           tabs={MODES.filter(({ id }) => id !== "precon" || browsable).map(({ id, labelTx }) => ({
             id,
             label: translate(labelTx),

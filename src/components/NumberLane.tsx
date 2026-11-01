@@ -38,8 +38,8 @@ export function SectionHeader({
   return (
     <View testID={testID} style={[themed($header), style]}>
       <Text preset="sectionLabel" text={label} accessibilityRole="header" style={$label} />
-      {action ??
-        (count === undefined ? null : <TrailingNumber preset="sectionLabel" value={count} />)}
+      {action}
+      {count === undefined ? null : <TrailingNumber preset="sectionLabel" value={count} />}
     </View>
   )
 }
