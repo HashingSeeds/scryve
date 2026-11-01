@@ -17,17 +17,24 @@ export function Tabs<Id extends string>({
   selectedId,
   onSelect,
   disabled,
+  accessibilityLabel,
   testID,
 }: {
   tabs: readonly Tab<Id>[]
   selectedId: Id
   onSelect: (id: Id) => void
   disabled?: boolean
+  accessibilityLabel?: string
   testID?: string
 }) {
   const { themed } = useAppTheme()
   return (
-    <View style={themed($bar)} accessibilityRole="tablist" testID={testID}>
+    <View
+      style={themed($bar)}
+      accessibilityRole="tablist"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+    >
       {tabs.map((tab) => {
         const selected = tab.id === selectedId
         return (

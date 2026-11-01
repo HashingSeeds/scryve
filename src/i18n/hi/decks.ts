@@ -641,6 +641,7 @@ export default {
     checkAgain: "फिर जाँचें",
     open: "खोलें",
     loadMore: "और लोड करें",
+    startingPoint: "शुरुआती बिंदु",
     importSource: "इंपोर्ट स्रोत",
     pasteText: "टेक्स्ट पेस्ट करें",
     sourceLink: "{{source}} लिंक",

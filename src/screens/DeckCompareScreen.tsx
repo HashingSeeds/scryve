@@ -6,7 +6,7 @@ import { useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { Header } from "@/components/Header"
+import { Header, HeaderIcon } from "@/components/Header"
 import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
@@ -30,7 +30,6 @@ import {
   $section,
   $statsRow,
   DeckComparePrompt,
-  HeaderBackAction,
   listLabel,
   type DeckStatsParams,
 } from "@/features/stats/DeckStatsParts"
@@ -56,7 +55,14 @@ export function DeckCompareScreen(props: Props) {
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
       <Header
         titleTx="decks:stats.compare"
-        LeftActionComponent={<HeaderBackAction onPress={props.onBack} />}
+        LeftActionComponent={
+          <HeaderIcon
+            testID="header-back"
+            icon="back"
+            label={translate("common:back")}
+            onPress={props.onBack}
+          />
+        }
       />
       <ConvexQueryBoundary
         resetKey={props.deckKey}

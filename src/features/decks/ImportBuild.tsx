@@ -1,19 +1,18 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { SectionList, View } from "react-native"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import { Header } from "@/components/Header"
-import { PressableIcon } from "@/components/Icon"
-import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
+import { Header, HeaderIcon } from "@/components/Header"
+import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
-import { isRTL, type TxKeyPath } from "@/i18n"
+import { type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -35,21 +34,6 @@ import { useCardNameIndex } from "./useCardNameIndex"
 import { deckFormatLabel } from "../../../convex/lib/deckGames"
 
 type Card = GuestDeckPayload["cards"][number]
-
-/** why: Header drops labels on its built-in icon actions, so screens pass this as LeftActionComponent to keep "Back" for screen readers. */
-export function HeaderBackIcon({ onPress }: { onPress: () => void }) {
-  const { themed } = useAppTheme()
-  return (
-    <PressableIcon
-      icon="back"
-      accessibilityRole="button"
-      accessibilityLabel={translate("common:back")}
-      onPress={onPress}
-      containerStyle={themed($backIcon)}
-      style={isRTL ? $flipped : undefined}
-    />
-  )
-}
 
 export function ImportBuild({
   name,
@@ -179,7 +163,9 @@ export function ImportBuild({
         <Header
           titleTx="decks:importBuild.title"
           backgroundColor={theme.colors.surface}
-          LeftActionComponent={<HeaderBackIcon onPress={onBack} />}
+          LeftActionComponent={
+            <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+          }
         />
         {listFinal ? null : progress}
       </View>
@@ -238,16 +224,14 @@ export function ImportBuild({
                 testID="import-problems-header"
                 label={translate("decks:importBuild.linesToFix")}
                 style={themed($problemsHeader)}
+                count={problems.length}
                 action={
-                  <>
-                    <TextAction
-                      testID="import-remove-all-problems"
-                      tx="decks:importBuild.removeAll"
-                      size="xs"
-                      onPress={onRemoveAllProblems}
-                    />
-                    <TrailingNumber preset="sectionLabel" value={problems.length} />
-                  </>
+                  <TextAction
+                    testID="import-remove-all-problems"
+                    tx="decks:importBuild.removeAll"
+                    size="xs"
+                    onPress={onRemoveAllProblems}
+                  />
                 }
               />
             ) : null}
@@ -431,14 +415,6 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.sm,
 })
 const $problemsHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.sm })
-const $backIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: "100%",
-  minWidth: 44,
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
-const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
 const $problem: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

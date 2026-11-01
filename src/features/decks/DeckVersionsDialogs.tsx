@@ -2,7 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
-import { Button } from "@/components/Button"
+import { Button, PlusAccessory } from "@/components/Button"
 import { DeckVersionDialog, type DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { PressableIcon } from "@/components/Icon"
@@ -14,7 +14,6 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { cardCountLabel } from "./deckCopy"
-import { PlusAccessory } from "./DeckView"
 
 export type VersionsRow<Id extends string = string> = {
   id: Id

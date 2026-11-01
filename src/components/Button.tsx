@@ -13,6 +13,7 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
+import { Icon } from "./Icon"
 import { Text, TextProps as AppTextProps } from "./Text"
 
 type Presets = "primary" | "secondary" | "destructive"
@@ -40,6 +41,19 @@ export interface ButtonProps extends PressableProps {
   children?: React.ReactNode
   disabled?: boolean
   disabledStyle?: StyleProp<ViewStyle>
+}
+
+/** why: actions that start something are outline buttons led by a plus, so every screen draws the same one. */
+export function PlusAccessory({ style, disabled }: ButtonAccessoryProps) {
+  const { theme } = useAppTheme()
+  return (
+    <Icon
+      icon="plus"
+      size={18}
+      color={disabled ? theme.colors.textDim : theme.colors.text}
+      containerStyle={style}
+    />
+  )
 }
 
 export function Button(props: ButtonProps) {

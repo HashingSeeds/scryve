@@ -5,9 +5,8 @@ import { useConvex } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
-import { Button, type ButtonAccessoryProps } from "@/components/Button"
-import { Header } from "@/components/Header"
-import { Icon } from "@/components/Icon"
+import { Button, PlusAccessory } from "@/components/Button"
+import { Header, HeaderIcon } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text, type TextProps } from "@/components/Text"
@@ -31,7 +30,6 @@ import {
 import { getManualMatchController } from "@/features/matches/matchOutbox"
 import { localDeckChoices } from "@/features/stats/deckChoices"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
-import { HeaderBackAction } from "@/features/stats/DeckStatsParts"
 import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -124,7 +122,14 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       <Header
         titleTx="play:recordMatch.title"
         backgroundColor={theme.colors.surface}
-        LeftActionComponent={<HeaderBackAction onPress={onBack} />}
+        LeftActionComponent={
+          <HeaderIcon
+            testID="header-back"
+            icon="back"
+            label={translate("common:back")}
+            onPress={onBack}
+          />
+        }
       />
       <ScrollView
         contentContainerStyle={themed($content)}
@@ -335,18 +340,6 @@ function FieldLabel({
       {translate(tx, txOptions)}
       {optional ? <Text size="xs" tone="dim" text={` ${translate("common:optional")}`} /> : null}
     </Text>
-  )
-}
-
-function PlusAccessory({ style, disabled }: ButtonAccessoryProps) {
-  const { theme } = useAppTheme()
-  return (
-    <Icon
-      icon="plus"
-      size={20}
-      color={disabled ? theme.colors.textDim : theme.colors.text}
-      containerStyle={style}
-    />
   )
 }
 

@@ -14,6 +14,7 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
+import { refreshDeckIdentity } from "./lib/deckIdentity"
 import {
   assertDeckKey,
   createOrReviveDeck,
@@ -614,6 +615,7 @@ export const create = mutation({
       args.deckKey,
     )
     await writeInitialVersion(ctx, deckId, game, [], now)
+    await refreshDeckIdentity(ctx, deckId)
     return deckId
   },
 })
@@ -657,6 +659,7 @@ export const importResolved = mutation({
       args.deckKey,
     )
     await writeInitialVersion(ctx, deckId, game, args.cards, now)
+    await refreshDeckIdentity(ctx, deckId)
     return deckId
   },
 })
@@ -783,6 +786,7 @@ export const importGuest = mutation({
     )
     if (versions) await replaceDeckVersions(ctx, deckId, game, versions, now)
     else await writeInitialVersion(ctx, deckId, game, args.cards, now)
+    await refreshDeckIdentity(ctx, deckId)
     return { status: "imported" as const, deckId, localUpdatedAt: args.localUpdatedAt }
   },
 })
@@ -847,6 +851,7 @@ export const importCatalog = mutation({
       args.deckKey,
     )
     await writeInitialVersion(ctx, deckId, game, cards, now)
+    await refreshDeckIdentity(ctx, deckId)
     return deckId
   },
 })
@@ -882,6 +887,7 @@ export const update = mutation({
       updatedAt: Date.now(),
       syncRevision: (deck.syncRevision ?? 0) + 1,
     })
+    if (format !== undefined && format !== deck.format) await refreshDeckIdentity(ctx, deck._id)
     return null
   },
 })
@@ -907,6 +913,7 @@ export const setBringingVersion = mutation({
         throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
     }
     await ctx.db.patch(deck._id, { bringingVersionId: args.versionId ?? undefined })
+    await refreshDeckIdentity(ctx, deck._id)
     return null
   },
 })
@@ -999,6 +1006,7 @@ export const saveVersion = mutation({
         now,
       )
       await ctx.db.patch(deck._id, { updatedAt: now })
+      await refreshDeckIdentity(ctx, deck._id)
       return versionId
     }
     const totals = cardTotals(args.cards)
@@ -1018,6 +1026,7 @@ export const saveVersion = mutation({
       updatedAt: now,
     })
     await ctx.db.patch(deck._id, { updatedAt: now })
+    await refreshDeckIdentity(ctx, deck._id)
     return target._id
   },
 })
@@ -1062,6 +1071,7 @@ export const createVersion = mutation({
       now,
     )
     await ctx.db.patch(deck._id, { updatedAt: now })
+    await refreshDeckIdentity(ctx, deck._id)
     return versionId
   },
 })
@@ -1104,6 +1114,7 @@ export const deleteVersion = mutation({
       updatedAt: now,
     })
     await ctx.db.patch(deck._id, { updatedAt: now })
+    await refreshDeckIdentity(ctx, deck._id)
     return null
   },
 })
@@ -1369,6 +1380,7 @@ export const syncVersionWrite = mutation({
     const now = Date.now()
     await ctx.db.patch(version._id, { ...totals, syncRevision: revision, updatedAt: now })
     await ctx.db.patch(deck._id, { updatedAt: now })
+    await refreshDeckIdentity(ctx, deck._id)
     const result = syncedVersion({ ...version, ...totals, syncRevision: revision, updatedAt: now })
     await ctx.db.insert("deckVersionSyncReceipts", {
       ownerUserId: user._id,
@@ -1466,6 +1478,7 @@ export const syncCreateVersion = mutation({
       now,
     )
     await ctx.db.patch(deck._id, { updatedAt: now })
+    await refreshDeckIdentity(ctx, deck._id)
     const version = await ctx.db.get(versionId)
     if (!version) throw new Error("Deck version disappeared during sync")
     const result = syncedVersion(version)
@@ -1586,6 +1599,7 @@ export const syncDeleteVersion = mutation({
     const syncRevision = (version.syncRevision ?? 0) + 1
     await ctx.db.patch(version._id, { archivedAt: now, syncRevision, updatedAt: now })
     await ctx.db.patch(deck._id, { updatedAt: now })
+    await refreshDeckIdentity(ctx, deck._id)
     const result = syncedVersion({
       ...version,
       archivedAt: now,

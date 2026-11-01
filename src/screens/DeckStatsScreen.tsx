@@ -7,7 +7,7 @@ import { usePaginatedQuery, useQuery } from "convex/react"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { EmptyState } from "@/components/EmptyState"
-import { Header } from "@/components/Header"
+import { Header, HeaderIcon } from "@/components/Header"
 import { SectionHeader } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -34,7 +34,6 @@ import {
   $statsRow,
   ChevronSlot,
   DeckComparePrompt,
-  HeaderBackAction,
   listDetail,
   listLabel,
   statsDate,
@@ -63,7 +62,14 @@ export function DeckStatsScreen(props: Props) {
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
       <Header
         title={props.deckName}
-        LeftActionComponent={<HeaderBackAction onPress={props.onBack} />}
+        LeftActionComponent={
+          <HeaderIcon
+            testID="header-back"
+            icon="back"
+            label={translate("common:back")}
+            onPress={props.onBack}
+          />
+        }
       />
       <ConvexQueryBoundary
         resetKey={props.deckKey}
