@@ -88,6 +88,7 @@ jest.mock("@expo/ui/swift-ui", () => {
       return isPresented ? children : null
     },
     finishSheetDismissals: () => pending.splice(0).forEach((run) => run()),
+    clearSheetDismissals: () => pending.splice(0),
   }
 })
 jest.mock("@expo/ui/swift-ui/modifiers", () => ({
