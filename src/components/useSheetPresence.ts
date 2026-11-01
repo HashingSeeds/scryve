@@ -7,16 +7,21 @@ export function useSheetPresence<T>(
 ) {
   const [shown, setShown] = useState(requested)
   const [leaving, setLeaving] = useState(false)
+  const [gone, setGone] = useState(false)
   const latest = useRef(requested)
   latest.current = requested
   if (!leaving && !Object.is(requested, shown)) {
-    if (shown !== undefined && isSheet(shown)) setLeaving(true)
-    else setShown(requested)
+    if (shown !== undefined && isSheet(shown) && !gone) setLeaving(true)
+    else {
+      setShown(requested)
+      setGone(false)
+    }
   }
   return {
     shown,
     visible: !leaving,
     onDismissed: () => {
+      if (!leaving) return setGone(true)
       setLeaving(false)
       setShown(latest.current)
     },

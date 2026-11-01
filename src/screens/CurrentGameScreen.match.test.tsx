@@ -1,4 +1,5 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { Modal } from "react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { createLocalGame } from "@/features/game/domain"
@@ -84,6 +85,9 @@ describe("CurrentGameScreen match mode", () => {
 
     expect(view.getByText("Boros Burn · 2 in sideboard")).toBeTruthy()
     fireEvent.press(view.getByTestId("sideboard-first"))
+    expect(view.queryByTestId("sideboard-sheet")).toBeNull()
+    const fadingPrompt = view.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onDismiss)
+    act(() => fadingPrompt?.props.onDismiss())
     fireEvent.press(view.getByLabelText("Swap one more Searing Blaze"))
     expect(view.getByTestId("sideboard-short")).toHaveTextContent(
       "Main would have 1. Take fewer out or bring more in.",

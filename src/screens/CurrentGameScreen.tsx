@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { TouchableOpacity, View } from "react-native"
+import { Platform, TouchableOpacity, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -105,7 +105,15 @@ export function CurrentGameScreen({
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
   const [sideboardOpen, setSideboardOpen] = useState(false)
-  const sideboardSheet = useSheetPresence(sideboardOpen || undefined)
+  // why: iOS can't present the sideboard sheet until the match prompt's Modal has faded out.
+  const [promptGone, setPromptGone] = useState(false)
+  const sideboardSheet = useSheetPresence(
+    sideboardOpen && (promptGone || Platform.OS !== "ios") ? true : undefined,
+  )
+  const closeSideboard = () => {
+    setSideboardOpen(false)
+    setPromptGone(false)
+  }
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
@@ -463,7 +471,8 @@ export function CurrentGameScreen({
 
       {matchPrompt?.match && !sideboardSheet.shown ? (
         <DialogCard
-          visible
+          visible={!sideboardOpen}
+          onDismissed={sideboardOpen ? () => setPromptGone(true) : undefined}
           onClose={() => setMatchPrompt(undefined)}
           closeDisabled={!canContinueMatch(matchPrompt)}
           backdropTestID="match-prompt-backdrop"
@@ -556,9 +565,9 @@ export function CurrentGameScreen({
           swaps={sideboardFirst.swaps}
           onApply={(swaps) => {
             sideboardFirst.apply(swaps)
-            setSideboardOpen(false)
+            closeSideboard()
           }}
-          onClose={() => setSideboardOpen(false)}
+          onClose={closeSideboard}
         />
       ) : null}
 

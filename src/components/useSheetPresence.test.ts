@@ -37,3 +37,11 @@ it("shows the latest request once the sheet has left", () => {
   act(() => view.result.current.onDismissed())
   expect(view.result.current.shown).toBe("rename")
 })
+
+it("swaps at once when the sheet already left without being closed", () => {
+  const view = renderPresence("actions")
+
+  act(() => view.result.current.onDismissed())
+  view.rerender({ requested: "rename" })
+  expect(view.result.current).toMatchObject({ shown: "rename", visible: true })
+})

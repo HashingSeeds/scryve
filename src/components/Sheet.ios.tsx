@@ -29,7 +29,7 @@ export function Sheet({
 }: SheetProps) {
   const { theme, themed } = useAppTheme()
   const { height } = useWindowDimensions()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const fit = size === "fit"
   const onScreen = useRef(false)
   const visibleNow = useRef(visible)
@@ -81,7 +81,7 @@ export function Sheet({
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
-                fit ? { maxHeight: height - top - FIT_TOP_GAP } : $fill,
+                fit ? { maxHeight: height - top - bottom - FIT_TOP_GAP } : $fill,
               ]}
             >
               {children}

@@ -29,7 +29,7 @@ export function Sheet({
 }: SheetProps) {
   const { theme, themed } = useAppTheme()
   const { height } = useWindowDimensions()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const sheet = useRef<ModalBottomSheetRef>(null)
   const [mounted, setMounted] = useState(visible)
   const latestOnDismissed = useRef(onDismissed)
@@ -79,7 +79,7 @@ export function Sheet({
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
-                fit ? { maxHeight: height - top - FIT_TOP_GAP } : $fill,
+                fit ? { maxHeight: height - top - bottom - FIT_TOP_GAP + DRAG_HANDLE } : $fill,
               ]}
             >
               {children}
@@ -92,6 +92,8 @@ export function Sheet({
 }
 
 const FIT_TOP_GAP = 24
+// why: Material 3's drag handle takes 48dp above the content.
+const DRAG_HANDLE = 48
 const $fill: ViewStyle = { flex: 1 }
 const $padded: ThemedStyle<ViewStyle> = ({ spacing }) => ({ padding: spacing.lg, gap: spacing.lg })
 const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
