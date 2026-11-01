@@ -11,8 +11,7 @@ import {
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-// why: type-only, since "./Sheet" resolves to this file on iOS.
-import type { SheetProps } from "./Sheet"
+import type { SheetProps } from "./sheetTypes"
 
 // why: the universal BottomSheet drops SwiftUI's onDismiss, and iOS can't present a Modal before it fires.
 export function Sheet({ visible, onClose, onDismissed, testID, children }: SheetProps) {

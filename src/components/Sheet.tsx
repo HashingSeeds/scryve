@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react"
+import { useEffect, useRef } from "react"
 import { View } from "react-native"
 import type { ViewStyle } from "react-native"
 import { BottomSheet, RNHostView } from "@expo/ui"
@@ -6,13 +6,7 @@ import { BottomSheet, RNHostView } from "@expo/ui"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export interface SheetProps {
-  visible: boolean
-  onClose: () => void
-  onDismissed?: () => void
-  testID?: string
-  children: ReactNode
-}
+import type { SheetProps } from "./sheetTypes"
 
 // why: unmounting a presented native sheet skips its exit animation; keep it mounted, toggle `visible`.
 export function Sheet({ visible, onClose, onDismissed, testID, children }: SheetProps) {
