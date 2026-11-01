@@ -888,6 +888,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
   const inviteSheet = useSheetPresence(inviteDialogOpen || undefined)
+  useEffect(() => {
+    if (inviteOpen && invitation === undefined) setInviteOpen(false)
+  }, [inviteOpen, invitation])
   const overlayOpen =
     menuOpen ||
     statusOpen ||
@@ -896,6 +899,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     playerActionsOpen ||
     roleOpen ||
     inviteDialogOpen ||
+    inviteAfterActions ||
+    Boolean(inviteSheet.shown) ||
     abandonedOpen
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
@@ -1155,7 +1160,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {abandonedOpen ? (
+      {abandonedOpen && !inviteSheet.shown ? (
         <DialogCard
           visible
           onClose={() => setAbandonedOpen(false)}

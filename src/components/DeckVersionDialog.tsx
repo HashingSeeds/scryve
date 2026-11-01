@@ -64,7 +64,6 @@ export function DeckVersionDialog({
         style={$sheetScroll}
         contentContainerStyle={themed($content)}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
       >
         <Text preset="subheading" text={title} />
         <TextField

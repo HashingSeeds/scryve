@@ -9,6 +9,7 @@ import {
   presentationDetents,
   presentationDragIndicator,
 } from "@expo/ui/swift-ui/modifiers"
+import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
@@ -30,6 +31,7 @@ export function Sheet({
   const { theme, themed } = useAppTheme()
   const { height } = useWindowDimensions()
   const { top, bottom } = useSafeAreaInsets()
+  const keyboard = useKeyboardState((state) => (state.isVisible ? state.height : 0))
   const fit = size === "fit"
   const onScreen = useRef(false)
   const visibleNow = useRef(visible)
@@ -81,7 +83,9 @@ export function Sheet({
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
-                fit ? { maxHeight: height - top - bottom - FIT_TOP_GAP } : $fill,
+                fit
+                  ? { maxHeight: height - top - Math.max(bottom, keyboard) - FIT_TOP_GAP }
+                  : $fill,
               ]}
             >
               {children}
