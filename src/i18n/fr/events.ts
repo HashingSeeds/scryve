@@ -37,7 +37,10 @@ export default {
   playerCount_other: "{{count}} joueurs",
   organizer: "Organisateur",
   list: {
+    current: "En cours",
     empty: "Aucun événement pour l'instant",
+    emptyHint:
+      "Organisez un tournoi pour votre boutique ou vos amis, ou rejoignez-en un avec son code.",
   },
   create: {
     title: "Nouvel événement",
@@ -145,6 +148,8 @@ export default {
     title: "Événements à proximité",
     host: "Organiser sur cet appareil",
     yourEvent: "Votre événement",
+    hostBusy: "Terminez votre événement pour en héberger un autre.",
+    nameFirst: "Saisissez votre nom pour rejoindre un événement.",
     searching: "Recherche d'événements sur ce Wi-Fi. Tout le monde doit être sur le même réseau.",
     denied:
       "Autorisez l'accès au réseau local dans Réglages pour trouver des événements sur ce Wi-Fi.",

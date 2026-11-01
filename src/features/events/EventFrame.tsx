@@ -5,8 +5,8 @@ import { ScrollView, StyleSheet, View } from "react-native"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { EmptyState } from "@/components/EmptyState"
 import { Header } from "@/components/Header"
+import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -24,7 +24,10 @@ export function EventFrame({
   children,
 }: {
   title: string
-  access?: Pick<CloudAccess, "ready" | "loading" | "message" | "actionLabel" | "request">
+  access?: Pick<
+    CloudAccess,
+    "ready" | "loading" | "signedIn" | "message" | "actionLabel" | "request"
+  >
   loading?: boolean
   onBack: () => void
   footer?: ReactNode
@@ -47,21 +50,19 @@ export function EventFrame({
         <>
           <EmptyState
             imageSource={null}
-            heading={translate("events:signIn")}
-            content={access.message}
+            heading={access.signedIn ? access.message : translate("events:signIn")}
+            content={access.signedIn ? "" : access.message}
             button={access.actionLabel ?? translate("account:signIn")}
             buttonOnPress={access.request}
           />
           {blockedAction ? <View style={themed($content)}>{blockedAction}</View> : null}
         </>
       ) : waiting ? (
-        <View
-          accessibilityRole="progressbar"
-          accessibilityLabel={translate("events:loading")}
-          style={themed($content)}
-        >
-          <Text size="xs" tone="dim" tx="events:loading" />
-        </View>
+        <LoadingProgress
+          testID="event-loading"
+          state="loading"
+          accessibilityText={translate("events:loading")}
+        />
       ) : (
         <>
           <ScrollView

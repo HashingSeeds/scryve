@@ -37,7 +37,10 @@ const events = {
   playerCount_other: "{{count}} players",
   organizer: "Organizer",
   list: {
+    // Section label above events that haven't finished: open for registration or mid-round.
+    current: "Current",
     empty: "No events yet",
+    emptyHint: "Run a tournament for your store or friends, or join one with its code.",
   },
   create: {
     title: "New event",
@@ -155,6 +158,8 @@ const events = {
     title: "Nearby events",
     host: "Host on this device",
     yourEvent: "Your event",
+    hostBusy: "Finish your event to host another.",
+    nameFirst: "Enter your name to join an event.",
     // Shown while no events are found; some store guest networks keep devices from seeing each other.
     searching: "Looking for events on this Wi-Fi. Everyone needs to be on the same network.",
     denied: "Allow local network access in Settings to find events on this Wi-Fi.",
