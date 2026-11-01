@@ -1,5 +1,5 @@
 import { useEffect, useReducer } from "react"
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
@@ -44,6 +44,7 @@ export function EventClockRow({
           testID="event-clock"
           preset="heading"
           accessibilityRole="timer"
+          style={$digits}
           text={left > 0 ? formatRemaining(left) : translate("events:clock.timeUp")}
         />
         {paused ? <Text size="xs" tone="dim" tx="events:clock.paused" /> : null}
@@ -78,6 +79,7 @@ export function EventClockRow({
 }
 
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $digits: TextStyle = { fontVariant: ["tabular-nums"] }
 const $time: ViewStyle = { flexDirection: "row", alignItems: "baseline", gap: 8 }
 const $controls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
