@@ -62,6 +62,8 @@ export function Tabs<Id extends string>({
 
 const $bar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
+  // why: at large text sizes the labels outgrow a phone's width, and a tab off-screen can't be reached.
+  flexWrap: "wrap",
   gap: spacing.lg,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,

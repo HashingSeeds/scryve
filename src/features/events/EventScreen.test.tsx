@@ -111,6 +111,17 @@ describe("EventScreen", () => {
     await waitFor(() => expect(screen.getByTestId("confirm-button")).toBeEnabled())
   })
 
+  it("lets a player drop from the event's actions", async () => {
+    const events = source(view())
+    renderEvent(events)
+
+    fireEvent.press(screen.getByTestId("event-actions-button"))
+    fireEvent.press(await screen.findByTestId("deck-action-drop"))
+    fireEvent.press(await screen.findByTestId("event-confirm-button"))
+
+    await waitFor(() => expect(events.dropPlayer).toHaveBeenCalledWith("ada"))
+  })
+
   it("holds the organizer's next round until every table has a result", () => {
     const events = source(view({ isOrganizer: true, myPlayerId: null }))
     renderEvent(events)

@@ -6,6 +6,7 @@ export default {
   newEvent: "Nuevo evento",
   joinEvent: "Unirse al evento",
   loading: "Cargando…",
+  actions: "Acciones del evento",
   failed: "No funcionó. Inténtalo de nuevo.",
   storeScreen: "Pantalla de la tienda",
   errors: {
@@ -104,6 +105,7 @@ export default {
   addGuest: "Añadir invitado",
   guestName: "Nombre del invitado",
   table: "Mesa {{table}}",
+  tables: "Mesas",
   versus: "{{first}} vs {{second}}",
   bye: "Bye",
   tableStatus: {

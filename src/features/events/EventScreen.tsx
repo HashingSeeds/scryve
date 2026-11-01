@@ -1,13 +1,17 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { TextStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
-import { Button } from "@/components/Button"
+import { Button, PlusAccessory } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet"
 import { EmptyState } from "@/components/EmptyState"
-import { SegmentedControl } from "@/components/SegmentedControl"
+import { HeaderIcon } from "@/components/Header"
+import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
+import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { ValueField } from "@/components/ValueField"
@@ -107,7 +111,9 @@ export function EventScreen({
   const [chosenTab, setTab] = useState<Tab>()
   const [editing, setEditing] = useState<string>()
   const resultSheet = useSheetPresence(editing)
-  const [confirming, setConfirming] = useState<Confirming>()
+  const [dialog, setDialog] = useState<"actions" | Confirming>()
+  const dialogs = useSheetPresence(dialog, (shown) => shown === "actions")
+  const confirming = dialogs.shown === "actions" ? undefined : dialogs.shown
   const [matchTable, setMatchTable] = useState<EventTableView>()
   // why: during registration the organizer's work (the join code, guests) is on Players.
   const tab =
@@ -140,7 +146,7 @@ export function EventScreen({
             preset="primary"
             disabled={command.busy || blocker !== undefined}
             tx="events:finish.action"
-            onPress={() => setConfirming("finish")}
+            onPress={() => setDialog("finish")}
           />
         ) : (
           <Button
@@ -156,11 +162,26 @@ export function EventScreen({
         )}
       </>
     ) : undefined
+  const me = view?.players.find((player) => player.id === view.myPlayerId)
+  const actions: DeckAction[] = (
+    [
+      ["finish", view?.isOrganizer && view.status === "active" && !finalRound],
+      ["remove", view?.isOrganizer && view.round === 0],
+      ["drop", me && !me.dropped && view?.status !== "finished"],
+    ] as const
+  )
+    .filter(([, shown]) => shown)
+    .map(([id]) => ({
+      id,
+      label: translate(`events:${id}.action`),
+      destructive: id !== "finish",
+      onPress: () => setDialog(id),
+    }))
 
   async function confirmAction() {
     if (!view || !confirming) return
     if (confirming === "replaceGame") {
-      setConfirming(undefined)
+      setDialog(undefined)
       if (matchTable) onStartMatch?.(view, matchTable, true)
       return
     }
@@ -169,7 +190,7 @@ export function EventScreen({
       else if (confirming === "remove") await source.remove()
       else if (view.myPlayerId) await source.dropPlayer(view.myPlayerId)
     })
-    setConfirming(undefined)
+    setDialog(undefined)
     if (done && confirming === "remove") onRemoved()
   }
 
@@ -180,11 +201,22 @@ export function EventScreen({
       loading={view === undefined}
       onBack={onBack}
       footer={organizerFooter}
+      headerAction={
+        actions.length > 0 ? (
+          <HeaderIcon
+            testID="event-actions-button"
+            icon="more"
+            label={translate("events:actions")}
+            onPress={() => setDialog("actions")}
+          />
+        ) : undefined
+      }
     >
       {view ? (
         <>
           <Text
-            size="xs"
+            size="meta"
+            tone="dim"
             text={[
               eventMeta(view),
               view.status === "active"
@@ -203,12 +235,16 @@ export function EventScreen({
               }
             />
           ) : null}
-          <SegmentedControl
+          <Tabs
             testID="event-tabs"
             accessibilityLabel={view.name}
-            segments={TABS.map((id) => ({ id, label: translate(`events:tabs.${id}`) }))}
+            tabs={TABS.map((id) => ({
+              id,
+              label: translate(`events:tabs.${id}`),
+              count: id === "players" ? view.players.length : undefined,
+            }))}
             selectedId={tab}
-            onSelect={(id) => setTab(TABS.find((value) => value === id) ?? "round")}
+            onSelect={setTab}
           />
           {notice ? <AlertNote testID="event-notice" text={notice} /> : null}
           {command.error ? <AlertNote testID="event-error" text={command.error} /> : null}
@@ -223,11 +259,9 @@ export function EventScreen({
                 ((table) => {
                   if (onStartMatch(view, table, false)) return
                   setMatchTable(table)
-                  setConfirming("replaceGame")
+                  setDialog("replaceGame")
                 })
               }
-              onAsk={setConfirming}
-              finalRound={finalRound}
             />
           ) : tab === "players" ? (
             <PlayersTab
@@ -254,6 +288,14 @@ export function EventScreen({
               }}
             />
           ) : null}
+          {dialogs.shown === "actions" ? (
+            <DeckActionsSheet
+              visible={dialogs.visible}
+              actions={actions}
+              onClose={() => setDialog(undefined)}
+              onDismissed={dialogs.onDismissed}
+            />
+          ) : null}
           <ConfirmDialog
             visible={confirming !== undefined}
             title={translate(`events:${confirming ?? "finish"}.title`)}
@@ -264,7 +306,7 @@ export function EventScreen({
             confirmTestID="event-confirm-button"
             backdropAccessibilityLabel={translate("common:cancel")}
             onConfirm={() => void confirmAction()}
-            onClose={() => setConfirming(undefined)}
+            onClose={() => setDialog(undefined)}
           />
         </>
       ) : null}
@@ -278,16 +320,12 @@ function RoundTab({
   onEdit,
   onConfirm,
   onStartMatch,
-  onAsk,
-  finalRound,
 }: {
   view: EventView
   busy: boolean
   onEdit: (tableId: string) => void
   onConfirm: (table: EventTableView) => void
   onStartMatch?: (table: EventTableView) => void
-  onAsk: (action: Confirming) => void
-  finalRound: boolean
 }) {
   const { themed } = useAppTheme()
   const mine = myTable(view)
@@ -296,7 +334,7 @@ function RoundTab({
     <>
       {me ? (
         <View testID="my-table" style={themed($section)}>
-          <Text preset="subheading" accessibilityRole="header" tx="events:myTable" />
+          <SectionHeader label={translate("events:myTable")} />
           {mine ? (
             <MyTable
               view={view}
@@ -323,7 +361,11 @@ function RoundTab({
         <Text tone="dim" tx="events:waitingToStart" />
       ) : null}
       {view.isOrganizer && view.tables.length > 0 ? (
-        <View style={themed($section)}>
+        <View testID="tables" style={themed($section)}>
+          <SectionHeader
+            label={translate("events:tables")}
+            count={`${view.tables.filter((table) => table.result !== null).length}/${view.tables.length}`}
+          />
           {view.tables.map((table) => (
             <TableRow
               key={table.id}
@@ -334,32 +376,6 @@ function RoundTab({
           ))}
         </View>
       ) : null}
-      <View style={themed($section)}>
-        {view.isOrganizer && view.status === "active" && !finalRound ? (
-          <Button
-            testID="finish-event-button"
-            tx="events:finish.action"
-            disabled={busy}
-            onPress={() => onAsk("finish")}
-          />
-        ) : null}
-        {view.isOrganizer && view.round === 0 ? (
-          <Button
-            testID="remove-event-button"
-            tx="events:remove.action"
-            disabled={busy}
-            onPress={() => onAsk("remove")}
-          />
-        ) : null}
-        {me && !me.dropped && view.status !== "finished" ? (
-          <Button
-            testID="drop-button"
-            tx="events:drop.action"
-            disabled={busy}
-            onPress={() => onAsk("drop")}
-          />
-        ) : null}
-      </View>
     </>
   )
 }
@@ -429,7 +445,7 @@ function MyTable({
       {canConfirm(view, table) && !reportedByMe ? (
         <Button
           testID="confirm-button"
-          preset="primary"
+          preset={view.isOrganizer ? undefined : "primary"}
           disabled={busy}
           tx="events:confirm"
           onPress={() => onConfirm(table)}
@@ -527,6 +543,7 @@ function PlayersTab({
             <Button
               testID="add-guest-button"
               tx="events:addGuest"
+              LeftAccessory={PlusAccessory}
               disabled={busy || !guest.trim()}
               onPress={() => void addGuest()}
             />
@@ -568,6 +585,7 @@ function PlayersTab({
         </>
       ) : null}
       <View style={themed($section)}>
+        <SectionHeader label={translate("events:tabs.players")} count={active} />
         {view.players.map((player) => (
           <View key={player.id} testID={`player-${player.id}`} style={themed($row)}>
             <Text style={$grow} numberOfLines={1} text={player.name} />
@@ -582,11 +600,10 @@ function PlayersTab({
               />
             ) : null}
             {managing ? (
-              <Button
+              <TextAction
                 testID={`${player.dropped ? "undrop" : "drop"}-${player.id}`}
                 tx={player.dropped ? "events:undrop" : "events:drop.action"}
                 disabled={busy}
-                style={$rowButton}
                 onPress={() =>
                   void run(() =>
                     player.dropped ? source.undropPlayer(player.id) : source.dropPlayer(player.id),
@@ -610,16 +627,23 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
   return (
     <View testID="standings">
       <View style={themed($row)}>
-        <Text size="xxs" tone="dim" style={themed($rank)} tx="events:standings.rank" />
-        <Text size="xxs" tone="dim" style={themed($grow)} tx="events:standings.player" />
-        <Text size="xxs" tone="dim" style={themed($stat)} tx="events:standings.points" />
-        <Text size="xxs" tone="dim" style={themed($stat)} tx="events:standings.record" />
+        <Text preset="sectionLabel" style={$rank} tx="events:standings.rank" />
+        <Text preset="sectionLabel" style={$grow} tx="events:standings.player" />
+        <TrailingNumber
+          adjustsFontSizeToFit
+          preset="sectionLabel"
+          value={translate("events:standings.points")}
+        />
+        <TrailingNumber
+          adjustsFontSizeToFit
+          preset="sectionLabel"
+          value={translate("events:standings.record")}
+        />
         {tiebreaker ? (
-          <Text
-            size="xxs"
-            tone="dim"
-            style={themed($stat)}
-            tx={`events:tiebreaker.${tiebreaker}`}
+          <TrailingNumber
+            adjustsFontSizeToFit
+            preset="sectionLabel"
+            value={translate(`events:tiebreaker.${tiebreaker}`)}
           />
         ) : null}
       </View>
@@ -627,10 +651,18 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
         <View key={row.playerId} testID={`standing-${row.playerId}`} style={themed($row)}>
           <Text size="xs" style={$rank} text={String(row.rank)} />
           <Text size="xs" style={$grow} numberOfLines={1} text={playerName(view, row.playerId)} />
-          <Text size="xs" weight="bold" style={$stat} text={String(row.points)} />
-          <Text size="xs" style={$stat} text={`${row.wins}-${row.losses}-${row.draws}`} />
+          <TrailingNumber adjustsFontSizeToFit size="xs" weight="bold" value={row.points} />
+          <TrailingNumber
+            adjustsFontSizeToFit
+            size="xs"
+            value={`${row.wins}-${row.losses}-${row.draws}`}
+          />
           {tiebreaker ? (
-            <Text size="xs" style={$stat} text={percent(row.tiebreakers[0] ?? 0)} />
+            <TrailingNumber
+              adjustsFontSizeToFit
+              size="xs"
+              value={percent(row.tiebreakers[0] ?? 0)}
+            />
           ) : null}
         </View>
       ))}
@@ -639,6 +671,4 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
 }
 
 const $tableNumber: ThemedStyle<TextStyle> = () => ({ width: 28 })
-const $rank: TextStyle = { width: 28 }
-const $stat: TextStyle = { width: 56, textAlign: "right" }
-const $rowButton: ViewStyle = { minHeight: 36, paddingVertical: 4 }
+const $rank: TextStyle = { width: 28, fontVariant: ["tabular-nums"] }

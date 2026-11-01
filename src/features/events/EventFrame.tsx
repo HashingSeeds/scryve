@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { ReactElement, ReactNode } from "react"
 import type { ViewStyle } from "react-native"
 import { ScrollView, StyleSheet, View } from "react-native"
 
@@ -19,6 +19,7 @@ export function EventFrame({
   loading = false,
   onBack,
   footer,
+  headerAction,
   blockedAction,
   children,
 }: {
@@ -27,6 +28,7 @@ export function EventFrame({
   loading?: boolean
   onBack: () => void
   footer?: ReactNode
+  headerAction?: ReactElement
   blockedAction?: ReactNode
   children: ReactNode
 }) {
@@ -35,7 +37,12 @@ export function EventFrame({
   const waiting = loading || access?.loading
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$frame}>
-      <Header title={title} leftTx="common:back" onLeftPress={onBack} />
+      <Header
+        title={title}
+        leftTx="common:back"
+        onLeftPress={onBack}
+        RightActionComponent={headerAction}
+      />
       {blocked ? (
         <>
           <EmptyState

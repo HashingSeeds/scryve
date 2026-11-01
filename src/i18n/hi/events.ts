@@ -6,6 +6,7 @@ export default {
   newEvent: "नया इवेंट",
   joinEvent: "इवेंट में शामिल हों",
   loading: "लोड हो रहा है…",
+  actions: "इवेंट कार्रवाइयाँ",
   failed: "यह नहीं हो पाया। फिर से कोशिश करें।",
   storeScreen: "स्टोर स्क्रीन",
   errors: {
@@ -103,6 +104,7 @@ export default {
   addGuest: "मेहमान जोड़ें",
   guestName: "मेहमान का नाम",
   table: "टेबल {{table}}",
+  tables: "टेबल",
   versus: "{{first}} बनाम {{second}}",
   bye: "बाई",
   tableStatus: {
