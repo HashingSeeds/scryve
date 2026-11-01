@@ -1,12 +1,11 @@
 import { useState, type ReactNode } from "react"
-import { ScrollView, SectionList, View } from "react-native"
+import { SectionList, View } from "react-native"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button, type ButtonAccessoryProps } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Icon, PressableIcon } from "@/components/Icon"
 import { Tabs } from "@/components/Tabs"
@@ -20,7 +19,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { CardSearchScreen } from "./CardSearchScreen"
-import { DeckAnalysisPanel, useDeckAnalysis } from "./DeckAnalysisPanel"
+import { DeckAnalysisSheet, useDeckAnalysis } from "./DeckAnalysisPanel"
 import { buildSections } from "./deckBuild"
 import { DeckBuildTools } from "./DeckBuildTools"
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
@@ -469,30 +468,13 @@ export function DeckView({
           onDiscard()
         }}
       />
-      {analysisOpen && analysis ? (
-        <DialogCard
-          visible
-          placement="bottom"
-          wide
+      {analysis ? (
+        <DeckAnalysisSheet
+          visible={analysisOpen}
+          analysis={analysis.analysis}
           onClose={() => setAnalysisOpen(false)}
-          dialogTestID="deck-analysis-sheet"
-          backdropAccessibilityLabel={translate("common:close")}
-          accessibilityViewIsModal
-        >
-          <ScrollView>
-            <Text preset="subheading" tx="decks:build.analysis" />
-            <DeckAnalysisPanel
-              analysis={analysis.analysis}
-              onChooseCommander={
-                chooseCommander &&
-                (() => {
-                  setAnalysisOpen(false)
-                  chooseCommander()
-                })
-              }
-            />
-          </ScrollView>
-        </DialogCard>
+          onChooseCommander={chooseCommander}
+        />
       ) : null}
     </>
   )

@@ -8,9 +8,8 @@ Android launch-time work. Pixel 6a release build, cold launch, board interactive
   created at launch; they are cheap). The build fails if Expo's
   `MainApplication` template stops matching.
 - `package.json` → `expo.autolinking.android.exclude`: native code Scryve never calls, which still
-  cost ~20ms per launch to register.
-  - `@expo/ui`: pulled in by expo-router for `Stack.Toolbar`. Remove the exclusion before using
-    native toolbars, or Android will crash with a missing native module.
+  costs launch time to register. Empty now: `@expo/ui` (~20ms) was excluded until the native
+  `Sheet` started using it.
 
 Recheck the exclusion when upgrading Expo. Clerk stopped pulling in the Solana wallet adapter in
 `@clerk/expo` 4.10, so it no longer needs one.

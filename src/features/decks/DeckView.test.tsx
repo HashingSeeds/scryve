@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
@@ -251,13 +251,24 @@ describe("sideboard", () => {
 })
 
 describe("analysis sheet", () => {
-  it("opens from the curve strip and its commander nudge opens the chooser", () => {
+  const { clearSheetDismissals, finishSheetDismissals } = jest.requireMock<{
+    clearSheetDismissals: () => void
+    finishSheetDismissals: () => void
+  }>("@expo/ui/swift-ui")
+  beforeEach(clearSheetDismissals)
+
+  it("opens from the curve strip, closes from its header, and its commander nudge opens the chooser", () => {
     const view = renderDeckView({ canChooseCommander: true })
 
     expect(view.queryByTestId("deck-analysis")).toBeNull()
     fireEvent.press(view.getByTestId("open-deck-analysis"))
-    expect(view.getByTestId("deck-analysis")).toBeTruthy()
+    fireEvent.press(view.getByTestId("close-deck-analysis"))
+    act(finishSheetDismissals)
+    expect(view.queryByTestId("deck-analysis")).toBeNull()
+    fireEvent.press(view.getByTestId("open-deck-analysis"))
     fireEvent.press(view.getByTestId("deck-analysis-choose-commander"))
+    expect(view.queryByTestId("card-search")).toBeNull()
+    act(finishSheetDismissals)
     expect(view.getByTestId("card-search")).toHaveTextContent("commander")
   })
 
