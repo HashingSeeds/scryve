@@ -88,6 +88,8 @@ export function DeckAnalysisSheet({
         afterClose.current = undefined
         run?.()
       }}
+      size="full"
+      edgeToEdge
       testID="deck-analysis-sheet"
     >
       <View style={themed($sheetHeader)}>

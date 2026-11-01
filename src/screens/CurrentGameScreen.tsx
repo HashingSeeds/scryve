@@ -11,6 +11,7 @@ import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
@@ -104,6 +105,7 @@ export function CurrentGameScreen({
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
   const [sideboardOpen, setSideboardOpen] = useState(false)
+  const sideboardSheet = useSheetPresence(sideboardOpen || undefined)
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
@@ -459,7 +461,7 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {matchPrompt?.match && !sideboardOpen ? (
+      {matchPrompt?.match && !sideboardSheet.shown ? (
         <DialogCard
           visible
           onClose={() => setMatchPrompt(undefined)}
@@ -546,8 +548,10 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {sideboardOpen && sideboardFirst ? (
+      {sideboardSheet.shown && sideboardFirst ? (
         <SideboardSwapSheet
+          visible={sideboardSheet.visible}
+          onDismissed={sideboardSheet.onDismissed}
           pool={sideboardFirst.pool}
           swaps={sideboardFirst.swaps}
           onApply={(swaps) => {

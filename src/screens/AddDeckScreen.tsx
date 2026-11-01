@@ -27,6 +27,7 @@ import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
@@ -381,6 +382,8 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
   const [preconOutline, setPreconOutline] = useState<PreconstructedDeckOutline>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [focusedPreviewCard, setFocusedPreviewCard] = useState<FocusedPreviewCard>()
+  const previewSheet = useSheetPresence(focusedPreviewCard)
+  const shownPreviewCard = previewSheet.shown
   const {
     detailsByKey: previewDetailsByKey,
     detailsError: previewDetailsError,
@@ -1057,18 +1060,20 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
             )
           }}
         >
-          {focusedPreviewCard ? (
+          {shownPreviewCard ? (
             <CardFocusDialog
+              visible={previewSheet.visible}
+              onDismissed={previewSheet.onDismissed}
               card={{
-                game: focusedPreviewCard.game ?? "mtg",
-                cardId: focusedPreviewCard.scryfallId ?? focusedPreviewCard.catalogCardId,
-                name: focusedPreviewCard.name,
-                imageUrl: focusedPreviewCard.imageUrl,
-                smallImageUrl: focusedPreviewCard.smallImageUrl,
-                quantity: focusedImportCard?.quantity ?? focusedPreviewCard.quantity,
-                boardLabel: focusedPreviewCard.boardLabel,
+                game: shownPreviewCard.game ?? "mtg",
+                cardId: shownPreviewCard.scryfallId ?? shownPreviewCard.catalogCardId,
+                name: shownPreviewCard.name,
+                imageUrl: shownPreviewCard.imageUrl,
+                smallImageUrl: shownPreviewCard.smallImageUrl,
+                quantity: focusedImportCard?.quantity ?? shownPreviewCard.quantity,
+                boardLabel: shownPreviewCard.boardLabel,
               }}
-              details={previewDetailsByKey[focusedPreviewCard.detailKey]}
+              details={previewDetailsByKey[shownPreviewCard.detailKey]}
               detailsError={previewDetailsError}
               detailsRetryAfterMs={previewDetailsRetryAfterMs}
               onRetryDetails={retryPreviewDetails}

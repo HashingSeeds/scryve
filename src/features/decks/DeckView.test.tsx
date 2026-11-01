@@ -251,11 +251,13 @@ describe("sideboard", () => {
 })
 
 describe("analysis sheet", () => {
-  const { clearSheetDismissals, finishSheetDismissals } = jest.requireMock<{
-    clearSheetDismissals: () => void
+  const { holdSheetDismissals, finishSheetDismissals, releaseSheetDismissals } = jest.requireMock<{
+    holdSheetDismissals: () => void
     finishSheetDismissals: () => void
+    releaseSheetDismissals: () => void
   }>("@expo/ui/swift-ui")
-  beforeEach(clearSheetDismissals)
+  beforeEach(holdSheetDismissals)
+  afterEach(releaseSheetDismissals)
 
   it("opens from the curve strip, closes from its header, and its commander nudge opens the chooser", () => {
     const view = renderDeckView({ canChooseCommander: true })
