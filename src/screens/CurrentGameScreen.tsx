@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { TouchableOpacity, View } from "react-native"
+import { Platform, TouchableOpacity, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -11,6 +11,7 @@ import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
@@ -104,6 +105,15 @@ export function CurrentGameScreen({
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
   const [sideboardOpen, setSideboardOpen] = useState(false)
+  // why: iOS can't present the sideboard sheet until the match prompt's Modal has faded out.
+  const [promptGone, setPromptGone] = useState(false)
+  const sideboardSheet = useSheetPresence(
+    sideboardOpen && (promptGone || Platform.OS !== "ios") ? true : undefined,
+  )
+  const closeSideboard = () => {
+    setSideboardOpen(false)
+    setPromptGone(false)
+  }
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
@@ -459,9 +469,10 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {matchPrompt?.match && !sideboardOpen ? (
+      {matchPrompt?.match && !sideboardSheet.shown ? (
         <DialogCard
-          visible
+          visible={!sideboardOpen}
+          onDismissed={sideboardOpen ? () => setPromptGone(true) : undefined}
           onClose={() => setMatchPrompt(undefined)}
           closeDisabled={!canContinueMatch(matchPrompt)}
           backdropTestID="match-prompt-backdrop"
@@ -546,15 +557,17 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {sideboardOpen && sideboardFirst ? (
+      {sideboardSheet.shown && sideboardFirst ? (
         <SideboardSwapSheet
+          visible={sideboardSheet.visible}
+          onDismissed={sideboardSheet.onDismissed}
           pool={sideboardFirst.pool}
           swaps={sideboardFirst.swaps}
           onApply={(swaps) => {
             sideboardFirst.apply(swaps)
-            setSideboardOpen(false)
+            closeSideboard()
           }}
-          onClose={() => setSideboardOpen(false)}
+          onClose={closeSideboard}
         />
       ) : null}
 

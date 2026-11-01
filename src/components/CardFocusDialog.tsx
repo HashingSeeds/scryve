@@ -7,11 +7,11 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { CardSymbolText, spokenCardText } from "@/components/CardSymbolText"
-import { DialogCard } from "@/components/DialogCard"
 import { PressableIcon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
+import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
 import { readCardFaces } from "@/features/decks/cardFaces"
 import { isBackground } from "@/features/decks/commanderSelection"
@@ -60,7 +60,9 @@ export interface CardFocusDialogProps {
   onIncrement?: () => void
   onDecrement?: () => void
   onSetCommander?: (color?: CommanderColor) => void
+  visible: boolean
   onClose: () => void
+  onDismissed: () => void
 }
 
 const CARD_ASPECT_RATIO = 488 / 680
@@ -120,7 +122,9 @@ export function CardFocusDialog({
   onIncrement,
   onDecrement,
   onSetCommander,
+  visible,
   onClose,
+  onDismissed,
 }: CardFocusDialogProps) {
   const { themed } = useAppTheme()
   const [commanderColor, setCommanderColor] = useState(card.commanderColor)
@@ -158,16 +162,12 @@ export function CardFocusDialog({
   const closeLabel = translate("decks:cardFocus.close")
 
   return (
-    <DialogCard
-      visible
-      wide
-      placement="bottom"
-      style={$sheet}
+    <Sheet
+      visible={visible}
       onClose={onClose}
-      backdropTestID="card-focus-backdrop"
-      backdropAccessibilityLabel={closeLabel}
-      dialogTestID="card-focus-dialog"
-      accessibilityViewIsModal
+      onDismissed={onDismissed}
+      size="full"
+      testID="card-focus-dialog"
     >
       <View style={themed($header)}>
         <Text preset="subheading" style={themed($name)} text={visibleName} />
@@ -295,11 +295,10 @@ export function CardFocusDialog({
           ) : null}
         </View>
       ) : null}
-    </DialogCard>
+    </Sheet>
   )
 }
 
-const $sheet: ViewStyle = { height: "88%" }
 const $scrollBody: ViewStyle = { flex: 1 }
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

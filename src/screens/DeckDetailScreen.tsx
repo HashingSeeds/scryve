@@ -15,7 +15,10 @@ import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/compon
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
+import { Sheet } from "@/components/Sheet"
+import { $sheetScroll } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
@@ -93,6 +96,9 @@ type DeckDialog =
   | "moveDeck"
   | "syncConflict"
   | "sideboard"
+
+const SHEET_DIALOGS: ReadonlySet<DeckDialog> = new Set(["actions", "sideboard", "syncConflict"])
+const isSheetDialog = (dialog: DeckDialog) => SHEET_DIALOGS.has(dialog)
 
 const NEW_LIST_NOTICE_MS = 8_000
 
@@ -323,12 +329,14 @@ function DeckDetailContent({
   const [mode, setMode] = useState<DeckMode>(draft.editing ? "build" : "play")
   const building = mode === "build"
   const [dialog, setDialog] = useState<DeckDialog>("none")
+  const dialogs = useSheetPresence(dialog === "none" ? undefined : dialog, isSheetDialog)
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
   const [error, setError] = useState<string>()
   const [newListNotice, setNewListNotice] = useState(false)
   const [busy, setBusy] = useState(false)
   const [bringingPending, setBringingPending] = useState<Id<"deckVersions">>()
   const [focusedKey, setFocusedKey] = useState<string>()
+  const focus = useSheetPresence(focusedKey)
   const metadataSaveStarted = useRef(false)
   const settingsSaveStarted = useRef(false)
 
@@ -403,8 +411,12 @@ function DeckDetailContent({
     refreshVersionCache()
   }, [refreshVersionCache, writeMotion])
   const focusedCard = (building ? cards : view.displayCards).find(
-    (card) => printingKey(card) === focusedKey,
+    (card) => printingKey(card) === focus.shown,
   )
+  // why: a details sheet whose card vanished can't animate out, so its request goes with it.
+  useEffect(() => {
+    if (focus.shown && !focusedCard) setFocusedKey(undefined)
+  }, [focus.shown, focusedCard])
   const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
       ? {
@@ -1075,17 +1087,14 @@ function DeckDetailContent({
           ) : undefined
         }
       />
-      {dialog === "syncConflict" && failedCardEdit && !failedEdit ? (
-        <DialogCard
-          visible
-          placement="bottom"
-          wide
+      {dialogs.shown === "syncConflict" && failedCardEdit && !failedEdit ? (
+        <Sheet
+          visible={dialogs.visible}
           onClose={() => setDialog("none")}
-          dialogTestID="version-sync-conflict"
-          backdropAccessibilityLabel={translate("decks:conflict.later")}
-          accessibilityViewIsModal
+          onDismissed={dialogs.onDismissed}
+          testID="version-sync-conflict"
         >
-          <ScrollView contentContainerStyle={themed($syncFailure)}>
+          <ScrollView style={$sheetScroll} contentContainerStyle={themed($syncFailure)}>
             <Text
               preset="subheading"
               tx={
@@ -1166,19 +1175,16 @@ function DeckDetailContent({
             />
             <Button tx="decks:conflict.later" onPress={() => setDialog("none")} />
           </ScrollView>
-        </DialogCard>
+        </Sheet>
       ) : null}
-      {dialog === "syncConflict" && failedEdit ? (
-        <DialogCard
-          visible
-          placement="bottom"
-          wide
+      {dialogs.shown === "syncConflict" && failedEdit ? (
+        <Sheet
+          visible={dialogs.visible}
           onClose={() => setDialog("none")}
-          dialogTestID="deck-sync-conflict"
-          backdropAccessibilityLabel={translate("decks:conflict.later")}
-          accessibilityViewIsModal
+          onDismissed={dialogs.onDismissed}
+          testID="deck-sync-conflict"
         >
-          <ScrollView contentContainerStyle={themed($syncFailure)}>
+          <ScrollView style={$sheetScroll} contentContainerStyle={themed($syncFailure)}>
             <Text
               preset="subheading"
               tx={
@@ -1292,7 +1298,7 @@ function DeckDetailContent({
             />
             <Button tx="decks:conflict.later" onPress={() => setDialog("none")} />
           </ScrollView>
-        </DialogCard>
+        </Sheet>
       ) : null}
       {focusedCard ? (
         <CardFocusDialog
@@ -1332,16 +1338,25 @@ function DeckDetailContent({
                 onDecrement: () => decrementFocusedCard(focusedCard),
               }
             : {})}
+          visible={focus.visible}
           onClose={() => setFocusedKey(undefined)}
+          onDismissed={focus.onDismissed}
         />
       ) : null}
 
-      {dialog === "actions" ? (
-        <DeckActionsSheet actions={deckActions} onClose={() => setDialog("none")} />
+      {dialogs.shown === "actions" ? (
+        <DeckActionsSheet
+          visible={dialogs.visible}
+          actions={deckActions}
+          onClose={() => setDialog("none")}
+          onDismissed={dialogs.onDismissed}
+        />
       ) : null}
 
-      {dialog === "sideboard" && sideboard ? (
+      {dialogs.shown === "sideboard" && sideboard ? (
         <SideboardSwapSheet
+          visible={dialogs.visible}
+          onDismissed={dialogs.onDismissed}
           pool={sideboard.pool}
           swaps={sideboard.swaps}
           onApply={(swaps) => {
@@ -1352,7 +1367,7 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {dialog === "settings" ? (
+      {dialogs.shown === "settings" ? (
         <DeckSettingsDialog
           game={deck.game}
           initial={{
@@ -1367,7 +1382,7 @@ function DeckDetailContent({
       ) : null}
 
       <DeckVersionsDialogs
-        dialog={dialog}
+        dialog={dialogs.shown ?? "none"}
         rows={view.versionRows.map((row) => {
           // Live records only; cached rows must not present unknown stats as fresh.
           const counts = row.record ? allRecord(row.record) : undefined
@@ -1418,7 +1433,7 @@ function DeckDetailContent({
         onClose={() => setDialog("none")}
       />
 
-      {dialog === "moveDeck" ? (
+      {dialogs.shown === "moveDeck" ? (
         <DialogCard
           visible
           onClose={() => setDialog("none")}
@@ -1454,7 +1469,7 @@ function DeckDetailContent({
           </View>
         </DialogCard>
       ) : null}
-      {dialog === "deleteDeck" ? (
+      {dialogs.shown === "deleteDeck" ? (
         <DialogCard
           visible
           onClose={() => setDialog("none")}

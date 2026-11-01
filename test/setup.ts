@@ -62,10 +62,11 @@ jest.doMock("react-native", () => {
   )
 })
 
-// why: the native sheet has no Jest renderer, and tests must control when its exit animation ends.
+// why: the native sheet has no Jest renderer; holdSheetDismissals() lets a test end its exit animation itself.
 jest.mock("@expo/ui/swift-ui", () => {
   const { useEffect, useRef } = jest.requireActual<typeof import("react")>("react")
   const pending: (() => void)[] = []
+  let holding = false
   const passThrough = ({ children }: { children: ReactNode }) => children
   return {
     Host: passThrough,
@@ -82,17 +83,28 @@ jest.mock("@expo/ui/swift-ui", () => {
     }) {
       const wasPresented = useRef(isPresented)
       useEffect(() => {
-        if (wasPresented.current && !isPresented && onDismiss) pending.push(onDismiss)
+        if (wasPresented.current && !isPresented && onDismiss) {
+          if (holding) pending.push(onDismiss)
+          else onDismiss()
+        }
         wasPresented.current = isPresented
       }, [isPresented, onDismiss])
       return isPresented ? children : null
     },
+    holdSheetDismissals: () => {
+      holding = true
+      pending.splice(0)
+    },
     finishSheetDismissals: () => pending.splice(0).forEach((run) => run()),
-    clearSheetDismissals: () => pending.splice(0),
+    releaseSheetDismissals: () => {
+      holding = false
+      pending.splice(0)
+    },
   }
 })
 jest.mock("@expo/ui/swift-ui/modifiers", () => ({
   frame: () => ({}),
+  interactiveDismissDisabled: () => ({}),
   presentationBackground: () => ({}),
   presentationDetents: () => ({}),
   presentationDragIndicator: () => ({}),

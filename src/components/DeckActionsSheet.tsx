@@ -1,11 +1,11 @@
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity } from "react-native"
 
-import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { DialogCard } from "./DialogCard"
+import { Sheet } from "./Sheet"
+import { $sheetScroll } from "./sheetStyles"
 import { Text } from "./Text"
 
 export type DeckAction = {
@@ -19,25 +19,25 @@ export type DeckAction = {
 }
 
 export function DeckActionsSheet({
+  visible,
   actions,
   onClose,
+  onDismissed,
 }: {
+  visible: boolean
   actions: readonly DeckAction[]
   onClose: () => void
+  onDismissed: () => void
 }) {
   const { themed } = useAppTheme()
   return (
-    <DialogCard
-      visible
+    <Sheet
+      visible={visible}
       onClose={onClose}
-      backdropTestID="deck-actions-backdrop"
-      backdropAccessibilityLabel={translate("decks:actions.close")}
-      dialogTestID="deck-actions-sheet"
-      accessibilityViewIsModal
-      placement="bottom"
-      wide
+      onDismissed={onDismissed}
+      testID="deck-actions-sheet"
     >
-      <ScrollView>
+      <ScrollView style={$sheetScroll}>
         {actions.map(({ id, label, onPress, destructive, detail, blocked }) => {
           const note = blocked ?? detail
           return (
@@ -62,7 +62,7 @@ export function DeckActionsSheet({
           )
         })}
       </ScrollView>
-    </DialogCard>
+    </Sheet>
   )
 }
 

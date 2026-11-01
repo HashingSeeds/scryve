@@ -3,8 +3,10 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 
 import { Button } from "@/components/Button"
-import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
+import { $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { SectionHeader } from "@/components/NumberLane"
+import { Sheet } from "@/components/Sheet"
+import { $sheetScroll } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -21,15 +23,19 @@ import {
 } from "./matchSideboard"
 
 export function SideboardSwapSheet({
+  visible,
   pool,
   swaps,
   onApply,
   onClose,
+  onDismissed,
 }: {
+  visible: boolean
   pool: SwapPool
   swaps: MatchSwaps
   onApply: (swaps: MatchSwaps) => void
   onClose: () => void
+  onDismissed: () => void
 }) {
   const { themed } = useAppTheme()
   const [draft, setDraft] = useState(() => draftOf(swaps))
@@ -66,44 +72,36 @@ export function SideboardSwapSheet({
   const outRows = rowsFor("out", pool.main)
 
   return (
-    <DialogCard
-      visible
-      onClose={onClose}
-      backdropTestID="sideboard-backdrop"
-      backdropAccessibilityLabel={translate("decks:sideboard.close")}
-      dialogTestID="sideboard-sheet"
-      accessibilityViewIsModal
-      placement="bottom"
-      wide
-      style={themed($sheet)}
-    >
-      <Text preset="subheading" tx="decks:sideboard.title" />
-      <ScrollView style={$flexShrink}>
-        <Section tx="decks:sideboard.inFromSide" count={inCount} />
-        {inRows}
-        <Section tx="decks:sideboard.outOfMain" count={outCount} />
-        {outRows}
-      </ScrollView>
-      {short ? (
-        <Text
-          testID="sideboard-short"
-          size="xs"
-          style={themed($short)}
-          text={translate("decks:sideboard.short", { count: main })}
-        />
-      ) : null}
-      <View style={themed($dialogActions)}>
-        <Button tx="common:cancel" style={themed($dialogButton)} onPress={onClose} />
-        <Button
-          testID="sideboard-apply"
-          tx="decks:sideboard.apply"
-          preset="primary"
-          disabled={short}
-          style={themed($dialogButton)}
-          onPress={() => onApply(next)}
-        />
+    <Sheet visible={visible} onClose={onClose} onDismissed={onDismissed} testID="sideboard-sheet">
+      <View style={themed($body)}>
+        <Text preset="subheading" tx="decks:sideboard.title" />
+        <ScrollView style={$sheetScroll}>
+          <Section tx="decks:sideboard.inFromSide" count={inCount} />
+          {inRows}
+          <Section tx="decks:sideboard.outOfMain" count={outCount} />
+          {outRows}
+        </ScrollView>
+        {short ? (
+          <Text
+            testID="sideboard-short"
+            size="xs"
+            style={themed($short)}
+            text={translate("decks:sideboard.short", { count: main })}
+          />
+        ) : null}
+        <View style={themed($dialogActions)}>
+          <Button tx="common:cancel" style={themed($dialogButton)} onPress={onClose} />
+          <Button
+            testID="sideboard-apply"
+            tx="decks:sideboard.apply"
+            preset="primary"
+            disabled={short}
+            style={themed($dialogButton)}
+            onPress={() => onApply(next)}
+          />
+        </View>
       </View>
-    </DialogCard>
+    </Sheet>
   )
 }
 
@@ -167,10 +165,9 @@ function SwapRow({
 }
 
 const $flex: ViewStyle = { flex: 1, minWidth: 0 }
-const $flexShrink: ViewStyle = { flexShrink: 1 }
 const $disabled: ViewStyle = { opacity: 0.35 }
 const $quantity: TextStyle = { minWidth: 28, textAlign: "center", fontVariant: ["tabular-nums"] }
-const $sheet: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm, maxHeight: "90%" })
+const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm, flexShrink: 1 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.sm,
   paddingBottom: spacing.xxs,

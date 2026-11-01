@@ -13,6 +13,7 @@ import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
@@ -151,6 +152,7 @@ export function GuestDeckDetailScreen({
     | "renameVersion"
     | "deleteVersion"
   >()
+  const sheets = useSheetPresence(sheet, (open) => open === "actions" || open === "sideboard")
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingElsewhere = useLocalDeckSyncing(localId)
@@ -173,9 +175,14 @@ export function GuestDeckDetailScreen({
   )
   const [leaving, setLeaving] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
+  const focus = useSheetPresence(focusedKey)
   const focusedCard = (draft ?? stored?.deck)?.cards.find(
-    (card) => printingKey(card) === focusedKey,
+    (card) => printingKey(card) === focus.shown,
   )
+  // why: a details sheet whose card vanished can't animate out, so its request goes with it.
+  useEffect(() => {
+    if (focus.shown && !focusedCard) setFocusedKey(undefined)
+  }, [focus.shown, focusedCard])
   const focusedGame = (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME
   const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
@@ -559,11 +566,18 @@ export function GuestDeckDetailScreen({
           </>
         }
       />
-      {sheet === "actions" ? (
-        <DeckActionsSheet actions={deckActions} onClose={() => setSheet(undefined)} />
+      {sheets.shown === "actions" ? (
+        <DeckActionsSheet
+          visible={sheets.visible}
+          actions={deckActions}
+          onClose={() => setSheet(undefined)}
+          onDismissed={sheets.onDismissed}
+        />
       ) : null}
-      {sheet === "sideboard" && sideboard ? (
+      {sheets.shown === "sideboard" && sideboard ? (
         <SideboardSwapSheet
+          visible={sheets.visible}
+          onDismissed={sheets.onDismissed}
           pool={sideboard.pool}
           swaps={sideboard.swaps}
           onApply={(swaps) => {
@@ -574,7 +588,7 @@ export function GuestDeckDetailScreen({
         />
       ) : null}
       <DeckVersionsDialogs
-        dialog={sheet}
+        dialog={sheets.shown}
         rows={versions.map((version) => ({
           id: String(version.number),
           label: deckVersionLabel({ ...version, versionNumber: version.number }, latestNumber),
@@ -612,7 +626,7 @@ export function GuestDeckDetailScreen({
           setError(undefined)
         }}
       />
-      {sheet === "settings" ? (
+      {sheets.shown === "settings" ? (
         <DeckSettingsDialog
           game={game}
           initial={{ name: current.name, format: current.format }}
@@ -646,7 +660,9 @@ export function GuestDeckDetailScreen({
           detailsError={detailsError}
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
+          visible={focus.visible}
           onClose={() => setFocusedKey(undefined)}
+          onDismissed={focus.onDismissed}
           onSetCommander={building && singleCommander ? chooseCommander : undefined}
           {...(building
             ? {
@@ -662,7 +678,7 @@ export function GuestDeckDetailScreen({
         />
       ) : null}
       <ConfirmDialog
-        visible={deleting}
+        visible={deleting && !sheets.shown}
         title={translate("decks:guestDetail.deleteTitle")}
         backdropAccessibilityLabel={translate("decks:guestDetail.cancelDelete")}
         message={translate("decks:guestDetail.deleteBody")}

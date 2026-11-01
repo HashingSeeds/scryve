@@ -294,7 +294,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   await act(async () => {})
   expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
   expect(onAdd).not.toHaveBeenCalled()
-  fireEvent.press(view.getByTestId("card-focus-backdrop"))
+  fireEvent.press(view.getByTestId("card-focus-close"))
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
   expect(view.getByTestId("card-search-input").props.value).toBe("ar")
   expect(view.getByLabelText("Filters (1)")).toBeTruthy()

@@ -26,7 +26,14 @@ function renderDialog(props: Partial<Parameters<typeof CardFocusDialog>[0]> = {}
   const handlers = { onIncrement: jest.fn(), onDecrement: jest.fn(), onClose: jest.fn() }
   const view = render(
     <ThemeProvider initialContext="light">
-      <CardFocusDialog card={card} details={details} {...handlers} {...props} />
+      <CardFocusDialog
+        visible
+        onDismissed={jest.fn()}
+        card={card}
+        details={details}
+        {...handlers}
+        {...props}
+      />
     </ThemeProvider>,
   )
   return { ...view, ...handlers }

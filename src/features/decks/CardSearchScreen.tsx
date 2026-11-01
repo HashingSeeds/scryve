@@ -33,6 +33,7 @@ import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
@@ -165,14 +166,17 @@ export function CardSearch({
     systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
+  const candidateSheet = useSheetPresence(candidate)
+  const shownCandidate = candidateSheet.shown
   const [candidateError, setCandidateError] = useState<string>()
   const candidateDetails = useCardDetails(
-    candidate
+    shownCandidate
       ? {
-          ...candidate,
-          detailKey: cardDetailsKey(candidate, game),
+          ...shownCandidate,
+          detailKey: cardDetailsKey(shownCandidate, game),
           game,
-          catalogCardId: candidate.cardId ?? candidate.printingId ?? candidate.providerCardId,
+          catalogCardId:
+            shownCandidate.cardId ?? shownCandidate.printingId ?? shownCandidate.providerCardId,
         }
       : undefined,
     choosingCommander,
@@ -1017,28 +1021,30 @@ export function CardSearch({
           onClose={() => setScanning(false)}
         />
       ) : null}
-      {candidate ? (
+      {shownCandidate ? (
         <CardFocusDialog
-          key={printingKey(candidate)}
+          key={printingKey(shownCandidate)}
           card={{
             game,
             cardId:
-              candidate.scryfallId ??
-              candidate.cardId ??
-              candidate.printingId ??
-              candidate.providerCardId,
-            name: candidate.name,
-            imageUrl: candidate.imageUrl,
-            smallImageUrl: candidate.smallImageUrl,
-            quantity: candidate.quantity,
-            boardLabel: inDeck(candidate) ? translate("decks:cardSearch.inDeck") : SCRYFALL,
-            commanderColor: candidate.commanderColor,
+              shownCandidate.scryfallId ??
+              shownCandidate.cardId ??
+              shownCandidate.printingId ??
+              shownCandidate.providerCardId,
+            name: shownCandidate.name,
+            imageUrl: shownCandidate.imageUrl,
+            smallImageUrl: shownCandidate.smallImageUrl,
+            quantity: shownCandidate.quantity,
+            boardLabel: inDeck(shownCandidate) ? translate("decks:cardSearch.inDeck") : SCRYFALL,
+            commanderColor: shownCandidate.commanderColor,
           }}
           details={candidateDetails.details}
           detailsError={candidateError ?? candidateDetails.detailsError}
           detailsRetryAfterMs={candidateDetails.detailsRetryAfterMs}
           onRetryDetails={candidateDetails.retryDetails}
+          visible={candidateSheet.visible}
           onClose={() => setCandidate(undefined)}
+          onDismissed={candidateSheet.onDismissed}
           showQuantity={false}
           onSetCommander={choosingCommander ? setCommander : undefined}
         />
