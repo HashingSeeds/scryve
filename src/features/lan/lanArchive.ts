@@ -1,6 +1,7 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto"
 
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
+import { isSharedDeckKey } from "@/features/decks/sharedDecks"
 import {
   asActorId,
   asDeviceId,
@@ -106,7 +107,15 @@ export function lanLocalGame(
           account: {
             ownerId,
             mePlayerId: asPlayerId(game.hostKey),
-            ...(hostDeck ? { deckVersionId: hostDeck.versionId, deckName: hostDeck.name } : {}),
+            ...(hostDeck && isSharedDeckKey(hostDeck.versionId)
+              ? {
+                  deckKey: hostDeck.versionId,
+                  deckName: hostDeck.name,
+                  ...(hostDeck.fingerprint ? { deckFingerprint: hostDeck.fingerprint } : {}),
+                }
+              : hostDeck
+                ? { deckVersionId: hostDeck.versionId, deckName: hostDeck.name }
+                : {}),
           },
         }
       : {}),

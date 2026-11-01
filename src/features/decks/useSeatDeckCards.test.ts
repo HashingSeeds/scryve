@@ -4,6 +4,7 @@ import { saveListSnapshot } from "@/features/stats/listSnapshots"
 import { storage } from "@/utils/storage"
 
 import { DeckVersionCacheRepository } from "./deckVersionsCache"
+import { keepSharedDeck } from "./sharedDecks"
 import { useSeatDeckCards, type SeatDeck } from "./useSeatDeckCards"
 
 const URL = "https://deployment.example"
@@ -60,5 +61,24 @@ it("reads a device deck from the list pinned when the game started", () => {
   )
 
   expect(result.current).toEqual([krenko, sol])
+  expect(mockQuery).not.toHaveBeenCalled()
+})
+
+it("reads a shared deck from the copy kept on this device, without asking the server", () => {
+  keepSharedDeck(
+    {
+      deckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      fingerprint: `v1:${"c".repeat(64)}`,
+      name: "Borrowed",
+      game: "mtg",
+      format: "commander",
+      cards: [sol],
+    },
+    "t".repeat(43),
+  )
+  const { result } = renderHook(() =>
+    useSeatDeckCards({ sharedDeckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+  )
+  expect(result.current).toEqual([sol])
   expect(mockQuery).not.toHaveBeenCalled()
 })

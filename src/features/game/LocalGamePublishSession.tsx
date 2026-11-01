@@ -12,6 +12,7 @@ import {
   useConnectedProfile,
 } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { isSharedDeckKey, loadSharedDeckByKey } from "@/features/decks/sharedDecks"
 import {
   onSeatClaim,
   pendingSeatClaims,
@@ -192,10 +193,21 @@ function ActivePublish({
       for (const claim of pendingSeatClaims(ownerId)) {
         if (cancelled) return
         try {
+          // why: a shared deck rides in the claim as its key; only here, sent to the server alone, does it become the link token.
+          const shared = isSharedDeckKey(claim.deckVersionId)
+            ? loadSharedDeckByKey(claim.deckVersionId)
+            : undefined
           const { status } = await claimSeat({
             publicId: claim.publicId,
             token: claim.token,
-            ...(claim.deckVersionId ? { deckVersionId: claim.deckVersionId } : {}),
+            ...(shared
+              ? {
+                  deckShareToken: shared.token,
+                  ...(claim.deckFingerprint ? { deckFingerprint: claim.deckFingerprint } : {}),
+                }
+              : claim.deckVersionId && !isSharedDeckKey(claim.deckVersionId)
+                ? { deckVersionId: claim.deckVersionId }
+                : {}),
           })
           if (status === "claimed") settleSeatClaim(claim.publicId)
           else waiting = true

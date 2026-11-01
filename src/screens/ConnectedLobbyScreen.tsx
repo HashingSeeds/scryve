@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Share } from "react-native"
-import { useMutation, useQuery } from "convex/react"
+import { useConvex, useMutation, useQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
@@ -15,6 +15,7 @@ import {
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { keepSharedDeck, loadSharedDecks, lobbySharedDeck } from "@/features/decks/sharedDecks"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { LobbyDeviceDeckSource } from "@/features/lobby/LobbyDeviceDeckSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
@@ -109,7 +110,9 @@ function ConnectedLobbyContent({
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
+  const convex = useConvex()
   const selectDeck = useMutation(api.decks.selectForSeat)
+  const [sharedDecks, setSharedDecks] = useState(loadSharedDecks)
   const setAppearance = useMutation(api.games.setMyAppearance)
   const billing = useRevenueCat()
   const [actionError, setActionError] = useState<string>()
@@ -156,7 +159,29 @@ function ConnectedLobbyContent({
     : null
   const manualCode = lobby?.invitation?.manualCode
 
-  async function chooseVersion(seat: number, deckVersionId?: string) {
+  const chooseVersion = (seat: number, deckVersionId?: string) =>
+    selectSeatDeck(
+      seat,
+      deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {},
+    )
+
+  async function seatSharedDeck(seat: number, deckKey: string) {
+    const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
+    if (!kept || selectingDeckSeatsInFlight.current.has(seat)) return
+    if (!isWebSocketConnected) return setActionError(onlineOnlyNotice("deck"))
+    // why: the seat takes the owner's current list, so the copy this board reads is refreshed to match it first.
+    const fresh = await convex.query(api.decks.shared, { token: kept.token }).catch(() => undefined)
+    if (fresh === undefined) return setActionError(translate("connected:lobby.errors.selectDeck"))
+    if (fresh === null) return setActionError(translate("decks:shared.unavailable"))
+    keepSharedDeck(fresh, kept.token)
+    setSharedDecks(loadSharedDecks())
+    await selectSeatDeck(seat, { shareToken: kept.token, deckFingerprint: fresh.fingerprint })
+  }
+
+  async function selectSeatDeck(
+    seat: number,
+    choice: { deckVersionId?: Id<"deckVersions">; shareToken?: string; deckFingerprint?: string },
+  ) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
       setActionError(onlineOnlyNotice("deck"))
@@ -166,12 +191,9 @@ function ConnectedLobbyContent({
     setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
     try {
       setActionError(undefined)
-      await selectDeck({
-        publicId,
-        seat,
-        ...(deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {}),
-      })
-      if (deckVersionId) captureAnalytics("deck_used", { feature: "assigned" })
+      await selectDeck({ publicId, seat, ...choice })
+      if (choice.deckVersionId || choice.shareToken)
+        captureAnalytics("deck_used", { feature: "assigned" })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.selectDeck")))
     } finally {
@@ -326,6 +348,10 @@ function ConnectedLobbyContent({
         ),
         selectingSeats: selectingDeckSeats,
         onSelect: (seat, deckVersionId) => void chooseVersion(seat, deckVersionId),
+        shared: {
+          decks: sharedDecks.map(lobbySharedDeck),
+          onUse: (seat, deckKey) => void seatSharedDeck(seat, deckKey),
+        },
         onManage: onManageDecks ? () => onManageDecks(lobby.system) : undefined,
         onAddDeck,
       }}

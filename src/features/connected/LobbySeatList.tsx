@@ -63,6 +63,19 @@ export type LobbyDeviceDecks = {
   onSyncAndUse: (seat: number, localId: string) => void
 }
 
+export type LobbySharedDeck = {
+  deckKey: string
+  game?: string
+  format?: string
+  name: string
+  cardQuantity: number
+}
+
+export type LobbySharedDecks = {
+  decks: readonly LobbySharedDeck[]
+  onUse: (seat: number, deckKey: string) => void
+}
+
 const NO_DECK_ID = "no-deck"
 
 const cardsLabel = (quantity?: number) =>
@@ -147,6 +160,7 @@ export function LobbySeatList({
   totalSeats,
   deckState,
   deviceDecks,
+  sharedDecks,
   versionLabel,
   selectingDeckSeats,
   deckRequired,
@@ -163,6 +177,7 @@ export function LobbySeatList({
   totalSeats?: number
   deckState?: LobbyDeckState
   deviceDecks?: LobbyDeviceDecks
+  sharedDecks?: LobbySharedDecks
   versionLabel: (
     version: { versionNumber: number; name?: string },
     latestVersionNumber: number,
@@ -225,11 +240,17 @@ export function LobbySeatList({
               (deck) => fitsLobby(deck) && !syncedKeys.has(deck.deckKey),
             ) ?? [])
           : []
-        const noDecks = usableDecks.length === 0 && usableDeviceDecks.length === 0
+        const usableSharedDecks = sharedDecks?.decks.filter(fitsLobby) ?? []
+        const noDecks =
+          usableDecks.length === 0 &&
+          usableDeviceDecks.length === 0 &&
+          usableSharedDecks.length === 0
         const hasCards = (deck: { cardQuantity?: number }) => deck.cardQuantity !== 0
         const choosable =
           usableDecks.some(hasCards) ||
-          usableDeviceDecks.some((deck) => hasCards(deck) && !deck.syncBlocked)
+          usableDeviceDecks.some((deck) => hasCards(deck) && !deck.syncBlocked) ||
+          usableSharedDecks.some(hasCards)
+        const chosenShared = usableSharedDecks.find((deck) => deck.deckKey === seat.deckVersionId)
         const chosenDeck = usableDecks.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
@@ -302,7 +323,7 @@ export function LobbySeatList({
                     text={
                       [
                         seat.controlledByMe ? translate("connected:seats.you") : undefined,
-                        chosenDeck?.name,
+                        chosenDeck?.name ?? chosenShared?.name,
                         chosenVersion
                           ? versionLabel(chosenVersion, latestVersionNumber)
                           : undefined,
@@ -417,7 +438,7 @@ export function LobbySeatList({
                       <DeckOption
                         testID={`seat-${seat.seat}-deck-${NO_DECK_ID}`}
                         name={translate("connected:seats.noDeck")}
-                        selected={!chosenDeck}
+                        selected={!chosenDeck && !chosenShared}
                         disabled={choicesLocked}
                         onPress={() => onSelectVersion(seat.seat)}
                       />
@@ -522,6 +543,34 @@ export function LobbySeatList({
                         />
                       )
                     })}
+                    {usableSharedDecks.length > 0 ? (
+                      <Text
+                        size="xxs"
+                        weight="medium"
+                        tone="dim"
+                        style={themed($section)}
+                        tx="connected:seats.sharedWithYou"
+                      />
+                    ) : null}
+                    {usableSharedDecks.map((deck) => (
+                      <DeckOption
+                        key={deck.deckKey}
+                        testID={`seat-${seat.seat}-shared-deck-${deck.deckKey}`}
+                        name={deck.name}
+                        detail={cardsLabel(deck.cardQuantity)}
+                        accessibilityLabel={translate("connected:seats.sharedDeckLabel", {
+                          name: deck.name,
+                        })}
+                        selected={chosenShared?.deckKey === deck.deckKey}
+                        disabled={choicesLocked}
+                        dimmed={!hasCards(deck)}
+                        onPress={
+                          hasCards(deck)
+                            ? () => sharedDecks?.onUse(seat.seat, deck.deckKey)
+                            : undefined
+                        }
+                      />
+                    ))}
                     {newDeckAction}
                   </View>
                 )}

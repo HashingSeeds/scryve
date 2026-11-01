@@ -229,6 +229,8 @@ export default {
     account: "계정",
     accountDeckLabel: "{{name}}, 동기화됨",
     onDevice: "이 기기",
+    sharedWithYou: "공유받은 덱",
+    sharedDeckLabel: "{{name}}, 공유받은 덱",
     syncAndUse: "동기화 후 사용",
     syncAndUseLabel: "{{name}} 동기화 후 사용",
     syncing: "동기화 중…",

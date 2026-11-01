@@ -17,6 +17,10 @@ export type SharedDeck = {
 }
 
 const SHARED_DECKS_KEY = "decks.shared.v1"
+
+/** why: a lobby seat playing a shared deck carries this key where a synced deck carries its version id. */
+export const isSharedDeckKey = (key: string | undefined): key is string =>
+  key !== undefined && /^shared-[0-9a-f]{32}$/.test(key)
 const SHARED_DECK_LIMIT = 20
 
 export function sharedDeckPayload({ name, game, format, cards }: SharedDeckView): GuestDeckPayload {
@@ -30,7 +34,7 @@ function isSharedDeck(value: unknown): value is SharedDeck {
     typeof token === "string" &&
     isShareToken(token) &&
     typeof deckKey === "string" &&
-    /^shared-[0-9a-f]{32}$/.test(deckKey) &&
+    isSharedDeckKey(deckKey) &&
     isGuestDeckPayload(deck) &&
     (startingValue === undefined || typeof startingValue === "number")
   )
@@ -60,4 +64,18 @@ export function keepSharedDeck(view: SharedDeckView, token: string) {
       SHARED_DECK_LIMIT,
     ),
   )
+}
+
+export function lobbySharedDeck({ deckKey, deck }: SharedDeck) {
+  return {
+    deckKey,
+    name: deck.name,
+    game: deck.game,
+    format: deck.format,
+    cardQuantity: deck.cards.reduce((total, card) => total + card.quantity, 0),
+  }
+}
+
+export function loadSharedDeckByKey(deckKey: string) {
+  return loadSharedDecks().find((shared) => shared.deckKey === deckKey)
 }

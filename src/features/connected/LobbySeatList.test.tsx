@@ -283,6 +283,52 @@ it("lists matching device decks with Sync and use, below the account decks", () 
   expect(onSyncAndUse).toHaveBeenCalledWith(2, "local-angels")
 })
 
+it("lists decks shared with the player, and marks the one their seat plays", () => {
+  const onUse = jest.fn()
+  const shared = {
+    deckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    name: "Borrowed",
+    game: "mtg",
+    format: "commander",
+    cardQuantity: 100,
+  }
+  const seat = (deckVersionId?: string) =>
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[
+            { seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true, deckVersionId },
+          ]}
+          openSeats={0}
+          system="mtg"
+          format="commander"
+          deckState={{ status: "ready", value: [] }}
+          sharedDecks={{
+            decks: [shared, { ...shared, deckKey: "shared-" + "c".repeat(32), format: "modern" }],
+            onUse,
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+  seat()
+  expect(screen.getByText("Shared with you")).toBeTruthy()
+  expect(screen.queryByTestId("seat-1-shared-deck-shared-" + "c".repeat(32))).toBeNull()
+  fireEvent.press(screen.getByTestId("seat-1-shared-deck-shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+  expect(onUse).toHaveBeenCalledWith(1, "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+  screen.unmount()
+
+  seat("shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+  expect(
+    screen.getByTestId("seat-1-shared-deck-shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").props
+      .accessibilityState,
+  ).toMatchObject({
+    selected: true,
+  })
+  expect(screen.getByText("You · Borrowed")).toBeTruthy()
+})
+
 it("shows device decks when the account has none, instead of a dead end", () => {
   render(
     <ThemeProvider initialContext="dark">

@@ -21,7 +21,9 @@ import {
   deckForKey,
   findDeckByKey,
   pinnedDeck,
+  versionFingerprint,
 } from "./lib/deckKeys"
+import { sharedDeckKey, sharedDeckVersion, sharedSeatDeck } from "./lib/deckShares"
 import { deckStartingValue } from "./lib/deckStartingValue"
 import {
   syncedDeck,
@@ -1677,11 +1679,22 @@ export const versionCards = query({
   },
 })
 
+const NO_SEAT_DECK = {
+  deckVersionId: undefined,
+  deckKey: undefined,
+  deckFingerprint: undefined,
+  deckLabel: undefined,
+  startingLife: undefined,
+}
+
 export const selectForSeat = mutation({
   args: {
     publicId: v.string(),
     seat: v.number(),
     deckVersionId: v.optional(v.id("deckVersions")),
+    shareToken: v.optional(v.string()),
+    // why: the player saw the list with this fingerprint, and the owner may have changed it since.
+    deckFingerprint: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const game = await ctx.db
@@ -1695,35 +1708,57 @@ export const selectForSeat = mutation({
       })
     const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
     await limitGameRate(ctx, "gameWrite", user._id)
-    if (args.deckVersionId === undefined) {
+    if (args.deckVersionId !== undefined && args.shareToken !== undefined)
+      throw new ConvexError({
+        code: "invalid_deck_selection",
+        message: "Choose one deck",
+      })
+    if (args.deckVersionId === undefined && args.shareToken === undefined) {
       if (game.deckRequired === true)
         throw new ConvexError({
           code: "deck_required",
           message: "This lobby requires every player to choose a deck",
         })
-      await ctx.db.patch(player._id, {
-        deckVersionId: undefined,
-        deckKey: undefined,
-        deckFingerprint: undefined,
-      })
+      await ctx.db.patch(player._id, NO_SEAT_DECK)
       await ctx.db.patch(game._id, { updatedAt: Date.now() })
       return { deckId: null, deckVersionId: null }
     }
-    const { deck, version } = await ownedVersion(ctx, args.deckVersionId)
-    assertNotArchived(deck)
-    const deckGame = deck.game ?? DEFAULT_DECK_GAME
     const lobbyGame = game.system ?? game.game ?? DEFAULT_DECK_GAME
-    if (deckGame !== lobbyGame)
+    const lobbyFormat = game.format ?? game.ruleset
+    const shared =
+      args.shareToken === undefined
+        ? undefined
+        : await sharedSeatDeck(ctx, args.shareToken, user._id, [lobbyGame, lobbyFormat])
+    if (shared?.kind === "shared") {
+      if (shared.deckFingerprint !== args.deckFingerprint)
+        throw new ConvexError({
+          code: "shared_deck_changed",
+          message: "This deck just changed. Choose it again.",
+        })
+      await ctx.db.patch(player._id, {
+        ...NO_SEAT_DECK,
+        deckKey: shared.deckKey,
+        deckFingerprint: shared.deckFingerprint,
+        deckLabel: shared.deckLabel,
+        startingLife: shared.startingValue,
+      })
+      await ctx.db.patch(game._id, { updatedAt: Date.now() })
+      return { deckId: null, deckVersionId: null, deckKey: shared.deckKey }
+    }
+    const { deck, version } = await ownedVersion(ctx, shared?.version._id ?? args.deckVersionId!)
+    assertNotArchived(deck)
+    if ((deck.game ?? DEFAULT_DECK_GAME) !== lobbyGame)
       throw new ConvexError({
         code: "deck_system_mismatch",
         message: "This deck belongs to another game system",
       })
-    if (deck.format !== (game.format ?? game.ruleset))
+    if (deck.format !== lobbyFormat)
       throw new ConvexError({
         code: "deck_format_mismatch",
         message: "Choose a deck matching the lobby format",
       })
     await ctx.db.patch(player._id, {
+      ...NO_SEAT_DECK,
       deckVersionId: version._id,
       ...(await pinnedDeck(ctx, version._id)),
     })
@@ -1825,8 +1860,6 @@ export const statsForKey = query({
   },
 })
 
-const SHARE_TOKEN = /^[A-Za-z0-9_-]{43}$/
-
 function shareToken() {
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
@@ -1842,13 +1875,6 @@ async function endShares(ctx: MutationCtx, deckId: Id<"decks">) {
     .withIndex("by_deck", (q) => q.eq("deckId", deckId))
     .take(10))
     await ctx.db.delete(link._id)
-}
-
-/** why: results travel to opponents with the deck key, so the key is a hash that cannot open the link. */
-async function sharedDeckKey(token: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
-  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0"))
-  return `shared-${hex.join("").slice(0, 32)}`
 }
 
 /** why: one link per deck, so sharing again hands back the link already sent. */
@@ -1882,17 +1908,9 @@ export const unshare = mutation({
 export const shared = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
-    if (!SHARE_TOKEN.test(args.token)) return null
-    const link = await ctx.db
-      .query("deckShares")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
-      .unique()
-    const deck = link ? await ctx.db.get(link.deckId) : null
-    if (!deck || deck.archivedAt !== undefined) return null
-    const versions = await activeVersions(ctx, deck._id)
-    const version =
-      versions.find((candidate) => candidate._id === deck.bringingVersionId) ?? versions.at(-1)
-    if (!version) return null
+    const found = await sharedDeckVersion(ctx, args.token)
+    if (!found) return null
+    const { deck, version } = found
     const game = deck.game ?? DEFAULT_DECK_GAME
     const cards = await ctx.db
       .query("deckCards")
@@ -1902,6 +1920,7 @@ export const shared = query({
     const startingValue = await deckStartingValue(ctx, version._id, game, deck.format)
     return {
       deckKey: await sharedDeckKey(args.token),
+      fingerprint: await versionFingerprint(ctx, version._id, game),
       name: deck.name,
       game,
       format: deck.format,

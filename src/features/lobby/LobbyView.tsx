@@ -32,6 +32,7 @@ import {
   LobbySeatList,
   type LobbyDeckState,
   type LobbyDeviceDecks,
+  type LobbySharedDecks,
   type LobbySeat,
 } from "@/features/connected/LobbySeatList"
 import { deckVersionLabel } from "@/features/decks/deckCopy"
@@ -84,6 +85,7 @@ export interface LobbyViewProps {
     source: (render: (state: LobbyDeckState, device?: LobbyDeviceDecks) => ReactNode) => ReactNode
     selectingSeats: ReadonlySet<number>
     onSelect: (seat: number, deckVersionId?: string) => void
+    shared?: LobbySharedDecks
     onManage?: () => void
     onAddDeck?: () => void
   }
@@ -198,6 +200,7 @@ export function LobbyView({
         totalSeats={lobby.playerCount}
         deckState={deckState}
         deviceDecks={deviceDecks}
+        sharedDecks={decks?.shared}
         system={lobby.system}
         format={lobby.format}
         onManageDecks={decks?.onManage}

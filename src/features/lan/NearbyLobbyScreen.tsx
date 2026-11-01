@@ -1,14 +1,15 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { buildInviteQrPayload } from "@/features/connected/inviteLinks"
 import type { MyDecks } from "@/features/decks/LocalDeckChoicesSource"
+import { loadSharedDecks, lobbySharedDeck } from "@/features/decks/sharedDecks"
 import { LobbyClosedScreen, LobbyView } from "@/features/lobby/LobbyView"
 import { translate } from "@/i18n/translate"
 
 import type { LanSeatDeck } from "./lanGame"
 import { lanSession, useLanSessionSlice, type LanSessionState } from "./lanSession"
 import { nearbyGameCode, nearbyGameHost } from "./nearbyCode"
-import { nearbyDeckState, nearbySeatDeck } from "./nearbyDecks"
+import { nearbyDeckState, nearbySeatDeck, nearbySharedSeatDeck } from "./nearbyDecks"
 import { NearbyDeviceDeckSource } from "./NearbyDeviceDeckSource"
 import { NearbyStatusScreen, OpenSettingsButton } from "./NearbyStatusScreen"
 
@@ -56,6 +57,7 @@ export function NearbyLobbyScreen({
   onAddDeck?: () => void
 }) {
   const { lobby, players, role, status, error, serviceName } = useLanSessionSlice(selectLobbyScreen)
+  const [sharedDecks] = useState(loadSharedDecks)
 
   const startedRound = useRef(lobby?.status === "active" ? lobby.round : undefined)
   useEffect(() => {
@@ -168,7 +170,22 @@ export function NearbyLobbyScreen({
                 const deck = versionId ? nearbySeatDeck(myDecks, versionId, lobby.setup) : null
                 if (deck !== undefined) selectDeck(deck)
               },
-              ...(signedIn ? { onManage: onManageDecks, onAddDeck } : {}),
+              ...(signedIn
+                ? {
+                    onManage: onManageDecks,
+                    onAddDeck,
+                    shared: {
+                      decks: sharedDecks.map(lobbySharedDeck),
+                      onUse: (_seat, deckKey) => {
+                        const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
+                        if (kept)
+                          void nearbySharedSeatDeck(kept, lobby.setup).then(
+                            (deck) => deck && selectDeck(deck),
+                          )
+                      },
+                    },
+                  }
+                : {}),
             }
           : undefined
       }

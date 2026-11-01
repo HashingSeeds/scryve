@@ -240,6 +240,9 @@ const connected = {
     account: "Account",
     accountDeckLabel: "{{name}}, synced",
     onDevice: "On this device",
+    // Heading over decks other people shared by link, which this player opened and played.
+    sharedWithYou: "Shared with you",
+    sharedDeckLabel: "{{name}}, shared with you",
     syncAndUse: "Sync and use",
     syncAndUseLabel: "Sync and use {{name}}",
     syncing: "Syncing…",

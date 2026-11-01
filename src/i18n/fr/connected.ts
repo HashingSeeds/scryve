@@ -257,6 +257,8 @@ export default {
     account: "Compte",
     accountDeckLabel: "{{name}}, synchronisé",
     onDevice: "Sur cet appareil",
+    sharedWithYou: "Partagés avec vous",
+    sharedDeckLabel: "{{name}}, partagé avec vous",
     syncAndUse: "Synchroniser et utiliser",
     syncAndUseLabel: "Synchroniser et utiliser {{name}}",
     syncing: "Synchronisation…",

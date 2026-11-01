@@ -2,6 +2,7 @@ import { act, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
 import { resetConnectedProfileBootstrapForTests } from "@/features/connected/useConnectedProfile"
+import { keepSharedDeck } from "@/features/decks/sharedDecks"
 import { pendingSeatClaims, rememberSeatClaim, setNearbyOwner } from "@/features/lan/nearbyAccount"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { remove } from "@/utils/storage"
@@ -171,6 +172,47 @@ describe("LocalGamePublishSession", () => {
       expect(pendingSeatClaims("owner-a").map(({ publicId }) => publicId)).toEqual([
         "game-pending",
       ]),
+    )
+  })
+
+  it("claims a seat played with a shared deck by sending its link token, never the key", async () => {
+    remove("lan.seatClaims")
+    keepSharedDeck(
+      {
+        deckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        fingerprint: `v1:${"c".repeat(64)}`,
+        name: "Borrowed",
+        game: "mtg",
+        format: "commander",
+        cards: [],
+      },
+      "t".repeat(43),
+    )
+    setNearbyOwner("owner-a")
+    rememberSeatClaim({
+      publicId: "game-shared",
+      token: "token",
+      savedAt: Date.now(),
+      deckFingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      deckVersionId: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    })
+    setNearbyOwner(undefined)
+    mockClaimSeat.mockResolvedValue({ status: "claimed" })
+
+    render(
+      <LocalGamePublishSession
+        ownerId="owner-a"
+        repository={new LocalGameRepository(new MemoryStorage())}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(mockClaimSeat).toHaveBeenCalledWith({
+        publicId: "game-shared",
+        token: "token",
+        deckShareToken: "t".repeat(43),
+        deckFingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      }),
     )
   })
 
