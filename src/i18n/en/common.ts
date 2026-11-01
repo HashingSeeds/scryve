@@ -6,6 +6,7 @@ const common = {
   delete: "Delete",
   done: "Done",
   edit: "Edit",
+  optional: "optional",
   remove: "Remove",
   retry: "Retry",
   save: "Save",
@@ -55,6 +56,7 @@ const common = {
       thisIsMe: "Opens the this is me choices",
       yourDeck: "Opens the your deck choices",
       system: "Opens the system choices",
+      list: "Opens the list choices",
     },
     closeLabel: {
       format: "Close format choices",
@@ -64,6 +66,7 @@ const common = {
       thisIsMe: "Close this is me choices",
       yourDeck: "Close your deck choices",
       system: "Close system choices",
+      list: "Close list choices",
     },
   },
   valueField: {

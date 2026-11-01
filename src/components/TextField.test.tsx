@@ -19,6 +19,16 @@ function renderField(initial: string) {
 }
 
 describe("TextField", () => {
+  it("marks an optional field after its label", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <TextField label="Notes" optional value="" />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Notes optional")).toBeTruthy()
+  })
+
   it("clears its text from the x", () => {
     const view = renderField("bolt")
 

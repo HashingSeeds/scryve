@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { ScrollView, View } from "react-native"
 import { router, useFocusEffect } from "expo-router"
 import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
 
@@ -49,7 +49,7 @@ import {
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
-import { DECK_MODES, DeckView, type DeckMode } from "@/features/decks/DeckView"
+import { DeckHeaderIcon, DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import {
@@ -165,12 +165,11 @@ function DeckDetailPlaceholder({
       <Header
         title=""
         backgroundColor={theme.colors.surface}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        LeftActionComponent={
+          <DeckHeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+        }
         RightActionComponent={
-          <View style={themed($headerAction)}>
-            <Text size="lg" text="•••" />
-          </View>
+          <DeckHeaderIcon icon="more" label={translate("decks:deckView.details")} disabled />
         }
       />
       <ScrollView
@@ -192,20 +191,7 @@ function DeckDetailPlaceholder({
               accessibilityText={failure ? statusText : translate("decks:detail.loading")}
             />
           </View>
-          <View style={themed($tabs)} accessibilityRole="tablist">
-            {DECK_MODES.map(({ mode, tx }) => (
-              <TouchableOpacity
-                key={mode}
-                testID={`deck-mode-${mode}`}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: mode === "play", disabled: true }}
-                style={[themed($tab), mode === "play" && themed($selectedTab)]}
-                disabled
-              >
-                <Text size="sm" tx={tx} tone={mode === "play" ? undefined : "dim"} />
-              </TouchableOpacity>
-            ))}
-          </View>
+          <DeckModeTabs mode="play" disabled />
           {access?.message ? (
             <Button text={access.actionLabel ?? access.message} onPress={access.request} />
           ) : null}
@@ -1521,27 +1507,6 @@ const $queryFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $titleBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-
-const $tabs: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  flexDirection: "row",
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
-  alignItems: "center",
-  paddingVertical: spacing.xs,
-  borderBottomWidth: 2,
-  borderBottomColor: "transparent",
-})
-const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
-const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: 56,
-  minWidth: 56,
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
 
 const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 

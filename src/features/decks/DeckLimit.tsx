@@ -15,9 +15,11 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { cardCountLabel } from "./deckCopy"
 import { useDecksWithQueuedEdits, useLocalDeckSync } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+import { deckFormatLabel, DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../../convex/lib/policy"
 
 type DeckCapacity = FunctionReturnType<typeof api.decks.capacity>
@@ -275,7 +277,18 @@ function DeckChoices({
             style={themed($choice)}
             onPress={() => onChoose(deck._id, deck.name)}
           >
-            <Text numberOfLines={1} text={deck.name} />
+            <Text weight="medium" numberOfLines={1} text={deck.name} />
+            <Text
+              size="meta"
+              tone="dim"
+              numberOfLines={1}
+              text={[
+                deckFormatLabel(deck.game ?? DEFAULT_DECK_GAME, deck.format),
+                deck.cardQuantity
+                  ? cardCountLabel(deck.cardQuantity)
+                  : translate("decks:shelf.emptyList"),
+              ].join(" · ")}
+            />
           </TouchableOpacity>
         ))}
     </ScrollView>

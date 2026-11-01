@@ -8,7 +8,13 @@ import { DeckLimitDialog } from "./DeckLimit"
 
 const mockMove = jest.fn()
 let mockCapacity = { used: 2, limit: 2, premium: false, canCreate: false }
-const mockDeck = { _id: "deck-1", name: "Elves" }
+const mockDeck = {
+  _id: "deck-1",
+  name: "Elves",
+  game: "mtg",
+  format: "commander",
+  cardQuantity: 100,
+}
 jest.mock("../../../convex/_generated/api", () => ({
   api: { decks: { capacity: "capacity", listMine: "listMine" } },
 }))
@@ -56,6 +62,7 @@ test("continues only after this dialog successfully moves a deck", async () => {
   mockMove.mockResolvedValue("local-id")
   const view = render(dialog(onRoomMade))
   fireEvent.press(view.getByTestId("deck-limit-move"))
+  expect(view.getByText("Commander · 100 cards")).toBeTruthy()
   fireEvent.press(view.getByText("Elves"))
   expect(onRoomMade).not.toHaveBeenCalled()
   fireEvent.press(view.getByTestId("deck-limit-confirm-move"))

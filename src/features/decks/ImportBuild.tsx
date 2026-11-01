@@ -1,17 +1,19 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { SectionList, View } from "react-native"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
+import { PressableIcon } from "@/components/Icon"
+import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
-import type { TxKeyPath } from "@/i18n"
+import { isRTL, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,6 +35,21 @@ import { useCardNameIndex } from "./useCardNameIndex"
 import { deckFormatLabel } from "../../../convex/lib/deckGames"
 
 type Card = GuestDeckPayload["cards"][number]
+
+/** why: Header drops labels on its built-in icon actions, so screens pass this as LeftActionComponent to keep "Back" for screen readers. */
+export function HeaderBackIcon({ onPress }: { onPress: () => void }) {
+  const { themed } = useAppTheme()
+  return (
+    <PressableIcon
+      icon="back"
+      accessibilityRole="button"
+      accessibilityLabel={translate("common:back")}
+      onPress={onPress}
+      containerStyle={themed($backIcon)}
+      style={isRTL ? $flipped : undefined}
+    />
+  )
+}
 
 export function ImportBuild({
   name,
@@ -162,8 +179,7 @@ export function ImportBuild({
         <Header
           titleTx="decks:importBuild.title"
           backgroundColor={theme.colors.surface}
-          leftTx="common:back"
-          onLeftPress={onBack}
+          LeftActionComponent={<HeaderBackIcon onPress={onBack} />}
         />
         {listFinal ? null : progress}
       </View>
@@ -218,30 +234,31 @@ export function ImportBuild({
             {useError ? <AlertNote text={useError} /> : null}
             {!name.trim() ? <AlertNote text={translate("decks:addDeck.nameRequired")} /> : null}
             {problems.length > 1 ? (
-              <View style={themed($problemsHeader)}>
-                <Text
-                  size="sm"
-                  weight="semiBold"
-                  style={$flex}
-                  tx="decks:importBuild.linesToFix"
-                  txOptions={{ count: problems.length }}
-                />
-                <TextAction
-                  testID="import-remove-all-problems"
-                  tx="decks:importBuild.removeAll"
-                  style={$touch}
-                  onPress={onRemoveAllProblems}
-                />
-              </View>
+              <SectionHeader
+                testID="import-problems-header"
+                label={translate("decks:importBuild.linesToFix")}
+                style={themed($problemsHeader)}
+                action={
+                  <>
+                    <TextAction
+                      testID="import-remove-all-problems"
+                      tx="decks:importBuild.removeAll"
+                      size="xs"
+                      onPress={onRemoveAllProblems}
+                    />
+                    <TrailingNumber preset="sectionLabel" value={problems.length} />
+                  </>
+                }
+              />
             ) : null}
             {problems.map((problem, index) => {
               const guess = guesses.get(problem.line)
               return (
                 <View key={`${problem.kind}:${problem.line}`} style={themed($problem)}>
                   <View style={$flex} testID={`import-problem-${index}`}>
-                    <Text size="sm" tone="dim" text={`"${problem.line}"`} />
                     <Text
                       size="sm"
+                      weight="medium"
                       text={
                         guess
                           ? translate("decks:importBuild.didYouMean", { card: guess })
@@ -252,6 +269,7 @@ export function ImportBuild({
                             )
                       }
                     />
+                    <Text size="meta" tone="dim" text={`"${problem.line}"`} />
                   </View>
                   {guess ? (
                     <TextAction
@@ -412,11 +430,15 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingTop: spacing.sm,
 })
-const $problemsHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
+const $problemsHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.sm })
+const $backIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  height: "100%",
+  minWidth: 44,
   alignItems: "center",
-  paddingTop: spacing.sm,
+  justifyContent: "center",
+  paddingHorizontal: spacing.md,
 })
+const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
 const $problem: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

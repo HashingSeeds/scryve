@@ -1543,7 +1543,7 @@ describe("DeckDetailScreen", () => {
         ],
       }
       const view = renderDetail()
-      expect(view.getByText("Results · 4-4")).toBeTruthy()
+      expect(view.getByTestId("deck-play-record")).toHaveTextContent("4-4")
       expect(
         within(view.getByTestId("play-result-r1")).getByText("vs Atraxa, Praetors' Voice, Goblins"),
       ).toBeTruthy()
@@ -1699,7 +1699,7 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByTestId("deck-draft-bar")).toBeNull()
     expect(mockSaveVersion).not.toHaveBeenCalled()
     view.unmount()
-    expect(renderDetail().getByTestId("deck-mode-play").props.accessibilityState).toEqual({
+    expect(renderDetail().getByTestId("deck-mode-play").props.accessibilityState).toMatchObject({
       selected: true,
     })
   })
@@ -1711,7 +1711,7 @@ describe("DeckDetailScreen", () => {
     first.unmount()
 
     const reopened = renderDetail()
-    expect(reopened.getByTestId("deck-mode-build").props.accessibilityState).toEqual({
+    expect(reopened.getByTestId("deck-mode-build").props.accessibilityState).toMatchObject({
       selected: true,
     })
     expect(reopened.getByText("1 change")).toBeTruthy()

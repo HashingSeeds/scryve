@@ -1,16 +1,19 @@
 import { useState, type ReactNode } from "react"
-import { SectionList, TouchableOpacity, View } from "react-native"
-import type { TextStyle, ViewStyle } from "react-native"
+import { SectionList, View } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
-import { Button } from "@/components/Button"
+import { Button, type ButtonAccessoryProps } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Header } from "@/components/Header"
+import { Icon, PressableIcon } from "@/components/Icon"
+import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,6 +36,65 @@ export const DECK_MODES = [
   { mode: "play", tx: "decks:deckView.play" },
   { mode: "build", tx: "decks:deckView.build" },
 ] as const
+
+/** why: the loading screen draws this same bar; a second hand-built copy made the tabs jump when the deck arrived. */
+export function DeckModeTabs({
+  mode,
+  onModeChange,
+  disabled,
+}: {
+  mode: DeckMode
+  onModeChange?: (mode: DeckMode) => void
+  disabled?: boolean
+}) {
+  return (
+    <Tabs
+      testID="deck-mode"
+      tabs={DECK_MODES.map((option) => ({ id: option.mode, label: translate(option.tx) }))}
+      selectedId={mode}
+      disabled={disabled}
+      onSelect={(next) => onModeChange?.(next)}
+    />
+  )
+}
+
+/** why: Header's own icon slot can't carry an accessibility label, so deck headers hand it a whole labelled button. */
+export function DeckHeaderIcon({
+  icon,
+  label,
+  disabled,
+  testID,
+  onPress,
+}: {
+  icon: "back" | "more"
+  label: string
+  disabled?: boolean
+  testID?: string
+  onPress?: () => void
+}) {
+  const { themed, theme } = useAppTheme()
+  return (
+    <PressableIcon
+      icon={icon}
+      size={24}
+      color={theme.colors.text}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      containerStyle={[themed($headerIcon), disabled && $disabled]}
+      style={icon === "back" && isRTL ? $flipped : undefined}
+    />
+  )
+}
+
+/** why: actions that start something are outline buttons led by a plus. */
+export function PlusAccessory({ style }: ButtonAccessoryProps) {
+  const { theme } = useAppTheme()
+  return <Icon icon="plus" size={18} color={theme.colors.text} containerStyle={style} />
+}
 
 type CardSearch = Omit<DeckSearchHost, "game" | "format"> & { deckId: string }
 
@@ -162,22 +224,17 @@ export function DeckView({
       <Header
         titleTx={guest ? "decks:deckView.guestTitle" : "decks:deckView.title"}
         backgroundColor={theme.colors.surface}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        LeftActionComponent={
+          <DeckHeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+        }
         RightActionComponent={
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={translate("decks:deckView.details")}
+          <DeckHeaderIcon
+            icon="more"
+            label={translate("decks:deckView.details")}
             testID="deck-settings-button"
-            style={$touch}
             disabled={busy || detailsDisabled || editingDisabled}
             onPress={onDetails}
-          >
-            <Text
-              text="•••"
-              style={busy || detailsDisabled || editingDisabled ? $disabled : undefined}
-            />
-          </TouchableOpacity>
+          />
         }
       />
       <SectionList
@@ -230,20 +287,7 @@ export function DeckView({
                 </View>
               ) : null}
             </View>
-            <View style={themed($modes)} accessibilityRole="tablist">
-              {DECK_MODES.map((option) => (
-                <TouchableOpacity
-                  key={option.mode}
-                  accessibilityRole="tab"
-                  testID={`deck-mode-${option.mode}`}
-                  accessibilityState={{ selected: mode === option.mode }}
-                  style={[themed($mode), mode === option.mode && themed($selectedMode)]}
-                  onPress={() => onModeChange(option.mode)}
-                >
-                  <Text size="sm" tx={option.tx} tone={mode === option.mode ? undefined : "dim"} />
-                </TouchableOpacity>
-              ))}
-            </View>
+            <DeckModeTabs mode={mode} onModeChange={onModeChange} />
             {building ? (
               <DeckBuildTools
                 analysis={cardsUnavailable || cards.length === 0 ? undefined : analysis?.analysis}
@@ -297,9 +341,10 @@ export function DeckView({
         ListFooterComponent={
           building ? (
             <View style={themed($notes)}>
-              <Text size="sm" weight="semiBold" tx="decks:build.notes" />
               <TextField
                 testID="deck-note-input"
+                labelTx="decks:build.notes"
+                optional
                 accessibilityLabel={translate("decks:deckView.notesLabel")}
                 value={note}
                 onChangeText={onNoteChange}
@@ -360,6 +405,7 @@ export function DeckView({
               <Button
                 testID="add-match-result"
                 tx="decks:deckView.addMatch"
+                LeftAccessory={PlusAccessory}
                 disabled={busy || !onAddMatch}
                 style={[$flex, $barButton]}
                 onPress={onAddMatch}
@@ -442,7 +488,15 @@ const $touch: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
 }
-const $disabled: TextStyle = { opacity: 0.4 }
+const $disabled: ViewStyle = { opacity: 0.4 }
+const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
+const $headerIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  height: "100%",
+  minWidth: 44,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: spacing.md,
+})
 const $noteInput: TextStyle = { minHeight: 120, textAlignVertical: "top" }
 const $barButton: ViewStyle = { minHeight: 44 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -458,20 +512,6 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.md,
 })
 const $notLatest: ThemedStyle<TextStyle> = ({ spacing }) => ({ marginLeft: spacing.sm })
-const $modes: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.lg,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $mode: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  justifyContent: "center",
-  paddingHorizontal: spacing.xxs,
-  borderBottomWidth: 2,
-  borderBottomColor: "transparent",
-})
-const $selectedMode: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
 const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.lg,
   gap: spacing.sm,

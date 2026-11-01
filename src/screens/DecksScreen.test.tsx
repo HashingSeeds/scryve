@@ -147,6 +147,11 @@ function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
   return render(shelf(props))
 }
 
+function chooseOption(view: ReturnType<typeof render>, field: string, option: string) {
+  fireEvent.press(view.getByTestId(field))
+  fireEvent.press(view.getByTestId(`${field}-option-${option}`))
+}
+
 describe("DecksScreen", () => {
   afterEach(() => jest.restoreAllMocks())
 
@@ -478,8 +483,7 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     const view = renderShelf({ onSelect })
-    expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
-    expect(view.getByText("3 versions")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 100 cards · 3 versions")).toBeTruthy()
     expect(view.getByText("3-2")).toBeTruthy()
     expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
     expect(view.getAllByText("Recent")).toHaveLength(1)
@@ -571,20 +575,13 @@ describe("DecksScreen", () => {
     ["dark", darkColors],
   ] as const)("keeps selected shelf controls readable in %s mode", (theme, themeColors) => {
     const view = render(shelf({}, theme))
-    expect(StyleSheet.flatten(view.getByText("All").props.style).color).toBe(
-      accessibleForeground(themeColors.tint),
-    )
+    expect(view.getByTestId("collection-filter-all").props.accessibilityState.selected).toBe(true)
 
     fireEvent.press(view.getByTestId("deck-filters-button"))
-    fireEvent.press(view.getByTestId("system-filter-mtg"))
+    chooseOption(view, "system-filter", "mtg")
     const done = view.getByTestId("deck-filters-done")
     expect(StyleSheet.flatten(done.props.style).backgroundColor).toBe(themeColors.tint)
     expect(StyleSheet.flatten(within(done).getByText("Show decks").props.style).color).toBe(
-      accessibleForeground(themeColors.tint),
-    )
-    fireEvent.press(done)
-    const activeFilter = view.getByLabelText("Remove filter Magic")
-    expect(StyleSheet.flatten(within(activeFilter).getByText("Magic  ✕").props.style).color).toBe(
       accessibleForeground(themeColors.tint),
     )
   })
@@ -616,32 +613,27 @@ describe("DecksScreen", () => {
     expect(view.queryByTestId("format-filter")).toBeNull()
     expect(view.getByText("Choose a system to filter by format.")).toBeTruthy()
 
-    fireEvent.press(view.getByTestId("system-filter-mtg"))
+    chooseOption(view, "system-filter", "mtg")
     expect(view.queryByText("Choose a system to filter by format.")).toBeNull()
-    expect(view.getByTestId("format-filter")).toBeTruthy()
-    expect(view.getByTestId("format-filter-all").props.accessibilityState.selected).toBe(true)
+    expect(view.getByLabelText("Format, All formats")).toBeTruthy()
 
     expect(view.getByText("Mono Red")).toBeTruthy()
-    fireEvent.press(view.getByTestId("format-filter-standard"))
+    chooseOption(view, "format-filter", "standard")
     expect(view.getByText("Mono Red")).toBeTruthy()
     expect(view.queryByText("Existing Deck")).toBeNull()
 
     fireEvent.press(view.getByTestId("deck-filters-done"))
     expect(view.queryByTestId("deck-filters-dialog")).toBeNull()
-    expect(view.getByLabelText("Remove filter Magic")).toBeTruthy()
-    expect(view.getByLabelText("Remove filter Standard")).toBeTruthy()
+    expect(view.queryByLabelText("Remove filter Magic")).toBeNull()
 
     fireEvent.press(view.getByTestId("collection-filter-favorites"))
-    expect(view.getByLabelText("Remove filter Magic")).toBeTruthy()
-    expect(view.getByLabelText("Remove filter Standard")).toBeTruthy()
-
     expect(view.getByLabelText("Filters (2)")).toBeTruthy()
-    fireEvent.press(view.getByLabelText("Remove filter Standard"))
+
+    fireEvent.press(view.getByTestId("deck-filters-button"))
+    chooseOption(view, "format-filter", "all")
     expect(view.getByLabelText("Filters (1)")).toBeTruthy()
-    expect(view.queryByLabelText("Remove filter Standard")).toBeNull()
-    fireEvent.press(view.getByLabelText("Remove filter Magic"))
+    fireEvent.press(view.getByText("Clear filters"))
     expect(view.getByLabelText("Filters")).toBeTruthy()
-    expect(view.queryByLabelText("Remove filter Magic")).toBeNull()
   })
 
   it("reserves the same dialog height when systems reveal different formats", () => {
@@ -649,7 +641,7 @@ describe("DecksScreen", () => {
     fireEvent.press(view.getByTestId("deck-filters-button"))
 
     for (const system of ["all", "mtg", "ygo", "pokemon", "all"]) {
-      fireEvent.press(view.getByTestId(`system-filter-${system}`))
+      chooseOption(view, "system-filter", system)
       expect(StyleSheet.flatten(view.getByTestId("deck-filters-dialog").props.style)).toMatchObject(
         {
           height: 480,
@@ -679,7 +671,7 @@ describe("DecksScreen", () => {
     const onAddDeck = jest.fn()
     const view = renderShelf({ onAddDeck })
     expect(view.getByText("No decks yet")).toBeTruthy()
-    fireEvent.press(view.getByText("Add deck"))
+    fireEvent.press(view.getByLabelText("Add deck"))
     expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
@@ -775,7 +767,7 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     const view = renderShelf()
-    expect(view.getByText("Add deck")).toBeEnabled()
+    expect(view.getByLabelText("Add deck")).toBeEnabled()
   })
 
   it.each([
@@ -838,7 +830,7 @@ describe("DecksScreen", () => {
     expect(view.queryByText("Existing Deck")).toBeNull()
     expect(view.getByText("Lucario Hariyama")).toBeTruthy()
     expect(loadString("decks.game")).toBe("pokemon")
-    fireEvent.press(view.getAllByText("Back to lobby")[0])
+    fireEvent.press(view.getByTestId("decks-back"))
     expect(onBack).toHaveBeenCalledTimes(1)
   })
   test("offers Sync for decks only on this device above the one list", () => {

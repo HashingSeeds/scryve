@@ -114,7 +114,8 @@ export function SelectField({
   const $entrance = useAnimatedStyle(() => ({ opacity: entrance.value }))
 
   return (
-    <View>
+    <View style={themed($field)}>
+      <Text preset="formLabel" size="xs" text={label} />
       <Pressable
         ref={trigger}
         testID={testID}
@@ -134,14 +135,11 @@ export function SelectField({
         ]}
         onPress={show}
       >
-        <View style={themed($triggerText)}>
-          <Text text={label} size="xxs" style={themed($triggerLabel)} />
-          <Text
-            text={selected?.label ?? placeholder}
-            numberOfLines={1}
-            style={[themed($triggerValue), !selected && { color: colors.textDim }]}
-          />
-        </View>
+        <Text
+          text={selected?.label ?? placeholder}
+          numberOfLines={1}
+          style={[themed($triggerValue), !selected && { color: colors.textDim }]}
+        />
         {selected?.accessory}
         <Text text={dropsDown || !open ? CARET_DOWN : CARET_UP} style={themed($caret)} />
       </Pressable>
@@ -242,19 +240,20 @@ function MenuOption({
   )
 }
 
+const $field: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
-  minHeight: 56,
+  minHeight: 44,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
   paddingHorizontal: spacing.sm,
-  borderRadius: radius.xl,
+  borderRadius: radius.lg,
   borderWidth: 1,
   borderColor: colors.border,
-  backgroundColor: colors.palette.neutral100,
+  backgroundColor: colors.field,
 })
 const $triggerPressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.palette.neutral200,
+  backgroundColor: colors.palette.neutral300,
 })
 const $triggerOpenDown: ViewStyle = {
   borderBottomLeftRadius: radius.none,
@@ -264,17 +263,11 @@ const $triggerOpenUp: ViewStyle = {
   borderTopLeftRadius: radius.none,
   borderTopRightRadius: radius.none,
 }
-const $triggerText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $triggerLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textDim,
-  letterSpacing: 1.2,
-  textTransform: "uppercase",
-})
-const $triggerValue: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
+const $triggerValue: ThemedStyle<TextStyle> = () => ({ flex: 1 })
 const $caret: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim, lineHeight: 20 })
 const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.transparent })
 const $menu: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
-  borderRadius: radius.xl,
+  borderRadius: radius.lg,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.background,
@@ -296,7 +289,7 @@ const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxHeight: MIN_MENU_HEIGHT * 2,
 })
 const $menuClip: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  borderRadius: radius.xl - 1,
+  borderRadius: radius.lg - 1,
   overflow: "hidden",
 })
 const $dimmed: ViewStyle = { opacity: 0.5 }

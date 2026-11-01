@@ -369,7 +369,9 @@ describe("AddDeckScreen", () => {
     expect(
       within(view.getByTestId("import-problem-1")).getByText("Couldn't read this line"),
     ).toBeTruthy()
-    expect(view.getByText("2 lines to fix")).toBeTruthy()
+    const problemsHeader = within(view.getByTestId("import-problems-header"))
+    expect(problemsHeader.getByText("Lines to fix")).toBeTruthy()
+    expect(problemsHeader.getByText("2")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeDisabled()
     fireEvent.press(view.getByLabelText("Remove 0 Mountain"))
     expect(view.queryByText('"0 Mountain"')).toBeNull()
@@ -459,7 +461,7 @@ describe("AddDeckScreen", () => {
     })
     expect(view.queryByText("Not found")).toBeNull()
     fireEvent.press(
-      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
+      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Close" }),
     )
     expect(view.getByLabelText("3× Sol Ring")).toBeTruthy()
     fireEvent.press(view.getByTestId("save-import-button"))
@@ -811,7 +813,7 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByLabelText("Add Sol Ring to deck"))
     fireEvent.press(view.getByLabelText("Add Sol Ring to deck"))
     fireEvent.press(
-      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
+      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Close" }),
     )
     expect(mockSaveDeck).not.toHaveBeenCalled()
     expect(view.getByLabelText("2× Island")).toBeTruthy()
@@ -953,7 +955,7 @@ describe("AddDeckScreen", () => {
       deviceId: expect.any(String),
     })
     expect(mockCardById).toHaveBeenCalledTimes(1)
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     fireEvent.press(view.getByTestId("import-card-main-0"))
     await waitFor(() =>
       expect(mockCardById).toHaveBeenCalledWith({
@@ -961,7 +963,7 @@ describe("AddDeckScreen", () => {
         deviceId: expect.any(String),
       }),
     )
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     fireEvent.press(view.getByTestId("import-card-main-1"))
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCardById).toHaveBeenCalledTimes(2)
@@ -1036,7 +1038,7 @@ describe("AddDeckScreen", () => {
       originalReference: "MEG 76",
       deviceId: expect.any(String),
     })
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     expect(view.getByTestId("import-card-thumbnail-main-0").props.source).toEqual([
       { uri: "https://assets.example/riolu/high.webp" },
     ])
@@ -1054,7 +1056,7 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByTestId("retry-card-details"))
     await waitFor(() => expect(view.getByText("Explore twice.")).toBeTruthy())
     expect(mockCardById).toHaveBeenCalledTimes(2)
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     expect(view.getByLabelText("2× Forest")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeEnabled()
     expect(mockSaveDeck).not.toHaveBeenCalled()
@@ -1268,7 +1270,7 @@ describe("AddDeckScreen", () => {
       expect(view.getByText("Use a public Archidekt deck or paste its text export.")).toBeTruthy(),
     )
     expect(view.getByTestId("deck-link-input").props.value).toBe(resolvedArchidekt.sourceUrl)
-    fireEvent.press(view.getByText("Paste text instead"))
+    fireEvent.press(view.getByTestId("import-source-text"))
     expect(view.getByLabelText("Deck list")).toBeTruthy()
     expect(mockSaveDeck).not.toHaveBeenCalled()
   })
@@ -1828,7 +1830,7 @@ describe("AddDeckScreen", () => {
       originalReference: "MEG 76",
       deviceId: expect.any(String),
     })
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     expect(view.getByTestId("import-card-thumbnail-main-0").props.source).toEqual([
       { uri: "https://assets.example/riolu/high.webp" },
     ])

@@ -52,13 +52,12 @@ export function DeckActionsSheet({
               onPress={onPress}
             >
               <Text
-                size="md"
                 weight="medium"
                 tone={blocked ? "dim" : undefined}
                 style={destructive && !blocked ? themed($destructive) : undefined}
                 text={label}
               />
-              {note ? <Text size="xs" tone="dim" text={note} /> : null}
+              {note ? <Text size="meta" tone="dim" text={note} /> : null}
             </TouchableOpacity>
           )
         })}

@@ -3,6 +3,7 @@ import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import Svg, { Path } from "react-native-svg"
 
 import { CardImage } from "@/components/CardImage"
+import { NUMBER_LANE_WIDTH, SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { translate } from "@/i18n/translate"
@@ -62,7 +63,7 @@ export function DeckCardRow({
         />
         <View style={$flex}>
           <Text size="sm" weight="medium" text={card.name} numberOfLines={2} />
-          {subtitle ? <Text size="xxs" tone="dim" text={subtitle} numberOfLines={1} /> : null}
+          {subtitle ? <Text size="meta" tone="dim" text={subtitle} numberOfLines={1} /> : null}
         </View>
       </TouchableOpacity>
       {editing ? (
@@ -127,7 +128,7 @@ export function DeckCardRow({
           </TouchableOpacity>
         </View>
       ) : (
-        <Text size="sm" text={`${card.quantity}×`} tone="dim" />
+        <TrailingNumber value={`${card.quantity}×`} tone="dim" />
       )}
     </View>
   )
@@ -146,26 +147,28 @@ export function DeckCardSectionHeader({
 }) {
   const { themed } = useAppTheme()
   return (
-    <View style={themed($section)}>
-      <Text size="sm" weight="semiBold" text={label} style={$flex} />
-      {onChooseCommander ? (
-        <TextAction
-          testID="choose-commander"
-          accessibilityLabel={
-            quantity
-              ? translate("decks:cardRow.changeCommander")
-              : translate("decks:cardRow.chooseCommander")
-          }
-          tx={quantity ? "decks:cardRow.change" : "decks:cardRow.choose"}
-          size="xs"
-          disabled={disabled}
-          style={$touch}
-          onPress={onChooseCommander}
-        />
-      ) : (
-        <Text size="sm" tone="dim" text={String(quantity)} />
-      )}
-    </View>
+    <SectionHeader
+      label={label}
+      count={quantity}
+      style={themed($section)}
+      action={
+        onChooseCommander ? (
+          <TextAction
+            testID="choose-commander"
+            accessibilityLabel={
+              quantity
+                ? translate("decks:cardRow.changeCommander")
+                : translate("decks:cardRow.chooseCommander")
+            }
+            tx={quantity ? "decks:cardRow.change" : "decks:cardRow.choose"}
+            size="xs"
+            disabled={disabled}
+            style={$lane}
+            onPress={onChooseCommander}
+          />
+        ) : undefined
+      }
+    />
   )
 }
 
@@ -179,10 +182,11 @@ export function DeckCardListSkeleton({
   const { themed } = useAppTheme()
   return sections.slice(0, 2).map((section, sectionIndex) => (
     <View key={section.id}>
-      <View style={themed($section)}>
-        <Text size="sm" weight="semiBold" text={section.label} style={$flex} />
-        {commanderAction && section.id === "commander" ? <View style={$touch} /> : null}
-      </View>
+      <SectionHeader
+        label={section.label}
+        style={themed($section)}
+        action={commanderAction && section.id === "commander" ? <View style={$lane} /> : undefined}
+      />
       {Array.from({ length: sectionIndex === 0 ? 1 : 3 }).map((_, index) => (
         <View key={index} style={themed($card)}>
           <View style={themed($cardLink)}>
@@ -203,14 +207,14 @@ const $touch: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
 }
-const $quantity: TextStyle = { minWidth: 18, textAlign: "center", fontVariant: ["tabular-nums"] }
+// why: a fixed width keeps the − button still when a count gains a digit.
+const $quantity: TextStyle = { width: 32, textAlign: "center", fontVariant: ["tabular-nums"] }
+const $lane: ViewStyle = { minWidth: NUMBER_LANE_WIDTH, minHeight: 44, alignItems: "flex-end" }
 const $image: ImageStyle & ViewStyle = { width: 32, height: 45 }
 const $placeholderLine: ViewStyle = { width: "64%", height: 14 }
 const $placeholder: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.separator })
 const $action: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
   paddingTop: spacing.lg,
   paddingBottom: spacing.xs,
 })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -8,15 +8,19 @@ import Svg, { Path } from "react-native-svg"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
-import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
+import { FilterButton } from "@/components/FilterPill"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { Header } from "@/components/Header"
+import { PressableIcon, type IconTypes } from "@/components/Icon"
+import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
+import { SelectField } from "@/components/SelectField"
+import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
+import { cardCountLabel, honestRate } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckHomeGlyph } from "@/features/decks/DeckHomeGlyph"
 import { DeckCount } from "@/features/decks/DeckLimit"
@@ -28,6 +32,7 @@ import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { isSystemVisible } from "@/features/game/systemVisibility"
+import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
@@ -86,7 +91,11 @@ function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
     ? cardCountLabel(deck.cardQuantity)
     : translate("decks:shelf.emptyList")
   const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel
-  return [showGame ? gameLabel : null, deckFormatLabel(game, deck.format), cards]
+  const versions =
+    deck.versionCount && deck.versionCount > 1
+      ? translate("decks:shelf.versionCount", { count: deck.versionCount })
+      : null
+  return [showGame ? gameLabel : null, deckFormatLabel(game, deck.format), cards, versions]
     .filter(Boolean)
     .join(" · ")
 }
@@ -134,11 +143,7 @@ function DeckRow({
   const local = guestDeckLocalId(String(deck._id)) !== undefined
   const favorite = deck.favoritedAt !== undefined
   const allResults = deck.keyRecord ?? deck.record
-  const record = tracksResults(game) && allResults && recordSummary(allRecord(allResults))
-  const versions =
-    deck.versionCount && deck.versionCount > 1
-      ? translate("decks:shelf.versionCount", { count: deck.versionCount })
-      : undefined
+  const rate = tracksResults(game) && allResults ? honestRate(allRecord(allResults)) : undefined
 
   return (
     <View testID={`deck-card-${deck._id}`} style={themed($row)}>
@@ -160,15 +165,30 @@ function DeckRow({
         onPress={() => onPress()}
       >
         <View style={themed($rowCopy)}>
-          <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} />
-          <Text size="xxs" numberOfLines={1} tone="dim" text={deckSubtitle(deck, game, showGame)} />
+          <Text weight="medium" numberOfLines={1} text={deck.name} />
+          <Text
+            size="meta"
+            numberOfLines={1}
+            tone="dim"
+            text={deckSubtitle(deck, game, showGame)}
+          />
         </View>
-        {record || versions ? (
-          <View style={themed($rowContext)}>
-            {record ? <Text size="xs" weight="bold" numberOfLines={1} text={record} /> : null}
-            {versions ? <Text size="xxs" numberOfLines={1} tone="dim" text={versions} /> : null}
-          </View>
-        ) : null}
+        <View testID={`deck-record-lane-${deck._id}`} style={$recordLane}>
+          {rate ? (
+            <TrailingNumber
+              weight="medium"
+              tone={rate.games ? undefined : "dim"}
+              value={rate.text}
+            />
+          ) : null}
+          {rate && !rate.tooFew ? (
+            <TrailingNumber
+              size="meta"
+              tone="dim"
+              value={translate("decks:stats.ofGames", { count: rate.games })}
+            />
+          ) : null}
+        </View>
         <View testID={`deck-home-lane-${deck._id}`} style={$homeLane}>
           <DeckHomeGlyph home={local ? "device" : "account"} />
         </View>
@@ -225,6 +245,34 @@ function StarIcon({ selected, color }: { selected: boolean; color: string }) {
         strokeLinejoin="round"
       />
     </Svg>
+  )
+}
+
+/** why: Header's built-in icon action has no accessibility label, and every icon-only control needs one. */
+function HeaderIconAction({
+  icon,
+  label,
+  testID,
+  onPress,
+}: {
+  icon: IconTypes
+  label: string
+  testID: string
+  onPress: () => void
+}) {
+  const { theme, themed } = useAppTheme()
+  return (
+    <PressableIcon
+      testID={testID}
+      icon={icon}
+      size={24}
+      color={theme.colors.tint}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      containerStyle={themed($headerIcon)}
+      style={icon === "back" && isRTL ? $flipped : undefined}
+    />
   )
 }
 
@@ -569,8 +617,13 @@ export function DecksScreen({
     }))
     return [{ id: ALL_FORMATS, label: translate("decks:shelf.allFormats") }, ...known]
   }, [system])
-  const selectedFormat = formatChips.find((candidate) => candidate.id === format)
-  const selectedSystem = DECK_GAME_LIST.find((candidate) => candidate.id === system)
+  const systemOptions = [
+    { id: ALL_SYSTEMS, label: translate("decks:shelf.allSystems") },
+    ...DECK_GAME_LIST.filter((game) => isSystemVisible(game.id)).map((game) => ({
+      id: game.id,
+      label: game.shortLabel,
+    })),
+  ]
   const activeFormat = system === ALL_SYSTEMS ? ALL_FORMATS : format
   const filterCount = Number(system !== ALL_SYSTEMS) + Number(activeFormat !== ALL_FORMATS)
   const guestRows: ShelfDeck[] = guestDecks.map((guest) => ({
@@ -627,73 +680,52 @@ export function DecksScreen({
         titleAccessory={
           (access?.ready ?? true) && !unavailableMessage ? <DeckCount access={access} /> : undefined
         }
-        leftTx={onBack ? "decks:shelf.backToLobby" : onCards ? "decks:shelf.cards" : undefined}
-        onLeftPress={
-          onBack ?? (onCards && (() => onCards(system === ALL_SYSTEMS ? undefined : system)))
+        LeftActionComponent={
+          onBack ? (
+            <HeaderIconAction
+              testID="decks-back"
+              icon="back"
+              label={translate("decks:shelf.backToLobby")}
+              onPress={onBack}
+            />
+          ) : undefined
         }
+        leftTx={onCards ? "decks:shelf.cards" : undefined}
+        onLeftPress={onCards && (() => onCards(system === ALL_SYSTEMS ? undefined : system))}
         backgroundColor={theme.colors.surface}
-        rightTx="decks:shelf.addDeck"
-        onRightPress={onAddDeck}
+        RightActionComponent={
+          <HeaderIconAction
+            testID="decks-add-deck"
+            icon="plus"
+            label={translate("decks:shelf.addDeck")}
+            onPress={onAddDeck}
+          />
+        }
       />
       <View style={themed($content)}>
-        <View style={themed($filterRow)}>
-          <ScrollView
-            testID="collection-filter"
-            accessibilityLabel={translate("decks:shelf.collection")}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={$filterScroll}
-            contentContainerStyle={themed($collectionFilter)}
-          >
-            {COLLECTIONS.map(({ id, labelTx }) => (
-              <FilterPill
-                key={id}
-                testID={`collection-filter-${id}`}
-                label={translate(labelTx)}
-                selected={collection === id}
-                onPress={() => setCollection(id)}
-              />
-            ))}
-          </ScrollView>
+        <View style={themed($searchRow)}>
+          <TextField
+            testID="deck-search-input"
+            placeholderTx="decks:shelf.search"
+            value={search}
+            maxLength={80}
+            autoCorrect={false}
+            clearable
+            containerStyle={$flex1}
+            onChangeText={setSearch}
+          />
           <FilterButton
             testID="deck-filters-button"
             count={filterCount}
             onPress={() => setFiltersOpen(true)}
           />
         </View>
-        <TextField
-          testID="deck-search-input"
-          placeholderTx="decks:shelf.search"
-          value={search}
-          maxLength={80}
-          autoCorrect={false}
-          clearable
-          containerStyle={themed($searchField)}
-          onChangeText={setSearch}
+        <Tabs
+          testID="collection-filter"
+          tabs={COLLECTIONS.map(({ id, labelTx }) => ({ id, label: translate(labelTx) }))}
+          selectedId={collection}
+          onSelect={setCollection}
         />
-        {filterCount > 0 ? (
-          <View style={themed($activeFilters)}>
-            {system !== ALL_SYSTEMS && selectedSystem ? (
-              <FilterPill
-                selected
-                removable
-                label={selectedSystem.shortLabel}
-                onPress={() => {
-                  setSystem(ALL_SYSTEMS)
-                  setFormat(ALL_FORMATS)
-                }}
-              />
-            ) : null}
-            {activeFormat !== ALL_FORMATS && selectedFormat ? (
-              <FilterPill
-                selected
-                removable
-                label={selectedFormat.label}
-                onPress={() => setFormat(ALL_FORMATS)}
-              />
-            ) : null}
-          </View>
-        ) : null}
         {guestOnly ? (
           <LocalDeckList
             rows={visibleGuestRows}
@@ -811,36 +843,23 @@ export function DecksScreen({
       >
         <Text preset="subheading" tx="decks:filters.label" />
         <ScrollView style={$filtersScroll} contentContainerStyle={themed($dialogBody)}>
-          <View testID="system-filter" accessibilityLabel={translate("decks:shelf.system")}>
-            <FilterGroup heading={translate("decks:shelf.system")}>
-              {[
-                { id: ALL_SYSTEMS, shortLabel: translate("decks:shelf.allSystems") },
-                ...DECK_GAME_LIST.filter((game) => isSystemVisible(game.id)),
-              ].map((candidate) => (
-                <FilterPill
-                  key={candidate.id}
-                  testID={`system-filter-${candidate.id}`}
-                  label={candidate.shortLabel}
-                  selected={system === candidate.id}
-                  onPress={() => chooseSystem(candidate.id)}
-                />
-              ))}
-            </FilterGroup>
-          </View>
+          <SelectField
+            testID="system-filter"
+            label={translate("decks:shelf.system")}
+            field="system"
+            options={systemOptions}
+            value={system}
+            onSelect={(next) => chooseSystem(next ?? ALL_SYSTEMS)}
+          />
           {system !== ALL_SYSTEMS && formatChips.length > 1 ? (
-            <View testID="format-filter" accessibilityLabel={translate("decks:shelf.format")}>
-              <FilterGroup heading={translate("decks:shelf.format")}>
-                {formatChips.map((candidate) => (
-                  <FilterPill
-                    key={candidate.id}
-                    testID={`format-filter-${candidate.id}`}
-                    label={candidate.label}
-                    selected={format === candidate.id}
-                    onPress={() => setFormat(candidate.id)}
-                  />
-                ))}
-              </FilterGroup>
-            </View>
+            <SelectField
+              testID="format-filter"
+              label={translate("decks:shelf.format")}
+              field="format"
+              options={formatChips}
+              value={format}
+              onSelect={(next) => setFormat(next ?? ALL_FORMATS)}
+            />
           ) : system === ALL_SYSTEMS ? (
             <Text size="xs" tone="dim" tx="decks:shelf.chooseSystem" />
           ) : null}
@@ -877,25 +896,14 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   paddingHorizontal: spacing.lg,
 })
-const $filterRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  minHeight: 44,
+  // why: FilterButton pulls itself spacing.md left to overlap scrolling pills, so this leaves spacing.xs beside the field.
+  gap: spacing.md + spacing.xs,
   paddingVertical: spacing.xs,
 })
-const $filterScroll: ViewStyle = { flex: 1 }
-const $collectionFilter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-  paddingRight: spacing.md,
-})
-const $activeFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xs,
-  paddingBottom: spacing.xs,
-})
-const $searchField: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.xs })
+const $flex1: ViewStyle = { flex: 1 }
 const $filtersDialog: ViewStyle = { height: 480 }
 const $filtersScroll: ViewStyle = { flex: 1 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
@@ -924,11 +932,7 @@ const $systemMarker: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   marginRight: spacing.sm,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
-const $rowContext: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minWidth: 72,
-  alignItems: "flex-end",
-  gap: spacing.xxxs,
-})
+const $recordLane: ViewStyle = { width: NUMBER_LANE_WIDTH }
 const $reviewIndicator: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $favoriteButton: ThemedStyle<ViewStyle> = () => ({
   width: 44,
@@ -968,3 +972,9 @@ const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $homeLane: ViewStyle = { width: 22, alignItems: "center" }
+const $headerIcon: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  height: "100%",
+  justifyContent: "center",
+  paddingHorizontal: spacing.md,
+})
+const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }

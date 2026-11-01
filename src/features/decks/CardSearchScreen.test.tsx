@@ -58,6 +58,14 @@ function chooser(cards = deck, onAdd = jest.fn()) {
   )
 }
 
+// why: colors live in the Filters sheet, so a pick opens it, presses each color and closes it.
+async function pickColors(view: ReturnType<typeof render>, ...colors: string[]) {
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  for (const color of colors) fireEvent.press(view.getByTestId(`card-color-${color}`))
+  fireEvent.press(view.getByText("Done"))
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   mockNameIndex = undefined
@@ -173,14 +181,14 @@ it("matches a quoted commander name in cached cards offline", () => {
   expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
 })
 
-it("keeps required color-choice commanders out of the colorless filter", () => {
+it("keeps required color-choice commanders out of the colorless filter", async () => {
   mockConnection.isWebSocketConnected = false
   saveCardDetails({
     talrand: { ...eligible, colorIdentity: "" },
     ring: { ...eligible, commanderEligibility: "color-choice", colorIdentity: "" },
   })
   const view = chooser(deck.slice(0, 2))
-  fireEvent.press(view.getByTestId("card-color-C"))
+  await pickColors(view, "C")
   expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
   expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
 })
@@ -232,9 +240,7 @@ it("searches within the commander's colors until the player clears them", async 
       />
     </ThemeProvider>,
   )
-  const selected = (color: string) =>
-    view.getByTestId(`card-color-${color}`).props.accessibilityState.selected
-  expect(["W", "U", "B", "R", "G"].map(selected)).toEqual([false, true, false, true, false])
+  expect(view.getByLabelText("Filters (2)")).toBeTruthy()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).not.toHaveBeenCalled()
   fireEvent.changeText(view.getByTestId("card-search-input"), "bolt")
@@ -246,6 +252,9 @@ it("searches within the commander's colors until the player clears them", async 
   })
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
+  const selected = (color: string) =>
+    view.getByTestId(`card-color-${color}`).props.accessibilityState.selected
+  expect(["W", "U", "B", "R", "G"].map(selected)).toEqual([false, true, false, true, false])
   fireEvent.press(view.getByText("Clear all"))
   await act(async () => jest.advanceTimersByTime(400))
   expect(selected("U")).toBe(false)
@@ -256,7 +265,7 @@ it("searches within the commander's colors until the player clears them", async 
   })
 })
 
-it("filters cached cards by color identity offline", () => {
+it("filters cached cards by color identity offline", async () => {
   mockConnection.isWebSocketConnected = false
   saveCardDetails({
     talrand: eligible,
@@ -264,7 +273,7 @@ it("filters cached cards by color identity offline", () => {
     unknown: { ...eligible, commanderEligibility: "color-choice", colorIdentity: "" },
   })
   const view = cardSearch(deck.map((card) => ({ card, game: "mtg" })))
-  fireEvent.press(view.getByTestId("card-color-C"))
+  await pickColors(view, "C")
   expect(view.getByText("Sol Ring")).toBeTruthy()
   expect(view.getByText("Unknown")).toBeTruthy()
   expect(view.queryByText("Talrand")).toBeNull()
@@ -273,10 +282,12 @@ it("filters cached cards by color identity offline", () => {
 
 it("previews a result without assigning it, preserves search filters on dismiss, and confirms explicitly", async () => {
   jest.useFakeTimers()
-  mockAction.mockResolvedValue([searchCard])
+  mockAction.mockImplementation((_ref, args) =>
+    Promise.resolve("query" in args ? [searchCard] : ["Flying"]),
+  )
   const onAdd = jest.fn()
   const view = chooser([], onAdd)
-  fireEvent.press(view.getByTestId("card-color-U"))
+  await pickColors(view, "U")
   fireEvent.changeText(view.getByTestId("card-search-input"), "ar")
   await act(async () => jest.advanceTimersByTime(400))
   fireEvent.press(view.getByText("Baral"))
@@ -286,7 +297,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   fireEvent.press(view.getByTestId("card-focus-backdrop"))
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
   expect(view.getByTestId("card-search-input").props.value).toBe("ar")
-  expect(view.getByTestId("card-color-U").props.accessibilityState.selected).toBe(true)
+  expect(view.getByLabelText("Filters (1)")).toBeTruthy()
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
   fireEvent.press(view.getByLabelText("Preview Baral as commander"))
   await act(async () => {})
@@ -315,8 +326,7 @@ it("requires the exact selected identity by default and optionally allows additi
     Promise.resolve("query" in args ? [{ ...searchCard, colorIdentity: "UBR" }] : ["Flying"]),
   )
   const view = chooser()
-  fireEvent.press(view.getByTestId("card-color-U"))
-  fireEvent.press(view.getByTestId("card-color-B"))
+  await pickColors(view, "U", "B")
   expect(view.queryByLabelText("Preview Talrand as commander")).toBeNull()
   expect(view.getByLabelText("Preview Sol Ring as commander")).toBeTruthy()
   expect(view.queryByLabelText("Preview Unknown as commander")).toBeNull()
@@ -329,7 +339,7 @@ it("requires the exact selected identity by default and optionally allows additi
   expect(view.queryByLabelText("Preview Baral as commander")).toBeNull()
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  fireEvent.press(view.getByLabelText("Allow additional colors"))
+  fireEvent.press(view.getByTestId("card-color-match-additional"))
   fireEvent.press(view.getByLabelText("Dismiss commander filters"))
   expect(view.getByLabelText("Preview Sol Ring as commander")).toBeTruthy()
   expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
@@ -398,7 +408,6 @@ it.each(["commander", "main"])(
       message: "Scryfall requests are paused. Try again shortly.",
       retryAfterMs: 3000,
     })
-    mockAction.mockRejectedValueOnce(failure).mockResolvedValue([searchCard])
     const view = render(
       <ThemeProvider initialContext="dark">
         <CardSearchScreen
@@ -411,7 +420,9 @@ it.each(["commander", "main"])(
         />
       </ThemeProvider>,
     )
-    if (section === "commander") fireEvent.press(view.getByTestId("card-color-U"))
+    if (section === "commander") await pickColors(view, "U")
+    mockAction.mockClear()
+    mockAction.mockRejectedValueOnce(failure).mockResolvedValue([searchCard])
     fireEvent.changeText(view.getByTestId("card-search-input"), "bar")
     await act(async () => jest.advanceTimersByTime(400))
     expect(view.getByText("Retrying in 3s")).toBeTruthy()
@@ -610,7 +621,7 @@ describe("with the device's card name list", () => {
 
   it("keeps name matches to the picked colors", async () => {
     const view = adder()
-    fireEvent.press(view.getByTestId("card-color-R"))
+    await pickColors(view, "R")
     expect(await search(view, "lightnig bolt")).toEqual([
       "Add Lightning Bolt to deck",
       "Add Lightning Axe to deck",

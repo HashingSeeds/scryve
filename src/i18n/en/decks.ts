@@ -46,7 +46,8 @@ const decks = {
     viewStats: "View deck stats",
     onDeviceLabel: "{{name}}, on this device",
     limited: "Breakdowns cover the latest 200 results.",
-    chooseList: "Choose a list",
+    compareList: "List",
+    compareWith: "Compared with",
     winLetter: "W",
     lossLetter: "L",
     drawLetter: "D",
@@ -360,10 +361,15 @@ const decks = {
     noCached: "No cached cards match. Cards appear here after you add them online.",
     noResults: "No cards found.",
     dismissFilters: "Dismiss commander filters",
+    // Heading in card search filters over the color buttons.
+    colors: "Colors",
     colorMatch: "Color match",
-    withinColors: "Within these colors",
-    allowAdditional: "Allow additional colors",
-    exactColors: "Exactly these colors",
+    // Segment under "Color match": cards use only the picked colors, or fewer.
+    withinColors: "Within",
+    // Segment under "Color match": cards use all the picked colors and may add more.
+    allowAdditional: "At least",
+    // Segment under "Color match": cards use exactly the picked colors.
+    exactColors: "Exactly",
     searchKeywords: "Search keywords",
     keywords: "Keywords",
     keywordsOffline: "Open filters online to save keyword choices.",
@@ -481,7 +487,7 @@ const decks = {
     version: "Version {{number}} · {{name}}",
     // Shown beside the version name when a newer version of this deck exists.
     notLatest: "Not the latest",
-    addMatch: "Add match result",
+    addMatch: "Add result",
     // The deck screen's two views: using the deck at the table, and changing its list.
     play: "Play",
     build: "Build",
@@ -499,8 +505,6 @@ const decks = {
     // Heading over the deck's versions. The player picks the one they bring to their next games.
     bringing: "Bringing",
     results: "Results",
-    // Heading over recent games with the deck's win-loss record, e.g. "Results · 2-1".
-    resultsRecord: "Results · {{record}}",
     // A recent game's opponents, named by their commanders or decks, e.g. "vs Atraxa, Krenko".
     versus: "vs {{opponents}}",
     startGame: "Start a game",
@@ -530,8 +534,6 @@ const decks = {
     open: "Sideboard",
     title: "Sideboard for this match",
     close: "Close sideboard",
-    // Running totals, e.g. "In 2 · Out 2 · Main 60".
-    counts: "In {{in}} · Out {{out}} · Main {{main}}",
     inFromSide: "In from sideboard",
     outOfMain: "Out of main",
     // Under a sideboard card, e.g. "1 of 2 in side".
@@ -608,7 +610,6 @@ const decks = {
     addDeck: "Add deck",
     // Header button that opens card lookup.
     cards: "Cards",
-    collection: "Deck collection",
     collectionAll: "All",
     collectionFavorites: "Favorites",
     collectionRecent: "Recent",
@@ -678,7 +679,6 @@ const decks = {
     linkFailed: "Could not load this deck. Try again or paste its text export.",
     resolveFailed: "Could not resolve deck list. Try again.",
     notes: "Notes",
-    optional: "Optional",
     noMatches: "No matching decks",
     noDecksHere: "No decks here yet",
     noMatchesDetail: "Try another search, paste a list, or start an empty deck.",
@@ -700,7 +700,6 @@ const decks = {
     loadingImages: "Loading card images",
     loadingOfficial: "Loading official card list",
     previewUnavailable: "Preview unavailable",
-    startingPoint: "Starting point",
     browseOffline: "You're offline. Decks will load when you reconnect.",
     rateLimited_one: "Refresh available in {{count}} seconds. Saved results remain available.",
     rateLimited_other: "Refresh available in {{count}} seconds. Saved results remain available.",
@@ -712,7 +711,6 @@ const decks = {
     importSource: "Import source",
     pasteText: "Paste text",
     sourceLink: "{{source}} link",
-    pasteInstead: "Paste text instead",
     deckList: "Deck list",
     // Card names, quoted examples and section headings are parser input; keep them in English exactly.
     listHelperYgo:
@@ -748,8 +746,7 @@ const decks = {
     search: "Search",
     searchLabel: "Search for a card to replace {{line}}",
     removeLabel: "Remove {{line}}",
-    linesToFix_one: "{{count}} line to fix",
-    linesToFix_other: "{{count}} lines to fix",
+    linesToFix: "Lines to fix",
     removeAll: "Remove all",
     useFailed: "Could not add {{card}}. Try again.",
   },

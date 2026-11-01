@@ -34,6 +34,7 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
   labelTx?: TextProps["tx"]
   labelTxOptions?: TextProps["txOptions"]
   LabelTextProps?: TextProps
+  optional?: boolean
   helper?: TextProps["text"]
   helperTx?: TextProps["tx"]
   helperTxOptions?: TextProps["txOptions"]
@@ -74,6 +75,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     RightAccessory,
     LeftAccessory,
     clearable,
+    optional,
     HelperTextProps,
     LabelTextProps,
     style: $inputStyleOverride,
@@ -91,6 +93,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
 
   const disabled = TextInputProps.editable === false || status === "disabled"
 
+  const labelContent = labelTx ? translate(labelTx, labelTxOptions) : label
   const placeholderContent = placeholderTx
     ? translate(placeholderTx, placeholderTxOptions)
     : placeholder
@@ -103,7 +106,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     $styles.row,
     $inputWrapperStyle,
     status === "error" && { borderColor: colors.error },
-    TextInputProps.multiline && { minHeight: 112 },
+    TextInputProps.multiline ? { minHeight: 112 } : $singleLineWrapper,
     LeftAccessory && { paddingStart: 0 },
     RightAccessory && { paddingEnd: 0 },
     $inputWrapperStyleOverride,
@@ -145,15 +148,13 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
       onPress={focusInput}
       accessibilityState={{ disabled }}
     >
-      {!!(label || labelTx) && (
-        <Text
-          preset="formLabel"
-          text={label}
-          tx={labelTx}
-          txOptions={labelTxOptions}
-          {...LabelTextProps}
-          style={themed($labelStyles)}
-        />
+      {!!labelContent && (
+        <Text preset="formLabel" size="xs" {...LabelTextProps} style={themed($labelStyles)}>
+          {labelContent}
+          {optional ? (
+            <Text size="xs" tone="dim" text={` ${translate("common:optional")}`} />
+          ) : null}
+        </Text>
       )}
 
       <View style={themed($inputWrapperStyles)}>
@@ -222,11 +223,13 @@ const $labelStyle: ThemedStyle<TextStyle> = ({ spacing }) => ({
 const $inputWrapperStyle: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   alignItems: "flex-start",
   borderWidth: 1,
-  borderRadius: radius.sm,
-  backgroundColor: colors.surface,
+  borderRadius: radius.lg,
+  backgroundColor: colors.field,
   borderColor: colors.border,
   overflow: "hidden",
 })
+
+const $singleLineWrapper: ViewStyle = { minHeight: 44, alignItems: "center" }
 
 const $inputStyle: ThemedStyle<TextStyle> = ({ colors, typography, spacing }) => ({
   flex: 1,

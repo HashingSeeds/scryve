@@ -9,6 +9,7 @@ export default {
   delete: "削除",
   done: "完了",
   edit: "編集",
+  optional: "任意",
   remove: "外す",
   retry: "再試行",
   save: "保存",
@@ -58,6 +59,7 @@ export default {
       thisIsMe: "「これは自分」の選択肢を開きます",
       yourDeck: "自分のデッキの選択肢を開きます",
       system: "システムの選択肢を開きます",
+      list: "選択肢の一覧を開く",
     },
     closeLabel: {
       format: "フォーマットの選択肢を閉じる",
@@ -67,6 +69,7 @@ export default {
       thisIsMe: "「これは自分」の選択肢を閉じる",
       yourDeck: "自分のデッキの選択肢を閉じる",
       system: "システムの選択肢を閉じる",
+      list: "選択肢の一覧を閉じる",
     },
   },
   valueField: {
