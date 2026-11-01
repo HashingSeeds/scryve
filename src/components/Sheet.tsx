@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react"
 import type { ViewStyle } from "react-native"
 
+import { translate } from "@/i18n/translate"
+import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
+
 import { DialogCard } from "./DialogCard"
 import type { SheetProps } from "./sheetTypes"
 
@@ -15,6 +19,7 @@ export function Sheet({
   testID,
   children,
 }: SheetProps) {
+  const { themed } = useAppTheme()
   const onScreen = useRef(visible)
   const latestOnDismissed = useRef(onDismissed)
   latestOnDismissed.current = onDismissed
@@ -34,11 +39,12 @@ export function Sheet({
         latestOnDismissed.current?.()
       }}
       closeDisabled={!dismissible}
+      backdropAccessibilityLabel={translate("common:close")}
       placement="bottom"
       wide
       dialogTestID={testID}
       accessibilityViewIsModal
-      style={[size === "full" ? $full : undefined, edgeToEdge ? $edgeToEdge : undefined]}
+      style={[size === "full" ? $full : undefined, edgeToEdge ? themed($edgeToEdge) : undefined]}
     >
       {children}
     </DialogCard>
@@ -46,4 +52,7 @@ export function Sheet({
 }
 
 const $full: ViewStyle = { height: "88%" }
-const $edgeToEdge: ViewStyle = { paddingHorizontal: 0 }
+const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingHorizontal: 0,
+  gap: spacing.sm,
+})

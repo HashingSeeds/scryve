@@ -45,3 +45,13 @@ it("swaps at once when the sheet already left without being closed", () => {
   view.rerender({ requested: "rename" })
   expect(view.result.current).toMatchObject({ shown: "rename", visible: true })
 })
+
+it("swaps once a sheet unmounts in the same render that closed it", () => {
+  const view = renderPresence("actions")
+  const onDismissedBeforeClose = view.result.current.onDismissed
+
+  view.rerender({ requested: undefined })
+  act(() => onDismissedBeforeClose())
+  view.rerender({ requested: "rename" })
+  expect(view.result.current).toMatchObject({ shown: "rename", visible: true })
+})

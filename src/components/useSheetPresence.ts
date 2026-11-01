@@ -10,6 +10,9 @@ export function useSheetPresence<T>(
   const [gone, setGone] = useState(false)
   const latest = useRef(requested)
   latest.current = requested
+  // why: a sheet that unmounts mid-render reports through the onDismissed from the render before.
+  const leavingNow = useRef(leaving)
+  leavingNow.current = leaving
   if (!leaving && !Object.is(requested, shown)) {
     if (shown !== undefined && isSheet(shown) && !gone) setLeaving(true)
     else {
@@ -21,7 +24,7 @@ export function useSheetPresence<T>(
     shown,
     visible: !leaving,
     onDismissed: () => {
-      if (!leaving) return setGone(true)
+      if (!leavingNow.current) return setGone(true)
       setLeaving(false)
       setShown(latest.current)
     },
