@@ -295,9 +295,6 @@ export default {
     unavailableHeading: "कनेक्टेड सुविधाएँ उपलब्ध नहीं हैं",
     localPlayAvailable: "लोकल गेम उपलब्ध रहेगा।",
     notConfigured: "इस बिल्ड में कनेक्टेड सुविधाएँ उपलब्ध नहीं हैं। लोकल गेम उपलब्ध रहता है।",
-    closeSignIn: "साइन इन बंद करें",
-    signInAgreement:
-      "जारी रखकर, आप <terms>उपयोग की शर्तों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत होते हैं।",
   },
   billing: {
     renewalPrompt: {

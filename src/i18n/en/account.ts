@@ -298,9 +298,6 @@ const account = {
     localPlayAvailable: "Local play remains available.",
     notConfigured:
       "Connected features are unavailable in this build. Local play remains available.",
-    closeSignIn: "Close sign in",
-    signInAgreement:
-      "By continuing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
   },
   billing: {
     // Asked right after someone buys a yearly plan.

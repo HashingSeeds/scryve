@@ -299,9 +299,6 @@ export default {
     localPlayAvailable: "Le jeu local reste disponible.",
     notConfigured:
       "Les fonctions connectées sont indisponibles dans cette version. Le jeu local reste disponible.",
-    closeSignIn: "Fermer la connexion",
-    signInAgreement:
-      "En continuant, vous acceptez les <terms>Conditions d'utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
   },
   billing: {
     renewalPrompt: {
