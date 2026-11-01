@@ -1,6 +1,6 @@
 {
   "name": "scryve",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "main": "expo-router/entry",
   "packageManager": "pnpm@10.34.5",
