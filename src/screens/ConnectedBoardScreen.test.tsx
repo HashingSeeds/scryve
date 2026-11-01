@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet } from "react-native"
+import { Dimensions, Modal, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
@@ -1263,6 +1263,9 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("game-menu-backdrop"))
     openConnectedPlayers()
     fireEvent.press(screen.getByTestId("invite-from-players-button"))
+    expect(screen.queryByTestId("invite-dialog")).toBeNull()
+    const fadingActions = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onDismiss)
+    act(() => fadingActions?.props.onDismiss())
     expect(screen.getByTestId("invite-dialog")).toBeTruthy()
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
@@ -1300,6 +1303,39 @@ describe("ConnectedBoardScreen", () => {
     screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByTestId("invite-dialog")).toBeNull()
     expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(false)
+  })
+
+  it("waits for a leaving invite sheet before showing that the game was abandoned", () => {
+    const sheets = jest.requireMock<{
+      holdSheetDismissals: () => void
+      finishSheetDismissals: () => void
+      releaseSheetDismissals: () => void
+    }>("@expo/ui/swift-ui")
+    sheets.holdSheetDismissals()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" initialInviteOpen />))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        status: "abandoned",
+        invitation: undefined,
+      },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
+
+    act(() => sheets.finishSheetDismissals())
+    expect(screen.getByTestId("abandoned-game-dialog")).toBeTruthy()
+    sheets.releaseSheetDismissals()
   })
 
   it("takes a finished board to its summary without a second trip", () => {

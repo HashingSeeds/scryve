@@ -97,7 +97,15 @@ type DeckDialog =
   | "syncConflict"
   | "sideboard"
 
-const SHEET_DIALOGS: ReadonlySet<DeckDialog> = new Set(["actions", "sideboard", "syncConflict"])
+const SHEET_DIALOGS: ReadonlySet<DeckDialog> = new Set([
+  "actions",
+  "sideboard",
+  "syncConflict",
+  "settings",
+  "newVersion",
+  "versions",
+  "renameVersion",
+])
 const isSheetDialog = (dialog: DeckDialog) => SHEET_DIALOGS.has(dialog)
 
 const NEW_LIST_NOTICE_MS = 8_000
@@ -1369,6 +1377,8 @@ function DeckDetailContent({
 
       {dialogs.shown === "settings" ? (
         <DeckSettingsDialog
+          visible={dialogs.visible}
+          onDismissed={dialogs.onDismissed}
           game={deck.game}
           initial={{
             name: deck.name,
@@ -1382,6 +1392,8 @@ function DeckDetailContent({
       ) : null}
 
       <DeckVersionsDialogs
+        visible={dialogs.visible}
+        onDismissed={dialogs.onDismissed}
         dialog={dialogs.shown ?? "none"}
         rows={view.versionRows.map((row) => {
           // Live records only; cached rows must not present unknown stats as fresh.

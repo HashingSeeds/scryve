@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/EmptyState"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { ValueField } from "@/components/ValueField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { readPublicCloudConfig } from "@/features/auth/config"
@@ -105,6 +106,7 @@ export function EventScreen({
   const command = useCommand()
   const [chosenTab, setTab] = useState<Tab>()
   const [editing, setEditing] = useState<string>()
+  const resultSheet = useSheetPresence(editing)
   const [confirming, setConfirming] = useState<Confirming>()
   const [matchTable, setMatchTable] = useState<EventTableView>()
   // why: during registration the organizer's work (the join code, guests) is on Players.
@@ -127,7 +129,7 @@ export function EventScreen({
   const nextRound = view ? startRoundBlocker(view) : undefined
   // why: finishing only needs every result in; a capped round count or a dropped field must not trap the organizer.
   const blocker = finalRound && nextRound?.kind !== "results" ? undefined : nextRound
-  const editingTable = view?.tables.find((table) => table.id === editing)
+  const editingTable = view?.tables.find((table) => table.id === resultSheet.shown)
   const organizerFooter =
     view?.isOrganizer && view.status !== "finished" ? (
       <>
@@ -243,7 +245,9 @@ export function EventScreen({
               view={view}
               table={editingTable}
               busy={command.busy}
+              visible={resultSheet.visible}
               onClose={() => setEditing(undefined)}
+              onDismissed={resultSheet.onDismissed}
               onSave={async (result) => {
                 if (await command.run(() => source.report(editingTable.id, result)))
                   setEditing(undefined)

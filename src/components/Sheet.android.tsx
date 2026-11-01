@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { StyleSheet, useWindowDimensions, View } from "react-native"
+import { StyleSheet, useWindowDimensions } from "react-native"
 import type { ViewStyle } from "react-native"
 import {
   Column,
@@ -9,6 +9,7 @@ import {
   type ModalBottomSheetRef,
 } from "@expo/ui/jetpack-compose"
 import { fillMaxHeight } from "@expo/ui/jetpack-compose/modifiers"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
@@ -75,15 +76,20 @@ export function Sheet({
       >
         <Column modifiers={fit ? [] : [fillMaxHeight()]}>
           <RNHostView matchContents={fit ? { vertical: true } : false}>
-            <View
+            {/* why: sheet content renders outside the app's root view, so its gestures need their own root. */}
+            <GestureHandlerRootView
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
-                fit ? { maxHeight: height - top - bottom - (FIT_TOP_GAP + DRAG_HANDLE) } : $fill,
+                fit
+                  ? {
+                      maxHeight: height - top - bottom - (FIT_TOP_GAP + DRAG_HANDLE),
+                    }
+                  : $fill,
               ]}
             >
               {children}
-            </View>
+            </GestureHandlerRootView>
           </RNHostView>
         </Column>
       </ModalBottomSheet>

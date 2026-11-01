@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { useWindowDimensions, View } from "react-native"
+import { useWindowDimensions } from "react-native"
 import type { ViewStyle } from "react-native"
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui"
 import {
@@ -9,6 +9,8 @@ import {
   presentationDetents,
   presentationDragIndicator,
 } from "@expo/ui/swift-ui/modifiers"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
+import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
@@ -30,6 +32,7 @@ export function Sheet({
   const { theme, themed } = useAppTheme()
   const { height } = useWindowDimensions()
   const { top, bottom } = useSafeAreaInsets()
+  const keyboard = useKeyboardState((state) => (state.isVisible ? state.height : 0))
   const fit = size === "fit"
   const onScreen = useRef(false)
   const visibleNow = useRef(visible)
@@ -77,15 +80,18 @@ export function Sheet({
           ]}
         >
           <RNHostView matchContents={fit ? { vertical: true } : false}>
-            <View
+            {/* why: sheet content renders outside the app's root view, so its gestures need their own root. */}
+            <GestureHandlerRootView
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
-                fit ? { maxHeight: height - top - bottom - FIT_TOP_GAP } : $fill,
+                fit
+                  ? { maxHeight: height - top - Math.max(bottom, keyboard) - FIT_TOP_GAP }
+                  : $fill,
               ]}
             >
               {children}
-            </View>
+            </GestureHandlerRootView>
           </RNHostView>
         </Group>
       </BottomSheet>

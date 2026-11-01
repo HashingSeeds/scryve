@@ -4,8 +4,9 @@ import { Platform, ScrollView, View } from "react-native"
 import * as Application from "expo-application"
 
 import { ChoiceButton } from "@/components/ChoiceButton"
-import { DialogCard } from "@/components/DialogCard"
 import { ListItem } from "@/components/ListItem"
+import { Sheet } from "@/components/Sheet"
+import { $sheetScroll } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import { ValueField } from "@/components/ValueField"
@@ -282,17 +283,12 @@ export function SettingsScreen({
         value={settings.syncStats ?? false}
         onValueChange={(value) => update({ syncStats: value })}
       />
-      <DialogCard
+      <Sheet
         visible={choosingGame}
         onClose={() => setChoosingGame(false)}
-        placement="bottom"
-        wide
-        backdropTestID="default-game-backdrop"
-        backdropAccessibilityLabel={translate("account:settings.closeGameChoices")}
-        dialogTestID="default-game-dialog"
-        accessibilityViewIsModal
+        testID="default-game-dialog"
       >
-        <ScrollView contentContainerStyle={themed($gameChoices)}>
+        <ScrollView style={$sheetScroll} contentContainerStyle={themed($gameChoices)}>
           <Text tx="account:settings.chooseGame" preset="subheading" accessibilityRole="header" />
           <GameTypeList
             types={gameTypes}
@@ -301,7 +297,7 @@ export function SettingsScreen({
             onChoose={selectGameType}
           />
         </ScrollView>
-      </DialogCard>
+      </Sheet>
     </SettingsPage>
   )
 }

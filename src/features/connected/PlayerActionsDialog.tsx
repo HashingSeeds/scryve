@@ -50,6 +50,8 @@ export function PlayerActionsDialog({
   onClose,
   onRole,
   onInvite,
+  visible = true,
+  onDismissed,
 }: {
   publicId: string
   players: ReportablePlayer[]
@@ -57,6 +59,8 @@ export function PlayerActionsDialog({
   onClose: () => void
   onRole?: () => void
   onInvite?: () => void
+  visible?: boolean
+  onDismissed?: () => void
 }) {
   const { themed } = useAppTheme()
   const report = useMutation(api.moderation.reportPlayer)
@@ -85,7 +89,8 @@ export function PlayerActionsDialog({
 
   return (
     <DialogCard
-      visible
+      visible={visible}
+      onDismissed={onDismissed}
       onClose={onClose}
       closeDisabled={busy}
       origin={origin}

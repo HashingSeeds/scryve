@@ -19,6 +19,8 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
+import { Sheet } from "@/components/Sheet"
+import { $sheetScroll } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
@@ -1123,17 +1125,12 @@ function NewGameForm({
           </View>
         </BottomActionBar>
       </>
-      <DialogCard
+      <Sheet
         visible={optionsOpen}
         onClose={() => setOptionsOpen(false)}
-        placement="bottom"
-        wide
-        backdropTestID="setup-options-backdrop"
-        backdropAccessibilityLabel={translate("play:newGame.closeOptions")}
-        dialogTestID="setup-options-dialog"
-        accessibilityViewIsModal
+        testID="setup-options-dialog"
       >
-        <ScrollView contentContainerStyle={themed($statusDetails)}>
+        <ScrollView style={$sheetScroll} contentContainerStyle={themed($statusDetails)}>
           <View style={themed($valueGrid)}>
             <View style={themed($playerValue)}>
               <ValueField
@@ -1255,7 +1252,7 @@ function NewGameForm({
           preset="primary"
           onPress={() => setOptionsOpen(false)}
         />
-      </DialogCard>
+      </Sheet>
       <DialogCard
         visible={showStatus}
         onClose={() => setShowStatus(false)}
