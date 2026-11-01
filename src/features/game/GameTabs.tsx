@@ -85,7 +85,7 @@ export function GameTabs({ tabs, selectedId, detail, onChoose }: GameTabsProps) 
           // why: each game's formats start scrolled to the front, not where the last game's row was left.
           key={tabKey(selectedTab)}
           testID="game-type"
-          edgeInset={spacing.lg}
+          edgeInset={spacing.md}
           accessibilityLabel={translate("play:newGame.formatLabel")}
           chips={selectedTab.types.map((type) => ({
             id: type.id,
@@ -109,10 +109,10 @@ const $tabsTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   marginBottom: spacing.sm,
 })
 // why: rows clipped at the content padding cut a label mid-word; running to the screen edge reads as scrollable instead.
-const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginHorizontal: -spacing.lg })
+const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginHorizontal: -spacing.md })
 const $tabs: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $tab: ThemedStyle<ViewStyle> = () => ({
   minHeight: 44,

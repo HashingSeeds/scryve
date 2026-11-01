@@ -573,7 +573,8 @@ const $surface: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: col
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,
   gap: spacing.md,
-  padding: spacing.lg,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
 })
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })

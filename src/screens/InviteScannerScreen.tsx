@@ -240,6 +240,7 @@ function ScannerLayout({
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
-  padding: spacing.lg,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })

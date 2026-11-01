@@ -240,7 +240,7 @@ function NewGameForm({
   const insets = useSafeAreaInsets()
   // why: the iPhone Duo's outer display floats its status bar beside the camera hole and reports it only as a side inset, so the toggle steps in where it would run under it.
   const toggleOverhang = (inset: number) =>
-    Math.max(inset - (width - Math.min(width, CONTENT_MAX_WIDTH)) / 2 - spacing.lg, 0)
+    Math.max(inset - (width - Math.min(width, CONTENT_MAX_WIDTH)) / 2 - spacing.md, 0)
   // why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over.
   const [formatPicked, setFormatPicked] = useState(false)
   const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
@@ -1554,7 +1554,7 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: CONTENT_MAX_WIDTH,
   alignSelf: "center",
   gap: spacing.xs,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -1600,7 +1600,7 @@ const $setupHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: CONTENT_MAX_WIDTH,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.md,
   gap: spacing.md,
 })

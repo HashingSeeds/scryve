@@ -49,6 +49,7 @@ export function EventFrame({
       {blocked ? (
         <>
           <EmptyState
+            style={themed($blocked)}
             imageSource={null}
             heading={access.signedIn ? access.message : translate("events:signIn")}
             content={access.signedIn ? "" : access.message}
@@ -82,9 +83,12 @@ export function EventFrame({
 // why: the fixed preset bottom-aligns content, which dropped the header to the bottom while loading or signed out.
 const $frame: ViewStyle = { flex: 1, justifyContent: "flex-start" }
 
+const $blocked: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingHorizontal: spacing.md })
+
 export const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.lg,
-  padding: spacing.lg,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
 })
 export const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })

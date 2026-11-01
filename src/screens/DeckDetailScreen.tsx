@@ -1578,7 +1578,7 @@ const $loadingContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 720,
   alignSelf: "center",
   gap: spacing.sm,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.lg,
 })
 

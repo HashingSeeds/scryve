@@ -128,7 +128,7 @@ const $column: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 560,
   alignSelf: "center",
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $content: ThemedStyle<ViewStyle> = (theme) => ({
   ...$column(theme),

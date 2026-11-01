@@ -727,6 +727,7 @@ const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.sm,
-  padding: spacing.lg,
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
 })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
