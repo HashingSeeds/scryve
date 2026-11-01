@@ -295,9 +295,6 @@ export default {
     localPlayAvailable: "ローカルプレイは引き続き利用できます。",
     notConfigured:
       "このビルドでは通信対戦機能を利用できません。ローカルプレイは引き続き利用できます。",
-    closeSignIn: "サインインを閉じる",
-    signInAgreement:
-      "続行すると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
   },
   billing: {
     renewalPrompt: {

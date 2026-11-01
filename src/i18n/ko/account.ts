@@ -295,9 +295,6 @@ export default {
     localPlayAvailable: "로컬 플레이는 계속 사용할 수 있습니다.",
     notConfigured:
       "이 빌드에서는 연결 기능을 사용할 수 없습니다. 로컬 플레이는 계속 사용할 수 있습니다.",
-    closeSignIn: "로그인 닫기",
-    signInAgreement:
-      "계속하면 <terms>이용약관</terms> 및 <privacy>개인정보 처리방침</privacy>에 동의하는 것으로 간주합니다.",
   },
   billing: {
     renewalPrompt: {
