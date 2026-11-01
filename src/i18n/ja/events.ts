@@ -35,7 +35,9 @@ export default {
   playerCount_other: "{{count}}人",
   organizer: "主催者",
   list: {
+    current: "進行中",
     empty: "イベントはまだありません",
+    emptyHint: "お店や友達同士でトーナメントを開催するか、コードを入力して参加しましょう。",
   },
   create: {
     title: "新規イベント",
@@ -141,6 +143,8 @@ export default {
     title: "近くのイベント",
     host: "この端末で主催",
     yourEvent: "あなたのイベント",
+    hostBusy: "別のイベントを主催するには、今のイベントを終了してください。",
+    nameFirst: "イベントに参加するには、名前を入力してください。",
     searching: "このWi-Fiでイベントを探しています。全員が同じネットワークにいる必要があります。",
     denied:
       "このWi-Fiでイベントを探すには、設定でローカルネットワークへのアクセスを許可してください。",

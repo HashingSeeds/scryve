@@ -37,7 +37,9 @@ export default {
   playerCount_other: "{{count}} jugadores",
   organizer: "Organizador",
   list: {
+    current: "Actuales",
     empty: "Aún no hay eventos",
+    emptyHint: "Organiza un torneo para tu tienda o tus amigos, o únete a uno con su código.",
   },
   create: {
     title: "Nuevo evento",
@@ -145,6 +147,8 @@ export default {
     title: "Eventos cercanos",
     host: "Organizar en este dispositivo",
     yourEvent: "Tu evento",
+    hostBusy: "Termina tu evento para crear otro.",
+    nameFirst: "Escribe tu nombre para unirte a un evento.",
     searching: "Buscando eventos en esta Wi-Fi. Todos deben estar en la misma red.",
     denied: "Permite el acceso a la red local en Ajustes para encontrar eventos en esta Wi-Fi.",
     name: "Tu nombre",

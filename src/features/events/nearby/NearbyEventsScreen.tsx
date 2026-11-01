@@ -5,7 +5,9 @@ import type { Service } from "react-native-zeroconf"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -61,21 +63,25 @@ export function NearbyEventsScreen({
       title={translate("events:nearby.title")}
       onBack={onBack}
       footer={
-        <Button
-          testID="host-nearby-event"
-          tx="events:nearby.host"
-          preset="primary"
-          disabled={hosted?.running}
-          onPress={() => (hosted?.unsaved ? setReplacing(true) : onHost())}
-        />
+        <>
+          {hosted?.running ? <Text size="xs" tone="dim" tx="events:nearby.hostBusy" /> : null}
+          <Button
+            testID="host-nearby-event"
+            tx="events:nearby.host"
+            preset="primary"
+            disabled={hosted?.running}
+            onPress={() => (hosted?.unsaved ? setReplacing(true) : onHost())}
+          />
+        </>
       }
     >
       {hosted ? (
         <View style={themed($section)}>
-          <Text preset="formLabel" tx="events:nearby.yourEvent" />
+          <SectionHeader label={translate("events:nearby.yourEvent")} />
           <TouchableOpacity
             testID="hosted-event"
             accessibilityRole="button"
+            activeOpacity={0.75}
             style={themed($row)}
             onPress={onOpenHosted}
           >
@@ -88,6 +94,7 @@ export function NearbyEventsScreen({
         <TextField
           testID="nearby-name-input"
           labelTx="events:nearby.name"
+          helperTx={events.length > 0 && !name.trim() ? "events:nearby.nameFirst" : undefined}
           value={name}
           maxLength={24}
           onChangeText={onNameChange}
@@ -104,9 +111,9 @@ export function NearbyEventsScreen({
             <View key={service.name} style={themed($row)}>
               <View style={$grow}>
                 <Text weight="medium" numberOfLines={1} text={nearbyEventTitle(service.name)} />
-                <Text size="xxs" tone="dim" text={nearbyEventCode(service.name)} />
+                <Text size="meta" tone="dim" text={nearbyEventCode(service.name)} />
               </View>
-              <Button
+              <TextAction
                 testID={`join-${nearbyEventCode(service.name)}`}
                 tx={joining === service.name ? "events:nearby.joining" : "events:nearby.join"}
                 disabled={joining !== undefined || (askName && !name.trim())}

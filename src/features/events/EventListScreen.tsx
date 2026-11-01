@@ -1,6 +1,8 @@
 import { TouchableOpacity, View } from "react-native"
 
-import { Button } from "@/components/Button"
+import { Button, PlusAccessory } from "@/components/Button"
+import { EmptyState } from "@/components/EmptyState"
+import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { translate } from "@/i18n/translate"
@@ -36,6 +38,18 @@ export function EventListScreen({
   const nearby = onNearby ? (
     <Button testID="nearby-events-button" tx="events:nearby.title" onPress={onNearby} />
   ) : null
+  const sections = [
+    {
+      id: "current",
+      label: translate("events:list.current"),
+      rows: events?.filter((event) => event.status !== "finished") ?? [],
+    },
+    {
+      id: "finished",
+      label: translate("events:status.finished"),
+      rows: events?.filter((event) => event.status === "finished") ?? [],
+    },
+  ]
   return (
     <EventFrame
       blockedAction={nearby}
@@ -54,7 +68,7 @@ export function EventListScreen({
           <Button
             testID="new-event-button"
             tx="events:newEvent"
-            preset="primary"
+            LeftAccessory={PlusAccessory}
             style={$action}
             onPress={onNew}
           />
@@ -62,34 +76,51 @@ export function EventListScreen({
       }
     >
       {nearby}
-      <View style={themed($section)}>
-        {events?.length === 0 ? <Text tone="dim" tx="events:list.empty" /> : null}
-        {events?.map((event) => (
-          <TouchableOpacity
-            key={event.id}
-            testID={`event-${event.id}`}
-            accessibilityRole="button"
-            activeOpacity={0.75}
-            style={themed($row)}
-            onPress={() => onOpen(event.id)}
-          >
-            <View style={$grow}>
-              <Text weight="medium" numberOfLines={1} text={event.name} />
-              <Text
-                size="xxs"
-                numberOfLines={1}
-                tone="dim"
-                text={[
-                  eventMeta(event),
-                  translate("events:playerCount", { count: event.playerCount }),
-                  ...(event.isOrganizer ? [translate("events:organizer")] : []),
-                ].join(" · ")}
-              />
-            </View>
-            <Text size="xs" text={eventStatusText(event)} />
-          </TouchableOpacity>
-        ))}
-      </View>
+      {events?.length === 0 ? (
+        <EmptyState
+          imageSource={null}
+          headingTx="events:list.empty"
+          contentTx="events:list.emptyHint"
+        />
+      ) : null}
+      {sections.map((section) =>
+        section.rows.length > 0 ? (
+          <View key={section.id} testID={`events-${section.id}`} style={themed($section)}>
+            <SectionHeader label={section.label} count={section.rows.length} />
+            {section.rows.map((event) => (
+              <EventRow key={event.id} event={event} onPress={() => onOpen(event.id)} />
+            ))}
+          </View>
+        ) : null,
+      )}
     </EventFrame>
+  )
+}
+
+function EventRow({ event, onPress }: { event: EventListItem; onPress: () => void }) {
+  const { themed } = useAppTheme()
+  return (
+    <TouchableOpacity
+      testID={`event-${event.id}`}
+      accessibilityRole="button"
+      activeOpacity={0.75}
+      style={themed($row)}
+      onPress={onPress}
+    >
+      <View style={$grow}>
+        <Text weight="medium" numberOfLines={1} text={event.name} />
+        <Text
+          size="meta"
+          numberOfLines={1}
+          tone="dim"
+          text={[
+            eventMeta(event),
+            translate("events:playerCount", { count: event.playerCount }),
+            ...(event.isOrganizer ? [translate("events:organizer")] : []),
+          ].join(" · ")}
+        />
+      </View>
+      <Text size="xs" text={eventStatusText(event)} />
+    </TouchableOpacity>
   )
 }
