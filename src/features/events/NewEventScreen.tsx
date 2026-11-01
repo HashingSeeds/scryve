@@ -5,6 +5,7 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
+import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { Switch } from "@/components/Toggle/Switch"
 import { ValueField } from "@/components/ValueField"
@@ -122,6 +123,7 @@ export function NewEventScreen({
         onSelect={chooseFormat}
       />
       <View style={themed($section)}>
+        <Text preset="formLabel" size="xs" tx="events:create.structure" />
         <SegmentedControl
           testID="event-structure"
           accessibilityLabel={translate("events:create.structure")}
@@ -132,7 +134,10 @@ export function NewEventScreen({
           selectedId={structure}
           onSelect={(id) => setStructure(EVENT_STRUCTURES.find((value) => value === id) ?? "swiss")}
         />
-        {structure === "swiss" ? (
+      </View>
+      {structure === "swiss" ? (
+        <View style={themed($section)}>
+          <Text preset="formLabel" size="xs" tx="events:create.bestOf" />
           <SegmentedControl
             testID="event-best-of"
             accessibilityLabel={translate("events:create.bestOf")}
@@ -143,8 +148,8 @@ export function NewEventScreen({
             selectedId={String(bestOf)}
             onSelect={(id) => setBestOf(MATCH_BEST_OF.find((value) => String(value) === id) ?? 3)}
           />
-        ) : null}
-      </View>
+        </View>
+      ) : null}
       <ValueField
         testID="event-rounds"
         label={translate("events:create.rounds")}
