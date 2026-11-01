@@ -377,6 +377,9 @@ export default defineSchema({
     note: v.optional(v.string()),
     favoritedAt: v.optional(v.number()),
     bringingVersionId: v.optional(v.id("deckVersions")),
+    // why: each game's own color codes (Magic: WUBRG letters, [] colorless), so other games can fill it later.
+    identityColors: v.optional(v.array(v.string())),
+    commanderNames: v.optional(v.array(v.string())),
     // why: archivedAt means deleted. The name predates unsynced decks and stays for installed clients.
     archivedAt: v.optional(v.number()),
     unsyncedAt: v.optional(v.number()),
