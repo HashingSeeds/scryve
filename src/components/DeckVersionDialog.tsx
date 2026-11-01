@@ -8,8 +8,9 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
-import { DialogCard } from "./DialogCard"
 import { SegmentedControl } from "./SegmentedControl"
+import { Sheet } from "./Sheet"
+import { $sheetScroll } from "./sheetStyles"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 
@@ -26,7 +27,9 @@ export interface DeckVersionDialogProps {
   error?: string
   onSubmit: (draft: DeckVersionDraft) => void
   onDelete?: () => void
+  visible: boolean
   onClose: () => void
+  onDismissed: () => void
 }
 
 export function DeckVersionDialog({
@@ -40,7 +43,9 @@ export function DeckVersionDialog({
   error,
   onSubmit,
   onDelete,
+  visible,
   onClose,
+  onDismissed,
 }: DeckVersionDialogProps) {
   const { themed } = useAppTheme()
   const [name, setName] = useState(initialName)
@@ -48,18 +53,15 @@ export function DeckVersionDialog({
   const [copyCards, setCopyCards] = useState(true)
 
   return (
-    <DialogCard
-      visible
+    <Sheet
+      visible={visible}
       onClose={onClose}
-      closeDisabled={busy}
-      backdropTestID="deck-version-backdrop"
-      backdropAccessibilityLabel={translate("decks:versionDialog.close")}
-      dialogTestID="deck-version-dialog"
-      accessibilityViewIsModal
-      placement="bottom"
-      wide
+      onDismissed={onDismissed}
+      dismissible={!busy}
+      testID="deck-version-dialog"
     >
       <ScrollView
+        style={$sheetScroll}
         contentContainerStyle={themed($content)}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
@@ -126,7 +128,7 @@ export function DeckVersionDialog({
           />
         ) : null}
       </ScrollView>
-    </DialogCard>
+    </Sheet>
   )
 }
 

@@ -10,7 +10,7 @@ import {
   useState,
 } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, AppState, ScrollView, Share, View } from "react-native"
+import { ActivityIndicator, AppState, Platform, ScrollView, Share, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
 
@@ -23,7 +23,9 @@ import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
+import { Sheet } from "@/components/Sheet"
 import { Text, type TextProps } from "@/components/Text"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { readPublicCloudConfig } from "@/features/auth/config"
@@ -624,6 +626,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
+  // why: iOS can't present the invite sheet until the player actions Modal has faded out.
+  const [inviteAfterActions, setInviteAfterActions] = useState(false)
   const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
@@ -883,6 +887,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
+  const inviteSheet = useSheetPresence(inviteDialogOpen || undefined)
   const overlayOpen =
     menuOpen ||
     statusOpen ||
@@ -961,17 +966,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         )}
       />
 
-      {inviteDialogOpen && invitation ? (
-        <DialogCard
-          visible
-          wide
-          placement="bottom"
-          origin={menuDialogOrigin}
+      {inviteSheet.shown && invitation ? (
+        <Sheet
+          visible={inviteSheet.visible}
           onClose={() => setInviteOpen(false)}
-          backdropTestID="invite-backdrop"
-          backdropAccessibilityLabel={translate("connected:invite.close")}
-          dialogTestID="invite-dialog"
-          accessibilityViewIsModal
+          onDismissed={inviteSheet.onDismissed}
+          testID="invite-dialog"
         >
           <Text preset="subheading" tx="connected:invite.title" style={themed($dialogText)} />
           <InviteCard
@@ -981,7 +981,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           />
           {inviteError ? <AlertNote text={inviteError} /> : null}
           <Button tx="common:close" onPress={() => setInviteOpen(false)} />
-        </DialogCard>
+        </Sheet>
       ) : null}
 
       {statusOpen ? (
@@ -1108,8 +1108,17 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {playerActionsOpen && cloud ? (
+      {(playerActionsOpen || inviteAfterActions) && cloud ? (
         <PlayerActionsDialog
+          visible={playerActionsOpen}
+          onDismissed={
+            inviteAfterActions
+              ? () => {
+                  setInviteAfterActions(false)
+                  setInviteOpen(true)
+                }
+              : undefined
+          }
           publicId={publicId}
           players={reportablePlayers}
           origin={menuDialogOrigin}
@@ -1126,7 +1135,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             invitation
               ? () => {
                   setPlayerActionsOpen(false)
-                  setInviteOpen(true)
+                  if (Platform.OS === "ios") setInviteAfterActions(true)
+                  else setInviteOpen(true)
                 }
               : undefined
           }

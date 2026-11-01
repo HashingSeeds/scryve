@@ -3,7 +3,9 @@ import { ScrollView, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
-import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
+import { $dialogActions, $dialogButton } from "@/components/DialogCard"
+import { Sheet } from "@/components/Sheet"
+import { $sheetScroll } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { ValueField } from "@/components/ValueField"
 import { isPlaySystemId } from "@/features/game/playSystems"
@@ -41,13 +43,17 @@ export function ResultDialog({
   view,
   table,
   busy,
+  visible,
   onClose,
+  onDismissed,
   onSave,
 }: {
   view: EventView
   table: EventTableView
   busy: boolean
+  visible: boolean
   onClose: () => void
+  onDismissed: () => void
   onSave: (result: TableResult | null) => void
 }) {
   const { themed } = useAppTheme()
@@ -57,17 +63,14 @@ export function ResultDialog({
   const draws = isPlaySystemId(view.system) && eventRules(view.system).draws
   const canClear = view.isOrganizer && table.result !== null
   return (
-    <DialogCard
-      visible
+    <Sheet
+      visible={visible}
       onClose={onClose}
-      closeDisabled={busy}
-      placement="bottom"
-      wide
-      dialogTestID="result-dialog"
-      backdropAccessibilityLabel={translate("common:cancel")}
-      accessibilityViewIsModal
+      onDismissed={onDismissed}
+      dismissible={!busy}
+      testID="result-dialog"
     >
-      <ScrollView contentContainerStyle={themed($section)}>
+      <ScrollView style={$sheetScroll} contentContainerStyle={themed($section)}>
         <Text
           preset="subheading"
           accessibilityRole="header"
@@ -145,6 +148,6 @@ export function ResultDialog({
           onPress={() => result && onSave(result)}
         />
       </View>
-    </DialogCard>
+    </Sheet>
   )
 }

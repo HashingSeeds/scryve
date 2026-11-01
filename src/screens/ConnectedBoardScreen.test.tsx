@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet } from "react-native"
+import { Dimensions, Modal, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
@@ -1263,6 +1263,9 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("game-menu-backdrop"))
     openConnectedPlayers()
     fireEvent.press(screen.getByTestId("invite-from-players-button"))
+    expect(screen.queryByTestId("invite-dialog")).toBeNull()
+    const fadingActions = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.onDismiss)
+    act(() => fadingActions?.props.onDismiss())
     expect(screen.getByTestId("invite-dialog")).toBeTruthy()
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()

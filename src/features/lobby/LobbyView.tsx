@@ -16,8 +16,10 @@ import {
 import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
+import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
   lobbyDetail,
@@ -128,7 +130,7 @@ export function LobbyView({
   } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteOrigin, setInviteOrigin] = useState<DialogOrigin>()
+  const inviteSheet = useSheetPresence((inviteOpen && Boolean(invite)) || undefined)
   const [leaveAction, setLeaveAction] = useState<LobbyExitAction>()
   const [exitOrigin, setExitOrigin] = useState<DialogOrigin>()
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
@@ -251,10 +253,7 @@ export function LobbyView({
                 testID="open-invite-button"
                 tx="connected:invite.label"
                 style={themed($inviteButton)}
-                onPress={(event) => {
-                  setInviteOrigin(originOf(event))
-                  setInviteOpen(true)
-                }}
+                onPress={() => setInviteOpen(true)}
               />
             ) : null}
           </View>
@@ -371,17 +370,12 @@ export function LobbyView({
           }}
         />
       </BottomActionBar>
-      {inviteOpen && invite ? (
-        <DialogCard
-          visible
-          wide
-          placement="bottom"
-          origin={inviteOrigin}
+      {inviteSheet.shown && invite ? (
+        <Sheet
+          visible={inviteSheet.visible}
           onClose={() => setInviteOpen(false)}
-          backdropTestID="invite-backdrop"
-          backdropAccessibilityLabel={translate("connected:invite.close")}
-          dialogTestID="invite-dialog"
-          accessibilityViewIsModal
+          onDismissed={inviteSheet.onDismissed}
+          testID="invite-dialog"
         >
           <Text preset="subheading" tx="connected:invite.title" />
           <InviteCard
@@ -390,7 +384,7 @@ export function LobbyView({
             onShare={invite.onShare}
           />
           <Button tx="common:close" onPress={() => setInviteOpen(false)} />
-        </DialogCard>
+        </Sheet>
       ) : null}
       {leaveAction && openExitCopy ? (
         <ConfirmDialog

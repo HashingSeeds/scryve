@@ -14,7 +14,9 @@ describe("DeckVersionDialog", () => {
           submitLabel="Create version"
           copyFromLabel="Current"
           onSubmit={onSubmit}
+          visible
           onClose={jest.fn()}
+          onDismissed={jest.fn()}
         />
       </ThemeProvider>,
     )

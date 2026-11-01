@@ -607,7 +607,7 @@ describe("versions", () => {
         "This deck holds up to 2 versions. Delete one to add another.",
       ),
     ).toBeTruthy()
-    fireEvent.press(full.getByTestId("deck-versions-backdrop"))
+    fireEvent.press(full.getByTestId("sheet-swipe-down"))
     expect(
       full.queryByText("This deck holds up to 2 versions. Delete one to add another."),
     ).toBeNull()

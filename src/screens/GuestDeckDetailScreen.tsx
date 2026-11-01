@@ -152,7 +152,7 @@ export function GuestDeckDetailScreen({
     | "renameVersion"
     | "deleteVersion"
   >()
-  const sheets = useSheetPresence(sheet, (open) => open === "actions" || open === "sideboard")
+  const sheets = useSheetPresence(sheet, (open) => open !== "deleteVersion")
   const [deleting, setDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingElsewhere = useLocalDeckSyncing(localId)
@@ -588,6 +588,8 @@ export function GuestDeckDetailScreen({
         />
       ) : null}
       <DeckVersionsDialogs
+        visible={sheets.visible}
+        onDismissed={sheets.onDismissed}
         dialog={sheets.shown}
         rows={versions.map((version) => ({
           id: String(version.number),
@@ -628,6 +630,8 @@ export function GuestDeckDetailScreen({
       />
       {sheets.shown === "settings" ? (
         <DeckSettingsDialog
+          visible={sheets.visible}
+          onDismissed={sheets.onDismissed}
           game={game}
           initial={{ name: current.name, format: current.format }}
           onClose={() => setSheet(undefined)}

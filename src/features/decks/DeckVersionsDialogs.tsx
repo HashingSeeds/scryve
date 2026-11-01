@@ -6,6 +6,8 @@ import { Button } from "@/components/Button"
 import { DeckVersionDialog, type DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { PressableIcon } from "@/components/Icon"
+import { Sheet } from "@/components/Sheet"
+import { $sheetScroll } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -39,7 +41,9 @@ export function DeckVersionsDialogs<Id extends string>({
   onRename,
   onDelete,
   onConfirmDelete,
+  visible,
   onClose,
+  onDismissed,
 }: {
   dialog: string | undefined
   rows: readonly VersionsRow<Id>[]
@@ -57,7 +61,9 @@ export function DeckVersionsDialogs<Id extends string>({
   onRename: (draft: DeckVersionDraft) => void
   onDelete?: () => void
   onConfirmDelete: () => void
+  visible: boolean
   onClose: () => void
+  onDismissed: () => void
 }) {
   const { themed } = useAppTheme()
   if (dialog === "newVersion" && onNew)
@@ -69,7 +75,9 @@ export function DeckVersionsDialogs<Id extends string>({
         busy={busy}
         error={error}
         onSubmit={onCreate}
+        visible={visible}
         onClose={onClose}
+        onDismissed={onDismissed}
       />
     )
   if (dialog === "renameVersion" && rename)
@@ -84,23 +92,21 @@ export function DeckVersionsDialogs<Id extends string>({
         error={error}
         onSubmit={onRename}
         {...(onDelete ? { onDelete } : {})}
+        visible={visible}
         onClose={onClose}
+        onDismissed={onDismissed}
       />
     )
   if (dialog === "versions")
     return (
-      <DialogCard
-        visible
+      <Sheet
+        visible={visible}
         onClose={onClose}
-        closeDisabled={busy}
-        backdropTestID="deck-versions-backdrop"
-        backdropAccessibilityLabel={translate("common:close")}
-        dialogTestID="deck-versions-dialog"
-        accessibilityViewIsModal
-        placement="bottom"
-        wide
+        onDismissed={onDismissed}
+        dismissible={!busy}
+        testID="deck-versions-dialog"
       >
-        <ScrollView contentContainerStyle={themed($versions)}>
+        <ScrollView style={$sheetScroll} contentContainerStyle={themed($versions)}>
           <Text preset="subheading" tx="decks:detail.versions" />
           {rows.map((row) => {
             const selected = row.id === activeId
@@ -155,7 +161,7 @@ export function DeckVersionsDialogs<Id extends string>({
           ) : null}
           {error ? <AlertNote text={error} /> : null}
         </ScrollView>
-      </DialogCard>
+      </Sheet>
     )
   if (dialog === "deleteVersion")
     return (

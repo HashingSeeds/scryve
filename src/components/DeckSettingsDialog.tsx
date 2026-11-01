@@ -8,8 +8,9 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
-import { DialogCard } from "./DialogCard"
 import { SelectField } from "./SelectField"
+import { Sheet } from "./Sheet"
+import { $sheetScroll } from "./sheetStyles"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 import { deckFormats } from "../../convex/lib/deckGames"
@@ -23,7 +24,9 @@ export interface DeckSettingsDialogProps {
   busy?: boolean
   error?: string
   onSubmit: (draft: DeckSettingsDraft) => void
+  visible: boolean
   onClose: () => void
+  onDismissed: () => void
 }
 
 export function DeckSettingsDialog({
@@ -32,25 +35,27 @@ export function DeckSettingsDialog({
   busy,
   error,
   onSubmit,
+  visible,
   onClose,
+  onDismissed,
 }: DeckSettingsDialogProps) {
   const { themed } = useAppTheme()
   const [name, setName] = useState(initial.name)
   const [format, setFormat] = useState(initial.format)
 
   return (
-    <DialogCard
-      visible
+    <Sheet
+      visible={visible}
       onClose={onClose}
-      closeDisabled={busy}
-      backdropTestID="deck-settings-backdrop"
-      backdropAccessibilityLabel={translate("decks:settings.close")}
-      dialogTestID="deck-settings-dialog"
-      accessibilityViewIsModal
-      placement="bottom"
-      wide
+      onDismissed={onDismissed}
+      dismissible={!busy}
+      testID="deck-settings-dialog"
     >
-      <ScrollView contentContainerStyle={themed($content)} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={$sheetScroll}
+        contentContainerStyle={themed($content)}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text preset="subheading" tx="decks:settings.title" />
         <TextField
           testID="deck-name-input"
@@ -82,7 +87,7 @@ export function DeckSettingsDialog({
           onPress={() => onSubmit({ name, format })}
         />
       </ScrollView>
-    </DialogCard>
+    </Sheet>
   )
 }
 
