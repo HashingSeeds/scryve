@@ -20,16 +20,21 @@ export function Sheet({
   children,
 }: SheetProps) {
   const { theme, themed } = useAppTheme()
-  const wasVisible = useRef(visible)
+  const onScreen = useRef(visible)
   const latestOnDismissed = useRef(onDismissed)
   latestOnDismissed.current = onDismissed
+  if (visible) onScreen.current = true
   useEffect(() => {
-    if (wasVisible.current && !visible) latestOnDismissed.current?.()
-    wasVisible.current = visible
+    if (visible || !onScreen.current) return
+    const timer = setTimeout(() => {
+      onScreen.current = false
+      latestOnDismissed.current?.()
+    }, WEB_EXIT_MS)
+    return () => clearTimeout(timer)
   }, [visible])
   useEffect(
     () => () => {
-      if (wasVisible.current) latestOnDismissed.current?.()
+      if (onScreen.current) latestOnDismissed.current?.()
     },
     [],
   )
@@ -55,6 +60,8 @@ export function Sheet({
   )
 }
 
+// why: @expo/ui's web sheet animates out for 300ms and unmounts by 400ms.
+const WEB_EXIT_MS = 400
 const $fill: ViewStyle = { flex: 1 }
 const $padded: ThemedStyle<ViewStyle> = ({ spacing }) => ({ padding: spacing.lg, gap: spacing.lg })
 const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

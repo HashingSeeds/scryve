@@ -674,7 +674,7 @@ export function GuestDeckDetailScreen({
         />
       ) : null}
       <ConfirmDialog
-        visible={deleting}
+        visible={deleting && !sheets.shown}
         title={translate("decks:guestDetail.deleteTitle")}
         backdropAccessibilityLabel={translate("decks:guestDetail.cancelDelete")}
         message={translate("decks:guestDetail.deleteBody")}
