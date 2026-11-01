@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { StyleSheet, useWindowDimensions, View } from "react-native"
+import { StyleSheet, useWindowDimensions } from "react-native"
 import type { ViewStyle } from "react-native"
 import {
   Column,
@@ -9,6 +9,7 @@ import {
   type ModalBottomSheetRef,
 } from "@expo/ui/jetpack-compose"
 import { fillMaxHeight } from "@expo/ui/jetpack-compose/modifiers"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -77,7 +78,7 @@ export function Sheet({
       >
         <Column modifiers={fit ? [] : [fillMaxHeight()]}>
           <RNHostView matchContents={fit ? { vertical: true } : false}>
-            <View
+            <GestureHandlerRootView
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
@@ -90,7 +91,7 @@ export function Sheet({
               ]}
             >
               {children}
-            </View>
+            </GestureHandlerRootView>
           </RNHostView>
         </Column>
       </ModalBottomSheet>

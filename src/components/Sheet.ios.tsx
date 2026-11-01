@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { useWindowDimensions, View } from "react-native"
+import { useWindowDimensions } from "react-native"
 import type { ViewStyle } from "react-native"
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui"
 import {
@@ -9,6 +9,7 @@ import {
   presentationDetents,
   presentationDragIndicator,
 } from "@expo/ui/swift-ui/modifiers"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -79,7 +80,7 @@ export function Sheet({
           ]}
         >
           <RNHostView matchContents={fit ? { vertical: true } : false}>
-            <View
+            <GestureHandlerRootView
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
@@ -89,7 +90,7 @@ export function Sheet({
               ]}
             >
               {children}
-            </View>
+            </GestureHandlerRootView>
           </RNHostView>
         </Group>
       </BottomSheet>
