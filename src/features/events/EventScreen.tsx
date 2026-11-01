@@ -629,10 +629,19 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
       <View style={themed($row)}>
         <Text preset="sectionLabel" style={$rank} tx="events:standings.rank" />
         <Text preset="sectionLabel" style={$grow} tx="events:standings.player" />
-        <TrailingNumber preset="sectionLabel" value={translate("events:standings.points")} />
-        <TrailingNumber preset="sectionLabel" value={translate("events:standings.record")} />
+        <TrailingNumber
+          adjustsFontSizeToFit
+          preset="sectionLabel"
+          value={translate("events:standings.points")}
+        />
+        <TrailingNumber
+          adjustsFontSizeToFit
+          preset="sectionLabel"
+          value={translate("events:standings.record")}
+        />
         {tiebreaker ? (
           <TrailingNumber
+            adjustsFontSizeToFit
             preset="sectionLabel"
             value={translate(`events:tiebreaker.${tiebreaker}`)}
           />
@@ -642,10 +651,18 @@ function StandingsTab({ view, source }: { view: EventView; source: EventSource }
         <View key={row.playerId} testID={`standing-${row.playerId}`} style={themed($row)}>
           <Text size="xs" style={$rank} text={String(row.rank)} />
           <Text size="xs" style={$grow} numberOfLines={1} text={playerName(view, row.playerId)} />
-          <TrailingNumber size="xs" weight="bold" value={row.points} />
-          <TrailingNumber size="xs" value={`${row.wins}-${row.losses}-${row.draws}`} />
+          <TrailingNumber adjustsFontSizeToFit size="xs" weight="bold" value={row.points} />
+          <TrailingNumber
+            adjustsFontSizeToFit
+            size="xs"
+            value={`${row.wins}-${row.losses}-${row.draws}`}
+          />
           {tiebreaker ? (
-            <TrailingNumber size="xs" value={percent(row.tiebreakers[0] ?? 0)} />
+            <TrailingNumber
+              adjustsFontSizeToFit
+              size="xs"
+              value={percent(row.tiebreakers[0] ?? 0)}
+            />
           ) : null}
         </View>
       ))}
