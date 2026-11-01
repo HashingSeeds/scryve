@@ -40,6 +40,7 @@ import type * as lib_deckIdentity from "../lib/deckIdentity.js";
 import type * as lib_deckKeys from "../lib/deckKeys.js";
 import type * as lib_deckRateLimits from "../lib/deckRateLimits.js";
 import type * as lib_deckResults from "../lib/deckResults.js";
+import type * as lib_deckShares from "../lib/deckShares.js";
 import type * as lib_deckSources from "../lib/deckSources.js";
 import type * as lib_deckStartingValue from "../lib/deckStartingValue.js";
 import type * as lib_deckSync from "../lib/deckSync.js";
@@ -141,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   "lib/deckKeys": typeof lib_deckKeys;
   "lib/deckRateLimits": typeof lib_deckRateLimits;
   "lib/deckResults": typeof lib_deckResults;
+  "lib/deckShares": typeof lib_deckShares;
   "lib/deckSources": typeof lib_deckSources;
   "lib/deckStartingValue": typeof lib_deckStartingValue;
   "lib/deckSync": typeof lib_deckSync;
