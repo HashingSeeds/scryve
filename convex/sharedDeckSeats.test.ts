@@ -74,7 +74,7 @@ describe("shared decks in connected lobbies", () => {
     const viewer = await signedIn(t, "shared-seat-viewer")
     const shared = await auroraDeck(owner)
     const { token } = await owner.mutation(api.decks.share, { deckId: shared.deckId })
-    const deckKey = (await viewer.query(api.decks.shared, { token }))!.deckKey
+    const { deckKey, fingerprint } = (await viewer.query(api.decks.shared, { token }))!
     const ownerDeckKey = (await owner.query(api.decks.detail, { deckId: shared.deckId })).deck
       .deckKey
     const hostDeck = await auroraDeck(viewer)
@@ -86,7 +86,12 @@ describe("shared decks in connected lobbies", () => {
       deckVersionId: hostDeck.versionId,
     })
     await expect(
-      viewer.mutation(api.decks.selectForSeat, { publicId, seat: 1, shareToken: token }),
+      viewer.mutation(api.decks.selectForSeat, {
+        publicId,
+        seat: 1,
+        shareToken: token,
+        deckFingerprint: fingerprint,
+      }),
     ).resolves.toEqual({ deckId: null, deckVersionId: null, deckKey })
     const ownerOther = await auroraDeck(owner)
     await owner.mutation(api.decks.selectForSeat, {
@@ -136,6 +141,14 @@ describe("shared decks in connected lobbies", () => {
     await expect(
       viewer.mutation(api.decks.selectForSeat, { publicId, seat: 1, shareToken: "x".repeat(43) }),
     ).rejects.toMatchObject({ data: { code: "shared_deck_not_found" } })
+    await expect(
+      viewer.mutation(api.decks.selectForSeat, {
+        publicId,
+        seat: 1,
+        shareToken: token,
+        deckFingerprint: `v1:${"0".repeat(64)}`,
+      }),
+    ).rejects.toMatchObject({ data: { code: "shared_deck_changed" } })
 
     const other = await signedIn(t, "shared-reject-other")
     const commander = await other.mutation(api.games.createLobby, {

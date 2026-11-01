@@ -68,6 +68,7 @@ it("reads a shared deck from the copy kept on this device, without asking the se
   keepSharedDeck(
     {
       deckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      fingerprint: `v1:${"c".repeat(64)}`,
       name: "Borrowed",
       game: "mtg",
       format: "commander",

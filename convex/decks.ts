@@ -21,6 +21,7 @@ import {
   deckForKey,
   findDeckByKey,
   pinnedDeck,
+  versionFingerprint,
 } from "./lib/deckKeys"
 import { sharedDeckKey, sharedDeckVersion, sharedSeatDeck } from "./lib/deckShares"
 import { deckStartingValue } from "./lib/deckStartingValue"
@@ -1692,6 +1693,8 @@ export const selectForSeat = mutation({
     seat: v.number(),
     deckVersionId: v.optional(v.id("deckVersions")),
     shareToken: v.optional(v.string()),
+    // why: the player saw the list with this fingerprint, and the owner may have changed it since.
+    deckFingerprint: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const game = await ctx.db
@@ -1727,6 +1730,11 @@ export const selectForSeat = mutation({
         ? undefined
         : await sharedSeatDeck(ctx, args.shareToken, user._id, [lobbyGame, lobbyFormat])
     if (shared?.kind === "shared") {
+      if (shared.deckFingerprint !== args.deckFingerprint)
+        throw new ConvexError({
+          code: "shared_deck_changed",
+          message: "This deck just changed. Choose it again.",
+        })
       await ctx.db.patch(player._id, {
         ...NO_SEAT_DECK,
         deckKey: shared.deckKey,
@@ -1912,6 +1920,7 @@ export const shared = query({
     const startingValue = await deckStartingValue(ctx, version._id, game, deck.format)
     return {
       deckKey: await sharedDeckKey(args.token),
+      fingerprint: await versionFingerprint(ctx, version._id, game),
       name: deck.name,
       game,
       format: deck.format,

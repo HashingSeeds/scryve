@@ -85,6 +85,7 @@ it("pins a shared deck from the copy kept on this device, under its own key", as
   keepSharedDeck(
     {
       deckKey,
+      fingerprint: `v1:${"c".repeat(64)}`,
       name: "Borrowed",
       game: "mtg",
       format: "commander",

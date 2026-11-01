@@ -180,6 +180,7 @@ describe("LocalGamePublishSession", () => {
     keepSharedDeck(
       {
         deckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        fingerprint: `v1:${"c".repeat(64)}`,
         name: "Borrowed",
         game: "mtg",
         format: "commander",

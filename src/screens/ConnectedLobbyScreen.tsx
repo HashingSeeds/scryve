@@ -170,14 +170,15 @@ function ConnectedLobbyContent({
     if (!kept) return
     // why: the seat takes the owner's current list, so the copy this board reads is refreshed to match it first.
     const fresh = await convex.query(api.decks.shared, { token: kept.token }).catch(() => undefined)
+    if (fresh === undefined) return setActionError(translate("connected:lobby.errors.selectDeck"))
     if (fresh === null) return setActionError(translate("decks:shared.unavailable"))
-    if (fresh) keepSharedDeck(fresh, kept.token)
-    await selectSeatDeck(seat, { shareToken: kept.token })
+    keepSharedDeck(fresh, kept.token)
+    await selectSeatDeck(seat, { shareToken: kept.token, deckFingerprint: fresh.fingerprint })
   }
 
   async function selectSeatDeck(
     seat: number,
-    choice: { deckVersionId?: Id<"deckVersions">; shareToken?: string },
+    choice: { deckVersionId?: Id<"deckVersions">; shareToken?: string; deckFingerprint?: string },
   ) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
