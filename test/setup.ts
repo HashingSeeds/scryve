@@ -62,11 +62,39 @@ jest.doMock("react-native", () => {
   )
 })
 
-// why: the native sheet has no Jest renderer; show its children only while it is presented.
-jest.mock("@expo/ui", () => ({
-  BottomSheet: ({ isPresented, children }: { isPresented: boolean; children: ReactNode }) =>
-    isPresented ? children : null,
-  RNHostView: ({ children }: { children: ReactNode }) => children,
+// why: the native sheet has no Jest renderer, and tests must control when its exit animation ends.
+jest.mock("@expo/ui/swift-ui", () => {
+  const { useEffect, useRef } = jest.requireActual<typeof import("react")>("react")
+  const pending: (() => void)[] = []
+  const passThrough = ({ children }: { children: ReactNode }) => children
+  return {
+    Host: passThrough,
+    Group: passThrough,
+    RNHostView: passThrough,
+    BottomSheet: function BottomSheet({
+      isPresented,
+      onDismiss,
+      children,
+    }: {
+      isPresented: boolean
+      onDismiss?: () => void
+      children: ReactNode
+    }) {
+      const wasPresented = useRef(isPresented)
+      useEffect(() => {
+        if (wasPresented.current && !isPresented && onDismiss) pending.push(onDismiss)
+        wasPresented.current = isPresented
+      }, [isPresented, onDismiss])
+      return isPresented ? children : null
+    },
+    finishSheetDismissals: () => pending.splice(0).forEach((run) => run()),
+  }
+})
+jest.mock("@expo/ui/swift-ui/modifiers", () => ({
+  frame: () => ({}),
+  presentationBackground: () => ({}),
+  presentationDetents: () => ({}),
+  presentationDragIndicator: () => ({}),
 }))
 
 jest.mock("react-native-keyboard-controller", () => ({

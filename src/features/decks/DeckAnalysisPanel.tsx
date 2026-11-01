@@ -77,8 +77,19 @@ export function DeckAnalysisSheet({
   onChooseCommander?: () => void
 }) {
   const { themed } = useAppTheme()
+  // why: card search is a Modal, which iOS refuses to present while this sheet is still leaving.
+  const afterClose = useRef<(() => void) | undefined>(undefined)
   return (
-    <Sheet visible={visible} onClose={onClose} testID="deck-analysis-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      onDismissed={() => {
+        const run = afterClose.current
+        afterClose.current = undefined
+        run?.()
+      }}
+      testID="deck-analysis-sheet"
+    >
       <View style={themed($sheetHeader)}>
         <Text preset="subheading" tx="decks:build.analysis" />
         <TextAction testID="close-deck-analysis" tx="common:close" onPress={onClose} />
@@ -89,8 +100,8 @@ export function DeckAnalysisSheet({
           onChooseCommander={
             onChooseCommander &&
             (() => {
+              afterClose.current = onChooseCommander
               onClose()
-              onChooseCommander()
             })
           }
         />

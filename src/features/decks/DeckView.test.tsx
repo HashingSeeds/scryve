@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
@@ -260,6 +260,12 @@ describe("analysis sheet", () => {
     expect(view.queryByTestId("deck-analysis")).toBeNull()
     fireEvent.press(view.getByTestId("open-deck-analysis"))
     fireEvent.press(view.getByTestId("deck-analysis-choose-commander"))
+    expect(view.queryByTestId("card-search")).toBeNull()
+    act(() =>
+      jest
+        .requireMock<{ finishSheetDismissals: () => void }>("@expo/ui/swift-ui")
+        .finishSheetDismissals(),
+    )
     expect(view.getByTestId("card-search")).toHaveTextContent("commander")
   })
 
