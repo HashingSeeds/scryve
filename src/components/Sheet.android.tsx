@@ -76,6 +76,7 @@ export function Sheet({
       >
         <Column modifiers={fit ? [] : [fillMaxHeight()]}>
           <RNHostView matchContents={fit ? { vertical: true } : false}>
+            {/* why: sheet content renders outside the app's root view, so its gestures need their own root. */}
             <GestureHandlerRootView
               testID={testID}
               style={[

@@ -1305,6 +1305,39 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(false)
   })
 
+  it("waits for a leaving invite sheet before showing that the game was abandoned", () => {
+    const sheets = jest.requireMock<{
+      holdSheetDismissals: () => void
+      finishSheetDismissals: () => void
+      releaseSheetDismissals: () => void
+    }>("@expo/ui/swift-ui")
+    sheets.holdSheetDismissals()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" initialInviteOpen />))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        status: "abandoned",
+        invitation: undefined,
+      },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
+
+    act(() => sheets.finishSheetDismissals())
+    expect(screen.getByTestId("abandoned-game-dialog")).toBeTruthy()
+    sheets.releaseSheetDismissals()
+  })
+
   it("takes a finished board to its summary without a second trip", () => {
     const onGameEnded = jest.fn()
     connectedHarness.runtime = {
