@@ -356,7 +356,7 @@ const $footerSpace: ViewStyle = { height: 44 }
 
 const $embeddedActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
-  maxWidth: 720 - spacing.lg * 2,
+  maxWidth: 720 - spacing.md * 2,
   alignSelf: "center",
   gap: spacing.xs,
 })
