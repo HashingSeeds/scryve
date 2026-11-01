@@ -75,8 +75,10 @@ it("uses a local deck's explicit key and defaults older decks to localId without
 
 it("pins a shared deck from the copy kept on this device, under its own key", async () => {
   const token = "s".repeat(43)
+  const deckKey = `shared-${"b".repeat(32)}`
   keepSharedDeck(
     {
+      deckKey,
       name: "Borrowed",
       game: "mtg",
       format: "commander",
@@ -87,12 +89,12 @@ it("pins a shared deck from the copy kept on this device, under its own key", as
   const [choice] = sharedDeckChoices(loadSharedDecks())
   const fingerprint = `v1:${"a".repeat(64)}`
   expect(await pinDeckChoice(choice, "owner")).toEqual({
-    deckKey: `shared-${token}`,
+    deckKey,
     deckVersionId: undefined,
     deckName: "Borrowed",
     deckFingerprint: fingerprint,
   })
-  expect(await lookupListSnapshot(`shared-${token}`, fingerprint, "owner")).toEqual([
+  expect(await lookupListSnapshot(deckKey, fingerprint, "owner")).toEqual([
     { name: "Sol Ring", quantity: 1, game: "mtg" },
   ])
 })

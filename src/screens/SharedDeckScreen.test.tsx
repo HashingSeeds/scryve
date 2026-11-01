@@ -29,6 +29,7 @@ beforeEach(() => clear())
 
 it("plays a shared deck without saving it as one of yours", () => {
   mockShared = {
+    deckKey: `shared-${"b".repeat(32)}`,
     name: "Borrowed",
     game: "mtg",
     format: "commander",
@@ -38,7 +39,7 @@ it("plays a shared deck without saving it as one of yours", () => {
   const view = renderScreen(onPlay)
   expect(view.getByTestId("shared-deck-name").props.children).toBe("Borrowed")
   fireEvent.press(view.getByTestId("shared-deck-play"))
-  expect(onPlay).toHaveBeenCalledWith(`shared-${token}`)
+  expect(onPlay).toHaveBeenCalledWith(`shared-${"b".repeat(32)}`)
   expect(loadSharedDeck(token)?.deck).toMatchObject({ name: "Borrowed", format: "commander" })
 })
 

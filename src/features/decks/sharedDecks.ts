@@ -10,15 +10,15 @@ import type { api } from "../../../convex/_generated/api"
 export type SharedDeckView = NonNullable<FunctionReturnType<typeof api.decks.shared>>
 
 /** why: game setup pins its cards from this copy, so a shared deck plays offline without becoming one of your decks. */
-export type SharedDeck = { token: string; deck: GuestDeckPayload; startingValue?: number }
+export type SharedDeck = {
+  token: string
+  deckKey: string
+  deck: GuestDeckPayload
+  startingValue?: number
+}
 
 const SHARED_DECKS_KEY = "decks.shared.v1"
 const SHARED_DECK_LIMIT = 20
-
-/** why: results from a shared deck are tracked under this key, apart from every deck of your own. */
-export function sharedDeckKey(token: string) {
-  return `shared-${token}`
-}
 
 export function sharedDeckPayload({ name, game, format, cards }: SharedDeckView): GuestDeckPayload {
   return { name, game, format, cards }
@@ -26,10 +26,12 @@ export function sharedDeckPayload({ name, game, format, cards }: SharedDeckView)
 
 function isSharedDeck(value: unknown): value is SharedDeck {
   if (typeof value !== "object" || value === null) return false
-  const { token, deck, startingValue } = value as Record<string, unknown>
+  const { token, deckKey, deck, startingValue } = value as Record<string, unknown>
   return (
     typeof token === "string" &&
     isShareToken(token) &&
+    typeof deckKey === "string" &&
+    /^shared-[0-9a-f]{32}$/.test(deckKey) &&
     isGuestDeckPayload(deck) &&
     (startingValue === undefined || typeof startingValue === "number")
   )
@@ -48,6 +50,7 @@ export function loadSharedDeck(token: string) {
 export function keepSharedDeck(view: SharedDeckView, token: string) {
   const shared: SharedDeck = {
     token,
+    deckKey: view.deckKey,
     deck: sharedDeckPayload(view),
     ...(view.startingValue === undefined ? {} : { startingValue: view.startingValue }),
   }
@@ -61,9 +64,9 @@ export function keepSharedDeck(view: SharedDeckView, token: string) {
 }
 
 export function sharedDeckChoices(decks: readonly SharedDeck[]): DeckChoice[] {
-  return decks.map(({ token, deck, startingValue }) => ({
+  return decks.map(({ token, deckKey, deck, startingValue }) => ({
     sharedToken: token,
-    deckKey: sharedDeckKey(token),
+    deckKey,
     name: deck.name,
     system: deck.game ?? "mtg",
     format: deck.format,

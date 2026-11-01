@@ -40,6 +40,8 @@ describe("deck share links", () => {
 
     const shared = await t.query(api.decks.shared, { token })
     expect(shared).toMatchObject({ name: "Shared", game: "mtg", format: "commander" })
+    expect(shared?.deckKey).toMatch(/^shared-[0-9a-f]{32}$/)
+    expect(shared?.deckKey).not.toContain(token)
     expect(shared?.cards).toEqual([expect.objectContaining({ name: "Sol Ring", quantity: 1 })])
     expect(shared?.cards[0]).not.toHaveProperty("_id")
     expect(shared?.cards[0]).not.toHaveProperty("deckVersionId")
@@ -74,6 +76,27 @@ describe("deck share links", () => {
     expect((await owner.query(api.decks.detail, { deckId })).shared).toBe(false)
     const again = await owner.mutation(api.decks.share, { deckId })
     expect(again.token).not.toBe(token)
+  })
+
+  it("stays dead when a deleted deck comes back", async () => {
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "share-owner-5", "Share Owner")
+    const deckId = await owner.mutation(api.decks.importResolved, {
+      deckKey: "revived-deck",
+      name: "Back again",
+      format: "commander",
+      cards: [card],
+    })
+    const { token } = await owner.mutation(api.decks.share, { deckId })
+    await owner.mutation(api.decks.archive, { deckId })
+    const revived = await owner.mutation(api.decks.importResolved, {
+      deckKey: "revived-deck",
+      name: "Back again",
+      format: "commander",
+      cards: [card],
+    })
+    expect(revived).toBe(deckId)
+    await expect(t.query(api.decks.shared, { token })).resolves.toBeNull()
   })
 
   it("stops working once the deck is deleted", async () => {

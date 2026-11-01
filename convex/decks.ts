@@ -1136,6 +1136,7 @@ export const archive = mutation({
       updatedAt: now,
       syncRevision: (deck.syncRevision ?? 0) + 1,
     })
+    await endShares(ctx, deck._id)
     return null
   },
 })
@@ -1794,6 +1795,7 @@ export const moveToDevice = mutation({
       updatedAt: now,
       syncRevision: (deck.syncRevision ?? 0) + 1,
     })
+    await endShares(ctx, deck._id)
     return syncedDeck((await ctx.db.get(deck._id))!)
   },
 })
@@ -1834,6 +1836,21 @@ function shareToken() {
     .replace(/=+$/, "")
 }
 
+async function endShares(ctx: MutationCtx, deckId: Id<"decks">) {
+  for (const link of await ctx.db
+    .query("deckShares")
+    .withIndex("by_deck", (q) => q.eq("deckId", deckId))
+    .take(10))
+    await ctx.db.delete(link._id)
+}
+
+/** why: results travel to opponents with the deck key, so the key is a hash that cannot open the link. */
+async function sharedDeckKey(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0"))
+  return `shared-${hex.join("").slice(0, 32)}`
+}
+
 /** why: one link per deck, so sharing again hands back the link already sent. */
 export const share = mutation({
   args: { deckId: v.id("decks") },
@@ -1856,11 +1873,7 @@ export const unshare = mutation({
   args: { deckId: v.id("decks") },
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
-    const link = await ctx.db
-      .query("deckShares")
-      .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
-      .first()
-    if (link) await ctx.db.delete(link._id)
+    await endShares(ctx, deck._id)
     return null
   },
 })
@@ -1888,6 +1901,7 @@ export const shared = query({
     const includeImages = await capabilityReleased(ctx, game, "images")
     const startingValue = await deckStartingValue(ctx, version._id, game, deck.format)
     return {
+      deckKey: await sharedDeckKey(args.token),
       name: deck.name,
       game,
       format: deck.format,

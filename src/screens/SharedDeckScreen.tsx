@@ -28,7 +28,6 @@ import { useSaveNewDeck } from "@/features/decks/localDeckSync"
 import { SaveDestination, useSaveDestination } from "@/features/decks/SaveDestination"
 import {
   keepSharedDeck,
-  sharedDeckKey,
   sharedDeckPayload,
   type SharedDeckView,
 } from "@/features/decks/sharedDecks"
@@ -142,7 +141,7 @@ function SharedDeckList({
 
   function play() {
     if (!keepSharedDeck(shared, token)) return setError(translate("decks:guestStorage.saveFailed"))
-    onPlay(sharedDeckKey(token))
+    onPlay(shared.deckKey)
   }
 
   async function save() {
