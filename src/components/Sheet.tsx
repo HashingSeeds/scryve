@@ -1,14 +1,10 @@
 import { useEffect, useRef } from "react"
-import { View } from "react-native"
 import type { ViewStyle } from "react-native"
-import { BottomSheet, RNHostView } from "@expo/ui"
 
-import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
-
+import { DialogCard } from "./DialogCard"
 import type { SheetProps } from "./sheetTypes"
 
-// why: Sheet.ios.tsx and Sheet.android.tsx cover native; this universal one serves web.
+// why: web has no swipe to close, and @expo/ui's web sheet sits in the top layer above RN Modal pickers.
 export function Sheet({
   visible,
   onClose,
@@ -19,19 +15,10 @@ export function Sheet({
   testID,
   children,
 }: SheetProps) {
-  const { theme, themed } = useAppTheme()
   const onScreen = useRef(visible)
   const latestOnDismissed = useRef(onDismissed)
   latestOnDismissed.current = onDismissed
   if (visible) onScreen.current = true
-  useEffect(() => {
-    if (visible || !onScreen.current) return
-    const timer = setTimeout(() => {
-      onScreen.current = false
-      latestOnDismissed.current?.()
-    }, WEB_EXIT_MS)
-    return () => clearTimeout(timer)
-  }, [visible])
   useEffect(
     () => () => {
       if (onScreen.current) latestOnDismissed.current?.()
@@ -39,29 +26,24 @@ export function Sheet({
     [],
   )
   return (
-    <BottomSheet
-      isPresented={visible}
-      onDismiss={() => {
-        if (dismissible) onClose()
+    <DialogCard
+      visible={visible}
+      onClose={onClose}
+      onDismissed={() => {
+        onScreen.current = false
+        latestOnDismissed.current?.()
       }}
-      snapPoints={size === "full" ? ["full"] : undefined}
-      containerColor={theme.colors.surface}
-      contentPadding={0}
+      closeDisabled={!dismissible}
+      placement="bottom"
+      wide
+      dialogTestID={testID}
+      accessibilityViewIsModal
+      style={[size === "full" ? $full : undefined, edgeToEdge ? $edgeToEdge : undefined]}
     >
-      <RNHostView>
-        <View
-          testID={testID}
-          style={[themed(edgeToEdge ? $edgeToEdge : $padded), size === "full" ? $fill : undefined]}
-        >
-          {children}
-        </View>
-      </RNHostView>
-    </BottomSheet>
+      {children}
+    </DialogCard>
   )
 }
 
-// why: @expo/ui's web sheet animates out for 300ms and unmounts by 400ms.
-const WEB_EXIT_MS = 400
-const $fill: ViewStyle = { flex: 1 }
-const $padded: ThemedStyle<ViewStyle> = ({ spacing }) => ({ padding: spacing.lg, gap: spacing.lg })
-const $edgeToEdge: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+const $full: ViewStyle = { height: "88%" }
+const $edgeToEdge: ViewStyle = { paddingHorizontal: 0 }
