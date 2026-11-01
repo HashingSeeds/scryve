@@ -230,7 +230,11 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
             {
               action: "VIEW",
               autoVerify: true,
-              data: [{ scheme: "https", host: inviteUrl.host, pathPrefix: "/join" }],
+              data: ["/join", "/deck"].map((pathPrefix) => ({
+                scheme: "https",
+                host: inviteUrl.host,
+                pathPrefix,
+              })),
               category: ["BROWSABLE", "DEFAULT"],
             },
           ]
