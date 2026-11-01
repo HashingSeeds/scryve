@@ -6,6 +6,7 @@ export default {
   newEvent: "新規イベント",
   joinEvent: "イベントに参加",
   loading: "読み込み中…",
+  actions: "イベント操作",
   failed: "うまくいきませんでした。もう一度お試しください。",
   storeScreen: "ストア画面",
   errors: {
@@ -102,6 +103,7 @@ export default {
   addGuest: "ゲストを追加",
   guestName: "ゲスト名",
   table: "テーブル{{table}}",
+  tables: "テーブル",
   versus: "{{first}} vs {{second}}",
   bye: "不戦勝",
   tableStatus: {

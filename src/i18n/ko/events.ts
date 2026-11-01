@@ -6,6 +6,7 @@ export default {
   newEvent: "새 이벤트",
   joinEvent: "이벤트 참가",
   loading: "불러오는 중…",
+  actions: "이벤트 작업",
   failed: "실패했습니다. 다시 시도하세요.",
   storeScreen: "매장 화면",
   errors: {
@@ -102,6 +103,7 @@ export default {
   addGuest: "손님 추가",
   guestName: "손님 이름",
   table: "{{table}}번 테이블",
+  tables: "테이블",
   versus: "{{first}} vs {{second}}",
   bye: "부전승",
   tableStatus: {

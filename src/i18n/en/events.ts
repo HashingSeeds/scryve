@@ -4,6 +4,8 @@ const events = {
   newEvent: "New event",
   joinEvent: "Join event",
   loading: "Loading…",
+  // Label for the header button that opens Finish, Delete, and Drop.
+  actions: "Event actions",
   failed: "That didn't work. Try again.",
   // Label above a web address the organizer opens on a store TV to show pairings, the clock, and standings.
   storeScreen: "Store screen",
@@ -108,6 +110,8 @@ const events = {
   addGuest: "Add guest",
   guestName: "Guest name",
   table: "Table {{table}}",
+  // Section label above every table in the round, with how many have a result.
+  tables: "Tables",
   // Separates player names at a 1v1 table, e.g. "Ada vs Grace".
   versus: "{{first}} vs {{second}}",
   bye: "Bye",
