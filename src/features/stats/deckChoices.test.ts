@@ -1,7 +1,13 @@
-import { keepSharedDeck, loadSharedDecks, sharedDeckChoices } from "@/features/decks/sharedDecks"
+import { keepSharedDeck, loadSharedDecks } from "@/features/decks/sharedDecks"
 import { clear } from "@/utils/storage"
 
-import { chosenDeckCards, chosenDeckKey, localDeckChoices, pinDeckChoice } from "./deckChoices"
+import {
+  chosenDeckCards,
+  chosenDeckKey,
+  localDeckChoices,
+  pinDeckChoice,
+  sharedDeckChoices,
+} from "./deckChoices"
 import { deckFingerprint } from "./deckFingerprint"
 import { lookupListSnapshot } from "./listSnapshots"
 

@@ -926,10 +926,9 @@ function DeckDetailContent({
             onPress: () => {
               setDialog("none")
               setLinkCopied(false)
-              void run(
-                () => unshareDeck({ deckId: deckId as Id<"decks"> }),
-                translate("decks:shared.stopFailed"),
-              )
+              void run(async () => {
+                await unshareDeck({ deckId: deckId as Id<"decks"> })
+              }, translate("decks:shared.stopFailed"))
             },
           },
         ]

@@ -32,7 +32,7 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
-import { loadSharedDecks, sharedDeckChoices } from "@/features/decks/sharedDecks"
+import { loadSharedDecks } from "@/features/decks/sharedDecks"
 import {
   createLocalGame,
   hasLocalGameStarted,
@@ -80,6 +80,7 @@ import {
   deckChoiceId,
   localDeckChoices,
   pinDeckChoice,
+  sharedDeckChoices,
   type DeckChoice,
   type SelectedDeck,
 } from "@/features/stats/deckChoices"

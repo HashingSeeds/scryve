@@ -2,7 +2,7 @@ import { DeckSyncRepository } from "@/features/decks/decksSync"
 import { newestPendingCardWrite, versionWriteOutbox } from "@/features/decks/decksVersionWrites"
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { guestDeckPlayCards, loadGuestDeck, type GuestDeck } from "@/features/decks/guestDeck"
-import { loadSharedDeck } from "@/features/decks/sharedDecks"
+import { loadSharedDeck, type SharedDeck } from "@/features/decks/sharedDecks"
 import { translate } from "@/i18n/translate"
 
 import { deckFingerprint } from "./deckFingerprint"
@@ -45,6 +45,17 @@ export function localDeckChoices(decks: readonly GuestDeck[]): DeckChoice[] {
       "startingValue" in local.deck && typeof local.deck.startingValue === "number"
         ? local.deck.startingValue
         : undefined,
+  }))
+}
+
+export function sharedDeckChoices(decks: readonly SharedDeck[]): DeckChoice[] {
+  return decks.map(({ token, deckKey, deck, startingValue }) => ({
+    sharedToken: token,
+    deckKey,
+    name: deck.name,
+    system: deck.game ?? "mtg",
+    format: deck.format,
+    startingValue,
   }))
 }
 

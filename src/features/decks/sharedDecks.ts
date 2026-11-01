@@ -1,6 +1,5 @@
 import type { FunctionReturnType } from "convex/server"
 
-import type { DeckChoice } from "@/features/stats/deckChoices"
 import { load, save } from "@/utils/storage"
 
 import { isGuestDeckPayload, type GuestDeckPayload } from "./guestDeck"
@@ -61,15 +60,4 @@ export function keepSharedDeck(view: SharedDeckView, token: string) {
       SHARED_DECK_LIMIT,
     ),
   )
-}
-
-export function sharedDeckChoices(decks: readonly SharedDeck[]): DeckChoice[] {
-  return decks.map(({ token, deckKey, deck, startingValue }) => ({
-    sharedToken: token,
-    deckKey,
-    name: deck.name,
-    system: deck.game ?? "mtg",
-    format: deck.format,
-    startingValue,
-  }))
 }
