@@ -10,7 +10,6 @@ import {
 } from "@expo/ui/jetpack-compose"
 import { fillMaxHeight } from "@expo/ui/jetpack-compose/modifiers"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
-import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
@@ -32,7 +31,6 @@ export function Sheet({
   const { theme, themed } = useAppTheme()
   const { height } = useWindowDimensions()
   const { top, bottom } = useSafeAreaInsets()
-  const keyboard = useKeyboardState((state) => (state.isVisible ? state.height : 0))
   const sheet = useRef<ModalBottomSheetRef>(null)
   const [mounted, setMounted] = useState(visible)
   const latestOnDismissed = useRef(onDismissed)
@@ -84,8 +82,7 @@ export function Sheet({
                 themed(edgeToEdge ? $edgeToEdge : $padded),
                 fit
                   ? {
-                      maxHeight:
-                        height - top - Math.max(bottom, keyboard) - (FIT_TOP_GAP + DRAG_HANDLE),
+                      maxHeight: height - top - bottom - (FIT_TOP_GAP + DRAG_HANDLE),
                     }
                   : $fill,
               ]}

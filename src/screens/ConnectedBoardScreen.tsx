@@ -888,6 +888,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
   const inviteSheet = useSheetPresence(inviteDialogOpen || undefined)
+  // why: the invite sheet must stay mounted to animate out after its invitation is gone.
+  const lastInvitation = useRef(invitation)
+  if (invitation) lastInvitation.current = invitation
+  const shownInvitation = lastInvitation.current
   useEffect(() => {
     if (inviteOpen && invitation === undefined) setInviteOpen(false)
   }, [inviteOpen, invitation])
@@ -971,7 +975,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         )}
       />
 
-      {inviteSheet.shown && invitation ? (
+      {inviteSheet.shown && shownInvitation ? (
         <Sheet
           visible={inviteSheet.visible}
           onClose={() => setInviteOpen(false)}
@@ -980,8 +984,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         >
           <Text preset="subheading" tx="connected:invite.title" style={themed($dialogText)} />
           <InviteCard
-            qrPayload={buildInviteQrPayload(invitation.token, invitation.manualCode)}
-            manualCode={invitation.manualCode}
+            qrPayload={buildInviteQrPayload(shownInvitation.token, shownInvitation.manualCode)}
+            manualCode={shownInvitation.manualCode}
             onShare={() => void shareInvite()}
           />
           {inviteError ? <AlertNote text={inviteError} /> : null}
