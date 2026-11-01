@@ -1,5 +1,6 @@
 import { createContext, ReactElement, ReactNode, useContext, useState } from "react"
 import {
+  ImageStyle,
   LayoutChangeEvent,
   StyleProp,
   TextStyle,
@@ -204,6 +205,38 @@ export function Header(props: HeaderProps) {
   )
 }
 
+/** why: Header's own `leftIcon`/`rightIcon` carry no accessibility label, and every icon-only header action needs one; pass this as `LeftActionComponent`/`RightActionComponent`. */
+export function HeaderIcon({
+  icon,
+  label,
+  onPress,
+  disabled,
+  testID,
+}: {
+  icon: IconTypes
+  label: string
+  onPress?: () => void
+  disabled?: boolean
+  testID?: string
+}) {
+  const { themed, theme } = useAppTheme()
+  return (
+    <PressableIcon
+      testID={testID}
+      icon={icon}
+      size={24}
+      color={theme.colors.tint}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      containerStyle={[themed($actionIconContainer), disabled && $disabledIcon]}
+      style={icon === "back" && isRTL ? $flipped : undefined}
+    />
+  )
+}
+
 function HeaderAction({ onLayout, ...props }: HeaderActionProps) {
   return (
     <View onLayout={onLayout} style={$actionSlot}>
@@ -258,6 +291,9 @@ function HeaderActionContent(props: Omit<HeaderActionProps, "onLayout">) {
 
   return <View style={[$actionFillerContainer, { backgroundColor }]} />
 }
+
+const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
+const $disabledIcon: ViewStyle = { opacity: 0.4 }
 
 const HEADER_MAX_FONT_SCALE = 1.5
 const CENTERED_TITLE_MAX_FONT_SCALE = 1.3

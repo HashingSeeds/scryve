@@ -467,6 +467,7 @@ export function HistoryScreen({
                 ))}
               </ScrollView>
               <FilterButton
+                overlap
                 testID="history-filters-button"
                 count={filterCount}
                 onPress={() => setFiltersOpen(true)}

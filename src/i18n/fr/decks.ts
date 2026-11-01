@@ -675,6 +675,7 @@ export default {
     checkAgain: "Vérifier à nouveau",
     open: "Ouvrir",
     loadMore: "Charger plus",
+    startingPoint: "Point de départ",
     importSource: "Source d’import",
     pasteText: "Coller du texte",
     sourceLink: "Lien {{source}}",

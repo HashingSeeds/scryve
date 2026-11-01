@@ -708,6 +708,7 @@ const decks = {
     checkAgain: "Check again",
     open: "Open",
     loadMore: "Load more",
+    startingPoint: "Starting point",
     importSource: "Import source",
     pasteText: "Paste text",
     sourceLink: "{{source}} link",

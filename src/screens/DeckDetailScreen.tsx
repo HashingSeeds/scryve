@@ -12,7 +12,7 @@ import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
-import { Header } from "@/components/Header"
+import { Header, HeaderIcon } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
@@ -52,7 +52,7 @@ import {
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
-import { DeckHeaderIcon, DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
+import { DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import {
@@ -172,10 +172,10 @@ function DeckDetailPlaceholder({
         title=""
         backgroundColor={theme.colors.surface}
         LeftActionComponent={
-          <DeckHeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+          <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
         }
         RightActionComponent={
-          <DeckHeaderIcon icon="more" label={translate("decks:deckView.details")} disabled />
+          <HeaderIcon icon="more" label={translate("decks:deckView.details")} disabled />
         }
       />
       <ScrollView

@@ -668,6 +668,7 @@ export default {
     checkAgain: "Comprobar de nuevo",
     open: "Abrir",
     loadMore: "Cargar más",
+    startingPoint: "Punto de partida",
     importSource: "Origen de importación",
     pasteText: "Pegar texto",
     sourceLink: "Enlace de {{source}}",

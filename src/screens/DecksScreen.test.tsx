@@ -929,6 +929,9 @@ describe("DecksScreen", () => {
         "colorless mana",
       )
       expect(view.queryByTestId("deck-colors-Unknown Pile")).toBeNull()
+      expect(view.getByLabelText(/^Azorius Flyers/).props.accessibilityLabel).toMatch(
+        /Color identity: White, Blue$/,
+      )
     })
 
     it("finds a deck by its commander", () => {

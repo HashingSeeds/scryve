@@ -23,8 +23,7 @@ import {
 import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
-import { Header } from "@/components/Header"
-import { PressableIcon } from "@/components/Icon"
+import { Header, HeaderIcon } from "@/components/Header"
 import { SectionHeader } from "@/components/NumberLane"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -635,16 +634,12 @@ export function CardSearch({
                 ? "decks:cardSearch.lookupTitle"
                 : "decks:cardSearch.title",
           )}
-          // why: Header's own icon actions take no accessibilityLabel, so the close icon brings one.
           LeftActionComponent={
-            <PressableIcon
+            <HeaderIcon
               testID="card-search-close"
               icon="x"
-              size={24}
-              accessibilityRole="button"
-              accessibilityLabel={translate("common:close")}
+              label={translate("common:close")}
               onPress={onClose}
-              containerStyle={themed($close)}
             />
           }
           backgroundColor={theme.colors.surface}
@@ -677,17 +672,15 @@ export function CardSearch({
               />
             ) : null}
             {filtersCards ? (
-              <View style={themed($filterSlot)}>
-                <FilterButton
-                  testID="card-filters-button"
-                  count={
-                    colorFilters.length +
-                    keywords.length +
-                    (colorMatch !== startingFilters.colorMatch ? 1 : 0)
-                  }
-                  onPress={() => setFiltersOpen(true)}
-                />
-              </View>
+              <FilterButton
+                testID="card-filters-button"
+                count={
+                  colorFilters.length +
+                  keywords.length +
+                  (colorMatch !== startingFilters.colorMatch ? 1 : 0)
+                }
+                onPress={() => setFiltersOpen(true)}
+              />
             ) : null}
           </View>
           {initialSection !== "commander" && !lookup && picksSection ? (
@@ -1083,14 +1076,6 @@ const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 
 const $queryField: ViewStyle = { flex: 1 }
 const $filterBody: ViewStyle = { gap: 16 }
 const $filterSection: ViewStyle = { gap: 8 }
-const $close: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: "100%",
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-})
 
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
 const $searchResults: ViewStyle = { paddingTop: 8 }
-
-// why: FilterButton overlaps its left neighbor by spacing.md; the padding keeps that off the search field.
-const $filterSlot: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingLeft: spacing.md })
