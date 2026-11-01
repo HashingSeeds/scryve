@@ -79,7 +79,7 @@ export function Sheet({
               testID={testID}
               style={[
                 themed(edgeToEdge ? $edgeToEdge : $padded),
-                fit ? { maxHeight: height - top - bottom - FIT_TOP_GAP + DRAG_HANDLE } : $fill,
+                fit ? { maxHeight: height - top - bottom - (FIT_TOP_GAP + DRAG_HANDLE) } : $fill,
               ]}
             >
               {children}

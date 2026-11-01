@@ -413,6 +413,10 @@ function DeckDetailContent({
   const focusedCard = (building ? cards : view.displayCards).find(
     (card) => printingKey(card) === focus.shown,
   )
+  // why: a details sheet whose card vanished can't animate out, so its request goes with it.
+  useEffect(() => {
+    if (focus.shown && !focusedCard) setFocusedKey(undefined)
+  }, [focus.shown, focusedCard])
   const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
       ? {
