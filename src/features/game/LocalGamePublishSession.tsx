@@ -201,7 +201,10 @@ function ActivePublish({
             publicId: claim.publicId,
             token: claim.token,
             ...(shared
-              ? { deckShareToken: shared.token }
+              ? {
+                  deckShareToken: shared.token,
+                  ...(claim.deckFingerprint ? { deckFingerprint: claim.deckFingerprint } : {}),
+                }
               : claim.deckVersionId && !isSharedDeckKey(claim.deckVersionId)
                 ? { deckVersionId: claim.deckVersionId }
                 : {}),

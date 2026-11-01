@@ -192,6 +192,7 @@ describe("LocalGamePublishSession", () => {
       publicId: "game-shared",
       token: "token",
       savedAt: Date.now(),
+      deckFingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       deckVersionId: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     })
     setNearbyOwner(undefined)
@@ -209,6 +210,7 @@ describe("LocalGamePublishSession", () => {
         publicId: "game-shared",
         token: "token",
         deckShareToken: "t".repeat(43),
+        deckFingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       }),
     )
   })

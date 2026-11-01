@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Share } from "react-native"
-import { useMutation, useQuery } from "convex/react"
+import { useConvex, useMutation, useQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
@@ -15,7 +15,7 @@ import {
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
-import { loadSharedDecks, lobbySharedDeck } from "@/features/decks/sharedDecks"
+import { keepSharedDeck, loadSharedDecks, lobbySharedDeck } from "@/features/decks/sharedDecks"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { LobbyDeviceDeckSource } from "@/features/lobby/LobbyDeviceDeckSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
@@ -110,6 +110,7 @@ function ConnectedLobbyContent({
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
+  const convex = useConvex()
   const selectDeck = useMutation(api.decks.selectForSeat)
   const [sharedDecks] = useState(loadSharedDecks)
   const setAppearance = useMutation(api.games.setMyAppearance)
@@ -163,6 +164,16 @@ function ConnectedLobbyContent({
       seat,
       deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {},
     )
+
+  async function seatSharedDeck(seat: number, deckKey: string) {
+    const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
+    if (!kept) return
+    // why: the seat takes the owner's current list, so the copy this board reads is refreshed to match it first.
+    const fresh = await convex.query(api.decks.shared, { token: kept.token }).catch(() => undefined)
+    if (fresh === null) return setActionError(translate("decks:shared.unavailable"))
+    if (fresh) keepSharedDeck(fresh, kept.token)
+    await selectSeatDeck(seat, { shareToken: kept.token })
+  }
 
   async function selectSeatDeck(
     seat: number,
@@ -336,10 +347,7 @@ function ConnectedLobbyContent({
         onSelect: (seat, deckVersionId) => void chooseVersion(seat, deckVersionId),
         shared: {
           decks: sharedDecks.map(lobbySharedDeck),
-          onUse: (seat, deckKey) => {
-            const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
-            if (kept) void selectSeatDeck(seat, { shareToken: kept.token })
-          },
+          onUse: (seat, deckKey) => void seatSharedDeck(seat, deckKey),
         },
         onManage: onManageDecks ? () => onManageDecks(lobby.system) : undefined,
         onAddDeck,

@@ -1,5 +1,7 @@
 import { makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
+import { versionFingerprint } from "./lib/deckKeys"
+import { sharedDeckVersion } from "./lib/deckShares"
 import fabCube from "./lib/games/fixtures/fabCube.json"
 import { hashSeatPassToken } from "./lib/seatPass"
 
@@ -50,6 +52,12 @@ async function fabLobby(host: Actor, joiner: Actor, publicId: string, invite: st
   })
   return created.publicId
 }
+
+const viewerFingerprint = (t: Harness, token: string) =>
+  t.run(async (ctx) => {
+    const found = await sharedDeckVersion(ctx, token)
+    return versionFingerprint(ctx, found!.version._id, "fab")
+  })
 
 const stored = (t: Harness) =>
   t.run(async (ctx) => ({
@@ -205,15 +213,32 @@ describe("shared decks in connected lobbies", () => {
         result: { kind: "win", winnerLocalIds: ["host"] },
       })
 
+    const fingerprint = await viewerFingerprint(t, token)
     await publish("lan_0123456789abcdef0123456789abcdef-1", "seat_one")
     await guest.mutation(api.games.claimNearbySeat, {
       publicId: "lan_0123456789abcdef0123456789abcdef-1",
       token: "seat_one",
       deckShareToken: token,
+      deckFingerprint: fingerprint,
     })
     let after = await stored(t)
     expect(after.results.filter((result) => result.deckKey === deckKey)).toHaveLength(1)
     expect(JSON.stringify(after)).not.toContain(token)
+
+    const edited = await owner.action(api.deckImports.resolvePasted, {
+      game: "fab",
+      list: "2x Snatch (red)\nHero: Aurora, Shooting Star",
+    })
+    await owner.mutation(api.decks.saveVersion, { deckId: shared.deckId, cards: edited.cards })
+    await publish("lan_0123456789abcdef0123456789abcdef-3", "seat_three")
+    await guest.mutation(api.games.claimNearbySeat, {
+      publicId: "lan_0123456789abcdef0123456789abcdef-3",
+      token: "seat_three",
+      deckShareToken: token,
+      deckFingerprint: fingerprint,
+    })
+    after = await stored(t)
+    expect(after.results.filter((result) => result.deckKey === deckKey)).toHaveLength(1)
 
     await owner.mutation(api.decks.unshare, { deckId: shared.deckId })
     await publish("lan_0123456789abcdef0123456789abcdef-2", "seat_two")

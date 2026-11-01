@@ -1634,16 +1634,23 @@ async function claimableDeck(
     : undefined
 }
 
-/** why: a claim that names a stale or mismatched shared deck still takes the seat, just without a deck, as claimableDeck does. */
+/**
+ * why: a claim that names a stale or mismatched shared deck still takes the seat, just without a deck,
+ * as claimableDeck does. The owner may have edited the deck since the game, so a list other than the
+ * one played is not attributed.
+ */
 async function claimableSharedDeck(
   ctx: QueryCtx,
-  token: string | undefined,
+  { deckShareToken, deckFingerprint }: { deckShareToken?: string; deckFingerprint?: string },
   userId: Id<"users">,
   game: Doc<"games">,
 ): Promise<SharedSeatDeck | undefined> {
-  if (token === undefined) return undefined
+  if (deckShareToken === undefined) return undefined
   try {
-    return await sharedSeatDeck(ctx, token, userId, gameDeckRules(game))
+    const shared = await sharedSeatDeck(ctx, deckShareToken, userId, gameDeckRules(game))
+    return shared.kind === "shared" && shared.deckFingerprint !== deckFingerprint
+      ? undefined
+      : shared
   } catch (cause) {
     if (cause instanceof ConvexError) return undefined
     throw cause
@@ -1656,6 +1663,7 @@ export const claimNearbySeat = mutation({
     token: v.string(),
     deckVersionId: v.optional(v.string()),
     deckShareToken: v.optional(v.string()),
+    deckFingerprint: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1695,7 +1703,7 @@ export const claimNearbySeat = mutation({
         message: "You already hold a seat in this game",
       })
     const identity = { userId: user._id, usernameAtJoin: user.username }
-    const sharedDeck = await claimableSharedDeck(ctx, args.deckShareToken, user._id, game)
+    const sharedDeck = await claimableSharedDeck(ctx, args, user._id, game)
     const chosen =
       sharedDeck?.kind === "owned"
         ? sharedDeck

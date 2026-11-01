@@ -608,8 +608,9 @@ export class LanSession {
     const round = lanRoundId(message.lobby)
     const { status } = message.lobby
     const { pass } = this
-    const deckVersionId = message.lobby.seats.find((seat) => seat.key === pass?.key)?.deck
-      ?.versionId
+    const seatDeck = message.lobby.seats.find((seat) => seat.key === pass?.key)?.deck
+    const deckVersionId = seatDeck?.versionId
+    const deckFingerprint = seatDeck?.fingerprint
     if (
       (status === "active" || status === "finished") &&
       pass &&
@@ -619,6 +620,7 @@ export class LanSession {
         token: pass.token,
         savedAt: Date.now(),
         ...(deckVersionId ? { deckVersionId } : {}),
+        ...(deckFingerprint ? { deckFingerprint } : {}),
       })
     )
       this.claimedRound = round
