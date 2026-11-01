@@ -112,7 +112,7 @@ function ConnectedLobbyContent({
   const abandon = useMutation(api.games.abandonGame)
   const convex = useConvex()
   const selectDeck = useMutation(api.decks.selectForSeat)
-  const [sharedDecks] = useState(loadSharedDecks)
+  const [sharedDecks, setSharedDecks] = useState(loadSharedDecks)
   const setAppearance = useMutation(api.games.setMyAppearance)
   const billing = useRevenueCat()
   const [actionError, setActionError] = useState<string>()
@@ -167,12 +167,14 @@ function ConnectedLobbyContent({
 
   async function seatSharedDeck(seat: number, deckKey: string) {
     const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
-    if (!kept) return
+    if (!kept || selectingDeckSeatsInFlight.current.has(seat)) return
+    if (!isWebSocketConnected) return setActionError(onlineOnlyNotice("deck"))
     // why: the seat takes the owner's current list, so the copy this board reads is refreshed to match it first.
     const fresh = await convex.query(api.decks.shared, { token: kept.token }).catch(() => undefined)
     if (fresh === undefined) return setActionError(translate("connected:lobby.errors.selectDeck"))
     if (fresh === null) return setActionError(translate("decks:shared.unavailable"))
     keepSharedDeck(fresh, kept.token)
+    setSharedDecks(loadSharedDecks())
     await selectSeatDeck(seat, { shareToken: kept.token, deckFingerprint: fresh.fingerprint })
   }
 
