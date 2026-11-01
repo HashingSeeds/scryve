@@ -242,6 +242,8 @@ export default {
     account: "खाता",
     accountDeckLabel: "{{name}}, सिंक हो गया",
     onDevice: "इस डिवाइस पर",
+    sharedWithYou: "आपके साथ शेयर किए गए",
+    sharedDeckLabel: "{{name}}, आपके साथ शेयर किया गया",
     syncAndUse: "सिंक करें और इस्तेमाल करें",
     syncAndUseLabel: "{{name}} को सिंक करें और इस्तेमाल करें",
     syncing: "सिंक हो रहा है…",

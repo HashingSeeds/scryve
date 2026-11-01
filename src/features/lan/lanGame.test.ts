@@ -249,6 +249,23 @@ describe("nearby decks", () => {
     expect(hostLife(commander)).toBe(40)
   })
 
+  it("carries a shared deck's list fingerprint over the wire", () => {
+    const shared = {
+      versionId: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      name: "Borrowed",
+      fingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    }
+    const game = setLanDeck(lobby(), "host", shared)
+    const state = parseHostMessage(
+      JSON.stringify({
+        type: "state",
+        lobby: lanLobbyOf(game),
+        projection: lanProjection(game, "guest"),
+      }),
+    )
+    expect(state).toMatchObject({ lobby: { seats: [{ deck: shared }] } })
+  })
+
   it("carries seat decks over the wire, and drops a malformed deck", () => {
     const game = setLanDeck(lobby(), "host", atraxa)
     const state = parseHostMessage(

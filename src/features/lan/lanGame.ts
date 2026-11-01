@@ -78,9 +78,12 @@ export interface LanSetup {
 }
 
 export interface LanSeatDeck {
+  // why: a shared deck has no version of this player's, so its `shared-` key stands in.
   versionId: string
   name: string
   startingValue?: number
+  /** why: a shared deck has no version to read back, so its list is named by fingerprint. */
+  fingerprint?: string
 }
 
 export interface LanSeat {
@@ -586,11 +589,14 @@ const MAX_DECK_NAME_LENGTH = 120
 
 function parseSeatDeck(value: unknown): LanSeatDeck | null {
   if (!isRecord(value) || !isId(value.versionId) || typeof value.name !== "string") return null
-  const { startingValue } = value
+  const { startingValue, fingerprint } = value
   return {
     versionId: value.versionId,
     name: value.name.slice(0, MAX_DECK_NAME_LENGTH),
     ...(isCount(startingValue) ? { startingValue } : {}),
+    ...(typeof fingerprint === "string" && /^v1:[0-9a-f]{64}$/.test(fingerprint)
+      ? { fingerprint }
+      : {}),
   }
 }
 

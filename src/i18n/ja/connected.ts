@@ -232,6 +232,8 @@ export default {
     account: "アカウント",
     accountDeckLabel: "{{name}}(同期済み)",
     onDevice: "このデバイス",
+    sharedWithYou: "共有されたデッキ",
+    sharedDeckLabel: "{{name}}(共有されたデッキ)",
     syncAndUse: "同期して使う",
     syncAndUseLabel: "{{name}}を同期して使う",
     syncing: "同期中…",

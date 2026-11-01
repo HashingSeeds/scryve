@@ -171,6 +171,30 @@ describe("lanLocalGame", () => {
     ).toEqual(["version-atraxa", undefined])
   })
 
+  it("uploads a host's shared deck by its key and list, with no version", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(
+      lanLocalGame(
+        finishedRound({
+          versionId: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          name: "Borrowed",
+          fingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        }),
+        {
+          ownerId: "host-account",
+        },
+      ),
+    )
+    const [pending] = repository.pendingPublishes("host-account")
+
+    expect(pending.account).toMatchObject({
+      deckKey: "shared-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      deckFingerprint: "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      deckName: "Borrowed",
+    })
+    expect(pending.account?.deckVersionId).toBeUndefined()
+  })
+
   it("keeps a signed-out host's round on the device without uploading it", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const summary = repository.archiveGame(lanLocalGame(finishedRound(), {}))

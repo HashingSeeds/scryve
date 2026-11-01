@@ -58,6 +58,7 @@ import { SyncStatsOverlay } from "@/features/connected/SyncStatsOverlay"
 import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { isSharedDeckKey } from "@/features/decks/sharedDecks"
 import { asPlayerId } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
@@ -713,7 +714,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     const versionId = controlled.has(playerId)
       ? game.players.find((candidate) => candidate.playerId === playerId)?.deckVersionId
       : undefined
-    return versionId ? { ownerId, versionId } : undefined
+    return isSharedDeckKey(versionId)
+      ? { sharedDeckKey: versionId }
+      : versionId
+        ? { ownerId, versionId }
+        : undefined
   }
   const commanderPort = {
     incoming: (to: PlayerId, commander?: CommanderSlot): Record<PlayerId, number> =>

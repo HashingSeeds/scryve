@@ -22,6 +22,7 @@ import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { assertDeckKey, assertDeckFingerprint, pinnedDeck } from "./lib/deckKeys"
 import { limitResultRate } from "./lib/deckRateLimits"
 import { canonicalResultId } from "./lib/deckResults"
+import { isSharedDeckKey, sharedSeatDeck, type SharedSeatDeck } from "./lib/deckShares"
 import { deckStartingValue } from "./lib/deckStartingValue"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import {
@@ -492,6 +493,13 @@ async function deckSelectionIsPlayable(
   )
 }
 
+/** why: a seat playing someone's shared deck has its key and list but no deck version of its own. */
+function sharedSeatKey(player: Pick<Doc<"gamePlayers">, "deckVersionId" | "deckKey">) {
+  return player.deckVersionId === undefined && isSharedDeckKey(player.deckKey)
+    ? player.deckKey
+    : undefined
+}
+
 function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
   return (
     (game.eventSequence ?? 0) +
@@ -688,7 +696,9 @@ async function terminalizeGame(
             ? { deckId: deck._id, deckNameAtFinish: deck.name }
             : player.deckKey && options.deckNames?.has(player._id)
               ? { deckNameAtFinish: options.deckNames.get(player._id) }
-              : {}),
+              : sharedSeatKey(player) && player.deckLabel?.name
+                ? { deckNameAtFinish: player.deckLabel.name }
+                : {}),
           ...(version
             ? { deckVersionId: version._id, deckVersionNumber: version.versionNumber }
             : {}),
@@ -1624,8 +1634,29 @@ async function claimableDeck(
     : undefined
 }
 
+/** why: a claim that names a stale or mismatched shared deck still takes the seat, just without a deck, as claimableDeck does. */
+async function claimableSharedDeck(
+  ctx: QueryCtx,
+  token: string | undefined,
+  userId: Id<"users">,
+  game: Doc<"games">,
+): Promise<SharedSeatDeck | undefined> {
+  if (token === undefined) return undefined
+  try {
+    return await sharedSeatDeck(ctx, token, userId, gameDeckRules(game))
+  } catch (cause) {
+    if (cause instanceof ConvexError) return undefined
+    throw cause
+  }
+}
+
 export const claimNearbySeat = mutation({
-  args: { publicId: v.string(), token: v.string(), deckVersionId: v.optional(v.string()) },
+  args: {
+    publicId: v.string(),
+    token: v.string(),
+    deckVersionId: v.optional(v.string()),
+    deckShareToken: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     if (args.token.length < 1 || args.token.length > 128) throw seatPassInvalid()
@@ -1664,7 +1695,12 @@ export const claimNearbySeat = mutation({
         message: "You already hold a seat in this game",
       })
     const identity = { userId: user._id, usernameAtJoin: user.username }
-    const chosen = await claimableDeck(ctx, args.deckVersionId, user._id, game)
+    const sharedDeck = await claimableSharedDeck(ctx, args.deckShareToken, user._id, game)
+    const chosen =
+      sharedDeck?.kind === "owned"
+        ? sharedDeck
+        : await claimableDeck(ctx, args.deckVersionId, user._id, game)
+    const shared = sharedDeck?.kind === "shared" ? sharedDeck : undefined
     await ctx.db.patch(seat._id, {
       ...identity,
       ...(chosen
@@ -1672,7 +1708,9 @@ export const claimNearbySeat = mutation({
             deckVersionId: chosen.version._id,
             deckKey: chosen.deck.deckKey,
           }
-        : {}),
+        : shared
+          ? { deckKey: shared.deckKey, deckFingerprint: shared.deckFingerprint }
+          : {}),
     })
     const claimed = summary.players.find((player) => player.playerId === seat._id)
     const deckLabel =
@@ -1690,7 +1728,14 @@ export const claimNearbySeat = mutation({
             deckVersionNumber: chosen.version.versionNumber,
             ...(deckLabel ? { deckLabel } : {}),
           }
-        : {}),
+        : shared
+          ? {
+              deckKey: shared.deckKey,
+              deckFingerprint: shared.deckFingerprint,
+              deckNameAtFinish: shared.deckLabel.name,
+              deckLabel: { ...claimed?.deckLabel, ...shared.deckLabel },
+            }
+          : {}),
     }
     await ctx.db.patch(summary._id, {
       players: summary.players.map((player) =>
@@ -1883,10 +1928,11 @@ export const lobbyProjection = query({
             playerId: p._id,
             seat: p.seat,
             displayName: displayNames.get(p._id) ?? seatLabelFor(p),
-            deckVersionId:
-              game.status === "lobby" &&
-              p.deckVersionId &&
-              !(await deckSelectionIsPlayable(ctx, p.deckVersionId, game))
+            // why: installed clients count a seat as having a deck only when this is set, so a shared deck's key fills it.
+            deckVersionId: !p.deckVersionId
+              ? sharedSeatKey(p)
+              : game.status === "lobby" &&
+                  !(await deckSelectionIsPlayable(ctx, p.deckVersionId, game))
                 ? undefined
                 : p.deckVersionId,
             color: p.color,
@@ -2174,8 +2220,9 @@ export const startGame = mutation({
     if (game.deckRequired === true) {
       for (const player of players) {
         if (
-          player.deckVersionId === undefined ||
-          !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
+          !sharedSeatKey(player) &&
+          (player.deckVersionId === undefined ||
+            !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game)))
         )
           throw new ConvexError({
             code: "deck_required",
@@ -2193,8 +2240,9 @@ export const startGame = mutation({
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
-      const deckLife =
-        player.deckVersionId && !invalidSinceSelection
+      const deckLife = sharedSeatKey(player)
+        ? player.startingLife
+        : player.deckVersionId && !invalidSinceSelection
           ? await deckStartingValue(ctx, player.deckVersionId, ...gameDeckRules(game))
           : undefined
       await ctx.db.patch(player._id, {
@@ -2563,6 +2611,9 @@ async function startRematch(
       ...(player.avatarUrl ? { avatarUrl: player.avatarUrl } : {}),
       ...(player.usernameAtJoin ? { usernameAtJoin: player.usernameAtJoin } : {}),
       ...(deckVersionId ? { deckVersionId, ...(await pinnedDeck(ctx, deckVersionId)) } : {}),
+      ...(sharedSeatKey(player)
+        ? { deckKey: player.deckKey, deckFingerprint: player.deckFingerprint }
+        : {}),
       ...(player.deckLabel ? { deckLabel: player.deckLabel } : {}),
       color: player.color,
       ...(player.shape ? { shape: player.shape } : {}),

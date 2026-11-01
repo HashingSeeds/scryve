@@ -15,6 +15,7 @@ import {
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { loadSharedDecks, lobbySharedDeck } from "@/features/decks/sharedDecks"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { LobbyDeviceDeckSource } from "@/features/lobby/LobbyDeviceDeckSource"
 import { LobbyClosedScreen, LobbyStatusScreen, LobbyView } from "@/features/lobby/LobbyView"
@@ -110,6 +111,7 @@ function ConnectedLobbyContent({
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
   const selectDeck = useMutation(api.decks.selectForSeat)
+  const [sharedDecks] = useState(loadSharedDecks)
   const setAppearance = useMutation(api.games.setMyAppearance)
   const billing = useRevenueCat()
   const [actionError, setActionError] = useState<string>()
@@ -156,7 +158,16 @@ function ConnectedLobbyContent({
     : null
   const manualCode = lobby?.invitation?.manualCode
 
-  async function chooseVersion(seat: number, deckVersionId?: string) {
+  const chooseVersion = (seat: number, deckVersionId?: string) =>
+    selectSeatDeck(
+      seat,
+      deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {},
+    )
+
+  async function selectSeatDeck(
+    seat: number,
+    choice: { deckVersionId?: Id<"deckVersions">; shareToken?: string },
+  ) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
       setActionError(onlineOnlyNotice("deck"))
@@ -166,12 +177,9 @@ function ConnectedLobbyContent({
     setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
     try {
       setActionError(undefined)
-      await selectDeck({
-        publicId,
-        seat,
-        ...(deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {}),
-      })
-      if (deckVersionId) captureAnalytics("deck_used", { feature: "assigned" })
+      await selectDeck({ publicId, seat, ...choice })
+      if (choice.deckVersionId || choice.shareToken)
+        captureAnalytics("deck_used", { feature: "assigned" })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.selectDeck")))
     } finally {
@@ -326,6 +334,13 @@ function ConnectedLobbyContent({
         ),
         selectingSeats: selectingDeckSeats,
         onSelect: (seat, deckVersionId) => void chooseVersion(seat, deckVersionId),
+        shared: {
+          decks: sharedDecks.map(lobbySharedDeck),
+          onUse: (seat, deckKey) => {
+            const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
+            if (kept) void selectSeatDeck(seat, { shareToken: kept.token })
+          },
+        },
         onManage: onManageDecks ? () => onManageDecks(lobby.system) : undefined,
         onAddDeck,
       }}

@@ -20,20 +20,26 @@ export function assertDeckFingerprint(fingerprint: string) {
   return fingerprint
 }
 
-export async function pinnedDeck(ctx: MutationCtx, versionId: Id<"deckVersions">) {
-  const version = await ctx.db.get(versionId)
-  const deck = version ? await ctx.db.get(version.deckId) : null
-  if (!deck) return {}
+export async function versionFingerprint(
+  ctx: QueryCtx,
+  versionId: Id<"deckVersions">,
+  game: string | undefined,
+) {
   const cards = await ctx.db
     .query("deckCards")
     .withIndex("by_deck_version", (q) => q.eq("deckVersionId", versionId))
     .take(MAX_DECK_CARDS + 1)
   if (cards.length > MAX_DECK_CARDS) throw new Error("Deck has too many cards")
+  return await deckFingerprint(cards.map((card) => ({ ...card, game: card.game ?? game ?? "mtg" })))
+}
+
+export async function pinnedDeck(ctx: MutationCtx, versionId: Id<"deckVersions">) {
+  const version = await ctx.db.get(versionId)
+  const deck = version ? await ctx.db.get(version.deckId) : null
+  if (!deck) return {}
   return {
     deckKey: deck.deckKey,
-    deckFingerprint: await deckFingerprint(
-      cards.map((card) => ({ ...card, game: card.game ?? deck.game ?? "mtg" })),
-    ),
+    deckFingerprint: await versionFingerprint(ctx, versionId, deck.game),
   }
 }
 

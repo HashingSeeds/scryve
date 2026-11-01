@@ -5,12 +5,15 @@ import { pinnedListCards } from "@/features/stats/listSnapshots"
 
 import type { DeckCard } from "./deckCards"
 import { DeckVersionCacheRepository } from "./deckVersionsCache"
+import { loadSharedDeckByKey } from "./sharedDecks"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
-/** why: a synced deck is read by version, and a device deck by the list pinned when the game started. */
+/** why: a synced deck is read by version, a device deck by the list pinned when the game started, and a shared deck from the copy kept on this device. */
 export type SeatDeck =
-  { ownerId: string; versionId: string } | { deckKey: string; fingerprint: string }
+  | { ownerId: string; versionId: string }
+  | { deckKey: string; fingerprint: string }
+  | { sharedDeckKey: string }
 
 const NO_CARDS: readonly DeckCard[] = []
 const readCards = () => (deploymentUrl: string, ownerId: string, versionId: string) =>
@@ -25,11 +28,13 @@ export function useSeatDeckCards(deck: SeatDeck | undefined): readonly DeckCard[
   const versionId = deck && "versionId" in deck ? deck.versionId : undefined
   const deckKey = deck && "deckKey" in deck ? deck.deckKey : undefined
   const fingerprint = deck && "deckKey" in deck ? deck.fingerprint : undefined
+  const sharedDeckKey = deck && "sharedDeckKey" in deck ? deck.sharedDeckKey : undefined
   const [cardsFor, rereadCards] = useReducer(readCards, undefined, readCards)
   const cards = useMemo(() => {
+    if (sharedDeckKey) return loadSharedDeckByKey(sharedDeckKey)?.deck.cards ?? NO_CARDS
     if (deckKey && fingerprint) return pinnedListCards(deckKey, fingerprint) ?? NO_CARDS
     return convex && ownerId && versionId ? cardsFor(convex.url, ownerId, versionId) : NO_CARDS
-  }, [cardsFor, convex, ownerId, versionId, deckKey, fingerprint])
+  }, [cardsFor, convex, ownerId, versionId, deckKey, fingerprint, sharedDeckKey])
 
   useEffect(() => {
     if (!convex || !ownerId || !versionId) return
