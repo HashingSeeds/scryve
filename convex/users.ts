@@ -59,7 +59,7 @@ export const syncFromClerk = internalMutation({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
     const sync = await usernameForSync(ctx, args.username, args.clerkUserId)
-    // why: Clerk usernames are unique, so the other account's copy is stale and a refresh frees it.
+    // why: Clerk usernames are unique, so the holder's copy is stale. This user gets the name on its next sync.
     if (sync.action === "keep" && sync.heldBy)
       await ctx.scheduler.runAfter(0, internal.users.refreshUsernameFromClerk, {
         clerkUserId: sync.heldBy,
@@ -67,13 +67,16 @@ export const syncFromClerk = internalMutation({
     const username = sync.action === "store" ? sync.username : undefined
     const now = Date.now()
     const value = {
-      displayName: args.displayName.trim().slice(0, MAX_DISPLAY_NAME_LENGTH) || "Player",
+      displayName: clampDisplayName(args.displayName.trim()) || "Player",
       ...(username ? { username, usernameNormalized: normalizeUsername(username) } : {}),
       ...(validAvatarUrl(args.avatarUrl) ? { avatarUrl: args.avatarUrl } : {}),
       updatedAt: now,
     }
     if (existing) {
-      await ctx.db.patch(existing._id, value)
+      await ctx.db.patch(existing._id, {
+        ...value,
+        ...(sync.action === "clear" ? { username: undefined, usernameNormalized: undefined } : {}),
+      })
       // Re-checked on every sync, not just at signup: a rename in Clerk's own UI arrives here.
       if (username) await enforceUsernameFilter(ctx, existing._id, username)
       await applyStoredRevenueCatState(ctx, existing)
@@ -95,6 +98,16 @@ export const syncFromClerk = internalMutation({
 
 type UsernameSync =
   { action: "store"; username: string } | { action: "clear" } | { action: "keep"; heldBy?: string }
+
+// why: slice can split an emoji into a lone surrogate, which Convex rejects on write.
+function clampDisplayName(name: string) {
+  let clamped = ""
+  for (const char of name) {
+    if (clamped.length + char.length > MAX_DISPLAY_NAME_LENGTH) break
+    clamped += char
+  }
+  return clamped
+}
 
 function validAvatarUrl(avatarUrl: string | undefined): avatarUrl is string {
   try {

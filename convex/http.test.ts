@@ -83,18 +83,27 @@ describe("Clerk webhook user sync", () => {
     expect(await users(t)).toEqual([])
   })
 
-  it("returns 200 for a signed user event without a username so Svix stops retrying it", async () => {
+  it("syncs a signed user event without a username and clears a username Clerk removed", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
     const t = makeConvexTest()
+    await fetchSigned(t, { type: "user.created", data: { id: "clerk_named", username: "named" } })
 
     for (const username of [undefined, null, ""]) {
-      const response = await fetchSigned(t, {
-        type: "user.updated",
-        data: { id: "clerk_no_username", username, first_name: "Missing" },
-      })
-      expect(response.status).toBe(200)
+      for (const id of ["clerk_never_named", "clerk_named"]) {
+        const response = await fetchSigned(t, {
+          type: "user.updated",
+          data: { id, username, first_name: "Nameless" },
+        })
+        expect(response.status).toBe(200)
+      }
     }
-    expect(await users(t)).toEqual([])
+    const rows = await users(t)
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row).toMatchObject({ displayName: "Nameless" })
+      expect(row).not.toHaveProperty("username")
+      expect(row).not.toHaveProperty("usernameNormalized")
+    }
   })
 
   it("returns 200 for a signed user.created event and writes its Clerk profile", async () => {
@@ -175,6 +184,11 @@ describe("Clerk webhook user sync", () => {
         { displayName: "x".repeat(32) },
       ],
       [
+        "clerk_emoji",
+        { username: "emoji-name", first_name: `${"x".repeat(31)}😀` },
+        { displayName: "x".repeat(31) },
+      ],
+      [
         "clerk_avatar",
         { username: "avatar", image_url: "http://insecure.test/a.png" },
         { username: "avatar" },
@@ -188,7 +202,7 @@ describe("Clerk webhook user sync", () => {
       expect(row).toMatchObject(expected)
     }
     const rows = await users(t)
-    expect(rows).toHaveLength(7)
+    expect(rows).toHaveLength(8)
     expect(rows.find((user) => user.clerkUserId === "clerk_holder")?.username).toBe("taken")
     expect(rows.find((user) => user.clerkUserId === "clerk_conflict")?.username).toBeUndefined()
     expect(rows.find((user) => user.clerkUserId === "clerk_avatar")).not.toHaveProperty("avatarUrl")

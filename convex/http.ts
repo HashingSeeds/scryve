@@ -179,9 +179,7 @@ http.route({
       if (!data) return new Response("Clerk user event is missing its data", { status: 400 })
       const clerkUserId = typeof data.id === "string" ? data.id : undefined
       if (!clerkUserId) return new Response("Clerk user event is missing its id", { status: 400 })
-      const username = typeof data.username === "string" ? data.username : undefined
-      // why: any non-2xx makes Svix retry for days and then disable the whole endpoint.
-      if (!username) return new Response("ok: skipped user without a username", { status: 200 })
+      const username = typeof data.username === "string" ? data.username : ""
       const firstName = typeof data.first_name === "string" ? data.first_name : ""
       const lastName = typeof data.last_name === "string" ? data.last_name : ""
       const displayName = `${firstName} ${lastName}`.trim() || username
