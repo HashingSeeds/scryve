@@ -17,11 +17,13 @@ steps:
   - tap: { id: setup-options-done }
   - await: { idle: true }
   - echo: Purple and teal so the side boards don't repeat the default orange and blue
+  - scroll-to: { target: { id: player-appearance-1 } }
   - tap: { id: player-appearance-1 }
   - await: { visible: { id: appearance-color-77558a } }
   - tap: { id: appearance-color-77558a }
   - tap: { id: save-local-appearance-button }
   - await: { idle: true }
+  - scroll-to: { target: { id: player-appearance-2 } }
   - tap: { id: player-appearance-2 }
   - await: { visible: { id: appearance-color-117b9c } }
   - tap: { id: appearance-color-117b9c }

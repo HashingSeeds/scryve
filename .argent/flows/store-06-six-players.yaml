@@ -18,21 +18,25 @@ steps:
   - await: { idle: true }
   - echo: >-
       The side boards leave seats 1-6 gold, red, green, brown, orange, teal (a pick swaps with the seat that held the color). A taken color can't be picked, so restore in the order that frees each one: 2, 6, 5, 1.
+  - scroll-to: { target: { id: player-appearance-2 } }
   - tap: { id: player-appearance-2 }
   - await: { visible: { id: appearance-color-41476e } }
   - tap: { id: appearance-color-41476e }
   - tap: { id: save-local-appearance-button }
   - await: { idle: true }
+  - scroll-to: { target: { id: player-appearance-6 } }
   - tap: { id: player-appearance-6 }
   - await: { visible: { id: appearance-color-a33a52 } }
   - tap: { id: appearance-color-a33a52 }
   - tap: { id: save-local-appearance-button }
   - await: { idle: true }
+  - scroll-to: { target: { id: player-appearance-5 } }
   - tap: { id: player-appearance-5 }
   - await: { visible: { id: appearance-color-77558a } }
   - tap: { id: appearance-color-77558a }
   - tap: { id: save-local-appearance-button }
   - await: { idle: true }
+  - scroll-to: { target: { id: player-appearance-1 } }
   - tap: { id: player-appearance-1 }
   - await: { visible: { id: appearance-color-b85636 } }
   - tap: { id: appearance-color-b85636 }
