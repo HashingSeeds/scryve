@@ -11,8 +11,9 @@ steps:
     steps:
       - when: { hidden: { id: shared-deck-name } }
         steps:
+          - echo: The one point inside Open on both the 6.9" iPhone (x .51-.83, y .51-.56) and the 13" iPad (x .50-.64, y .49-.53)
           - tool: gesture-tap
-            args: { x: 0.668, y: 0.539 }
+            args: { x: 0.575, y: 0.52 }
   - await: { visible: { id: shared-deck-name }, timeout: 30000 }
   - await: { visible: { id: shared-deck-play }, timeout: 20000 }
   - wait: 2500
