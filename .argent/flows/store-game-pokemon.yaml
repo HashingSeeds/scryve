@@ -35,8 +35,9 @@ steps:
   - tap: { id: dice-chip-2-claim }
   - await: { idle: true }
   - echo: >-
-      Seat 2 Active is Charizard ex (needs the preview backend). Plain "charizard" lists only
-      Charizard cards, so the query adds " ex" and hides the keypad before picking the hit.
+      Seat 2 Active is Charizard (needs the preview backend). Every pick is the top hit by id:
+      only it shows on small screens while the keypad is up, a text tap can hit the search box
+      that holds the same words, and the space and hide keys sit under the iPad home indicator.
   - tap: { id: pokemon-place-active-seat-2 }
   - echo: The first tap after the flip can land while its overlay closes; retry once if still empty
   - await: { idle: true }
@@ -55,12 +56,8 @@ steps:
   - tap: { id: pokemon-key-a-seat-2 }
   - tap: { id: pokemon-key-r-seat-2 }
   - tap: { id: pokemon-key-d-seat-2 }
-  - tap: { id: pokemon-key-space-seat-2 }
-  - tap: { id: pokemon-key-e-seat-2 }
-  - tap: { id: pokemon-key-x-seat-2 }
-  - tap: { id: pokemon-key-hide-keypad-seat-2 }
-  - await: { visible: { text: Charizard ex }, timeout: 15000 }
-  - tap: { text: Charizard ex }
+  - await: { visible: { id: pokemon-result-2024sv-1 }, timeout: 15000 }
+  - tap: { id: pokemon-result-2024sv-1 }
   - await: { visible: { id: pokemon-damage-seat-2-10 } }
   - echo: >-
       Seat 1 Active is Pikachu. Its upside-down sheet is short, so hide the keypad and take the
@@ -100,9 +97,8 @@ steps:
   - tap: { id: pokemon-key-e-seat-2 }
   - tap: { id: pokemon-key-r-seat-2 }
   - await: { idle: true }
-  - tap: { id: pokemon-key-hide-keypad-seat-2 }
-  - await: { visible: { id: pokemon-result-sv03.5-004 }, timeout: 15000 }
-  - tap: { id: pokemon-result-sv03.5-004 }
+  - await: { visible: { id: pokemon-result-sm7.5-1 }, timeout: 15000 }
+  - tap: { id: pokemon-result-sm7.5-1 }
   - await: { idle: true }
   - long-press: { id: pokemon-bench-add-seat-2 }
   - await: { visible: { id: pokemon-search-seat-2 } }
@@ -117,9 +113,8 @@ steps:
   - tap: { id: pokemon-key-o-seat-2 }
   - tap: { id: pokemon-key-n-seat-2 }
   - await: { idle: true }
-  - tap: { id: pokemon-key-hide-keypad-seat-2 }
-  - await: { visible: { id: pokemon-result-sv03.5-005 }, timeout: 15000 }
-  - tap: { id: pokemon-result-sv03.5-005 }
+  - await: { visible: { id: pokemon-result-sm7.5-2 }, timeout: 15000 }
+  - tap: { id: pokemon-result-sm7.5-2 }
   - await: { idle: true }
   - echo: >-
       Damage zones ignore id taps, so these are points. Seat 1 is upside down; its
