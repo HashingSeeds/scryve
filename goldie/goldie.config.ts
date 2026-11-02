@@ -76,16 +76,14 @@ const config: GoldieConfig = {
     {
       kind: "screenshot",
       id: "games",
-      flow: "store-06-pokemon",
-      // why: trio is a three device layout in the mchisolm0/goldie fork; Pokémon sits in front.
+      flow: "store-game-mtg",
+      // why: trio is a three device layout in the mchisolm0/goldie fork; Magic sits in front.
       layout: "trio",
       secondScene: "game-ygo",
-      thirdScene: "game-lorcana",
+      thirdScene: "game-pokemon",
       headline: { "en-US": "Your game, covered" },
       subhead: { "en-US": "Pick your game. More on the way." },
     },
-    { kind: "capture", id: "game-ygo", flow: "store-game-ygo" },
-    { kind: "capture", id: "game-lorcana", flow: "store-game-lorcana" },
     {
       kind: "screenshot",
       id: "shared-deck",
@@ -114,10 +112,13 @@ const config: GoldieConfig = {
       headline: { "en-US": "Every game saved" },
       subhead: { "en-US": "Local and connected games, one history." },
     },
+    // why: these boards recolor seats 1 and 2, which carries over; six-players restores them.
+    { kind: "capture", id: "game-ygo", flow: "store-game-ygo" },
+    { kind: "capture", id: "game-pokemon", flow: "store-game-pokemon" },
     {
       kind: "screenshot",
       id: "six-players",
-      flow: "store-07-six-players",
+      flow: "store-06-six-players",
       headline: { "en-US": "Two to six players" },
       subhead: { "en-US": "Pick the layout that matches how you sit." },
     },

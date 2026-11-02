@@ -1,0 +1,95 @@
+steps:
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - echo: Switch the fresh game to game-type-commander through Game setup
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { id: game-tab-mtg } }
+  - tap: { id: game-tab-mtg }
+  - tap: { id: game-type-commander }
+  - echo: Seat count carries over between games; pin it to 6 (the stepper clamps at 2 and 6)
+  - tap: { id: setup-change-button }
+  - await: { visible: { id: player-count-increment } }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: setup-options-done }
+  - await: { idle: true }
+  - echo: >-
+      The side boards leave seats 1-6 gold, red, green, brown, orange, teal (a pick swaps with the seat that held the color). A taken color can't be picked, so restore in the order that frees each one: 2, 6, 5, 1.
+  - tap: { id: player-appearance-2 }
+  - await: { visible: { id: appearance-color-41476e } }
+  - tap: { id: appearance-color-41476e }
+  - tap: { id: save-local-appearance-button }
+  - await: { idle: true }
+  - tap: { id: player-appearance-6 }
+  - await: { visible: { id: appearance-color-a33a52 } }
+  - tap: { id: appearance-color-a33a52 }
+  - tap: { id: save-local-appearance-button }
+  - await: { idle: true }
+  - tap: { id: player-appearance-5 }
+  - await: { visible: { id: appearance-color-77558a } }
+  - tap: { id: appearance-color-77558a }
+  - tap: { id: save-local-appearance-button }
+  - await: { idle: true }
+  - tap: { id: player-appearance-1 }
+  - await: { visible: { id: appearance-color-b85636 } }
+  - tap: { id: appearance-color-b85636 }
+  - tap: { id: save-local-appearance-button }
+  - await: { idle: true }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - echo: Spread the life totals so the table reads mid-game
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-3--1 }
+  - tap: { id: life-seat-3--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-6-1 }
+  - tap: { id: life-seat-6-1 }
+  - tap: { id: life-seat-6-1 }
+  - wait: 2500
+  - await: { idle: true }

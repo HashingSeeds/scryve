@@ -1,5 +1,5 @@
 steps:
-  - echo: A two seat ygo-advanced board for the multi-game tile
+  - echo: A two seat Yu-Gi-Oh! board for the multi-game tile
   - launch: com.sowinghope.count.preview
   - run: store-reset-local
   - tap: { id: game-menu-button }
@@ -15,6 +15,17 @@ steps:
   - tap: { id: player-count-decrement }
   - tap: { id: player-count-decrement }
   - tap: { id: setup-options-done }
+  - await: { idle: true }
+  - echo: Purple and teal so the side boards don't repeat the default orange and blue
+  - tap: { id: player-appearance-1 }
+  - await: { visible: { id: appearance-color-77558a } }
+  - tap: { id: appearance-color-77558a }
+  - tap: { id: save-local-appearance-button }
+  - await: { idle: true }
+  - tap: { id: player-appearance-2 }
+  - await: { visible: { id: appearance-color-117b9c } }
+  - tap: { id: appearance-color-117b9c }
+  - tap: { id: save-local-appearance-button }
   - await: { idle: true }
   - tap: { id: start-game-button }
   - await: { visible: { id: player-grid } }
