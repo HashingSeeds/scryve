@@ -1,4 +1,7 @@
 import { Platform } from "react-native"
+import { LinearTransition, ReduceMotion } from "react-native-reanimated"
+
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 export type LifeCardContentRotation = -90 | 0 | 90 | 180
 export type LifeCardMenuCorner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight"
@@ -6,8 +9,16 @@ export type LifeCardMenuEdge = "top" | "bottom" | "left" | "right"
 
 export type LifeCardEdge = "top" | "bottom" | "left" | "right"
 
+export interface LifeCardCorner {
+  edge: LifeCardEdge
+  side: LifeCardEdge
+  size: number
+}
+
 export interface LifeCardContentInsets extends Record<LifeCardEdge, number> {
-  cutout?: { edge: LifeCardEdge; side: LifeCardEdge; size: number }
+  cutout?: LifeCardCorner
+  // why: tabs are shallower than a camera hole, so the bench and full-seat overlays would give up room for nothing if they cleared them too.
+  tabCorners?: readonly LifeCardCorner[]
 }
 
 export type LifeCardScreenEdges = Record<LifeCardEdge, boolean>
@@ -57,10 +68,32 @@ export function cornerOffset(
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
 ) {
-  if (insets?.cutout?.edge === edge && insets.cutout.side === side) return gap + insets.cutout.size
+  const step = cornerStep(insets, edge, side)
+  if (step > 0) return gap + step
   const inset = insets?.[edge] ?? 0
   const screenCorner = !!screenEdges?.[edge] && !!screenEdges[side]
   return screenCorner ? Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE)) : gap + inset
+}
+
+/** why: corner chrome steps along its row past whatever sits in its corner, a camera hole or a first-player tab. */
+export function cornerStep(
+  insets: LifeCardContentInsets | undefined,
+  edge: LifeCardEdge,
+  side: LifeCardEdge,
+) {
+  const corners = [insets?.cutout, ...(insets?.tabCorners ?? [])]
+  return Math.max(
+    0,
+    ...corners.map((corner) => (corner?.edge === edge && corner.side === side ? corner.size : 0)),
+  )
+}
+
+// why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
+const CORNER_SLIDE = LinearTransition.duration(220).reduceMotion(ReduceMotion.Never)
+
+/** why: corner chrome slides back when the first-player tabs leave instead of jumping. */
+export function useCornerSlide() {
+  return useReducedMotion() === false ? CORNER_SLIDE : undefined
 }
 
 export const LIFE_GLYPH_LINE_HEIGHT = 50

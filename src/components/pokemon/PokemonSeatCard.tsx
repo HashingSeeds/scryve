@@ -52,6 +52,8 @@ import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   clearOfCutout,
   cornerOffset,
+  cornerStep,
+  useCornerSlide,
   CUTOUT_ENDS_INSIDE_INSET,
   getDeltaFontSizeThatFits,
   getLifeLineHeight,
@@ -187,10 +189,13 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.bottom -
       padding
     : seatIdentityBottomGap(identityMetrics.edge, insets.bottom, edges.bottom) - padding
-  // why: the board drops a corner camera hole's side inset, so the bench and the identity or prizes in that corner step along their rows past the hole, as a life card's corners do.
-  const cutout = contentInsets?.cutout
-  const cutoutStep = (side: "left" | "right") =>
-    cutout?.edge === edges[side] && cutout.side === edges.bottom ? cutout.size : 0
+  // why: the board drops a corner camera hole's side inset, so the identity and prizes step along their row past whatever sits in their corner, as a life card's corners do. The bench sits deeper than a first-player tab reaches, so only the hole moves it.
+  const cornerChromeStep = (side: "left" | "right") =>
+    cornerStep(contentInsets, edges[side], edges.bottom)
+  const cornerSlide = useCornerSlide()
+  const hole = contentInsets?.cutout
+  const benchStep = (side: "left" | "right") =>
+    hole?.edge === edges[side] && hole.side === edges.bottom ? hole.size : 0
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -573,8 +578,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             themed($bench),
             {
               height: benchChip.height,
-              marginLeft: identityMetrics.edge - padding + cutoutStep("left"),
-              marginRight: identityMetrics.edge - padding + cutoutStep("right"),
+              marginLeft: identityMetrics.edge - padding + benchStep("left"),
+              marginRight: identityMetrics.edge - padding + benchStep("right"),
               marginBottom: padding,
             },
           ]}
@@ -644,16 +649,25 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           testID={`pokemon-bottom-row-seat-${seatNumber}`}
           style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}
         >
-          <SeatIdentity
-            seatNumber={seatNumber}
-            playerName={displayName}
-            shape={shape}
-            color={ink}
-            compact={cramped}
-            foil={foil && !!shape && isProMarkShape(shape)}
-            staleSince={staleSince}
-            style={[$identity, { marginLeft: identityMetrics.edge - padding + cutoutStep("left") }]}
-          />
+          <Animated.View
+            testID={`pokemon-identity-slot-seat-${seatNumber}`}
+            layout={cornerSlide}
+            style={[
+              $identity,
+              { marginLeft: identityMetrics.edge - padding + cornerChromeStep("left") },
+            ]}
+          >
+            <SeatIdentity
+              seatNumber={seatNumber}
+              playerName={displayName}
+              shape={shape}
+              color={ink}
+              compact={cramped}
+              foil={foil && !!shape && isProMarkShape(shape)}
+              staleSince={staleSince}
+              style={$identity}
+            />
+          </Animated.View>
           {diceChips?.length && dice?.onPressChip && !dice.view && !sheetMode ? (
             <DiceChips
               seatNumber={seatNumber}
@@ -664,61 +678,63 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               onPress={dice.onPressChip}
             />
           ) : null}
-          <BoardPressable
-            testID={`pokemon-prizes-seat-${seatNumber}`}
-            accessibilityRole={controlsLive ? "button" : undefined}
-            accessibilityLabel={translate("board:counters.seatItem", {
-              identity,
-              label: counterValueLabel("pokemon", prizes),
-            })}
-            accessibilityHint={controlsLive ? translate("board:pokemon.prizesHint") : undefined}
-            disabled={!controlsLive}
-            delayLongPress={LONG_PRESS_MS}
-            accessibilityActions={[
-              { name: "longpress", label: translate("board:pokemon.putPrizeBack") },
-            ]}
-            onAccessibilityAction={({ nativeEvent }) => {
-              if (nativeEvent.actionName === "longpress") putPrizeBack()
-            }}
-            // why: React Native Web never fires long press from the keyboard, so keyboard players put a prize back with + or the up arrow.
-            onKeyDown={(event) => {
-              if (HOLD_KEYS.has(event.key)) putPrizeBack()
-            }}
-            onPress={() => prizes > 0 && onChangePrizes(-1)}
-            onLongPress={putPrizeBack}
-            style={({ pressed }) => [
-              themed($prizes),
-              { marginRight: cutoutStep("right") },
-              pressed && { backgroundColor: tint(0.14) },
-            ]}
+          <Animated.View
+            testID={`pokemon-prizes-slot-seat-${seatNumber}`}
+            layout={cornerSlide}
+            style={[$prizesSlot, { marginRight: cornerChromeStep("right") }]}
           >
-            {/* why: a two-wide flexWrap grid can wrap after every pip when Yoga's float sums overshoot its width, standing the cards in one line. */}
-            <View
-              style={{ gap: pip.gap }}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
+            <BoardPressable
+              testID={`pokemon-prizes-seat-${seatNumber}`}
+              accessibilityRole={controlsLive ? "button" : undefined}
+              accessibilityLabel={translate("board:counters.seatItem", {
+                identity,
+                label: counterValueLabel("pokemon", prizes),
+              })}
+              accessibilityHint={controlsLive ? translate("board:pokemon.prizesHint") : undefined}
+              disabled={!controlsLive}
+              delayLongPress={LONG_PRESS_MS}
+              accessibilityActions={[
+                { name: "longpress", label: translate("board:pokemon.putPrizeBack") },
+              ]}
+              onAccessibilityAction={({ nativeEvent }) => {
+                if (nativeEvent.actionName === "longpress") putPrizeBack()
+              }}
+              // why: React Native Web never fires long press from the keyboard, so keyboard players put a prize back with + or the up arrow.
+              onKeyDown={(event) => {
+                if (HOLD_KEYS.has(event.key)) putPrizeBack()
+              }}
+              onPress={() => prizes > 0 && onChangePrizes(-1)}
+              onLongPress={putPrizeBack}
+              style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
             >
-              {Array.from({ length: Math.ceil(prizePips / 2) }, (_, row) => (
-                <View key={row} style={[$prizeRow, { gap: pip.gap }]}>
-                  {[row * 2, row * 2 + 1]
-                    .filter((index) => index < prizePips)
-                    .map((index) => (
-                      <View
-                        key={index}
-                        testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
-                        style={[
-                          $prizePip,
-                          { width: pip.width, height: pip.height },
-                          index < prizes
-                            ? { backgroundColor: ink }
-                            : [$prizePipGone, { borderColor: tint(0.45) }],
-                        ]}
-                      />
-                    ))}
-                </View>
-              ))}
-            </View>
-          </BoardPressable>
+              {/* why: a two-wide flexWrap grid can wrap after every pip when Yoga's float sums overshoot its width, standing the cards in one line. */}
+              <View
+                style={{ gap: pip.gap }}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                {Array.from({ length: Math.ceil(prizePips / 2) }, (_, row) => (
+                  <View key={row} style={[$prizeRow, { gap: pip.gap }]}>
+                    {[row * 2, row * 2 + 1]
+                      .filter((index) => index < prizePips)
+                      .map((index) => (
+                        <View
+                          key={index}
+                          testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
+                          style={[
+                            $prizePip,
+                            { width: pip.width, height: pip.height },
+                            index < prizes
+                              ? { backgroundColor: ink }
+                              : [$prizePipGone, { borderColor: tint(0.45) }],
+                          ]}
+                        />
+                      ))}
+                  </View>
+                ))}
+              </View>
+            </BoardPressable>
+          </Animated.View>
         </View>
 
         {asking ? (
@@ -1497,9 +1513,8 @@ const $prizes: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   paddingHorizontal: spacing.xs,
   paddingVertical: spacing.xxs,
   borderRadius: radius.xl,
-  maxWidth: "100%",
-  marginLeft: "auto",
 })
+const $prizesSlot: ViewStyle = { maxWidth: "100%", marginLeft: "auto" }
 const $bar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   left: spacing.xs,

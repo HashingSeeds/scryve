@@ -1,4 +1,4 @@
-import { memo } from "react"
+import { createContext, memo } from "react"
 import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated"
@@ -28,6 +28,9 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 56
 const TAB_DEPTH = 40
+export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
+/** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
+export const FirstPlayerTabsShownContext = createContext(false)
 const TAB_BORDER = 2
 const GLYPH_SIZE = 22
 // why: Reanimated reads the system setting only at startup, so the live preference gates this instead.

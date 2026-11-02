@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { TurnedBoardContext } from "@/components/BoardPressable"
 import {
   FirstPlayerTabs,
+  FirstPlayerTabsShownContext,
   type FirstPlayerOffer,
   type FirstPlayerTab,
 } from "@/components/FirstPlayerTabs"
@@ -110,6 +111,7 @@ function PinnedGameBoardStage({
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
   const menuOpen = menu.open && !menu.exitAction
+  const tabsShown = !!firstPlayer && !menu.open && !menu.exitAction
   const bag = openToolBag(menu.actions)
 
   return (
@@ -117,7 +119,9 @@ function PinnedGameBoardStage({
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
-            {renderGrid(boardOrientation)}
+            <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+              {renderGrid(boardOrientation)}
+            </FirstPlayerTabsShownContext.Provider>
             <GameMenuBackdrop open={menuOpen} onClose={bag?.onToggle ?? menu.onClose} />
             <GameMenuCluster
               open={menu.open}
@@ -132,9 +136,7 @@ function PinnedGameBoardStage({
               statusLine={menu.statusLine}
               onToggle={menu.onToggle}
             />
-            {firstPlayer && !menu.open && !menu.exitAction ? (
-              <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
-            ) : null}
+            {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
@@ -171,6 +173,7 @@ function LegacyGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
+  const tabsShown = !!firstPlayer && !menu.open && !menu.exitAction
 
   return (
     <Animated.View
@@ -179,7 +182,9 @@ function LegacyGameBoardStage({
       testID={testID}
       style={$stage}
     >
-      {renderGrid(boardOrientation)}
+      <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+        {renderGrid(boardOrientation)}
+      </FirstPlayerTabsShownContext.Provider>
       <GameRadialMenu
         {...menu}
         anchor={menuAnchor}
@@ -187,9 +192,7 @@ function LegacyGameBoardStage({
         nativeFrame={boardOrientation.nativeFrame}
         compact={playerCount > 2}
       />
-      {firstPlayer && !menu.open && !menu.exitAction ? (
-        <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
-      ) : null}
+      {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
       {windowOverlay}
     </Animated.View>
   )

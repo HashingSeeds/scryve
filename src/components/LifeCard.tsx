@@ -81,6 +81,7 @@ import {
   LIFE_TARGET_SIZE,
   clearOfCutout,
   cornerOffset,
+  useCornerSlide,
   CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
@@ -201,6 +202,7 @@ export const LifeCard = memo(function LifeCard({
   const diceChips = dice?.chips
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
+  const cornerSlide = useCornerSlide()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
   const locked = !!out && out.cause !== "life"
@@ -930,9 +932,10 @@ export const LifeCard = memo(function LifeCard({
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          <View
+          <Animated.View
             testID={`life-identity-row-seat-${seatNumber}`}
             pointerEvents="box-none"
+            layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
                 current?.x === layout.x && current.y === layout.y
@@ -1014,7 +1017,7 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
-          </View>
+          </Animated.View>
           {calculatorButtonShown ? (
             <BoardPressable
               testID={`life-calculator-open-seat-${seatNumber}`}

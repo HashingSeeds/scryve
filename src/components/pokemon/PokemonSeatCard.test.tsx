@@ -577,9 +577,9 @@ describe("PokemonSeatCard", () => {
   })
 
   it.each([
-    [180, { edge: "right", side: "top" }, "seat-identity-seat-1", "marginLeft"],
+    [180, { edge: "right", side: "top" }, "pokemon-identity-slot-seat-1", "marginLeft"],
     [180, { edge: "right", side: "top" }, "pokemon-bench-seat-1", "marginLeft"],
-    [-90, { edge: "top", side: "right" }, "pokemon-prizes-seat-1", "marginRight"],
+    [-90, { edge: "top", side: "right" }, "pokemon-prizes-slot-seat-1", "marginRight"],
     [-90, { edge: "top", side: "right" }, "pokemon-bench-seat-1", "marginRight"],
   ] as const)(
     "steps a %s seat's corner past a camera hole",
