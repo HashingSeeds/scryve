@@ -397,6 +397,100 @@ describe("claiming an imported seat through claimSeat", () => {
   })
 })
 
+describe("imported games where anyone edits any seat", () => {
+  const threeSeats = snapshotArgs({
+    players: [
+      ...baseSnapshot.players,
+      {
+        localId: "local-third-player",
+        seat: 3,
+        displayName: "Third",
+        color: "#16A34A",
+        shape: "square",
+        currentLife: 40,
+      },
+    ],
+  })
+
+  async function claim(
+    t: ConvexTestHarness,
+    manualCode: string,
+    seat: number,
+    editsAnySeat: boolean,
+  ) {
+    const player = await signedIn(t, `seat-${seat}-subject`, `Seat ${seat}`)
+    const deviceId = `device-seat-${seat}-0001`
+    await player.mutation(api.games.claimSeat, {
+      seat,
+      manualCode,
+      deviceId,
+      ...(editsAnySeat ? { editsAnySeat: true } : {}),
+    })
+    return { player, deviceId }
+  }
+
+  it("opens editing once every claimed seat's app supports it", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host-subject", "Host")
+    const created = await host.mutation(api.games.publishLocalGame, {
+      ...threeSeats,
+      editsAnySeat: true,
+    })
+    const projection = () => host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    await expect(projection()).resolves.toMatchObject({ lifeEditing: "anyone" })
+    const second = await claim(t, created.manualCode, 2, true)
+    await claim(t, created.manualCode, 3, true)
+    await expect(projection()).resolves.toMatchObject({ lifeEditing: "anyone" })
+    await second.player.mutation(api.games.changeLife, {
+      publicId: created.publicId,
+      playerId: created.players[2].playerId,
+      operationId: "cross-seat-operation-0001",
+      delta: -5,
+      deviceId: second.deviceId,
+      clientCreatedAt: 1,
+    })
+    expect((await projection()).players[2].currentLife).toBe(35)
+  })
+
+  it("stays owner-only while any claimed seat's app is too old", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host-subject", "Host")
+    const created = await host.mutation(api.games.publishLocalGame, {
+      ...threeSeats,
+      editsAnySeat: true,
+    })
+    const second = await claim(t, created.manualCode, 2, true)
+    await claim(t, created.manualCode, 3, false)
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    expect(projection.lifeEditing).toBeUndefined()
+    await expect(
+      second.player.mutation(api.games.changeLife, {
+        publicId: created.publicId,
+        playerId: created.players[2].playerId,
+        operationId: "cross-seat-operation-0002",
+        delta: -5,
+        deviceId: second.deviceId,
+        clientCreatedAt: 1,
+      }),
+    ).rejects.toThrow("Seat-owner permission required")
+
+    const oldHost = await signedIn(t, "old-host-subject", "Old Host")
+    const unflagged = await oldHost.mutation(
+      api.games.publishLocalGame,
+      snapshotArgs({
+        operationId: "publish-operation-00000002",
+        publicId: "published-game-id-00002",
+        inviteToken: "u".repeat(43),
+        manualCodeCandidates: ["GHJ234"],
+      }),
+    )
+    await claim(t, unflagged.manualCode, 2, true)
+    await expect(
+      oldHost.query(api.games.lobbyProjection, { publicId: unflagged.publicId }),
+    ).resolves.not.toHaveProperty("lifeEditing")
+  })
+})
+
 describe("imported game invite renewal and discovery", () => {
   it("rotates the invite on an active imported game and rejects the revoked token", async () => {
     const t = makeConvexTest()

@@ -501,8 +501,11 @@ function sharedSeatKey(player: Pick<Doc<"gamePlayers">, "deckVersionId" | "deckK
     : undefined
 }
 
-function lifeEditingFor(players: readonly Pick<Doc<"gamePlayers">, "editsAnySeat">[]) {
-  return players.every((player) => player.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}
+/** why: unclaimed seats belong to the host, so only apps holding a seat decide whether editing opens. */
+function lifeEditingFor(players: readonly Pick<Doc<"gamePlayers">, "userId" | "editsAnySeat">[]) {
+  return players.every((player) => player.userId === undefined || player.editsAnySeat)
+    ? { lifeEditing: "anyone" as const }
+    : {}
 }
 
 function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
@@ -932,6 +935,7 @@ async function claimPreparedSeat(
     seat,
     deviceId,
     displayName,
+    editsAnySeat,
   }: {
     game: Doc<"games">
     user: Doc<"users">
@@ -939,6 +943,7 @@ async function claimPreparedSeat(
     seat?: number
     deviceId?: string
     displayName?: string
+    editsAnySeat?: boolean
   },
 ) {
   const held = players.find((player) => player.userId === user._id)
@@ -961,13 +966,19 @@ async function claimPreparedSeat(
   if (!target) throw new ConvexError({ code: "game_full", message: "Lobby is full" })
   if (target.userId !== undefined)
     throw new ConvexError({ code: "seat_taken", message: "Seat already claimed" })
-  await ctx.db.patch(target._id, {
+  const claimed = {
     userId: user._id,
     ...(deviceId ? { deviceId } : {}),
     ...(displayName ? { displayName } : {}),
     usernameAtJoin: user.username,
-  })
-  await ctx.db.patch(game._id, { updatedAt: Date.now() })
+    ...(editsAnySeat ? { editsAnySeat: true } : {}),
+  }
+  await ctx.db.patch(target._id, claimed)
+  // why: an older app claiming here closes editing again, so it never sees others change its seat.
+  const { lifeEditing } = lifeEditingFor(
+    players.map((player) => (player._id === target._id ? { ...player, ...claimed } : player)),
+  )
+  await ctx.db.patch(game._id, { updatedAt: Date.now(), lifeEditing })
   return { publicId: game.publicId, seat: target.seat }
 }
 
@@ -1034,6 +1045,7 @@ export const claimSeat = mutation({
         ...(args.seat === undefined ? {} : { seat: args.seat }),
         ...(args.deviceId ? { deviceId: args.deviceId } : {}),
         ...(claimedName === undefined ? {} : { displayName: claimedName }),
+        ...(args.editsAnySeat ? { editsAnySeat: true } : {}),
       })
     if (claimedName === undefined)
       throw new ConvexError({
@@ -1171,6 +1183,8 @@ export const publishLocalGame = mutation({
     ),
     table: v.optional(tableStateValidator),
     layout: v.optional(playerGridLayoutValidator),
+    // why: kept out of the receipt key, so a retry after the host updates the app still matches its first publish.
+    editsAnySeat: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1268,6 +1282,7 @@ export const publishLocalGame = mutation({
       system: gameSystem,
       ...(format ? { format } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
+      ...(args.editsAnySeat ? { lifeEditing: "anyone" as const } : {}),
       createdAt: now,
       startedAt: now,
       updatedAt: now,
@@ -1293,6 +1308,7 @@ export const publishLocalGame = mutation({
         eventCount: 0,
         resumable: true,
         joinedAt: now,
+        ...(isHost && args.editsAnySeat ? { editsAnySeat: true } : {}),
       })
       mapping.push({ localId: player.localId, playerId, seat: player.seat })
       playerIdsBySeat.set(player.seat, playerId)
