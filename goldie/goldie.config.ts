@@ -3,6 +3,12 @@ import { fileURLToPath } from "node:url"
 
 const APP_ROOT = fileURLToPath(new URL("..", import.meta.url))
 
+/**
+ * One-time setup per iOS simulator, kept in its keychain and settings across captures: sign in as
+ * riley+clerk_test@sow.care (store-sign-in signs in on Android and on a 6.9" iPhone, but Clerk's
+ * sheet sits elsewhere on other screens), and accept "Open in Scryve (Preview)?" the first time
+ * the shared deck link opens. Run `node goldie/seed.cjs` after `pnpm preview:up`.
+ */
 const config: GoldieConfig = {
   appRoot: APP_ROOT,
   // why: preview EAS builds pointed at this branch's Convex preview (pnpm preview:up), seeded by goldie/seed.cjs, so captures never read staging or production.

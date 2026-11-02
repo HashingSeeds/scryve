@@ -6,15 +6,11 @@ steps:
   - run: store-reset-local
   - run: store-shared-deck-link
   - wait: 2500
-  - echo: iOS may ask "Open in Scryve (Preview)?"; flow taps can't reach system UI, so gesture-tap hits Open
-  - when: { platform: ios }
-    steps:
-      - when: { hidden: { id: shared-deck-name } }
-        steps:
-          - echo: The one point inside Open on both the 6.9" iPhone (x .51-.83, y .51-.56) and the 13" iPad (x .50-.64, y .49-.53)
-          - tool: gesture-tap
-            args: { x: 0.575, y: 0.52 }
-  - await: { visible: { id: shared-deck-name }, timeout: 30000 }
-  - await: { visible: { id: shared-deck-play }, timeout: 20000 }
-  - wait: 2500
-  - await: { idle: true }
+  - echo: >-
+      iOS asks "Open in Scryve (Preview)?" the first time a simulator opens the link, and remembers
+      the answer. Flows can't tap system UI, so accept it once by hand along with the one-time
+      sign-in (see goldie/goldie.config.ts).
+  - echo: >-
+      On the iPhone Duo the link loses argent's native devtools connection, so no step after it
+      can read the UI tree; a fixed wait lets the deck load from the preview before capture.
+  - wait: 6000
