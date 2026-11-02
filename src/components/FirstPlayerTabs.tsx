@@ -1,7 +1,12 @@
 import { createContext, memo } from "react"
 import type { ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated"
+import Animated, {
+  Easing,
+  type EntryExitAnimationFunction,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated"
 
 import type { DiceTool } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
@@ -31,10 +36,49 @@ const TAB_DEPTH = 40
 export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)
-const TAB_BORDER = 2
+const TAB_BORDER = 4
 const GLYPH_SIZE = 22
-// why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
-const TAB_ENTERING = FadeIn.delay(260).duration(180).reduceMotion(ReduceMotion.Never)
+const TAB_ENTER_DELAY_MS = 260
+const TAB_SLIDE_MS = 200
+
+function outward(edge: BoardEdge) {
+  return {
+    x: edge === "left" ? -TAB_DEPTH : edge === "right" ? TAB_DEPTH : 0,
+    y: edge === "top" ? -TAB_DEPTH : edge === "bottom" ? TAB_DEPTH : 0,
+  }
+}
+
+/** why: a tab slides out of its edge when it appears and back into it when it goes, while the marks beside it slide into the room it leaves. */
+function slideFromEdge(edge: BoardEdge): EntryExitAnimationFunction {
+  const { x, y } = outward(edge)
+  return () => {
+    "worklet"
+    const timing = { duration: TAB_SLIDE_MS, easing: Easing.out(Easing.quad) }
+    return {
+      initialValues: { transform: [{ translateX: x }, { translateY: y }] },
+      animations: {
+        transform: [
+          { translateX: withDelay(TAB_ENTER_DELAY_MS, withTiming(0, timing)) },
+          { translateY: withDelay(TAB_ENTER_DELAY_MS, withTiming(0, timing)) },
+        ],
+      },
+    }
+  }
+}
+
+function tuckIntoEdge(edge: BoardEdge): EntryExitAnimationFunction {
+  const { x, y } = outward(edge)
+  return () => {
+    "worklet"
+    const timing = { duration: TAB_SLIDE_MS, easing: Easing.in(Easing.quad) }
+    return {
+      initialValues: { transform: [{ translateX: 0 }, { translateY: 0 }] },
+      animations: {
+        transform: [{ translateX: withTiming(x, timing) }, { translateY: withTiming(y, timing) }],
+      },
+    }
+  }
+}
 
 /** why: the tool needs no words, so each copy can sit at an edge and turn toward whoever is nearest. Every copy runs the same action, so screen readers and keyboards get only the first. */
 export const FirstPlayerTabs = memo(function FirstPlayerTabs({
@@ -57,7 +101,8 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
         return (
           <Animated.View
             key={`${tab.edge}:${tab.at}`}
-            entering={animateFully ? TAB_ENTERING : undefined}
+            entering={animateFully ? slideFromEdge(tab.edge) : undefined}
+            exiting={animateFully ? tuckIntoEdge(tab.edge) : undefined}
             aria-hidden={!primary}
             accessibilityElementsHidden={!primary}
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}
