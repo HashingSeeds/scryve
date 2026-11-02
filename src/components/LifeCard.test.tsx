@@ -1293,6 +1293,37 @@ describe("LifeCard", () => {
     })
   })
 
+  it("stops the editor at a corner camera hole's side", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={180}
+          contentInsets={{
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            cutout: { edge: "right", side: "top", size: 84 },
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 466, height: 330 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+
+    expect(StyleSheet.flatten(view.getByTestId("life-editor-seat-1").props.style)).toMatchObject({
+      paddingLeft: 12 + 84,
+      paddingRight: 12,
+    })
+  })
+
   it("aligns a compact editor title with its quick actions", () => {
     const view = render(card(20, jest.fn()))
     fireEvent(view.getByTestId("life-card-seat-1"), "layout", {

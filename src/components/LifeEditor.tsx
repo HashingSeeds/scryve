@@ -272,6 +272,8 @@ export function LifeEditor({
         rotatedBounds,
         {
           backgroundColor: editorColor,
+          paddingLeft: (compact ? 6 : 12) + safe[HEADER_EDGES[rotation].left],
+          paddingRight: (compact ? 6 : 12) + safe[HEADER_EDGES[rotation].right],
           transform: [{ rotate: `${rotation}deg` }],
         },
         overlayStyle,

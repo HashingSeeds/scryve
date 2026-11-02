@@ -50,6 +50,7 @@ import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
+  clearOfCutout,
   cornerOffset,
   CUTOUT_ENDS_INSIDE_INSET,
   getDeltaFontSizeThatFits,
@@ -186,6 +187,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.bottom -
       padding
     : seatIdentityBottomGap(identityMetrics.edge, insets.bottom, edges.bottom) - padding
+  // why: the board drops a corner camera hole's side inset, so the bench and the identity or prizes in that corner step along their rows past the hole, as a life card's corners do.
+  const cutout = contentInsets?.cutout
+  const cutoutStep = (side: "left" | "right") =>
+    cutout?.edge === edges[side] && cutout.side === edges.bottom ? cutout.size : 0
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -568,7 +573,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             themed($bench),
             {
               height: benchChip.height,
-              marginHorizontal: identityMetrics.edge - padding,
+              marginLeft: identityMetrics.edge - padding + cutoutStep("left"),
+              marginRight: identityMetrics.edge - padding + cutoutStep("right"),
               marginBottom: padding,
             },
           ]}
@@ -646,7 +652,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             foil={foil && !!shape && isProMarkShape(shape)}
             staleSince={staleSince}
-            style={[$identity, { marginLeft: identityMetrics.edge - padding }]}
+            style={[$identity, { marginLeft: identityMetrics.edge - padding + cutoutStep("left") }]}
           />
           {diceChips?.length && dice?.onPressChip && !dice.view && !sheetMode ? (
             <DiceChips
@@ -680,7 +686,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }}
             onPress={() => prizes > 0 && onChangePrizes(-1)}
             onLongPress={putPrizeBack}
-            style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
+            style={({ pressed }) => [
+              themed($prizes),
+              { marginRight: cutoutStep("right") },
+              pressed && { backgroundColor: tint(0.14) },
+            ]}
           >
             {/* why: a two-wide flexWrap grid can wrap after every pip when Yoga's float sums overshoot its width, standing the cards in one line. */}
             <View
@@ -817,7 +827,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           rotation={contentRotation}
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
-          insets={insets}
+          insets={contentInsetsFor(contentRotation, clearOfCutout(contentInsets))}
           clearance={clearance}
           compact={cramped}
           damageStep={rules.damageStep}

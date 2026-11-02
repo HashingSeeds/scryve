@@ -79,6 +79,7 @@ import {
   LIFE_MAX_FONT_SCALE,
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
+  clearOfCutout,
   cornerOffset,
   CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
@@ -1082,7 +1083,7 @@ export const LifeCard = memo(function LifeCard({
           rotation={contentRotation}
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
-          contentInsets={contentInsets}
+          contentInsets={clearOfCutout(contentInsets)}
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
           onChange={onChange}
@@ -1100,7 +1101,7 @@ export const LifeCard = memo(function LifeCard({
           boardRotation={boardRotation}
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
-          contentInsets={contentInsets}
+          contentInsets={clearOfCutout(contentInsets)}
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
           onChange={onChange}
