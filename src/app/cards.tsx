@@ -10,7 +10,7 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace("/"))
 
 export default function CardsRoute() {
   const { game, deckId } = useLocalSearchParams<{ game?: string; deckId?: string }>()
-  const [system] = useState(() =>
+  const [system, setSystem] = useState(() =>
     playSystemId(game ?? localGameRepository.loadActiveGame()?.system),
   )
   const host = useDeckSearchHost(deckId)
@@ -21,6 +21,7 @@ export default function CardsRoute() {
       game={system}
       format={playSystemFormat(system)}
       presentation="screen"
+      onGameChange={setSystem}
       onClose={leave}
     />
   )
