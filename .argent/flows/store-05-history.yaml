@@ -1,4 +1,5 @@
 steps:
+  - script: { path: scripts/table-local.mjs, timeout: 60000 }
   - launch: com.sowinghope.count.preview
   - echo: A reinstall signs Android out, and a capture of this scene alone has no earlier sign-in
   - run: store-reset-local

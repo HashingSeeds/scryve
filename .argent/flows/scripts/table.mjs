@@ -13,7 +13,7 @@ const require = createRequire(`${ROOT}package.json`)
 const { ConvexClient } = require("convex/browser")
 const { anyApi: api } = require("convex/server")
 
-const { STORE_ACCOUNT } = require("./goldie/seed.cjs")
+const { STORE_ACCOUNT, recordTodayGames } = require("./goldie/seed.cjs")
 const { botIdentity, previewCredentials } = require("./scripts/bots.cjs")
 const { previewKey, previewName } = require("./scripts/preview.cjs")
 
@@ -60,6 +60,11 @@ export async function resetTable() {
       })
     }
   })
+}
+
+/** why: History should open on local and connected games mixed, so local games land just before it. */
+export async function recordLocalGames() {
+  await store(recordTodayGames)
 }
 
 export async function fillLobby() {

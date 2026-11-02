@@ -252,6 +252,46 @@ async function seedGames(client, versions) {
   console.log(`${games.length} games`)
 }
 
+// why: seeded games all end on earlier days and capture runs finish connected games today, so History opened only on connected rows.
+const TODAY = [
+  { deck: "Charizard ex", minutesAgo: 2, won: true },
+  { deck: "Ur-Dragon", minutesAgo: 24, won: false },
+]
+
+async function recordTodayGames(client) {
+  const { decks } = await client.query(api.decks.listMine, {})
+  const versions = new Map(decks.map((deck) => [deck.name, deck.latestVersionId]))
+  const now = Date.now()
+  for (const [index, game] of TODAY.entries()) {
+    const deck = DECKS.find(({ name }) => name === game.deck)
+    const play = PLAY[deck.game]
+    const finishedAt = now - game.minutesAgo * 60 * 1000
+    const winnerSeat = game.won ? 0 : 1
+    const players = Array.from({ length: play.seats }, (_, seat) => ({
+      localId: `p${seat + 1}`,
+      seat: seat + 1,
+      displayName:
+        seat === 0 ? STORE_ACCOUNT.username : OPPONENTS[(index + seat) % OPPONENTS.length],
+      color: COLORS[seat],
+      shape: SHAPES[seat],
+      currentLife: seat === winnerSeat ? play.winner : play.loser,
+      ...(seat === 0 ? { me: true, deckVersionId: versions.get(deck.name) } : {}),
+    }))
+    await client.mutation(api.games.publishFinishedLocalGame, {
+      publicId: stableId("today", deck.name, String(now)),
+      system: deck.game,
+      format: play.format,
+      ruleset: play.format,
+      startingLife: play.life,
+      startedAt: finishedAt - 30 * 60 * 1000,
+      finishedAt,
+      eventCount: 30,
+      players,
+      result: { kind: "win", winnerLocalIds: [`p${winnerSeat + 1}`] },
+    })
+  }
+}
+
 function runInternal(preview, deployKey, name, args) {
   const convex = path.join(
     path.dirname(require.resolve("./seed.cjs")),
@@ -322,4 +362,4 @@ if (require.main === module)
     process.exitCode = 1
   })
 
-module.exports = { STORE_ACCOUNT }
+module.exports = { STORE_ACCOUNT, recordTodayGames }
