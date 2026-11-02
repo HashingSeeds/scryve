@@ -149,4 +149,14 @@ describe("SyncLatency", () => {
       expect.objectContaining({ e2e_own_p50: 120, e2e_cross_count: 1, e2e_cross_p99: 90 }),
     )
   })
+
+  it("keeps a tap painted before this device's clock is known and times it once it is", () => {
+    const { latency, at } = meter()
+    latency.remoteChange(12_050, 1, { tappedAt: 12_000, crossSeat: true })
+    at(2_100)
+    latency.painted(1)
+    expect(latency.summary().tapCross).toBeUndefined()
+    latency.clockSample(3_000, 3_020, 13_010)
+    expect(latency.summary().tapCross).toEqual(expect.objectContaining({ count: 1, p50: 100 }))
+  })
 })

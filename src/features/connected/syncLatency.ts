@@ -53,7 +53,7 @@ export function latencyStats(samples: readonly number[]): LatencyStats | undefin
   }
 }
 
-const keepNewest = (samples: number[], sample: number) => {
+const keepNewest = <Sample>(samples: Sample[], sample: Sample) => {
   samples.push(sample)
   if (samples.length > MAX_SAMPLES) samples.shift()
 }
@@ -65,6 +65,7 @@ export class SyncLatency {
   private uncorrected: number[] = []
   private acks: number[] = []
   private taps = { own: [] as number[], cross: [] as number[] }
+  private uncorrectedTaps: { tap: LastChange; paintedAt: number }[] = []
   private unpainted: { authorityAt: number; eventSequence: number; tap?: LastChange }[] = []
   private paused = false
   private backAt = 0
@@ -91,6 +92,8 @@ export class SyncLatency {
     const offset = authorityAt - (sentAt + receivedAt) / 2
     this.clock = { offset, rtt, at: receivedAt }
     for (const paint of this.uncorrected.splice(0)) this.keepPaint(paint, offset)
+    for (const { tap, paintedAt } of this.uncorrectedTaps.splice(0))
+      this.keepTap(tap, paintedAt + offset)
   }
 
   // why: a slightly-off offset can put a fast paint a few ms before the authority applied it.
@@ -138,7 +141,8 @@ export class SyncLatency {
       const paint = at - change.authorityAt
       if (this.clock) this.keepPaint(paint, this.clock.offset)
       else keepNewest(this.uncorrected, paint)
-      if (this.clock && change.tap) this.keepTap(change.tap, at + this.clock.offset)
+      if (change.tap && this.clock) this.keepTap(change.tap, at + this.clock.offset)
+      else if (change.tap) keepNewest(this.uncorrectedTaps, { tap: change.tap, paintedAt: at })
       return false
     })
   }
@@ -181,6 +185,7 @@ export class SyncLatency {
     this.uncorrected = []
     this.acks = []
     this.taps = { own: [], cross: [] }
+    this.uncorrectedTaps = []
     if (!delivery && !ack) return
     captureAnalytics("sync_latency", {
       transport: this.context.transport,
