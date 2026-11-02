@@ -307,7 +307,7 @@ function phoneRows(game: DemoGame) {
 // a mini map of the board with one cell per player at that player's seat position.
 
 const SITE_LEAF =
-  "M22 7.5C29.5 12 33.5 18.5 32.8 25.2 32.2 30.6 27.8 33.6 22 33.6 16.2 33.6 11.8 30.6 11.2 25.2 10.5 18.5 14.5 12 22 7.5ZM21.1 33h1.8v3.5a.9.9 0 0 1-1.8 0Z"
+  "M22 7.5C29.5 12 33.5 18.5 32.8 25.2 32.2 30.6 27.8 33.6 22.9 33.6V36.5A.9.9 0 0 1 21.1 36.5V33.6C16.2 33.6 11.8 30.6 11.2 25.2 10.5 18.5 14.5 12 22 7.5Z"
 
 // The app's mark shapes (src/components/PlayerMark.tsx), drawn on a 44 unit box. "heart" draws a leaf and "triangle" a rosette, as in the app.
 const APP_MARK_SHAPES: Record<SiteMarkShape, string> = {
