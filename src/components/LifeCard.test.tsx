@@ -20,7 +20,7 @@ import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/
 import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
-import { deepShade, TAKEOVER_MS } from "./CommanderDamageCardControls"
+import { ATTACK_SHADE, TAKEOVER_MS } from "./CommanderDamageCardControls"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import {
@@ -495,7 +495,7 @@ describe("LifeCard", () => {
     </ThemeProvider>
   )
 
-  it("grows the attacker's card across a defender in a shade of the defender's own color, around a disc of its own", () => {
+  it("grows the attacker's card across a defender in the attack shade, around a disc of its own", () => {
     const view = render(defendingCard())
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
@@ -503,7 +503,7 @@ describe("LifeCard", () => {
     const flood = view.getByTestId("commander-flood-seat-2")
     // why: the attacker's card sits just left of this one and has grown 900 on every side.
     expect(StyleSheet.flatten(flood.props.style)).toMatchObject({
-      backgroundColor: deepShade("#397B61"),
+      backgroundColor: ATTACK_SHADE,
       left: -1097,
       top: -900,
       width: 1993,

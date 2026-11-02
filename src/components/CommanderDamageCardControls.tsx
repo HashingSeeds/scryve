@@ -255,10 +255,13 @@ export function useCommanderTakeover<Attacker>(
   }
 }
 
-// why: a defender floods a deep shade of its own color, so the attacker is the only bright card and no flood can be mistaken for another player's color. The attacker's power box inks its number in the same shade. 0.87 in linear light keeps about 40% of each sRGB channel.
+// why: the attacker's power box inks its number in a deep shade of the attacker's own color. 0.87 in linear light keeps about 40% of each sRGB channel.
 export function deepShade(color: string) {
   return mixColorsInLinearLight(color, "#000000", 0.87)
 }
+
+// why: every defender floods the same dark red, so being targeted reads as danger and never as the grey dimming of a seat that is out.
+export const ATTACK_SHADE = "#4A0610"
 
 // why: every shadow is dark enough for white ink, so a defender's controls and commander strip read in white over it whatever the attacker's color.
 export const SHADOW_INK = "#FFFFFF"
