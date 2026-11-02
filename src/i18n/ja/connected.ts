@@ -145,8 +145,8 @@ export default {
     opensPro: "Scryve Proを開きます",
     pro: "Pro",
     shapes: {
-      heart: "ハート",
-      triangle: "三角",
+      heart: "葉",
+      triangle: "ロゼット",
       square: "四角",
       diamond: "ひし形",
       star: "星",

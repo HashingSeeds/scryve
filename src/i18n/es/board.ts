@@ -219,8 +219,8 @@ export default {
     addGames_other: "Añadir {{count}} partidas",
   },
   shape: {
-    heart: "corazón",
-    triangle: "triángulo",
+    heart: "hoja",
+    triangle: "roseta",
     square: "cuadrado",
     diamond: "rombo",
     star: "estrella",

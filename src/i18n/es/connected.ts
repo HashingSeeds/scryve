@@ -164,8 +164,8 @@ export default {
     opensPro: "Abre Scryve Pro",
     pro: "Pro",
     shapes: {
-      heart: "corazón",
-      triangle: "triángulo",
+      heart: "hoja",
+      triangle: "roseta",
       square: "cuadrado",
       diamond: "rombo",
       star: "estrella",

@@ -214,8 +214,8 @@ export default {
     addGames_other: "{{count}} गेम जोड़ें",
   },
   shape: {
-    heart: "दिल",
-    triangle: "त्रिकोण",
+    heart: "पत्ती",
+    triangle: "रोज़ेट",
     square: "वर्ग",
     diamond: "हीरा",
     star: "तारा",

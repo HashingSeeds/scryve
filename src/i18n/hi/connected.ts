@@ -155,8 +155,8 @@ export default {
     opensPro: "Scryve Pro खोलता है",
     pro: "Pro",
     shapes: {
-      heart: "दिल",
-      triangle: "त्रिकोण",
+      heart: "पत्ती",
+      triangle: "रोज़ेट",
       square: "वर्ग",
       diamond: "समचतुर्भुज",
       star: "तारा",

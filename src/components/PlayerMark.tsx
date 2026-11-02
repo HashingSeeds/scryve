@@ -13,20 +13,20 @@ import type { LifeCardContentRotation } from "./playerCardTypes"
 import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-/** why: shapes sit inside their 44 unit box with different margins, so lining up boxes leaves drawn edges misaligned (the triangle floated above the prize grid). */
+/** why: shapes sit inside their 44 unit box with different margins, so lining up boxes leaves drawn edges misaligned (a pointed shape floated above the prize grid). */
 export const MARK_ART_BOUNDS: Record<
   PlayerMarkShape,
   { top: number; bottom: number; left: number; right: number }
 > = {
   circle: { top: 10, bottom: 34, left: 10, right: 34 },
-  triangle: { top: 8.56, bottom: 34.5, left: 7.59, right: 36.41 },
+  triangle: { top: 9.3, bottom: 34.7, left: 9.74, right: 34.26 },
   square: { top: 11, bottom: 33, left: 11, right: 33 },
   diamond: { top: 9.04, bottom: 34.96, left: 9.04, right: 34.96 },
   star: { top: 8.43, bottom: 35.06, left: 8.08, right: 35.92 },
   hexagon: { top: 8.39, bottom: 35.61, left: 9.88, right: 34.12 },
   plus: { top: 8, bottom: 36, left: 8, right: 36 },
   shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
-  heart: { top: 9.15, bottom: 34.84, left: 8, right: 36 },
+  heart: { top: 7.5, bottom: 37.4, left: 11.12, right: 32.88 },
   crown: { top: 10.25, bottom: 35, left: 8.25, right: 35.75 },
   flame: { top: 8, bottom: 36, left: 11, right: 33 },
   bolt: { top: 7.75, bottom: 36.25, left: 10.25, right: 33.75 },
@@ -164,19 +164,18 @@ export function DrawMark({ color, size = 44 }: { color: string; size?: number })
   )
 }
 
-const SWORD_INSET_THAT_FITS_SHAPE: Record<
-  PlayerMarkShape,
-  { centerX: number; centerY: number; size: number }
-> = {
+type Inset = { centerX: number; centerY: number; size: number }
+
+const SWORD_INSET_THAT_FITS_SHAPE: Record<PlayerMarkShape, Inset> = {
   circle: { centerX: 22, centerY: 22, size: 14 },
   square: { centerX: 22, centerY: 22, size: 15 },
   diamond: { centerX: 22, centerY: 22, size: 14 },
   hexagon: { centerX: 22, centerY: 22, size: 16 },
-  triangle: { centerX: 22, centerY: 25, size: 14 },
+  triangle: { centerX: 22, centerY: 22, size: 15 },
   star: { centerX: 22, centerY: 23, size: 12 },
   plus: { centerX: 22, centerY: 22, size: 12 },
   shield: { centerX: 22, centerY: 21.5, size: 15 },
-  heart: { centerX: 22, centerY: 22.5, size: 13 },
+  heart: { centerX: 22, centerY: 21.5, size: 14 },
   crown: { centerX: 22, centerY: 22.5, size: 11 },
   flame: { centerX: 22, centerY: 27, size: 12 },
   bolt: { centerX: 22, centerY: 22.5, size: 9 },
@@ -185,14 +184,6 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   spade: { centerX: 22, centerY: 22, size: 12 },
   gem: { centerX: 22, centerY: 19.5, size: 13 },
   tower: { centerX: 22, centerY: 24.5, size: 13 },
-}
-
-// why: an X or check reads as centred at a heart's visual middle, up toward its lobes (the same spot commander numbers use), not where the sword fits.
-const GLYPH_CENTER_Y: Partial<Record<PlayerMarkShape, number>> = { heart: 20.5 }
-
-function glyphInset(shape: PlayerMarkShape) {
-  const inset = SWORD_INSET_THAT_FITS_SHAPE[shape]
-  return { ...inset, centerY: GLYPH_CENTER_Y[shape] ?? inset.centerY }
 }
 
 function CloseIconOverlay({
@@ -204,7 +195,7 @@ function CloseIconOverlay({
   color: string
   entering: ReturnType<typeof ZoomIn.duration> | undefined
 }) {
-  const inset = glyphInset(shape)
+  const inset = SWORD_INSET_THAT_FITS_SHAPE[shape]
   return (
     <Animated.View
       testID="player-mark-close"
@@ -242,7 +233,7 @@ function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string })
 
 function CheckInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
   return (
-    <G testID="player-mark-check" transform={insetTransform(glyphInset(shape))}>
+    <G testID="player-mark-check" transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}>
       <Path
         d="M4.5 12.5 9.5 17.5 19.5 6.5"
         stroke={color}
@@ -255,7 +246,7 @@ function CheckInset({ shape, color }: { shape: PlayerMarkShape; color: string })
   )
 }
 
-function insetTransform({ centerX, centerY, size }: ReturnType<typeof glyphInset>) {
+function insetTransform({ centerX, centerY, size }: Inset) {
   return `translate(${centerX - size / 2} ${centerY - size / 2}) scale(${size / SWORD_VIEW_BOX})`
 }
 
@@ -267,12 +258,17 @@ const SKULL_FACE =
   "M20 20.5a3.6 3.6 0 1 1-7.2 0 3.6 3.6 0 1 1 7.2 0ZM31.2 20.5a3.6 3.6 0 1 1-7.2 0 3.6 3.6 0 1 1 7.2 0ZM22 24.6l1.9 3.4h-3.8ZM18.5 31.2V35.6H20.3V31.2ZM23.7 31.2V35.6H25.5V31.2Z"
 const SKULL_EYES_OVER_SWORD =
   "M20 18.5a3.4 3.4 0 1 1-6.8 0 3.4 3.4 0 1 1 6.8 0ZM30.8 18.5a3.4 3.4 0 1 1-6.8 0 3.4 3.4 0 1 1 6.8 0Z"
+const LEAF =
+  "M22 7.5C29.5 12 33.5 18.5 32.8 25.2 32.2 30.6 27.8 33.6 22.9 33.6V36.5A.9.9 0 0 1 21.1 36.5V33.6C16.2 33.6 11.8 30.6 11.2 25.2 10.5 18.5 14.5 12 22 7.5Z"
+const LEAF_RIB = "M21.2 13.5h1.6v18.5h-1.6Z"
+const ROSETTE =
+  "M25.4 11.54A3.7 3.7 0 0 1 30.9 15.53 3.7 3.7 0 0 1 33 22 3.7 3.7 0 0 1 30.9 28.47 3.7 3.7 0 0 1 25.4 32.46 3.7 3.7 0 0 1 18.6 32.46 3.7 3.7 0 0 1 13.1 28.47 3.7 3.7 0 0 1 11 22 3.7 3.7 0 0 1 13.1 15.53 3.7 3.7 0 0 1 18.6 11.54 3.7 3.7 0 0 1 25.4 11.54Z"
 const GEM =
   "M15.2 10H28.8A1.5 1.5 0 0 1 29.95 10.53L35.2 16.9A1.5 1.5 0 0 1 35.23 18.8L23.17 34.4A1.5 1.5 0 0 1 20.83 34.4L8.77 18.8A1.5 1.5 0 0 1 8.8 16.9L14.05 10.53A1.5 1.5 0 0 1 15.2 10Z"
 const GEM_FACETS =
   "M9.4 19.15H34.6V17.25H9.4ZM17.5 10.61 14.8 17.91 16.4 18.49 19.1 11.19ZM24.9 11.19 27.6 18.49 29.2 17.91 26.5 10.61ZM14.82 18.53 20.42 31.83 21.98 31.17 16.38 17.87ZM27.62 17.87 22.02 31.17 23.58 31.83 29.18 18.53Z"
 
-/** why: a sword inset over the eye's hole or the gem's facets would get lost in the cut-outs, so `solid` draws the plain silhouette; the skull keeps raised eyes and lets the sword stand in for its nose and teeth. */
+/** why: a sword inset over the eye's hole, the gem's facets or the leaf's rib would get lost in the cut-outs, so `solid` draws the plain silhouette; the skull keeps raised eyes and lets the sword stand in for its nose and teeth. */
 function MarkShape({
   shape,
   color,
@@ -289,12 +285,7 @@ function MarkShape({
     case "circle":
       return <Circle {...common} cx="22" cy="22" r="12" />
     case "triangle":
-      return (
-        <Path
-          {...common}
-          d="M19.83 9.82a2.5 2.5 0 0 1 4.34 0l11.91 20.94a2.5 2.5 0 0 1-2.18 3.74H10.1a2.5 2.5 0 0 1-2.18-3.74Z"
-        />
-      )
+      return <Path {...common} d={ROSETTE} />
     case "square":
       return <Rect {...common} x="11" y="11" width="22" height="22" rx="3" />
     case "diamond":
@@ -333,12 +324,7 @@ function MarkShape({
         />
       )
     case "heart":
-      return (
-        <Path
-          {...common}
-          d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"
-        />
-      )
+      return <Path {...common} fillRule="evenodd" d={solid ? LEAF : LEAF + LEAF_RIB} />
     case "crown":
       return (
         <G {...common}>

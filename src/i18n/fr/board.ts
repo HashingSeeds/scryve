@@ -219,8 +219,8 @@ export default {
     addGames_other: "Ajouter {{count}} parties",
   },
   shape: {
-    heart: "cœur",
-    triangle: "triangle",
+    heart: "feuille",
+    triangle: "rosette",
     square: "carré",
     diamond: "losange",
     star: "étoile",
