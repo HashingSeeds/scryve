@@ -170,6 +170,8 @@ export default defineSchema({
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    // why: a seat's app that predates editing any seat leaves this unset, so its game stays owner-only.
+    editsAnySeat: v.optional(v.boolean()),
     lastWrite: v.optional(
       v.object({
         actorUserId: v.id("users"),

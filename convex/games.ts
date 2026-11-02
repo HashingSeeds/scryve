@@ -50,7 +50,6 @@ import {
   isSameCommanderClaim,
   isSameCommanderResolution,
   lastChangeFor,
-  lifeEditingValidator,
   MAX_COMMANDER_DAMAGE,
   MAX_PENDING_COMMANDER_CLAIMS,
   MAX_SNAPSHOT_LIFE,
@@ -502,6 +501,10 @@ function sharedSeatKey(player: Pick<Doc<"gamePlayers">, "deckVersionId" | "deckK
     : undefined
 }
 
+function lifeEditingFor(players: readonly Pick<Doc<"gamePlayers">, "editsAnySeat">[]) {
+  return players.every((player) => player.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}
+}
+
 function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
   return (
     (game.eventSequence ?? 0) +
@@ -781,7 +784,7 @@ export const createLobby = mutation({
     format: v.optional(v.string()),
     variant: v.optional(gameVariantValidator),
     layout: v.optional(playerGridLayoutValidator),
-    lifeEditing: v.optional(lifeEditingValidator),
+    editsAnySeat: v.optional(v.boolean()),
     inviteToken: v.string(),
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
@@ -851,7 +854,6 @@ export const createLobby = mutation({
       ...(format ? { format } : {}),
       ...(args.variant ? { variant: args.variant } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
-      ...(args.lifeEditing ? { lifeEditing: args.lifeEditing } : {}),
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -877,6 +879,7 @@ export const createLobby = mutation({
       eventCount: 0,
       resumable: true,
       joinedAt: now,
+      ...(args.editsAnySeat ? { editsAnySeat: true } : {}),
     })
     const invitationId = await ctx.db.insert("invitations", {
       gameId,
@@ -981,6 +984,7 @@ export const claimSeat = mutation({
     seat: v.optional(v.number()),
     systems: v.optional(v.array(v.string())),
     variants: v.optional(v.array(v.string())),
+    editsAnySeat: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1071,6 +1075,7 @@ export const claimSeat = mutation({
       eventCount: 0,
       resumable: true,
       joinedAt: Date.now(),
+      ...(args.editsAnySeat ? { editsAnySeat: true } : {}),
     })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return { publicId: game.publicId, seat }
@@ -1967,6 +1972,7 @@ export const lobbyProjection = query({
             ...(commanderDamage
               ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
               : {}),
+            ...(p.editsAnySeat ? { editsAnySeat: true } : {}),
             controlledByMe:
               (p.userId === user._id || (p.userId === undefined && isHost)) &&
               (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
@@ -2255,7 +2261,12 @@ export const startGame = mutation({
     }
     const roles = rolesFor(game, players.length)
     const now = Date.now()
-    await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
+    await ctx.db.patch(game._id, {
+      status: "active",
+      startedAt: now,
+      updatedAt: now,
+      ...lifeEditingFor(players),
+    })
     for (const [index, player] of resolvePlayerAppearances(
       players,
       ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
@@ -2306,6 +2317,31 @@ export const revealMyRole = mutation({
       await ctx.db.patch(player._id, { roleRevealed: true })
     }
     return { role: player.role }
+  },
+})
+
+export const noteAnySeatSupport = mutation({
+  args: { publicId: v.string(), deviceId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (args.deviceId) assertDeviceId(args.deviceId)
+    const game = await gameByPublicId(ctx, args.publicId)
+    if (game.status !== "lobby") return
+    const user = await requireUser(ctx)
+    const seats = await ctx.db
+      .query("gamePlayers")
+      .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
+      .take(MAX_PLAYERS_PER_GAME_READ)
+    const behind = seats.filter(
+      (seat) =>
+        !seat.editsAnySeat &&
+        (seat.deviceId === undefined ||
+          args.deviceId === undefined ||
+          seat.deviceId === args.deviceId),
+    )
+    if (behind.length === 0) return
+    await limitGameRate(ctx, "gameWrite", user._id)
+    for (const seat of behind) await ctx.db.patch(seat._id, { editsAnySeat: true })
+    await ctx.db.patch(game._id, { updatedAt: Date.now() })
   },
 })
 
@@ -2614,7 +2650,7 @@ async function startRematch(
     ...(finished.format === undefined ? {} : { format: finished.format }),
     ...(finished.variant === undefined ? {} : { variant: finished.variant }),
     ...(finished.layout === undefined ? {} : { layout: finished.layout }),
-    ...(finished.lifeEditing === undefined ? {} : { lifeEditing: finished.lifeEditing }),
+    ...lifeEditingFor(players),
     rematchOfGameId: finished._id,
     createdAt: now,
     startedAt: now,
@@ -2653,6 +2689,7 @@ async function startRematch(
       eventCount: 0,
       resumable: true,
       joinedAt: now,
+      ...(player.editsAnySeat ? { editsAnySeat: true } : {}),
       ...roles?.[index],
     })
   }

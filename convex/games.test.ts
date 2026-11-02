@@ -15,7 +15,7 @@ async function lobby(
     playerCount?: number
     layout?: "tabletop"
     system?: { system: string; ruleset: string; startingLife: number }
-    lifeEditing?: "anyone" | "owner"
+    editsAnySeat?: boolean
   } = {},
 ) {
   const host = await signedIn(t, "host-subject", "Host")
@@ -27,7 +27,7 @@ async function lobby(
     ...options.system,
     ...(options.deckRequired === undefined ? {} : { deckRequired: options.deckRequired }),
     ...(options.layout ? { layout: options.layout } : {}),
-    ...(options.lifeEditing ? { lifeEditing: options.lifeEditing } : {}),
+    ...(options.editsAnySeat ? { editsAnySeat: true } : {}),
     inviteToken: token,
     manualCodeCandidates: ["ABC234", "DEF567"],
     hostDisplayName: "Host",
@@ -540,14 +540,15 @@ describe("Convex connected-game authorization", () => {
 async function activeGame(
   t: ConvexTestHarness,
   system?: NonNullable<Parameters<typeof lobby>[1]>["system"],
-  lifeEditing?: "anyone" | "owner",
+  editsAnySeat?: { host: boolean; joiner: boolean },
 ) {
-  const { host, created } = await lobby(t, { system, lifeEditing })
+  const { host, created } = await lobby(t, { system, editsAnySeat: editsAnySeat?.host })
   const joiner = await signedIn(t, "active-joiner", "Joiner")
   await joiner.mutation(api.games.claimSeat, {
     token,
     displayName: "Joiner",
     color: "#2563EB",
+    ...(editsAnySeat?.joiner ? { editsAnySeat: true } : {}),
   })
   await host.mutation(api.games.startGame, { publicId: created.publicId })
   const hostProjection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
@@ -3524,9 +3525,11 @@ describe("tap-to-paint timing", () => {
 })
 
 describe("games where anyone edits any seat", () => {
+  const everyone = { host: true, joiner: true }
+
   it("lets any seated player change another seat's life, counters and commander damage", async () => {
     const t = makeConvexTest()
-    const game = await activeGame(t, undefined, "anyone")
+    const game = await activeGame(t, undefined, everyone)
     await game.joiner.mutation(
       api.games.changeLife,
       lifeArgs(game.publicId, game.hostPlayerId, "operation-anyone-001", -3, "device-joiner-001"),
@@ -3559,9 +3562,9 @@ describe("games where anyone edits any seat", () => {
     expect(projection.table?.players[game.hostPlayerId]).toEqual({ counters: { poison: 1 } })
   })
 
-  it("still turns away accounts without a seat, and games without the setting stay owner-only", async () => {
+  it("still turns away accounts without a seat", async () => {
     const t = makeConvexTest()
-    const game = await activeGame(t, undefined, "anyone")
+    const game = await activeGame(t, undefined, everyone)
     const stranger = await signedIn(t, "anyone-stranger", "Stranger")
     await expect(
       stranger.mutation(
@@ -3574,28 +3577,37 @@ describe("games where anyone edits any seat", () => {
         }),
       ),
     ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
-
-    const owned = await activeGame(makeConvexTest(), undefined, "owner")
-    await expect(
-      owned.joiner.mutation(
-        api.games.changeLife,
-        lifeArgs(
-          owned.publicId,
-          owned.hostPlayerId,
-          "operation-owner-0001",
-          -1,
-          "device-joiner-001",
-        ),
-      ),
-    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
-    expect(
-      (await owned.host.query(api.games.lobbyProjection, { publicId: owned.publicId })).lifeEditing,
-    ).toBeUndefined()
   })
 
-  it("keeps the setting for a rematch", async () => {
+  it("plays owner-only when any seat's app is too old, and says whose", async () => {
     const t = makeConvexTest()
-    const game = await activeGame(t, undefined, "anyone")
+    const game = await activeGame(t, undefined, { host: true, joiner: false })
+    await expect(
+      game.joiner.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, "operation-owner-0001", -1, "device-joiner-001"),
+      ),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+    const projection = await game.host.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.lifeEditing).toBeUndefined()
+    expect(projection.players.map((player) => player.editsAnySeat)).toEqual([true, undefined])
+  })
+
+  it("opens up once a player who updated comes back to the lobby", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t, { editsAnySeat: true })
+    const joiner = await signedIn(t, "updated-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" })
+    await joiner.mutation(api.games.noteAnySeatSupport, { publicId: created.publicId })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    await expect(
+      host.query(api.games.lobbyProjection, { publicId: created.publicId }),
+    ).resolves.toMatchObject({ lifeEditing: "anyone" })
+  })
+
+  it("keeps editing any seat for a rematch", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, undefined, everyone)
     await game.host.mutation(api.games.finishGame, {
       publicId: game.publicId,
       rematch: {
