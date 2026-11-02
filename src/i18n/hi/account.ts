@@ -52,7 +52,6 @@ export default {
       lockedPro: "{{name}}, Scryve Pro",
       foilHeading: "Scryve Foil",
       opensPro: "Scryve Pro खोलता है",
-      opensSignIn: "साइन इन खुलता है",
       proFailed: "Scryve Pro की जाँच नहीं हो सकी, इसलिए Pro आइकन लॉक हैं।",
       names: {
         Default: "डिफ़ॉल्ट",
@@ -297,6 +296,8 @@ export default {
     notConfigured: "इस बिल्ड में कनेक्टेड सुविधाएँ उपलब्ध नहीं हैं। लोकल गेम उपलब्ध रहता है।",
   },
   billing: {
+    proNeedsAccount:
+      "Scryve Pro एक खाते से जुड़ा है। Pro पाने या अपना मौजूदा Pro इस्तेमाल करने के लिए साइन इन करें।",
     renewalPrompt: {
       title: "नवीनीकरण से पहले याद दिलाएँ?",
       body: "आपके अगले वार्षिक शुल्क से 3 दिन पहले नोटिफ़िकेशन पाएँ।",

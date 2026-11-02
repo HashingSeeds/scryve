@@ -66,16 +66,15 @@ describe("AppIconPicker", () => {
     expect(previews.every((preview) => isHiddenFromAccessibility(preview))).toBe(true)
   })
 
-  it("sends free players to the paywall and signed-out players to sign in", () => {
+  it("sends free players to the paywall and explains sign in to signed-out players", () => {
     const view = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false })
     fireEvent.press(view.getByTestId("app-icon-midnight"))
     expect(mockPresentPaywall).toHaveBeenCalledTimes(1)
     view.unmount()
-    fireEvent.press(
-      renderFor({ isSignedIn: false, isCountPro: false, isFoil: false }).getByTestId(
-        "app-icon-midnight",
-      ),
-    )
+    const signedOut = renderFor({ isSignedIn: false, isCountPro: false, isFoil: false })
+    fireEvent.press(signedOut.getByTestId("app-icon-midnight"))
+    expect(mockOpenAuth).not.toHaveBeenCalled()
+    fireEvent.press(signedOut.getByTestId("pro-sign-in"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
     expect(mockPresentPaywall).toHaveBeenCalledTimes(1)
     expect(setAlternateAppIcon).not.toHaveBeenCalled()

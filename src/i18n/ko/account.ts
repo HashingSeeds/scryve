@@ -52,7 +52,6 @@ export default {
       lockedPro: "{{name}}, Scryve Pro",
       foilHeading: "Scryve Foil",
       opensPro: "Scryve Pro 열기",
-      opensSignIn: "로그인 화면을 엽니다",
       proFailed: "Scryve Pro를 확인할 수 없어 Pro 아이콘이 잠겨 있습니다.",
       names: {
         Default: "기본",
@@ -297,6 +296,8 @@ export default {
       "이 빌드에서는 연결 기능을 사용할 수 없습니다. 로컬 플레이는 계속 사용할 수 있습니다.",
   },
   billing: {
+    proNeedsAccount:
+      "Scryve Pro는 계정에 연결됩니다. Pro를 구매하거나 이미 가지고 있는 Pro를 사용하려면 로그인하세요.",
     renewalPrompt: {
       title: "갱신 전에 알려드릴까요?",
       body: "다음 연간 결제 3일 전에 알림을 받습니다.",
