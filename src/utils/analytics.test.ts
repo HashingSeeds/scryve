@@ -213,7 +213,8 @@ it("keeps scan counts and heat but nothing else from a finished scan", () => {
   )
 })
 
-it("tags events with the running update's commit and still drops SDK device metadata", () => {
+it("tags events with the build environment and running update's commit, and still drops SDK device metadata", () => {
+  jest.doMock("@/utils/buildEnvironment", () => ({ buildEnvironment: () => "beta" }))
   jest.doMock("expo-constants", () => ({
     __esModule: true,
     default: {
@@ -226,7 +227,10 @@ it("tags events with the running update's commit and still drops SDK device meta
     properties = analyticsProperties("app_opened", { $device_id: "private" })
   })
   jest.dontMock("expo-constants")
-  expect(properties).toEqual(expect.objectContaining({ commit: "0123456789ab" }))
+  jest.dontMock("@/utils/buildEnvironment")
+  expect(properties).toEqual(
+    expect.objectContaining({ commit: "0123456789ab", environment: "beta" }),
+  )
   expect(properties).not.toHaveProperty("$device_id")
 })
 
