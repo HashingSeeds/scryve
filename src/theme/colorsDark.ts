@@ -34,7 +34,7 @@ const palette = {
   info500: "#77558A",
   destructive500: "#A33A52",
 
-  overlay50: "rgba(25, 16, 21, 0.5)",
+  overlay50: "rgba(0, 0, 0, 0.5)",
 } as const
 
 export const colors = {
