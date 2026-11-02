@@ -30,13 +30,13 @@ steps:
   - tap: { id: appearance-color-a33a52 }
   - tap: { id: save-local-appearance-button }
   - await: { idle: true }
-  - scroll-to: { target: { id: player-appearance-5 } }
+  - scroll-to: { target: { id: player-appearance-5 }, direction: up }
   - tap: { id: player-appearance-5 }
   - await: { visible: { id: appearance-color-77558a } }
   - tap: { id: appearance-color-77558a }
   - tap: { id: save-local-appearance-button }
   - await: { idle: true }
-  - scroll-to: { target: { id: player-appearance-1 } }
+  - scroll-to: { target: { id: player-appearance-1 }, direction: up }
   - tap: { id: player-appearance-1 }
   - await: { visible: { id: appearance-color-b85636 } }
   - tap: { id: appearance-color-b85636 }
