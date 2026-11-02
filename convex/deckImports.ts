@@ -773,7 +773,6 @@ export const syncPreconRows = internalMutation({
   },
 })
 
-// why: deployments that stored the deck list before precon rows existed get them on first use.
 export const startPreconRowSync = internalMutation({
   args: {},
   handler: async (ctx) => {

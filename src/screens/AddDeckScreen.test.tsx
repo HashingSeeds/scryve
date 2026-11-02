@@ -82,7 +82,6 @@ const mockExplorers: MockCatalogDeck = {
 const defaultCatalogRows = (args: MockCatalogArgs) => (args.game === "mtg" ? [mockExplorers] : [])
 const mockCatalogRows = jest.fn(defaultCatalogRows)
 const mockListCatalog = jest.fn((args: MockCatalogArgs) => mockCatalogRows(args))
-// why: like Convex, a list answers after the render that subscribes to it and is forgotten once unsubscribed.
 const mockCatalogServer = { answered: new Set<string>(), answering: false }
 const defaultFreshness = async (_args: unknown) => ({
   status: "ready",

@@ -787,6 +787,43 @@ describe("Browse list", () => {
     }
   })
 
+  it("syncs every precon across batches and updates a changed one in place", async () => {
+    jest.useFakeTimers()
+    try {
+      const t = makeConvexTest()
+      const decks = Array.from({ length: 201 }, (_, index) => ({
+        fileName: `Deck${index}_SET`,
+        name: `Deck ${index}`,
+        type: "Commander Deck",
+        releaseDate: "2020-01-01",
+      }))
+      await t.mutation(internal.deckImports.storeCatalog, { decks })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: decks.map((deck, index) =>
+          index === 200 ? { ...deck, name: "Renamed", releaseDate: "2025-06-01" } : deck,
+        ),
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      const rows = await t.run(
+        async (ctx) =>
+          await ctx.db
+            .query("deckCatalogs")
+            .withIndex("by_game_and_source_and_external_id", (q) =>
+              q.eq("game", "mtg").eq("source", "mtgjson"),
+            )
+            .collect(),
+      )
+      expect(rows).toHaveLength(201)
+      expect(rows.find((row) => row.externalId === "Deck200_SET")).toMatchObject({
+        name: "Renamed",
+        publishedAt: Date.parse("2025-06-01"),
+      })
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("fills precon rows for a deck list stored before they existed", async () => {
     jest.useFakeTimers()
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
