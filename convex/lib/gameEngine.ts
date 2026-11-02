@@ -150,7 +150,6 @@ export interface WriteRequest {
   operationId: string
   deviceId: string
   clientCreatedAt: number
-  /** why: the first tap behind this write on the authority's clock; it only times tap-to-paint, so a bad one is dropped instead of refusing the write. */
   tappedAt?: number
 }
 

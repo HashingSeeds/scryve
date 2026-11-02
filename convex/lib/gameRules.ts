@@ -52,7 +52,6 @@ export interface LastChange {
   crossSeat: boolean
 }
 
-/** why: a viewer times only taps made on other devices, and its next paint shows the latest change. */
 export function lastChangeFor(
   seat: (SeatOwner & { lastWrite?: SeatWrite }) | undefined,
   viewer: { userId: string; deviceId?: string },

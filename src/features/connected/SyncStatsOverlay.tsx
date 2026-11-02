@@ -76,10 +76,10 @@ const $table: ViewStyle = {
 
 const $row: ViewStyle = { flexDirection: "row" }
 
-const $name: TextStyle = { width: 72, color: "#FFFFFF" }
+const $name: TextStyle = { width: 56, color: "#FFFFFF" }
 
 const $cell: TextStyle = {
-  width: 36,
+  width: 34,
   textAlign: "right",
   color: "#FFFFFF",
   fontVariant: ["tabular-nums"],

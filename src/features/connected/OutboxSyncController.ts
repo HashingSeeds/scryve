@@ -253,7 +253,7 @@ export class OutboxSyncController {
       !this.confirmed ||
       incoming.eventSequence > this.confirmed.eventSequence ||
       incoming.serverUpdatedAt > this.confirmed.serverUpdatedAt
-    // why: the first fresh projection after mounting or reconnecting is a catch-up that measures time away (a replay of the cached one is not fresh), and one carrying this device's own write was painted before it was sent. A lastChange is never this device's.
+    // why: the first fresh projection after mounting or reconnecting is a catch-up that measures time away (a replay of the cached one is not fresh), and one carrying this device's own write was painted before it was sent.
     if (
       this.timingLive &&
       (pending.length === 0 || incoming.lastChange) &&

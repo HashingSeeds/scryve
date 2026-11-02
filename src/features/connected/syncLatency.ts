@@ -9,7 +9,6 @@ const CLOCK_STALE_MS = 60_000
 const MAX_TRACKED_WRITES = 32
 // why: frames can stall without the app leaving the foreground, and a stalled backlog measures the stall.
 const MAX_UNPAINTED = 16
-// why: a change queued offline reaches the table long after its tap, and that wait is time offline, not sync.
 const MAX_TAP_TO_PAINT_MS = 30_000
 
 export type SyncTransport = { transport: "cloud" } | { transport: "nearby"; role: "host" | "guest" }
