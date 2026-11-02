@@ -34,7 +34,8 @@ import { TextAction } from "@/components/TextAction"
 import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { localizedDeckSections } from "@/features/game/playSystems"
+import { localizedDeckSections, playSystemShortLabel } from "@/features/game/playSystems"
+import { VISIBLE_SYSTEM_IDS } from "@/features/game/systemVisibility"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -65,7 +66,12 @@ import type { GuestDeckPayload } from "./guestDeck"
 import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { api } from "../../../convex/_generated/api"
-import { picksCommander, systemDefinition } from "../../../convex/lib/systems"
+import {
+  isSystemId,
+  picksCommander,
+  systemDefinition,
+  type SystemId,
+} from "../../../convex/lib/systems"
 import { canReadCardText } from "../../../modules/card-text-reader"
 
 type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
@@ -127,7 +133,10 @@ type CardSearchProps = {
   commanderCards?: DeckCard[]
   deckCards?: DeckCard[]
   presentation?: "modal" | "screen"
+  onGameChange?: (game: SystemId) => void
 }
+
+const GAME_OPTIONS = VISIBLE_SYSTEM_IDS.map((id) => ({ id, label: playSystemShortLabel(id) }))
 
 // why: DeckView and ImportBuild type their search props from this component and always add cards.
 export function CardSearchScreen(props: CardSearchProps & { onAdd: AddCard }) {
@@ -145,6 +154,7 @@ export function CardSearch({
   commanderCards,
   deckCards,
   presentation = "modal",
+  onGameChange,
 }: CardSearchProps) {
   const convex = useConvex()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
@@ -683,6 +693,18 @@ export function CardSearch({
               />
             ) : null}
           </View>
+          {onGameChange ? (
+            <SelectField
+              testID="card-search-game"
+              label={translate("decks:shelf.system")}
+              field="system"
+              options={GAME_OPTIONS}
+              value={game}
+              onSelect={(value) => {
+                if (isSystemId(value)) onGameChange(value)
+              }}
+            />
+          ) : null}
           {initialSection !== "commander" && !lookup && picksSection ? (
             <SelectField
               testID="card-search-section"
