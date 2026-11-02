@@ -515,7 +515,7 @@ describe("NewGameScreen", () => {
     })
   })
 
-  it("gives a signed-out device free marks and sends its Pro taps to sign-in", () => {
+  it("gives a signed-out device free marks and explains sign in before opening it", () => {
     const openAuth = authAs(false)
     const view = setup({ initialGame: crownGame() })
 
@@ -525,6 +525,10 @@ describe("NewGameScreen", () => {
       disabled: false,
     })
     fireEvent.press(view.getByTestId("appearance-shape-flame"))
+    expect(openAuth).not.toHaveBeenCalled()
+    expect(view.getByTestId("pro-sign-in-note")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("pro-sign-in"))
     expect(openAuth).toHaveBeenCalledTimes(1)
     expect(view.queryByTestId("local-appearance-dialog")).toBeNull()
   })

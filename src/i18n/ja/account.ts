@@ -52,7 +52,6 @@ export default {
       lockedPro: "{{name}}、Scryve Pro",
       foilHeading: "Scryve Foil",
       opensPro: "Scryve Proを開きます",
-      opensSignIn: "サインインを開きます",
       proFailed: "Scryve Proを確認できなかったため、Proアイコンはロックされています。",
       names: {
         Default: "デフォルト",
@@ -297,6 +296,8 @@ export default {
       "このビルドでは通信対戦機能を利用できません。ローカルプレイは引き続き利用できます。",
   },
   billing: {
+    proNeedsAccount:
+      "Scryve Proはアカウントに紐づいています。Proをご利用になるにはサインインしてください。",
     renewalPrompt: {
       title: "更新前にお知らせしますか?",
       body: "次の年額課金の3日前に通知を受け取れます。",

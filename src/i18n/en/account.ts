@@ -52,7 +52,6 @@ const account = {
       lockedPro: "{{name}}, Scryve Pro",
       foilHeading: "Scryve Foil",
       opensPro: "Opens Scryve Pro",
-      opensSignIn: "Opens sign in",
       proFailed: "Couldn't check Scryve Pro, so Pro icons are locked.",
       names: {
         Default: "Default",
@@ -300,6 +299,9 @@ const account = {
       "Connected features are unavailable in this build. Local play remains available.",
   },
   billing: {
+    // Shown when a signed-out player taps something that needs Scryve Pro, beside a Sign in button.
+    proNeedsAccount:
+      "Scryve Pro is tied to an account. Sign in to get Pro or use Pro you already have.",
     // Asked right after someone buys a yearly plan.
     renewalPrompt: {
       title: "Remind you before it renews?",

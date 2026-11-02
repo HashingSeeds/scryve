@@ -26,6 +26,7 @@ import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
 import type { NextPageState } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { ProSignInNote, useProSignIn } from "@/features/billing/ProSignIn"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
@@ -759,6 +760,7 @@ function NewGameForm({
   function closeAppearancePicker() {
     setAppearanceSeat(undefined)
     setAppearanceDraft(undefined)
+    pro.dismiss()
   }
 
   async function presentPaywall() {
@@ -768,11 +770,14 @@ function NewGameForm({
   }
 
   function openPaywall() {
-    if (!auth.isSignedIn) {
-      closeAppearancePicker()
-      auth.openAuth()
-    } else if (Platform.OS === "ios") setPaywall("waitingForDismiss")
+    if (appearanceSeat !== undefined && Platform.OS === "ios") setPaywall("waitingForDismiss")
     else void presentPaywall()
+  }
+  const pro = useProSignIn(openPaywall)
+
+  function signInForPro() {
+    closeAppearancePicker()
+    pro.signIn()
   }
 
   function saveAppearance() {
@@ -1414,9 +1419,10 @@ function NewGameForm({
             proShapes={PRO_MARK_SHAPES}
             proLocked={!billing.isCountPro}
             foil={billing.isFoil}
-            onLockedPress={openPaywall}
+            onLockedPress={pro.request}
             onChange={setAppearanceDraft}
           />
+          {pro.explaining ? <ProSignInNote onSignIn={signInForPro} /> : null}
           <View style={themed($dialogActions)}>
             <Button
               tx="common:cancel"

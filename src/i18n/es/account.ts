@@ -52,7 +52,6 @@ export default {
       lockedPro: "{{name}}, Scryve Pro",
       foilHeading: "Scryve Foil",
       opensPro: "Abre Scryve Pro",
-      opensSignIn: "Abre el inicio de sesión",
       proFailed: "No se pudo comprobar Scryve Pro, así que los iconos Pro están bloqueados.",
       names: {
         Default: "Predeterminado",
@@ -300,6 +299,8 @@ export default {
       "Las funciones conectadas no están disponibles en esta versión. El juego local sigue disponible.",
   },
   billing: {
+    proNeedsAccount:
+      "Scryve Pro está vinculado a una cuenta. Inicia sesión para obtener Pro o usar el Pro que ya tienes.",
     renewalPrompt: {
       title: "¿Quieres que te avisemos antes de la renovación?",
       body: "Recibe una notificación 3 días antes de tu próximo cobro anual.",

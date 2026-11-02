@@ -9,6 +9,7 @@ import {
 
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { ProSignInNote, useProSignIn } from "@/features/billing/ProSignIn"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -108,6 +109,7 @@ export function AppIconPicker() {
   const planFailed = planLoading && !billing.isLoading && Boolean(billing.error)
   const [current, setCurrent] = useState(() => (supportsAlternateIcons ? getAppIconName() : null))
   const [error, setError] = useState("")
+  const pro = useProSignIn(() => void billing.presentPaywall())
   if (!supportsAlternateIcons) return null
 
   async function choose(name: AppIconName | null) {
@@ -164,23 +166,14 @@ export function AppIconPicker() {
         accessibilityLabel={
           locked ? translate("account:settings.appIcon.lockedPro", { name: label }) : label
         }
-        accessibilityHint={
-          locked
-            ? translate(
-                auth.isSignedIn
-                  ? "account:settings.appIcon.opensPro"
-                  : "account:settings.appIcon.opensSignIn",
-              )
-            : undefined
-        }
+        accessibilityHint={locked ? translate("account:settings.appIcon.opensPro") : undefined}
         accessibilityState={{ selected, disabled }}
         disabled={disabled}
         activeOpacity={0.75}
         style={[$option, (locked || lapsed) && $locked]}
         onPress={() => {
           if (!locked) void choose(name)
-          else if (auth.isSignedIn) void billing.presentPaywall()
-          else auth.openAuth()
+          else pro.request()
         }}
       >
         {/* why: release builds label bundled images with their asset path, which VoiceOver would read. */}
@@ -211,6 +204,7 @@ export function AppIconPicker() {
           <View style={themed($row)}>{foilOptions.map(renderOption)}</View>
         </>
       ) : null}
+      {pro.explaining ? <ProSignInNote onSignIn={pro.signIn} /> : null}
       {planFailed ? <Text size="xs" tx="account:settings.appIcon.proFailed" /> : null}
       {error ? <Text accessibilityRole="alert" size="xs" text={error} /> : null}
     </View>
