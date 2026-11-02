@@ -4,6 +4,7 @@ import { v } from "convex/values"
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
 import { eventClock, eventPoints, eventTableResult } from "./lib/events/validators"
 import { feedbackFix, feedbackKind } from "./lib/feedback"
+import { lifeEditingValidator } from "./lib/gameRules"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { pokemonBoardValidator } from "./lib/table"
@@ -127,6 +128,8 @@ export default defineSchema({
     format: v.optional(v.string()),
     variant: v.optional(gameVariantValidator),
     layout: v.optional(playerGridLayoutValidator),
+    // why: missing means only a seat's owner edits it, which is how every game before this field played.
+    lifeEditing: v.optional(lifeEditingValidator),
     createdAt: v.number(),
     startedAt: v.optional(v.number()),
     updatedAt: v.number(),
@@ -167,6 +170,8 @@ export default defineSchema({
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    // why: a seat's app that predates editing any seat leaves this unset, so its game stays owner-only.
+    editsAnySeat: v.optional(v.boolean()),
     lastWrite: v.optional(
       v.object({
         actorUserId: v.id("users"),
