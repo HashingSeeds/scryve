@@ -47,7 +47,7 @@ const config: GoldieConfig = {
     copyBand: 0.16,
     copyScale: 0.95,
     // why: two player boards put an upside-down seat on top, so their tiles show the whole device or its bottom half.
-    template: ["hero", "trio", "classic", "tilt", "offset", "copy-below", "tilt-right"],
+    template: ["hero", "classic", "tilt", "offset", "copy-below", "classic", "tilt-right"],
   },
 
   store: {
@@ -72,17 +72,6 @@ const config: GoldieConfig = {
       flow: "store-01-connected",
       headline: { "en-US": "Local or connected" },
       subhead: { "en-US": "Starts on your phone. Connect with a code." },
-    },
-    {
-      kind: "screenshot",
-      id: "games",
-      flow: "store-game-mtg",
-      // why: trio is a three device layout in the mchisolm0/goldie fork; Magic sits in front.
-      layout: "trio",
-      secondScene: "game-ygo",
-      thirdScene: "game-pokemon",
-      headline: { "en-US": "Your game, covered" },
-      subhead: { "en-US": "Pick your game. More on the way." },
     },
     {
       kind: "screenshot",
@@ -112,9 +101,13 @@ const config: GoldieConfig = {
       headline: { "en-US": "Every game saved" },
       subhead: { "en-US": "Local and connected games, one history." },
     },
-    // why: these boards recolor seats 1 and 2, which carries over; six-players restores them.
-    { kind: "capture", id: "game-ygo", flow: "store-game-ygo" },
-    { kind: "capture", id: "game-pokemon", flow: "store-game-pokemon" },
+    {
+      kind: "screenshot",
+      id: "pokemon",
+      flow: "store-game-pokemon",
+      headline: { "en-US": "HP, card by card" },
+      subhead: { "en-US": "Pick your Active. HP stays up front." },
+    },
     {
       kind: "screenshot",
       id: "six-players",
