@@ -12,6 +12,13 @@ export interface LifeCardContentInsets extends Record<LifeCardEdge, number> {
 
 export type LifeCardScreenEdges = Record<LifeCardEdge, boolean>
 
+/** why: a full-seat overlay lays out whole rows and grids, so instead of stepping one row around a corner camera hole it stops at the hole's side, as screens stop at the iPhone Duo's rail. */
+export function clearOfCutout(insets?: LifeCardContentInsets): LifeCardContentInsets | undefined {
+  if (!insets?.cutout) return insets
+  const { cutout, ...edges } = insets
+  return { ...edges, [cutout.edge]: Math.max(edges[cutout.edge], cutout.size) }
+}
+
 export function lifeCardContentInsetStyle(insets?: LifeCardContentInsets): {
   paddingTop: number
   paddingBottom: number

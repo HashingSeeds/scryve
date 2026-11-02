@@ -200,8 +200,8 @@ describe("PokemonSeatCard", () => {
 
       const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
       const bench = StyleSheet.flatten(screen.getByTestId("pokemon-bench-seat-1").props.style)
-      expect((layer.paddingLeft as number) + (bench.marginHorizontal as number)).toBe(left)
-      expect((layer.paddingRight as number) + (bench.marginHorizontal as number)).toBe(right)
+      expect((layer.paddingLeft as number) + (bench.marginLeft as number)).toBe(left)
+      expect((layer.paddingRight as number) + (bench.marginRight as number)).toBe(right)
     },
   )
 
@@ -575,6 +575,34 @@ describe("PokemonSeatCard", () => {
     )
     expect(row().fromEdge).toBe(47)
   })
+
+  it.each([
+    [180, { edge: "right", side: "top" }, "seat-identity-seat-1", "marginLeft"],
+    [180, { edge: "right", side: "top" }, "pokemon-bench-seat-1", "marginLeft"],
+    [-90, { edge: "top", side: "right" }, "pokemon-prizes-seat-1", "marginRight"],
+    [-90, { edge: "top", side: "right" }, "pokemon-bench-seat-1", "marginRight"],
+  ] as const)(
+    "steps a %s seat's corner past a camera hole",
+    (contentRotation, cutout, testID, margin) => {
+      const table = pokemonTable(["Ada", "Grace"])
+      const offset = (contentInsets?: PokemonSeatCardProps["contentInsets"]) => {
+        render(
+          <Seat
+            harness={table}
+            seat={0}
+            contentRotation={contentRotation}
+            {...{ contentInsets }}
+          />,
+        )
+        const node = screen.getByTestId(testID, { includeHiddenElements: true })
+        return Number(StyleSheet.flatten(node.props.style)[margin] ?? 0)
+      }
+      const plain = offset()
+      const insets = { top: 0, right: 0, bottom: 0, left: 0, cutout: { ...cutout, size: 84 } }
+
+      expect(offset(insets)).toBe(plain + 84)
+    },
+  )
 
   it("stops taking prizes at 0 and putting them back at 6", () => {
     const table = pokemonTable(["Ada", "Grace"])
