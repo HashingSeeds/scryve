@@ -26,6 +26,9 @@ steps:
       - when: { visible: { id: abandon-game-button } }
         steps:
           - tap: { id: abandon-game-button }
+          - echo: Let the dialog finish closing so its Abandon text doesn't match below
+          - wait: 1500
+          - await: { idle: true }
       - echo: A connected game ends through "Who won?", whose Abandon has no id
       - when: { visible: { text: Abandon } }
         steps:
