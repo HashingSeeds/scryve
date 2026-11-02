@@ -81,6 +81,7 @@ import {
   LIFE_TARGET_SIZE,
   clearOfCutout,
   cornerOffset,
+  cornerStep,
   useCornerSlide,
   CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
@@ -1267,9 +1268,12 @@ export function seatIdentityPlacement({
     insets?.cutout?.edge === rightEdge && insets.cutout.side === bottomEdge
       ? insets.cutout.size - CUTOUT_ENDS_INSIDE_INSET
       : 0
-  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
+  const farTab = cornerStep(insets?.tabCorners ?? [], rightEdge, bottomEdge)
+  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout. A long name or its chips stop short of a first-player tab at the far end.
   const rowMaxWidth =
-    run && !tucked ? Math.max(run - left - Math.max(left, farCutout), 0) : position.maxWidth
+    run && !tucked
+      ? Math.max(run - left - Math.max(left, farCutout, farTab && gap + farTab), 0)
+      : position.maxWidth
   return { layer, position, rowMaxWidth, trailing }
 }
 

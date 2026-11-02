@@ -51,6 +51,7 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatO
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   clearOfCutout,
+  cornerObstacles,
   cornerOffset,
   cornerStep,
   useCornerSlide,
@@ -191,11 +192,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     : seatIdentityBottomGap(identityMetrics.edge, insets.bottom, edges.bottom) - padding
   // why: the board drops a corner camera hole's side inset, so the identity and prizes step along their row past whatever sits in their corner, as a life card's corners do. The bench sits deeper than a first-player tab reaches, so only the hole moves it.
   const cornerChromeStep = (side: "left" | "right") =>
-    cornerStep(contentInsets, edges[side], edges.bottom)
+    cornerStep(cornerObstacles(contentInsets), edges[side], edges.bottom)
   const cornerSlide = useCornerSlide()
-  const hole = contentInsets?.cutout
   const benchStep = (side: "left" | "right") =>
-    hole?.edge === edges[side] && hole.side === edges.bottom ? hole.size : 0
+    cornerStep([contentInsets?.cutout], edges[side], edges.bottom)
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)

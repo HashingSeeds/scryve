@@ -880,6 +880,36 @@ describe("LifeCard", () => {
     ).toBeUndefined()
   })
 
+  it("ends a long name's row short of a first-player tab at its far end", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 3"
+          seatNumber={3}
+          life={40}
+          color="#41476E"
+          compact
+          contentRotation={90}
+          contentInsets={{
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            tabCorners: [{ edge: "bottom", side: "left", size: 28 }],
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-3"), "layout", {
+      nativeEvent: { layout: { width: 157, height: 185 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style),
+    ).toMatchObject({ maxWidth: 185 - 12 - (12 + 28) })
+  })
+
   it("keeps room for the name when a side notch is not at the card's middle", () => {
     const view = render(
       <ThemeProvider initialContext="dark">

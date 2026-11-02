@@ -68,20 +68,23 @@ export function cornerOffset(
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
 ) {
-  const step = cornerStep(insets, edge, side)
+  const step = cornerStep(cornerObstacles(insets), edge, side)
   if (step > 0) return gap + step
   const inset = insets?.[edge] ?? 0
   const screenCorner = !!screenEdges?.[edge] && !!screenEdges[side]
   return screenCorner ? Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE)) : gap + inset
 }
 
+export function cornerObstacles(insets?: LifeCardContentInsets) {
+  return [insets?.cutout, ...(insets?.tabCorners ?? [])]
+}
+
 /** why: corner chrome steps along its row past whatever sits in its corner, a camera hole or a first-player tab. */
 export function cornerStep(
-  insets: LifeCardContentInsets | undefined,
+  corners: readonly (LifeCardCorner | undefined)[],
   edge: LifeCardEdge,
   side: LifeCardEdge,
 ) {
-  const corners = [insets?.cutout, ...(insets?.tabCorners ?? [])]
   return Math.max(
     0,
     ...corners.map((corner) => (corner?.edge === edge && corner.side === side ? corner.size : 0)),
