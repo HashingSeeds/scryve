@@ -1,4 +1,7 @@
 import { Platform } from "react-native"
+import { LinearTransition, ReduceMotion } from "react-native-reanimated"
+
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 export type LifeCardContentRotation = -90 | 0 | 90 | 180
 export type LifeCardMenuCorner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight"
@@ -6,8 +9,16 @@ export type LifeCardMenuEdge = "top" | "bottom" | "left" | "right"
 
 export type LifeCardEdge = "top" | "bottom" | "left" | "right"
 
+export interface LifeCardCorner {
+  edge: LifeCardEdge
+  side: LifeCardEdge
+  size: number
+}
+
 export interface LifeCardContentInsets extends Record<LifeCardEdge, number> {
-  cutout?: { edge: LifeCardEdge; side: LifeCardEdge; size: number }
+  cutout?: LifeCardCorner
+  // why: tabs are shallower than a camera hole, so the bench and full-seat overlays would give up room for nothing if they cleared them too.
+  tabCorners?: readonly LifeCardCorner[]
 }
 
 export type LifeCardScreenEdges = Record<LifeCardEdge, boolean>
@@ -57,10 +68,35 @@ export function cornerOffset(
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
 ) {
-  if (insets?.cutout?.edge === edge && insets.cutout.side === side) return gap + insets.cutout.size
+  const step = cornerStep(cornerObstacles(insets), edge, side)
+  if (step > 0) return gap + step
   const inset = insets?.[edge] ?? 0
   const screenCorner = !!screenEdges?.[edge] && !!screenEdges[side]
   return screenCorner ? Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE)) : gap + inset
+}
+
+export function cornerObstacles(insets?: LifeCardContentInsets) {
+  return [insets?.cutout, ...(insets?.tabCorners ?? [])]
+}
+
+/** why: corner chrome steps along its row past whatever sits in its corner, a camera hole or a first-player tab. */
+export function cornerStep(
+  corners: readonly (LifeCardCorner | undefined)[],
+  edge: LifeCardEdge,
+  side: LifeCardEdge,
+) {
+  return Math.max(
+    0,
+    ...corners.map((corner) => (corner?.edge === edge && corner.side === side ? corner.size : 0)),
+  )
+}
+
+// why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
+const CORNER_SLIDE = LinearTransition.duration(220).reduceMotion(ReduceMotion.Never)
+
+/** why: corner chrome slides back when the first-player tabs leave instead of jumping. Web layout transitions animate a size change by scaling the row, which stretches the name whenever a chip comes or goes, so web moves it at once. */
+export function useCornerSlide() {
+  return useReducedMotion() === false && Platform.OS !== "web" ? CORNER_SLIDE : undefined
 }
 
 export const LIFE_GLYPH_LINE_HEIGHT = 50

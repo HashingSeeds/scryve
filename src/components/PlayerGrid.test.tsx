@@ -12,6 +12,7 @@ import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
+import { FIRST_PLAYER_TAB, FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
 import { LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import {
@@ -577,6 +578,25 @@ describe("PlayerGrid", () => {
   ])("reads a portrait side inset as a corner camera hole", ({ insets, cutout }) => {
     expect(getCornerCutout(insets, { width: 466, height: 678 })).toEqual(cutout)
     expect(getCornerCutout(insets, { width: 678, height: 466 })).toBeUndefined()
+  })
+
+  it("steps a seat's mark past the first-player tab beside it while the tabs show", () => {
+    const grid = (tabsShown: boolean) => (
+      <ThemeProvider initialContext="dark">
+        <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+          <PlayerGrid players={players(4)} onChange={jest.fn()} />
+        </FirstPlayerTabsShownContext.Provider>
+      </ThemeProvider>
+    )
+    const view = render(grid(false))
+    const markFromSeam = () =>
+      Number(StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style).left)
+    const resting = markFromSeam()
+
+    view.rerender(grid(true))
+    expect(markFromSeam()).toBe(resting + FIRST_PLAYER_TAB.length / 2)
+    view.rerender(grid(false))
+    expect(markFromSeam()).toBe(resting)
   })
 
   it("squares only the corners that meet the device's rounded screen corners", () => {

@@ -81,6 +81,8 @@ import {
   LIFE_TARGET_SIZE,
   clearOfCutout,
   cornerOffset,
+  cornerStep,
+  useCornerSlide,
   CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
@@ -201,6 +203,7 @@ export const LifeCard = memo(function LifeCard({
   const diceChips = dice?.chips
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
+  const cornerSlide = useCornerSlide()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
   const locked = !!out && out.cause !== "life"
@@ -930,9 +933,10 @@ export const LifeCard = memo(function LifeCard({
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          <View
+          <Animated.View
             testID={`life-identity-row-seat-${seatNumber}`}
             pointerEvents="box-none"
+            layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
                 current?.x === layout.x && current.y === layout.y
@@ -1014,7 +1018,7 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
-          </View>
+          </Animated.View>
           {calculatorButtonShown ? (
             <BoardPressable
               testID={`life-calculator-open-seat-${seatNumber}`}
@@ -1264,9 +1268,12 @@ export function seatIdentityPlacement({
     insets?.cutout?.edge === rightEdge && insets.cutout.side === bottomEdge
       ? insets.cutout.size - CUTOUT_ENDS_INSIDE_INSET
       : 0
-  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
+  const farTab = cornerStep(insets?.tabCorners ?? [], rightEdge, bottomEdge)
+  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout. A long name or its chips stop short of a first-player tab at the far end.
   const rowMaxWidth =
-    run && !tucked ? Math.max(run - left - Math.max(left, farCutout), 0) : position.maxWidth
+    run && !tucked
+      ? Math.max(run - left - Math.max(left, farCutout, farTab && gap + farTab), 0)
+      : position.maxWidth
   return { layer, position, rowMaxWidth, trailing }
 }
 

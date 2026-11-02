@@ -1,7 +1,7 @@
-import { memo } from "react"
+import { createContext, memo } from "react"
 import type { ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated"
+import Animated, { Easing, Keyframe, ReduceMotion } from "react-native-reanimated"
 
 import type { DiceTool } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
@@ -28,10 +28,40 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 56
 const TAB_DEPTH = 40
-const TAB_BORDER = 2
+export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
+/** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
+export const FirstPlayerTabsShownContext = createContext(false)
+const TAB_BORDER = 4
 const GLYPH_SIZE = 22
-// why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
-const TAB_ENTERING = FadeIn.delay(260).duration(180).reduceMotion(ReduceMotion.Never)
+const TAB_ENTER_DELAY_MS = 260
+const TAB_SLIDE_MS = 200
+
+/** why: a tab slides out of its edge when it appears and back into it when it goes, while the marks beside it slide into the room it leaves. Reanimated reads the system setting only at startup, so the live preference gates these instead. */
+function edgeSlides(edge: BoardEdge) {
+  const tuckedBy = (share: number) => ({
+    transform: [
+      { translateX: (edge === "left" ? -TAB_DEPTH : edge === "right" ? TAB_DEPTH : 0) * share },
+      { translateY: (edge === "top" ? -TAB_DEPTH : edge === "bottom" ? TAB_DEPTH : 0) * share },
+    ],
+  })
+  return {
+    // why: web keyframes only take named ease-in curves, so the ease-out is drawn as a midpoint: an ease-out quad has three quarters of the way behind it halfway through.
+    entering: new Keyframe({ 0: tuckedBy(1), 50: tuckedBy(0.25), 100: tuckedBy(0) })
+      .delay(TAB_ENTER_DELAY_MS)
+      .duration(TAB_SLIDE_MS)
+      .reduceMotion(ReduceMotion.Never),
+    exiting: new Keyframe({ 0: tuckedBy(0), 100: { ...tuckedBy(1), easing: Easing.quad } })
+      .duration(TAB_SLIDE_MS)
+      .reduceMotion(ReduceMotion.Never),
+  }
+}
+
+const EDGE_SLIDES = {
+  left: edgeSlides("left"),
+  right: edgeSlides("right"),
+  top: edgeSlides("top"),
+  bottom: edgeSlides("bottom"),
+} satisfies Record<BoardEdge, ReturnType<typeof edgeSlides>>
 
 /** why: the tool needs no words, so each copy can sit at an edge and turn toward whoever is nearest. Every copy runs the same action, so screen readers and keyboards get only the first. */
 export const FirstPlayerTabs = memo(function FirstPlayerTabs({
@@ -54,7 +84,8 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
         return (
           <Animated.View
             key={`${tab.edge}:${tab.at}`}
-            entering={animateFully ? TAB_ENTERING : undefined}
+            entering={animateFully ? EDGE_SLIDES[tab.edge].entering : undefined}
+            exiting={animateFully ? EDGE_SLIDES[tab.edge].exiting : undefined}
             aria-hidden={!primary}
             accessibilityElementsHidden={!primary}
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}

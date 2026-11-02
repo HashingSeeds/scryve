@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useContext, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
@@ -30,6 +30,7 @@ import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
+import { FIRST_PLAYER_TAB, FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -41,6 +42,7 @@ import {
   TUCKS_INTO_SCREEN_CORNERS,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
+  type LifeCardCorner,
   type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
@@ -53,6 +55,7 @@ import {
   getPlayerGridRowFlex,
   getPlayerGridRows,
 } from "./playerGridGeometry"
+import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
@@ -311,6 +314,9 @@ export function PlayerGrid({
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
+  const tabRow = useContext(FirstPlayerTabsShownContext)
+    ? (menuJunction?.boundary ?? fallbackMenuBoundary)
+    : null
   const boardSeats = commanderDamage
     ? commanderBoardSeats(
         seatedRows,
@@ -410,6 +416,7 @@ export function PlayerGrid({
                 left: screenEdges.left ? insets.left : 0,
                 right: screenEdges.right ? insets.right : 0,
                 cutout: seatCutout(cutout, contentRotation, screenEdges),
+                tabCorners: seatTabCorners(tabRow, rowIndex, contentRotation, screenEdges),
               }
               const fallbackMenu =
                 fallbackMenuBoundary === null
@@ -741,6 +748,28 @@ function seatCutout(
   return facesCutoutSide
     ? { edge: "top", side: cutout.edge, size: cutout.size }
     : { edge: cutout.edge, side: "top", size: cutout.size }
+}
+
+/** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
+function seatTabCorners(
+  tabRow: number | null,
+  rowIndex: number,
+  rotation: LifeCardContentRotation,
+  screenEdges: Record<LifeCardEdge, boolean>,
+): LifeCardCorner[] | undefined {
+  if (tabRow === null) return undefined
+  const seam = rowIndex === tabRow ? "top" : rowIndex === tabRow - 1 ? "bottom" : null
+  if (!seam) return undefined
+  const rowEdge = CONTENT_EDGES[rotation].bottom
+  return (["left", "right"] as const)
+    .filter((side) => screenEdges[side])
+    .flatMap((side): LifeCardCorner[] =>
+      rowEdge === seam
+        ? [{ edge: side, side: seam, size: FIRST_PLAYER_TAB.depth }]
+        : rowEdge === side
+          ? [{ edge: seam, side, size: FIRST_PLAYER_TAB.length / 2 }]
+          : [],
+    )
 }
 
 /** why: on web, pass the insets. The page only reaches a rounded screen corner where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
