@@ -138,6 +138,12 @@ async function scryfallSearchData(ctx: ActionCtx, query: string): Promise<unknow
   return Array.isArray(payload?.data) ? payload.data : []
 }
 
+const scryfallWords = (query: string) =>
+  query
+    .replace(/[^\s()]*[:<>=]+(?:"[^"]*"|[^\s()]*)/g, " ")
+    .replace(/[()"]|(?:^|\s)(?:and|or)(?=\s|$)/gi, " ")
+    .trim()
+
 function printedName(card: unknown) {
   const record = objectRecord(card)
   const name = record?.printed_name ?? record?.name
@@ -178,11 +184,12 @@ async function searchScryfall(
   await requireActionCapability(ctx, "mtg", "cardCatalog")
   await limitCardLookup(ctx, deviceId)
   let data = await scryfallSearchData(ctx, query)
-  if (!data.length && !/\blang:/i.test(query)) {
+  const words = scryfallWords(query)
+  if (!data.length && !/\blang:/i.test(query) && /[^\p{ASCII}]/u.test(words)) {
     const printed = await scryfallSearchData(ctx, `(${query}) lang:any`)
     data = await englishPrintings(
       ctx,
-      rankByName(printed, query, printedName).slice(0, MAX_SEARCH_RESULTS),
+      rankByName(printed, words, printedName).slice(0, MAX_SEARCH_RESULTS),
     )
   }
   const cards = data

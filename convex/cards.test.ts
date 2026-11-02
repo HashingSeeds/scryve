@@ -1261,7 +1261,9 @@ describe("search by printed name", () => {
       })
     })
 
-    const cards = await makeConvexTest().action(api.cards.search, { query: "稲妻" })
+    const cards = await makeConvexTest().action(api.cards.search, {
+      query: "(稲妻) is:commander f:commander",
+    })
 
     expect(cards.map((card) => [card.name, "scryfallId" in card && card.scryfallId])).toEqual([
       ["Lightning Bolt", bolt],
@@ -1270,6 +1272,17 @@ describe("search by printed name", () => {
     expect(collectionBodies).toEqual([
       { identifiers: [{ oracle_id: "oracle-bolt" }, { oracle_id: "oracle-arc" }] },
     ])
+  })
+
+  it("searches Scryfall once when an English name finds nothing", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(() => response({ object: "error" }, 404))
+
+    await expect(
+      makeConvexTest().action(api.cards.search, { query: "Lightnig Bolt" }),
+    ).resolves.toEqual([])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
   it("finds Yu-Gi-Oh cards typed in hiragana without ・ and stores their English names", async () => {
