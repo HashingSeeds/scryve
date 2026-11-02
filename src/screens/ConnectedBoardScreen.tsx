@@ -666,6 +666,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const active = game.status === "active"
   const finished = game.status === "finished"
 
+  const anySeat = game.lifeEditing === "anyone"
   const controlled = useMemo(
     () =>
       new Set(
@@ -747,7 +748,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     if (
       !active ||
       controls.current().connectionStatus !== "connected" ||
-      !controlled.has(player.id)
+      !(anySeat || controlled.has(player.id))
     )
       return
     attackDispatch({ type: "press", playerId: player.id })
@@ -940,8 +941,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onOpenRule={(ruleId) => system && onRules?.(system, ruleId)}
             layoutVariant={layoutVariant}
             disabled={!active || overlayOpen}
-            isPlayerDisabled={(player) => !controlled.has(player.id)}
-            isPlayerOwned={(player) => controlled.has(player.id)}
+            {...(anySeat
+              ? {}
+              : {
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
+                })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
             }

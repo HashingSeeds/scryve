@@ -78,6 +78,7 @@ export interface LanSessionState {
   seatKey?: string
   serviceName?: string
   partners?: boolean
+  hostEditsAnySeat?: boolean
   error?: string
 }
 
@@ -384,7 +385,7 @@ export class LanSession {
           const previous = this.peers.get(seatKey)
           this.peers.set(seatKey, peer)
           previous?.close()
-          peer.send({ type: "welcome", pass: admitted.pass, partners: true })
+          peer.send({ type: "welcome", pass: admitted.pass, partners: true, editsAnySeat: true })
           return this.publish(admitted.game)
         }
         if (!seatKey) return
@@ -573,6 +574,7 @@ export class LanSession {
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
       variants: ["treachery"],
+      editsAnySeat: true,
       ...(this.pass ? { pass: this.pass } : {}),
     })
     const ping = () => {
@@ -600,7 +602,11 @@ export class LanSession {
     if (message.type === "welcome") {
       this.pass = message.pass
       save(PASS_KEY, { service: this.state.serviceName, ...message.pass })
-      return this.set({ seatKey: message.pass.key, partners: message.partners === true })
+      return this.set({
+        seatKey: message.pass.key,
+        partners: message.partners === true,
+        hostEditsAnySeat: message.editsAnySeat === true,
+      })
     }
     if (message.type === "pong")
       return this.latency.clockSample(message.at, Date.now(), message.hostAt)

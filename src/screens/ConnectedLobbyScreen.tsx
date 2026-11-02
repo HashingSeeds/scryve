@@ -108,6 +108,14 @@ function ConnectedLobbyContent({
   const [savingSettings, setSavingSettings] = useState(false)
   const settingsInFlight = useRef(false)
   const start = useMutation(api.games.startGame)
+  const noteAnySeatSupport = useMutation(api.games.noteAnySeatSupport)
+  const unmarkedSeat =
+    lobby?.status === "lobby" &&
+    lobby.players.some((player) => player.controlledByMe && !player.editsAnySeat)
+  useEffect(() => {
+    if (unmarkedSeat && isWebSocketConnected)
+      noteAnySeatSupport({ publicId, deviceId }).catch(() => undefined)
+  }, [deviceId, isWebSocketConnected, noteAnySeatSupport, publicId, unmarkedSeat])
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
   const convex = useConvex()
@@ -324,6 +332,9 @@ function ConnectedLobbyContent({
         manualCode ? { text: manualCode, label: translate("connected:invite.code") } : undefined
       }
       online={isWebSocketConnected}
+      outdatedNames={lobby.players
+        .filter((player) => !player.controlledByMe && !player.editsAnySeat)
+        .map((player) => player.displayName)}
       offlineNotice={onlineOnlyNotice("start")}
       exitOfflineNotice={onlineOnlyNotice("exit")}
       error={actionError}

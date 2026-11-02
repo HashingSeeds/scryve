@@ -372,6 +372,8 @@ export default {
     },
   },
   lobby: {
+    outdatedApps_other:
+      "{{names}}のScryveが古いため、全員が席を自由に編集することはまだできません。このまま開始することもできます。その場合、各プレイヤーは自分の席だけを変更できます。",
     title: "ロビー",
     loadingLabel: "ロビーを読み込み中",
     loading: "ロビーを読み込み中…",

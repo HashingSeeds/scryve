@@ -176,6 +176,7 @@ function ConnectedHostQuerySource({
         hostDisplayName: connectedProfile.profile.displayName,
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
+        editsAnySeat: true,
       })
       requestSucceeded = true
       captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })

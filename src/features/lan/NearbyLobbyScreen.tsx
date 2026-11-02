@@ -26,12 +26,14 @@ const selectLobbyScreen = ({
   status,
   error,
   serviceName,
+  hostEditsAnySeat,
 }: LanSessionState) => ({
   lobby,
   role,
   status,
   error,
   serviceName,
+  hostEditsAnySeat,
   players: projection?.players.map(({ currentLife: _currentLife, ...player }) => player),
 })
 
@@ -56,7 +58,8 @@ export function NearbyLobbyScreen({
   onManageDecks?: () => void
   onAddDeck?: () => void
 }) {
-  const { lobby, players, role, status, error, serviceName } = useLanSessionSlice(selectLobbyScreen)
+  const { lobby, players, role, status, error, serviceName, hostEditsAnySeat } =
+    useLanSessionSlice(selectLobbyScreen)
   const [sharedDecks] = useState(loadSharedDecks)
 
   const startedRound = useRef(lobby?.status === "active" ? lobby.round : undefined)
@@ -111,6 +114,15 @@ export function NearbyLobbyScreen({
   const isHost = role === "host"
   const code = serviceName ? nearbyGameCode(serviceName) : undefined
   const away = new Set(lobby.seats.filter((seat) => !seat.connected).map((seat) => seat.key))
+  // why: a host from before editing any seat sends no seat flags at all, so only the host can be named.
+  const outdatedNames =
+    lobby.status === "active"
+      ? []
+      : hostEditsAnySeat === false
+        ? lobby.seats.filter((seat) => seat.seat === 1).map((seat) => seat.name)
+        : players
+            .filter((player) => !player.controlledByMe && !player.editsAnySeat)
+            .map((player) => player.displayName)
   return (
     <LobbyView
       lobby={{
@@ -127,6 +139,7 @@ export function NearbyLobbyScreen({
           : undefined
       }
       online={isHost || status === "connected"}
+      outdatedNames={outdatedNames}
       invite={code ? { qrPayload: buildInviteQrPayload("", code), manualCode: code } : undefined}
       offlineNotice={translate("connected:nearby.reconnecting")}
       error={error}

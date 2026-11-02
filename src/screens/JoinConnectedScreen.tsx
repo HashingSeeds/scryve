@@ -162,6 +162,7 @@ export function JoinConnectedScreen({
         deviceId,
         systems: PLAYABLE_SYSTEMS,
         variants: PLAYABLE_VARIANTS,
+        editsAnySeat: true,
       })
       if (!result) throw new Error(translate("connected:join.invalidInvite"))
       requestSucceeded = true
